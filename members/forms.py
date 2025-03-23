@@ -5,9 +5,11 @@ class MemberForm(forms.ModelForm):
     class Meta:
         model = Member
         fields = [
-            'SSA_member_number', 'first_name', 'last_name', 'email', 'phone',
-            'address', 'city', 'state', 'zip_code', 'is_instructor',
-            'is_duty_officer', 'is_assistant_duty_officer', 'membership_status'
+            "username", "email", "first_name", "last_name",  # default user fields
+            "SSA_member_number", "phone", "address", "city", "state", "zip_code",
+            "glider_rating", "is_instructor", "is_duty_officer", "is_assistant_duty_officer",
+            "secretary", "treasurer", "webmaster", "glider_owned", "second_glider_owned",
+            "joined_club", "emergency_contact", "public_notes", "private_notes"
         ]
         widgets = {
             'SSA_member_number': forms.TextInput(attrs={'placeholder': 'SSA Member Number'}),

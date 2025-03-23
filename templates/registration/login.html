@@ -11,5 +11,10 @@
         {{ form.as_p }}
         <button type="submit">Login</button>
     </form>
+    <h2>Login with Google</h2>
+    <a href="{% url 'social:begin' 'google-oauth2' %}?next={{ request.GET.next|urlencode }}">
+    <img src="https://developers.google.com/identity/images/btn_google_signin_dark_normal_web.png" alt="Sign in with Google">
+    </a>
 </body>
 </html>
+

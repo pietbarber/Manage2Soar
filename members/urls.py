@@ -14,4 +14,6 @@ urlpatterns = [
     path("", views.member_list, name="member_list"),
     path('<int:member_id>/edit/', member_edit, name='member_edit'),
     path('tinymce/', include('tinymce.urls')),
+    path('oauth/', include('social_django.urls', namespace='social')),
+
 ]

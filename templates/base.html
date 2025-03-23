@@ -18,7 +18,10 @@
                         <span class="nav-link">Welcome, {{ user.get_full_name|default:user.username }}</span>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'logout' %}">Log out</a>
+                        <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link nav-link" style="display:inline; padding:0;">Log out</button>
+                        </form>
                     </li>
                 {% else %}
                     <li class="nav-item">

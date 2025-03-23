@@ -1,11 +1,8 @@
 from django.contrib import admin
-
-# Register your models here.
-from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 from .models import Member
 
-class MemberAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'email', 'glider_rating')
-    list_filter = ('glider_rating', 'secretary', 'treasurer', 'webmaster')
-
-admin.site.register(Member, MemberAdmin)
+@admin.register(Member)
+class MemberAdmin(UserAdmin):
+    model = Member
+    list_display = ("username", "email", "is_staff", "is_active")
