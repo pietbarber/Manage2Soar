@@ -2,7 +2,12 @@
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Club Members</h2>
+<h2 class="mb-4 d-flex justify-content-between align-items-center">
+    Club Members
+    {% if user.is_staff %}
+        <a href="/admin/members/member/add/" class="btn btn-success btn-sm">➕ Add New Member</a>
+    {% endif %}
+</h2>
 
 <table class="table table-bordered table-hover table-striped">
     <thead class="table-light">
