@@ -1,0 +1,21 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Skyline Soaring</title>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <p>Welcome, {{ user.get_full_name }}! | <a href="{% url 'logout' %}">Log out</a></p>
+    {% else %}
+        <p><a href="{% url 'login' %}">Log in</a></p>
+    {% endif %}
+
+    <hr>
+
+    {% block content %}
+    <!-- Page-specific content goes here -->
+    {% endblock %}
+</body>
+</html>
