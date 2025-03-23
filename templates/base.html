@@ -1,21 +1,42 @@
-<!-- templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Skyline Soaring</title>
+    <title>{% block title %}Skyline Soaring{% endblock %}</title>
+    <!-- Bootstrap 5 CSS from CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    {% if user.is_authenticated %}
-        <p>Welcome, {{ user.get_full_name }}! | <a href="{% url 'logout' %}">Log out</a></p>
-    {% else %}
-        <p><a href="{% url 'login' %}">Log in</a></p>
-    {% endif %}
 
-    <hr>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="#">Skyline Soaring</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <span class="nav-link">Welcome, {{ user.get_full_name|default:user.username }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'logout' %}">Log out</a>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Log in</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
 
+<div class="container">
     {% block content %}
-    <!-- Page-specific content goes here -->
+    <!-- page-specific content here -->
     {% endblock %}
+</div>
+
+<!-- Optional Bootstrap JS for interactivity (dropdowns, etc.) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
