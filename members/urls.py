@@ -1,6 +1,8 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views
+from .views import member_list, member_edit
+
 
 urlpatterns = [
     path('login/', auth_views.LoginView.as_view(), name='login'),
@@ -9,5 +11,7 @@ urlpatterns = [
     path('instructors/', views.instructors_only, name='instructors'),
     path('members/', views.members_list, name='members'),
     path('log_sheets/', views.log_sheets, name='log_sheets'),
+    path('', member_list, name='member_list'),
+    path('<int:member_id>/edit/', member_edit, name='member_edit'),
 ]
 

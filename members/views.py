@@ -1,5 +1,7 @@
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Member
+from .forms import MemberForm
 
 def is_instructor(user):
     return user.is_authenticated and user.is_instructor
@@ -21,3 +23,20 @@ def members_list(request):
 def log_sheets(request):
     return render(request, 'members/log_sheets.html')
 
+@login_required
+def member_list(request):
+    members = Member.objects.all()
+    return render(request, "members/member_list.html", {"members": members})
+
+@login_required
+@user_passes_test(lambda u: u.groups.filter(name='Membership Officers').exists(), login_url='/')
+def member_edit(request, member_id):
+    member = get_object_or_404(Member, id=member_id)
+    if request.method == "POST":
+        form = MemberForm(request.POST, instance=member)
+        if form.is_valid():
+            form.save()
+            return redirect('member_list')
+    else:
+        form = MemberForm(instance=member)
+    return render(request, "members/member_edit.html", {"form": form, "member": member})

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>List of All Active Members</h2>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Address</th>
+            <th>Phone</th>
+            <th>Duties</th>
+            <th>Email</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for member in members %}
+        <tr>
+            <td>{{ member.first_name }} {{ member.last_name }}</td>
+            <td>{{ member.address }}, {{ member.city }}, {{ member.state }} {{ member.zip_code }}</td>
+            <td>{{ member.phone }}</td>
+            <td>
+                {% if member.is_duty_officer %} DO {% endif %}
+                {% if member.is_assistant_duty_officer %} ADO {% endif %}
+            </td>
+            <td><a href="mailto:{{ member.email }}">{{ member.email }}</a></td>
+            <td>
+                <a href="{% url 'member_edit' member.id %}">Edit</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
