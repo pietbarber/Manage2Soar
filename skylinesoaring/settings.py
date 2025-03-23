@@ -77,7 +77,14 @@ ROOT_URLCONF = "skylinesoaring.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        'DIRS': [BASE_DIR / "templates"],  # <- this line is key
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                # default context processors...
+            ],
+        },
+
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
