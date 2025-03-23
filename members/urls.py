@@ -11,7 +11,6 @@ urlpatterns = [
     path('instructors/', views.instructors_only, name='instructors'),
     path('members/', views.members_list, name='members'),
     path('log_sheets/', views.log_sheets, name='log_sheets'),
-    path('', member_list, name='member_list'),
+    path("", views.member_list, name="member_list"),
     path('<int:member_id>/edit/', member_edit, name='member_edit'),
 ]
-

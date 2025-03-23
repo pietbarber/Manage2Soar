@@ -60,3 +60,15 @@ class Member(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.glider_rating})"
+
+class Member(AbstractUser):
+    glider_rating = models.CharField(
+        max_length=10,
+        choices=[
+            ("student", "Student"),
+            ("transition", "Transition"),
+            ("private", "Private"),
+            ("commercial", "Commercial"),
+        ],
+        default="student",
+    )
