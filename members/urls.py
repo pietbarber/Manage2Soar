@@ -1,5 +1,5 @@
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import path, include
 from . import views
 from .views import member_list, member_edit
 
@@ -13,4 +13,5 @@ urlpatterns = [
     path('log_sheets/', views.log_sheets, name='log_sheets'),
     path("", views.member_list, name="member_list"),
     path('<int:member_id>/edit/', member_edit, name='member_edit'),
+    path('tinymce/', include('tinymce.urls')),
 ]
