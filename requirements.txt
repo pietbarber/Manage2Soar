@@ -1,0 +1,5 @@
+django
+psycopg2-binary
+django-tinymce
+python-dotenv
+social-auth-app-django
