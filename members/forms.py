@@ -1,5 +1,7 @@
 from django import forms
+from datetime import date, timedelta
 from .models import Member
+from tinymce.widgets import TinyMCE
 
 class MemberForm(forms.ModelForm):
     class Meta:
@@ -24,12 +26,14 @@ class MemberForm(forms.ModelForm):
           'zip_code',
           'profile_photo',
           'glider_rating',
-          'is_instructor',
-          'is_duty_officer',
-          'is_assistant_duty_officer',
+          'instructor',
+          'duty_officer',
+          'assistant_duty_officer',
           'secretary',
           'treasurer',
           'webmaster',
+          'director',
+          'member_manager',
           'glider_owned',
           'second_glider_owned',
           'joined_club',
@@ -40,64 +44,36 @@ class MemberForm(forms.ModelForm):
         ]
 
         widgets = {
-            'SSA_member_number': forms.TextInput(attrs={'placeholder': 'SSA Member Number'}),
-            'first_name': forms.TextInput(attrs={'placeholder': 'First Name'}),
-            'last_name': forms.TextInput(attrs={'placeholder': 'Last Name'}),
-            'email': forms.EmailInput(attrs={'placeholder': 'Email'}),
-            'phone': forms.TextInput(attrs={'placeholder': 'Phone'}),
-            'address': forms.Textarea(attrs={'placeholder': 'Address'}),
-            'city': forms.TextInput(attrs={'placeholder': 'City'}),
-            'state': forms.TextInput(attrs={'placeholder': 'State'}),
-            'zip_code': forms.TextInput(attrs={'placeholder': 'Zip Code'}),
+            'address': forms.Textarea(attrs={'rows': 2}),
+            'emergency_contact': forms.Textarea(attrs={'rows': 2}),
+            'public_notes': TinyMCE(attrs={'rows': 10}),
+            'private_notes': TinyMCE(attrs={'rows': 10}),
         }
-        labels = {
-            'SSA_member_number': 'SSA Member Number',
-            'first_name': 'First Name',
-            'last_name': 'Last Name',
-            'email': 'Email',
-            'phone': 'Phone',
-            'address': 'Address',
-            'city': 'City',
-            'state': 'State',
-            'zip_code': 'Zip Code',
-        }
-        help_texts = {
-            'SSA_member_number': 'Enter the SSA member number.',
-            'first_name': 'Enter the first name of the member.',
-            'last_name': 'Enter the last name of the member.',
-            'email': 'Enter a valid email address.',
-            'phone': 'Enter the phone number.',
-            'address': 'Enter the address.',
-            'city': 'Enter the city.',
-            'state': 'Enter the state.',
-            'zip_code': 'Enter the zip code.',
-        }
-        error_messages = {
-            'SSA_member_number': {
-                'required': 'SSA Member Number is required.',
-                'unique': 'This SSA Member Number is already in use.',
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        today = date.today()
+        min_date = date(1990, 1, 1)
+        max_date = today + timedelta(days=30)
+
+        self.fields['joined_club'].widget = forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'min': min_date.isoformat(),   # '1990-01-01'
+                'max': max_date.isoformat(),   # e.g. '2025-04-24'
             },
-            'email': {
-                'required': 'Email is required.',
-                'invalid': 'Enter a valid email address.',
-            },
-        }
-        # Add any additional validation or customization as needed
-        # Example: custom validation for unique SSA member number   
-        def clean_SSA_member_number(self):
-            SSA_member_number = self.cleaned_data.get('SSA_member_number')
-            if Member.objects.exclude(pk=self.instance.pk).filter(SSA_member_number=SSA_member_number).exists():
-                raise forms.ValidationError("This SSA Member Number is already in use.")
-            return SSA_member_number
-        # Example: custom validation for email
-        def clean_email(self):
-            email = self.cleaned_data.get('email')
-            if Member.objects.exclude(pk=self.instance.pk).filter(email=email).exists():
-                raise forms.ValidationError("This email is already in use.")
-            return email
-        # Example: custom validation for membership status
-        def clean_membership_status(self):
-            membership_status = self.cleaned_data.get('membership_status')
-            if membership_status not in ['Full Member', 'Student Member', 'Inactive']:
-                raise forms.ValidationError("Invalid membership status.")
-            return membership_status
+            format='%Y-%m-%d'  # 💥 This ensures ISO 8601 display format
+        )
+
+
+
+        # Remove default verbose help text for system fields
+        for field in ['username', 'email', 'first_name', 'last_name']:
+            self.fields[field].help_text = None
+
+        self.fields['glider_owned'].help_text = "e.g. N123AB – Schweizer 1-26"
+        self.fields['profile_photo'].help_text = "Upload a clear, smiling portrait. 😄"
+        self.fields['public_notes'].help_text = "Visible to all members."
+        self.fields['private_notes'].help_text = "Visible only to club officers."

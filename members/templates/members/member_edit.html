@@ -5,13 +5,24 @@
 
 {% block content %}
 <div class="container">
+
   <h2 class="mb-4">Edit Member</h2>
 
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.media }}
 
+
     <div class="row">
+    <div class="mt-4">
+      {% if form.instance.profile_photo %}
+        <img src="{{ form.instance.profile_photo.url }}" height="100" class="mb-2 d-block rounded">
+      {% endif %}
+      {{ form.profile_photo|as_crispy_field }}
+    </div>
+
+    <div class="row">
+
       <div class="col-md-6">
         <h5>Personal Info</h5>
         {{ form.first_name|as_crispy_field }}
@@ -42,40 +53,29 @@
 
       <div class="col-md-6">
         <h5>Roles & Access</h5>
-        {{ form.is_instructor|as_crispy_field }}
-        {{ form.is_duty_officer|as_crispy_field }}
-        {{ form.is_assistant_duty_officer|as_crispy_field }}
+        {{ form.instructor|as_crispy_field }}
+        {{ form.duty_officer|as_crispy_field }}
+        {{ form.assistant_duty_officer|as_crispy_field }}
         {{ form.secretary|as_crispy_field }}
         {{ form.treasurer|as_crispy_field }}
         {{ form.webmaster|as_crispy_field }}
-        {{ form.is_staff|as_crispy_field }}
+        {{ form.director|as_crispy_field }}
+        {{ form.member_manager|as_crispy_field }}
       </div>
     </div>
 
     <div class="mt-4">
-      <h5>Emergency Contact</h5>
       {{ form.emergency_contact|as_crispy_field }}
     </div>
 
     <div class="row mt-4">
       <div class="col-md-6">
-        <h5>Public Notes</h5>
         {{ form.public_notes|as_crispy_field }}
       </div>
       <div class="col-md-6">
-        <h5>Private Notes</h5>
         {{ form.private_notes|as_crispy_field }}
       </div>
     </div>
-
-    <div class="mt-4">
-      <h5>Profile Photo</h5>
-      {% if form.instance.profile_photo %}
-        <img src="{{ form.instance.profile_photo.url }}" height="100" class="mb-2 d-block rounded">
-      {% endif %}
-      {{ form.profile_photo|as_crispy_field }}
-    </div>
-
     <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
   </form>
 </div>
