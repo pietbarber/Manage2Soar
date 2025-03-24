@@ -12,7 +12,17 @@ class Glider(models.Model):
     max_rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.n_number} - {self.make} {self.model}"
+        parts = []
+        if self.competition_number:
+            parts.append(self.competition_number.upper())
+        if self.n_number:
+            parts.append(self.n_number.upper())
+        if self.model:
+            parts.append(self.model)
+        return " ".join(parts)
+
+
+
 class Member(AbstractUser):
     MEMBERSHIP_STATUS_CHOICES = [
         ('Full Member', 'Full Member'),
