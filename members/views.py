@@ -74,7 +74,6 @@ def custom_permission_denied_view(request, exception=None):
 
 from .models import Badge
 
-@login_required
 @active_member_required
 def badge_board(request):
     badges = Badge.objects.prefetch_related('memberbadge_set__member')

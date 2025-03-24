@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h2 class="mb-4">🎖️ SSA Badge Board</h2>
+
+{% for badge in badges %}
+  <div class="mb-4">
+    <h4>
+      <img src="{{ badge.image.url }}" alt="{{ badge.name }}" style="height: 40px;" class="me-2">
+      {{ badge.name }}
+    </h4>
+    <div class="d-flex flex-wrap gap-3">
+      {% for memberbadge in badge.memberbadge_set.all %}
+        <div class="text-center">
+          {% if memberbadge.member.profile_photo %}
+            <img src="{{ memberbadge.member.profile_photo.url }}" class="rounded-circle" style="height: 75px;" alt="{{ memberbadge.member.get_full_name }}">
+          {% else %}
+            <img src="{% static 'images/default-avatar.png' %}" class="rounded-circle" style="height: 75px;" alt="{{ memberbadge.member.get_full_name }}">
+          {% endif %}
+          <div class="small">{{ memberbadge.member.get_full_name }}</div>
+        </div>
+      {% empty %}
+        <p class="text-muted">No recipients yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+{% endfor %}
+
+{% endblock %}
