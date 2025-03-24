@@ -13,32 +13,49 @@
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-4">
-  <div class="container">
-    <a class="navbar-brand d-flex align-items-center" href="{% url 'member_list' %}">
-      <img src="{% static 'images/skylinesoaring-logo.png' %}" alt="Skyline Soaring Logo" height="40" class="me-2">
-      <span>Skyline Soaring Club Members Content</span>
-    </a>
-
-    <ul class="navbar-nav ms-auto align-items-center">
-      {% if user.is_authenticated %}
-        <li class="nav-item d-flex align-items-center">
-          <span class="nav-link mb-0">Welcome, {{ user.get_full_name|default:user.username }}</span>
-        </li>
-        <li class="nav-item d-flex align-items-center">
-          <form method="post" action="{% url 'logout' %}" class="mb-0 ms-2">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{% url 'home' %}">
+        <img src="{% static 'images/skylinesoaring-logo.png' %}" alt="Skyline Logo" height="30" class="d-inline-block align-text-top">
+        Skyline Soaring
+      </a>
+  
+      <!-- Hamburger toggle button -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
+              aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+  
+      <!-- Collapsible links -->
+      <div class="collapse navbar-collapse" id="navbarCollapse">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'member_list' %}">Members</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'duty_roster' %}">Duty Roster</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'log_sheets' %}">Log Sheets</a>
+          </li>
+        </ul>
+  
+        <!-- Right side: Welcome + Logout -->
+        {% if user.is_authenticated %}
+          <span class="navbar-text me-3">
+            Welcome, {{ user.first_name }} {{ user.last_name }}
+          </span>
+          <form action="{% url 'logout' %}" method="post" class="d-flex">
             {% csrf_token %}
-            <button type="submit" class="btn btn-link nav-link p-0 m-0 align-baseline">Log out</button>
+            <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
           </form>
-        </li>
-      {% else %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'login' %}">Log in</a>
-        </li>
-      {% endif %}
-    </ul>
-   </div>
-</nav>
+        {% else %}
+          <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">Login</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+  
 
 <div class="container">
     {% block content %}
