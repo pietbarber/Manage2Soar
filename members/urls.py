@@ -12,7 +12,7 @@ urlpatterns = [
     path('members/', views.members_list, name='members'),
     path('log_sheets/', views.log_sheets, name='log_sheets'),
     path("", views.member_list, name="member_list"),
-    path('<int:member_id>/edit/', member_edit, name='member_edit'),
+    path('<int:pk>/edit/', member_edit, name='member_edit'),
     path('tinymce/', include('tinymce.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
 

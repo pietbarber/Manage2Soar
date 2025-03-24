@@ -1,10 +1,9 @@
 <!-- templates/registration/login.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Login</title>
-</head>
-<body>
+
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
     <h2>Please log in</h2>
     <form method="post">
         {% csrf_token %}
@@ -15,6 +14,5 @@
     <a href="{% url 'social:begin' 'google-oauth2' %}?next={{ request.GET.next|urlencode }}">
     <img src="https://developers.google.com/identity/images/btn_google_signin_dark_normal_web.png" alt="Sign in with Google">
     </a>
-</body>
-</html>
 
+{% endblock %}
