@@ -50,7 +50,16 @@ def member_edit(request, pk):
     print("FILES received:", request.FILES)
     return render(request, "members/member_edit.html", {"form": form})
 
+from django.http import HttpResponse
+from .utils import generate_vcard_qr
+import base64
+
 @login_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
-    return render(request, "members/member_view.html", {"member": member})
+    qr_png = generate_vcard_qr(member)
+    qr_base64 = base64.b64encode(qr_png).decode('utf-8')
+    return render(request, "members/member_view.html", {
+        "member": member,
+        "qr_base64": qr_base64
+    })

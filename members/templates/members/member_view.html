@@ -11,6 +11,8 @@
       {% else %}
         <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
       {% endif %}
+      <h5>Contact Card QR Code</h5>
+      <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width: 200px;">
     </div>
     <div class="col-md-8">
       <ul class="list-group">
