@@ -1,3 +1,6 @@
+{% load static %}
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,31 +11,31 @@
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
-    <div class="container">
-        <a class="navbar-brand" href="#">Skyline Soaring</a>
-        <div class="collapse navbar-collapse">
-            <ul class="navbar-nav ms-auto">
-                {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <span class="nav-link">Welcome, {{ user.get_full_name|default:user.username }}</span>
-                    </li>
-                    <li class="nav-item">
-                        <form method="post" action="{% url 'logout' %}" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-link nav-link" style="display:inline; padding:0;" style="display:inline;">
-                            Log out
-                            </button>
-                        </form>
-                    </li>
-                {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Log in</a>
-                    </li>
-                {% endif %}
-            </ul>
-        </div>
-    </div>
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-4">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center" href="{% url 'member_list' %}">
+      <img src="{% static 'images/skylinesoaring-logo.png' %}" alt="Skyline Soaring Logo" height="40" class="me-2">
+      <span>Skyline Soaring</span>
+    </a>
+
+    <ul class="navbar-nav ms-auto align-items-center">
+      {% if user.is_authenticated %}
+        <li class="nav-item d-flex align-items-center">
+          <span class="nav-link mb-0">Welcome, {{ user.get_full_name|default:user.username }}</span>
+        </li>
+        <li class="nav-item d-flex align-items-center">
+          <form method="post" action="{% url 'logout' %}" class="mb-0 ms-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-link nav-link p-0 m-0 align-baseline">Log out</button>
+          </form>
+        </li>
+      {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'login' %}">Log in</a>
+        </li>
+      {% endif %}
+    </ul>
+   </div>
 </nav>
 
 <div class="container">

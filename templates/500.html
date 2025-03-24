@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Server Error{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="display-4 text-danger">500</h1>
+    <p class="lead">Something went wrong on our end.</p>
+    <hr>
+    <p class="mb-4">The tow rope might’ve snapped. Our crew is working on it!</p>
+    <a href="{% url 'member_list' %}" class="btn btn-primary">Back to Members List</a>
+</div>
+{% endblock %}

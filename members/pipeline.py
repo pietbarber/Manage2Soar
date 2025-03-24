@@ -1,27 +1,31 @@
 # members/pipeline.py
 
+def debug_pipeline_data(strategy, details, *args, **kwargs):
+    print("🚀 OAuth details:", details)
+    return
+
 def create_username(strategy, details, backend, user=None, *args, **kwargs):
-    """
-    Set username to "firstname.lastname" on first-time Google login.
-    """
     if user:
         return
 
-    first = details.get("first_name", "").lower()
-    last = details.get("last_name", "").lower()
+    first = details.get("first_name")
+    last = details.get("last_name")
 
     if first and last:
-        desired_username = f"{first}.{last}"
+        base_username = f"{first.lower()}.{last.lower()}"
     else:
-        desired_username = details.get("email").split("@")[0]
+        email = details.get("email", "")
+        base_username = email.split('@')[0].lower()
 
-    # Ensure uniqueness
     from django.contrib.auth import get_user_model
     User = get_user_model()
-    original = desired_username
+
+    username = base_username
     counter = 1
-    while User.objects.filter(username=desired_username).exists():
-        desired_username = f"{original}{counter}"
+    while User.objects.filter(username=username).exists():
+        username = f"{base_username}{counter}"
         counter += 1
 
-    return {"username": desired_username}
+    # ✅ This is the key: overwrite details['username']
+    details['username'] = username
+    return {"username": username}
