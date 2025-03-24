@@ -205,3 +205,19 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 from django.conf import settings
 from django.conf.urls.static import static
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'social': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}

@@ -7,13 +7,8 @@ class MemberForm(forms.ModelForm):
     class Meta:
         model = Member
         fields = [
-          'id',
-          'last_login',
-          'is_superuser',
           'membership_status',
           'username', 'first_name', 'last_name', 'email',
-          'is_staff',
-          'is_active',
           'SSA_member_number', 'phone', 'mobile_phone',
           'address',
           'city',
