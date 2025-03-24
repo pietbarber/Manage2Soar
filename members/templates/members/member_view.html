@@ -11,6 +11,7 @@
       {% else %}
         <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
       {% endif %}
+      <br><br>
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width: 200px;">
     </div>
@@ -42,8 +43,12 @@
             {% endif %}
         </li>
         <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> {{ member.city }}, {{ member.state }} {{ member.zip_code }}</li>
-        <li class="list-group-item"><strong>Glider Owned:</strong> {{ member.glider_owned }}</li>
+        {% if member.glider_owned %}
+        <li class="list-group-item"><strong>Glider:</strong> {{ member.glider_owned }}</li>
+        {% endif %}
+        {% if member.second_glider_owned %}
         <li class="list-group-item"><strong>Second Glider:</strong> {{ member.second_glider_owned }}</li>
+        {% endif %}
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
