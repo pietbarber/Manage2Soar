@@ -38,7 +38,7 @@
                 <a href="mailto:{{ member.email }}">{{ member.email }}</a>
             </td>
             <td>
-                {% if member.is_superuser or member.is_staff or user.id == member.id %}
+                {% if user.is_staff %}
                 <a class="btn btn-sm btn-outline-primary" href="{% url 'member_edit' member.id %}">Edit</a>
                 {% endif %}
             </td>

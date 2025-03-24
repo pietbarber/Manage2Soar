@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Permission Denied{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="display-4 text-danger">403 Forbidden</h1>
+    <p class="lead">You don’t have permission to access this page.</p>
+    <hr>
+    <p class="mb-4">If you believe this is an error, please contact a club administrator.</p>
+    <a href="{% url 'member_list' %}" class="btn btn-primary">Back to Members List</a>
+</div>
+{% endblock %}

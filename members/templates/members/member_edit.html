@@ -4,6 +4,7 @@
 
 <form method="post">
     {% csrf_token %}
+    {{ form.media }}
     <table>
         {{ form.as_table }}
     </table>

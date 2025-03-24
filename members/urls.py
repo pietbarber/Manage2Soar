@@ -17,3 +17,7 @@ urlpatterns = [
     path('oauth/', include('social_django.urls', namespace='social')),
 
 ]
+
+from django.conf.urls import handler403
+
+handler403 = "django.views.defaults.permission_denied"

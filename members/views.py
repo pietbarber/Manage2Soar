@@ -1,7 +1,10 @@
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Member
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from .forms import MemberForm
+from .models import Member
+
 
 def is_instructor(user):
     return user.is_authenticated and user.is_instructor
@@ -42,18 +45,12 @@ def member_edit(request, member_id):
     return render(request, "members/member_edit.html", {"form": form, "member": member})
 
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
-from .models import Member
-from .forms import MemberForm
-
 @login_required
 def member_edit(request, pk):
-    member = get_object_or_404(Member, pk=pk)
+    if not request.user.is_staff:
+        raise PermissionDenied()
 
-    # If the user isn't staff and they're trying to edit someone else:
-    if not request.user.is_staff and request.user.pk != member.pk:
-        return redirect('member_list')  # or return 403 if you prefer
+    member = get_object_or_404(Member, pk=pk)
 
     if request.method == "POST":
         form = MemberForm(request.POST, instance=member)
