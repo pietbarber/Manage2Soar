@@ -10,6 +10,7 @@ class MemberForm(forms.ModelForm):
           'id',
           'last_login',
           'is_superuser',
+          'membership_status',
           'username', 'first_name', 'last_name', 'email',
           'is_staff',
           'is_active',

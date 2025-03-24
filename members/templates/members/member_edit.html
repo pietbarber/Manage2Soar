@@ -78,6 +78,7 @@
     <div class="row mt-4">
       <div class="col-md-6">
         <h5>Membership</h5>
+        {{ form.membership_status|as_crispy_field }}
         {{ form.joined_club|as_crispy_field }}
         {{ form.glider_rating|as_crispy_field }}
         {{ form.glider_owned|as_crispy_field }}
