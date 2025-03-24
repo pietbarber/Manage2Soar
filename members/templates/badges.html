@@ -1,0 +1,12 @@
+<!-- for each badge -->
+<h3><img src="{{ badge.image.url }}" height="30"> {{ badge.name }}</h3>
+<div class="row">
+  {% for mb in badge.memberbadge_set.all %}
+    <div class="col-auto text-center">
+      <img src="{{ mb.member.profile_photo.url }}" class="rounded-circle" style="height: 64px;">
+      <div class="small">{{ mb.member.first_name }}</div>
+    </div>
+  {% empty %}
+    <p>No members have earned this badge yet.</p>
+  {% endfor %}
+</div>

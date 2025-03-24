@@ -104,3 +104,23 @@ class Member(AbstractUser):
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
+class Badge(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to='badge_icons/')
+    
+    def __str__(self):
+        return self.name
+
+
+class MemberBadge(models.Model):
+    member = models.ForeignKey('Member', on_delete=models.CASCADE, related_name='badges')
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    date_awarded = models.DateField()
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('member', 'badge')
+
+    def __str__(self):
+        return f"{self.member} - {self.badge.name}"

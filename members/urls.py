@@ -18,6 +18,8 @@ urlpatterns = [
     path('tinymce/', include('tinymce.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
+    path("badges/", views.badge_board, name="badge_board"),
+
 
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

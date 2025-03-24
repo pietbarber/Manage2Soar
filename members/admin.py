@@ -14,3 +14,8 @@ from .models import Glider
 class GliderAdmin(admin.ModelAdmin):
     list_display = ('n_number', 'make', 'model', 'number_of_seats', 'rental_rate')
     search_fields = ('n_number', 'make', 'model', 'competition_number')
+
+from .models import Badge, MemberBadge
+
+admin.site.register(Badge)
+admin.site.register(MemberBadge)

@@ -71,3 +71,12 @@ def member_view(request, member_id):
 
 def custom_permission_denied_view(request, exception=None):
     return render(request, "403.html", status=403)
+
+from .models import Badge
+
+@login_required
+@active_member_required
+def badge_board(request):
+    badges = Badge.objects.prefetch_related('memberbadge_set__member')
+    return render(request, "members/badges.html", {"badges": badges})
+

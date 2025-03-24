@@ -54,3 +54,15 @@ class MemberForm(forms.ModelForm):
         self.fields['public_notes'].help_text = "Visible to all members."
         self.fields['private_notes'].help_text = "Visible only to club officers."
         self.fields['legacy_username'].help_text = "User handle that was used on old web server"
+
+
+from .models import MemberBadge
+
+class MemberBadgeForm(forms.ModelForm):
+    class Meta:
+        model = MemberBadge
+        fields = ['badge', 'date_awarded', 'notes']
+        widgets = {
+            'date_awarded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'rows': 2}),
+        }

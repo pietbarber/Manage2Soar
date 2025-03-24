@@ -15,6 +15,7 @@
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width: 200px;">
     </div>
+  
     <div class="col-md-8">
       <ul class="list-group">
         <li class="list-group-item">
@@ -55,7 +56,45 @@
         <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}</li>
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
+
+
+    <div class="mt-4">
+      <h4>🏅 SSA Badges</h4>
+      {% if member.badges.exists %}
+        <div class="row">
+          {% for badge in member.badges.all %}
+            {% if badge.badge.name in "'A Badge','B Badge','C Badge','Bronze Badge'" %}
+              <div class="col-auto mb-2">
+                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 150px;">
+                <div class="text-center small">{{ badge.badge.name }}</div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+    </div>
+
+  <div class="row mt-3">
+    {% for badge in member.badges.all %}
+      {% if badge.badge.name in "Silver,Gold,Diamond" %}
+        <div class="col-auto mb-2">
+          <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 150px;">
+          <div class="text-center small">{{ badge.badge.name }}</div>
+          <div class="text-muted small">
+            Awarded: {{ badge.date_awarded|date:"Y-m-d" }}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No badges awarded yet.</p>
+{% endif %}
+ 
+
+
+
     </div>
   </div>
+
 </div>
 {% endblock %}
