@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ member.first_name }} {{ member.last_name }}</h2>
+  <div class="row">
+    <div class="col-md-4">
+      {% if member.profile_photo %}
+        <img src="{{ member.profile_photo.url }}" class="img-thumbnail" alt="Profile Photo">
+      {% else %}
+        <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
+      {% endif %}
+    </div>
+    <div class="col-md-8">
+      <ul class="list-group">
+        <li class="list-group-item">
+            <strong>Email:</strong>
+            {% if member.email and "@" in member.email %}
+              <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+            {% else %}
+              {{ member.email }}
+            {% endif %}
+        </li>
+        <li class="list-group-item">
+            <strong>Phone:</strong>
+            {% if member.phone %}
+              <a href="tel:+1{{ member.phone }}">{{ member.phone }}</a>
+            {% else %}
+              N/A
+            {% endif %}
+        </li>
+          
+        <li class="list-group-item">
+            <strong>Mobile:</strong>
+            {% if member.mobile_phone %}
+              <a href="tel:+1{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
+            {% else %}
+              N/A
+            {% endif %}
+        </li>
+        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> {{ member.city }}, {{ member.state }} {{ member.zip_code }}</li>
+        <li class="list-group-item"><strong>Glider Owned:</strong> {{ member.glider_owned }}</li>
+        <li class="list-group-item"><strong>Second Glider:</strong> {{ member.second_glider_owned }}</li>
+        <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
+        <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
+        <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
+        <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}</li>
+        <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
