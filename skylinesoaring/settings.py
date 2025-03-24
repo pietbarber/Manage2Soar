@@ -200,9 +200,6 @@ DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']  # Or your real domain in production
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 

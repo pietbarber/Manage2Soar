@@ -32,32 +32,20 @@ def member_list(request):
     return render(request, "members/member_list.html", {"members": members})
 
 @login_required
-@user_passes_test(lambda u: u.groups.filter(name='Membership Officers').exists(), login_url='/')
-def member_edit(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    if request.method == "POST":
-        form = MemberForm(request.POST, instance=member)
-        if form.is_valid():
-            form.save()
-            return redirect('member_list')
-    else:
-        form = MemberForm(instance=member)
-    return render(request, "members/member_edit.html", {"form": form, "member": member})
-
-
-@login_required
 def member_edit(request, pk):
-    if not request.user.is_staff:
-        raise PermissionDenied()
-
     member = get_object_or_404(Member, pk=pk)
 
+    if not (request.user.is_staff or request.user == member):
+        return render(request, "403.html", status=403)
+
     if request.method == "POST":
-        form = MemberForm(request.POST, instance=member)
+        form = MemberForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
-            return redirect('member_list')
+            return redirect("member_list")
+        else:
+            print("Form errors:", form.errors)  # 🔍 Debug!
     else:
         form = MemberForm(instance=member)
-
-    return render(request, "members/member_edit.html", {"form": form, "member": member})
+    print("FILES received:", request.FILES)
+    return render(request, "members/member_edit.html", {"form": form})

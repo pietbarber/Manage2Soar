@@ -5,9 +5,32 @@
 {% block title %}Edit Member{% endblock %}
 
 {% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  flatpickr(".datepicker", {
+    dateFormat: "Y-m-d", // ISO 8601 format
+    maxDate: new Date().fp_incr(30), // 30 days in future
+    minDate: "1990-01-01"
+  });
+</script>
+
 <div class="container">
 
   <h2 class="mb-4">Edit Member</h2>
+    {% if form.errors %}
+    <div class="alert alert-danger">
+      <strong>There were errors:</strong>
+      <ul>
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li>{{ field.label }}: {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
 
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
