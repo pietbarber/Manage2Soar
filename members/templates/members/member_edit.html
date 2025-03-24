@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}Edit Member{% endblock %}
 
@@ -15,8 +16,17 @@
 
     <div class="row">
     <div class="mt-4">
+      <h5>Profile Photo</h5>
       {% if form.instance.profile_photo %}
-        <img src="{{ form.instance.profile_photo.url }}" height="100" class="mb-2 d-block rounded">
+      <img src="{{ form.instance.profile_photo.url }}"
+           class="img-thumbnail mb-2"
+           style="max-height: 150px;"
+           alt="Current profile photo">
+      {% else %}
+      <img src="{% static 'images/default-avatar-large.png' %}"
+           class="img-thumbnail mb-2"
+           style="max-height: 150px;"
+           alt="Default profile photo">
       {% endif %}
       {{ form.profile_photo|as_crispy_field }}
     </div>
