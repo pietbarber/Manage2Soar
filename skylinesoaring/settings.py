@@ -46,11 +46,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "crispy_forms",
+    "crispy_bootstrap4",
     "social_django",
     "tinymce",
     "members",
 ]
 
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/members/'
 LOGOUT_REDIRECT_URL = 'login'
@@ -194,3 +198,6 @@ AUTHENTICATION_BACKENDS = (
 
 DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']  # Or your real domain in production
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

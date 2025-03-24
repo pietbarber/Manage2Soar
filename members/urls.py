@@ -2,6 +2,9 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from . import views
 from .views import member_list, member_edit
+from django.conf import settings
+from django.conf.urls.static import static
+
 
 
 urlpatterns = [
@@ -16,7 +19,7 @@ urlpatterns = [
     path('tinymce/', include('tinymce.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
 
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 from django.conf.urls import handler403
 

@@ -2,13 +2,35 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class Member(AbstractUser):
+    MEMBERSHIP_STATUS_CHOICES = [
+        ('Full Member', 'Full Member'),
+        ('Student Member', 'Student Member'),
+        ('Family Member', 'Family Member'),
+        ('Honorary Member', 'Honorary Member'),
+        ('Life Member', 'Life Member'),
+        ('Temporary Member', 'Temporary Member'),
+        ('Introductory Member', 'Introductory Member'),
+        ('Inactive', 'Inactive'),
+        ('Non-Member', 'Non-Member'),
+    ]
+
+    membership_status = models.CharField(
+        max_length=20,
+        choices=MEMBERSHIP_STATUS_CHOICES,
+        default='Non-Member',
+        blank=True,
+        null=True,
+    )
+
+ 
     SSA_member_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
+    mobile_phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=50, blank=True, null=True)
     state = models.CharField(max_length=20, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
-
+    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     GLIDER_RATING_CHOICES = [
         ('student', 'Student'),
         ('transition', 'Transition'),

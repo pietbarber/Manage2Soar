@@ -1,15 +1,82 @@
 {% extends "base.html" %}
-{% block content %}
-<h2>Update Member Information</h2>
+{% load crispy_forms_tags %}
 
-<form method="post">
+{% block title %}Edit Member{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2 class="mb-4">Edit Member</h2>
+
+  <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.media }}
-    <table>
-        {{ form.as_table }}
-    </table>
-    <button type="submit">Save Changes</button>
-    <a href="{% url 'member_list' %}">Cancel</a>
-</form>
 
+    <div class="row">
+      <div class="col-md-6">
+        <h5>Personal Info</h5>
+        {{ form.first_name|as_crispy_field }}
+        {{ form.last_name|as_crispy_field }}
+        {{ form.username|as_crispy_field }}
+        {{ form.email|as_crispy_field }}
+        {{ form.phone|as_crispy_field }}
+        {{ form.mobile_phone|as_crispy_field }}
+      </div>
+
+      <div class="col-md-6">
+        <h5>Address</h5>
+        {{ form.address|as_crispy_field }}
+        {{ form.city|as_crispy_field }}
+        {{ form.state|as_crispy_field }}
+        {{ form.zip_code|as_crispy_field }}
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <h5>Membership</h5>
+        {{ form.joined_club|as_crispy_field }}
+        {{ form.glider_rating|as_crispy_field }}
+        {{ form.glider_owned|as_crispy_field }}
+        {{ form.second_glider_owned|as_crispy_field }}
+      </div>
+
+      <div class="col-md-6">
+        <h5>Roles & Access</h5>
+        {{ form.is_instructor|as_crispy_field }}
+        {{ form.is_duty_officer|as_crispy_field }}
+        {{ form.is_assistant_duty_officer|as_crispy_field }}
+        {{ form.secretary|as_crispy_field }}
+        {{ form.treasurer|as_crispy_field }}
+        {{ form.webmaster|as_crispy_field }}
+        {{ form.is_staff|as_crispy_field }}
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <h5>Emergency Contact</h5>
+      {{ form.emergency_contact|as_crispy_field }}
+    </div>
+
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <h5>Public Notes</h5>
+        {{ form.public_notes|as_crispy_field }}
+      </div>
+      <div class="col-md-6">
+        <h5>Private Notes</h5>
+        {{ form.private_notes|as_crispy_field }}
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <h5>Profile Photo</h5>
+      {% if form.instance.profile_photo %}
+        <img src="{{ form.instance.profile_photo.url }}" height="100" class="mb-2 d-block rounded">
+      {% endif %}
+      {{ form.profile_photo|as_crispy_field }}
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
+  </form>
+</div>
 {% endblock %}

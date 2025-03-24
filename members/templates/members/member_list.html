@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
@@ -12,23 +14,35 @@
 <table class="table table-bordered table-hover table-striped">
     <thead class="table-light">
         <tr>
+            <th>Photo</th>
             <th>Name</th>
             <th>Address</th>
             <th>Phone</th>
             <th>Duties</th>
             <th>Email</th>
+            {% if user.is_staff %}
             <th>Edit</th>
+            {% endif %}
+        </tr>
         </tr>
     </thead>
     <tbody>
         {% for member in members %}
         <tr>
+            <td>
+                {% if member.profile_photo %}
+                  <img src="{{ member.profile_photo.url }}" alt="Profile photo" height="60" class="rounded-circle me-2">
+                {% else %}
+                  <img src="{% static 'images/default-avatar-100px.png' %}" height="60" class="rounded-circle me-2">
+                {% endif %}
+            </td>
+            </td>
             <td>{{ member.first_name }} {{ member.last_name }}</td>
             <td>
                 {{ member.address }}<br>
                 {{ member.city }}, {{ member.state }} {{ member.zip_code }}
             </td>
-            <td>{{ member.phone }}</td>
+            <td>{{ member.phone }}<br>{{ member.mobile_phone }}</td>
             <td>
                 {% if member.is_duty_officer %}<span class="badge bg-info">DO</span>{% endif %}
                 {% if member.is_assistant_duty_officer %}<span class="badge bg-secondary">ADO</span>{% endif %}
@@ -37,11 +51,11 @@
             <td>
                 <a href="mailto:{{ member.email }}">{{ member.email }}</a>
             </td>
-            <td>
                 {% if user.is_staff %}
+            <td>
                 <a class="btn btn-sm btn-outline-primary" href="{% url 'member_edit' member.id %}">Edit</a>
-                {% endif %}
             </td>
+                {% endif %}
         </tr>
         {% endfor %}
     </tbody>

@@ -1,4 +1,6 @@
 {% load static %}
+{% load crispy_forms_tags %}
+
 
 
 <!DOCTYPE html>
@@ -15,7 +17,7 @@
   <div class="container">
     <a class="navbar-brand d-flex align-items-center" href="{% url 'member_list' %}">
       <img src="{% static 'images/skylinesoaring-logo.png' %}" alt="Skyline Soaring Logo" height="40" class="me-2">
-      <span>Skyline Soaring</span>
+      <span>Skyline Soaring Club Members Content</span>
     </a>
 
     <ul class="navbar-nav ms-auto align-items-center">
