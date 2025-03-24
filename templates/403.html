@@ -2,11 +2,25 @@
 {% block title %}Permission Denied{% endblock %}
 
 {% block content %}
-<div class="text-center mt-5">
-    <h1 class="display-4 text-danger">403 Forbidden</h1>
-    <p class="lead">You don’t have permission to access this page.</p>
-    <hr>
-    <p class="mb-4">If you believe this is an error, please contact a club administrator.</p>
-    <a href="{% url 'member_list' %}" class="btn btn-primary">Back to Members List</a>
-</div>
+  <div class="text-center mt-5">
+    <h1 class="display-4">🚫 Access Denied</h1>
+    <p class="lead">You don't have permission to access this page.</p>
+
+    {% if user.is_authenticated and user.membership_status == "Non-Member" %}
+      <div class="alert alert-info mt-4" role="alert">
+        <strong>Hey {{ user.first_name }}!</strong><br>
+        You successfully logged in with Google, but your account hasn’t been activated yet.<br>
+        Please contact the Membership Officer to complete your setup.
+      </div>
+    {% elif user.is_authenticated and user.membership_status == "Inactive" %}
+      <div class="alert alert-warning mt-4" role="alert">
+        Your account is currently marked as <strong>Inactive</strong>.<br>
+        Please reach out to a club officer for assistance.
+      </div>
+    {% else %}
+      <p>If you think this is a mistake, please contact the administrator.</p>
+    {% endif %}
+
+    <a href="{% url 'member_list' %}" class="btn btn-primary mt-3">Return to Members</a>
+  </div>
 {% endblock %}

@@ -4,34 +4,35 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from .forms import MemberForm
 from .models import Member
+from members.decorators import active_member_required
 
 
 def is_instructor(user):
     return user.is_authenticated and user.is_instructor
 
-@login_required
+@active_member_required
 def duty_roster(request):
     return render(request, 'members/duty_roster.html')
 
-@login_required
+@active_member_required
 @user_passes_test(is_instructor)
 def instructors_only(request):
     return render(request, 'members/instructors.html')
 
-@login_required
+@active_member_required
 def members_list(request):
     return render(request, 'members/members.html')
 
-@login_required
+@active_member_required
 def log_sheets(request):
     return render(request, 'members/log_sheets.html')
 
-@login_required
+@active_member_required
 def member_list(request):
     members = Member.objects.all()
     return render(request, "members/member_list.html", {"members": members})
 
-@login_required
+@active_member_required
 def member_edit(request, pk):
     member = get_object_or_404(Member, pk=pk)
 
@@ -54,7 +55,7 @@ from django.http import HttpResponse
 from .utils import generate_vcard_qr
 import base64
 
-@login_required
+@active_member_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     qr_png = generate_vcard_qr(member)
@@ -63,3 +64,6 @@ def member_view(request, member_id):
         "member": member,
         "qr_base64": qr_base64
     })
+
+def custom_permission_denied_view(request, exception=None):
+    return render(request, "403.html", status=403)

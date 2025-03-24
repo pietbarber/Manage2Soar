@@ -141,6 +141,7 @@ SOCIAL_AUTH_PIPELINE = (
 
     'social_core.pipeline.user.get_username',
     'social_core.pipeline.user.create_user',
+    'members.pipeline.set_default_membership_status',
     
     'social_core.pipeline.social_auth.associate_user',
     'social_core.pipeline.social_auth.load_extra_data',
@@ -221,3 +222,5 @@ LOGGING = {
         },
     },
 }
+
+handler403 = 'members.views.custom_permission_denied_view'

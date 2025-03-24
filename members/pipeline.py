@@ -29,3 +29,8 @@ def create_username(strategy, details, backend, user=None, *args, **kwargs):
     # ✅ This is the key: overwrite details['username']
     details['username'] = username
     return {"username": username}
+
+def set_default_membership_status(backend, user=None, **kwargs):
+    if user and user.membership_status is None:
+        user.membership_status = "Non-Member"
+        user.save()
