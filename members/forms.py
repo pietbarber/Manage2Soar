@@ -9,7 +9,7 @@ class MemberForm(forms.ModelForm):
         fields = [
           'membership_status',
           'username', 'first_name', 'last_name', 'email',
-          'SSA_member_number', 'phone', 'mobile_phone',
+          'legacy_username', 'SSA_member_number', 'phone', 'mobile_phone',
           'address',
           'city',
           'state',
@@ -53,3 +53,4 @@ class MemberForm(forms.ModelForm):
         self.fields['profile_photo'].help_text = "Upload a clear, smiling portrait. 😄"
         self.fields['public_notes'].help_text = "Visible to all members."
         self.fields['private_notes'].help_text = "Visible only to club officers."
+        self.fields['legacy_username'].help_text = "User handle that was used on old web server"

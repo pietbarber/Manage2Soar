@@ -48,6 +48,7 @@ class Member(AbstractUser):
 
  
     SSA_member_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    legacy_username = models.CharField(max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     mobile_phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
@@ -56,6 +57,7 @@ class Member(AbstractUser):
     zip_code = models.CharField(max_length=10, blank=True, null=True)
     profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     GLIDER_RATING_CHOICES = [
+        ('none', 'None'),
         ('student', 'Student'),
         ('transition', 'Transition'),
         ('private', 'Private'),
