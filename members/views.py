@@ -5,10 +5,14 @@ from django.core.exceptions import PermissionDenied
 from .forms import MemberForm
 from .models import Member
 from members.decorators import active_member_required
+from django.shortcuts import render
 
 
 def is_instructor(user):
     return user.is_authenticated and user.is_instructor
+
+def home(request):
+    return render(request, "home.html")
 
 @active_member_required
 def duty_roster(request):

@@ -19,8 +19,11 @@ from django.urls import path, include
 
 from django.conf import settings
 from django.conf.urls.static import static
+from members import views as member_views
+
 
 urlpatterns = [
+    path("", member_views.home, name="home"),
     path('admin/', admin.site.urls),
     path('members/', include('members.urls')),
 ]
