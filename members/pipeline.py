@@ -34,3 +34,20 @@ def set_default_membership_status(backend, user=None, **kwargs):
     if user and user.membership_status is None:
         user.membership_status = "Non-Member"
         user.save()
+
+import requests
+from django.core.files.base import ContentFile
+from urllib.parse import urlparse
+import os
+
+def fetch_google_profile_picture(backend, user, response, *args, **kwargs):
+    if backend.name == "google-oauth2":
+        picture_url = response.get("picture")
+        if picture_url and not user.profile_photo:
+            try:
+                result = requests.get(picture_url)
+                result.raise_for_status()
+                filename = os.path.basename(urlparse(picture_url).path)
+                user.profile_photo.save(filename, ContentFile(result.content), save=True)
+            except Exception as e:
+                print(f"Error fetching profile photo: {e}")

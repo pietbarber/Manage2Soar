@@ -151,6 +151,7 @@ SOCIAL_AUTH_PIPELINE = (
     'social_core.pipeline.user.get_username',                  # Default username getter
     'social_core.pipeline.user.create_user',                   # Create user if not found
     'members.pipeline.set_default_membership_status',          # Set membership status
+    'members.pipeline.fetch_google_profile_picture',           # Fetch profile picture from Google
 
     # Standard steps to finalize
     'social_core.pipeline.social_auth.associate_user',         # Link social to user

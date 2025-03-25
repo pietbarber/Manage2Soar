@@ -7,3 +7,4 @@ Pillow
 django-crispy-forms
 crispy-bootstrap4
 qrcode[pil]
+requests
