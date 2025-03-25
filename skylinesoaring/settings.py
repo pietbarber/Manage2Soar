@@ -30,8 +30,13 @@ STATICFILES_DIRS = [
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # That's why we put it in .env and .env is in .gitignore ! 
+
 import os
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") 
+from dotenv import load_dotenv
+load_dotenv()
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+
 if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
 
@@ -115,10 +120,6 @@ WSGI_APPLICATION = "skylinesoaring.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
 
 DATABASES = {
     'default': {
