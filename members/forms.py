@@ -15,7 +15,7 @@ class MemberForm(forms.ModelForm):
           'state',
           'zip_code',
           'profile_photo',
-          'glider_rating', 'instructor', 'duty_officer', 'assistant_duty_officer', 'secretary',
+          'glider_rating', 'instructor', 'towpilot', 'duty_officer', 'assistant_duty_officer', 'secretary',
           'treasurer', 'webmaster', 'director', 'member_manager',
           'glider_owned',
           'second_glider_owned',

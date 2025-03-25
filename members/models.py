@@ -68,6 +68,7 @@ class Member(AbstractUser):
     )
 
     instructor = models.BooleanField(default=False)
+    towpilot = models.BooleanField(default=False)
     duty_officer = models.BooleanField(default=False)
     assistant_duty_officer = models.BooleanField(default=False)
     secretary = models.BooleanField(default=False)
