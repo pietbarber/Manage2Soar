@@ -66,3 +66,13 @@ class MemberBadgeForm(forms.ModelForm):
             'date_awarded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
         }
+
+from django import forms
+from tinymce.widgets import TinyMCE
+from .models import Badge
+
+class BadgeForm(forms.ModelForm):
+    description = forms.CharField(widget=TinyMCE(attrs={'rows': 10}))
+    class Meta:
+        model = Badge
+        fields = '__all__'
