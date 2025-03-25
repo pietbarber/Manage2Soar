@@ -1,5 +1,6 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
+from members import views
 from . import views
 from .views import member_list, member_edit
 from django.conf import settings
@@ -19,8 +20,7 @@ urlpatterns = [
     path('oauth/', include('social_django.urls', namespace='social')),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
     path("badges/", views.badge_board, name="badge_board"),
-
-
+    path('set-password/', views.set_password, name='set_password'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

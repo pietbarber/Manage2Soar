@@ -1,11 +1,13 @@
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from .forms import MemberForm
-from .models import Member
-from members.decorators import active_member_required
 from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
+from .forms import MemberForm
+from members.decorators import active_member_required
+from .models import Member
 
 
 def is_instructor(user):
@@ -78,4 +80,18 @@ from .models import Badge
 def badge_board(request):
     badges = Badge.objects.prefetch_related('memberbadge_set__member')
     return render(request, "members/badges.html", {"badges": badges})
+
+@active_member_required
+
+def set_password(request):
+    if request.method == 'POST':
+        form = SetPasswordForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your password has been set. You can now log in with it.")
+            return redirect('member_view', member_id=request.user.id)
+    else:
+        form = SetPasswordForm(user=request.user)
+    return render(request, 'members/set_password.html', {'form': form})
+
 
