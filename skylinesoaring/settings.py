@@ -29,6 +29,8 @@ STATICFILES_DIRS = [
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# That's why we put it in .env and .env is in .gitignore ! 
+import os
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") 
 if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY not set in environment!")
