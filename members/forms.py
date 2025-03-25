@@ -4,6 +4,14 @@ from .models import Member
 from tinymce.widgets import TinyMCE
 
 class MemberForm(forms.ModelForm):
+    joined_club = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+        }),
+        input_formats=['%Y-%m-%d']
+    )
     class Meta:
         model = Member
         fields = [
@@ -36,14 +44,21 @@ class MemberForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["joined_club"].widget = forms.TextInput(
+        # 📅 Restrict joined_club date to reasonable range
+        today = date.today()
+        min_date = date(1990, 1, 1)
+        max_date = today + timedelta(days=30)
+
+        self.fields['joined_club'].widget = forms.DateInput(
             attrs={
-                "class": "form-control datepicker",  # let flatpickr hook onto it
-                "placeholder": "YYYY-MM-DD",
-                "autocomplete": "off",               # optional: prevents weird autofill
-            }
+                'type': 'date',
+                'class': 'form-control',
+                'min': min_date.isoformat(),
+                'max': max_date.isoformat(),
+            },
+            format='%Y-%m-%d'
         )
-        self.fields["joined_club"].input_formats = ["%Y-%m-%d"]
+        self.fields['joined_club'].input_formats = ['%Y-%m-%d']
 
 
         # Remove default verbose help text for system fields
