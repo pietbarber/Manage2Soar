@@ -136,22 +136,26 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_KEY")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET")
 
 SOCIAL_AUTH_PIPELINE = (
-    'social_core.pipeline.social_auth.social_details',
-    'social_core.pipeline.social_auth.social_uid',
-    'social_core.pipeline.social_auth.auth_allowed',
-    'social_core.pipeline.social_auth.social_user',
-    
-    # Your custom step comes BEFORE user creation:
-    'members.pipeline.debug_pipeline_data',  # 👈 your debug step
-    'members.pipeline.create_username',
+    # Standard steps
+    'social_core.pipeline.social_auth.social_details',         # Get user details from provider
+    'social_core.pipeline.social_auth.social_uid',             # Get provider UID
+    'social_core.pipeline.social_auth.auth_allowed',           # Check if auth is allowed
+    'social_core.pipeline.social_auth.social_user',            # Try to find existing social user
 
-    'social_core.pipeline.user.get_username',
-    'social_core.pipeline.user.create_user',
-    'members.pipeline.set_default_membership_status',
-    
-    'social_core.pipeline.social_auth.associate_user',
-    'social_core.pipeline.social_auth.load_extra_data',
-    'social_core.pipeline.user.user_details',
+    # 🔁 NEW: Associate by email if not linked yet (password-first → OAuth2)
+    'social_core.pipeline.social_auth.associate_by_email',
+
+    # 🛠️ Custom steps — insert after association
+    'members.pipeline.debug_pipeline_data',                    # Log details
+    'members.pipeline.create_username',                        # Create proper username format
+    'social_core.pipeline.user.get_username',                  # Default username getter
+    'social_core.pipeline.user.create_user',                   # Create user if not found
+    'members.pipeline.set_default_membership_status',          # Set membership status
+
+    # Standard steps to finalize
+    'social_core.pipeline.social_auth.associate_user',         # Link social to user
+    'social_core.pipeline.social_auth.load_extra_data',        # Load extras
+    'social_core.pipeline.user.user_details',                  # Update user fields
 )
 
 
