@@ -62,7 +62,7 @@ This is a Django-based web application for managing the members, gliders, badges
 
 ## Roadmap
 
-See `roadmap.md` (or check pinned roadmap in ChatGPT thread).
+See `roadmap.md`
 
 ## License
 
