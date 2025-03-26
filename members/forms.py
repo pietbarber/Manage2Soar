@@ -8,6 +8,8 @@ from django.core.exceptions import ValidationError
 from PIL import Image
 import io
 
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit
 
 class MemberForm(forms.ModelForm):
     joined_club = forms.DateField(
@@ -105,6 +107,28 @@ class MemberForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.helper = FormHelper()
+        self.helper.form_method = 'post'
+
+        self.helper.layout = Layout(
+            # You can include other fields before this…
+    
+            Fieldset(
+                'Location Info',
+                Row(
+                    Column('country', css_class='form-group col-md-6 mb-0'),
+                ),
+                Row(
+                    Column('state_code', css_class='form-group col-md-6 mb-0', css_id='state-code-wrapper'),
+                    Column('state_freeform', css_class='form-group col-md-6 mb-0', css_id='state-freeform-wrapper'),
+                ),
+            ),
+
+            # Followed by other fields or buttons
+            Submit('submit', 'Save changes')
+        )
+
+
         # 📅 Restrict joined_club date to reasonable range
         today = date.today()
         min_date = date(1990, 1, 1)
@@ -121,6 +145,7 @@ class MemberForm(forms.ModelForm):
         )
         self.fields['joined_club'].input_formats = ['%Y-%m-%d']
         self.fields['username'].disabled = True
+        self.fields['username'].help_text = "Usernames are not editable."
 
 
         # Remove default verbose help text for system fields

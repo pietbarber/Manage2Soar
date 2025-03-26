@@ -24,13 +24,13 @@ This roadmap outlines current and future development goals for the Skyline Soari
 10. Improve navigation UI and add responsive hamburger menu.
 11. Setup flatpickr calendar popup for ISO 8601 date input.
 12. Automated profile photos using Pydenticon instead of the static image. 
+13. States should be a pull-down.  (Complicated by the fact that we have non-US ex members)
 
 ---
 
 ## In Progress 🔄
 - Migration tooling for importing legacy member data from PostgreSQL JSON export
 - Improve member import with robust date parsing and dry-run validation
-- Automatically generated icons for people who haven't uploaded a profile photo. 
 
 ---
 
@@ -45,7 +45,6 @@ This roadmap outlines current and future development goals for the Skyline Soari
 8. Add glider image thumbnails to members who own gliders
 9. Add contact group management (for targeted emails)
 10. Add flight history viewer (imported legacy data + new log uploads)
-11. States should be a pull-down.  (Complicated by the fact that we have non-US ex members)
 12. Hyphenate phone numbers so the phone numbers don't look like barbaric strings of digits
 13. members_list page: differentiate home vs cell phone numbers. 
 

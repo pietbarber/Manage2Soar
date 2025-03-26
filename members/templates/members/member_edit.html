@@ -57,6 +57,9 @@
     <div class="row">
 
       <div class="col-md-6">
+        <h5>Account Info</h5>
+        {{ form.username|as_crispy_field }}
+
         <h5>Personal Info</h5>
         {{ form.first_name|as_crispy_field }}
         {{ form.middle_initial|as_crispy_field }}
@@ -73,10 +76,18 @@
         <h5>Address</h5>
         {{ form.address|as_crispy_field }}
         {{ form.city|as_crispy_field }}
-        {{ form.state_code|as_crispy_field }}
-        {{ form.state_freeform|as_crispy_field }}
-        {{ form.country|as_crispy_field }}
 
+        <div class="row">
+          <div class="col-md-6">
+            {{ form.country|as_crispy_field }}
+          </div>
+          <div class="col-md-6" id="state-code-wrapper">
+            {{ form.state_code|as_crispy_field }}
+          </div>
+          <div class="col-md-6" id="state-freeform-wrapper" style="display: none;">
+            {{ form.state_freeform|as_crispy_field }}
+          </div>
+        </div>
         {{ form.zip_code|as_crispy_field }}
       </div>
     </div>
@@ -121,4 +132,32 @@
     <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
   </form>
 </div>
+
+
+<script>
+  function toggleStateFields() {
+    const countrySelect = document.getElementById("id_country");
+    const stateCodeWrapper = document.getElementById("state-code-wrapper");
+    const stateFreeformWrapper = document.getElementById("state-freeform-wrapper");
+
+    const selectedCountry = countrySelect.value;
+
+    if (selectedCountry === "US") {
+      stateCodeWrapper.style.display = "block";
+      stateFreeformWrapper.style.display = "none";
+    } else {
+      stateCodeWrapper.style.display = "none";
+      stateFreeformWrapper.style.display = "block";
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const countrySelect = document.getElementById("id_country");
+    if (countrySelect) {
+      toggleStateFields();  // run once on load
+      countrySelect.addEventListener("change", toggleStateFields);
+    }
+  });
+</script>
+
 {% endblock %}
