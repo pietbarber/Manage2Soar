@@ -222,3 +222,73 @@ class MemberBadge(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
+    
+
+    #################################################################
+    # Logsheet stuff follows 
+    #################################################################
+
+from django.db import models
+from django.conf import settings
+
+class Towplane(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    registration = models.CharField(max_length=20, blank=True)
+    picture = models.ImageField(upload_to='towplane_photos/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+class FlightLog(models.Model):
+    FLIGHT_TYPE_CHOICES = [
+        ('Solo', 'Solo'),
+        ('Dual', 'Dual'),
+        ('Checkride', 'Checkride'),
+        ('Demo', 'Demo'),
+        ('Other', 'Other'),
+    ]
+
+    PAYS_CHOICES = [
+        ('all', 'All'),
+        ('half', 'Half'),
+        ('rental', 'Rental'),
+        ('tow', 'Tow'),
+    ]
+
+    flight_date = models.DateField()
+    field = models.CharField(max_length=10, help_text="Airfield identifier, e.g. KFRR, W99")
+
+    pilot = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='flights_flown')
+    passenger = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='flights_passenger')
+    instructor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='flights_instructed')
+    towpilot = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='flights_towed')
+
+    glider = models.ForeignKey("Glider", on_delete=models.SET_NULL, null=True)
+    towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
+
+    takeoff_time = models.TimeField()
+    landing_time = models.TimeField()
+    flight_time = models.DurationField(help_text="Total time of flight")
+
+    release_altitude = models.PositiveIntegerField(help_text="In feet", null=True, blank=True)
+
+    flight_type = models.CharField(max_length=20, choices=FLIGHT_TYPE_CHOICES, default='Solo', blank=True)
+
+    exception = models.TextField(blank=True)
+
+    alternate_payer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='flights_paid')
+    pays = models.CharField(max_length=10, choices=PAYS_CHOICES, blank=True)
+
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-flight_date', 'takeoff_time']
+
+    def __str__(self):
+        return f"{self.flight_date} - {self.pilot} in {self.glider} at {self.field}"
+

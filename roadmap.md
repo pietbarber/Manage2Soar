@@ -28,13 +28,18 @@ This roadmap outlines current and future development goals for the Skyline Soari
 14. Hyphenate phone numbers so the phone numbers don't look like barbaric strings of digits
 15. members_list page: differentiate home vs cell phone numbers. 
 16. members_list page: sort by lastname in a default view.  
+- Create restricted site for Instructors
+
+---
+
+## On Hold tasks 🛑
+- Migration tooling for importing legacy member data from PostgreSQL JSON export
+- create flight log tables in preparation for logsheet program. 
 
 ---
 
 ## In Progress 🔄
-- Migration tooling for importing legacy member data from PostgreSQL JSON export
 - Improve member import with robust date parsing and dry-run validation
-- Create restricted site for Instructors
 
 ---
 

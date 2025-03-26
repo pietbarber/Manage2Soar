@@ -1,6 +1,7 @@
 # Ignore environment variables and secret passwords, please. 
 .env
 media/glider_photos
+media/towplane_photos
 media/profile_photos
 media/biography
 media/generated_avatars
