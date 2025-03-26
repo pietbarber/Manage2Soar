@@ -42,15 +42,13 @@
 
             <td>
                 {% if member.phone %}
-                <span style="white-space: nowrap;">📞 {{ member.phone|format_us_phone }}</span>
+                <div style="white-space: nowrap;">📞 {{ member.phone|format_us_phone }}</div>
                 {% endif %}
                 {% if member.mobile_phone %}
-                <span style="white-space: nowrap;">📱 {{ member.mobile_phone|format_us_phone }}</span>
+                <div style="white-space: nowrap;">📱 {{ member.mobile_phone|format_us_phone }}</div>
                 {% endif %}
-            <td>
-                {% if member.is_duty_officer %}<span class="badge bg-info">DO</span>{% endif %}
-                {% if member.is_assistant_duty_officer %}<span class="badge bg-secondary">ADO</span>{% endif %}
-                {% if member.is_instructor %}<span class="badge bg-warning text-dark">Instructor</span>{% endif %}
+            <td class="text-center">
+                {{ member|render_duties|safe }}
             </td>
             <td>
                 <a href="mailto:{{ member.email }}">{{ member.email }}</a>

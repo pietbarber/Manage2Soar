@@ -40,3 +40,27 @@ def format_us_phone(value):
     if len(digits) == 10:
         return f"+1 {digits[0:3]}-{digits[3:6]}-{digits[6:]}"
     return value  # Fallback: return original
+
+@register.filter
+def render_duties(member):
+    duties = []
+    if member.instructor:
+        duties.append('<span title="Instructor">🧑‍🏫</span>')
+    if member.towpilot:
+        duties.append('<span title="Tow Pilot">✈️</span>')
+    if member.duty_officer:
+        duties.append('<span title="Duty Officer">📋</span>')
+    if member.assistant_duty_officer:
+        duties.append('<span title="Assistant DO">🧑‍💼</span>')
+    if member.secretary:
+        duties.append('<span title="Secretary">📝</span>')
+    if member.treasurer:
+        duties.append('<span title="Treasurer">💰</span>')
+    if member.webmaster:
+        duties.append('<span title="Webmaster">🌐</span>')
+    if member.director:
+        duties.append('<span title="Director">🎖️</span>')
+    if member.member_manager:
+        duties.append('<span title="Membership Manager">🧑‍🔧</span>')
+
+    return ' '.join(duties) if duties else "-"

@@ -36,7 +36,7 @@ def log_sheets(request):
 
 @active_member_required
 def member_list(request):
-    members = Member.objects.all()
+    members = Member.objects.order_by('last_name', 'first_name')
     return render(request, "members/member_list.html", {"members": members})
 
 @active_member_required
@@ -69,7 +69,6 @@ def member_view(request, member_id):
     qr_png = generate_vcard_qr(member)
     qr_base64 = base64.b64encode(qr_png).decode('utf-8')
     can_edit = request.user == member or request.user.is_superuser
-
 
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)

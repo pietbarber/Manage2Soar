@@ -57,7 +57,7 @@
           {{ member.city }}, {{ member.state_code }} {{ member.state_freeform }} {{ member.zip_code }}<br>
           {{ member.country }}
         </li>
-       
+        <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li> 
         {% if member.glider_owned %}
         <li class="list-group-item"><strong>Glider:</strong> {{ member.glider_owned }}</li>
         {% endif %}
