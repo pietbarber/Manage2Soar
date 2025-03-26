@@ -58,7 +58,7 @@ def member_edit(request, pk):
     return render(request, "members/member_edit.html", {"form": form})
 
 from django.http import HttpResponse
-from .utils import generate_vcard_qr
+from .utils.vcard_tools import generate_vcard_qr
 import base64
 
 @active_member_required

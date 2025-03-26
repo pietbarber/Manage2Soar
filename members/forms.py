@@ -2,6 +2,12 @@ from django import forms
 from datetime import date, timedelta
 from .models import Member
 from tinymce.widgets import TinyMCE
+from .utils.image_processing import resize_and_crop_profile_photo
+from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
+from PIL import Image
+import io
+
 
 class MemberForm(forms.ModelForm):
     joined_club = forms.DateField(
@@ -40,6 +46,57 @@ class MemberForm(forms.ModelForm):
             'public_notes': TinyMCE(attrs={'rows': 10}),
             'private_notes': TinyMCE(attrs={'rows': 10}),
         }
+
+    def clean_profile_photo(self):
+        photo = self.cleaned_data.get("profile_photo")
+
+        if not photo:
+            return photo
+
+        # Load image and check dimensions
+        try:
+            image = Image.open(photo)
+            width, height = image.size
+
+            # Aspect ratio check: no panoramas, no skyscrapers
+            aspect_ratio = width / height
+            if aspect_ratio > 2.0:
+                raise ValidationError("Image too wide — please upload a square-ish photo.")
+            elif aspect_ratio < 0.5:
+                raise ValidationError("Image too tall — please upload a square-ish photo.")
+    
+        except Exception as e:
+            raise ValidationError("Invalid image uploaded.")
+    
+        return photo
+
+
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        uploaded_photo = self.cleaned_data.get("profile_photo")
+
+        if uploaded_photo:
+            try:
+                resized_image = resize_and_crop_profile_photo(uploaded_photo)
+
+                # Build safe filename based on username and original extension
+                extension = uploaded_photo.name.split('.')[-1]
+                filename = f"profile_{instance.username}.{extension}"
+
+                instance.profile_photo.save(filename, resized_image, save=False)
+
+            except ValueError as e:
+                self.add_error("profile_photo", str(e))
+                raise  # Re-raise to stop saving if invalid
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
