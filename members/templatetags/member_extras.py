@@ -8,18 +8,30 @@ from django import template
 
 register = template.Library()
 
+from django import template
+
+register = template.Library()
+
 @register.filter
-def display_name(member):
+def full_display_name(member):
+    """Returns the member's full display name with nickname, middle initial, suffix, etc."""
+    if not member:
+        return ""
+
     parts = []
+    if member.first_name:
+        parts.append(member.first_name)
+
+    if member.middle_initial:
+        parts.append(member.middle_initial)
 
     if member.nickname:
-        parts.append(f'"{member.nickname}" {member.last_name}')
-    elif member.middle_initial:
-        parts.append(f"{member.first_name} {member.middle_initial}. {member.last_name}")
-    else:
-        parts.append(f"{member.first_name} {member.last_name}")
+        parts.append(f'“{member.nickname}”')
+
+    if member.last_name:
+        parts.append(member.last_name)
 
     if member.name_suffix:
-        parts.append(f", {member.name_suffix}")
+        parts.append(member.name_suffix)
 
-    return "".join(parts)
+    return " ".join(parts)

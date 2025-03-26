@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings
+from tinymce.models import HTMLField
 
 def biography_upload_path(instance, filename):
     return f'biography/{instance.member.username}/{filename}'
@@ -151,7 +152,6 @@ class Member(AbstractUser):
     joined_club = models.DateField(blank=True, null=True)
     emergency_contact = models.TextField(blank=True, null=True)
 
-    from tinymce.models import HTMLField
     public_notes = HTMLField(blank=True, null=True)
     private_notes = HTMLField(blank=True, null=True)
 
@@ -162,9 +162,13 @@ class Member(AbstractUser):
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
     image = models.ImageField(upload_to='badge_images/', blank=True, null=True)
- 
+    description = HTMLField(blank=True)
+    order = models.PositiveIntegerField(default=0)  # 👈 Add this!
+
+    class Meta:
+        ordering = ['order']  # 👈 Ensure badges come out in the desired order
+
     def __str__(self):
         return self.name
 

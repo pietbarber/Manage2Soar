@@ -1,30 +1,71 @@
 {% extends "base.html" %}
 {% load static %}
+{% load member_extras %}
+
 
 {% block content %}
 <h2 class="mb-4">🎖️ SSA Badge Board</h2>
 
-{% for badge in badges %}
-  <div class="mb-4">
-    <h4>
-      <img src="{{ badge.image.url }}" alt="{{ badge.name }}" style="height: 40px;" class="me-2">
-      {{ badge.name }}
-    </h4>
-    <div class="d-flex flex-wrap gap-3">
-      {% for memberbadge in badge.memberbadge_set.all %}
-        <div class="text-center">
-          {% if memberbadge.member.profile_photo %}
-            <img src="{{ memberbadge.member.profile_photo.url }}" class="rounded-circle" style="height: 75px;" alt="{{ memberbadge.member.get_full_name }}">
+<div class="container">
+  {% for badge in badges %}
+    <div class="row mb-4">
+      <div class="col-auto">
+        <!-- Badge icon toggles the collapsible description -->
+        <a data-bs-toggle="collapse" href="#badge-desc-{{ badge.id }}" role="button" aria-expanded="false" aria-controls="badge-desc-{{ badge.id }}">
+          <img src="{{ badge.image.url }}" alt="{{ badge.name }}" class="img-thumbnail" style="max-width: 100px;">
+        </a>
+      </div>
+      <div class="col">
+        <div class="fw-bold">{{ badge.name }}</div>
+
+        <!-- Badge recipient thumbnails -->
+
+<!-- Badge recipient thumbnails and names -->
+
+
+{% if badge.memberbadge_set.all %}
+  <div class="d-flex flex-wrap mt-1">
+    {% for mb in badge.memberbadge_set.all %}
+      <div class="d-flex align-items-center me-3 mb-2">
+
+
+        <a href="{% url 'member_view' mb.member.pk %}" class="d-flex align-items-center text-decoration-none">
+          {% if mb.member.profile_photo %}
+            <img src="{{ mb.member.profile_photo.url }}"
+                 alt="{{ mb.member }}"
+                 class="rounded-circle me-1"
+                 style="width: 32px; height: 32px; object-fit: cover;">
           {% else %}
-            <img src="{% static 'images/default-avatar.png' %}" class="rounded-circle" style="height: 75px;" alt="{{ memberbadge.member.get_full_name }}">
+            <img src="{% static 'images/default-avatar.png' %}"
+                 alt="No photo"
+                 class="rounded-circle me-1"
+                 style="width: 32px; height: 32px; object-fit: cover;">
           {% endif %}
-          <div class="small">{{ memberbadge.member.get_full_name }}</div>
-        </div>
-      {% empty %}
-        <p class="text-muted">No recipients yet.</p>
-      {% endfor %}
-    </div>
+          <span class="small text-body">{{ mb.member|full_display_name }}</span>
+        </a>
+
+
+
+      </div>
+    {% endfor %}
   </div>
-{% endfor %}
+{% endif %}
+
+
+
+        <!-- Collapsible rich HTML description -->
+        <div class="collapse mt-2" id="badge-desc-{{ badge.id }}">
+          <div class="card card-body small text-muted">
+            {{ badge.description|safe }}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+
+
+
 
 {% endblock %}
