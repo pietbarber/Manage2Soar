@@ -23,12 +23,14 @@ This roadmap outlines current and future development goals for the Skyline Soari
 9. Add member name formatting helper (`get_display_name`)
 10. Improve navigation UI and add responsive hamburger menu.
 11. Setup flatpickr calendar popup for ISO 8601 date input.
+12. Automated profile photos using Pydenticon instead of the static image. 
 
 ---
 
 ## In Progress 🔄
 - Migration tooling for importing legacy member data from PostgreSQL JSON export
 - Improve member import with robust date parsing and dry-run validation
+- Automatically generated icons for people who haven't uploaded a profile photo. 
 
 ---
 

@@ -2,6 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings
 from tinymce.models import HTMLField
+from .utils.avatar_generator import generate_identicon
+import os
 
 def biography_upload_path(instance, filename):
     return f'biography/{instance.member.username}/{filename}'
@@ -156,6 +158,20 @@ class Member(AbstractUser):
     private_notes = HTMLField(blank=True, null=True)
 
     last_updated_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.profile_photo:
+            # Only generate if no photo already exists
+            filename = f"profile_{self.username}.png"
+            file_path = os.path.join('generated_avatars', filename)
+
+            # Prevent overwriting if avatar already exists
+            if not os.path.exists(os.path.join('media', file_path)):
+                generate_identicon(self.username, file_path)
+
+            self.profile_photo = file_path
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
