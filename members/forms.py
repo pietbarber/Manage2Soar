@@ -154,3 +154,13 @@ class MemberProfilePhotoForm(forms.ModelForm):
         model = Member
         fields = ['profile_photo']
 
+
+from .models import Biography
+
+class BiographyForm(forms.ModelForm):
+    class Meta:
+        model = Biography
+        fields = ['content', 'uploaded_image']
+        widgets = {
+            'content': TinyMCE(attrs={'cols': 80, 'rows': 30}),
+        }

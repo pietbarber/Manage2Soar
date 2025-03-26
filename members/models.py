@@ -1,5 +1,18 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings
+
+def biography_upload_path(instance, filename):
+    return f'biography/{instance.member.username}/{filename}'
+
+class Biography(models.Model):
+    member = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    content = models.TextField(blank=True, null=True)
+    uploaded_image = models.ImageField(upload_to=biography_upload_path, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Biography of {self.member.get_full_name()}"
 
 class Glider(models.Model):
     make = models.CharField(max_length=100)

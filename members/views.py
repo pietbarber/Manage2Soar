@@ -68,6 +68,8 @@ def member_view(request, member_id):
     is_self = request.user == member
     qr_png = generate_vcard_qr(member)
     qr_base64 = base64.b64encode(qr_png).decode('utf-8')
+    can_edit = request.user == member or request.user.is_superuser
+
 
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
@@ -82,6 +84,7 @@ def member_view(request, member_id):
         "qr_base64": qr_base64,
         "form": form,
         "is_self": is_self,
+        "can_edit": can_edit
     })
 
 
@@ -108,4 +111,54 @@ def set_password(request):
         form = SetPasswordForm(user=request.user)
     return render(request, 'members/set_password.html', {'form': form})
 
+# members/views.py
 
+from .models import Biography
+from .forms import BiographyForm
+
+@active_member_required
+def biography_view(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    biography, _ = Biography.objects.get_or_create(member=member)
+
+    can_edit = request.user == member or request.user.is_superuser
+
+    if request.method == "POST" and can_edit:
+        form = BiographyForm(request.POST, request.FILES, instance=biography)
+        if form.is_valid():
+            form.save()
+            return redirect("member_view", member_id=member.id)
+    else:
+        form = BiographyForm(instance=biography)
+
+    return render(request, "members/biography.html", {
+        "form": form,
+        "biography": biography,
+        "member": member,
+        "can_edit": can_edit
+    })
+
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import os
+from django.conf import settings
+
+@csrf_exempt
+def tinymce_image_upload(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        upload = request.FILES['file']
+        username = request.user.username or "anonymous"
+        safe_username = "".join(c for c in username if c.isalnum() or c in ('-', '_')).rstrip()
+        upload_dir = os.path.join(settings.MEDIA_ROOT, "biography", safe_username)
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Save file with original name
+        file_path = os.path.join(upload_dir, upload.name)
+        with open(file_path, 'wb+') as dest:
+            for chunk in upload.chunks():
+                dest.write(chunk)
+
+        media_url = f"{settings.MEDIA_URL}biography/{safe_username}/{upload.name}"
+        return JsonResponse({'location': media_url})
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)

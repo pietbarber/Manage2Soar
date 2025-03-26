@@ -108,6 +108,21 @@
 
     </div>
   </div>
-
+  <hr>
+  <h4>🧾 Biography</h4>
+  {% if member.biography %}
+    <div class="prose max-w-none">
+      {{ member.biography.content|safe }}
+    </div>
+    {% if can_edit %}
+      <a href="{% url 'biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Edit Biography</a>
+    {% endif %}
+  {% else %}
+    <p>{{ member.first_name }} {{ member.last_name }} hasn’t uploaded a biography yet.</p>
+    {% if can_edit %}
+      <a href="{% url 'biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Write Biography</a>
+    {% endif %}
+  {% endif %}
+  
 </div>
 {% endblock %}
