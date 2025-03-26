@@ -78,10 +78,23 @@
           {% for badge in member.badges.all %}
             {% if badge.badge.name in "'A Badge','B Badge','C Badge','Bronze Badge'" %}
               <div class="col-auto mb-2">
-                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 150px;">
+                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 100px;">
                 <div class="text-center small">{{ badge.badge.name }}</div>
+                <div class="text-center small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
               </div>
             {% endif %}
+          {% endfor %}
+        </div>
+        <div class="row">
+          {% for badge in member.badges.all %}
+            {% if badge.badge.name in "'FAI Silver Badge','FAI Gold Badge','FAI Diamond Badge'" %}
+              <div class="col-auto mb-2">
+                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 100px;">
+                <div class="text-center small">{{ badge.badge.name }}</div>
+                <div class="text-center small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
+              </div>
+            {% endif %}
+
           {% endfor %}
         </div>
     </div>
