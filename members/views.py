@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 from django.shortcuts import render, get_object_or_404, redirect
 from .forms import MemberForm
+from .forms import MemberProfilePhotoForm
 from members.decorators import active_member_required
 from .models import Member
 
@@ -64,12 +65,25 @@ import base64
 @active_member_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
+    is_self = request.user == member
     qr_png = generate_vcard_qr(member)
     qr_base64 = base64.b64encode(qr_png).decode('utf-8')
+
+    if is_self and request.method == "POST":
+        form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
+        if form.is_valid():
+            form.save()
+            return redirect("member_view", member_id=member.id)
+    else:
+        form = MemberProfilePhotoForm(instance=member) if is_self else None
+
     return render(request, "members/member_view.html", {
         "member": member,
-        "qr_base64": qr_base64
+        "qr_base64": qr_base64,
+        "form": form,
+        "is_self": is_self,
     })
+
 
 def custom_permission_denied_view(request, exception=None):
     return render(request, "403.html", status=403)

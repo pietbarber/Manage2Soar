@@ -148,3 +148,9 @@ class BadgeForm(forms.ModelForm):
     class Meta:
         model = Badge
         fields = '__all__'
+
+class MemberProfilePhotoForm(forms.ModelForm):
+    class Meta:
+        model = Member
+        fields = ['profile_photo']
+
