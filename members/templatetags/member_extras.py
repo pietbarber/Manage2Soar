@@ -5,10 +5,7 @@
 
 
 from django import template
-
-register = template.Library()
-
-from django import template
+import re
 
 register = template.Library()
 
@@ -35,3 +32,11 @@ def full_display_name(member):
         parts.append(member.name_suffix)
 
     return " ".join(parts)
+
+@register.filter
+def format_us_phone(value):
+    """Format a 10-digit US phone number into +1-AAA-BBB-CCCC"""
+    digits = re.sub(r'\D', '', str(value))
+    if len(digits) == 10:
+        return f"+1 {digits[0:3]}-{digits[3:6]}-{digits[6:]}"
+    return value  # Fallback: return original

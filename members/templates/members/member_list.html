@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% load member_extras %}
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
@@ -16,7 +16,6 @@
         <tr>
             <th>Photo</th>
             <th>Name</th>
-            <th>Address</th>
             <th>Phone</th>
             <th>Duties</th>
             <th>Email</th>
@@ -42,10 +41,12 @@
             <td>{{ member.first_name }} {% if member.nickname %}“{{ member.nickname }}”{% endif %} {% if member.middle_initial %}{{ member.middle_initial }}.{% endif %} {{ member.last_name }} {% if member.name_suffix %}{{ member.name_suffix }}{% endif %}</td>
 
             <td>
-                {{ member.address }}<br>
-                {{ member.city }}, {{ member.state_code }} {{ member.state_freeform }} {{ member.zip_code }}<br>
-            </td>
-            <td>{{ member.phone }}<br>{{ member.mobile_phone }}</td>
+                {% if member.phone %}
+                <span style="white-space: nowrap;">📞 {{ member.phone|format_us_phone }}</span>
+                {% endif %}
+                {% if member.mobile_phone %}
+                <span style="white-space: nowrap;">📱 {{ member.mobile_phone|format_us_phone }}</span>
+                {% endif %}
             <td>
                 {% if member.is_duty_officer %}<span class="badge bg-info">DO</span>{% endif %}
                 {% if member.is_assistant_duty_officer %}<span class="badge bg-secondary">ADO</span>{% endif %}

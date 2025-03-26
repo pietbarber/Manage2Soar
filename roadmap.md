@@ -25,6 +25,7 @@ This roadmap outlines current and future development goals for the Skyline Soari
 11. Setup flatpickr calendar popup for ISO 8601 date input.
 12. Automated profile photos using Pydenticon instead of the static image. 
 13. States should be a pull-down.  (Complicated by the fact that we have non-US ex members)
+14. Hyphenate phone numbers so the phone numbers don't look like barbaric strings of digits
 
 ---
 
@@ -34,19 +35,23 @@ This roadmap outlines current and future development goals for the Skyline Soari
 
 ---
 
+## Abandoned Tasks ⚰️
+1. Allow uploading vCard files to populate members (**deprioritized**)
+
+
+---
+
 ## Upcoming Tasks 🚀
 1. Add support for importing badge achievements from legacy system
-2. Allow uploading vCard files to populate members (**deprioritized**)
-3. Set up OAuth2 login for providers other than Google (Yahoo, Microsoft, Facebook)
-4. Admin UI for editing badge recipients in a non-admin interface
-5. Integrate legacy usernames (handle) to link historical flight log data
-6. Customize Django admin list display to show additional fields like `membership_status`, `towpilot`, `glider_rating`, etc.
-7. Allow members to view but not edit their own membership records (except photo & biography)
-8. Add glider image thumbnails to members who own gliders
-9. Add contact group management (for targeted emails)
-10. Add flight history viewer (imported legacy data + new log uploads)
-12. Hyphenate phone numbers so the phone numbers don't look like barbaric strings of digits
-13. members_list page: differentiate home vs cell phone numbers. 
+2. Set up OAuth2 login for providers other than Google (Yahoo, Microsoft, Facebook)
+3. Admin UI for editing badge recipients in a non-admin interface
+4. Integrate legacy usernames (handle) to link historical flight log data
+5. Customize Django admin list display to show additional fields like `membership_status`, `towpilot`, `glider_rating`, etc.
+6. Allow members to view but not edit their own membership records (except photo & biography)
+7. Add glider image thumbnails to members who own gliders
+8. Add contact group management (for targeted emails)
+9. Add flight history viewer (imported legacy data + new log uploads)
+10. members_list page: differentiate home vs cell phone numbers. 
 
 ---
 

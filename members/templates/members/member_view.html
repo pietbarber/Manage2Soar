@@ -39,7 +39,7 @@
         <li class="list-group-item">
             <strong>Phone:</strong>
             {% if member.phone %}
-              <a href="tel:+1{{ member.phone }}">{{ member.phone }}</a>
+              📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
             {% else %}
               N/A
             {% endif %}
@@ -48,7 +48,7 @@
         <li class="list-group-item">
             <strong>Mobile:</strong>
             {% if member.mobile_phone %}
-              <a href="tel:+1{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
+              📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
             {% else %}
               N/A
             {% endif %}
