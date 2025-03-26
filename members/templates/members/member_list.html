@@ -39,7 +39,8 @@
                 {% endif %}
             </td>
             </td>
-            <td>{{ member.first_name }} {{ member.last_name }}</td>
+            <td>{{ member.first_name }} {% if member.nickname %}“{{ member.nickname }}”{% endif %} {% if member.middle_initial %}{{ member.middle_initial }}.{% endif %} {{ member.last_name }} {% if member.name_suffix %}{{ member.name_suffix }}{% endif %}</td>
+
             <td>
                 {{ member.address }}<br>
                 {{ member.city }}, {{ member.state }} {{ member.zip_code }}

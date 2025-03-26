@@ -37,19 +37,39 @@ class Glider(models.Model):
 
 
 class Member(AbstractUser):
+   # Here are the legacy codes from the old database,
+    # which you can use for reference when we do the migration
+    # Legacy status codes:
+    # M = Full Member
+    # U = Student Member
+    # Q = Family Member
+    # F = Founding Member
+    # H = Honorary Member
+    # E = Introductory Member
+    # C = SSEF Member (Scholarship)
+    # I = Inactive
+    # N = Non-Member
+    # P = Probationary Member
+    # T = Transient Member
+    # A = FAST Member
+    # S = Service Member
+
     MEMBERSHIP_STATUS_CHOICES = [
         ('Full Member', 'Full Member'),
         ('Student Member', 'Student Member'),
         ('Family Member', 'Family Member'),
         ('Founding Member', 'Founding Member'),
         ('Honorary Member', 'Honorary Member'),
-        ('Emeritus Member', 'Emeritus Member'),
-        ('SSEF Member', 'SSEF Member'),
-        ('Temporary Member', 'Temporary Member'),
         ('Introductory Member', 'Introductory Member'),
+        ('SSEF Member', 'SSEF Member'),
         ('Inactive', 'Inactive'),
         ('Non-Member', 'Non-Member'),
+        ('Probationary Member', 'Probationary Member'),
+        ('Transient Member', 'Transient Member'),
+        ('FAST Member', 'FAST Member'),
+        ('Service Member', 'Service Member'),
     ]
+
 
     membership_status = models.CharField(
         max_length=20,
@@ -59,6 +79,28 @@ class Member(AbstractUser):
         null=True,
     )
 
+    NAME_SUFFIX_CHOICES = [
+    ('', '—'),  # blank default
+    ('Jr.', 'Jr.'),
+    ('Sr.', 'Sr.'),
+    ('II', 'II'),
+    ('III', 'III'),
+    ('IV', 'IV'),
+    ('V', 'V'),
+    ]
+
+    # Additional name-related fields
+
+    middle_initial = models.CharField(max_length=2, blank=True, null=True)
+    nickname = models.CharField(max_length=50, blank=True, null=True)
+    name_suffix = models.CharField(
+        max_length=10,
+        choices=NAME_SUFFIX_CHOICES,
+        blank=True,
+        null=True,
+    )
+
+    # Additional contact information fields
  
     SSA_member_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
     legacy_username = models.CharField(max_length=50, unique=True, blank=True, null=True)

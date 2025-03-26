@@ -59,8 +59,11 @@
       <div class="col-md-6">
         <h5>Personal Info</h5>
         {{ form.first_name|as_crispy_field }}
+        {{ form.middle_initial|as_crispy_field }}
+        {{ form.nickname|as_crispy_field }}
         {{ form.last_name|as_crispy_field }}
-        {{ form.username|as_crispy_field }}
+        {{ form.name_suffix|as_crispy_field }}
+
         {{ form.email|as_crispy_field }}
         {{ form.phone|as_crispy_field }}
         {{ form.mobile_phone|as_crispy_field }}

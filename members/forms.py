@@ -22,8 +22,13 @@ class MemberForm(forms.ModelForm):
         model = Member
         fields = [
           'membership_status',
-          'username', 'first_name', 'last_name', 'email',
+          'username', 
+         
+          'email',
           'legacy_username', 'SSA_member_number', 'phone', 'mobile_phone',
+
+          'first_name', 'middle_initial', 'nickname', 'last_name', 'name_suffix',
+
           'address',
           'city',
           'state',
@@ -46,7 +51,7 @@ class MemberForm(forms.ModelForm):
             'public_notes': TinyMCE(attrs={'rows': 10}),
             'private_notes': TinyMCE(attrs={'rows': 10}),
         }
-
+    
     def clean_profile_photo(self):
         photo = self.cleaned_data.get("profile_photo")
 
@@ -116,6 +121,7 @@ class MemberForm(forms.ModelForm):
             format='%Y-%m-%d'
         )
         self.fields['joined_club'].input_formats = ['%Y-%m-%d']
+        self.fields['username'].disabled = True
 
 
         # Remove default verbose help text for system fields
