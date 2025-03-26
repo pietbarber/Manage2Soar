@@ -11,20 +11,12 @@ from members.decorators import active_member_required
 from .models import Member
 
 
-def is_instructor(user):
-    return user.is_authenticated and user.is_instructor
-
 def home(request):
     return render(request, "home.html")
 
 @active_member_required
 def duty_roster(request):
     return render(request, 'members/duty_roster.html')
-
-@active_member_required
-@user_passes_test(is_instructor)
-def instructors_only(request):
-    return render(request, 'members/instructors.html')
 
 @active_member_required
 def members_list(request):
@@ -161,3 +153,14 @@ def tinymce_image_upload(request):
         return JsonResponse({'location': media_url})
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+from django.contrib.auth.decorators import user_passes_test
+from .decorators import active_member_required
+
+def is_instructor(user):
+    return user.is_authenticated and getattr(user, "instructor", False)
+
+@active_member_required
+@user_passes_test(is_instructor)
+def instructors_only_home(request):
+    return render(request, "members/instructors_home.html")

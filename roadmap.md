@@ -34,6 +34,7 @@ This roadmap outlines current and future development goals for the Skyline Soari
 ## In Progress 🔄
 - Migration tooling for importing legacy member data from PostgreSQL JSON export
 - Improve member import with robust date parsing and dry-run validation
+- Create restricted site for Instructors
 
 ---
 
@@ -53,7 +54,6 @@ This roadmap outlines current and future development goals for the Skyline Soari
 7. Add glider image thumbnails to members who own gliders
 8. Add contact group management (for targeted emails)
 9. Add flight history viewer (imported legacy data + new log uploads)
-- Create restricted site for Instructors
 - Import Training Syllabus
 
 ---
