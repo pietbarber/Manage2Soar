@@ -73,7 +73,10 @@
         <h5>Address</h5>
         {{ form.address|as_crispy_field }}
         {{ form.city|as_crispy_field }}
-        {{ form.state|as_crispy_field }}
+        {{ form.state_code|as_crispy_field }}
+        {{ form.state_freeform|as_crispy_field }}
+        {{ form.country|as_crispy_field }}
+
         {{ form.zip_code|as_crispy_field }}
       </div>
     </div>

@@ -53,7 +53,11 @@
               N/A
             {% endif %}
         </li>
-        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> {{ member.city }}, {{ member.state }} {{ member.zip_code }}</li>
+        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> 
+          {{ member.city }}, {{ member.state_code }} {{ member.state_freeform }} {{ member.zip_code }}<br>
+          {{ member.country }}
+        </li>
+       
         {% if member.glider_owned %}
         <li class="list-group-item"><strong>Glider:</strong> {{ member.glider_owned }}</li>
         {% endif %}

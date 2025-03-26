@@ -67,12 +67,27 @@ class Member(AbstractUser):
         ('SSEF Member', 'SSEF Member'),
         ('Inactive', 'Inactive'),
         ('Non-Member', 'Non-Member'),
+        ('Pending', 'Pending'),
         ('Probationary Member', 'Probationary Member'),
         ('Transient Member', 'Transient Member'),
         ('FAST Member', 'FAST Member'),
         ('Service Member', 'Service Member'),
     ]
-
+    US_STATE_CHOICES = [
+        ('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'),
+        ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'),
+        ('FL', 'Florida'), ('GA', 'Georgia'), ('HI', 'Hawaii'), ('ID', 'Idaho'),
+        ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'),
+        ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MD', 'Maryland'),
+        ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'),
+        ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'),
+        ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'),
+        ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'),
+        ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'),
+        ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'),
+        ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'),
+        ('WI', 'Wisconsin'), ('WY', 'Wyoming')
+    ]
 
     membership_status = models.CharField(
         max_length=20,
@@ -109,9 +124,16 @@ class Member(AbstractUser):
     legacy_username = models.CharField(max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     mobile_phone = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=2, blank=True, null=True, default='US')
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=50, blank=True, null=True)
-    state = models.CharField(max_length=20, blank=True, null=True)
+    state_code = models.CharField(
+        max_length=2,
+        choices=US_STATE_CHOICES,
+        blank=True,
+        null=True
+    )
+    state_freeform = models.CharField(max_length=50, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
     profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     GLIDER_RATING_CHOICES = [

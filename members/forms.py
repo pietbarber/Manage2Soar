@@ -28,10 +28,9 @@ class MemberForm(forms.ModelForm):
           'legacy_username', 'SSA_member_number', 'phone', 'mobile_phone',
 
           'first_name', 'middle_initial', 'nickname', 'last_name', 'name_suffix',
-
+          'country', 'state_code', 'state_freeform',
           'address',
           'city',
-          'state',
           'zip_code',
           'profile_photo',
           'glider_rating', 'instructor', 'towpilot', 'duty_officer', 'assistant_duty_officer', 'secretary',
