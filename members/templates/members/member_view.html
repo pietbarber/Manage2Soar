@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load member_extras %}
 
 {% block content %}
 <div class="container mt-4">
-  <h2>{{ member.first_name }} {% if member.nickname %}“{{ member.nickname }}”{% endif %} {% if member.middle_initial %}{{ member.middle_initial }}.{% endif %} {{ member.last_name }} {% if member.name_suffix %}{{ member.name_suffix }}{% endif %}</h2>
+  <h2>{{ member|display_name }}</h2>
   <div class="row">
     <div class="col-md-4">
       {% if member.profile_photo %}
