@@ -26,6 +26,8 @@ This roadmap outlines current and future development goals for the Skyline Soari
 12. Automated profile photos using Pydenticon instead of the static image. 
 13. States should be a pull-down.  (Complicated by the fact that we have non-US ex members)
 14. Hyphenate phone numbers so the phone numbers don't look like barbaric strings of digits
+15. members_list page: differentiate home vs cell phone numbers. 
+16. members_list page: sort by lastname in a default view.  
 
 ---
 
@@ -51,14 +53,15 @@ This roadmap outlines current and future development goals for the Skyline Soari
 7. Add glider image thumbnails to members who own gliders
 8. Add contact group management (for targeted emails)
 9. Add flight history viewer (imported legacy data + new log uploads)
-10. members_list page: differentiate home vs cell phone numbers. 
+- Create restricted site for Instructors
+- Import Training Syllabus
 
 ---
 
 ## Nice-to-Haves / Stretch Goals
 - Add calendar of events (duty roster, instructor availability, club events)
 - Member activity timeline (badge earned, glider flights, etc.)
-- CSV or PDF export of member list for club use
+- CSV, XLS or PDF export of member list for club use
 - Automatic backup and restore scripts for database/media
 - Dockerize deployment
 

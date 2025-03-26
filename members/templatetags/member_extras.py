@@ -6,6 +6,8 @@
 
 from django import template
 import re
+from django.utils.safestring import mark_safe
+
 
 register = template.Library()
 
@@ -64,3 +66,33 @@ def render_duties(member):
         duties.append('<span title="Membership Manager">🧑‍🔧</span>')
 
     return ' '.join(duties) if duties else "-"
+
+
+@register.simple_tag
+def duty_emoji_legend():
+    return mark_safe("""
+    <div class="accordion mb-4" id="emojiLegendAccordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingLegend">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLegend" aria-expanded="false" aria-controls="collapseLegend">
+            📖 Expand to show Legend 
+          </button>
+        </h2>
+        <div id="collapseLegend" class="accordion-collapse collapse" aria-labelledby="headingLegend" data-bs-parent="#emojiLegendAccordion">
+          <div class="accordion-body">
+            <ul class="list-unstyled mb-0">
+              <li>🧑‍🏫 – Instructor</li>
+              <li>✈️ – Tow Pilot</li>
+              <li>🗓️ – Duty Officer</li>
+              <li>🧭 – Assistant Duty Officer</li>
+              <li>📋 – Secretary</li>
+              <li>💰 – Treasurer</li>
+              <li>🌐 – Webmaster</li>
+              <li>🎯 – Director</li>
+              <li>🧑‍💼 – Membership Manager</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    """)
