@@ -26,6 +26,7 @@ urlpatterns = [
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
     path("instructors/", views.instructors_only_home, name="instructors_home"),
     path("logsheet/manage/", views.manage_logsheet, name="manage_logsheet"),
+    path("logsheet/start/", views.start_logsheet, name="start_logsheet"),
 
 
 

@@ -226,3 +226,18 @@ def manage_logsheet(request):
         'flight_logs': flight_logs,
         'today': today,
     })
+
+from .forms import FlightDayForm
+
+
+@active_member_required
+def start_logsheet(request):
+    if request.method == 'POST':
+        form = FlightDayForm(request.POST)
+        if form.is_valid():
+            flight_day = form.save()
+            return redirect('manage_logsheet')  # 👈 Redirect to the logsheet management page
+    else:
+        form = FlightDayForm(initial={'date': date.today()})
+    
+    return render(request, 'members/start_logsheet.html', {'form': form})

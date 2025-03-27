@@ -261,3 +261,26 @@ class FlightLogForm(forms.ModelForm):
             },
             format='%Y-%m-%d'
         )
+
+from django import forms
+from .models import FlightDay
+
+class FlightDayForm(forms.ModelForm):
+    class Meta:
+        model = FlightDay
+        fields = ['date', 'airfield', 'duty_officer', 'assistant', 'instructor', 'towpilot']
+        widgets = {
+            'date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }, format='%Y-%m-%d')
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        import datetime
+        self.fields['date'].initial = datetime.date.today()
+        self.fields['duty_officer'].queryset = Member.objects.filter(duty_officer=True)
+        self.fields['instructor'].queryset = Member.objects.filter(instructor=True)
+        self.fields['towpilot'].queryset = Member.objects.filter(towpilot=True)
+
