@@ -326,3 +326,19 @@ class FlightLog(models.Model):
         self.full_clean()  # Run clean() validations
         super().save(*args, **kwargs)
 
+from django.utils import timezone
+from .models import Member, Airfield
+
+class FlightDay(models.Model):
+    date = models.DateField()
+    airfield = models.ForeignKey(Airfield, on_delete=models.CASCADE)
+    duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_duty')
+    instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_instructing')
+    towpilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_tow')
+    assistant = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_assist')
+
+    is_closed = models.BooleanField(default=False)
+    notes = HTMLField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.date} @ {self.airfield}"
