@@ -86,4 +86,32 @@
     <p>No flights logged today yet.</p>
   {% endif %}
 </div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const gliderSelect = document.getElementById('id_glider');
+      const passengerField = document.getElementById('id_passenger');
+      const instructorField = document.getElementById('id_instructor');
+      const seatData = JSON.parse(gliderSelect.dataset.gliders || '{}');
+    
+      function toggleFields() {
+        const selectedGliderId = gliderSelect.value;
+        const seats = seatData[selectedGliderId];
+    
+        const disable = seats == 1;
+        passengerField.disabled = disable;
+        instructorField.disabled = disable;
+    
+        if (disable) {
+          passengerField.value = '';
+          instructorField.value = '';
+        }
+      }
+    
+      gliderSelect.addEventListener('change', toggleFields);
+      toggleFields();  // run on load
+    });
+    </script>
+
 {% endblock %}

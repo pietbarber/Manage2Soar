@@ -199,7 +199,19 @@ class BiographyForm(forms.ModelForm):
 from django import forms
 from .models import FlightLog
 
+import json
 class FlightLogForm(forms.ModelForm):
+    flight_date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control"
+            },
+            format="%Y-%m-%d"
+        ),
+        input_formats=["%Y-%m-%d"],
+        required=True
+    )
     class Meta:
         model = FlightLog
         fields = [
@@ -225,14 +237,6 @@ class FlightLogForm(forms.ModelForm):
             'flight_time': forms.TimeInput(attrs={'type': 'time'}),
         }
 
-    flight_date = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control'
-        }),
-        input_formats=['%Y-%m-%d']
-    )
-
     flight_time = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
@@ -242,7 +246,18 @@ class FlightLogForm(forms.ModelForm):
         })
     )
 
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['instructor'].queryset = Member.objects.filter(instructor=True)
+
+        from .models import Glider  # local import to avoid circular imports
+        glider_seats = {glider.id: glider.number_of_seats for glider in Glider.objects.all()}
+        self.fields['glider'].widget.attrs['data-gliders'] = json.dumps(glider_seats)
+
+        self.fields['flight_date'].widget = forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+            },
+            format='%Y-%m-%d'
+        )
