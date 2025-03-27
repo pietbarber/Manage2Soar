@@ -2,6 +2,7 @@
 .env
 media/glider_photos
 media/towplane_photos
+media/airfield_photos/
 media/profile_photos
 media/biography
 media/generated_avatars

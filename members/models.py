@@ -241,6 +241,16 @@ class Towplane(models.Model):
         return self.name
 
 
+class Airfield(models.Model):
+    identifier = models.CharField(max_length=10, unique=True)  # e.g., KFRR
+    name = models.CharField(max_length=100)  # e.g., Front Royal Warren County Airport
+    photo = models.ImageField(upload_to='airfield_photos/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.identifier} – {self.name}"
+
+
 class FlightLog(models.Model):
     FLIGHT_TYPE_CHOICES = [
         ('Solo', 'Solo'),
@@ -258,7 +268,8 @@ class FlightLog(models.Model):
     ]
 
     flight_date = models.DateField()
-    field = models.CharField(max_length=10, help_text="Airfield identifier, e.g. KFRR, W99")
+    airfield = models.ForeignKey('Airfield', on_delete=models.PROTECT, null=True, blank=True)
+
 
     pilot = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='flights_flown')
     passenger = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='flights_passenger')
@@ -290,5 +301,5 @@ class FlightLog(models.Model):
         ordering = ['-flight_date', 'takeoff_time']
 
     def __str__(self):
-        return f"{self.flight_date} - {self.pilot} in {self.glider} at {self.field}"
+        return f"{self.flight_date} - {self.pilot} in {self.glider} at {self.airfield}"
 

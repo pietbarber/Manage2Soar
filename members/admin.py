@@ -47,11 +47,25 @@ class TowplaneAdmin(admin.ModelAdmin):
         return "(No image uploaded)"
     towplane_image_preview.short_description = "Current Image"
 
+from .models import Airfield
 
 @admin.register(FlightLog)
 class FlightLogAdmin(admin.ModelAdmin):
-    list_display = ['flight_date', 'pilot', 'glider', 'takeoff_time', 'landing_time', 'field']
-    list_filter = ['flight_date', 'field', 'glider']
+    list_display = ['flight_date', 'pilot', 'glider', 'takeoff_time', 'landing_time', 'airfield']
+    list_filter = ['flight_date', 'airfield', 'glider']
     search_fields = ['pilot__username', 'glider__n_number']
     autocomplete_fields = ['pilot', 'passenger', 'instructor', 'towpilot', 'glider', 'towplane', 'alternate_payer']
+
+@admin.register(Airfield)
+class AirfieldAdmin(admin.ModelAdmin):
+    list_display = ['identifier', 'name', 'is_active']
+    search_fields = ['identifier', 'name']
+    list_filter = ['is_active']
+    readonly_fields = ['airfield_image_preview']
+
+    def airfield_image_preview(self, obj):
+        if obj.photo:
+            return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
+        return "(No photo uploaded)"
+    airfield_image_preview.short_description = "Current Photo"
 
