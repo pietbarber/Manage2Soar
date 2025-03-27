@@ -9,6 +9,8 @@ from .forms import MemberForm
 from .forms import MemberProfilePhotoForm
 from members.decorators import active_member_required
 from .models import Member
+from datetime import date
+
 
 
 def home(request):
@@ -164,3 +166,63 @@ def is_instructor(user):
 @user_passes_test(is_instructor)
 def instructors_only_home(request):
     return render(request, "members/instructors_home.html")
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from .models import FlightLog, Airfield, Towplane, Glider
+from .forms import FlightLogForm
+
+@active_member_required
+def logsheet_list(request):
+    logsheets = FlightLog.objects.select_related('airfield', 'glider', 'towplane').order_by('-flight_date')
+    return render(request, 'members/logsheet_list.html', {'logsheets': logsheets})
+
+@active_member_required
+def logsheet_add(request):
+    if request.method == 'POST':
+        form = FlightLogForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('logsheet_list')
+    else:
+        form = FlightLogForm()
+    return render(request, 'members/logsheet_form.html', {'form': form})
+
+@active_member_required
+def logsheet_edit(request, pk):
+    log = get_object_or_404(FlightLog, pk=pk)
+    if request.method == 'POST':
+        form = FlightLogForm(request.POST, instance=log)
+        if form.is_valid():
+            form.save()
+            return redirect('logsheet_list')
+    else:
+        form = FlightLogForm(instance=log)
+    return render(request, 'members/logsheet_form.html', {'form': form})
+
+@active_member_required
+def logsheet_delete(request, pk):
+    log = get_object_or_404(FlightLog, pk=pk)
+    if request.method == 'POST':
+        log.delete()
+        return redirect('logsheet_list')
+    return render(request, 'members/logsheet_confirm_delete.html', {'log': log})
+
+@active_member_required
+def manage_logsheet(request):
+    today = date.today()
+    flight_logs = FlightLog.objects.filter(flight_date=today).select_related('pilot', 'passenger', 'towpilot', 'glider', 'airfield')
+
+    if request.method == 'POST':
+        form = FlightLogForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('manage_logsheet')
+    else:
+        form = FlightLogForm(initial={'flight_date': today})
+
+    return render(request, 'members/logsheet_manage.html', {
+        'form': form,
+        'flight_logs': flight_logs,
+        'today': today,
+    })

@@ -194,3 +194,36 @@ class BiographyForm(forms.ModelForm):
         widgets = {
             'content': TinyMCE(attrs={'cols': 80, 'rows': 30}),
         }
+
+
+from django import forms
+from .models import FlightLog
+
+class FlightLogForm(forms.ModelForm):
+    class Meta:
+        model = FlightLog
+        fields = [
+            'flight_date',
+            'pilot',
+            'instructor',
+            'passenger',
+            'glider',
+            'towplane',
+            'towpilot',
+            'release_altitude',
+            'takeoff_time',
+            'landing_time',
+            'flight_time',
+            'alternate_payer',
+            'pays',
+            'airfield',
+        ]
+        widgets = {
+            'flight_date': forms.DateInput(attrs={'type': 'date'}),
+            'takeoff_time': forms.TimeInput(attrs={'type': 'time'}),
+            'landing_time': forms.TimeInput(attrs={'type': 'time'}),
+            'flight_time': forms.TimeInput(attrs={'type': 'time'}),
+        }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['instructor'].queryset = Member.objects.filter(instructor=True)

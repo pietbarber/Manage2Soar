@@ -25,6 +25,8 @@ urlpatterns = [
     path('<int:member_id>/biography/', views.biography_view, name='biography_view'),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
     path("instructors/", views.instructors_only_home, name="instructors_home"),
+    path("logsheet/manage/", views.manage_logsheet, name="manage_logsheet"),
+
 
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
