@@ -4,6 +4,41 @@
 {% load member_extras %}
 {% block content %}
 
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const takeoff = document.getElementById("id_takeoff_time");
+      const landing = document.getElementById("id_landing_time");
+      const flightTime = document.getElementById("id_flight_time");
+    
+      function calculateDuration() {
+        if (!takeoff.value || !landing.value) return;
+    
+        const [toH, toM] = takeoff.value.split(":").map(Number);
+        const [laH, laM] = landing.value.split(":").map(Number);
+    
+        let takeoffMinutes = toH * 60 + toM;
+        let landingMinutes = laH * 60 + laM;
+    
+        if (landingMinutes < takeoffMinutes) {
+          landingMinutes += 24 * 60;  // Crosses midnight
+        }
+    
+        const duration = landingMinutes - takeoffMinutes;
+        const durH = Math.floor(duration / 60).toString().padStart(2, "0");
+        const durM = (duration % 60).toString().padStart(2, "0");
+    
+        flightTime.value = `${durH}:${durM}`;
+      }
+    
+      if (takeoff && landing && flightTime) {
+        flightTime.readOnly = true;
+        takeoff.addEventListener("change", calculateDuration);
+        landing.addEventListener("change", calculateDuration);
+      }
+    });
+    </script>
+
+
 
 <div class="container mt-4">
   <h2 class="mb-3">Log Flight</h2>

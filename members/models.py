@@ -1,6 +1,9 @@
-from django.contrib.auth.models import AbstractUser
-from django.db import models
+from datetime import timedelta
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils.timezone import now
 from tinymce.models import HTMLField
 from .utils.avatar_generator import generate_identicon
 import os
@@ -279,9 +282,9 @@ class FlightLog(models.Model):
     glider = models.ForeignKey("Glider", on_delete=models.SET_NULL, null=True)
     towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
 
-    takeoff_time = models.TimeField()
-    landing_time = models.TimeField()
-    flight_time = models.DurationField(help_text="Total time of flight")
+    takeoff_time = models.TimeField(null=True, blank=True)
+    landing_time = models.TimeField(null=True, blank=True)
+    flight_time = models.DurationField(null=True, blank=True, help_text="Total time of flight")
 
     release_altitude = models.PositiveIntegerField(help_text="In feet", null=True, blank=True)
 
@@ -302,4 +305,24 @@ class FlightLog(models.Model):
 
     def __str__(self):
         return f"{self.flight_date} - {self.pilot} in {self.glider} at {self.airfield}"
+    
+    def clean(self):
+        # Prevent passenger/instructor if glider is single seat
+        if self.glider.number_of_seats == 1:
+            if self.passenger:
+                raise ValidationError("Single-seat gliders cannot have a passenger.")
+            if self.instructor:
+                raise ValidationError("Single-seat gliders cannot have an instructor.")
+
+    def save(self, *args, **kwargs):
+        if self.takeoff_time and self.landing_time:
+            # Calculate flight duration
+            takeoff_dt = now().replace(hour=self.takeoff_time.hour, minute=self.takeoff_time.minute)
+            landing_dt = now().replace(hour=self.landing_time.hour, minute=self.landing_time.minute)
+            if landing_dt < takeoff_dt:
+                landing_dt += timedelta(days=1)  # Handle flights that land after midnight
+            self.flight_time = landing_dt - takeoff_dt
+
+        self.full_clean()  # Run clean() validations
+        super().save(*args, **kwargs)
 

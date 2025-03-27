@@ -204,10 +204,11 @@ class FlightLogForm(forms.ModelForm):
         model = FlightLog
         fields = [
             'flight_date',
+            'airfield',
+            'glider',
             'pilot',
             'instructor',
             'passenger',
-            'glider',
             'towplane',
             'towpilot',
             'release_altitude',
@@ -216,7 +217,6 @@ class FlightLogForm(forms.ModelForm):
             'flight_time',
             'alternate_payer',
             'pays',
-            'airfield',
         ]
         widgets = {
             'flight_date': forms.DateInput(attrs={'type': 'date'}),
@@ -224,6 +224,25 @@ class FlightLogForm(forms.ModelForm):
             'landing_time': forms.TimeInput(attrs={'type': 'time'}),
             'flight_time': forms.TimeInput(attrs={'type': 'time'}),
         }
+
+    flight_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        }),
+        input_formats=['%Y-%m-%d']
+    )
+
+    flight_time = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'readonly': 'readonly',
+            'class': 'form-control',
+            'placeholder': 'hh:mm'
+        })
+    )
+
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['instructor'].queryset = Member.objects.filter(instructor=True)
