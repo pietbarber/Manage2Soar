@@ -228,14 +228,26 @@ def manage_logsheet(request):
     })
 
 from .forms import FlightDayForm
-
+from datetime import date
+from .models import FlightDay
 
 @active_member_required
 def start_logsheet(request):
     if request.method == 'POST':
-        form = FlightDayForm(request.POST)
+
+        today = date.today()
+        try:
+            active_day = FlightDay.objects.get(flight_date=today)
+            initial = {'flight_date': active_day.flight_date}
+        except FlightDay.DoesNotExist:
+            active_day = None
+            initial = {}
+        form = FlightLogForm(request.POST or None, initial=initial)
+        
         if form.is_valid():
-            flight_day = form.save()
+            flight_day = form.save(commit=False)
+            flight_day.flight_date = date.today()  # Assign manually
+            flight_day.save()
             return redirect('manage_logsheet')  # 👈 Redirect to the logsheet management page
     else:
         form = FlightDayForm(initial={'date': date.today()})

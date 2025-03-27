@@ -89,29 +89,36 @@
 
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const gliderSelect = document.getElementById('id_glider');
-      const passengerField = document.getElementById('id_passenger');
-      const instructorField = document.getElementById('id_instructor');
-      const seatData = JSON.parse(gliderSelect.dataset.gliders || '{}');
-    
-      function toggleFields() {
-        const selectedGliderId = gliderSelect.value;
-        const seats = seatData[selectedGliderId];
-    
-        const disable = seats == 1;
-        passengerField.disabled = disable;
-        instructorField.disabled = disable;
-    
-        if (disable) {
-          passengerField.value = '';
-          instructorField.value = '';
-        }
+  document.addEventListener('DOMContentLoaded', function () {
+      const takeoff = document.getElementById('id_takeoff_time');
+      const landing = document.getElementById('id_landing_time');
+      const duration = document.getElementById('id_flight_time');
+  
+      function updateDuration() {
+          if (takeoff.value && landing.value) {
+              const t1 = takeoff.value.split(":").map(Number);
+              const t2 = landing.value.split(":").map(Number);
+  
+              const date1 = new Date(0, 0, 0, t1[0], t1[1]);
+              const date2 = new Date(0, 0, 0, t2[0], t2[1]);
+              let diff = (date2 - date1) / 60000; // in minutes
+  
+              if (diff < 0) diff += 24 * 60;
+  
+              const hours = Math.floor(diff / 60).toString().padStart(2, '0');
+              const mins = Math.floor(diff % 60).toString().padStart(2, '0');
+              duration.value = `${hours}:${mins}:00`;
+          } else {
+              duration.value = '';  // clear if incomplete
+          }
       }
-    
-      gliderSelect.addEventListener('change', toggleFields);
-      toggleFields();  // run on load
-    });
-    </script>
+  
+      takeoff.addEventListener('change', updateDuration);
+      landing.addEventListener('change', updateDuration);
+  });
+  </script>
+  
+
+
 
 {% endblock %}

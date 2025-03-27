@@ -74,6 +74,6 @@ from .models import FlightDay  # Make sure FlightDay is imported
 
 @admin.register(FlightDay)
 class FlightDayAdmin(admin.ModelAdmin):
-    list_display = ('date', 'airfield', 'duty_officer', 'instructor', 'towpilot', 'assistant')
-    list_filter = ('airfield', 'date')
+    list_display = ('flight_date', 'airfield', 'duty_officer', 'instructor', 'towpilot', 'assistant')
+    list_filter = ('airfield', 'flight_date')
     search_fields = ('duty_officer__username', 'instructor__username', 'towpilot__username', 'assistant__username')

@@ -314,6 +314,23 @@ class FlightLog(models.Model):
             if self.instructor:
                 raise ValidationError("Single-seat gliders cannot have an instructor.")
 
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.glider:
+            if self.glider.number_of_seats == 1:
+                if self.passenger:
+                    errors['passenger'] = "This glider only has one seat. It cannot have a passenger."
+                if self.instructor:
+                    errors['instructor'] = "This glider only has one seat. It cannot have an instructor."
+        else:
+            # Glider is optional or not yet selected
+            pass
+        
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         if self.takeoff_time and self.landing_time:
             # Calculate flight duration
@@ -330,7 +347,7 @@ from django.utils import timezone
 from .models import Member, Airfield
 
 class FlightDay(models.Model):
-    date = models.DateField()
+    flight_date = models.DateField()
     airfield = models.ForeignKey(Airfield, on_delete=models.CASCADE)
     duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_duty')
     instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='flight_days_instructing')
