@@ -108,3 +108,32 @@ def list_logsheets(request):
         "logsheets": logsheets,
         "query": query,
     })
+
+from django.http import HttpResponseForbidden
+from .models import Flight
+from .forms import FlightForm
+
+@active_member_required
+def edit_flight(request, logsheet_pk, flight_pk):
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
+    flight = get_object_or_404(Flight, pk=flight_pk, logsheet=logsheet)
+
+    # Optional: Only allow edits if not finalized
+    if logsheet.finalized and not request.user.is_superuser:
+        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
+
+    if request.method == "POST":
+        form = FlightForm(request.POST, instance=flight)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Flight updated.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+    else:
+        form = FlightForm(instance=flight)
+
+    return render(request, "logsheet/edit_flight.html", {
+        "form": form,
+        "flight": flight,
+        "logsheet": logsheet
+    })
+
