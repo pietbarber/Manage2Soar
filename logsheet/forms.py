@@ -22,3 +22,32 @@ class CreateLogsheetForm(forms.ModelForm):
                 raise ValidationError("A logsheet for this date and location already exists.")
 
         return cleaned_data
+
+from django import forms
+from .models import Flight
+
+class FlightForm(forms.ModelForm):
+    class Meta:
+        model = Flight
+        fields = [
+            "launch_time",
+            "landing_time",
+            "pilot",
+            "instructor",
+            "glider",
+            "tow_pilot",
+            "field",
+            "flight_type",
+            "notes",
+        ]
+        widgets = {
+            "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "landing_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "pilot": forms.Select(attrs={"class": "form-select"}),
+            "instructor": forms.Select(attrs={"class": "form-select"}),
+            "glider": forms.Select(attrs={"class": "form-select"}),
+            "tow_pilot": forms.Select(attrs={"class": "form-select"}),
+            "field": forms.TextInput(attrs={"class": "form-control"}),
+            "flight_type": forms.TextInput(attrs={"class": "form-control"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }

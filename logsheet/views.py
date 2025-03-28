@@ -10,14 +10,6 @@ from .forms import CreateLogsheetForm
 from .models import Logsheet
 from django.contrib import messages
 
-@active_member_required
-def manage_logsheet(request, pk):
-    logsheet = get_object_or_404(Logsheet, pk=pk)
-    return render(request, "logsheet/logsheet_manage.html", {
-        "logsheet": logsheet,
-    })
-
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Logsheet
@@ -49,3 +41,26 @@ def create_logsheet(request):
         form = CreateLogsheetForm()
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})
+
+from .forms import FlightForm
+
+@active_member_required
+def manage_logsheet(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    if request.method == "POST":
+        form = FlightForm(request.POST)
+        if form.is_valid():
+            flight = form.save(commit=False)
+            flight.logsheet = logsheet
+            flight.save()
+            messages.success(request, "Flight added successfully.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+    else:
+        form = FlightForm(initial={"field": logsheet.location})
+
+    return render(request, "logsheet/logsheet_manage.html", {
+        "logsheet": logsheet,
+        "form": form,
+    })
+
