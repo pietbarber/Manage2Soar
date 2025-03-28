@@ -30,3 +30,14 @@ def create_logsheet(request):
         form = CreateLogsheetForm()
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})
+
+from django.shortcuts import get_object_or_404
+from .models import Logsheet
+
+@active_member_required
+def manage_logsheet(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+    return render(request, "logsheet/logsheet_manage.html", {
+        "logsheet": logsheet,
+    })
+
