@@ -18,6 +18,7 @@
       <th>Created By</th>
       <th>Created At</th>
       <th>Flights</th>
+      <th>Status</th>
       <th></th>
     </tr>
   </thead>
@@ -29,9 +30,17 @@
       <td>{{ log.created_by }}</td>
       <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
       <td>{{ log.flights.count }}</td>
-
       <td>
-        <a href="{% url 'logsheet:manage' pk=log.pk %}" class="btn btn-sm btn-primary">Manage</a>
+        {% if log.finalized %}
+          <span class="badge bg-success">Finalized</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">Open</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="{% url 'logsheet:manage' pk=log.pk %}" class="btn btn-sm {% if log.finalized %}btn-secondary{% else %}btn-primary{% endif %}">
+          {% if log.finalized %}View{% else %}Manage{% endif %}
+        </a>
       </td>
     </tr>
     {% empty %}
