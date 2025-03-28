@@ -6,7 +6,6 @@
 
 {% block content %}
 
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
   flatpickr(".datepicker", {
     dateFormat: "Y-m-d", // ISO 8601 format
@@ -159,5 +158,21 @@
     }
   });
 </script>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      flatpickr("#id_joined_club", {
+          dateFormat: "Y-m-d",
+          allowInput: true
+      });
+    });
+    </script>
+
+
 
 {% endblock %}

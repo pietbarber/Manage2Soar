@@ -13,14 +13,6 @@ from crispy_forms.layout import Field
 from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit
 
 class MemberForm(forms.ModelForm):
-    joined_club = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-        }),
-        input_formats=['%Y-%m-%d']
-    )
     class Meta:
         model = Member
         fields = [
@@ -71,10 +63,8 @@ class MemberForm(forms.ModelForm):
                 raise ValidationError("Image too wide — please upload a square-ish photo.")
             elif aspect_ratio < 0.5:
                 raise ValidationError("Image too tall — please upload a square-ish photo.")
-    
         except Exception as e:
             raise ValidationError("Invalid image uploaded.")
-    
         return photo
 
 
@@ -137,14 +127,12 @@ class MemberForm(forms.ModelForm):
 
         self.fields['joined_club'].widget = forms.DateInput(
             attrs={
-                'type': 'date',
                 'class': 'form-control',
                 'min': min_date.isoformat(),
                 'max': max_date.isoformat(),
             },
             format='%Y-%m-%d'
         )
-        self.fields['joined_club'].input_formats = ['%Y-%m-%d']
         self.fields['username'].disabled = True
         self.fields['username'].help_text = "Usernames are not editable."
 
@@ -157,7 +145,6 @@ class MemberForm(forms.ModelForm):
         self.fields['public_notes'].help_text = "Visible to all members."
         self.fields['private_notes'].help_text = "Visible only to club officers."
         self.fields['legacy_username'].help_text = "User handle that was used on old web server"
-
 
 from .models import MemberBadge
 
