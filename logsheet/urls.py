@@ -7,6 +7,8 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("create/", views.create_logsheet, name="create"), 
     path("correct/", views.index, name="correct"),
+    path("manage/<int:pk>/", views.manage_logsheet, name="manage"),
+
 ] 
 
 from django.conf.urls import handler403

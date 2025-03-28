@@ -8,32 +8,39 @@
   Create New Logsheet
 </button>
 
+{% if message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ message }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+
 <!-- Modal HTML structure -->
 <div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
+
       <form method="POST">
         {% csrf_token %}
-        <div class="modal-header">
-          <h5 class="modal-title" id="createLogsheetModalLabel">New Logsheet Details</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        {{ form.non_field_errors }}
+    
+        <div class="mb-3">
+            {{ form.log_date.label_tag }}
+            {{ form.log_date }}
+            {{ form.log_date.errors }}
         </div>
-        <div class="modal-body">
-          <!-- Replace this with your real form -->
-          <div class="mb-3">
-            <label for="log_date" class="form-label">Date</label>
-            <input type="date" class="form-control" id="log_date" name="log_date">
-          </div>
-          <div class="mb-3">
-            <label for="location" class="form-label">Field</label>
-            <input type="text" class="form-control" id="location" name="location">
-          </div>
+        <div class="mb-3">
+            {{ form.location.label_tag }}
+            {{ form.location }}
+            {{ form.location.errors }}
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-success">Start Logsheet</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
-      </form>
+        
+
     </div>
   </div>
 </div>
