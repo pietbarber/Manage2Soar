@@ -48,7 +48,7 @@
     {% for flight in flights %}
     <li class="list-group-item">
       {{ flight.launch_time }} — {{ flight.landing_time }}:
-      {{ flight.pilot }} in {{ flight.glider }} ({{ flight.flight_type }})
+      {{ flight.pilot }} in {{ flight.glider }} towed by {{ flight.towplane }}
       <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" class="btn btn-sm btn-outline-secondary">
         Edit
       </a>
@@ -89,6 +89,8 @@
 
   <div class="row mt-2">
     <div class="col-md-3">{{ form.glider.label }}{{ form.glider }}</div>
+    <div class="col-md-3">{{ form.tow_plane.label }}{{ form.tow_plane }}</div>
+    <div class="col-md-3">{{ form.towplane.label }}{{ form.towplane }}</div>
     <div class="col-md-3">{{ form.tow_pilot.label }}{{ form.tow_pilot }}</div>
     <div class="col-md-3">{{ form.flight_type.label }}{{ form.flight_type }}</div>
     <div class="col-md-3">{{ form.field.label }}{{ form.field }}</div>

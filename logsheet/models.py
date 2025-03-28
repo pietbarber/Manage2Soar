@@ -24,6 +24,7 @@ class Flight(models.Model):
     instructor = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_instructor")
     glider = models.ForeignKey("members.Glider", on_delete=models.SET_NULL, null=True)
     tow_pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_tow_pilot")
+    towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
     field = models.CharField(max_length=100)  # Copy from logsheet or input per-flight
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
     notes = models.TextField(blank=True)
@@ -45,4 +46,15 @@ class RevisionLog(models.Model):
     def __str__(self):
         return f"Revised by {self.revised_by} on {self.revised_at}"
 
+class Towplane(models.Model):
+    name = models.CharField(max_length=100)
+    registration = models.CharField(max_length=50)  # e.g., N-number
+    photo = models.ImageField(upload_to="towplane_photos/", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        status = " (Inactive)" if not self.is_active else ""
+        return f"{self.name} ({self.registration})"
 

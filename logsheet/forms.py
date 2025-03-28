@@ -25,6 +25,7 @@ class CreateLogsheetForm(forms.ModelForm):
 
 from django import forms
 from .models import Flight
+from .models import Towplane
 
 class FlightForm(forms.ModelForm):
     class Meta:
@@ -35,10 +36,8 @@ class FlightForm(forms.ModelForm):
             "pilot",
             "instructor",
             "glider",
+            "towplane",
             "tow_pilot",
-            "field",
-            "flight_type",
-            "notes",
         ]
         widgets = {
             "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
@@ -47,7 +46,11 @@ class FlightForm(forms.ModelForm):
             "instructor": forms.Select(attrs={"class": "form-select"}),
             "glider": forms.Select(attrs={"class": "form-select"}),
             "tow_pilot": forms.Select(attrs={"class": "form-select"}),
-            "field": forms.TextInput(attrs={"class": "form-control"}),
-            "flight_type": forms.TextInput(attrs={"class": "form-control"}),
-            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "towplane": forms.Select(attrs={"class": "form-select"}),
+
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True)
+
