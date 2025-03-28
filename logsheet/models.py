@@ -32,4 +32,17 @@ class Flight(models.Model):
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
+    
+    from django.db import models
+from members.models import Member
+
+class RevisionLog(models.Model):
+    logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="revisions")
+    revised_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
+    revised_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Revised by {self.revised_by} on {self.revised_at}"
+
 

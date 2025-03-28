@@ -7,6 +7,15 @@
     <h5 class="card-title">Logsheet for {{ logsheet.log_date }}</h5>
     <p class="card-text">Location: {{ logsheet.location }}</p>
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
+    {% if logsheet.revisions.exists %}
+    <details>Revision History</details>
+      <ul class="mb-0">
+        {% for rev in logsheet.revisions.all %}
+        <li> Reopened by {{ rev.revised_by }} on {{ rev.revised_at|date:"Y-m-d H:i" }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
   </div>
 </div>
 {% if logsheet.finalized and user.is_superuser %}
