@@ -43,10 +43,22 @@ def create_logsheet(request):
     return render(request, "logsheet/start_logsheet.html", {"form": form})
 
 from .forms import FlightForm
+from django.db.models import Q
 
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    query = request.GET.get("q", "").strip()
+    flights = logsheet.flights.all()
+
+    if query:
+        flights = flights.filter(
+            Q(pilot__first_name__icontains=query) |
+            Q(pilot__last_name__icontains=query) |
+            Q(instructor__first_name__icontains=query) |
+            Q(instructor__last_name__icontains=query)
+        )
 
     if request.method == "POST":
         form = FlightForm(request.POST)
@@ -61,12 +73,28 @@ def manage_logsheet(request, pk):
 
     return render(request, "logsheet/logsheet_manage.html", {
         "logsheet": logsheet,
+        "flights": flights,
         "form": form,
+        "query": query,
     })
+
+
+from django.db.models import Q
 
 @active_member_required
 def list_logsheets(request):
-    logsheets = Logsheet.objects.order_by("-log_date", "-created_at")
+    query = request.GET.get("q", "")
+    logsheets = Logsheet.objects.all()
+
+    if query:
+        logsheets = logsheets.filter(
+            Q(log_date__icontains=query) |
+            Q(location__icontains=query) |
+            Q(created_by__username__icontains=query)
+        )
+
+    logsheets = logsheets.order_by("-log_date", "-created_at")
     return render(request, "logsheet/logsheet_list.html", {
         "logsheets": logsheets,
+        "query": query,
     })

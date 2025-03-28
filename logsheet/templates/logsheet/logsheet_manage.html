@@ -15,16 +15,27 @@
 
 {% if logsheet.flights.exists %}
   <ul class="list-group">
-    {% for flight in logsheet.flights.all %}
-      <li class="list-group-item">
-        {{ flight.launch_time }} — {{ flight.landing_time }}:
-        {{ flight.pilot }} in {{ flight.glider }} ({{ flight.flight_type }})
-      </li>
-    {% endfor %}
+    {% for flight in flights %}
+    <li class="list-group-item">
+      {{ flight.launch_time }} — {{ flight.landing_time }}:
+      {{ flight.pilot }} in {{ flight.glider }} ({{ flight.flight_type }})
+    </li>
+  {% empty %}
+    <li class="list-group-item">No flights found.</li>
+  {% endfor %}
   </ul>
 {% else %}
   <p>No flights recorded yet for this logsheet.</p>
 {% endif %}
+<form method="get" class="row mb-3">
+  <div class="col-md-4">
+    <input type="text" name="q" class="form-control" placeholder="Search by pilot or instructor" value="{{ query }}">
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-outline-primary">Filter</button>
+  </div>
+</form>
+
 
 <hr>
 <h3>Add a New Flight</h3>

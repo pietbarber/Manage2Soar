@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>All Logsheets</h1>
-
+<form method="get" class="row mb-3">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="Search by date, location, or user" value="{{ query }}">
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-primary">Search</button>
+    </div>
+  </form>
+  
 <table class="table table-striped">
   <thead>
     <tr>
