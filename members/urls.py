@@ -10,12 +10,11 @@ from .views import tinymce_image_upload
 
 
 urlpatterns = [
+    path("", views.member_list, name="member_list"),
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('duty_roster/', views.duty_roster, name='duty_roster'),
     path('members/', views.members_list, name='members'),
-    path('log_sheets/', views.log_sheets, name='log_sheets'),
-    path("", views.member_list, name="member_list"),
     path('<int:pk>/edit/', member_edit, name='member_edit'),
     path('tinymce/', include('tinymce.urls')),
     path('oauth/', include('social_django.urls', namespace='social')),
@@ -24,10 +23,6 @@ urlpatterns = [
     path('set-password/', views.set_password, name='set_password'),
     path('<int:member_id>/biography/', views.biography_view, name='biography_view'),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
-    path("instructors/", views.instructors_only_home, name="instructors_home"),
-    path("logsheet/manage/", views.manage_logsheet, name="manage_logsheet"),
-    path("logsheet/start/", views.start_logsheet, name="start_logsheet"),
-    path("logsheet/edit/<int:pk>/", views.edit_flightlog, name="edit_flightlog"),
 
 
 

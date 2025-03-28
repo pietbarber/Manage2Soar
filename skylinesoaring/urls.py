@@ -26,6 +26,8 @@ urlpatterns = [
     path("", member_views.home, name="home"),
     path('admin/', admin.site.urls),
     path('members/', include('members.urls')),
+    path('logsheet/', include('logsheet.urls')),
+    path('instructors/', include('instructors.urls')),
 ]
 
 # Serve media files in development only

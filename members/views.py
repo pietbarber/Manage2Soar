@@ -165,7 +165,7 @@ def is_instructor(user):
 @active_member_required
 @user_passes_test(is_instructor)
 def instructors_only_home(request):
-    return render(request, "members/instructors_home.html")
+    return render(request, "instructors/instructors_home.html")
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -175,7 +175,7 @@ from .forms import FlightLogForm
 @active_member_required
 def logsheet_list(request):
     logsheets = FlightLog.objects.select_related('airfield', 'glider', 'towplane').order_by('-flight_date')
-    return render(request, 'members/logsheet_list.html', {'logsheets': logsheets})
+    return render(request, 'logsheet/logsheet_list.html', {'logsheets': logsheets})
 
 @active_member_required
 def logsheet_add(request):
@@ -186,7 +186,7 @@ def logsheet_add(request):
             return redirect('logsheet_list')
     else:
         form = FlightLogForm()
-    return render(request, 'members/logsheet_form.html', {'form': form})
+    return render(request, 'logsheet/logsheet_form.html', {'form': form})
 
 @active_member_required
 def logsheet_edit(request, pk):
@@ -198,7 +198,7 @@ def logsheet_edit(request, pk):
             return redirect('logsheet_list')
     else:
         form = FlightLogForm(instance=log)
-    return render(request, 'members/logsheet_form.html', {'form': form})
+    return render(request, 'logsheet/logsheet_form.html', {'form': form})
 
 @active_member_required
 def logsheet_delete(request, pk):
@@ -206,7 +206,7 @@ def logsheet_delete(request, pk):
     if request.method == 'POST':
         log.delete()
         return redirect('logsheet_list')
-    return render(request, 'members/logsheet_confirm_delete.html', {'log': log})
+    return render(request, 'logsheet/logsheet_confirm_delete.html', {'log': log})
 
 
 from django.utils.timezone import now
@@ -218,7 +218,7 @@ def manage_logsheet(request):
     today = now().date()
     flights = FlightLog.objects.filter(flight_date=today).order_by('takeoff_time')
 
-    return render(request, "members/logsheet_manage.html", {
+    return render(request, "logsheet/logsheet_manage.html", {
         "form": form,
         "flights_today": flights,
         "today": today,
@@ -249,7 +249,7 @@ def start_logsheet(request):
     else:
         form = FlightDayForm(initial={'date': date.today()})
     
-    return render(request, 'members/start_logsheet.html', {'form': form})
+    return render(request, 'logsheet/start_logsheet.html', {'form': form})
 
 
 @active_member_required
@@ -264,7 +264,7 @@ def edit_flightlog(request, pk):
             return JsonResponse({"success": False, "errors": form.errors}, status=400)
     else:
         form = FlightLogForm(instance=flight)
-        return render(request, "members/partials/edit_flight_form.html", {
+        return render(request, "logsheet/partials/edit_flight_form.html", {
             "form": form,
             "flight": flight,
         })

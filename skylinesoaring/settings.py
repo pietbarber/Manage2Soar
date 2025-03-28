@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     "social_django",
     "tinymce",
     "members",
+    "instructors",
+    "logsheet"
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
