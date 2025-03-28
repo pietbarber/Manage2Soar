@@ -5,7 +5,7 @@ app_name = "logsheet"
 
 urlpatterns = [
     path("", views.index, name="index"),
-    path("create/", views.index, name="create"),  # will point to a real view later
+    path("create/", views.create_logsheet, name="create"), 
     path("correct/", views.index, name="correct"),
 ] 
 

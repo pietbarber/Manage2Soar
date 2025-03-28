@@ -1,13 +1,44 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %}
-
 {% block content %}
-<div class="container mt-4">
-  <h2>Start New Logsheet</h2>
-  <form method="post" class="mt-3">
-    {% csrf_token %}
-    {{ form|crispy }}
-    <button type="submit" class="btn btn-success">Start Logsheet</button>
-  </form>
+<h1>Create New Log Sheet</h1>
+
+
+<!-- Button to trigger modal -->
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
+  Create New Logsheet
+</button>
+
+<!-- Modal HTML structure -->
+<div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createLogsheetModalLabel">New Logsheet Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Replace this with your real form -->
+          <div class="mb-3">
+            <label for="log_date" class="form-label">Date</label>
+            <input type="date" class="form-control" id="log_date" name="log_date">
+          </div>
+          <div class="mb-3">
+            <label for="location" class="form-label">Field</label>
+            <input type="text" class="form-control" id="location" name="location">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Start Logsheet</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+  <footer style="font-size: 0.8em; color: gray;">
+    Template: <code>logsheet/start_logsheet.html</code>
+  </footer>
 {% endblock %}
