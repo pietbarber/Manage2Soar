@@ -64,3 +64,9 @@ def manage_logsheet(request, pk):
         "form": form,
     })
 
+@active_member_required
+def list_logsheets(request):
+    logsheets = Logsheet.objects.order_by("-log_date", "-created_at")
+    return render(request, "logsheet/logsheet_list.html", {
+        "logsheets": logsheets,
+    })

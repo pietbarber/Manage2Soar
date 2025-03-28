@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>All Logsheets</h1>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Location</th>
+      <th>Created By</th>
+      <th>Created At</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for log in logsheets %}
+    <tr>
+      <td>{{ log.log_date }}</td>
+      <td>{{ log.location }}</td>
+      <td>{{ log.created_by }}</td>
+      <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+      <td>
+        <a href="{% url 'logsheet:manage' pk=log.pk %}" class="btn btn-sm btn-primary">Manage</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5">No logsheets found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<footer style="font-size: 0.8em; color: gray;">
+  Template: <code>logsheet/logsheet_list.html</code>
+</footer>
+{% endblock %}

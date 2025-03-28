@@ -4,7 +4,7 @@ from . import views
 app_name = "logsheet"
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    path("", views.list_logsheets, name="index"),
     path("create/", views.create_logsheet, name="create"), 
     path("correct/", views.index, name="correct"),
     path("manage/<int:pk>/", views.manage_logsheet, name="manage"),
