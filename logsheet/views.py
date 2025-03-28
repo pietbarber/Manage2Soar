@@ -61,6 +61,16 @@ def manage_logsheet(request, pk):
         )
 
     if request.method == "POST":
+        if "revise" in request.POST:
+            if request.user.is_superuser:  # You could later expand this to roles
+                logsheet.finalized = False
+                logsheet.save()
+                messages.warning(request, "Logsheet has been reopened for revision.")
+            else:
+                return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+    if request.method == "POST":
         if "finalize" in request.POST:
             logsheet.finalized = True
             logsheet.save()
