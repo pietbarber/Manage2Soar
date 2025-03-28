@@ -9,6 +9,18 @@
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
   </div>
 </div>
+{% if not logsheet.finalized %}
+  <form method="post" class="mt-3">
+    {% csrf_token %}
+    <button type="submit" name="finalize" class="btn btn-danger">
+      Finalize Logsheet
+    </button>
+  </form>
+{% else %}
+  <div class="alert alert-warning mt-3">
+    <strong>This logsheet is finalized.</strong> No further changes are allowed.
+  </div>
+{% endif %}
 
 <hr>
 <h2>Flights</h2>
@@ -38,6 +50,8 @@
 
 
 <hr>
+
+{% if not logsheet.finalized %}
 <h3>Add a New Flight</h3>
 
 <form method="post">
@@ -63,6 +77,7 @@
   <button type="submit" class="btn btn-primary mt-3">Add Flight</button>
 </form>
 
+{% endif %}
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_manage.html</code>

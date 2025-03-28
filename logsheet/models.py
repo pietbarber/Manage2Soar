@@ -6,6 +6,7 @@ class Logsheet(models.Model):
     location = models.CharField(max_length=100)
     created_by = models.ForeignKey(Member, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    finalized = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("log_date", "location")

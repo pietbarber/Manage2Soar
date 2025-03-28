@@ -61,15 +61,25 @@ def manage_logsheet(request, pk):
         )
 
     if request.method == "POST":
+        if "finalize" in request.POST:
+            logsheet.finalized = True
+            logsheet.save()
+            messages.success(request, "Logsheet has been finalized.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+    
         form = FlightForm(request.POST)
         if form.is_valid():
-            flight = form.save(commit=False)
-            flight.logsheet = logsheet
-            flight.save()
-            messages.success(request, "Flight added successfully.")
-            return redirect("logsheet:manage", pk=logsheet.pk)
+            if logsheet.finalized:
+                messages.error(request, "This logsheet is finalized and cannot accept new flights.")
+            else:
+                flight = form.save(commit=False)
+                flight.logsheet = logsheet
+                flight.save()
+                messages.success(request, "Flight added successfully.")
+                return redirect("logsheet:manage", pk=logsheet.pk)
     else:
         form = FlightForm(initial={"field": logsheet.location})
+
 
     return render(request, "logsheet/logsheet_manage.html", {
         "logsheet": logsheet,
