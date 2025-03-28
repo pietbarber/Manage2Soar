@@ -2,87 +2,152 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load member_extras %}
+
 {% block content %}
-
-
-
 <div class="container mt-4">
-  <h2 class="mb-3">Log Flight</h2>
+  <h1 class="mb-4">Log Flight 🛫</h1>
 
   <form method="post" enctype="multipart/form-data" class="mb-4">
     {% csrf_token %}
-    {{ form|crispy }}
-    <button type="submit" class="btn btn-primary">Save Flight</button>
+    <div class="row">
+      <div class="col-md-4">
+        {{ form.flight_date|as_crispy_field }}
+        {{ form.airfield|as_crispy_field }}
+        {{ form.glider|as_crispy_field }}
+        {{ form.pilot|as_crispy_field }}
+      </div>
+
+      <div class="col-md-4">
+        {{ form.instructor|as_crispy_field }}
+        {{ form.passenger|as_crispy_field }}
+        {{ form.towplane|as_crispy_field }}
+        {{ form.towpilot|as_crispy_field }}
+      </div>
+
+      <div class="col-md-4">
+        {{ form.release_altitude|as_crispy_field }}
+        {{ form.takeoff_time|as_crispy_field }}
+        {{ form.landing_time|as_crispy_field }}
+        {{ form.flight_time|as_crispy_field }}
+        
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3">💾 Save Flight</button>
   </form>
-
-  <hr>
-
-  <h3 class="mb-3">Flights for {{ today }}</h3>
-  {% if flight_logs %}
-    <table class="table table-sm table-striped">
-      <thead>
-        <tr>
-          <th>Glider</th>
-          <th>Pilot</th>
-          <th>Passenger</th>
-          <th>Tow Pilot</th>
-          <th>Takeoff</th>
-          <th>Landing</th>
-          <th>Duration</th>
-          <th>Field</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for flight in flight_logs %}
-        <tr>
-          <td>{{ flight.glider }}</td>
-          <td>{{ flight.pilot|full_display_name }}</td>
-          <td>{{ flight.instructor|full_display_name }}</td>
-          <td>{{ flight.passenger|default:"—" }}</td>
-          <td>{{ flight.towpilot|full_display_name }}</td>
-          <td>{{ flight.takeoff_time }}</td>
-          <td>{{ flight.landing_time }}</td>
-          <td>{{ flight.flight_time }}</td>
-          <td>{{ flight.airfield.code }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No flights logged today yet.</p>
-  {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      flatpickr("#id_flight_date", {
-        dateFormat: "Y-m-d",
-        allowInput: true,
-        defaultDate: "today"
-      });
-
-
-      flatpickr("#id_takeoff_time", {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: "H:i",
-        time_24hr: true,
-        allowInput: true,
-      });
-    
-      flatpickr("#id_landing_time", {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: "H:i",
-        time_24hr: true,
-        allowInput: true,
-      });
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    flatpickr("#id_flight_date", {
+      dateFormat: "Y-m-d",
+      allowInput: true,
+      defaultDate: "today"
     });
-    </script>
 
+    const now = new Date();
+    const formattedTime = now.toTimeString().slice(0, 5);
 
+    flatpickr("#id_takeoff_time", {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+      defaultDate: formattedTime,
+      allowInput: true
+    });
 
+    flatpickr("#id_landing_time", {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+      defaultDate: formattedTime,
+      allowInput: true
+    });
+
+    const gliderSelect = document.querySelector("#id_glider");
+    const passengerField = document.querySelector("#id_passenger");
+    const instructorField = document.querySelector("#id_instructor");
+    const pilotField = document.querySelector("#id_pilot");
+
+    const gliderSeats = JSON.parse(gliderSelect.dataset.gliders);
+
+    function toggleFields() {
+      const gliderId = gliderSelect.value;
+      const numSeats = gliderSeats[gliderId];
+
+      if (numSeats === 1) {
+        passengerField.disabled = true;
+        instructorField.disabled = true;
+      } else {
+        const hasPassenger = passengerField.value !== "";
+        const hasInstructor = instructorField.value !== "";
+
+        if (hasPassenger && hasInstructor) {
+          // prioritize disabling instructor if both filled
+          instructorField.disabled = true;
+        } else {
+          instructorField.disabled = false;
+        }
+
+        if (hasPassenger && hasInstructor) {
+          passengerField.disabled = true;
+        } else {
+          passengerField.disabled = false;
+        }
+      }
+    }
+
+    gliderSelect.addEventListener("change", toggleFields);
+    passengerField.addEventListener("input", toggleFields);
+    instructorField.addEventListener("input", toggleFields);
+    toggleFields();
+
+    // Increase step size for release altitude input
+    const releaseInput = document.getElementById("id_release_altitude");
+    if (releaseInput) {
+      releaseInput.setAttribute("step", "500");
+    }
+  });
+
+  function updateFlightDuration() {
+    const takeoff = document.getElementById("id_takeoff_time").value;
+    const landing = document.getElementById("id_landing_time").value;
+    const output = document.getElementById("id_flight_time");
+
+    if (!takeoff || !landing) {
+      output.value = "";
+      return;
+    }
+
+    const [toHours, toMinutes] = takeoff.split(":").map(Number);
+    const [landHours, landMinutes] = landing.split(":").map(Number);
+
+    let start = new Date();
+    let end = new Date();
+
+    start.setHours(toHours, toMinutes, 0);
+    end.setHours(landHours, landMinutes, 0);
+
+    if (end < start) {
+      // Assume the flight crossed midnight
+      end.setDate(end.getDate() + 1);
+    }
+
+    const diffMs = end - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const minutes = diffMins % 60;
+
+    output.value = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("id_takeoff_time").addEventListener("change", updateFlightDuration);
+    document.getElementById("id_landing_time").addEventListener("change", updateFlightDuration);
+  });
+
+</script>
 {% endblock %}

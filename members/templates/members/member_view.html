@@ -38,23 +38,18 @@
               {{ member.email }}
             {% endif %}
         </li>
+        {% if member.phone %}
         <li class="list-group-item">
             <strong>Phone:</strong>
-            {% if member.phone %}
               📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
-            {% else %}
-              N/A
-            {% endif %}
         </li>
-          
+        {% endif %}
+        {% if member.mobile_phone %}
         <li class="list-group-item">
             <strong>Mobile:</strong>
-            {% if member.mobile_phone %}
               📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
-            {% else %}
-              N/A
-            {% endif %}
         </li>
+        {% endif %}
         <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> 
           {{ member.city }}, {{ member.state_code }} {{ member.state_freeform }} {{ member.zip_code }}<br>
           {{ member.country }}

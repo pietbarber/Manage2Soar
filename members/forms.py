@@ -207,6 +207,15 @@ class FlightLogForm(forms.ModelForm):
             'alternate_payer',
             'pays',
         ]
+        flight_time = forms.CharField(
+            required=False,
+            widget=forms.TextInput(attrs={
+                'readonly': 'readonly',
+                'class': 'form-control bg-light text-muted ghost-field',
+                'placeholder': 'hh:mm',
+                'tabindex': '-1',  # Skip this field when tabbing through the form
+            })
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
