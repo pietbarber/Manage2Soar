@@ -9,6 +9,7 @@
       <th>Location</th>
       <th>Created By</th>
       <th>Created At</th>
+      <th>Flights</th>
       <th></th>
     </tr>
   </thead>
@@ -19,6 +20,8 @@
       <td>{{ log.location }}</td>
       <td>{{ log.created_by }}</td>
       <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
+      <td>{{ log.flights.count }}</td>
+
       <td>
         <a href="{% url 'logsheet:manage' pk=log.pk %}" class="btn btn-sm btn-primary">Manage</a>
       </td>
