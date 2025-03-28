@@ -4,40 +4,6 @@
 {% load member_extras %}
 {% block content %}
 
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const takeoff = document.getElementById("id_takeoff_time");
-      const landing = document.getElementById("id_landing_time");
-      const flightTime = document.getElementById("id_flight_time");
-    
-      function calculateDuration() {
-        if (!takeoff.value || !landing.value) return;
-    
-        const [toH, toM] = takeoff.value.split(":").map(Number);
-        const [laH, laM] = landing.value.split(":").map(Number);
-    
-        let takeoffMinutes = toH * 60 + toM;
-        let landingMinutes = laH * 60 + laM;
-    
-        if (landingMinutes < takeoffMinutes) {
-          landingMinutes += 24 * 60;  // Crosses midnight
-        }
-    
-        const duration = landingMinutes - takeoffMinutes;
-        const durH = Math.floor(duration / 60).toString().padStart(2, "0");
-        const durM = (duration % 60).toString().padStart(2, "0");
-    
-        flightTime.value = `${durH}:${durM}`;
-      }
-    
-      if (takeoff && landing && flightTime) {
-        flightTime.readOnly = true;
-        takeoff.addEventListener("change", calculateDuration);
-        landing.addEventListener("change", calculateDuration);
-      }
-    });
-    </script>
-
 
 
 <div class="container mt-4">
@@ -87,37 +53,35 @@
   {% endif %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-      const takeoff = document.getElementById('id_takeoff_time');
-      const landing = document.getElementById('id_landing_time');
-      const duration = document.getElementById('id_flight_time');
-  
-      function updateDuration() {
-          if (takeoff.value && landing.value) {
-              const t1 = takeoff.value.split(":").map(Number);
-              const t2 = landing.value.split(":").map(Number);
-  
-              const date1 = new Date(0, 0, 0, t1[0], t1[1]);
-              const date2 = new Date(0, 0, 0, t2[0], t2[1]);
-              let diff = (date2 - date1) / 60000; // in minutes
-  
-              if (diff < 0) diff += 24 * 60;
-  
-              const hours = Math.floor(diff / 60).toString().padStart(2, '0');
-              const mins = Math.floor(diff % 60).toString().padStart(2, '0');
-              duration.value = `${hours}:${mins}:00`;
-          } else {
-              duration.value = '';  // clear if incomplete
-          }
-      }
-  
-      takeoff.addEventListener('change', updateDuration);
-      landing.addEventListener('change', updateDuration);
-  });
-  </script>
-  
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      flatpickr("#id_flight_date", {
+        dateFormat: "Y-m-d",
+        allowInput: true,
+        defaultDate: "today"
+      });
+
+
+      flatpickr("#id_takeoff_time", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        allowInput: true,
+      });
+    
+      flatpickr("#id_landing_time", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        allowInput: true,
+      });
+    });
+    </script>
 
 
 

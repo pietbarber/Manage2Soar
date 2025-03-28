@@ -9,6 +9,7 @@ from PIL import Image
 import io
 
 from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Field
 from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit
 
 class MemberForm(forms.ModelForm):
@@ -201,17 +202,6 @@ from .models import FlightLog
 
 import json
 class FlightLogForm(forms.ModelForm):
-    flight_date = forms.DateField(
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "class": "form-control"
-            },
-            format="%Y-%m-%d"
-        ),
-        input_formats=["%Y-%m-%d"],
-        required=True
-    )
     class Meta:
         model = FlightLog
         fields = [
@@ -230,21 +220,6 @@ class FlightLogForm(forms.ModelForm):
             'alternate_payer',
             'pays',
         ]
-        widgets = {
-            'flight_date': forms.DateInput(attrs={'type': 'date'}),
-            'takeoff_time': forms.TimeInput(attrs={'type': 'time'}),
-            'landing_time': forms.TimeInput(attrs={'type': 'time'}),
-            'flight_time': forms.TimeInput(attrs={'type': 'time'}),
-        }
-
-    flight_time = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            'readonly': 'readonly',
-            'class': 'form-control',
-            'placeholder': 'hh:mm'
-        })
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -255,20 +230,38 @@ class FlightLogForm(forms.ModelForm):
         self.fields['glider'].widget.attrs['data-gliders'] = json.dumps(glider_seats)
 
         self.fields['flight_date'].widget = forms.DateInput(
-            attrs={
-                'type': 'date',
-                'class': 'form-control',
-            },
+            attrs={'type': 'text', 'class': 'form-control'},
             format='%Y-%m-%d'
         )
 
         self.fields['takeoff_time'].widget = forms.TimeInput(
-            attrs={'type': 'time', 'class': 'form-control', 'step': '60'},
+            attrs={'type': 'text', 'class': 'form-control'},
             format='%H:%M'
         )
+
         self.fields['landing_time'].widget = forms.TimeInput(
-            attrs={'type': 'time', 'class': 'form-control', 'step': '60'},
+            attrs={'type': 'text', 'class': 'form-control'},
             format='%H:%M'
+        )
+
+        self.helper = FormHelper()
+        self.helper.form_method = 'post'
+        self.helper.layout = Layout(
+            'flight_date',
+            'airfield',
+            'glider',
+            'pilot',
+            'instructor',
+            'passenger',
+            'towplane',
+            'towpilot',
+            'release_altitude',
+            'takeoff_time',
+            'landing_time',
+            Field('flight_time', readonly=True),
+            'alternate_payer',
+            'pays',
+            Submit('submit', 'Save Flight')
         )
 
 from django import forms
