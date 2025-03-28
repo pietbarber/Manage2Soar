@@ -1,0 +1,44 @@
+{% load crispy_forms_tags %}
+
+
+<form method="post" id="edit-flight-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form|crispy }}
+  
+    <div class="text-end mt-3">
+      <button type="submit" class="btn btn-success">
+        💾 Save Changes
+      </button>
+    </div>
+  </form>
+  
+  <script>
+    document.getElementById("edit-flight-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const url = form.action || window.location.href;
+      const data = new FormData(form);
+  
+      fetch(url, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: data
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Form submission failed");
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          const modal = bootstrap.Modal.getInstance(document.getElementById("editFlightModal"));
+          modal.hide();
+          location.reload();  // reload the page to reflect changes
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        alert("Could not save flight. Please try again.");
+      });
+  });
+  </script>
+  

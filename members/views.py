@@ -208,23 +208,20 @@ def logsheet_delete(request, pk):
         return redirect('logsheet_list')
     return render(request, 'members/logsheet_confirm_delete.html', {'log': log})
 
+
+from django.utils.timezone import now
+
 @active_member_required
 def manage_logsheet(request):
-    today = date.today()
-    flight_logs = FlightLog.objects.filter(flight_date=today).select_related('pilot', 'passenger', 'towpilot', 'glider', 'airfield')
+    from .forms import FlightLogForm
+    form = FlightLogForm()
+    today = now().date()
+    flights = FlightLog.objects.filter(flight_date=today).order_by('takeoff_time')
 
-    if request.method == 'POST':
-        form = FlightLogForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('manage_logsheet')
-    else:
-        form = FlightLogForm(initial={'flight_date': today})
-
-    return render(request, 'members/logsheet_manage.html', {
-        'form': form,
-        'flight_logs': flight_logs,
-        'today': today,
+    return render(request, "members/logsheet_manage.html", {
+        "form": form,
+        "flights_today": flights,
+        "today": today,
     })
 
 from .forms import FlightDayForm
@@ -253,3 +250,21 @@ def start_logsheet(request):
         form = FlightDayForm(initial={'date': date.today()})
     
     return render(request, 'members/start_logsheet.html', {'form': form})
+
+
+@active_member_required
+def edit_flightlog(request, pk):
+    flight = get_object_or_404(FlightLog, pk=pk)
+    if request.method == "POST":
+        form = FlightLogForm(request.POST, instance=flight)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"success": True})
+        else:
+            return JsonResponse({"success": False, "errors": form.errors}, status=400)
+    else:
+        form = FlightLogForm(instance=flight)
+        return render(request, "members/partials/edit_flight_form.html", {
+            "form": form,
+            "flight": flight,
+        })

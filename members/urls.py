@@ -27,6 +27,7 @@ urlpatterns = [
     path("instructors/", views.instructors_only_home, name="instructors_home"),
     path("logsheet/manage/", views.manage_logsheet, name="manage_logsheet"),
     path("logsheet/start/", views.start_logsheet, name="start_logsheet"),
+    path("logsheet/edit/<int:pk>/", views.edit_flightlog, name="edit_flightlog"),
 
 
 

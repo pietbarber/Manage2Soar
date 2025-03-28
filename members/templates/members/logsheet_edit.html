@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="container mt-4">
-  <h1 class="mb-4">Log Flight 🛫</h1>
+	<h2 class="mb-4">Edit Log for {{ flight.glider }} </h2>
 
   <form method="post" enctype="multipart/form-data" class="mb-4">
     {% csrf_token %}
@@ -69,11 +69,7 @@
         <td>{{ flight.landing_time|default:"—" }}</td>
         <td>{{ flight.flight_time|default:"—" }}</td>
         <td>
-          <a href="{% url 'edit_flightlog' flight.id %}" 
-            class="btn btn-outline-primary btn-sm"
-            data-bs-toggle="modal"
-            data-bs-target="#editFlightModal"
-            data-edit-url="{% url 'edit_flightlog' flight.id %}">
+          <a href="{% url 'edit_flightlog' flight.id %}" class="btn btn-outline-primary btn-sm">
             ✏️ Edit
           </a>
         </td>
@@ -85,43 +81,10 @@
     {% endfor %}
   </tbody>
 </table>
-<!-- Edit Flight Modal -->
-<div class="modal fade" id="editFlightModal" tabindex="-1" aria-labelledby="editFlightModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="editFlightModalLabel">Edit Flight</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="editFlightFormContainer">Loading...</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-
-  document.addEventListener("DOMContentLoaded", function () {
-    const editModal = document.getElementById("editFlightModal");
-    const container = document.getElementById("editFlightFormContainer");
-
-    editModal.addEventListener("show.bs.modal", function (event) {
-      const trigger = event.relatedTarget;
-      const url = trigger.getAttribute("data-edit-url");
-      fetch(url)
-        .then(response => response.text())
-        .then(html => {
-          container.innerHTML = html;
-          // Reinitialize flatpickr if needed:
-          flatpickr("#id_takeoff_time", { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true });
-          flatpickr("#id_landing_time", { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true });
-        });
-    });
-  });
-
   document.addEventListener("DOMContentLoaded", function () {
     flatpickr("#id_flight_date", {
       dateFormat: "Y-m-d",
