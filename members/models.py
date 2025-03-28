@@ -358,4 +358,4 @@ class FlightDay(models.Model):
     notes = HTMLField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.date} @ {self.airfield}"
+        return f"{self.flight_date} @ {self.airfield}"
