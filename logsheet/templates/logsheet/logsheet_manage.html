@@ -11,8 +11,20 @@
 </div>
 
 <hr>
+<h2>Flights</h2>
 
-<p>This is where we’ll eventually manage the flights for this day.</p>
+{% if logsheet.flights.exists %}
+  <ul class="list-group">
+    {% for flight in logsheet.flights.all %}
+      <li class="list-group-item">
+        {{ flight.launch_time }} — {{ flight.landing_time }}:
+        {{ flight.pilot }} in {{ flight.glider }} ({{ flight.flight_type }})
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No flights recorded yet for this logsheet.</p>
+{% endif %}
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_manage.html</code>
