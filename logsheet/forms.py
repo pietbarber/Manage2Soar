@@ -26,6 +26,8 @@ class CreateLogsheetForm(forms.ModelForm):
 from django import forms
 from .models import Flight
 from .models import Towplane
+from members.models import Member
+
 
 class FlightForm(forms.ModelForm):
     class Meta:
@@ -53,4 +55,8 @@ class FlightForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True)
+        # Filter instructors only
+        self.fields["instructor"].queryset = Member.objects.filter(instructor=True)
+        self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True)
+
 
