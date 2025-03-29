@@ -226,20 +226,3 @@ class MemberBadge(models.Model):
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
     
-
-    #################################################################
-    # Logsheet stuff follows 
-    #################################################################
-
-from django.db import models
-from django.conf import settings
-
-class Airfield(models.Model):
-    identifier = models.CharField(max_length=10, unique=True)  # e.g., KFRR
-    name = models.CharField(max_length=100)  # e.g., Front Royal Warren County Airport
-    photo = models.ImageField(upload_to='airfield_photos/', blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return f"{self.identifier} – {self.name}"
-

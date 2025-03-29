@@ -30,19 +30,3 @@ class GliderAdmin(admin.ModelAdmin):
 from .models import Badge, MemberBadge
 
 admin.site.register(MemberBadge)
-
-from django.contrib import admin
-from .models import Airfield
-
-@admin.register(Airfield)
-class AirfieldAdmin(admin.ModelAdmin):
-    list_display = ['identifier', 'name', 'is_active']
-    search_fields = ['identifier', 'name']
-    list_filter = ['is_active']
-    readonly_fields = ['airfield_image_preview']
-
-    def airfield_image_preview(self, obj):
-        if obj.photo:
-            return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
-        return "(No photo uploaded)"
-    airfield_image_preview.short_description = "Current Photo"
