@@ -32,21 +32,6 @@ from .models import Badge, MemberBadge
 admin.site.register(MemberBadge)
 
 from django.contrib import admin
-from .models import FlightLog, Towplane
-
-@admin.register(Towplane)
-class TowplaneAdmin(admin.ModelAdmin):
-    list_display = ['name', 'registration', 'is_active']
-    search_fields = ['name', 'registration']
-    list_filter = ['is_active']
-    readonly_fields = ['towplane_image_preview']
-
-    def towplane_image_preview(self, obj):
-        if obj.picture:
-            return format_html('<img src="{}" style="max-height: 150px;" />', obj.picture.url)
-        return "(No image uploaded)"
-    towplane_image_preview.short_description = "Current Image"
-
 from .models import Airfield
 
 @admin.register(Airfield)
