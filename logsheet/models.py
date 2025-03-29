@@ -22,7 +22,7 @@ class Flight(models.Model):
     landing_time = models.TimeField(blank=True, null=True)
     pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, related_name="flights_as_pilot")
     instructor = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_instructor")
-    glider = models.ForeignKey("members.Glider", on_delete=models.SET_NULL, null=True)
+    glider = models.ForeignKey("logsheet.Glider", on_delete=models.SET_NULL, null=True)
     tow_pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_tow_pilot")
     towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
     duration = models.DurationField(blank=True, null=True)
