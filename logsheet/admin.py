@@ -19,9 +19,9 @@ class GliderAdmin(admin.ModelAdmin):
 
 @admin.register(Logsheet)
 class LogsheetAdmin(admin.ModelAdmin):
-    list_display = ("log_date", "location", "created_by", "created_at", "finalized")
-    list_filter = ("finalized", "location")
-    search_fields = ("location", "created_by__username")
+    list_display = ("log_date", "airfield", "created_by", "created_at", "finalized")
+    list_filter = ("finalized", "airfield")
+    search_fields = ("airfield", "created_by__username")
 
 @admin.register(Flight)
 class FlightAdmin(admin.ModelAdmin):
