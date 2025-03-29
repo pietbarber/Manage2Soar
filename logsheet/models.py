@@ -58,3 +58,22 @@ class Towplane(models.Model):
         status = " (Inactive)" if not self.is_active else ""
         return f"{self.name} ({self.registration})"
 
+class Glider(models.Model):
+    make = models.CharField(max_length=100)
+    model = models.CharField(max_length=100)
+    n_number = models.CharField(max_length=20, unique=True)  # Registration (e.g. N123AB)
+    competition_number = models.CharField(max_length=10, blank=True)
+    seats = models.PositiveIntegerField(default=2)
+    picture = models.ImageField(upload_to="glider_photos/", blank=True, null=True)
+    rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    max_rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+
+    def __str__(self):
+        parts = []
+        if self.competition_number:
+            parts.append(self.competition_number.upper())
+        if self.n_number:
+            parts.append(self.n_number.upper())
+        if self.model:
+            parts.append(self.model)
+        return " / ".join(parts)
