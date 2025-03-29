@@ -30,8 +30,10 @@ class MemberForm(forms.ModelForm):
           'profile_photo',
           'glider_rating', 'instructor', 'towpilot', 'duty_officer', 'assistant_duty_officer', 'secretary',
           'treasurer', 'webmaster', 'director', 'member_manager',
+          
           'glider_owned',
           'second_glider_owned',
+          
           'joined_club',
           'emergency_contact',
           'public_notes',

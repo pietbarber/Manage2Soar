@@ -161,19 +161,19 @@ class Member(AbstractUser):
     member_manager = models.BooleanField(default=False)
 
     glider_owned = models.ForeignKey(
-        Glider,
+        "logsheet.Glider",
         on_delete=models.SET_NULL,
-        blank=True,
         null=True,
-        related_name='primary_owners'
+        blank=True,
+        related_name="owners"
     )
 
     second_glider_owned = models.ForeignKey(
-        Glider,
+        "logsheet.Glider",
         on_delete=models.SET_NULL,
-        blank=True,
         null=True,
-        related_name='secondary_owners'
+        blank=True,
+        related_name="secondary_owners"
     )
 
     joined_club = models.DateField(blank=True, null=True)
