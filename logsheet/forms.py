@@ -40,6 +40,7 @@ class FlightForm(forms.ModelForm):
             "glider",
             "towplane",
             "tow_pilot",
+            "release_altitude",
         ]
         widgets = {
             "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
@@ -49,6 +50,7 @@ class FlightForm(forms.ModelForm):
             "glider": forms.Select(attrs={"class": "form-select"}),
             "tow_pilot": forms.Select(attrs={"class": "form-select"}),
             "towplane": forms.Select(attrs={"class": "form-select"}),
+            "release_altitude": forms.Select(attrs={"class": "form-select"}),
 
         }
 

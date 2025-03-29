@@ -48,7 +48,16 @@
     {% for flight in flights %}
     <li class="list-group-item">
       {{ flight.launch_time }} — {{ flight.landing_time }}:
-      {{ flight.pilot }} in {{ flight.glider }} towed by {{ flight.towplane }}
+      {{ flight.pilot }} in {{ flight.glider }} towed by {{ flight.towplane }} to {{ flight.release_altitude }} ft.
+      {% if flight.instructor %}
+        Instructor: {{ flight.instructor }}
+      {% endif %}
+      {% if flight.duration %}
+      {{ flight.duration|timesince:"0:00" }}
+      {% endif %}
+      {% if flight.notes %}
+        <br><strong>Notes:</strong> {{ flight.notes|truncatewords:10 }}
+      {% endif %}
       <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" class="btn btn-sm btn-outline-secondary">
         Edit
       </a>
@@ -92,6 +101,7 @@
     <div class="col-md-3">{{ form.tow_plane.label }}{{ form.tow_plane }}</div>
     <div class="col-md-3">{{ form.towplane.label }}{{ form.towplane }}</div>
     <div class="col-md-3">{{ form.tow_pilot.label }}{{ form.tow_pilot }}</div>
+    <div class="col-md-3">{{ form.release_altitude.label }}{{ form.tow_pilot }}</div>
     <div class="col-md-3">{{ form.flight_type.label }}{{ form.flight_type }}</div>
     <div class="col-md-3">{{ form.field.label }}{{ form.field }}</div>
   </div>

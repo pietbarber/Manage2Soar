@@ -14,7 +14,7 @@ class Logsheet(models.Model):
     def __str__(self):
         return f"{self.log_date} @ {self.location}"
     
-    from django.db import models
+from datetime import datetime, timedelta, date
 
 class Flight(models.Model):
     logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="flights")
@@ -25,16 +25,40 @@ class Flight(models.Model):
     glider = models.ForeignKey("members.Glider", on_delete=models.SET_NULL, null=True)
     tow_pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_tow_pilot")
     towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
+    duration = models.DurationField(blank=True, null=True)
+
     field = models.CharField(max_length=100)  # Copy from logsheet or input per-flight
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    RELEASE_ALTITUDE_CHOICES = [(i, f"{i} ft") for i in range(0, 7100, 100)]
+
+    release_altitude = models.IntegerField(
+        choices=RELEASE_ALTITUDE_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Release altitude in feet (0–7000 in 100ft steps)"
+    )
+
+    def save(self, *args, **kwargs):
+        if self.launch_time and self.landing_time:
+            launch_dt = datetime.combine(date.today(), self.launch_time)
+            land_dt = datetime.combine(date.today(), self.landing_time)
+    
+            # Handle overnight flights (if landing before launch)
+            if land_dt < launch_dt:
+                land_dt += timedelta(days=1)
+    
+            self.duration = land_dt - launch_dt
+        else:
+            self.duration = None
+    
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
     
-    from django.db import models
 from members.models import Member
 
 class RevisionLog(models.Model):
