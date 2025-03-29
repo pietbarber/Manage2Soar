@@ -20,27 +20,6 @@ class Biography(models.Model):
     def __str__(self):
         return f"Biography of {self.member.get_full_name()}"
 
-class Glider(models.Model):
-    make = models.CharField(max_length=100)
-    model = models.CharField(max_length=100)
-    n_number = models.CharField(max_length=10, unique=True)
-    competition_number = models.CharField(max_length=3, blank=True, null=True)
-    number_of_seats = models.PositiveIntegerField(default=1)
-    photo = models.ImageField(upload_to='glider_photos/', blank=True, null=True)
-    rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-    max_rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
-
-    def __str__(self):
-        parts = []
-        if self.competition_number:
-            parts.append(self.competition_number.upper())
-        if self.n_number:
-            parts.append(self.n_number.upper())
-        if self.model:
-            parts.append(self.model)
-        return " ".join(parts)
-
-
 
 class Member(AbstractUser):
    # Here are the legacy codes from the old database,
