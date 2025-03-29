@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Glider, Towplane, Logsheet, Flight, RevisionLog
+from django.utils.html import format_html
 
 
 @admin.register(Towplane)
@@ -32,3 +33,18 @@ class FlightAdmin(admin.ModelAdmin):
 class RevisionLogAdmin(admin.ModelAdmin):
     list_display = ("logsheet", "revised_by", "revised_at")
     list_filter = ("revised_by", "revised_at")
+
+
+from .models import Airfield
+@admin.register(Airfield)
+class AirfieldAdmin(admin.ModelAdmin):
+    list_display = ['identifier', 'name', 'is_active']
+    search_fields = ['identifier', 'name']
+    list_filter = ['is_active']
+    readonly_fields = ['airfield_image_preview']
+
+    def airfield_image_preview(self, obj):
+        if obj.photo:
+            return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
+        return "(No photo uploaded)"
+    airfield_image_preview.short_description = "Current Photo"
