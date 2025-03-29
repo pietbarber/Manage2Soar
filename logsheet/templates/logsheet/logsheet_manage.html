@@ -42,6 +42,13 @@
 
 <hr>
 <h2>Flights</h2>
+<a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
+   class="btn btn-sm btn-primary mb-3"
+   data-bs-toggle="modal"
+   data-bs-target="#flightModal"
+   data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
+  + Add Flight
+</a>
 
 {% if logsheet.flights.exists %}
 <table class="table table-bordered table-hover align-middle">
@@ -91,13 +98,17 @@
           {% endif %}
      <td>
         {% if flight.duration %}
-          {{ flight.duration|timesince:"0:00" }}
+          {{ flight.duration }}
         {% endif %}
       </td>
       <td>
-        <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" class="btn btn-sm btn-outline-secondary">
-          Edit
-        </a>
+        <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
+          class="btn btn-sm btn-outline-secondary"
+          data-bs-toggle="modal"
+          data-bs-target="#flightModal"
+          data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
+         Edit
+       </a>
       </td>
     </tr>
     {% empty %}
@@ -153,6 +164,33 @@
 </form>
 
 {% endif %}
+
+<div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" id="flightModalContent">
+      <!-- The form will be loaded here via JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+  const flightModal = document.getElementById("flightModal");
+
+  flightModal.addEventListener("show.bs.modal", function (event) {
+    const button = event.relatedTarget;
+    const url = button.getAttribute("data-url");
+
+    fetch(url, {
+      headers: {
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    })
+    .then(response => response.text())
+    .then(html => {
+      document.getElementById("flightModalContent").innerHTML = html;
+    });
+  });
+</script>
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_manage.html</code>

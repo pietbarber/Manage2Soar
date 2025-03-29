@@ -150,9 +150,33 @@ def edit_flight(request, logsheet_pk, flight_pk):
     else:
         form = FlightForm(instance=flight)
 
-    return render(request, "logsheet/edit_flight.html", {
+    return render(request, "logsheet/edit_flight_form.html", {
         "form": form,
         "flight": flight,
         "logsheet": logsheet
     })
 
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Logsheet, Flight
+from .forms import FlightForm
+from members.decorators import active_member_required
+
+@active_member_required
+def add_flight(request, logsheet_pk):
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
+
+    if request.method == "POST":
+        form = FlightForm(request.POST)
+        if form.is_valid():
+            flight = form.save(commit=False)
+            flight.logsheet = logsheet
+            flight.save()
+            return redirect("logsheet:manage", pk=logsheet.pk)
+    else:
+        form = FlightForm()
+
+    return render(request, "logsheet/edit_flight_form.html", {
+        "form": form,
+        "logsheet": logsheet,
+        "mode": "add",
+    })

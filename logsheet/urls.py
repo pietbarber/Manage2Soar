@@ -9,6 +9,7 @@ urlpatterns = [
     path("correct/", views.index, name="correct"),
     path("manage/<int:pk>/", views.manage_logsheet, name="manage"),
     path("manage/<int:logsheet_pk>/edit-flight/<int:flight_pk>/", views.edit_flight, name="edit_flight"),
+    path("manage/<int:logsheet_pk>/add-flight/", views.add_flight, name="add_flight"),
 
 
 ] 
