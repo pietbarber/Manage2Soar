@@ -49,13 +49,6 @@ class TowplaneAdmin(admin.ModelAdmin):
 
 from .models import Airfield
 
-@admin.register(FlightLog)
-class FlightLogAdmin(admin.ModelAdmin):
-    list_display = ['flight_date', 'pilot', 'glider', 'takeoff_time', 'landing_time', 'airfield']
-    list_filter = ['flight_date', 'airfield', 'glider']
-    search_fields = ['pilot__username', 'glider__n_number']
-    autocomplete_fields = ['pilot', 'passenger', 'instructor', 'towpilot', 'glider', 'towplane', 'alternate_payer']
-
 @admin.register(Airfield)
 class AirfieldAdmin(admin.ModelAdmin):
     list_display = ['identifier', 'name', 'is_active']
@@ -68,12 +61,3 @@ class AirfieldAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
         return "(No photo uploaded)"
     airfield_image_preview.short_description = "Current Photo"
-
-from django.contrib import admin
-from .models import FlightDay  # Make sure FlightDay is imported
-
-@admin.register(FlightDay)
-class FlightDayAdmin(admin.ModelAdmin):
-    list_display = ('flight_date', 'airfield', 'duty_officer', 'instructor', 'towpilot', 'assistant')
-    list_filter = ('airfield', 'flight_date')
-    search_fields = ('duty_officer__username', 'instructor__username', 'towpilot__username', 'assistant__username')
