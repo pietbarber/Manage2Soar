@@ -44,29 +44,70 @@
 <h2>Flights</h2>
 
 {% if logsheet.flights.exists %}
-  <ul class="list-group">
+<table class="table table-bordered table-hover align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Status</th>
+      <th>Time</th>
+      <th>Pilot</th>
+      <th>Instructor</th>
+      <th>Glider</th>
+      <th>Towplane</th>
+      <th>Release Alt</th>
+      <th>Duration</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
     {% for flight in flights %}
-    <li class="list-group-item">
-      {{ flight.launch_time }} — {{ flight.landing_time }}:
-      {{ flight.pilot }} in {{ flight.glider }} towed by {{ flight.towplane }} to {{ flight.release_altitude }} ft.
-      {% if flight.instructor %}
-        Instructor: {{ flight.instructor }}
-      {% endif %}
-      {% if flight.duration %}
-      {{ flight.duration|timesince:"0:00" }}
-      {% endif %}
-      {% if flight.notes %}
-        <br><strong>Notes:</strong> {{ flight.notes|truncatewords:10 }}
-      {% endif %}
-      <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" class="btn btn-sm btn-outline-secondary">
-        Edit
-      </a>
+    <tr>
+      <td>
+        {% if flight.launch_time and flight.landing_time %}
+          <span class="badge bg-success">landed</span>
+        {% elif flight.launch_time %}
+          <span class="badge bg-primary">flying</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if flight.launch_time %}
+          {{ flight.launch_time|time:"H:i" }}
+        {% endif %}
+        —
+        {% if flight.landing_time %}
+          {{ flight.landing_time|time:"H:i" }}
+        {% endif %}
+      </td>
+      <td>{{ flight.pilot }}</td>
+       <td>
+        {% if flight.instructor %}
+          {{ flight.instructor }}
+        {% endif %}
+      </td>
+      <td>{{ flight.glider }}</td>
+      <td>{{ flight.towplane }}</td>
+      <td>
+          {% if flight.release_altitude %}
+            {{ flight.release_altitude }} ft</td>
+          {% endif %}
+     <td>
+        {% if flight.duration %}
+          {{ flight.duration|timesince:"0:00" }}
+        {% endif %}
+      </td>
+      <td>
+        <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" class="btn btn-sm btn-outline-secondary">
+          Edit
+        </a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="9" class="text-center">No flights found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
-    </li>
-  {% empty %}
-    <li class="list-group-item">No flights found.</li>
-  {% endfor %}
-  </ul>
 {% else %}
   <p>No flights recorded yet for this logsheet.</p>
 {% endif %}
