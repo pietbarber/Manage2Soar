@@ -117,3 +117,12 @@ def tinymce_image_upload(request):
         return JsonResponse({'location': url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
+from .models import Badge
+
+@active_member_required
+def badge_board(request):
+    badges = Badge.objects.prefetch_related('memberbadge_set__member').order_by('order')
+    return render(request, "members/badges.html", {"badges": badges})
+
+
+

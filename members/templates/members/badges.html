@@ -29,7 +29,7 @@
       <div class="d-flex align-items-center me-3 mb-2">
 
 
-        <a href="{% url 'member_view' mb.member.pk %}" class="d-flex align-items-center text-decoration-none">
+        <a href="{% url 'members:member_view' mb.member.pk %}" class="d-flex align-items-center text-decoration-none">
           {% if mb.member.profile_photo %}
             <img src="{{ mb.member.profile_photo.url }}"
                  alt="{{ mb.member }}"
