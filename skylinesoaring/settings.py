@@ -70,7 +70,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 LOGIN_URL = '/members/login/'
 LOGIN_REDIRECT_URL = '/members/'
-LOGOUT_REDIRECT_URL = '/members/login/'
+LOGOUT_REDIRECT_URL = '/login/'
 AUTH_USER_MODEL = 'members.Member'
 
 
