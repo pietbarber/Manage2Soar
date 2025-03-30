@@ -37,20 +37,29 @@ def member_edit(request, pk):
 
     return render(request, "members/member_edit.html", {"form": form, "member": member})
 
+
+
 @active_member_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
     can_edit = is_self or request.user.is_superuser
-    form = MemberProfilePhotoForm(instance=member) if is_self else None
-
-    # Biography logic (if you have one)
+        # Biography logic (if you have one)
     biography = getattr(member, "biography", None)
 
     # QR code generation
     qr_png = generate_vcard_qr(member)
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
+
+    if is_self and request.method == "POST":
+        form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Profile photo updated.")
+            return redirect("members:member_view", member_id=member.id)
+    else:
+        form = MemberProfilePhotoForm(instance=member) if is_self else None
     return render(
         request,
         "members/member_view.html",
@@ -63,6 +72,9 @@ def member_view(request, member_id):
             "biography": biography,
         },
     )
+
+
+
 
 
 
