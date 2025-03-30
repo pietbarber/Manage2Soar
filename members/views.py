@@ -84,14 +84,30 @@ def badge_board(request):
     badges = set(b for m in members for b in m.badges.all())
     return render(request, "members/badges.html", {"members": members, "badges": badges})
 
+
 @active_member_required
+
 def biography_view(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    try:
-        bio = member.biography
-    except Biography.DoesNotExist:
-        bio = None
-    return render(request, "members/biography.html", {"member": member, "biography": bio})
+    member = get_object_or_404(Member, pk=member_id)
+    biography, _ = Biography.objects.get_or_create(member=member)
+
+    can_edit = request.user == member or request.user.is_superuser
+
+    if request.method == "POST" and can_edit:
+        form = BiographyForm(request.POST, request.FILES, instance=biography)
+        if form.is_valid():
+            form.save()
+            return redirect("members:member_view", member_id=member.id)
+    else:
+        form = BiographyForm(instance=biography)
+
+    return render(request, "members/biography.html", {
+        "form": form,
+        "biography": biography,
+        "member": member,
+        "can_edit": can_edit
+    })
+
 
 @active_member_required
 def duty_roster(request):

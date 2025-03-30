@@ -2,6 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
+
 {% block content %}
 <div class="container mt-4">
   <h2>🧾 Edit Biography for {{ member.get_full_name }}</h2>
@@ -21,7 +22,7 @@
       {% endif %}
 
       <button type="submit" class="btn btn-primary mt-3">Save Biography</button>
-      <a href="{% url 'member_view' member.id %}" class="btn btn-secondary mt-3">Cancel</a>
+      <a href="{% url 'members:member_view' member.id %}" class="btn btn-secondary mt-3">Cancel</a>
     </form>
   {% else %}
     <div class="alert alert-danger">
