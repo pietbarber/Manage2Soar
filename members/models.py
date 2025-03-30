@@ -13,7 +13,7 @@ def biography_upload_path(instance, filename):
 
 class Biography(models.Model):
     member = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    content = models.TextField(blank=True, null=True)
+    content = HTMLField(blank=True, null=True)
     uploaded_image = models.ImageField(upload_to=biography_upload_path, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
