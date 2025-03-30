@@ -15,7 +15,7 @@
       {% else %}
         <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
       {% endif %}
-      {% if request.user == member %}
+      {% if is_self %}
       <h5>Update Profile Photo</h5>
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}

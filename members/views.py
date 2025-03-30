@@ -9,6 +9,8 @@ import io
 import base64
 import qrcode
 from .utils.vcard_tools import generate_vcard_qr
+from .forms import MemberProfilePhotoForm
+
 
 
 
@@ -38,18 +40,16 @@ def member_edit(request, pk):
 @active_member_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
+    is_self = request.user == member
+    can_edit = is_self or request.user.is_superuser
+    form = MemberProfilePhotoForm(instance=member) if is_self else None
 
-    # vCard + QR Code logic
-    vcard_text = generate_vcard_qr(member)
-    qr = qrcode.make(vcard_text)
-    buffer = io.BytesIO()
-    qr.save(buffer, format="PNG")
-    qr_png = buffer.getvalue()
-    qr_base64 = base64.b64encode(qr_png).decode("utf-8")
-
-    # biography editing permission
-    is_owner_or_superuser = request.user == member or request.user.is_superuser
+    # Biography logic (if you have one)
     biography = getattr(member, "biography", None)
+
+    # QR code generation
+    qr_png = generate_vcard_qr(member)
+    qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
     return render(
         request,
@@ -57,10 +57,13 @@ def member_view(request, member_id):
         {
             "member": member,
             "qr_base64": qr_base64,
+            "form": form,
+            "is_self": is_self,
+            "can_edit": can_edit,
             "biography": biography,
-            "can_edit_bio": is_owner_or_superuser,
         },
     )
+
 
 
 @active_member_required
