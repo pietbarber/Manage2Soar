@@ -66,7 +66,7 @@
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
         {% if request.user == member %}
         <li class="list-group-item"><strong>User Name:</strong> {{ member.username }}</li>
-        <a href="{% url 'set_password' %}" class="btn btn-secondary mt-3">Set Password</a>
+        <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3">Set Password</a>
         {% endif %}
         <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}</li>
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>

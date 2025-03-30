@@ -55,11 +55,18 @@
       <!-- Collapsible links -->
       <div class="collapse navbar-collapse" id="navbarCollapse">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'member_list' %}">Members</a>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="membersDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Members
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="membersDropdown">
+              <li><a class="dropdown-item" href="{% url 'members:member_list' %}">Member List</a></li>
+              <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">Badge Board</a></li>
+            </ul>
           </li>
+
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'duty_roster' %}">Duty Roster</a>
+            <a class="nav-link" href="{% url 'duty_roster:index' %}">Duty Roster</a>
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="logsheetDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -68,13 +75,9 @@
             <ul class="dropdown-menu" aria-labelledby="logsheetDropdown">
               <li><a class="dropdown-item" href="{% url 'logsheet:index' %}">Manage Log Sheets</a></li>
               <li><a class="dropdown-item" href="{% url 'logsheet:create' %}">Create New</a></li>
-              <li><a class="dropdown-item" href="{% url 'logsheet:correct' %}">Correct Existing</a></li>
             </ul>
           </li>
           
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'badge_board' %}">Badge Board</a>
-          </li>
           {% if user.is_authenticated and user.instructor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'instructors:index' %}">Instructor Tools</a>

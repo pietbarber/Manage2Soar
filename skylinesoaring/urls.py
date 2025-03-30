@@ -20,14 +20,23 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from members import views as member_views
+from django.contrib.auth import views as auth_views
+from django.urls import include
+
 
 
 urlpatterns = [
-    path("", member_views.home, name="home"),
+    path("", member_views.member_list, name="home"),
     path('admin/', admin.site.urls),
     path('members/', include('members.urls')),
     path('logsheet/', include('logsheet.urls')),
     path('instructors/', include('instructors.urls')),
+    path('duty_roster/', include('duty_roster.urls')),
+    path('login/', auth_views.LoginView.as_view(), name='login'),  # ← add this!
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('oauth/', include('social_django.urls', namespace='social')),
+
+
 ]
 
 # Serve media files in development only

@@ -7,22 +7,21 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views import tinymce_image_upload
 
-
+app_name = "members"
 
 urlpatterns = [
     path("", views.member_list, name="member_list"),
-    path('login/', auth_views.LoginView.as_view(), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
-    path('duty_roster/', views.duty_roster, name='duty_roster'),
-    path('members/', views.members_list, name='members'),
-    path('<int:pk>/edit/', member_edit, name='member_edit'),
-    path('tinymce/', include('tinymce.urls')),
-    path('oauth/', include('social_django.urls', namespace='social')),
-    path("<int:member_id>/view/", views.member_view, name="member_view"),
     path("badges/", views.badge_board, name="badge_board"),
-    path('set-password/', views.set_password, name='set_password'),
+
+    path('<int:pk>/edit/', member_edit, name='member_edit'),
+    path("badges/", views.badge_board, name="badge_board"),
     path('<int:member_id>/biography/', views.biography_view, name='biography_view'),
+    path('duty_roster/', views.duty_roster, name='duty_roster'),
+    path('tinymce/', include('tinymce.urls')),
+    path("<int:member_id>/view/", views.member_view, name="member_view"),
+    path('set-password/', views.set_password, name='set_password'),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
+
 
 
 

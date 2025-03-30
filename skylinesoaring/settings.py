@@ -62,14 +62,15 @@ INSTALLED_APPS = [
     "tinymce",
     "members",
     "instructors",
-    "logsheet"
+    "logsheet",
+    "duty_roster"
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
-LOGIN_URL = 'login'
+LOGIN_URL = '/members/login/'
 LOGIN_REDIRECT_URL = '/members/'
-LOGOUT_REDIRECT_URL = 'login'
+LOGOUT_REDIRECT_URL = '/members/login/'
 AUTH_USER_MODEL = 'members.Member'
 
 

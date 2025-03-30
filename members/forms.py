@@ -184,3 +184,37 @@ class BiographyForm(forms.ModelForm):
         widgets = {
             'content': TinyMCE(attrs={'cols': 80, 'rows': 30}),
         }
+
+from django import forms
+from .models import Member, Biography
+from django.core.exceptions import ValidationError
+
+class MemberForm(forms.ModelForm):
+    class Meta:
+        model = Member
+        exclude = [
+            "user", "last_login", "date_joined", "groups", "user_permissions"
+        ]
+
+class BiographyForm(forms.ModelForm):
+    class Meta:
+        model = Biography
+        fields = ["content"]
+
+class SetPasswordForm(forms.Form):
+    new_password1 = forms.CharField(
+        label="New password",
+        widget=forms.PasswordInput
+    )
+    new_password2 = forms.CharField(
+        label="Confirm new password",
+        widget=forms.PasswordInput
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get("new_password1")
+        p2 = cleaned_data.get("new_password2")
+        if p1 and p2 and p1 != p2:
+            raise ValidationError("Passwords do not match.")
+        return cleaned_data
