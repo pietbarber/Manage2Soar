@@ -29,12 +29,18 @@
 {% endif %}
 
 {% if not logsheet.finalized %}
-  <form method="post" class="mt-3">
+  <form method="post" class="mt-3" onsubmit="return confirmFinalize();">
     {% csrf_token %}
     <button type="submit" name="finalize" class="btn btn-danger">
       Finalize Logsheet
     </button>
   </form>
+
+  <script>
+    function confirmFinalize() {
+      return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
+    }
+  </script>
 {% else %}
   <div class="alert alert-warning mt-3">
     <strong>This logsheet is finalized.</strong> No further changes are allowed.
