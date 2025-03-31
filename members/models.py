@@ -17,6 +17,9 @@ class Biography(models.Model):
     uploaded_image = models.ImageField(upload_to=biography_upload_path, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name_plural = "Biographies"
+
     def __str__(self):
         return f"Biography of {self.member.get_full_name()}"
 

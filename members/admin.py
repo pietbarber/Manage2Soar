@@ -18,3 +18,13 @@ admin.site.register(Badge, BadgeAdmin)
 class MemberAdmin(UserAdmin):
     model = Member
     list_display = ("username", "email", "is_staff", "is_active")
+
+
+from django.contrib import admin
+from .models import Biography
+
+@admin.register(Biography)
+class BiographyAdmin(admin.ModelAdmin):
+    list_display = ("member", "updated_at")
+    search_fields = ("member__first_name", "member__last_name", "member__email")
+    ordering = ("-updated_at",)
