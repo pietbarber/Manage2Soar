@@ -131,40 +131,6 @@
   </div>
 </form>
 
-
-<hr>
-
-{% if not logsheet.finalized %}
-<h3>Add a New Flight</h3>
-
-<form method="post">
-  {% csrf_token %}
-  {{ form.non_field_errors }}
-
-  <div class="row">
-    <div class="col-md-3">{{ form.launch_time.label }}{{ form.launch_time }}</div>
-    <div class="col-md-3">{{ form.landing_time.label }}{{ form.landing_time }}</div>
-    <div class="col-md-3">{{ form.pilot.label }}{{ form.pilot }}</div>
-    <div class="col-md-3">{{ form.instructor.label }}{{ form.instructor }}</div>
-  </div>
-
-  <div class="row mt-2">
-    <div class="col-md-3">{{ form.glider.label }}{{ form.glider }}</div>
-    <div class="col-md-3">{{ form.tow_plane.label }}{{ form.tow_plane }}</div>
-    <div class="col-md-3">{{ form.towplane.label }}{{ form.towplane }}</div>
-    <div class="col-md-3">{{ form.tow_pilot.label }}{{ form.tow_pilot }}</div>
-    <div class="col-md-3">{{ form.release_altitude.label }}{{ form.tow_pilot }}</div>
-    <div class="col-md-3">{{ form.flight_type.label }}{{ form.flight_type }}</div>
-    <div class="col-md-3">{{ form.field.label }}{{ form.field }}</div>
-  </div>
-
-  <div class="mt-2">{{ form.notes.label }}{{ form.notes }}</div>
-
-  <button type="submit" class="btn btn-primary mt-3">Add Flight</button>
-</form>
-
-{% endif %}
-
 <div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content" id="flightModalContent">
