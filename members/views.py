@@ -107,6 +107,10 @@ def biography_view(request, member_id):
         "member": member,
         "can_edit": can_edit
     })
+from django.shortcuts import render
+
+def home(request):
+    return render(request, "home.html")
 
 
 @active_member_required

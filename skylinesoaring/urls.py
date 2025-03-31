@@ -26,7 +26,6 @@ from django.urls import include
 
 
 urlpatterns = [
-    path("", member_views.member_list, name="home"),
     path('admin/', admin.site.urls),
     path('members/', include('members.urls')),
     path('logsheet/', include('logsheet.urls')),
@@ -35,6 +34,8 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(), name='login'),  # ← add this!
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('oauth/', include('social_django.urls', namespace='social')),
+    path("", member_views.home, name="home"),  # ← This should point to home, not member_list
+
 
 
 ]
