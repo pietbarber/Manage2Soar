@@ -193,7 +193,7 @@ class MemberForm(forms.ModelForm):
     class Meta:
         model = Member
         exclude = [
-            "user", "last_login", "date_joined", "groups", "user_permissions"
+            "user", "last_login", "date_joined", "groups", "user_permissions", "password"
         ]
 
 class BiographyForm(forms.ModelForm):
