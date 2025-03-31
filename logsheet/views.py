@@ -171,3 +171,19 @@ def add_flight(request, logsheet_pk):
         "logsheet": logsheet,
         "mode": "add",
     })
+
+from django.views.decorators.http import require_POST
+
+@require_POST
+@active_member_required
+def delete_flight(request, logsheet_pk, flight_pk):
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
+    flight = get_object_or_404(Flight, pk=flight_pk, logsheet=logsheet)
+
+    if logsheet.finalized:
+        return HttpResponseForbidden("Cannot delete a finalized flight.")
+
+    flight.delete()
+    messages.success(request, "Flight deleted.")
+    return redirect("logsheet:manage", pk=logsheet_pk)
+
