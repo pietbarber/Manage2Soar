@@ -51,17 +51,17 @@
 </a>
 
 {% if logsheet.flights.exists %}
-<table class="table table-bordered table-hover align-middle">
+<table class="table table-bordered table-hover align-middle" id="flightsTable" class="sort">
   <thead class="table-light">
     <tr>
-      <th>Status</th>
-      <th>Time</th>
-      <th>Pilot</th>
-      <th>Instructor</th>
-      <th>Glider</th>
-      <th>Towplane</th>
-      <th>Release Alt</th>
-      <th>Duration</th>
+      <th col="sortable">Status<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Time<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Pilot<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Instructor<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Glider<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Towplane<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Release Alt<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
+      <th col="sortable">Duration<i class="bi bi-arrow-down-up ms-1 sort-icon"></i></th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -168,4 +168,40 @@
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_manage.html</code>
 </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    new Tablesort(document.getElementById("flightsTable"));
+  });
+</script>
+<script>
+  const table = document.getElementById("flightsTable");
+  const headers = table.querySelectorAll("th[data-sortable]");
+
+  headers.forEach((th, index) => {
+    th.addEventListener("click", function () {
+      const allIcons = table.querySelectorAll(".sort-icon");
+      allIcons.forEach(icon => {
+        icon.classList.remove("bi-arrow-up", "bi-arrow-down");
+        icon.classList.add("bi-arrow-down-up");
+      });
+
+      const icon = th.querySelector(".sort-icon");
+
+      // Toggle icon direction
+      if (th.classList.contains("sort-up")) {
+        icon.classList.remove("bi-arrow-down-up", "bi-arrow-down");
+        icon.classList.add("bi-arrow-up");
+      } else if (th.classList.contains("sort-down")) {
+        icon.classList.remove("bi-arrow-down-up", "bi-arrow-up");
+        icon.classList.add("bi-arrow-down");
+      }
+    });
+  });
+
+  new Tablesort(table);
+</script>
+
+
 {% endblock %}
