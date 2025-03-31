@@ -16,31 +16,22 @@ from .models import Logsheet
 from .forms import CreateLogsheetForm
 from members.decorators import active_member_required
 
+
 @active_member_required
 def create_logsheet(request):
     if request.method == "POST":
         form = CreateLogsheetForm(request.POST)
         if form.is_valid():
-            log_date = form.cleaned_data['log_date']
-            location = form.cleaned_data['location']
-
-            # Check if one already exists
-            existing = Logsheet.objects.filter(log_date=log_date, location=location).first()
-            if existing:
-                messages.info(request, f"A logsheet for {log_date} at {location} already exists.")
-                return redirect("logsheet:manage", pk=existing.pk)
-
-            # No duplicate, so go ahead and create
             logsheet = form.save(commit=False)
             logsheet.created_by = request.user
             logsheet.save()
-
-            messages.success(request, f"Logsheet created for {log_date} at {location}")
-            return redirect("logsheet:manage", pk=logsheet.pk)
+            messages.success(request, f"Logsheet for {logsheet.log_date} at {logsheet.airfield} created.")
+            return redirect("logsheet:manage", logsheet_pk=logsheet.pk)
     else:
         form = CreateLogsheetForm()
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})
+
 
 from .forms import FlightForm
 from django.db.models import Q
@@ -97,7 +88,7 @@ def manage_logsheet(request, pk):
                 messages.success(request, "Flight added successfully.")
                 return redirect("logsheet:manage", pk=logsheet.pk)
     else:
-        form = FlightForm(initial={"field": logsheet.location})
+        form = FlightForm(initial={"field": logsheet.airfield})
 
 
     return render(request, "logsheet/logsheet_manage.html", {

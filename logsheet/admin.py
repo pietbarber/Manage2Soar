@@ -17,11 +17,6 @@ class GliderAdmin(admin.ModelAdmin):
     list_display = ("competition_number", "n_number", "model", "make", "seats")
     search_fields = ("competition_number", "n_number", "model", "make")
 
-@admin.register(Logsheet)
-class LogsheetAdmin(admin.ModelAdmin):
-    list_display = ("log_date", "airfield", "created_by", "created_at", "finalized")
-    list_filter = ("finalized", "airfield")
-    search_fields = ("airfield", "created_by__username")
 
 @admin.register(Flight)
 class FlightAdmin(admin.ModelAdmin):
@@ -48,3 +43,11 @@ class AirfieldAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
         return "(No photo uploaded)"
     airfield_image_preview.short_description = "Current Photo"
+
+    from .models import Logsheet
+
+@admin.register(Logsheet)
+class LogsheetAdmin(admin.ModelAdmin):
+    list_display = ("log_date", "airfield", "created_by", "finalized", "created_at")
+    list_filter = ("airfield", "finalized")
+    search_fields = ("airfield__name", "created_by__username")

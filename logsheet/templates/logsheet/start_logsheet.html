@@ -31,6 +31,7 @@
 {% endif %}
 
 <!-- Modal HTML structure -->
+
 <div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -38,26 +39,37 @@
       <form method="POST">
         {% csrf_token %}
         {{ form.non_field_errors }}
-    
-        <div class="mb-3">
-            {{ form.log_date.label_tag }}
-            {{ form.log_date }}
-            {{ form.log_date.errors }}
+
+        <div class="modal-header">
+          <h5 class="modal-title" id="createLogsheetModalLabel">Create New Logsheet</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="mb-3">
-            {{ form.location.label_tag }}
-            {{ form.location }}
-            {{ form.location.errors }}
+
+        <div class="modal-body">
+          <div class="mb-3">
+              {{ form.log_date.label_tag }}
+              {{ form.log_date }}
+              {{ form.log_date.errors }}
+          </div>
+          <div class="mb-3">
+              {{ form.airfield.label_tag }}
+              {{ form.airfield }}
+              {{ form.airfield.errors }}
+          </div>
         </div>
+
         <div class="modal-footer">
           <button type="submit" class="btn btn-success">Start Logsheet</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
-        
+      </form>
 
     </div>
   </div>
 </div>
+
+
+
 
   <footer style="font-size: 0.8em; color: gray;">
     Template: <code>logsheet/start_logsheet.html</code>
