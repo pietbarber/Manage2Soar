@@ -28,3 +28,11 @@ class BiographyAdmin(admin.ModelAdmin):
     list_display = ("member", "updated_at")
     search_fields = ("member__first_name", "member__last_name", "member__email")
     ordering = ("-updated_at",)
+
+from .models import Badge, MemberBadge
+
+@admin.register(MemberBadge)
+class MemberBadgeAdmin(admin.ModelAdmin):
+    list_display = ("member", "badge", "date_awarded")
+    list_filter = ("badge",)
+    search_fields = ("member__first_name", "member__last_name", "badge__name")
