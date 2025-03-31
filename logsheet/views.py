@@ -26,7 +26,7 @@ def create_logsheet(request):
             logsheet.created_by = request.user
             logsheet.save()
             messages.success(request, f"Logsheet for {logsheet.log_date} at {logsheet.airfield} created.")
-            return redirect("logsheet:manage", logsheet_pk=logsheet.pk)
+            return redirect("logsheet:manage", pk=logsheet.pk)
     else:
         form = CreateLogsheetForm()
 

@@ -101,12 +101,27 @@ class Airfield(models.Model):
     def __str__(self):
         return f"{self.identifier} – {self.name}"
 
+from django.db import models
+from members.models import Member
+from .models import Towplane, Airfield  # Adjust import paths as needed
+
 class Logsheet(models.Model):
     log_date = models.DateField()
     airfield = models.ForeignKey(Airfield, on_delete=models.PROTECT)
     created_by = models.ForeignKey(Member, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     finalized = models.BooleanField(default=False)
+
+    # NEW: Duty crew assignments
+    duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_duty_officer", limit_choices_to={"duty_officer": True})
+    assistant_duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_assistant_duty_officer", limit_choices_to={"assistant_duty_officer": True})
+    duty_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_duty_instructor", limit_choices_to={"instructor": True})
+    surge_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_surge_instructor", limit_choices_to={"instructor": True})
+    tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_tow_pilot", limit_choices_to={"towpilot": True})
+    surge_tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_surge_tow_pilot", limit_choices_to={"towpilot": True})
+
+    # NEW: Default towplane
+    default_towplane = models.ForeignKey(Towplane, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
         unique_together = ("log_date", "airfield")

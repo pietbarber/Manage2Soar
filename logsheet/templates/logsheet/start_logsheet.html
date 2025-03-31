@@ -44,20 +44,55 @@
           <h5 class="modal-title" id="createLogsheetModalLabel">Create New Logsheet</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-
         <div class="modal-body">
           <div class="mb-3">
-              {{ form.log_date.label_tag }}
-              {{ form.log_date }}
-              {{ form.log_date.errors }}
+            {{ form.log_date.label_tag }}
+            {{ form.log_date }}
+            {{ form.log_date.errors }}
           </div>
           <div class="mb-3">
-              {{ form.airfield.label_tag }}
-              {{ form.airfield }}
-              {{ form.airfield.errors }}
+            {{ form.airfield.label_tag }}
+            {{ form.airfield }}
+            {{ form.airfield.errors }}
+          </div>
+      
+          <!-- Duty Crew Fields -->
+          <div class="mb-3">
+            {{ form.duty_officer.label_tag }}
+            {{ form.duty_officer }}
+            {{ form.duty_officer.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.assistant_duty_officer.label_tag }}
+            {{ form.assistant_duty_officer }}
+            {{ form.assistant_duty_officer.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.duty_instructor.label_tag }}
+            {{ form.duty_instructor }}
+            {{ form.duty_instructor.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.surge_instructor.label_tag }}
+            {{ form.surge_instructor }}
+            {{ form.surge_instructor.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.tow_pilot.label_tag }}
+            {{ form.tow_pilot }}
+            {{ form.tow_pilot.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.surge_tow_pilot.label_tag }}
+            {{ form.surge_tow_pilot }}
+            {{ form.surge_tow_pilot.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.default_towplane.label_tag }}
+            {{ form.default_towplane }}
+            {{ form.default_towplane.errors }}
           </div>
         </div>
-
         <div class="modal-footer">
           <button type="submit" class="btn btn-success">Start Logsheet</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

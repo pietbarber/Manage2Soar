@@ -40,10 +40,21 @@ class FlightForm(forms.ModelForm):
 
 from .models import Logsheet, Airfield
 
+from django import forms
+from django.core.exceptions import ValidationError
+from logsheet.models import Logsheet, Towplane, Airfield
+from members.models import Member
+
 class CreateLogsheetForm(forms.ModelForm):
     class Meta:
         model = Logsheet
-        fields = ["log_date", "airfield"]
+        fields = [
+            "log_date", "airfield",
+            "duty_officer", "assistant_duty_officer",
+            "duty_instructor", "surge_instructor",
+            "tow_pilot", "surge_tow_pilot",
+            "default_towplane",
+        ]
         widgets = {
             "log_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         }
@@ -61,11 +72,30 @@ class CreateLogsheetForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.fields["log_date"].widget.attrs.update({"class": "form-control"})
         self.fields["airfield"].queryset = Airfield.objects.filter(is_active=True).order_by("name")
         self.fields["airfield"].widget.attrs.update({"class": "form-select"})
+
         default_airfield = Airfield.objects.filter(identifier="KFRR").first()
         if default_airfield:
             self.fields["airfield"].initial = default_airfield
 
+        # Setup filtered querysets for each duty crew role
+        self.fields["duty_officer"].queryset = Member.objects.filter(duty_officer=True).order_by("last_name")
+        self.fields["assistant_duty_officer"].queryset = Member.objects.filter(assistant_duty_officer=True).order_by("last_name")
+        self.fields["duty_instructor"].queryset = Member.objects.filter(instructor=True).order_by("last_name")
+        self.fields["surge_instructor"].queryset = Member.objects.filter(instructor=True).order_by("last_name")
+        self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True).order_by("last_name")
+        self.fields["surge_tow_pilot"].queryset = Member.objects.filter(towpilot=True).order_by("last_name")
+        self.fields["default_towplane"].queryset = Towplane.objects.all().order_by("name", "registration")
 
+        # Optional: set widget styles for dropdowns
+        for name in [
+            "duty_officer", "assistant_duty_officer",
+            "duty_instructor", "surge_instructor",
+            "tow_pilot", "surge_tow_pilot",
+            "default_towplane",
+        ]:
+            self.fields[name].required = False
+            self.fields[name].widget.attrs.update({"class": "form-select"})
