@@ -226,4 +226,26 @@ class TowRate(models.Model):
     def __str__(self):
         return f"{self.altitude} ft – ${self.price:.2f}"
     
+class LogsheetPayment(models.Model):
+    logsheet = models.ForeignKey(
+        Logsheet, on_delete=models.CASCADE, related_name="payments"
+    )
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="logsheet_payments"
+    )
+    payment_method = models.CharField(
+        max_length=10,
+        choices=[("account", "On Account"), ("check", "Check")],
+        null=True,
+        blank=True
+    )
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        unique_together = ("logsheet", "member")
+
+    def __str__(self):
+        return f"{self.member.full_display_name} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
+
+    
 
