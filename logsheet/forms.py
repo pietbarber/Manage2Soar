@@ -22,6 +22,8 @@ class FlightForm(forms.ModelForm):
             "release_altitude",
             "passenger",
             "passenger_name",
+            "split_with",
+            "split_type"
         ]
         widgets = {
             "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
@@ -36,6 +38,7 @@ class FlightForm(forms.ModelForm):
             "landing_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
             "passenger": forms.Select(attrs={"class": "form-select"}),
             "passenger_name": forms.TextInput(attrs={"placeholder": "If not a member", "class": "form-control"}),
+            "split_type": forms.Select(attrs={"class": "form-select"}),
 
         }
 
@@ -45,6 +48,7 @@ class FlightForm(forms.ModelForm):
         # Filter instructors only
         self.fields["instructor"].queryset = Member.objects.filter(instructor=True)
         self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True)
+        self.fields["split_with"].queryset = Member.objects.filter(is_active=True).order_by("last_name")
         if not self.instance.pk:
             self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
 

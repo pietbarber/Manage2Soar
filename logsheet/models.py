@@ -111,6 +111,26 @@ class Flight(models.Model):
     
         super().save(*args, **kwargs)
 
+    split_with = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="shared_flights"
+    )
+
+    split_type = models.CharField(
+        max_length=10,
+        choices=[
+            ("even", "50/50"),
+            ("tow", "Tow Only"),
+            ("rental", "Rental Only"),
+            ("full", "Full Cost")
+        ],
+        null=True,
+        blank=True
+    )
+
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
     
@@ -205,3 +225,5 @@ class TowRate(models.Model):
 
     def __str__(self):
         return f"{self.altitude} ft – ${self.price:.2f}"
+    
+
