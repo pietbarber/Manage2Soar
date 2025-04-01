@@ -31,6 +31,70 @@ class Flight(models.Model):
         null=True,
         help_text="Release altitude in feet (0–7000 in 100ft steps)"
     )
+    tow_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    rental_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    @property
+    def tow_cost_calculated(self):
+        if self.release_altitude is None:
+            return None
+        return (
+            TowRate.objects
+            .filter(altitude__lte=self.release_altitude)
+            .order_by("-altitude")
+            .values_list("price", flat=True)
+            .first()
+        )
+
+    @property
+    def rental_cost_calculated(self):
+        if not self.glider or not self.duration:
+            return None
+        if not self.glider.rental_rate:
+            return 0
+        hours = self.duration.total_seconds() / 3600
+        return round(self.glider.rental_rate * hours, 2)
+
+    @property
+    def tow_cost(self):
+        if self.release_altitude is None:
+            return None
+        return (
+            TowRate.objects
+            .filter(altitude__lte=self.release_altitude)
+            .order_by("-altitude")
+            .values_list("price", flat=True)
+            .first()
+        )
+
+    @property
+    def tow_cost_display(self):
+        cost = self.tow_cost
+        return f"${cost:.2f}" if cost else "—"
+
+    @property
+    def rental_cost(self):
+        if not self.glider or not self.duration:
+            return None
+        if not self.glider.rental_rate:
+            return 0
+        hours = self.duration.total_seconds() / 3600
+        return round(self.glider.rental_rate * hours, 2)
+
+    @property
+    def rental_cost_display(self):
+        cost = self.rental_cost
+        return f"${cost:.2f}" if cost is not None else "—"
+
+    @property
+    def total_cost(self):
+        tow = self.tow_cost or 0
+        rental = self.rental_cost or 0
+        return round(tow + rental, 2)
+
+    @property
+    def total_cost_display(self):
+        return f"${self.total_cost:.2f}" if self.total_cost > 0 else "—"
 
     def save(self, *args, **kwargs):
         if self.launch_time and self.landing_time:

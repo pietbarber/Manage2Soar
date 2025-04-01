@@ -20,9 +20,19 @@ class GliderAdmin(admin.ModelAdmin):
 
 @admin.register(Flight)
 class FlightAdmin(admin.ModelAdmin):
-    list_display = ("logsheet", "launch_time", "landing_time", "pilot", "instructor", "glider", "towplane", "tow_pilot")
+    list_display = ("logsheet", "launch_time", "landing_time", "pilot", "instructor", 
+                    "glider", "towplane", "tow_pilot", "tow_cost_actual", "rental_cost_actual")
     list_filter = ("logsheet", "glider", "towplane", "instructor")
     search_fields = ("pilot__first_name", "pilot__last_name", "instructor__first_name", "instructor__last_name")
+    readonly_fields = ("tow_cost", "rental_cost", "total_cost_display")
+    def tow_cost(self, obj):
+        return obj.tow_cost_display
+
+    def rental_cost(self, obj):
+        return obj.rental_cost_display
+
+    def total_cost_display(self, obj):
+        return obj.total_cost_display
 
 @admin.register(RevisionLog)
 class RevisionLogAdmin(admin.ModelAdmin):
