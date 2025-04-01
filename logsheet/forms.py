@@ -1,13 +1,24 @@
-
+from .models import Logsheet, Airfield
+from django.core.exceptions import ValidationError
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Logsheet
-from .models import Flight
-from .models import Towplane
+from .models import Logsheet, Flight, Towplane
 from members.models import Member
 from django.utils.timezone import localtime, now
 
-
+# FlightForm
+# This form is used to handle the creation and editing of Flight model instances.
+# It includes fields for launch and landing times, pilot, instructor, glider, towplane, tow pilot, release altitude, passenger, and cost-splitting details.
+# Widgets are customized for better user experience:
+# - TimeInput widgets for "launch_time" and "landing_time" with "time" input type and "form-control" class.
+# - Select widgets for dropdown fields like "pilot", "instructor", "glider", "tow_pilot", "towplane", "release_altitude", "passenger", and "split_type" with "form-select" class.
+# - TextInput widgets for "passenger_name" with a placeholder and "form-control" class.
+# The __init__ method customizes querysets for specific fields:
+# - Filters active towplanes for "towplane".
+# - Filters members who are instructors for "instructor".
+# - Filters members who are tow pilots for "tow_pilot".
+# - Filters active members for "split_with", ordered by last name.
+# Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
     class Meta:
         model = Flight
@@ -53,13 +64,24 @@ class FlightForm(forms.ModelForm):
             self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
 
 
-from .models import Logsheet, Airfield
+# CreateLogsheetForm
+# This form is used to handle the creation of Logsheet model instances. It includes fields for log date, airfield, duty crew roles, and the default towplane. The form ensures that only one logsheet exists for a specific date and airfield combination.
 
-from django import forms
-from django.core.exceptions import ValidationError
-from logsheet.models import Logsheet, Towplane, Airfield
-from members.models import Member
+# Widgets:
+# - "log_date": DateInput widget with "date" input type and "form-control" class for selecting the log date.
+# - "airfield": Select widget with "form-select" class, pre-filtered to show only active airfields, ordered by name.
+# - Dropdown fields for duty crew roles ("duty_officer", "assistant_duty_officer", "duty_instructor", "surge_instructor", "tow_pilot", "surge_tow_pilot") and "default_towplane" are styled with the "form-select" class.
 
+# Methods:
+#    - `clean`: Validates that a logsheet does not already exist for the selected date and airfield. Raises a ValidationError if a duplicate is found.
+#    - `__init__`: 
+#        - Initializes the form with filtered querysets for dropdown fields:
+#        - Filters active airfields for "airfield".
+#        - Filters members based on their roles for duty crew fields (e.g., duty officer, instructor, tow pilot).
+#        - Orders members by last name for better usability.
+#        - Orders towplanes by name and registration.
+#        - Sets the default airfield to "KFRR" if it exists.
+#        - Applies consistent widget styles for dropdown fields.
 class CreateLogsheetForm(forms.ModelForm):
     class Meta:
         model = Logsheet
