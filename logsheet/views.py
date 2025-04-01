@@ -1,20 +1,15 @@
-from django.shortcuts import render
+from django.http import HttpResponseForbidden
+from django.views.decorators.http import require_POST
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Logsheet, Flight
+from .forms import CreateLogsheetForm, FlightForm
 from members.decorators import active_member_required
+from django.db.models import Q
 
 @active_member_required
 def index(request):
     return render(request, "logsheet/index.html")
-
-from django.shortcuts import render, redirect
-from .forms import CreateLogsheetForm
-from .models import Logsheet
-from django.contrib import messages
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from .models import Logsheet
-from .forms import CreateLogsheetForm
-from members.decorators import active_member_required
 
 
 @active_member_required
@@ -32,9 +27,6 @@ def create_logsheet(request):
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})
 
-
-from .forms import FlightForm
-from django.db.models import Q
 
 @active_member_required
 def manage_logsheet(request, pk):
@@ -109,8 +101,6 @@ def manage_logsheet(request, pk):
     })
 
 
-from django.db.models import Q
-
 @active_member_required
 def list_logsheets(request):
     query = request.GET.get("q", "")
@@ -129,9 +119,6 @@ def list_logsheets(request):
         "query": query,
     })
 
-from django.http import HttpResponseForbidden
-from .models import Flight
-from .forms import FlightForm
 
 @active_member_required
 def edit_flight(request, logsheet_pk, flight_pk):
@@ -157,10 +144,6 @@ def edit_flight(request, logsheet_pk, flight_pk):
         "logsheet": logsheet
     })
 
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import Logsheet, Flight
-from .forms import FlightForm
-from members.decorators import active_member_required
 
 @active_member_required
 def add_flight(request, logsheet_pk):
@@ -182,7 +165,6 @@ def add_flight(request, logsheet_pk):
         "mode": "add",
     })
 
-from django.views.decorators.http import require_POST
 
 @require_POST
 @active_member_required
