@@ -294,13 +294,14 @@ def delete_flight(request, logsheet_pk, flight_pk):
 # - View a detailed breakdown of flight costs for all flights in the logsheet.
 # - Display costs based on whether the logsheet is finalized (actual costs) or not (calculated costs).
 # - Summarize financial data per pilot, including the number of flights, tow costs, rental costs, and total costs.
+# - Calculate and display charges for each member, considering cost-sharing arrangements (e.g., even splits, tow-only splits, rental-only splits, or full responsibility).
 # 
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
 #    pk (int): The primary key of the logsheet to manage finances for.
 # 
 # Returns:
-#    HttpResponse: Renders the financial management page with detailed cost breakdowns and summaries.
+#    HttpResponse: Renders the financial management page with detailed cost breakdowns, pilot summaries, and member charges.
 
 @active_member_required
 def manage_logsheet_finances(request, pk):
@@ -341,6 +342,43 @@ def manage_logsheet_finances(request, pk):
             summary["rental"] += costs["rental"] or 0
             summary["total"] += costs["total"] or 0
 
+    from collections import defaultdict
+    from decimal import Decimal
+
+    # Who pays what?
+    member_charges = defaultdict(lambda: {"tow": Decimal("0.00"), "rental": Decimal("0.00"), "total": Decimal("0.00")})
+
+    for flight, costs in flight_data:
+        pilot = flight.pilot
+        partner = flight.split_with
+        split_type = flight.split_type
+        tow = costs["tow"] or Decimal("0.00")
+        rental = costs["rental"] or Decimal("0.00")
+        total = costs["total"] or Decimal("0.00")
+
+        if partner and split_type:
+            if split_type == "even":
+                half = total / 2
+                member_charges[pilot]["total"] += half
+                member_charges[partner]["total"] += half
+            elif split_type == "tow":
+                member_charges[pilot]["rental"] += rental
+                member_charges[partner]["tow"] += tow
+            elif split_type == "rental":
+                member_charges[pilot]["tow"] += tow
+                member_charges[partner]["rental"] += rental
+            elif split_type == "full":
+                member_charges[partner]["tow"] += tow
+                member_charges[partner]["rental"] += rental
+        else:
+            # No split — pilot pays all
+            member_charges[pilot]["tow"] += tow
+            member_charges[pilot]["rental"] += rental
+
+    # Add combined totals
+    for summary in member_charges.values():
+        summary["total"] = summary["tow"] + summary["rental"]
+
     context = {
         "logsheet": logsheet,
         "flight_data": flight_data,
@@ -348,6 +386,7 @@ def manage_logsheet_finances(request, pk):
         "total_rental": total_rental,
         "total_sum": total_sum,
         "pilot_summary": dict(pilot_summary),
+        "member_charges": dict(member_charges)
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

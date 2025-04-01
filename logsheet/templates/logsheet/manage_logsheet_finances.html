@@ -30,6 +30,29 @@
     {% endfor %}
   </tbody>
 </table>
+<h4 class="mt-5">Member Charges</h4>
+<p class="text-muted">This reflects who is financially responsible for each flight, including splits.</p>
+
+<table class="table table-sm table-striped">
+  <thead>
+    <tr>
+      <th>Member</th>
+      <th class="text-end">Tow</th>
+      <th class="text-end">Rental</th>
+      <th class="text-end">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for member, summary in member_charges.items %}
+    <tr>
+      <td>{{ member|full_display_name }}</td>
+      <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
+      <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
+      <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 <h4 class="mt-5">Summary by Flight</h4>
 <table class="table table-bordered table-sm align-middle">
