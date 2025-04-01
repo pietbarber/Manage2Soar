@@ -131,3 +131,13 @@ class Logsheet(models.Model):
 
     def __str__(self):
         return f"{self.log_date} @ {self.airfield}"
+
+class TowRate(models.Model):
+    altitude = models.PositiveIntegerField(help_text="Release altitude in feet (e.g. 2000)")
+    price = models.DecimalField(max_digits=6, decimal_places=2, help_text="Price in USD")
+
+    class Meta:
+        ordering = ['altitude']
+
+    def __str__(self):
+        return f"{self.altitude} ft – ${self.price:.2f}"

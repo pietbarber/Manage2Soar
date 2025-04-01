@@ -51,3 +51,12 @@ class LogsheetAdmin(admin.ModelAdmin):
     list_display = ("log_date", "airfield", "created_by", "finalized", "created_at")
     list_filter = ("airfield", "finalized")
     search_fields = ("airfield__name", "created_by__username")
+
+from django.contrib import admin
+from .models import TowRate
+
+@admin.register(TowRate)
+class TowRateAdmin(admin.ModelAdmin):
+    list_display = ("altitude", "price")
+    list_editable = ("price",)
+    ordering = ("altitude",)
