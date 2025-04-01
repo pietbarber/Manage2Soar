@@ -379,6 +379,21 @@ def manage_logsheet_finances(request, pk):
     for summary in member_charges.values():
         summary["total"] = summary["tow"] + summary["rental"]
 
+    from .models import LogsheetPayment
+
+    member_payment_data = []
+    
+    for member in member_charges:
+        summary = member_charges[member]
+        payment, created = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
+
+        member_payment_data.append({
+            "member": member,
+            "amount": summary["total"],
+            "payment_method": payment.payment_method,
+            "note": payment.note,
+        })
+
     context = {
         "logsheet": logsheet,
         "flight_data": flight_data,
@@ -386,8 +401,23 @@ def manage_logsheet_finances(request, pk):
         "total_rental": total_rental,
         "total_sum": total_sum,
         "pilot_summary": dict(pilot_summary),
-        "member_charges": dict(member_charges)
+        "member_charges": dict(member_charges),
+        "member_payment_data": member_payment_data
     }
+    if request.method == "POST":
+        for entry in member_payment_data:
+            member = entry["member"]
+            payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
+
+            payment_method = request.POST.get(f"payment_method_{member.id}")
+            note = request.POST.get(f"note_{member.id}", "").strip()
+
+            payment.payment_method = payment_method or None
+            payment.note = note
+            payment.save()
+
+        messages.success(request, "Payment methods updated.")
+        return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
 

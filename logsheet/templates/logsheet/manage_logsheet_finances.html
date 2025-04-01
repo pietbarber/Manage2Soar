@@ -53,6 +53,45 @@
     {% endfor %}
   </tbody>
 </table>
+<h4 class="mt-5">Payment Method Tracker</h4>
+
+<form method="post">
+  {% csrf_token %}
+  <table class="table table-sm table-bordered">
+    <thead>
+      <tr>
+        <th>Member</th>
+        <th>Amount</th>
+        <th>Payment Method</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      {% for row in member_payment_data %}
+      <tr>
+        <td>{{ row.member|full_display_name }}</td>
+        <td>${{ row.amount|floatformat:2 }}</td>
+        <td>
+          <select name="payment_method_{{ row.member.id }}" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="account" {% if row.payment_method == "account" %}selected{% endif %}>On Account</option>
+            <option value="check" {% if row.payment_method == "check" %}selected{% endif %}>Check</option>
+            <option value="zelle" {% if row.payment_method == "zelle" %}selected{% endif %}>Zelle</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" name="note_{{ row.member.id }}" class="form-control form-control-sm"
+                 value="{{ row.note }}">
+        </td>
+      </tr>
+    {% endfor %}
+    
+    </tbody>
+  </table>
+
+  <button type="submit" class="btn btn-success">Update Payments</button>
+</form>
 
 <h4 class="mt-5">Summary by Flight</h4>
 <table class="table table-bordered table-sm align-middle">

@@ -235,7 +235,11 @@ class LogsheetPayment(models.Model):
     )
     payment_method = models.CharField(
         max_length=10,
-        choices=[("account", "On Account"), ("check", "Check")],
+        choices=[
+            ("account", "On Account"), 
+            ("check", "Check"),
+            ("zelle", "Zelle")
+            ],
         null=True,
         blank=True
     )
