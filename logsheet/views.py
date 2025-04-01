@@ -7,10 +7,28 @@ from .forms import CreateLogsheetForm, FlightForm
 from members.decorators import active_member_required
 from django.db.models import Q
 
+#################################################
+# index
+# This function might have been abandoned.  Considering updating it or deleting it. 
 @active_member_required
 def index(request):
     return render(request, "logsheet/index.html")
 
+
+#################################################
+# Handles the creation of a new logsheet.
+# 
+# This view is accessible only to active members due to the `@active_member_required` decorator.
+# It processes both GET and POST requests:
+# - For GET requests, it initializes an empty `CreateLogsheetForm` and renders the logsheet creation page.
+# - For POST requests, it validates the submitted form data, creates a new logsheet instance, associates it with the currently logged-in user, and saves it to the database. If successful, it redirects the user to the logsheet management page and displays a success message.
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+# 
+# Returns:
+#    HttpResponse: Renders the logsheet creation page with the form for GET requests.
+#    HttpResponseRedirect: Redirects to the logsheet management page upon successful creation of a logsheet.
 
 @active_member_required
 def create_logsheet(request):
@@ -27,6 +45,24 @@ def create_logsheet(request):
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})
 
+#################################################
+# manage_logsheet
+
+# This view handles the management of a specific logsheet.
+# 
+# It allows active members to:
+# - View all flights associated with the logsheet, with optional filtering by pilot or instructor name.
+# - Add new flights to the logsheet (if not finalized).
+# - Finalize the logsheet, locking in all calculated costs as actual costs.
+# - Reopen a finalized logsheet for revision (superusers only).
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    pk (int): The primary key of the logsheet to manage.
+# 
+# Returns:
+#    HttpResponse: Renders the logsheet management page with the list of flights and a form for adding flights.
+#    HttpResponseRedirect: Redirects to the same page after performing actions like finalizing, revising, or adding flights.
 
 @active_member_required
 def manage_logsheet(request, pk):
@@ -101,6 +137,21 @@ def manage_logsheet(request, pk):
     })
 
 
+#################################################
+# list_logsheets
+
+# This view handles the listing of all logsheets.
+# 
+# It allows active members to:
+# - View a list of all logsheets, optionally filtered by a search query.
+# - Search logsheets by log date, location, or the username of the creator.
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+# 
+# Returns:
+#    HttpResponse: Renders the logsheet list page with the filtered or unfiltered list of logsheets.
+
 @active_member_required
 def list_logsheets(request):
     query = request.GET.get("q", "")
@@ -119,13 +170,30 @@ def list_logsheets(request):
         "query": query,
     })
 
+#################################################
+# edit_flight
+
+# This view handles the editing of an existing flight within a specific logsheet.
+# 
+# It allows active members to:
+# - Edit the details of a flight associated with a logsheet.
+# - Prevent edits if the logsheet is finalized (unless the user is a superuser).
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    logsheet_pk (int): The primary key of the logsheet containing the flight.
+#    flight_pk (int): The primary key of the flight to edit.
+# 
+# Returns:
+#    HttpResponse: Renders the flight editing form for GET requests.
+#    HttpResponseRedirect: Redirects to the logsheet management page upon successful update of the flight.
 
 @active_member_required
 def edit_flight(request, logsheet_pk, flight_pk):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
     flight = get_object_or_404(Flight, pk=flight_pk, logsheet=logsheet)
 
-    # Optional: Only allow edits if not finalized
+    # Only allow edits if not finalized
     if logsheet.finalized and not request.user.is_superuser:
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
@@ -144,6 +212,22 @@ def edit_flight(request, logsheet_pk, flight_pk):
         "logsheet": logsheet
     })
 
+#################################################
+# add_flight
+
+# This view handles the addition of a new flight to a specific logsheet.
+# 
+# It allows active members to:
+# - Add a new flight to the logsheet if it is not finalized.
+# - Display a form for entering flight details.
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    logsheet_pk (int): The primary key of the logsheet to which the flight will be added.
+# 
+# Returns:
+#    HttpResponse: Renders the flight addition form for GET requests.
+#    HttpResponseRedirect: Redirects to the logsheet management page upon successful addition of the flight.
 
 @active_member_required
 def add_flight(request, logsheet_pk):
@@ -165,6 +249,28 @@ def add_flight(request, logsheet_pk):
         "mode": "add",
     })
 
+#################################################
+# delete_flight
+
+# This view handles the deletion of a flight from a specific logsheet.
+# 
+# Decorators:
+# - @require_POST: Ensures that this view can only be accessed via a POST request, preventing accidental deletions through GET requests.
+# - @active_member_required: Restricts access to active members only, ensuring that only authorized users can perform this action.
+# 
+# Functionality:
+# - Deletes a flight associated with a logsheet if the logsheet is not finalized.
+# - Prevents deletion of flights from finalized logsheets to maintain data integrity.
+# - Displays a success message upon successful deletion.
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    logsheet_pk (int): The primary key of the logsheet containing the flight.
+#    flight_pk (int): The primary key of the flight to delete.
+# 
+# Returns:
+#    HttpResponseForbidden: If the logsheet is finalized, deletion is forbidden.
+#    HttpResponseRedirect: Redirects to the logsheet management page after successful deletion.
 
 @require_POST
 @active_member_required
@@ -178,6 +284,23 @@ def delete_flight(request, logsheet_pk, flight_pk):
     flight.delete()
     messages.success(request, "Flight deleted.")
     return redirect("logsheet:manage", pk=logsheet_pk)
+
+#################################################
+# manage_logsheet_finances
+
+# This view handles the financial management of a specific logsheet.
+# 
+# It allows active members to:
+# - View a detailed breakdown of flight costs for all flights in the logsheet.
+# - Display costs based on whether the logsheet is finalized (actual costs) or not (calculated costs).
+# - Summarize financial data per pilot, including the number of flights, tow costs, rental costs, and total costs.
+# 
+# Args:
+#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    pk (int): The primary key of the logsheet to manage finances for.
+# 
+# Returns:
+#    HttpResponse: Renders the financial management page with detailed cost breakdowns and summaries.
 
 @active_member_required
 def manage_logsheet_finances(request, pk):
