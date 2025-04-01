@@ -5,6 +5,8 @@ from .models import Logsheet
 from .models import Flight
 from .models import Towplane
 from members.models import Member
+from django.utils.timezone import localtime, now
+
 
 class FlightForm(forms.ModelForm):
     class Meta:
@@ -28,6 +30,9 @@ class FlightForm(forms.ModelForm):
             "tow_pilot": forms.Select(attrs={"class": "form-select"}),
             "towplane": forms.Select(attrs={"class": "form-select"}),
             "release_altitude": forms.Select(attrs={"class": "form-select"}),
+            "launch_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
+            "landing_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
+
 
         }
 
@@ -37,6 +42,9 @@ class FlightForm(forms.ModelForm):
         # Filter instructors only
         self.fields["instructor"].queryset = Member.objects.filter(instructor=True)
         self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True)
+        if not self.instance.pk:
+            self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
+
 
 from .models import Logsheet, Airfield
 

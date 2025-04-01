@@ -152,6 +152,29 @@
     </div>
   </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<script>
+  document.getElementById("flightModal").addEventListener("shown.bs.modal", function () {
+    console.log("Modal is visible — initializing Flatpickr");
+
+    flatpickr("#id_launch_time", {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+    });
+
+    flatpickr("#id_landing_time", {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+    });
+  });
+</script>
+
+
 
 <script>
   const flightModal = document.getElementById("flightModal");
