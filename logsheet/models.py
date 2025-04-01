@@ -1,7 +1,6 @@
 from django.db import models
 from members.models import Member
-from decimal import Decimal 
-    
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 
 class Flight(models.Model):
@@ -53,7 +52,7 @@ class Flight(models.Model):
         if not self.glider.rental_rate:
             return Decimal("0.00")
         hours = Decimal(self.duration.total_seconds()) / Decimal(3600)
-        return self.glider.rental_rate * hours
+        return Decimal(str(self.glider.rental_rate)) * hours
 
     @property
     def tow_cost(self):
@@ -72,14 +71,19 @@ class Flight(models.Model):
         cost = self.tow_cost
         return f"${cost:.2f}" if cost else "—"
 
+
     @property
     def rental_cost(self):
         if not self.glider or not self.duration:
             return None
         if not self.glider.rental_rate:
-            return 0
-        hours = self.duration.total_seconds() / 3600
-        return round(self.glider.rental_rate * hours, 2)
+            return Decimal("0.00")
+
+        hours = Decimal(self.duration.total_seconds()) / Decimal("3600")
+        rate = Decimal(str(self.glider.rental_rate))
+        cost = rate * hours
+    
+        return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
     def rental_cost_display(self):

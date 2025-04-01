@@ -295,6 +295,14 @@ def delete_flight(request, logsheet_pk, flight_pk):
 # - Display costs based on whether the logsheet is finalized (actual costs) or not (calculated costs).
 # - Summarize financial data per pilot, including the number of flights, tow costs, rental costs, and total costs.
 # - Calculate and display charges for each member, considering cost-sharing arrangements (e.g., even splits, tow-only splits, rental-only splits, or full responsibility).
+# - Update payment methods and notes for each member.
+# - Finalize the logsheet, locking in all costs and ensuring all responsible members have a payment method.
+# 
+# Methods:
+# - flight_costs(f): Determines the tow, rental, and total costs for a flight based on whether the logsheet is finalized.
+# - POST handling:
+#   - Finalize: Ensures all responsible members have payment methods, locks in costs, and finalizes the logsheet.
+#   - Update payment methods: Saves payment methods and notes for each member.
 # 
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
@@ -329,10 +337,11 @@ def manage_logsheet_finances(request, pk):
         total_sum += costs["total"] or 0
 
     from collections import defaultdict
+    from decimal import Decimal
+    from .models import LogsheetPayment
 
     # Summary per pilot
     pilot_summary = defaultdict(lambda: {"count": 0, "tow": 0, "rental": 0, "total": 0})
-
     for flight, costs in flight_data:
         pilot = flight.pilot
         if pilot:
@@ -342,12 +351,8 @@ def manage_logsheet_finances(request, pk):
             summary["rental"] += costs["rental"] or 0
             summary["total"] += costs["total"] or 0
 
-    from collections import defaultdict
-    from decimal import Decimal
-
     # Who pays what?
     member_charges = defaultdict(lambda: {"tow": Decimal("0.00"), "rental": Decimal("0.00"), "total": Decimal("0.00")})
-
     for flight, costs in flight_data:
         pilot = flight.pilot
         partner = flight.split_with
@@ -371,28 +376,83 @@ def manage_logsheet_finances(request, pk):
                 member_charges[partner]["tow"] += tow
                 member_charges[partner]["rental"] += rental
         else:
-            # No split — pilot pays all
-            member_charges[pilot]["tow"] += tow
-            member_charges[pilot]["rental"] += rental
+            if pilot:
+                member_charges[pilot]["tow"] += tow
+                member_charges[pilot]["rental"] += rental
 
     # Add combined totals
     for summary in member_charges.values():
         summary["total"] = summary["tow"] + summary["rental"]
 
-    from .models import LogsheetPayment
-
     member_payment_data = []
-    
     for member in member_charges:
         summary = member_charges[member]
-        payment, created = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
-
+        payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
         member_payment_data.append({
             "member": member,
             "amount": summary["total"],
             "payment_method": payment.payment_method,
             "note": payment.note,
         })
+
+    if request.method == "POST":
+        if "finalize" in request.POST:
+            # Check that all responsible members have a payment method
+            responsible_members = set()
+
+            for flight in flights:
+                pilot = flight.pilot
+                partner = flight.split_with
+                split = flight.split_type
+
+                if partner and split == "full":
+                    responsible_members.add(partner)
+                elif partner and split in ("even", "tow", "rental"):
+                    responsible_members.update([pilot, partner])
+                elif pilot:
+                    responsible_members.add(pilot)
+
+            missing = []
+            for member in responsible_members:
+                try:
+                    payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
+                    if not payment.payment_method:
+                        missing.append(member.full_display_name)
+                except LogsheetPayment.DoesNotExist:
+                    missing.append(member.full_display_name)
+
+            if missing:
+                messages.error(
+                    request,
+                    "Cannot finalize. Missing payment method for: " + ", ".join(missing)
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+            # Lock in costs
+            for flight in flights:
+                if flight.tow_cost_actual is None:
+                    flight.tow_cost_actual = flight.tow_cost_calculated
+                if flight.rental_cost_actual is None:
+                    flight.rental_cost_actual = flight.rental_cost_calculated
+                flight.save()
+
+            logsheet.finalized = True
+            logsheet.save()
+            messages.success(request, "Logsheet has been finalized and all costs locked in.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+        else:
+            for entry in member_payment_data:
+                member = entry["member"]
+                payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
+                payment_method = request.POST.get(f"payment_method_{member.id}")
+                note = request.POST.get(f"note_{member.id}", "").strip()
+                payment.payment_method = payment_method or None
+                payment.note = note
+                payment.save()
+
+            messages.success(request, "Payment methods updated.")
+            return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
     context = {
         "logsheet": logsheet,
@@ -404,21 +464,5 @@ def manage_logsheet_finances(request, pk):
         "member_charges": dict(member_charges),
         "member_payment_data": member_payment_data
     }
-    if request.method == "POST":
-        for entry in member_payment_data:
-            member = entry["member"]
-            payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
-
-            payment_method = request.POST.get(f"payment_method_{member.id}")
-            note = request.POST.get(f"note_{member.id}", "").strip()
-
-            payment.payment_method = payment_method or None
-            payment.note = note
-            payment.save()
-
-        messages.success(request, "Payment methods updated.")
-        return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
-
-
