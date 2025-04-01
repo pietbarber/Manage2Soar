@@ -69,12 +69,22 @@ def manage_logsheet(request, pk):
                 return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
-
     if request.method == "POST":
         if "finalize" in request.POST:
+            if logsheet.finalized:
+                messages.info(request, "This logsheet has already been finalized.")
+                return redirect("logsheet:manage", pk=logsheet.pk)
+    
+            for flight in logsheet.flights.all():
+                if flight.tow_cost_actual is None:
+                    flight.tow_cost_actual = flight.tow_cost_calculated
+                if flight.rental_cost_actual is None:
+                    flight.rental_cost_actual = flight.rental_cost_calculated
+                flight.save()
+    
             logsheet.finalized = True
             logsheet.save()
-            messages.success(request, "Logsheet has been finalized.")
+            messages.success(request, "Logsheet has been finalized and all costs locked in.")
             return redirect("logsheet:manage", pk=logsheet.pk)
     
         form = FlightForm(request.POST)

@@ -1,6 +1,6 @@
 from django.db import models
 from members.models import Member
-
+from decimal import Decimal 
     
 from datetime import datetime, timedelta, date
 
@@ -51,9 +51,9 @@ class Flight(models.Model):
         if not self.glider or not self.duration:
             return None
         if not self.glider.rental_rate:
-            return 0
-        hours = self.duration.total_seconds() / 3600
-        return round(self.glider.rental_rate * hours, 2)
+            return Decimal("0.00")
+        hours = Decimal(self.duration.total_seconds()) / Decimal(3600)
+        return self.glider.rental_rate * hours
 
     @property
     def tow_cost(self):
