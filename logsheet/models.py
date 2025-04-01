@@ -14,6 +14,9 @@ class Flight(models.Model):
     tow_pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_tow_pilot")
     towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
     duration = models.DurationField(blank=True, null=True)
+    passenger = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_passenger")
+    passenger_name = models.CharField(max_length=100, blank=True, help_text="Name of passenger if not a member")
+
 
     field = models.CharField(max_length=100)  # Copy from logsheet or input per-flight
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.

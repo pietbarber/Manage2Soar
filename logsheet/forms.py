@@ -20,6 +20,8 @@ class FlightForm(forms.ModelForm):
             "towplane",
             "tow_pilot",
             "release_altitude",
+            "passenger",
+            "passenger_name",
         ]
         widgets = {
             "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
@@ -32,7 +34,8 @@ class FlightForm(forms.ModelForm):
             "release_altitude": forms.Select(attrs={"class": "form-select"}),
             "launch_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
             "landing_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
-
+            "passenger": forms.Select(attrs={"class": "form-select"}),
+            "passenger_name": forms.TextInput(attrs={"placeholder": "If not a member", "class": "form-control"}),
 
         }
 
