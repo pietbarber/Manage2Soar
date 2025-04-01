@@ -74,3 +74,46 @@ This roadmap outlines current and future development goals for the Skyline Soari
 
 If you have questions, suggestions, or contributions, please open an issue or reach out to Piet Barber!
 
+## Logsheet Program – Future Enhancements
+
+- [ ] Support logging of passengers:
+  - Passenger may be a member (dropdown) or a non-member (plain text).
+  - Field is only visible if no instructor is present on the flight.
+
+- [ ] Implement logsheet-level finances:
+  - Add a Finances modal or section, accessible via a dedicated button.
+  - Completion of finances is required before finalizing a logsheet.
+
+- [ ] Define tow altitude rate model:
+  - Create a model under `logsheet` to store tow altitude → cost mappings.
+  - Combine with existing glider rental rates.
+
+- [ ] Add support for payment methods:
+  - "On account" or handwritten check.
+  - Payments may be assigned to a member other than the pilot.
+  - Support 50/50 cost splits or split by component (tow vs rental).
+
+- [ ] Require duty officer log/essay before logsheet finalization.
+
+- [ ] Block finalization unless all gliders are marked as landed.
+
+- [ ] Centralized validation logic before allowing logsheet finalization:
+  - Gliders landed
+  - Finances completed
+  - Duty officer essay entered
+
+- [ ] Migration tool for legacy flight logs:
+  - Import historical PostgreSQL data going back to 2005.
+  - Must integrate with current Member, Glider, and Towplane models.
+
+- [ ] Paginated or limited logsheet list:
+  - Display most recent year or 50 logsheets by default.
+  - Include search or filter capability for older logsheets.
+
+- [ ] Offline-compatible logsheet entry:
+  - Support local Django instance with full flight logging functionality.
+  - End-of-day synchronization to live server (e.g., push finalized logsheets).
+
+- [ ] Export finalized logsheets to CSV for Quickbooks Online:
+  - Output must meet QBO format requirements.
+  - May include member name, aircraft, cost breakdown, and payment method.
