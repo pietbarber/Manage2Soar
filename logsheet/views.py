@@ -197,3 +197,39 @@ def delete_flight(request, logsheet_pk, flight_pk):
     messages.success(request, "Flight deleted.")
     return redirect("logsheet:manage", pk=logsheet_pk)
 
+@active_member_required
+def manage_logsheet_finances(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+    flights = logsheet.flights.all()
+
+    # Use locked-in values if finalized, else use calculated
+    def flight_costs(f):
+        return {
+            "tow": f.tow_cost_actual if logsheet.finalized else f.tow_cost_calculated,
+            "rental": f.rental_cost_actual if logsheet.finalized else f.rental_cost_calculated,
+            "total": f.total_cost if logsheet.finalized else (
+                (f.tow_cost_calculated or 0) + (f.rental_cost_calculated or 0)
+            )
+        }
+
+    flight_data = []
+    total_tow = total_rental = total_sum = 0
+
+    for flight in flights:
+        costs = flight_costs(flight)
+        flight_data.append((flight, costs))
+        total_tow += costs["tow"] or 0
+        total_rental += costs["rental"] or 0
+        total_sum += costs["total"] or 0
+
+    context = {
+        "logsheet": logsheet,
+        "flight_data": flight_data,
+        "total_tow": total_tow,
+        "total_rental": total_rental,
+        "total_sum": total_sum,
+    }
+
+    return render(request, "logsheet/manage_logsheet_finances.html", context)
+
+

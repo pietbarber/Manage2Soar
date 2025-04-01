@@ -58,6 +58,10 @@
   + Add Flight
 {% endif %}
 </a>
+<a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn btn-outline-success mb-3">
+  View Finances
+</a>
+
 
 {% if logsheet.flights.exists %}
 <table class="table table-bordered table-hover align-middle sort" id="flightsTable">

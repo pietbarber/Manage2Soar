@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<h2>Finances for {{ logsheet.log_date }} @ {{ logsheet.airfield }}</h2>
+
+<table class="table table-bordered table-sm align-middle">
+  <thead>
+    <tr>
+      <th>Pilot</th>
+      <th>Glider</th>
+      <th>Duration</th>
+      <th class="text-end">Tow Cost</th>
+      <th class="text-end">Rental Cost</th>
+      <th class="text-end">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for flight, costs in flight_data %}
+      <tr>
+        <td>{{ flight.pilot }}</td>
+        <td>{{ flight.glider }}</td>
+        <td>{{ flight.duration }}</td>
+        <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
+        <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
+        <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="table-light">
+      <th colspan="3" class="text-end">Totals:</th>
+      <th class="text-end">${{ total_tow|floatformat:2 }}</th>
+      <th class="text-end">${{ total_rental|floatformat:2 }}</th>
+      <th class="text-end">${{ total_sum|floatformat:2 }}</th>
+    </tr>
+  </tfoot>
+</table>
+
+<a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">Back to Flight Log</a>
+{% endblock %}
