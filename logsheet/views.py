@@ -222,12 +222,27 @@ def manage_logsheet_finances(request, pk):
         total_rental += costs["rental"] or 0
         total_sum += costs["total"] or 0
 
+    from collections import defaultdict
+
+    # Summary per pilot
+    pilot_summary = defaultdict(lambda: {"count": 0, "tow": 0, "rental": 0, "total": 0})
+
+    for flight, costs in flight_data:
+        pilot = flight.pilot
+        if pilot:
+            summary = pilot_summary[pilot]
+            summary["count"] += 1
+            summary["tow"] += costs["tow"] or 0
+            summary["rental"] += costs["rental"] or 0
+            summary["total"] += costs["total"] or 0
+
     context = {
         "logsheet": logsheet,
         "flight_data": flight_data,
         "total_tow": total_tow,
         "total_rental": total_rental,
         "total_sum": total_sum,
+        "pilot_summary": dict(pilot_summary),
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

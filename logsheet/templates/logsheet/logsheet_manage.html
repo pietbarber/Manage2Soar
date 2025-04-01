@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% load member_extras %}
 <h1>Manage Logsheet</h1>
 
 <div class="card">
@@ -97,10 +98,10 @@
           {{ flight.landing_time|time:"H:i" }}
         {% endif %}
       </td>
-      <td>{{ flight.pilot }}</td>
+      <td>{{ flight.pilot|full_display_name }}</td>
        <td>
         {% if flight.instructor %}
-          {{ flight.instructor }}
+          {{ flight.instructor|full_display_name }}
         {% endif %}
       </td>
       <td>{{ flight.glider }}</td>
