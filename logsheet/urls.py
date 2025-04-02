@@ -11,6 +11,7 @@ urlpatterns = [
     path("manage/<int:logsheet_pk>/add-flight/", views.add_flight, name="add_flight"),
     path("manage/<int:logsheet_pk>/delete-flight/<int:flight_pk>/",views.delete_flight,name="delete_flight"),
     path("manage/<int:pk>/finances/", views.manage_logsheet_finances, name="manage_logsheet_finances"),
+    path("manage/<int:pk>/closeout/", views.edit_logsheet_closeout, name="edit_logsheet_closeout"),
 
 
 

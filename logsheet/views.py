@@ -2,8 +2,9 @@ from django.http import HttpResponseForbidden
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Logsheet, Flight
-from .forms import CreateLogsheetForm, FlightForm
+from .models import Logsheet, Flight, LogsheetCloseout
+from .forms import CreateLogsheetForm, FlightForm, LogsheetCloseoutForm
+
 from members.decorators import active_member_required
 from django.db.models import Q
 
@@ -81,6 +82,11 @@ def manage_logsheet(request, pk):
     if request.method == "POST" and "finalize" in request.POST:
         if logsheet.finalized:
             messages.info(request, "This logsheet has already been finalized.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+        # 🔒 REQUIRE CLOSEOUT BEFORE FINALIZATION
+        if not hasattr(logsheet, "closeout"):
+            messages.error(request, "Cannot finalize. Closeout has not been completed.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
         from logsheet.models import LogsheetPayment
@@ -450,3 +456,27 @@ def manage_logsheet_finances(request, pk):
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
+
+
+@active_member_required
+def edit_logsheet_closeout(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    if logsheet.finalized and not request.user.is_superuser:
+        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
+
+    closeout, _ = LogsheetCloseout.objects.get_or_create(logsheet=logsheet)
+
+    if request.method == "POST":
+        form = LogsheetCloseoutForm(request.POST, instance=closeout)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Closeout updated.")
+            return redirect("logsheet:manage", pk=pk)
+    else:
+        form = LogsheetCloseoutForm(instance=closeout)
+
+    return render(request, "logsheet/edit_closeout_form.html", {
+        "logsheet": logsheet,
+        "form": form
+    })

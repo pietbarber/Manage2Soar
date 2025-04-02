@@ -2,7 +2,7 @@ from .models import Logsheet, Airfield
 from django.core.exceptions import ValidationError
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Logsheet, Flight, Towplane
+from .models import Logsheet, Flight, Towplane, LogsheetCloseout
 from members.models import Member
 from django.utils.timezone import localtime, now
 
@@ -136,3 +136,13 @@ class CreateLogsheetForm(forms.ModelForm):
         ]:
             self.fields[name].required = False
             self.fields[name].widget.attrs.update({"class": "form-select"})
+
+class LogsheetCloseoutForm(forms.ModelForm):
+    class Meta:
+        model = LogsheetCloseout
+        fields = ["safety_issues", "equipment_issues", "operations_summary"]
+        widgets = {
+            "safety_issues": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "equipment_issues": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "operations_summary": forms.Textarea(attrs={"rows": 5, "class": "form-control"}),
+        }

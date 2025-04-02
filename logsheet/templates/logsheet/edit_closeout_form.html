@@ -1,0 +1,95 @@
+{% load static %}
+{% load crispy_forms_tags %}
+
+<div class="modal-header">
+  <h5 class="modal-title">Logsheet Closeout - {{ logsheet.log_date }} @ {{ logsheet.airfield }}</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<form method="post" id="closeout-form">
+  <div class="modal-body">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <table class="table table-borderless align-middle">
+      <tbody>
+        <tr>
+          <th scope="row" class="text-end">{{ form.safety_issues.label_tag }}</th>
+          <td>{{ form.safety_issues|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ form.equipment_issues.label_tag }}</th>
+          <td>{{ form.equipment_issues|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ form.operations_summary.label_tag }}</th>
+          <td>{{ form.operations_summary|as_crispy_field }}</td>
+        </tr>
+
+        <tr><td colspan="2"><hr class="my-3"></td></tr>
+        <tr><th colspan="2">Duty Crew</th></tr>
+
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.duty_officer.label_tag }}</th>
+          <td>{{ duty_form.duty_officer|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.assistant_duty_officer.label_tag }}</th>
+          <td>{{ duty_form.assistant_duty_officer|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.duty_instructor.label_tag }}</th>
+          <td>{{ duty_form.duty_instructor|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.surge_instructor.label_tag }}</th>
+          <td>{{ duty_form.surge_instructor|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.tow_pilot.label_tag }}</th>
+          <td>{{ duty_form.tow_pilot|as_crispy_field }}</td>
+        </tr>
+        <tr>
+          <th scope="row" class="text-end">{{ duty_form.surge_tow_pilot.label_tag }}</th>
+          <td>{{ duty_form.surge_tow_pilot|as_crispy_field }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-footer">
+    <button type="submit" class="btn btn-success">Save Closeout</button>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+  </div>
+</form>
+
+<script>
+  document.getElementById("closeout-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const form = e.target;
+    const url = form.action || window.location.href;
+    const data = new FormData(form);
+
+    fetch(url, {
+      method: "POST",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      body: data
+    })
+    .then(response => {
+      if (!response.ok) throw new Error("Failed to save");
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      }
+    })
+    .catch(error => {
+      alert("Could not save the closeout. Please try again.");
+    });
+  });
+</script>
+
+<footer style="font-size: 0.8em; color: gray;">
+  Template: <code>logsheet/edit_closeout_form.html</code>
+</footer>

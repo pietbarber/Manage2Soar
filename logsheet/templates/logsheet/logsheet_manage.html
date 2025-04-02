@@ -39,24 +39,36 @@
   </form>
 {% endif %}
 
-{% if not logsheet.finalized %}
-  <form method="post" class="mt-3" onsubmit="return confirmFinalize();">
-    {% csrf_token %}
-    <button type="submit" name="finalize" class="btn btn-danger">
-      Finalize Logsheet
-    </button>
-  </form>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn btn-outline-success">
+    📊 View Finances
+  </a>
 
-  <script>
-    function confirmFinalize() {
-      return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
-    }
-  </script>
-{% else %}
+  <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-warning">
+    📝 Edit Closeout
+  </a>
+
+  {% if not logsheet.finalized %}
+    <form method="post" onsubmit="return confirmFinalize();" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" name="finalize" class="btn btn-danger">
+        🔒 Finalize Logsheet
+      </button>
+    </form>
+  {% endif %}
+</div>
+
+{% if logsheet.finalized %}
   <div class="alert alert-warning mt-3">
     <strong>This logsheet is finalized.</strong> No further changes are allowed.
   </div>
 {% endif %}
+
+<script>
+  function confirmFinalize() {
+    return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
+  }
+</script>
 
 <hr>
 <h2>Flights</h2>
@@ -69,10 +81,6 @@
   + Add Flight
 {% endif %}
 </a>
-<a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn btn-outline-success mb-3">
-  View Finances
-</a>
-
 
 {% if logsheet.flights.exists %}
 <table class="table table-bordered table-hover align-middle sort" id="flightsTable">
