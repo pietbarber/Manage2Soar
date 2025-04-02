@@ -171,6 +171,14 @@ def manage_logsheet(request, pk):
 
         logsheet.finalized = True
         logsheet.save()
+        from .models import RevisionLog  # if not already imported
+        
+        RevisionLog.objects.create(
+            logsheet=logsheet,
+            revised_by=request.user,
+            note="Logsheet finalized"
+        )
+        
         messages.success(request, "Logsheet has been finalized and all costs locked in.")
         return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -189,17 +197,20 @@ def manage_logsheet(request, pk):
                 RevisionLog.objects.create(
                     logsheet=logsheet,
                     revised_by=request.user,
+                    note="Logsheet returned to revised state"
                 )
 
-                messages.warning(request, "Logsheet has been reopened for revision.")
             else:
                 return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
+    revisions = logsheet.revisions.select_related("revised_by").order_by("-revised_at")
     context = {
         "logsheet": logsheet,
         "flights": flights,
         "can_edit": not logsheet.finalized or request.user.is_superuser,
+        "revisions": revisions,
+
     }
     return render(request, "logsheet/logsheet_manage.html", context)
 

@@ -6,14 +6,15 @@
 <hr>
 
 {% if closeout %}
-<h4>Operations Summary</h4>
-<div class="mb-4">{{ closeout.operations_summary|safe }}</div>
-
 <h4>Safety Issues</h4>
 <div class="mb-4">{{ closeout.safety_issues|safe }}</div>
 
 <h4>Equipment Issues</h4>
 <div class="mb-4">{{ closeout.equipment_issues|safe }}</div>
+
+<h4>Operations Summary</h4>
+<div class="mb-4">{{ closeout.operations_summary|safe }}</div>
+
 {% else %}
 <div class="alert alert-info">No closeout report was submitted for this day.</div>
 {% endif %}
@@ -37,7 +38,7 @@
       <td>{{ tow.start_tach }}</td>
       <td>{{ tow.end_tach }}</td>
       <td>{{ tow.fuel_added }} gal</td>
-      <td>{{ tow.notes|default:"—" }}</td>
+      <td>{{ tow.notes|default:"—"|safe }}</td>
     </tr>
     {% endfor %}
   </tbody>

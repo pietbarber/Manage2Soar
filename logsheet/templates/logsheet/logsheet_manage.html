@@ -20,13 +20,19 @@
     <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
     {% if logsheet.revisions.exists %}
-    <details>Revision History
+    <details class="mb-3">
+      <summary>Revision History</summary>
       <ul class="mb-0">
         {% for rev in logsheet.revisions.all %}
-        <li> Reopened by {{ rev.revised_by }} on {{ rev.revised_at|date:"Y-m-d H:i" }}</li>
+          <li>
+            {{ rev.revised_at|date:"Y-m-d H:i" }} — {{ rev.note }}{% if rev.revised_by %} by {{ rev.revised_by|full_display_name }}{% endif %}
+          </li>
+        {% empty %}
+          <li>No revisions logged.</li>
         {% endfor %}
       </ul>
     </details>
+
     {% endif %}
   </div>
 </div>
