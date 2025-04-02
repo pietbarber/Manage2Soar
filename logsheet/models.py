@@ -358,8 +358,8 @@ class LogsheetCloseout(models.Model):
 class TowplaneCloseout(models.Model):
     logsheet = models.ForeignKey(Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
-    start_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
-    end_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    start_tach = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    end_tach = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     fuel_added = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     notes = HTMLField(blank=True)
     class Meta:
