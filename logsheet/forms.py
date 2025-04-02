@@ -145,9 +145,10 @@ class LogsheetCloseoutForm(forms.ModelForm):
         model = LogsheetCloseout
         fields = ["safety_issues", "equipment_issues", "operations_summary"]
         widgets = {
-            "safety_issues": TinyMCE(attrs={"rows": 3 }),
-            "equipment_issues": TinyMCE(attrs={"rows": 3 }),
-            "operations_summary": TinyMCE(attrs={"rows": 5 }),
+            "safety_issues": TinyMCE(mce_attrs={"height": 200}),
+            "equipment_issues": TinyMCE(mce_attrs={"height": 200}),
+            "operations_summary": TinyMCE(mce_attrs={"height": 500}),
+
         }
 
 
@@ -169,6 +170,6 @@ TowplaneCloseoutFormSet = modelformset_factory(
     fields=["towplane", "start_tach", "end_tach", "fuel_added", "notes"],
     extra=0,
     widgets={
-        "notes": TinyMCE(attrs={"rows": 3}),
+        "notes": TinyMCE(mce_attrs={"height": 300}),
     }
 )

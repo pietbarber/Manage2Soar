@@ -23,6 +23,21 @@
   <div class="modal-body">
     {% csrf_token %}
     {{ form.media }}
+    {% if form.errors %}
+  <div class="alert alert-danger">
+    {{ form.errors }}
+  </div>
+{% endif %}
+{% if duty_form.errors %}
+  <div class="alert alert-danger">
+    {{ duty_form.errors }}
+  </div>
+{% endif %}
+{% if formset.errors %}
+  <div class="alert alert-danger">
+    {{ formset.errors }}
+  </div>
+{% endif %}
     {{ form.non_field_errors }}
 
     <table class="table table-borderless align-middle">
@@ -71,7 +86,19 @@
         {% if formset %}
           <tr><td colspan="2"><hr class="my-3"></td></tr>
           <tr><th colspan="2">Towplane Closeout</th></tr>
+          {% csrf_token %}
+          {{ formset.management_form }}
+
           {% for towform in formset %}
+            <tr>
+              <td colspan="2">
+                {% for hidden in towform.hidden_fields %}
+                  {{ hidden }}
+                {% endfor %}
+                <strong>{{ towform.instance.towplane }}</strong>
+              </td>
+            </tr>
+
           <tr>
             <th class="text-end">Towplane</th>
             <td>{{ towform.towplane }} {{ towform.towplane.errors }}</td>

@@ -537,9 +537,6 @@ def edit_logsheet_closeout(request, pk):
             duty_form.save()
             formset.save()
 
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({"success": True})
-
             messages.success(request, "Closeout, duty crew, and towplane info updated.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
