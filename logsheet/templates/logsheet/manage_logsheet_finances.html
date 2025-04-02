@@ -99,8 +99,13 @@
     
     </tbody>
   </table>
-
-  <button type="submit" class="btn btn-success">Update Payments</button>
+  {% if not logsheet.finalized %}
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success">Update Payments</button>
+  </form>
+  {% endif %}
+  
 </form>
 
 <h4 class="mt-5">Summary by Flight</h4>

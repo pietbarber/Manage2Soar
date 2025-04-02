@@ -164,6 +164,11 @@ SOCIAL_AUTH_PIPELINE = (
 )
 
 
+from django.contrib.messages import constants as messages
+
+MESSAGE_TAGS = {
+    messages.ERROR: "danger",  # maps Django "error" to Bootstrap "danger"
+}
 
 
 
