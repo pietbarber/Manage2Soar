@@ -2,9 +2,10 @@ from .models import Logsheet, Airfield
 from django.core.exceptions import ValidationError
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Logsheet, Flight, Towplane, LogsheetCloseout
+from .models import Logsheet, Flight, Towplane, LogsheetCloseout, TowplaneCloseout
 from members.models import Member
 from django.utils.timezone import localtime, now
+from django.forms import modelformset_factory
 
 # FlightForm
 # This form is used to handle the creation and editing of Flight model instances.
@@ -146,3 +147,26 @@ class LogsheetCloseoutForm(forms.ModelForm):
             "equipment_issues": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "operations_summary": forms.Textarea(attrs={"rows": 5, "class": "form-control"}),
         }
+
+
+class LogsheetDutyCrewForm(forms.ModelForm):
+    class Meta:
+        model = Logsheet
+        fields = [
+            "duty_officer",
+            "assistant_duty_officer",
+            "duty_instructor",
+            "surge_instructor",
+            "tow_pilot",
+            "surge_tow_pilot",
+        ]
+
+
+TowplaneCloseoutFormSet = modelformset_factory(
+    TowplaneCloseout,
+    fields=["towplane", "start_tach", "end_tach", "fuel_added", "notes"],
+    extra=0,
+    widgets={
+        "notes": forms.Textarea(attrs={"rows": 1, "class": "form-control form-control-sm"}),
+    }
+)

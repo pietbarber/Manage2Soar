@@ -2,6 +2,8 @@ from django.db import models
 from members.models import Member
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
+from tinymce.models import HTMLField
+
 
 class Flight(models.Model):
     logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="flights")
@@ -258,16 +260,21 @@ class LogsheetPayment(models.Model):
  # models.py additions
 class LogsheetCloseout(models.Model):
     logsheet = models.OneToOneField(Logsheet, on_delete=models.CASCADE, related_name="closeout")
-    safety_issues = models.TextField(blank=True)
-    equipment_issues = models.TextField(blank=True)
-    operations_summary = models.TextField(blank=True)
+    safety_issues = HTMLField(blank=True)
+    equipment_issues = HTMLField(blank=True)
+    operations_summary = HTMLField(blank=True)
 
 class TowplaneCloseout(models.Model):
     logsheet = models.ForeignKey(Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
-    towplane = models.ForeignKey(Towplane, on_delete=models.PROTECT)
+    towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
     start_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     end_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     fuel_added = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     notes = models.TextField(blank=True)
+    class Meta:
+        unique_together = ("logsheet", "towplane")
+
+    def __str__(self):
+        return f"{self.towplane.registration} on {self.logsheet.log_date}"
 
 

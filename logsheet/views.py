@@ -3,10 +3,12 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Logsheet, Flight, LogsheetCloseout
-from .forms import CreateLogsheetForm, FlightForm, LogsheetCloseoutForm
-
+from .forms import CreateLogsheetForm, FlightForm, LogsheetCloseoutForm, LogsheetDutyCrewForm
+from .models import Logsheet
 from members.decorators import active_member_required
 from django.db.models import Q
+from django.http import JsonResponse
+
 
 #################################################
 # index
@@ -115,6 +117,22 @@ def manage_logsheet(request, pk):
                 invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
             if not flight.tow_pilot:
                 invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
+
+            # Enforce required duty crew before finalization
+            required_roles = {
+                "duty_officer": logsheet.duty_officer,
+                "tow_pilot": logsheet.tow_pilot,
+                "duty_instructor": logsheet.duty_instructor,  # optional? you decide!
+            }
+
+            missing_roles = [label.replace("_", " ").title() for label, value in required_roles.items() if not value]
+
+            if missing_roles:
+                messages.error(
+                    request,
+                    "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles)
+                )
+                return redirect("logsheet:manage", pk=logsheet.pk)
 
         missing = []
 
@@ -479,4 +497,59 @@ def edit_logsheet_closeout(request, pk):
     return render(request, "logsheet/edit_closeout_form.html", {
         "logsheet": logsheet,
         "form": form
+    })
+
+from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm
+
+from django.http import HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, render, redirect
+from .models import Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane
+from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet
+from django.forms import modelformset_factory
+
+@active_member_required
+def edit_logsheet_closeout(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+    closeout, _ = LogsheetCloseout.objects.get_or_create(logsheet=logsheet)
+
+    if logsheet.finalized and not request.user.is_superuser:
+        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
+
+    # Identify towplanes used in this logsheet
+    towplanes_used = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
+
+    # Make sure a TowplaneCloseout exists for each
+    for towplane in towplanes_used:
+        TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
+
+    # Build formset for towplane closeouts
+    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
+    formset_class = TowplaneCloseoutFormSet
+    formset = formset_class(queryset=queryset)
+
+    if request.method == "POST":
+        form = LogsheetCloseoutForm(request.POST, instance=closeout)
+        duty_form = LogsheetDutyCrewForm(request.POST, instance=logsheet)
+        formset = formset_class(request.POST, queryset=queryset)
+
+        if form.is_valid() and duty_form.is_valid() and formset.is_valid():
+            form.save()
+            duty_form.save()
+            formset.save()
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": True})
+
+            messages.success(request, "Closeout, duty crew, and towplane info updated.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+    else:
+        form = LogsheetCloseoutForm(instance=closeout)
+        duty_form = LogsheetDutyCrewForm(instance=logsheet)
+
+    return render(request, "logsheet/edit_closeout_form.html", {
+        "logsheet": logsheet,
+        "form": form,
+        "duty_form": duty_form,
+        "formset": formset,
     })

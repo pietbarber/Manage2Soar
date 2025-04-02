@@ -1,6 +1,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
+
 <div class="modal-header">
   <h5 class="modal-title">Logsheet Closeout - {{ logsheet.log_date }} @ {{ logsheet.airfield }}</h5>
   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -15,15 +16,15 @@
       <tbody>
         <tr>
           <th scope="row" class="text-end">{{ form.safety_issues.label_tag }}</th>
-          <td>{{ form.safety_issues|as_crispy_field }}</td>
+          <td>{{ form.safety_issues }} {{ form.safety_issues.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ form.equipment_issues.label_tag }}</th>
-          <td>{{ form.equipment_issues|as_crispy_field }}</td>
+          <td>{{ form.equipment_issues }} {{ form.equipment_issues.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ form.operations_summary.label_tag }}</th>
-          <td>{{ form.operations_summary|as_crispy_field }}</td>
+          <td>{{ form.operations_summary }} {{ form.operations_summary.errors }}</td>
         </tr>
 
         <tr><td colspan="2"><hr class="my-3"></td></tr>
@@ -31,28 +32,56 @@
 
         <tr>
           <th scope="row" class="text-end">{{ duty_form.duty_officer.label_tag }}</th>
-          <td>{{ duty_form.duty_officer|as_crispy_field }}</td>
+          <td>{{ duty_form.duty_officer }} {{ duty_form.duty_officer.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.assistant_duty_officer.label_tag }}</th>
-          <td>{{ duty_form.assistant_duty_officer|as_crispy_field }}</td>
+          <td>{{ duty_form.assistant_duty_officer }} {{ duty_form.assistant_duty_officer.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.duty_instructor.label_tag }}</th>
-          <td>{{ duty_form.duty_instructor|as_crispy_field }}</td>
+          <td>{{ duty_form.duty_instructor }} {{ duty_form.duty_instructor.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.surge_instructor.label_tag }}</th>
-          <td>{{ duty_form.surge_instructor|as_crispy_field }}</td>
+          <td>{{ duty_form.surge_instructor }} {{ duty_form.surge_instructor.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.tow_pilot.label_tag }}</th>
-          <td>{{ duty_form.tow_pilot|as_crispy_field }}</td>
+          <td>{{ duty_form.tow_pilot }} {{ duty_form.tow_pilot.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.surge_tow_pilot.label_tag }}</th>
-          <td>{{ duty_form.surge_tow_pilot|as_crispy_field }}</td>
+          <td>{{ duty_form.surge_tow_pilot }} {{ duty_form.surge_tow_pilot.errors }}</td>
         </tr>
+
+        {% if formset %}
+          <tr><td colspan="2"><hr class="my-3"></td></tr>
+          <tr><th colspan="2">Towplane Closeout</th></tr>
+          {% for towform in formset %}
+          <tr>
+            <th class="text-end">Towplane</th>
+            <td>{{ towform.towplane }} {{ towform.towplane.errors }}</td>
+          </tr>
+          <tr>
+            <th class="text-end">Start Tach</th>
+            <td>{{ towform.start_tach }} {{ towform.start_tach.errors }}</td>
+          </tr>
+          <tr>
+            <th class="text-end">End Tach</th>
+            <td>{{ towform.end_tach }} {{ towform.end_tach.errors }}</td>
+          </tr>
+          <tr>
+            <th class="text-end">Fuel Added</th>
+            <td>{{ towform.fuel_added }} {{ towform.fuel_added.errors }}</td>
+          </tr>
+          <tr>
+            <th class="text-end">Notes</th>
+            <td>{{ towform.notes }} {{ towform.notes.errors }}</td>
+          </tr>
+          <tr><td colspan="2"><hr></td></tr>
+          {% endfor %}
+        {% endif %}
       </tbody>
     </table>
   </div>
