@@ -4,6 +4,31 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 from tinymce.models import HTMLField
 
+####################################################
+# Flight model
+#
+# This is the biggest model we've got, so pay attention! 
+#
+# This model represents a single flight entry in the logsheet system. It captures details about the flight, 
+# including the pilot, instructor, glider, towplane, and other relevant information. The model also calculates 
+# costs associated with the flight, such as tow costs and rental costs, based on the provided data. 
+# Additionally, it supports splitting costs between members and includes properties for displaying costs 
+# in a user-friendly format.
+#
+# Properties:
+# - tow_cost_calculated: Calculates the tow cost based on the release altitude and tow rates.
+# - rental_cost_calculated: Calculates the rental cost based on the glider's rental rate and flight duration.
+# - tow_cost: Retrieves the tow cost based on the release altitude and tow rates.
+# - tow_cost_display: Returns a formatted string representation of the tow cost.
+# - rental_cost: Calculates the rental cost based on the glider's rental rate and flight duration.
+# - rental_cost_display: Returns a formatted string representation of the rental cost.
+# - total_cost: Calculates the total cost of the flight (tow cost + rental cost).
+# - total_cost_display: Returns a formatted string representation of the total cost.
+# 
+# Methods:
+# - save: Overrides the save method to calculate the flight duration based on launch and landing times. 
+#         Handles overnight flights by adjusting the landing time if it occurs before the launch time.
+# - __str__: Returns a string representation of the flight, including the pilot, glider, and launch time.
 
 class Flight(models.Model):
     logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="flights")
@@ -140,8 +165,23 @@ class Flight(models.Model):
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
     
-from members.models import Member
 
+####################################################
+# RevisionLog model
+#
+# This model tracks revisions made to a logsheet. It records details about 
+# who made the revision, when it was made, and any notes associated with the revision.
+# The RevisionLog is used when somebody reactivates a logsheet that was marked as "finalized"
+#
+# Fields:
+# - logsheet: The logsheet that was revised.
+# - revised_by: The member who made the revision.
+# - revised_at: The timestamp when the revision was made.
+# - note: An optional note describing the revision.
+#
+# Methods:
+# - __str__: Returns a string representation of the revision, including the reviser and timestamp.
+#
 class RevisionLog(models.Model):
     logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="revisions")
     revised_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
@@ -151,6 +191,12 @@ class RevisionLog(models.Model):
     def __str__(self):
         return f"Revised by {self.revised_by} on {self.revised_at}"
 
+####################################################
+# Towplane model
+# 
+# Each tow plane is listed here.  the Tow plane is referenced for 
+# each flight in the logsheet. 
+#
 class Towplane(models.Model):
     name = models.CharField(max_length=100)
     registration = models.CharField(max_length=50)  # e.g., N-number
@@ -163,6 +209,14 @@ class Towplane(models.Model):
         status = " (Inactive)" if not self.is_active else ""
         return f"{self.name} ({self.registration})"
 
+####################################################
+# Glider model
+# 
+# All member gliders are stored in here.  
+# All flights in a logsheet have a glider associated with them, and it links to a glider
+# in this table.  The only way to manage gliders is with the admin interface. 
+# The rental rates for each glider is listed here, (listed in dollars per hour)
+#
 class Glider(models.Model):
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
@@ -183,8 +237,14 @@ class Glider(models.Model):
             parts.append(self.model)
         return " / ".join(parts)
     
-from django.db import models
 
+####################################################
+# Airfield model
+#
+# The Logsheet model refers to the Airfields, where we keep a list
+# of all the airfields that we can operate out of.  The only 
+# way to manage the Airfields is through the admin interface. 
+#
 class Airfield(models.Model):
     identifier = models.CharField(max_length=10, unique=True)  # e.g., KFRR
     name = models.CharField(max_length=100)  # e.g., Front Royal Warren County Airport
@@ -194,10 +254,17 @@ class Airfield(models.Model):
     def __str__(self):
         return f"{self.identifier} – {self.name}"
 
-from django.db import models
-from members.models import Member
 from .models import Towplane, Airfield  # Adjust import paths as needed
 
+####################################################
+# Logsheet model
+# 
+# Each logsheet has some particular information associated with it, like 
+# what day the operations happened, what airfield these operations happened at. 
+# Also, we record who was scheduled and participated for the duty on this day. 
+# that includes the duty officer, instructor, tow pilots, and any other staff 
+# associated with this day's flight ops. 
+#
 class Logsheet(models.Model):
     log_date = models.DateField()
     airfield = models.ForeignKey(Airfield, on_delete=models.PROTECT)
@@ -205,15 +272,12 @@ class Logsheet(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     finalized = models.BooleanField(default=False)
 
-    # NEW: Duty crew assignments
     duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_duty_officer", limit_choices_to={"duty_officer": True})
     assistant_duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_assistant_duty_officer", limit_choices_to={"assistant_duty_officer": True})
     duty_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_duty_instructor", limit_choices_to={"instructor": True})
     surge_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_surge_instructor", limit_choices_to={"instructor": True})
     tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_tow_pilot", limit_choices_to={"towpilot": True})
     surge_tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="log_surge_tow_pilot", limit_choices_to={"towpilot": True})
-
-    # NEW: Default towplane
     default_towplane = models.ForeignKey(Towplane, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
@@ -222,6 +286,14 @@ class Logsheet(models.Model):
     def __str__(self):
         return f"{self.log_date} @ {self.airfield}"
 
+
+####################################################
+# TowRate model
+# 
+# The price for an aerotow to a particular height are stored here 
+# All tow heights are all the same price, mo matter the towplane. 
+# (This should probably be changed later)
+#
 class TowRate(models.Model):
     altitude = models.PositiveIntegerField(help_text="Release altitude in feet (e.g. 2000)")
     price = models.DecimalField(max_digits=6, decimal_places=2, help_text="Price in USD")
@@ -232,6 +304,14 @@ class TowRate(models.Model):
     def __str__(self):
         return f"{self.altitude} ft – ${self.price:.2f}"
     
+####################################################
+# LogsheetPayment model
+# 
+# The methods that each member who paid for flights show up here. 
+# This is based on what is in the logsheet.  Sometimes a pilot can 
+# fly multiple times, so this is where the costs for the sum of those
+# flights are marked for payment. 
+#
 class LogsheetPayment(models.Model):
     logsheet = models.ForeignKey(
         Logsheet, on_delete=models.CASCADE, related_name="payments"
@@ -257,13 +337,24 @@ class LogsheetPayment(models.Model):
     def __str__(self):
         return f"{self.member.full_display_name} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
 
- # models.py additions
+####################################################
+# LogsheetCloseout model
+# 
+# When the duty officer is ready to finalize a logsheet, there's one closeout page
+# that allows him to write up safety issues, equipment issues and a summary of the operations
+# This used to be done in an email, but the email gets lost to time.  Why not keep it
+# in our record for future generations to review, without having to trundle through the email 
+# archives? 
+#
 class LogsheetCloseout(models.Model):
     logsheet = models.OneToOneField(Logsheet, on_delete=models.CASCADE, related_name="closeout")
     safety_issues = HTMLField(blank=True)
     equipment_issues = HTMLField(blank=True)
     operations_summary = HTMLField(blank=True)
 
+####################################################
+# TowplaneCloseout model
+#
 class TowplaneCloseout(models.Model):
     logsheet = models.ForeignKey(Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
