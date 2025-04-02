@@ -85,12 +85,14 @@ def manage_logsheet(request, pk):
 
         from logsheet.models import LogsheetPayment
         responsible_members = set()
+        invalid_flights = []
 
         for flight in flights:
             pilot = flight.pilot
             partner = flight.split_with
             split = flight.split_type
 
+            # Ensure that the flight has a valid pilot
             if partner and split == "full":
                 responsible_members.add(partner)
             elif partner and split in ("even", "tow", "rental"):
@@ -98,7 +100,19 @@ def manage_logsheet(request, pk):
             elif pilot:
                 responsible_members.add(pilot)
 
+             # Validate required fields before finalization
+            if not flight.landing_time:
+                invalid_flights.append(f"Flight #{flight.id} is missing a landing time.")
+            if not flight.release_altitude:
+                invalid_flights.append(f"Flight #{flight.id} is missing a release altitude.")
+            if not flight.towplane:
+                invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
+            if not flight.tow_pilot:
+                invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
+
         missing = []
+
+        # Check if all responsible members have a payment method set
         for member in responsible_members:
             try:
                 payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
@@ -107,6 +121,13 @@ def manage_logsheet(request, pk):
             except LogsheetPayment.DoesNotExist:
                 missing.append(member)
 
+        # If there are invalid flights, do not finalize
+        if invalid_flights:
+            for msg in invalid_flights:
+                messages.error(request, msg)
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+        # If there are missing payment methods, do not finalize
         if missing:
             messages.error(
                 request,
@@ -115,6 +136,8 @@ def manage_logsheet(request, pk):
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
         # Lock in cost values
+        # That means take the temporary values we calculated for the costs 
+        # and place them in these other variables that get perma-written to the database. 
         for flight in flights:
             if flight.tow_cost_actual is None:
                 flight.tow_cost_actual = flight.tow_cost_calculated
@@ -126,7 +149,11 @@ def manage_logsheet(request, pk):
         logsheet.save()
         messages.success(request, "Logsheet has been finalized and all costs locked in.")
         return redirect("logsheet:manage", pk=logsheet.pk)
-    
+
+    # If the logsheet is finalized, prevent adding new flights
+    # This check is done here to ensure that only superusers can reopen finalized logbooks
+    # If there is a "revise", then we'll remove the finalized status
+    # and the logsheet can be returned to editing status.  
     elif request.method == "POST":
         from .models import RevisionLog
 

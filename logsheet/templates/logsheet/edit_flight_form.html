@@ -12,7 +12,11 @@
 </div>
 
 <form method="post" enctype="multipart/form-data" id="edit-flight-form"
-    action="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
+    action="{% if flight.pk %}
+            {% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}
+            {% else %}
+            {% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}
+            {% endif %}">
   <div class="modal-body">
     {% csrf_token %}
     <table class="table table-borderless align-middle">
