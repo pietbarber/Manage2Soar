@@ -67,10 +67,9 @@ def create_logsheet(request):
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
+    flights = logsheet.flights.select_related("pilot", "glider").all().order_by("launch_time")
 
-    query = request.GET.get("q", "").strip()
-    flights = logsheet.flights.all()
-
+    query = request.GET.get("q")
     if query:
         flights = flights.filter(
             Q(pilot__first_name__icontains=query) |
@@ -79,7 +78,56 @@ def manage_logsheet(request, pk):
             Q(instructor__last_name__icontains=query)
         )
 
-    if request.method == "POST":
+    if request.method == "POST" and "finalize" in request.POST:
+        if logsheet.finalized:
+            messages.info(request, "This logsheet has already been finalized.")
+            return redirect("logsheet:manage", pk=logsheet.pk)
+
+        from logsheet.models import LogsheetPayment
+        responsible_members = set()
+
+        for flight in flights:
+            pilot = flight.pilot
+            partner = flight.split_with
+            split = flight.split_type
+
+            if partner and split == "full":
+                responsible_members.add(partner)
+            elif partner and split in ("even", "tow", "rental"):
+                responsible_members.update([pilot, partner])
+            elif pilot:
+                responsible_members.add(pilot)
+
+        missing = []
+        for member in responsible_members:
+            try:
+                payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
+                if not payment.payment_method:
+                    missing.append(member)
+            except LogsheetPayment.DoesNotExist:
+                missing.append(member)
+
+        if missing:
+            messages.error(
+                request,
+                "Cannot finalize. Missing payment method for: " + ", ".join(str(m) for m in missing)
+            )
+            return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+
+        # Lock in cost values
+        for flight in flights:
+            if flight.tow_cost_actual is None:
+                flight.tow_cost_actual = flight.tow_cost_calculated
+            if flight.rental_cost_actual is None:
+                flight.rental_cost_actual = flight.rental_cost_calculated
+            flight.save()
+
+        logsheet.finalized = True
+        logsheet.save()
+        messages.success(request, "Logsheet has been finalized and all costs locked in.")
+        return redirect("logsheet:manage", pk=logsheet.pk)
+    
+    elif request.method == "POST":
         from .models import RevisionLog
 
         if "revise" in request.POST:
@@ -97,44 +145,12 @@ def manage_logsheet(request, pk):
                 return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
-    if request.method == "POST":
-        if "finalize" in request.POST:
-            if logsheet.finalized:
-                messages.info(request, "This logsheet has already been finalized.")
-                return redirect("logsheet:manage", pk=logsheet.pk)
-    
-            for flight in logsheet.flights.all():
-                if flight.tow_cost_actual is None:
-                    flight.tow_cost_actual = flight.tow_cost_calculated
-                if flight.rental_cost_actual is None:
-                    flight.rental_cost_actual = flight.rental_cost_calculated
-                flight.save()
-    
-            logsheet.finalized = True
-            logsheet.save()
-            messages.success(request, "Logsheet has been finalized and all costs locked in.")
-            return redirect("logsheet:manage", pk=logsheet.pk)
-    
-        form = FlightForm(request.POST)
-        if form.is_valid():
-            if logsheet.finalized:
-                messages.error(request, "This logsheet is finalized and cannot accept new flights.")
-            else:
-                flight = form.save(commit=False)
-                flight.logsheet = logsheet
-                flight.save()
-                messages.success(request, "Flight added successfully.")
-                return redirect("logsheet:manage", pk=logsheet.pk)
-    else:
-        form = FlightForm(initial={"field": logsheet.airfield})
-
-
-    return render(request, "logsheet/logsheet_manage.html", {
+    context = {
         "logsheet": logsheet,
         "flights": flights,
-        "form": form,
-        "query": query,
-    })
+        "can_edit": not logsheet.finalized or request.user.is_superuser,
+    }
+    return render(request, "logsheet/logsheet_manage.html", context)
 
 
 #################################################
@@ -417,9 +433,9 @@ def manage_logsheet_finances(request, pk):
                 try:
                     payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
                     if not payment.payment_method:
-                        missing.append(member.full_display_name)
+                        missing.append(member)
                 except LogsheetPayment.DoesNotExist:
-                    missing.append(member.full_display_name)
+                    missing.append(member)
 
             if missing:
                 messages.error(

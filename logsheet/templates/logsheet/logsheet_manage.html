@@ -3,6 +3,16 @@
 {% block content %}
 {% load member_extras %}
 <h1>Manage Logsheet</h1>
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
 
 <div class="card">
   <div class="card-body">
@@ -10,7 +20,7 @@
     <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
     {% if logsheet.revisions.exists %}
-    <details>Revision History</details>
+    <details>Revision History
       <ul class="mb-0">
         {% for rev in logsheet.revisions.all %}
         <li> Reopened by {{ rev.revised_by }} on {{ rev.revised_at|date:"Y-m-d H:i" }}</li>
