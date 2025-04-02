@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<h2>📝 Closeout Summary – {{ logsheet.log_date }}</h2>
+<hr>
+
+{% if closeout %}
+<h4>Operations Summary</h4>
+<div class="mb-4">{{ closeout.operations_summary|safe }}</div>
+
+<h4>Safety Issues</h4>
+<div class="mb-4">{{ closeout.safety_issues|safe }}</div>
+
+<h4>Equipment Issues</h4>
+<div class="mb-4">{{ closeout.equipment_issues|safe }}</div>
+{% else %}
+<div class="alert alert-info">No closeout report was submitted for this day.</div>
+{% endif %}
+
+{% if towplanes %}
+<h4 class="mt-4">Towplane Summary</h4>
+<table class="table table-bordered w-auto">
+  <thead>
+    <tr>
+      <th>Towplane</th>
+      <th>Start Tach</th>
+      <th>End Tach</th>
+      <th>Fuel Added</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for tow in towplanes %}
+    <tr>
+      <td>{{ tow.towplane }}</td>
+      <td>{{ tow.start_tach }}</td>
+      <td>{{ tow.end_tach }}</td>
+      <td>{{ tow.fuel_added }} gal</td>
+      <td>{{ tow.notes|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary mt-3">← Back to Logsheet</a>
+{% endblock %}

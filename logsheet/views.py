@@ -550,3 +550,14 @@ def edit_logsheet_closeout(request, pk):
         "duty_form": duty_form,
         "formset": formset,
     })
+
+@active_member_required
+def view_logsheet_closeout(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+    closeout = getattr(logsheet, "closeout", None)
+    towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
+    return render(request, "logsheet/view_closeout.html", {
+        "logsheet": logsheet,
+        "closeout": closeout,
+        "towplanes": towplanes,
+    })

@@ -32,38 +32,55 @@
 </div>
 
 <!-- Three buttons for Duty Officer to manage logsheet-->
-<div class="d-flex flex-wrap gap-2 mb-3">
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
 
-  <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn btn-outline-success me-2 mb-3">
-    📊 <span>View Finances</span>
+<!-- Three buttons for Duty Officer to manage logsheet-->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn {% if logsheet.finalized %}btn-outline-success{% else %}btn-success{% endif %} me-2 mb-3">
+    📊 {% if logsheet.finalized %}View Finances{% else %}Edit Finances{% endif %}
   </a>
-  <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-warning me-2 mb-3">
-    📝 <span>Edit Closeout</span>
-  </a>
+
+  {% if logsheet.finalized %}
+    <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-outline-warning me-2 mb-3">
+      📝 View Closeout
+    </a>
+  {% else %}
+    <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-warning me-2 mb-3">
+      📝 Edit Closeout
+    </a>
+  {% endif %}
+
   {% if not logsheet.finalized %}
     <form method="post" class="d-inline me-2 mb-3" onsubmit="return confirmFinalize();">
       {% csrf_token %}
       <button type="submit" name="finalize" class="btn btn-danger">
-        🔒 <span>Finalize Logsheet</span>
+        🔒 Finalize Logsheet
       </button>
-      <script>
-        function confirmFinalize() {
-          return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
-        }
-      </script>
     </form>
+
+    <script>
+      function confirmFinalize() {
+        return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
+      }
+    </script>
   {% endif %}
+
   {% if logsheet.finalized and user.is_superuser %}
-    <form method="post" class="d-inline mt-2 mb-3">
-    {% csrf_token %}
-    <button type="submit" name="revise" class="btn btn-outline-danger w-100">
-      🔓 <span>Revise Logsheet</span>
-    </button>
+    <form method="post" class="d-inline mb-3">
+      {% csrf_token %}
+      <button type="submit" name="revise" class="btn btn-outline-danger">
+        ✏️ Revise Logsheet
+      </button>
     </form>
-  {% else %}
-    <strong>This logsheet is finalized.</strong> No further changes are allowed.
   {% endif %}
 </div>
+
 
 <hr>
 <h2>Flights</h2>
