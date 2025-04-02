@@ -270,7 +270,7 @@ class TowplaneCloseout(models.Model):
     start_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     end_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
     fuel_added = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
-    notes = models.TextField(blank=True)
+    notes = HTMLField(blank=True)
     class Meta:
         unique_together = ("logsheet", "towplane")
 

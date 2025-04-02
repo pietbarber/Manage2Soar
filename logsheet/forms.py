@@ -6,6 +6,8 @@ from .models import Logsheet, Flight, Towplane, LogsheetCloseout, TowplaneCloseo
 from members.models import Member
 from django.utils.timezone import localtime, now
 from django.forms import modelformset_factory
+from tinymce.widgets import TinyMCE
+
 
 # FlightForm
 # This form is used to handle the creation and editing of Flight model instances.
@@ -143,9 +145,9 @@ class LogsheetCloseoutForm(forms.ModelForm):
         model = LogsheetCloseout
         fields = ["safety_issues", "equipment_issues", "operations_summary"]
         widgets = {
-            "safety_issues": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
-            "equipment_issues": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
-            "operations_summary": forms.Textarea(attrs={"rows": 5, "class": "form-control"}),
+            "safety_issues": TinyMCE(attrs={"rows": 3 }),
+            "equipment_issues": TinyMCE(attrs={"rows": 3 }),
+            "operations_summary": TinyMCE(attrs={"rows": 5 }),
         }
 
 
@@ -167,6 +169,6 @@ TowplaneCloseoutFormSet = modelformset_factory(
     fields=["towplane", "start_tach", "end_tach", "fuel_added", "notes"],
     extra=0,
     widgets={
-        "notes": forms.Textarea(attrs={"rows": 1, "class": "form-control form-control-sm"}),
+        "notes": TinyMCE(attrs={"rows": 3}),
     }
 )

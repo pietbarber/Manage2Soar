@@ -42,12 +42,9 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
   <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn btn-outline-success">
     📊 View Finances</a>
-  <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}"
-  class="btn btn-warning mb-3"
-  data-bs-toggle="modal"
-  data-bs-target="#closeoutModal"
-  data-url="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}">
- 📝 Edit Closeout</a>
+    <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-warning mb-3">
+      📝 Edit Closeout
+    </a>
 
   {% if not logsheet.finalized %}
     <form method="post" onsubmit="return confirmFinalize();" class="d-inline">
@@ -184,14 +181,6 @@
   </div>
 </div>
 
-<div class="modal fade" id="closeoutModal" tabindex="-1" aria-labelledby="closeoutModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content" id="closeoutModalContent">
-      <!-- Modal content will load here via JavaScript -->
-    </div>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
   function togglePassengerFields() {
@@ -216,19 +205,6 @@
     });
   });
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const modal = document.getElementById("closeoutModal");
-    modal.addEventListener("show.bs.modal", function (event) {
-      const button = event.relatedTarget;
-      const url = button.getAttribute("data-url");
-  
-      fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
-        .then(response => response.text())
-        .then(html => {
-          document.getElementById("closeoutModalContent").innerHTML = html;
-        });
-    });
-  });
 </script>
 
 <script>
