@@ -255,5 +255,19 @@ class LogsheetPayment(models.Model):
     def __str__(self):
         return f"{self.member.full_display_name} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
 
-    
+ # models.py additions
+class LogsheetCloseout(models.Model):
+    logsheet = models.OneToOneField(Logsheet, on_delete=models.CASCADE, related_name="closeout")
+    safety_issues = models.TextField(blank=True)
+    equipment_issues = models.TextField(blank=True)
+    operations_summary = models.TextField(blank=True)
+
+class TowplaneCloseout(models.Model):
+    logsheet = models.ForeignKey(Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
+    towplane = models.ForeignKey(Towplane, on_delete=models.PROTECT)
+    start_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    end_tach = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    fuel_added = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    notes = models.TextField(blank=True)
+
 

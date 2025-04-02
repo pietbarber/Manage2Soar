@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield
+from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield, LogsheetCloseout, TowplaneCloseout 
 from django.utils.html import format_html
 
 # Admin configuration for managing Towplane objects
@@ -96,3 +96,11 @@ class TowRateAdmin(admin.ModelAdmin):
     list_display = ("altitude", "price")
     list_editable = ("price",)
     ordering = ("altitude",)
+
+@admin.register(LogsheetCloseout)
+class LogsheetCloseoutAdmin(admin.ModelAdmin):
+    list_display = ("logsheet",)
+
+@admin.register(TowplaneCloseout)
+class TowplaneCloseoutAdmin(admin.ModelAdmin):
+    list_display = ("logsheet", "towplane")
