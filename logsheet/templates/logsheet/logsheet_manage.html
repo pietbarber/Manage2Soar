@@ -38,15 +38,6 @@
 </div>
 
 <!-- Three buttons for Duty Officer to manage logsheet-->
-{% if messages %}
-  <div class="container mt-3">
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-  </div>
-{% endif %}
-
-<!-- Three buttons for Duty Officer to manage logsheet-->
 <div class="d-flex flex-wrap gap-2 mb-3">
   <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn {% if logsheet.finalized %}btn-outline-success{% else %}btn-success{% endif %} me-2 mb-3">
     📊 {% if logsheet.finalized %}View Finances{% else %}Edit Finances{% endif %}
@@ -123,6 +114,8 @@
           <span class="badge bg-success">landed</span>
         {% elif flight.launch_time %}
           <span class="badge bg-primary">flying</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">pending</span>
         {% endif %}
       </td>
       <td>

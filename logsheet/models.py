@@ -32,7 +32,7 @@ from tinymce.models import HTMLField
 
 class Flight(models.Model):
     logsheet = models.ForeignKey("Logsheet", on_delete=models.CASCADE, related_name="flights")
-    launch_time = models.TimeField()
+    launch_time = models.TimeField(blank=True, null=True)
     landing_time = models.TimeField(blank=True, null=True)
     pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, related_name="flights_as_pilot")
     instructor = models.ForeignKey("members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_instructor")
@@ -59,6 +59,15 @@ class Flight(models.Model):
     )
     tow_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     rental_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    @property
+    def status(self):
+        if self.landing_time:
+            return "landed"
+        elif self.launch_time:
+            return "flying"
+        else:
+            return "pending"
 
     @property
     def tow_cost_calculated(self):

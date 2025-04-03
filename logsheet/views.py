@@ -70,7 +70,12 @@ def create_logsheet(request):
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    flights = logsheet.flights.select_related("pilot", "glider").all().order_by("launch_time")
+    #flights = logsheet.flights.select_related("pilot", "glider").all().order_by("launch_time")
+    flights = (
+        logsheet.flights
+        .select_related("pilot", "glider")
+        .order_by("-landing_time", "-launch_time")
+    )
 
     query = request.GET.get("q")
     if query:
@@ -117,12 +122,14 @@ def manage_logsheet(request, pk):
                 invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
             if not flight.tow_pilot:
                 invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
+            if not flight.launch_time:
+                invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
             # Enforce required duty crew before finalization
             required_roles = {
                 "duty_officer": logsheet.duty_officer,
                 "tow_pilot": logsheet.tow_pilot,
-                "duty_instructor": logsheet.duty_instructor,  # optional? you decide!
+                "duty_instructor": logsheet.duty_instructor,
             }
 
             missing_roles = [label.replace("_", " ").title() for label, value in required_roles.items() if not value]
