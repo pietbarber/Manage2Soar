@@ -143,7 +143,13 @@ class Flight(models.Model):
     
             # Handle overnight flights (if landing before launch)
             if land_dt < launch_dt:
-                land_dt += timedelta(days=1)
+                if (launch_dt - land_dt).total_seconds() < 16 * 3600: # < 16 hours difference
+                    land_dt += timedelta (days=1)
+                else:
+                    # probably a bad duration, so throw it away
+                    self.duration = None
+                    super().save(*args, **kwargs)
+                    return
     
             self.duration = land_dt - launch_dt
         else:
