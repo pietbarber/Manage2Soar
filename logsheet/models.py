@@ -350,7 +350,7 @@ class LogsheetPayment(models.Model):
         unique_together = ("logsheet", "member")
 
     def __str__(self):
-        return f"{self.member.full_display_name} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
+        return f"{self.member} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
 
 ####################################################
 # LogsheetCloseout model

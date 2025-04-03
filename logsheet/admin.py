@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield, LogsheetCloseout, TowplaneCloseout 
+from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield, LogsheetCloseout, TowplaneCloseout, LogsheetPayment
 from django.utils.html import format_html
 
 # Admin configuration for managing Towplane objects
@@ -104,3 +104,16 @@ class LogsheetCloseoutAdmin(admin.ModelAdmin):
 @admin.register(TowplaneCloseout)
 class TowplaneCloseoutAdmin(admin.ModelAdmin):
     list_display = ("logsheet", "towplane")
+
+
+@admin.register(LogsheetPayment)
+class LogsheetPaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        'member',
+        'logsheet',
+        'payment_method',
+        'note',
+    )
+    list_filter = ('payment_method', 'logsheet')
+    search_fields = ('member__first_name', 'member__last_name', 'note')
+    autocomplete_fields = ('member', 'logsheet')
