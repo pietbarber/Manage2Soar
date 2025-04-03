@@ -64,6 +64,8 @@
   </tbody>
 </table>
 <h4 class="mt-5">Payment Method Tracker</h4>
+<!-- start form -->
+<h4 class="mt-5">Payment Method Tracker</h4>
 
 <form method="post">
   {% csrf_token %}
@@ -77,15 +79,14 @@
       </tr>
     </thead>
     <tbody>
-
       {% for row in member_payment_data %}
       <tr>
         <td>{{ row.member|full_display_name }}</td>
         <td>${{ row.amount|floatformat:2 }}</td>
         <td>
           <select name="payment_method_{{ row.member.id }}" 
-            class="form-select form-select-sm"
-            {% if logsheet.finalized %}disabled{% endif %}>
+                  class="form-select form-select-sm"
+                  {% if logsheet.finalized %}disabled{% endif %}>
             <option value="">—</option>
             <option value="account" {% if row.payment_method == "account" %}selected{% endif %}>On Account</option>
             <option value="check" {% if row.payment_method == "check" %}selected{% endif %}>Check</option>
@@ -95,21 +96,19 @@
         <td>
           <input type="text" name="note_{{ row.member.id }}" class="form-control form-control-sm"
                  value="{{ row.note }}"
-                 {% if logsheet.finalized %}disabled{% endif %} >
+                 {% if logsheet.finalized %}disabled{% endif %}>
         </td>
       </tr>
-    {% endfor %}
-    
+      {% endfor %}
     </tbody>
   </table>
+
   {% if not logsheet.finalized %}
-  <form method="post">
-    {% csrf_token %}
     <button type="submit" class="btn btn-success">Update Payments</button>
-  </form>
   {% endif %}
-  
 </form>
+
+<!-- end form -->
 
 <h4 class="mt-5">Summary by Flight</h4>
 <table class="table table-bordered table-sm align-middle">
