@@ -1,178 +1,135 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %}
 {% load static %}
 
 {% block title %}Edit Member{% endblock %}
 
 {% block content %}
 
-<script>
-  flatpickr(".datepicker", {
-    dateFormat: "Y-m-d", // ISO 8601 format
-    maxDate: new Date().fp_incr(30), // 30 days in future
-    minDate: "1990-01-01"
-  });
-</script>
-
 <div class="container">
-
   <h2 class="mb-4">Edit Member</h2>
-    {% if form.errors %}
-    <div class="alert alert-danger">
-      <strong>There were errors:</strong>
-      <ul>
-        {% for field in form %}
-          {% for error in field.errors %}
-            <li>{{ field.label }}: {{ error }}</li>
-          {% endfor %}
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
 
+  {% if form.errors %}
+  <div class="alert alert-danger">
+    <strong>There were errors:</strong>
+    <ul>
+      {% for field in form %}
+        {% for error in field.errors %}
+          <li>{{ field.label }}: {{ error }}</li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.media }}
 
+    <table class="table table-sm align-middle">
+      <tr>
+        <th colspan="2"><h5>Profile Photo</h5></th>
+      </tr>
+      <tr>
+        <td colspan="2">
+          {% if form.instance.profile_photo %}
+            <img src="{{ form.instance.profile_photo.url }}" class="img-thumbnail mb-2" style="max-height: 150px;" alt="Current profile photo">
+          {% else %}
+            <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail mb-2" style="max-height: 150px;" alt="Default profile photo">
+          {% endif %}
+          {{ form.profile_photo }}
+        </td>
+      </tr>
 
-    <div class="row">
-    <div class="mt-4">
-      <h5>Profile Photo</h5>
-      {% if form.instance.profile_photo %}
-      <img src="{{ form.instance.profile_photo.url }}"
-           class="img-thumbnail mb-2"
-           style="max-height: 150px;"
-           alt="Current profile photo">
-      {% else %}
-      <img src="{% static 'images/default-avatar-large.png' %}"
-           class="img-thumbnail mb-2"
-           style="max-height: 150px;"
-           alt="Default profile photo">
-      {% endif %}
-      {{ form.profile_photo|as_crispy_field }}
-    </div>
+      <tr><th colspan="2"><h5>Account Info</h5></th></tr>
+      <tr><th>Username</th><td>{{ form.username }}</td></tr>
 
-    <div class="row">
+      <tr><th colspan="2"><h5>Personal Info</h5></th></tr>
+      <tr><th>First Name</th><td>{{ form.first_name }}</td></tr>
+      <tr><th>Middle Initial</th><td>{{ form.middle_initial }}</td></tr>
+      <tr><th>Nickname</th><td>{{ form.nickname }}</td></tr>
+      <tr><th>Last Name</th><td>{{ form.last_name }}</td></tr>
+      <tr><th>Name Suffix</th><td>{{ form.name_suffix }}</td></tr>
+      <tr><th>Email</th><td>{{ form.email }}</td></tr>
+      <tr><th>Phone</th><td>{{ form.phone }}</td></tr>
+      <tr><th>Mobile Phone</th><td>{{ form.mobile_phone }}</td></tr>
 
-      <div class="col-md-6">
-        <h5>Account Info</h5>
-        {{ form.username|as_crispy_field }}
+      <tr><th colspan="2"><h5>Address</h5></th></tr>
+      <tr><th>Address</th><td>{{ form.address }}</td></tr>
+      <tr><th>City</th><td>{{ form.city }}</td></tr>
+      <tr><th>Country</th><td>{{ form.country }}</td></tr>
+      <tr id="state-code-wrapper"><th>State</th><td>{{ form.state_code }}</td></tr>
+      <tr id="state-freeform-wrapper" style="display: none;"><th>Province / Region</th><td>{{ form.state_freeform }}</td></tr>
+      <tr><th>ZIP</th><td>{{ form.zip_code }}</td></tr>
 
-        <h5>Personal Info</h5>
-        {{ form.first_name|as_crispy_field }}
-        {{ form.middle_initial|as_crispy_field }}
-        {{ form.nickname|as_crispy_field }}
-        {{ form.last_name|as_crispy_field }}
-        {{ form.name_suffix|as_crispy_field }}
+      <tr><th colspan="2"><h5>Membership</h5></th></tr>
+      <tr><th>Legacy Username</th><td>{{ form.legacy_username }}</td></tr>
+      <tr><th>Status</th><td>{{ form.membership_status }}</td></tr>
+      <tr><th>Joined Club</th><td>{{ form.joined_club }}</td></tr>
+      <tr><th>Glider Rating</th><td>{{ form.glider_rating }}</td></tr>
+      <tr><th>Owns Glider</th><td>{{ form.glider_owned }}</td></tr>
+      <tr><th>Owns Second Glider</th><td>{{ form.second_glider_owned }}</td></tr>
 
-        {{ form.email|as_crispy_field }}
-        {{ form.phone|as_crispy_field }}
-        {{ form.mobile_phone|as_crispy_field }}
-      </div>
+      <tr><th colspan="2"><h5>Roles & Access</h5></th></tr>
+      <tr><th>Instructor</th><td>{{ form.instructor }}</td></tr>
+      <tr><th>Tow Pilot</th><td>{{ form.towpilot }}</td></tr>
+      <tr><th>Duty Officer</th><td>{{ form.duty_officer }}</td></tr>
+      <tr><th>Asst Duty Officer</th><td>{{ form.assistant_duty_officer }}</td></tr>
+      <tr><th>Secretary</th><td>{{ form.secretary }}</td></tr>
+      <tr><th>Treasurer</th><td>{{ form.treasurer }}</td></tr>
+      <tr><th>Webmaster</th><td>{{ form.webmaster }}</td></tr>
+      <tr><th>Director</th><td>{{ form.director }}</td></tr>
+      <tr><th>Member Manager</th><td>{{ form.member_manager }}</td></tr>
 
-      <div class="col-md-6">
-        <h5>Address</h5>
-        {{ form.address|as_crispy_field }}
-        {{ form.city|as_crispy_field }}
+      <tr><th colspan="2"><h5>Emergency Contact</h5></th></tr>
+      <tr><th>Contact Info</th><td>{{ form.emergency_contact }}</td></tr>
 
-        <div class="row">
-          <div class="col-md-6">
-            {{ form.country|as_crispy_field }}
-          </div>
-          <div class="col-md-6" id="state-code-wrapper">
-            {{ form.state_code|as_crispy_field }}
-          </div>
-          <div class="col-md-6" id="state-freeform-wrapper" style="display: none;">
-            {{ form.state_freeform|as_crispy_field }}
-          </div>
-        </div>
-        {{ form.zip_code|as_crispy_field }}
-      </div>
-    </div>
+      <tr><th colspan="2"><h5>Notes</h5></th></tr>
+      <tr><th>Public Notes</th><td>{{ form.public_notes }}</td></tr>
+      <tr><th>Private Notes</th><td>{{ form.private_notes }}</td></tr>
+    </table>
 
-    <div class="row mt-4">
-      <div class="col-md-6">
-        <h5>Membership</h5>
-        {{ form.legacy_username|as_crispy_field }}
-        {{ form.membership_status|as_crispy_field }}
-        {{ form.joined_club|as_crispy_field }}
-        {{ form.glider_rating|as_crispy_field }}
-        {{ form.glider_owned|as_crispy_field }}
-        {{ form.second_glider_owned|as_crispy_field }}
-      </div>
-
-      <div class="col-md-6">
-        <h5>Roles & Access</h5>
-        {{ form.instructor|as_crispy_field }}
-        {{ form.towpilot|as_crispy_field }}
-        {{ form.duty_officer|as_crispy_field }}
-        {{ form.assistant_duty_officer|as_crispy_field }}
-        {{ form.secretary|as_crispy_field }}
-        {{ form.treasurer|as_crispy_field }}
-        {{ form.webmaster|as_crispy_field }}
-        {{ form.director|as_crispy_field }}
-        {{ form.member_manager|as_crispy_field }}
-      </div>
-    </div>
-
-    <div class="mt-4">
-      {{ form.emergency_contact|as_crispy_field }}
-    </div>
-
-    <div class="row mt-4">
-      <div class="col-md-6">
-        {{ form.public_notes|as_crispy_field }}
-      </div>
-      <div class="col-md-6">
-        {{ form.private_notes|as_crispy_field }}
-      </div>
-    </div>
-    <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
+    <button type="submit" class="btn btn-primary mt-3">Save Changes</button>
+    <a href="{% url 'members:member_list' %}" class="btn btn-secondary mt-3 ms-2">Cancel</a>
   </form>
 </div>
 
-
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+  flatpickr("#id_joined_club", {
+    dateFormat: "Y-m-d",
+    allowInput: true
+  });
+
   function toggleStateFields() {
     const countrySelect = document.getElementById("id_country");
     const stateCodeWrapper = document.getElementById("state-code-wrapper");
     const stateFreeformWrapper = document.getElementById("state-freeform-wrapper");
 
-    const selectedCountry = countrySelect.value;
-
-    if (selectedCountry === "US") {
-      stateCodeWrapper.style.display = "block";
+    if (countrySelect.value === "US") {
+      stateCodeWrapper.style.display = "table-row";
       stateFreeformWrapper.style.display = "none";
     } else {
       stateCodeWrapper.style.display = "none";
-      stateFreeformWrapper.style.display = "block";
+      stateFreeformWrapper.style.display = "table-row";
     }
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     const countrySelect = document.getElementById("id_country");
     if (countrySelect) {
-      toggleStateFields();  // run once on load
+      toggleStateFields();
       countrySelect.addEventListener("change", toggleStateFields);
     }
   });
 </script>
-
-
-
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      flatpickr("#id_joined_club", {
-          dateFormat: "Y-m-d",
-          allowInput: true
-      });
-    });
-    </script>
-
-
 
 {% endblock %}
