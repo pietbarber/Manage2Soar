@@ -133,6 +133,14 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
+    },
+    'legacy': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('LEGACY_DB_NAME'),
+        'USER': os.getenv('LEGACY_DB_USER'),
+        'PASSWORD': os.getenv('LEGACY_DB_PASSWORD'),
+        'HOST': os.getenv('LEGACY_DB_HOST', 'localhost'),
+        'PORT': os.getenv('LEGACY_DB_PORT', '5555'),
     }
 }
 
