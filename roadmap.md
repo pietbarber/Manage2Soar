@@ -29,6 +29,26 @@ This roadmap outlines current and future development goals for the Skyline Soari
 - members_list page: differentiate home vs cell phone numbers. 
 - members_list page: sort by lastname in a default view.  
 - Create restricted site for Instructors
+- Support logging of passengers:
+  - Passenger may be a member (dropdown) or a non-member (plain text).
+  - Field is only visible if no instructor is present on the flight.
+- Implement logsheet-level finances:
+  - Add a Finances modal or section, accessible via a dedicated button.
+  - Completion of finances is required before finalizing a logsheet.
+- Define tow altitude rate model:
+  - Create a model under `logsheet` to store tow altitude → cost mappings.
+  - Combine with existing glider rental rates.
+- Add support for payment methods:
+  - "On account" or handwritten check.
+  - Payments may be assigned to a member other than the pilot.
+  - Support 50/50 cost splits or split by component (tow vs rental).
+- Require duty officer log/essay before logsheet finalization.
+- Block finalization unless all gliders are marked as landed.
+- Centralized validation logic before allowing logsheet finalization:
+  - Gliders landed
+  - Finances completed
+  - Duty officer essay entered
+ - Optionally add a “pending” flight status for pre-launch queue logging
 
 ---
 
@@ -40,12 +60,23 @@ This roadmap outlines current and future development goals for the Skyline Soari
 
 ## In Progress 🔄
 - Improve member import with robust date parsing and dry-run validation
+- 📦 QuickBooks Integration
+- Explored sample CSV formats and invoice examples.
+- Awaiting Ralph’s feedback on:
+-- Comfort level with QBO imports vs manual entry
+-- Format requirements for invoice line items
+-- Proposal to export finalized logsheets to QBO-ready CSV is on hold until Ralph greenlights.
+- 📡 Runway 10 Logging Options
+-- Piet will test AT&T and Verizon coverage at Runway 10 this weekend.
+-- Proposal drafted for a dedicated club iPad with cellular access:
+-- Auto-login using role account or token
+-- Live flight ops, real-time visibility, zero syncing hassle
+- Option B (offline laptop Django instance) discussed as a fallback, but deemed complex.
 
 ---
 
 ## Abandoned Tasks ⚰️
 1. Allow uploading vCard files to populate members (**deprioritized**)
-
 
 ---
 
@@ -60,6 +91,11 @@ This roadmap outlines current and future development goals for the Skyline Soari
 - Add contact group management (for targeted emails)
 - Add flight history viewer (imported legacy data + new log uploads)
 - Import Training Syllabus
+- ✈️ Logsheet Program
+ - Add “Export to QuickBooks” button (post-finalization only)
+ - Add read-only version of finances and closeout after finalization
+ - Create summary financial export (CSV for archive or club reports)
+ - Build a “quick entry” interface to transcribe paper logs quickly
 
 ---
 
@@ -75,32 +111,6 @@ This roadmap outlines current and future development goals for the Skyline Soari
 If you have questions, suggestions, or contributions, please open an issue or reach out to Piet Barber!
 
 ## Logsheet Program – Future Enhancements
-
-- [ ] Support logging of passengers:
-  - Passenger may be a member (dropdown) or a non-member (plain text).
-  - Field is only visible if no instructor is present on the flight.
-
-- [ ] Implement logsheet-level finances:
-  - Add a Finances modal or section, accessible via a dedicated button.
-  - Completion of finances is required before finalizing a logsheet.
-
-- [ ] Define tow altitude rate model:
-  - Create a model under `logsheet` to store tow altitude → cost mappings.
-  - Combine with existing glider rental rates.
-
-- [ ] Add support for payment methods:
-  - "On account" or handwritten check.
-  - Payments may be assigned to a member other than the pilot.
-  - Support 50/50 cost splits or split by component (tow vs rental).
-
-- [ ] Require duty officer log/essay before logsheet finalization.
-
-- [ ] Block finalization unless all gliders are marked as landed.
-
-- [ ] Centralized validation logic before allowing logsheet finalization:
-  - Gliders landed
-  - Finances completed
-  - Duty officer essay entered
 
 - [ ] Migration tool for legacy flight logs:
   - Import historical PostgreSQL data going back to 2005.
