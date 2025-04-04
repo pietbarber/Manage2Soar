@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+logging.basicConfig(level=logging.DEBUG)
 
 import psycopg2
 from django.conf import settings
@@ -141,11 +142,12 @@ class Command(BaseCommand):
             member.towpilot = row.get('towpilot')
             member.duty_officer = row.get('dutyofficer')
             member.assistant_duty_officer = row.get('ado')
+            raw_notes = row.get('private_notes')
+            logger.debug(f"{handle} raw_notes type: {type(raw_notes)} | content: {repr(raw_notes)[:100]}")
 
-            public_notes = sanitize(row.get('public_notes'))
-            private_notes = sanitize(row.get('private_notes'))
-            logger.debug(f"{handle} private_notes length after sanitize: {len(private_notes)}")
-            member.notes = f"{public_notes}\n---\n{private_notes}".strip()
+            member.public_notes = sanitize(row.get('public_notes'))
+            member.private_notes = sanitize(row.get('private_notes'))
+            #logger.debug(f"{handle} private_notes length after sanitize: {len(private_notes)}")
 
             join_date = parse_date(row.get('joindate'))
             if not join_date:
