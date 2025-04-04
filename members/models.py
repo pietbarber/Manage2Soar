@@ -166,6 +166,17 @@ class Member(AbstractUser):
 
     last_updated_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
 
+    @property
+    def full_display_name(self):
+        name = f"{self.first_name} {self.middle_initial or ''} {self.last_name}".strip()
+        if self.name_suffix:
+            name = f"{name}, {self.name_suffix}"
+        return " ".join(name.split())  # Normalize spaces
+
+
+    def is_active_member(self):
+        return self.membership_status in ['active', 'student', 'ssef', 'fast', 'service']
+
     def save(self, *args, **kwargs):
         if not self.profile_photo:
             # Only generate if no photo already exists

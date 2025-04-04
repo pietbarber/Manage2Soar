@@ -12,12 +12,12 @@ from .utils.vcard_tools import generate_vcard_qr
 from .forms import MemberProfilePhotoForm
 
 
-
-
 @active_member_required
 def member_list(request):
-    members = Member.objects.order_by('last_name', 'first_name')
-    return render(request, "members/member_list.html", {"members": members})
+    members = Member.objects.all()
+    if not request.GET.get('show_all'):
+        members = [m for m in members if m.is_active_member()]
+    return render(request, 'members/member_list.html', {'members': members})
 
 @active_member_required
 def member_edit(request, pk):
