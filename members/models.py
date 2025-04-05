@@ -136,6 +136,15 @@ class Member(AbstractUser):
 
     last_updated_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
 
+
+    @property
+    def profile_image_url(self):
+        from django.urls import reverse
+        if self.profile_photo:
+            return self.profile_photo.url
+        return reverse('pydenticon', kwargs={'username': self.username})
+
+
     @property
     def full_display_name(self):
         name = f"{self.first_name} {self.middle_initial or ''} {self.last_name}".strip()
