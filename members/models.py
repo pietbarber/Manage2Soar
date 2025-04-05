@@ -43,21 +43,40 @@ class Member(AbstractUser):
     # S = Service Member
 
     MEMBERSHIP_STATUS_CHOICES = [
-        ('Full Member', 'Full Member'),
-        ('Student Member', 'Student Member'),
-        ('Family Member', 'Family Member'),
-        ('Founding Member', 'Founding Member'),
-        ('Honorary Member', 'Honorary Member'),
-        ('Introductory Member', 'Introductory Member'),
-        ('SSEF Member', 'SSEF Member'),
+        ("Charter Member", "Charter Member"),
+        ("Full Member", "Full Member"),
+        ("Probationary Member", "Probationary Member"),
+        ("FAST Member", "FAST Member"),
+        ("Introductory Member", "Introductory Member"),
+        ("Affiliate Member", "Affiliate Member"),
+        ("Family Member", "Family Member"),
+        ("Service Member", "Service Member"),
+        ("Student Member", "Student Member"),
+        ("Transient Member", "Transient Member"),
+        ("Emeritus Member", "Emeritus Member"),
+        ("Honorary Member", "Honorary Member"),
         ('Inactive', 'Inactive'),
         ('Non-Member', 'Non-Member'),
         ('Pending', 'Pending'),
-        ('Probationary Member', 'Probationary Member'),
-        ('Transient Member', 'Transient Member'),
-        ('FAST Member', 'FAST Member'),
-        ('Service Member', 'Service Member'),
+        ('Deceased', 'Deceased'),
     ]
+
+    DEFAULT_ACTIVE_STATUSES = [
+        "Charter Member",           # Article IV 1 (a)
+        "Full Member",              # Article IV 1 (b)
+        "Probationary Member",      # Article IV 1 (c)
+        "FAST Member",              # Article IV 1 (d)(i)
+        "Introductory Member",      # Article IV 1 (d)(ii)
+        "Affiliate Member",         # Article IV 1 (d)(iii)
+        "Family Member",            # Article IV 1 (d)(iv)
+        "Service Member",           # Article IV 1 (d)(v)
+        "Student Member",           # Article IV 1 (d)(vi)
+        "Transient Member",         # Article IV 1 (d)(vii)
+        "Emeritus Member",          # Article IV 1 (d)(ix)
+        "Honorary Member",          # Article IV 1 (d)(x)
+    ]
+
+
     US_STATE_CHOICES = [
         ('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'),
         ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'),

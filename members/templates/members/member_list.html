@@ -11,7 +11,19 @@
     {% endif %}
 </h2>
 {% duty_emoji_legend %}
+<form method="get">
+    <label><input type="checkbox" name="status" value="active" checked> Active ✅</label>
+    <label><input type="checkbox" name="status" value="pending"> Pending ⏳</label>
+    <label><input type="checkbox" name="status" value="inactive"> Inactive 💤</label>
+    <label><input type="checkbox" name="status" value="nonmember"> Non-member 🚫</label>
+    <br> 
+    <label><input type="checkbox" name="role" value="towpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}> 🛩️ Tow Pilot</label>
+    <label><input type="checkbox" name="role" value="instructor" {% if 'instructor' in selected_roles %}checked{% endif %}> 🎓 Instructor</label>
+    <label><input type="checkbox" name="role" value="director" {% if 'director' in selected_roles %}checked{% endif %}> 🎩 Director</label>
+    <label><input type="checkbox" name="role" value="dutyofficer" {% if 'duty_officer' in selected_roles %}checked{% endif %}> 📋 Duty Officer</label>
 
+    <button type="submit">Filter</button>
+  </form>
 <table class="table table-bordered table-hover table-striped">
     <thead class="table-light">
         <tr>
@@ -39,7 +51,7 @@
                 {% endif %}
             </td>
             </td>
-            <td>{{ member.first_name }} {% if member.nickname %}“{{ member.nickname }}”{% endif %} {% if member.middle_initial %}{{ member.middle_initial }}.{% endif %} {{ member.last_name }} {% if member.name_suffix %}{{ member.name_suffix }}{% endif %}</td>
+            <td>{{ member.full_display_name }}</td>
 
             <td>
                 {% if member.phone %}
@@ -64,4 +76,20 @@
         {% endfor %}
     </tbody>
 </table>
+
+{% with request.GET.urlencode as query_string %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+      <a href="?{{ query_string }}&page={{ page_obj.previous_page_number }}">« Prev</a>
+    {% endif %}
+
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+
+    {% if page_obj.has_next %}
+      <a href="?{{ query_string }}&page={{ page_obj.next_page_number }}">Next »</a>
+    {% endif %}
+  </div>
+{% endwith %}
+
+
 {% endblock %}

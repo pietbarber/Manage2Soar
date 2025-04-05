@@ -5,19 +5,61 @@ from django.urls import reverse
 from .models import Member, Biography
 from .forms import MemberForm, BiographyForm, SetPasswordForm
 from .decorators import active_member_required
-import io
 import base64
-import qrcode
 from .utils.vcard_tools import generate_vcard_qr
 from .forms import MemberProfilePhotoForm
+from django.core.paginator import Paginator
 
 
-@active_member_required
+
 def member_list(request):
-    members = Member.objects.all()
-    if not request.GET.get('show_all'):
-        members = [m for m in members if m.is_active_member()]
-    return render(request, 'members/member_list.html', {'members': members})
+    selected_statuses = request.GET.getlist("status")
+
+    DEFAULT_ACTIVE_STATUSES = [
+        "Charter Member",           # Article IV 1 (a)
+        "Full Member",              # Article IV 1 (b)
+        "Probationary Member",      # Article IV 1 (c)
+        "FAST Member",              # Article IV 1 (d)(i)
+        "Introductory Member",      # Article IV 1 (d)(ii)
+        "Affiliate Member",         # Article IV 1 (d)(iii)
+        "Family Member",            # Article IV 1 (d)(iv)
+        "Service Member",           # Article IV 1 (d)(v)
+        "Student Member",           # Article IV 1 (d)(vi)
+        "Transient Member",         # Article IV 1 (d)(vii)
+        "Emeritus Member",          # Article IV 1 (d)(ix)
+        "Honorary Member",          # Article IV 1 (d)(x)
+    ]
+
+    if not selected_statuses:
+        selected_statuses = ["Active", "Inactive", "Pending", "Non-Member"]
+    if not selected_statuses:
+        selected_statuses = DEFAULT_ACTIVE_STATUSES
+
+    members = Member.objects.filter(membership_status__in=selected_statuses)
+
+    selected_roles = request.GET.getlist("role")
+    if 'towpilot' in selected_roles:
+        members = members.filter(towpilot=True)
+    if 'instructor' in selected_roles:
+        members = members.filter(instructor=True)
+    if 'director' in selected_roles:
+        members = members.filter(director=True)
+    if 'dutyofficer' in selected_roles:
+        members = members.filter(duty_officer=True)
+
+    members = members.order_by("last_name", "first_name")
+
+    paginator = Paginator(members, 150)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "members/member_list.html", {
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "members": page_obj.object_list,
+        "selected_statuses": selected_statuses,
+        "selected_roles": selected_roles,
+    })
 
 @active_member_required
 def member_edit(request, pk):

@@ -47,23 +47,23 @@ def format_us_phone(value):
 def render_duties(member):
     duties = []
     if member.instructor:
-        duties.append('<span title="Instructor">🧑‍🏫</span>')
+        duties.append('<span title="Instructor">🎓</span>')
     if member.towpilot:
-        duties.append('<span title="Tow Pilot">✈️</span>')
+        duties.append('<span title="Tow Pilot">🛩️</span>')
     if member.duty_officer:
         duties.append('<span title="Duty Officer">📋</span>')
     if member.assistant_duty_officer:
-        duties.append('<span title="Assistant DO">🧑‍💼</span>')
+        duties.append('<span title="Assistant DO">💪</span>')
     if member.secretary:
-        duties.append('<span title="Secretary">📝</span>')
+        duties.append('<span title="Secretary">✍️</span>')
     if member.treasurer:
         duties.append('<span title="Treasurer">💰</span>')
     if member.webmaster:
         duties.append('<span title="Webmaster">🌐</span>')
     if member.director:
-        duties.append('<span title="Director">🎖️</span>')
+        duties.append('<span title="Director">️🎩</span>')
     if member.member_manager:
-        duties.append('<span title="Membership Manager">🧑‍🔧</span>')
+        duties.append('<span title="Membership Manager">📇</span>')
 
     return ' '.join(duties) if duties else "-"
 
@@ -81,15 +81,15 @@ def duty_emoji_legend():
         <div id="collapseLegend" class="accordion-collapse collapse" aria-labelledby="headingLegend" data-bs-parent="#emojiLegendAccordion">
           <div class="accordion-body">
             <ul class="list-unstyled mb-0">
-              <li>🧑‍🏫 – Instructor</li>
-              <li>✈️ – Tow Pilot</li>
-              <li>🗓️ – Duty Officer</li>
-              <li>🧭 – Assistant Duty Officer</li>
-              <li>📋 – Secretary</li>
+              <li>🎓 – Instructor</li>
+              <li>🛩️ – Tow Pilot</li>
+              <li>📋 – Duty Officer</li>
+              <li>💪 – Assistant Duty Officer</li>
+              <li>✍️ – Secretary</li>
               <li>💰 – Treasurer</li>
               <li>🌐 – Webmaster</li>
-              <li>🎯 – Director</li>
-              <li>🧑‍💼 – Membership Manager</li>
+              <li>🎩 – Director</li>
+              <li>📇 – Membership Manager</li>
             </ul>
           </div>
         </div>
