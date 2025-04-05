@@ -7,7 +7,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
 from members.models import Member
-from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +144,17 @@ class Command(BaseCommand):
                 member.membership_status = "Deceased"
             else:
                 member.membership_status = STATUS_MAP.get(row.get('memberstatus'), 'Non-Member')
+            
+            # Only activate if the member deserves it
+            # If this person is inactive, or not a member or 
+            # pending, or dead, don't let them log into the site. 
+            # since settings.py entry has AUTH_USER_MODEL = 'members.Member'
+            # this is where we set if the user is active or not. 
+            if member.membership_status not in ("Inactive", "Non-Member", "Pending", "Deceased"):
+                member.is_active = True
+            else:
+                member.is_active = False
+
 
             member.glider_rating = RATING_MAP.get(row.get('rating'), 'student')
             member.director = row.get('director')
