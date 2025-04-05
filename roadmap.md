@@ -49,12 +49,23 @@ This roadmap outlines current and future development goals for the Skyline Soari
   - Finances completed
   - Duty officer essay entered
  - Optionally add a “pending” flight status for pre-launch queue logging
+- Migration tool for legacy flight logs:
+  - Import historical PostgreSQL data going back to 2005.
+  - Must integrate with current Member, Glider, and Towplane models.
+- Paginated or limited logsheet list:
+  - Include search or filter capability for older logsheets.
+- Add support for importing badge achievements from legacy system
+- Integrate legacy usernames (handle) to link historical flight log data
+- Admin UI for editing badge recipients in a non-admin interface
 
 ---
 
 ## On Hold tasks 🛑
 - Migration tooling for importing legacy member data from PostgreSQL JSON export
 - create flight log tables in preparation for logsheet program. 
+- [ ] Offline-compatible logsheet entry:
+  - Support local Django instance with full flight logging functionality.
+  - End-of-day synchronization to live server (e.g., push finalized logsheets).
 
 ---
 
@@ -81,10 +92,8 @@ This roadmap outlines current and future development goals for the Skyline Soari
 ---
 
 ## Upcoming Tasks 🚀
-- Add support for importing badge achievements from legacy system
 - Set up OAuth2 login for providers other than Google (Yahoo, Microsoft, Facebook)
-- Admin UI for editing badge recipients in a non-admin interface
-- Integrate legacy usernames (handle) to link historical flight log data
+- Display most recent year or 50 logsheets by default.
 - Customize Django admin list display to show additional fields like `membership_status`, `towpilot`, `glider_rating`, etc.
 - Allow members to view but not edit their own membership records (except photo & biography)
 - Add glider image thumbnails to members who own gliders
@@ -108,22 +117,11 @@ This roadmap outlines current and future development goals for the Skyline Soari
 
 ---
 
-If you have questions, suggestions, or contributions, please open an issue or reach out to Piet Barber!
 
 ## Logsheet Program – Future Enhancements
-
-- [ ] Migration tool for legacy flight logs:
-  - Import historical PostgreSQL data going back to 2005.
-  - Must integrate with current Member, Glider, and Towplane models.
-
-- [ ] Paginated or limited logsheet list:
-  - Display most recent year or 50 logsheets by default.
-  - Include search or filter capability for older logsheets.
-
-- [ ] Offline-compatible logsheet entry:
-  - Support local Django instance with full flight logging functionality.
-  - End-of-day synchronization to live server (e.g., push finalized logsheets).
 
 - [ ] Export finalized logsheets to CSV for Quickbooks Online:
   - Output must meet QBO format requirements.
   - May include member name, aircraft, cost breakdown, and payment method.
+
+If you have questions, suggestions, or contributions, please open an issue or reach out to Piet Barber!
