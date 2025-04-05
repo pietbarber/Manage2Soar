@@ -21,9 +21,15 @@
         background-color: #f8f9fa; /* Bootstrap’s light gray */
       }
 
+      .emoji {
+        font-size: 1.5em;
+        line-height: 1;
+        vertical-align: middle;
+      }
+
       th[role=columnheader]:not(.no-sort) {
-	        cursor: pointer;
-        }
+	      cursor: pointer;
+      }
 
       th[role=columnheader]:not(.no-sort):after {
 	      content: '';
@@ -117,7 +123,7 @@
         <!-- Right side: Welcome + Logout -->
         {% if user.is_authenticated %}
           <span class="navbar-text me-3">
-            Welcome, {{ user.first_name }} {{ user.last_name }}
+            Welcome, {{ member.first_name }} {{ member.last_name }}
           </span>
           <form action="{% url 'logout' %}" method="post" class="d-flex">
             {% csrf_token %}

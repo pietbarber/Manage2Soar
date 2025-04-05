@@ -51,14 +51,16 @@
                 {% endif %}
             </td>
             </td>
-            <td>{{ member.full_display_name }}</td>
+            <td>{{ member.full_display_name }}{% if member.biography %} 📔{% endif %}</td>
 
             <td>
-                {% if member.phone %}
-                <div style="white-space: nowrap;">📞 {{ member.phone|format_us_phone }}</div>
-                {% endif %}
-                {% if member.mobile_phone %}
-                <div style="white-space: nowrap;">📱 {{ member.mobile_phone|format_us_phone }}</div>
+                {% if member.phone and member.phone == member.mobile_phone %}
+                  📞📱 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
+                {% else %}
+                  {% if member.phone %}📞 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>{% endif %}
+                  {% if member.mobile_phone %}
+                    <br>📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
+                  {% endif %}
                 {% endif %}
             <td class="text-center">
                 {{ member|render_duties|safe }}

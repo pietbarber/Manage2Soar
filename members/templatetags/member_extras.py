@@ -47,23 +47,23 @@ def format_us_phone(value):
 def render_duties(member):
     duties = []
     if member.instructor:
-        duties.append('<span title="Instructor">🎓</span>')
+        duties.append('<span title="Instructor" class="emoji">🎓</span>')
     if member.towpilot:
-        duties.append('<span title="Tow Pilot">🛩️</span>')
+        duties.append('<span title="Tow Pilot" class="emoji">🛩️</span>')
     if member.duty_officer:
-        duties.append('<span title="Duty Officer">📋</span>')
+        duties.append('<span title="Duty Officer" class="emoji">📋</span>')
     if member.assistant_duty_officer:
-        duties.append('<span title="Assistant DO">💪</span>')
+        duties.append('<span title="Assistant DO" class="emoji">💪</span>')
     if member.secretary:
-        duties.append('<span title="Secretary">✍️</span>')
+        duties.append('<span title="Secretary" class="emoji">✍️</span>')
     if member.treasurer:
-        duties.append('<span title="Treasurer">💰</span>')
+        duties.append('<span title="Treasurer" class="emoji">💰</span>')
     if member.webmaster:
-        duties.append('<span title="Webmaster">🌐</span>')
+        duties.append('<span title="Webmaster" class="emoji">🌐</span>')
     if member.director:
-        duties.append('<span title="Director">️🎩</span>')
+        duties.append('<span title="Director" class="emoji"️>🎩</span>')
     if member.member_manager:
-        duties.append('<span title="Membership Manager">📇</span>')
+        duties.append('<span title="Membership Manager" class="emoji">📇</span>')
 
     return ' '.join(duties) if duties else "-"
 
@@ -81,15 +81,15 @@ def duty_emoji_legend():
         <div id="collapseLegend" class="accordion-collapse collapse" aria-labelledby="headingLegend" data-bs-parent="#emojiLegendAccordion">
           <div class="accordion-body">
             <ul class="list-unstyled mb-0">
-              <li>🎓 – Instructor</li>
-              <li>🛩️ – Tow Pilot</li>
-              <li>📋 – Duty Officer</li>
-              <li>💪 – Assistant Duty Officer</li>
-              <li>✍️ – Secretary</li>
-              <li>💰 – Treasurer</li>
-              <li>🌐 – Webmaster</li>
-              <li>🎩 – Director</li>
-              <li>📇 – Membership Manager</li>
+              <li><span class="emoji">🎓</span> – Instructor</li>
+              <li><span class="emoji">🛩️</span> – Tow Pilot</li>
+              <li><span class="emoji">📋</span> – Duty Officer</li>
+              <li><span class="emoji">💪</span> – Assistant Duty Officer</li>
+              <li><span class="emoji">✍️</span> – Secretary</li>
+              <li><span class="emoji">💰</span> – Treasurer</li>
+              <li><span class="emoji">🌐</span> – Webmaster</li>
+              <li><span class="emoji">🎩</span> – Director</li>
+              <li><span class="emoji">📇</span> – Membership Manager</li>
             </ul>
           </div>
         </div>

@@ -30,10 +30,23 @@ def member_list(request):
         "Honorary Member",          # Article IV 1 (d)(x)
     ]
 
-    if not selected_statuses:
-        selected_statuses = ["Active", "Inactive", "Pending", "Non-Member"]
-    if not selected_statuses:
-        selected_statuses = DEFAULT_ACTIVE_STATUSES
+    STATUS_ALIASES = {
+        "active": DEFAULT_ACTIVE_STATUSES,
+        "inactive": ["Inactive"],
+        "nonmember": ["Non-Member"],
+        "pending": ["Pending"],
+        "deceased": ["Deceased"],
+    }
+
+    raw_statuses = request.GET.getlist("status")
+
+    # If no status selected, default to "Active"
+    if not raw_statuses:
+        raw_statuses = ["active"]
+
+    selected_statuses = []
+    for s in raw_statuses:
+        selected_statuses.extend(STATUS_ALIASES.get(s, [s]))
 
     members = Member.objects.filter(membership_status__in=selected_statuses)
 

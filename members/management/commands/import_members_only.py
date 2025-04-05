@@ -12,19 +12,18 @@ from django.db.models import Q
 logger = logging.getLogger(__name__)
 
 STATUS_MAP = {
-    'M': 'active',
-    'U': 'student',
-    'Q': 'family',
-    'F': 'founding',
-    'H': 'honorary',
-    'E': 'intro',
-    'C': 'ssef',
-    'I': 'inactive',
-    'N': 'nonmember',
-    'P': 'probationary',
-    'T': 'transient',
-    'A': 'fast',
-    'S': 'service',
+    'M': 'Full Member',
+    'U': 'Student Member',
+    'Q': 'Family Member',
+    'F': 'Charter Member',
+    'H': 'Honorary Member',
+    'E': 'Introductory Member',
+    'I': 'Inactive',
+    'N': 'Non-Member',
+    'P': 'Probationary Member',
+    'T': 'Transient Member',
+    'A': 'FAST Member',
+    'S': 'Service Member',
 }
 
 RATING_MAP = {
@@ -64,14 +63,20 @@ def sanitize(text):
         logger.warning(f"Failed to sanitize text: {e}")
         return ''
 
+import re
+
 def generate_username(first, last):
-    base = f"{first.lower()}.{last.lower()}"
+    # Keep only A-Z and a-z
+    first_clean = re.sub(r'[^A-Za-z]', '', first)
+    last_clean = re.sub(r'[^A-Za-z]', '', last)
+    base = f"{first_clean.lower()}.{last_clean.lower()}"
     username = base
     suffix = 1
     while Member.objects.filter(username=username).exists():
         username = f"{base}{suffix}"
         suffix += 1
     return username
+
 
 class Command(BaseCommand):
     help = "Import legacy members from the SQL_ASCII database using psycopg2 via settings.DATABASES['legacy']"
@@ -132,7 +137,15 @@ class Command(BaseCommand):
             member.emergency_contact = sanitize(row.get('emergency_contact'))
             ssa = row.get('ssa_id')
             member.SSA_member_number = ssa if ssa else None
-            member.membership_status = STATUS_MAP.get(row.get('memberstatus'), 'nonmember')
+            official_title = sanitize(row.get('official_title'))
+            private_notes = sanitize(row.get('private_notes'))
+
+            # Check if "Deceased" appears in either field
+            if 'deceased' in official_title.lower() or 'deceased' in private_notes.lower():
+                member.membership_status = "Deceased"
+            else:
+                member.membership_status = STATUS_MAP.get(row.get('memberstatus'), 'Non-Member')
+
             member.glider_rating = RATING_MAP.get(row.get('rating'), 'student')
             member.director = row.get('director')
             member.treasurer = row.get('treasurer')
@@ -143,7 +156,7 @@ class Command(BaseCommand):
             member.duty_officer = row.get('dutyofficer')
             member.assistant_duty_officer = row.get('ado')
             raw_notes = row.get('private_notes')
-            logger.debug(f"{handle} raw_notes type: {type(raw_notes)} | content: {repr(raw_notes)[:100]}")
+            #logger.debug(f"{handle} raw_notes type: {type(raw_notes)} | content: {repr(raw_notes)[:100]}")
 
             member.public_notes = sanitize(row.get('public_notes'))
             member.private_notes = sanitize(row.get('private_notes'))

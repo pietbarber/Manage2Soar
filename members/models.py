@@ -190,6 +190,8 @@ class Member(AbstractUser):
         name = f"{self.first_name} {self.middle_initial or ''} {self.last_name}".strip()
         if self.name_suffix:
             name = f"{name}, {self.name_suffix}"
+        if self.membership_status == "Deceased":
+            name += "†"
         return " ".join(name.split())  # Normalize spaces
 
 
