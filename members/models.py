@@ -42,56 +42,7 @@ class Member(AbstractUser):
     # A = FAST Member
     # S = Service Member
 
-    MEMBERSHIP_STATUS_CHOICES = [
-        ("Charter Member", "Charter Member"),
-        ("Full Member", "Full Member"),
-        ("Probationary Member", "Probationary Member"),
-        ("FAST Member", "FAST Member"),
-        ("Introductory Member", "Introductory Member"),
-        ("Affiliate Member", "Affiliate Member"),
-        ("Family Member", "Family Member"),
-        ("Service Member", "Service Member"),
-        ("Student Member", "Student Member"),
-        ("Transient Member", "Transient Member"),
-        ("Emeritus Member", "Emeritus Member"),
-        ("Honorary Member", "Honorary Member"),
-        ('Inactive', 'Inactive'),
-        ('Non-Member', 'Non-Member'),
-        ('Pending', 'Pending'),
-        ('Deceased', 'Deceased'),
-    ]
-
-    DEFAULT_ACTIVE_STATUSES = [
-        "Charter Member",           # Article IV 1 (a)
-        "Full Member",              # Article IV 1 (b)
-        "Probationary Member",      # Article IV 1 (c)
-        "FAST Member",              # Article IV 1 (d)(i)
-        "Introductory Member",      # Article IV 1 (d)(ii)
-        "Affiliate Member",         # Article IV 1 (d)(iii)
-        "Family Member",            # Article IV 1 (d)(iv)
-        "Service Member",           # Article IV 1 (d)(v)
-        "Student Member",           # Article IV 1 (d)(vi)
-        "Transient Member",         # Article IV 1 (d)(vii)
-        "Emeritus Member",          # Article IV 1 (d)(ix)
-        "Honorary Member",          # Article IV 1 (d)(x)
-    ]
-
-
-    US_STATE_CHOICES = [
-        ('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'),
-        ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'),
-        ('FL', 'Florida'), ('GA', 'Georgia'), ('HI', 'Hawaii'), ('ID', 'Idaho'),
-        ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'),
-        ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MD', 'Maryland'),
-        ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'),
-        ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'),
-        ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'),
-        ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'),
-        ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'),
-        ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'),
-        ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'),
-        ('WI', 'Wisconsin'), ('WY', 'Wyoming')
-    ]
+    from members.constants import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 
     membership_status = models.CharField(
         max_length=20,

@@ -123,7 +123,7 @@
         <!-- Right side: Welcome + Logout -->
         {% if user.is_authenticated %}
           <span class="navbar-text me-3">
-            Welcome, {{ member.first_name }} {{ member.last_name }}
+            Welcome, {{ user.first_name }} {{ user.last_name }}
           </span>
           <form action="{% url 'logout' %}" method="post" class="d-flex">
             {% csrf_token %}

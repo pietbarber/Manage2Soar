@@ -12,7 +12,9 @@
       <div class="col-auto">
         <!-- Badge icon toggles the collapsible description -->
         <a data-bs-toggle="collapse" href="#badge-desc-{{ badge.id }}" role="button" aria-expanded="false" aria-controls="badge-desc-{{ badge.id }}">
+          {% if badge.image %}
           <img src="{{ badge.image.url }}" alt="{{ badge.name }}" class="img-thumbnail" style="max-width: 100px;">
+          {% endif %}
         </a>
       </div>
       <div class="col">
@@ -25,7 +27,7 @@
 
 {% if badge.memberbadge_set.all %}
   <div class="d-flex flex-wrap mt-1">
-    {% for mb in badge.memberbadge_set.all %}
+    {% for mb in badge.filtered_memberbadges %}
       <div class="d-flex align-items-center me-3 mb-2">
 
 

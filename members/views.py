@@ -8,34 +8,12 @@ import base64
 from .utils.vcard_tools import generate_vcard_qr
 from .forms import MemberProfilePhotoForm
 from django.core.paginator import Paginator
-
+from members.constants import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
+from django.db.models import Prefetch
 
 
 def member_list(request):
     selected_statuses = request.GET.getlist("status")
-
-    DEFAULT_ACTIVE_STATUSES = [
-        "Charter Member",           # Article IV 1 (a)
-        "Full Member",              # Article IV 1 (b)
-        "Probationary Member",      # Article IV 1 (c)
-        "FAST Member",              # Article IV 1 (d)(i)
-        "Introductory Member",      # Article IV 1 (d)(ii)
-        "Affiliate Member",         # Article IV 1 (d)(iii)
-        "Family Member",            # Article IV 1 (d)(iv)
-        "Service Member",           # Article IV 1 (d)(v)
-        "Student Member",           # Article IV 1 (d)(vi)
-        "Transient Member",         # Article IV 1 (d)(vii)
-        "Emeritus Member",          # Article IV 1 (d)(ix)
-        "Honorary Member",          # Article IV 1 (d)(x)
-    ]
-
-    STATUS_ALIASES = {
-        "active": DEFAULT_ACTIVE_STATUSES,
-        "inactive": ["Inactive"],
-        "nonmember": ["Non-Member"],
-        "pending": ["Pending"],
-        "deceased": ["Deceased"],
-    }
 
     raw_statuses = request.GET.getlist("status")
 
@@ -128,17 +106,6 @@ def member_view(request, member_id):
     )
 
 
-
-
-
-
-@active_member_required
-def badge_board(request):
-    members = Member.objects.prefetch_related("badges")
-    badges = set(b for m in members for b in m.badges.all())
-    return render(request, "members/badges.html", {"members": members, "badges": badges})
-
-
 @active_member_required
 
 def biography_view(request, member_id):
@@ -203,12 +170,22 @@ def tinymce_image_upload(request):
         return JsonResponse({'location': url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-from .models import Badge
+from .models import Badge, MemberBadge
 
 @active_member_required
 def badge_board(request):
-    badges = Badge.objects.prefetch_related('memberbadge_set__member').order_by('order')
-    return render(request, "members/badges.html", {"badges": badges})
+    active_members = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
 
+    badges = Badge.objects.prefetch_related(
+        Prefetch(
+            'memberbadge_set',
+            queryset=MemberBadge.objects.filter(
+                member__in=active_members
+            ).select_related('member').order_by('member__last_name', 'member__first_name'),
+            to_attr='filtered_memberbadges'
+        )
+    ).order_by('order')
 
-
+    return render(request, "members/badges.html", {
+        "badges": badges
+    })
