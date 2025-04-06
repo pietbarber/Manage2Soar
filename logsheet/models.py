@@ -43,16 +43,16 @@ class Flight(models.Model):
     passenger = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_passenger")
 
     # Guest name fallbacks (for legacy import)
-    guest_pilot_name = models.CharField(max_length=100, blank=True)
-    guest_instructor_name = models.CharField(max_length=100, blank=True)
-    guest_towpilot_name = models.CharField(max_length=100, blank=True)
+    guest_pilot_name = models.CharField(max_length=100, blank=True, null=True)
+    guest_instructor_name = models.CharField(max_length=100, blank=True, null=True)
+    guest_towpilot_name = models.CharField(max_length=100, blank=True, null=True)
 
     # Legacy name tracking for post-import cleanup or debug
     passenger_name = models.CharField(max_length=100, blank=True, help_text="Name of passenger if not a member")
-    legacy_pilot_name = models.CharField(max_length=100, blank=True)
-    legacy_instructor_name = models.CharField(max_length=100, blank=True)
-    legacy_passenger_name = models.CharField(max_length=100, blank=True)
-    legacy_towpilot_name = models.CharField(max_length=100, blank=True)
+    legacy_pilot_name = models.CharField(max_length=100, blank=True, null=True)
+    legacy_instructor_name = models.CharField(max_length=100, blank=True, null=True)
+    legacy_passenger_name = models.CharField(max_length=100, blank=True, null=True)
+    legacy_towpilot_name = models.CharField(max_length=100, blank=True, null=True)
 
     # Launch method for winch/self-launch/other
     class LaunchMethod(models.TextChoices):
