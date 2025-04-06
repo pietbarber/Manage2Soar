@@ -41,8 +41,31 @@ class Flight(models.Model):
     towplane = models.ForeignKey("Towplane", on_delete=models.SET_NULL, null=True, blank=True)
     duration = models.DurationField(blank=True, null=True)
     passenger = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="flights_as_passenger")
-    passenger_name = models.CharField(max_length=100, blank=True, help_text="Name of passenger if not a member")
 
+    # Guest name fallbacks (for legacy import)
+    guest_pilot_name = models.CharField(max_length=100, blank=True)
+    guest_instructor_name = models.CharField(max_length=100, blank=True)
+    guest_towpilot_name = models.CharField(max_length=100, blank=True)
+
+    # Legacy name tracking for post-import cleanup or debug
+    passenger_name = models.CharField(max_length=100, blank=True, help_text="Name of passenger if not a member")
+    legacy_pilot_name = models.CharField(max_length=100, blank=True)
+    legacy_instructor_name = models.CharField(max_length=100, blank=True)
+    legacy_passenger_name = models.CharField(max_length=100, blank=True)
+    legacy_towpilot_name = models.CharField(max_length=100, blank=True)
+
+    # Launch method for winch/self-launch/other
+    class LaunchMethod(models.TextChoices):
+        TOWPLANE = "tow", "Towplane"
+        WINCH = "winch", "Winch"
+        SELF = "self", "Self-Launch"
+        OTHER = "other", "Other"
+
+    launch_method = models.CharField(
+        max_length=10,
+        choices=LaunchMethod.choices,
+        default=LaunchMethod.TOWPLANE,
+    )
 
     field = models.CharField(max_length=100)  # Copy from logsheet or input per-flight
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
