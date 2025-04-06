@@ -64,17 +64,30 @@ def sanitize(text):
 
 import re
 
-def generate_username(first, last):
-    # Keep only A-Z and a-z
-    first_clean = re.sub(r'[^A-Za-z]', '', first)
-    last_clean = re.sub(r'[^A-Za-z]', '', last)
-    base = f"{first_clean.lower()}.{last_clean.lower()}"
+def extract_nickname(first_name):
+    match = re.search(r'"(.*?)"', first_name)
+    if match:
+        nickname = match.group(1)
+        first_name_clean = re.sub(r'".*?"', '', first_name).strip()
+        return first_name_clean, nickname
+    return first_name, ''
+
+def generate_username(first, last, nickname):
+    # Prefer nickname if available
+    if nickname:
+        first_part = re.sub(r'[^A-Za-z]', '', nickname)
+    else:
+        first_part = re.sub(r'[^A-Za-z]', '', first)
+
+    last_part = re.sub(r'[^A-Za-z]', '', last)
+    base = f"{first_part.lower()}.{last_part.lower()}"
     username = base
     suffix = 1
     while Member.objects.filter(username=username).exists():
         username = f"{base}{suffix}"
         suffix += 1
     return username
+
 
 
 class Command(BaseCommand):
@@ -106,18 +119,26 @@ class Command(BaseCommand):
 
         for row in rows:
             handle = row['handle'].strip()
-            first = sanitize(row['firstname']).strip()
+            raw_first = sanitize(row['firstname']).strip()
             last = sanitize(row['lastname']).strip()
+            first, nickname = extract_nickname(raw_first)
 
-            username = generate_username(first, last)
+            username = generate_username(first, last, nickname)
 
             member = Member.objects.filter(legacy_username=handle).first() or Member(
                 legacy_username=handle, username=username
             )
 
-            member.username = member.username or username
-            member.first_name = first
+            nickname_match = re.search(r'"([^"]+)"', first)
+            nickname = nickname_match.group(1) if nickname_match else None
+            first_cleaned = re.sub(r'"[^"]+"', '', first).strip()
+            
+            # Use the cleaned names for the object
+            member.first_name = sanitize(first_cleaned)
+            member.nickname = nickname
+            member.username = generate_username(first_cleaned, last, nickname)
             member.last_name = last
+
             member.middle_initial = sanitize(row.get('middleinitial'))
             member.name_suffix = sanitize(row.get('namesuffix'))
             member.email = sanitize(row.get('email'))
@@ -179,6 +200,15 @@ class Command(BaseCommand):
                 except Exception:
                     join_date = datetime(2000, 1, 1)
             member.joined_club = make_aware(join_date)
+
+            deceased_keywords = ["deceased"]
+            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower()
+
+
+            if any(word in death_note for word in deceased_keywords):
+                member.membership_status = "Deceased"
+
+            member.is_active = member.membership_status not in ["Inactive", "Non-Member", "Pending", "Deceased"]
 
             if dry_run:
                 self.stdout.write(f"[DRY RUN] Would import: {first} {last} ({username})")
