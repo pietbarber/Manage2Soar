@@ -178,7 +178,7 @@ class Command(BaseCommand):
                     join_date = datetime.fromtimestamp(int(row.get('lastupdated')))
                 except Exception:
                     join_date = datetime(2000, 1, 1)
-            member.date_joined = make_aware(join_date)
+            member.joined_club = make_aware(join_date)
 
             if dry_run:
                 self.stdout.write(f"[DRY RUN] Would import: {first} {last} ({username})")
