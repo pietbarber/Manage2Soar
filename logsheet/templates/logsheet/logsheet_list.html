@@ -50,6 +50,17 @@
     {% endfor %}
   </tbody>
 </table>
+<div class="pagination mt-4 d-flex justify-content-center">
+  {% if page_obj.has_previous %}
+    <a class="btn btn-outline-primary btn-sm me-2" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+  {% endif %}
+
+  <span class="align-self-center">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+  {% if page_obj.has_next %}
+    <a class="btn btn-outline-primary btn-sm ms-2" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
+  {% endif %}
+</div>
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_list.html</code>

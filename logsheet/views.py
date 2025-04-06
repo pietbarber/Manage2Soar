@@ -254,6 +254,33 @@ def list_logsheets(request):
         "logsheets": logsheets,
         "query": query,
     })
+from django.core.paginator import Paginator
+
+@active_member_required
+def list_logsheets(request):
+    query = request.GET.get("q", "")
+    logsheets = Logsheet.objects.all()
+
+    if query:
+        logsheets = logsheets.filter(
+            Q(log_date__icontains=query) |
+            Q(location__icontains=query) |
+            Q(created_by__username__icontains=query)
+        )
+
+    logsheets = logsheets.order_by("-log_date", "-created_at")
+
+    # 🔹 Paginate: 25 logsheets per page
+    paginator = Paginator(logsheets, 25)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "logsheet/logsheet_list.html", {
+        "logsheets": page_obj.object_list,
+        "query": query,
+        "page_obj": page_obj,
+        "paginator": paginator,
+    })
 
 #################################################
 # edit_flight
