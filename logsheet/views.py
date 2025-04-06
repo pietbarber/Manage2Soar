@@ -237,29 +237,17 @@ def manage_logsheet(request, pk):
 # Returns:
 #    HttpResponse: Renders the logsheet list page with the filtered or unfiltered list of logsheets.
 
-@active_member_required
-def list_logsheets(request):
-    query = request.GET.get("q", "")
-    logsheets = Logsheet.objects.all()
-
-    if query:
-        logsheets = logsheets.filter(
-            Q(log_date__icontains=query) |
-            Q(location__icontains=query) |
-            Q(created_by__username__icontains=query)
-        )
-
-    logsheets = logsheets.order_by("-log_date", "-created_at")
-    return render(request, "logsheet/logsheet_list.html", {
-        "logsheets": logsheets,
-        "query": query,
-    })
 from django.core.paginator import Paginator
+from datetime import datetime
 
 @active_member_required
 def list_logsheets(request):
     query = request.GET.get("q", "")
+    year = request.GET.get("year", str(datetime.now().year))  # Default to current year
     logsheets = Logsheet.objects.all()
+
+    if year:
+        logsheets = logsheets.filter(log_date__year=year)
 
     if query:
         logsheets = logsheets.filter(
@@ -270,16 +258,26 @@ def list_logsheets(request):
 
     logsheets = logsheets.order_by("-log_date", "-created_at")
 
-    # 🔹 Paginate: 25 logsheets per page
     paginator = Paginator(logsheets, 25)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
+    from django.db.models.functions import ExtractYear
+
+    available_years = (
+        Logsheet.objects.annotate(year=ExtractYear("log_date"))
+        .values_list("year", flat=True)
+        .distinct()
+        .order_by("-year")
+    )
+
     return render(request, "logsheet/logsheet_list.html", {
         "logsheets": page_obj.object_list,
         "query": query,
+        "year": year,
         "page_obj": page_obj,
         "paginator": paginator,
+        "available_years": available_years,
     })
 
 #################################################

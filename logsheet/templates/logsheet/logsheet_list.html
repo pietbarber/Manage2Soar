@@ -9,7 +9,18 @@
       <button type="submit" class="btn btn-outline-primary">Search</button>
     </div>
   </form>
-  
+  <form method="get" class="mb-3 d-flex align-items-center">
+    <label for="year" class="me-2">Show logsheets from:</label>
+    <select name="year" id="year" class="form-select form-select-sm me-2" onchange="this.form.submit()">
+      {% for y in available_years %}
+        <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    {% if query %}
+      <input type="hidden" name="q" value="{{ query }}">
+    {% endif %}
+  </form>
+   
 <table class="table table-striped">
   <thead>
     <tr>
@@ -50,17 +61,32 @@
     {% endfor %}
   </tbody>
 </table>
-<div class="pagination mt-4 d-flex justify-content-center">
-  {% if page_obj.has_previous %}
-    <a class="btn btn-outline-primary btn-sm me-2" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a>
-  {% endif %}
 
-  <span class="align-self-center">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
 
-  {% if page_obj.has_next %}
-    <a class="btn btn-outline-primary btn-sm ms-2" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a>
-  {% endif %}
-</div>
+<nav aria-label="Page navigation">
+  <ul class="pagination justify-content-center">
+    {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if year %}&year={{ year }}{% endif %}{% if query %}&q={{ query }}{% endif %}">Previous</a>
+      </li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </span>
+    </li>
+
+    {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if year %}&year={{ year }}{% endif %}{% if query %}&q={{ query }}{% endif %}">Next</a>
+      </li>
+    {% endif %}
+  </ul>
+</nav>
+
+
+
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_list.html</code>
