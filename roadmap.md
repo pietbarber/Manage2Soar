@@ -58,70 +58,62 @@ This roadmap outlines current and future development goals for the Skyline Soari
 - Integrate legacy usernames (handle) to link historical flight log data
 - Admin UI for editing badge recipients in a non-admin interface
 
----
+### 🔁 Legacy Data Import
+- Imported 29,000+ historical flights from legacy `flight_info` table.
+- Created logsheet entries automatically during flight import if none existed.
+- Imported towplane closeouts from legacy `towplane_data`, handling:
+  - Tach start/stop
+  - Tach time
+  - Fuel added
+  - Comments
+- Imported duty crews from legacy `ops_days`, auto-creating logsheets if missing.
+- Linked flights and logsheets to `Member` records using `legacy_username`.
+- Cleaned up glider references using a custom contest-ID-to-N-number mapping.
+- Deleted the `import_bot` user after import to avoid security issues.
 
-## On Hold tasks 🛑
-- Migration tooling for importing legacy member data from PostgreSQL JSON export
-- create flight log tables in preparation for logsheet program. 
-- [ ] Offline-compatible logsheet entry:
-  - Support local Django instance with full flight logging functionality.
-  - End-of-day synchronization to live server (e.g., push finalized logsheets).
+### 🛩️ Flight & Logsheet Enhancements
+- `manage_logsheet` now shows `full_display_name` for members.
+- Fallback to `legacy_pilot_name` if pilot FK is null.
+- Prevent or warn on edits to imported logsheets (from `import_bot`).
+- Winch launches recognized from `"N-A Winch"` towpilot entries.
+- `airfield` now properly displayed in the logsheet list view.
+- Year dropdown UI fixed (not full-width).
+- Location search bug fixed (was incorrectly using nonexistent `location` field).
+- Closeout summary now shows full duty crew (DO, ADO, DI, surge, tow).
 
----
-
-## In Progress 🔄
-- Improve member import with robust date parsing and dry-run validation
-- 📦 QuickBooks Integration
-- Explored sample CSV formats and invoice examples.
-- Awaiting Ralph’s feedback on:
--- Comfort level with QBO imports vs manual entry
--- Format requirements for invoice line items
--- Proposal to export finalized logsheets to QBO-ready CSV is on hold until Ralph greenlights.
-- 📡 Runway 10 Logging Options
--- Piet will test AT&T and Verizon coverage at Runway 10 this weekend.
--- Proposal drafted for a dedicated club iPad with cellular access:
--- Auto-login using role account or token
--- Live flight ops, real-time visibility, zero syncing hassle
-- Option B (offline laptop Django instance) discussed as a fallback, but deemed complex.
-
----
-
-## Abandoned Tasks ⚰️
-1. Allow uploading vCard files to populate members (**deprioritized**)
-
----
-
-## Upcoming Tasks 🚀
-- Set up OAuth2 login for providers other than Google (Yahoo, Microsoft, Facebook)
-- Display most recent year or 50 logsheets by default.
-- Customize Django admin list display to show additional fields like `membership_status`, `towpilot`, `glider_rating`, etc.
-- Allow members to view but not edit their own membership records (except photo & biography)
-- Add glider image thumbnails to members who own gliders
-- Add contact group management (for targeted emails)
-- Add flight history viewer (imported legacy data + new log uploads)
-- Import Training Syllabus
-- ✈️ Logsheet Program
- - Add “Export to QuickBooks” button (post-finalization only)
- - Add read-only version of finances and closeout after finalization
- - Create summary financial export (CSV for archive or club reports)
- - Build a “quick entry” interface to transcribe paper logs quickly
+### 👤 Member Profile Enhancements
+- Added "Flights by Member" page showing all flights in reverse chronological order.
+- Linked from `member_list` with a flight icon button.
+- User’s own flight history available via navbar profile dropdown.
+- `member_view` includes a summary of all gliders flown by that member.
+- Added ability to export a member’s logbook to Excel in 14 CFR §61.51 format.
 
 ---
 
-## Nice-to-Haves / Stretch Goals
-- Add calendar of events (duty roster, instructor availability, club events)
-- Member activity timeline (badge earned, glider flights, etc.)
-- CSV, XLS or PDF export of member list for club use
-- Automatic backup and restore scripts for database/media
-- Dockerize deployment
+## 🚧 In Progress
+
+- Adding support for multiple towplanes with unique tow rates (independent contractor support).
+- Additional filters for `member_list` by roles and activity.
+- Better search and filtering on logsheets and flight lists.
+- Winch launch representation in cost calculations and flight display.
+- Optional local/offline mode for flight logging.
 
 ---
 
+## 📝 Upcoming To-Dos
 
-## Logsheet Program – Future Enhancements
+- Add missing pilots/instructors to imported flights using `legacy_*_name`.
+- Build admin UI to manage Towplane-specific pricing.
+- Automatically generate financial records for historical flights (optional).
+- Ensure only active members can appear in duty roles post-import.
+- Polish logsheet closeout UI to support tach time entry.
+- Add QuickBooks Online CSV export for finalized logsheets.
 
-- [ ] Export finalized logsheets to CSV for Quickbooks Online:
-  - Output must meet QBO format requirements.
-  - May include member name, aircraft, cost breakdown, and payment method.
+---
 
-If you have questions, suggestions, or contributions, please open an issue or reach out to Piet Barber!
+## 🪦 Abandoned or Deferred
+
+- vCard upload to populate members (dropped due to data quality/control).
+- Attempting to match all legacy passengers to `Member` records (manual cleanup preferred).
+
+---
