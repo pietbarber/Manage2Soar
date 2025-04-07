@@ -101,17 +101,24 @@ def resolve_glider(legacy_name, flight_date):
 
 def find_member_by_name(name):
     """
-    Tries to match a name like 'Danny Brotto' to first_name + last_name.
+    Tries to match a name to legacy_username first, then falls back to first_name + last_name.
     """
     if not name:
         return None
+    name = name.strip()
 
-    parts = name.strip().split()
+    # 1. Match legacy_username
+    member = Member.objects.filter(legacy_username__iexact=name).first()
+    if member:
+        return member
+
+    # 2. Fallback: match by first and last name
+    parts = name.split()
     if len(parts) < 2:
         return None
-
     first, last = parts[0], parts[-1]
     return Member.objects.filter(first_name__iexact=first, last_name__iexact=last).first()
+
 
 from members.models import Member
 

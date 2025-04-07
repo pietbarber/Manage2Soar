@@ -71,7 +71,15 @@ class Command(BaseCommand):
             def resolve_member(name):
                 if not name:
                     return None
-                parts = name.strip().split()
+                name = name.strip()
+            
+                # Try legacy_username match first
+                member = Member.objects.filter(legacy_username__iexact=name).first()
+                if member:
+                    return member
+            
+                # Fallback to first + last name
+                parts = name.split()
                 if len(parts) < 2:
                     return None
                 first, last = parts[0], parts[-1]
