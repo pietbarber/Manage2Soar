@@ -161,7 +161,7 @@ class Command(BaseCommand):
         )
 
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM flight_info ORDER BY flight_date ASC")
+            cursor.execute("SELECT * FROM flight_info2 ORDER BY flight_date ASC")
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
 
@@ -196,41 +196,73 @@ class Command(BaseCommand):
             # Parse times
             def parse_time(t): return t if isinstance(t, time) else None
 
-            # --- Create the Flight ---
+            # --- Deduplicate old flights ---
+            towpilot = find_member_by_name(data["towpilot"])
+            glider = resolve_glider(data["glider"], data["flight_date"])
+            airfield = Airfield.objects.get(identifier=data["field"].strip())
+            launch_time = parse_time(data["takeoff_time"])
+            landing_time = parse_time(data["landing_time"])
+            
+            # Fetch or create the Logsheet
+            logsheet, _ = Logsheet.objects.get_or_create(
+                log_date=data["flight_date"],
+                airfield=airfield,
+                defaults={
+                    "created_by": import_user,
+                    "default_towplane": None,
+                    "duty_officer": None,
+                    "finalized": True,
+                },
+            )
+            
+            # Try to find an existing matching flight
+            possible_dupes = Flight.objects.filter(
+                logsheet=logsheet,
+                glider=glider,
+                pilot=pilot,
+                instructor=instructor,
+                launch_time=launch_time,
+                landing_time=landing_time,
+                passenger=passenger,
+            )
+            
+            # Check for a dupe with same or null towplane
+            if possible_dupes.filter(tow_pilot=towpilot).exists() or possible_dupes.filter(tow_pilot__isnull=True).exists():
+                print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
+                possible_dupes.delete()
+            
+            # --- Now create the new Flight ---
             flight = Flight(
                 logsheet=logsheet,
                 glider=glider,
-                launch_time=parse_time(data["takeoff_time"]),
-                landing_time=parse_time(data["landing_time"]),
-                duration=None,  # Will be calculated in save()
-
+                launch_time=launch_time,
+                landing_time=landing_time,
+                duration=None,
+            
                 pilot=pilot,
                 guest_pilot_name=data["pilot"] if not pilot else "",
                 legacy_pilot_name=data["pilot"],
-
+            
                 instructor=instructor,
                 guest_instructor_name=data["instructor"] if not instructor and data["instructor"] else "",
                 legacy_instructor_name=data["instructor"] or "",
-
+            
                 passenger=passenger,
                 passenger_name=data["passenger"] if not passenger and data["passenger"] else "",
                 legacy_passenger_name=data["passenger"] or "",
-
+            
                 tow_pilot=towpilot,
                 guest_towpilot_name=data["towpilot"] if not towpilot and data["towpilot"] else "",
                 legacy_towpilot_name=data["towpilot"] or "",
-
+            
                 release_altitude=data["release_altitude"] or None,
                 tow_cost_actual=parse_money(data["tow_cost"]),
                 rental_cost_actual=parse_money(data["flight_cost"]),
                 field=data["field"],
-                #flight_type=data["flight_type"],
-                notes="",  # No notes in legacy, but maybe from comments table later
+                notes="",
             )
 
-            # Infer launch method
             flight.launch_method = infer_launch_method(data["towpilot"])
-
             flight.save()
 
         print(f"\n✅ Imported {count} flights.")
