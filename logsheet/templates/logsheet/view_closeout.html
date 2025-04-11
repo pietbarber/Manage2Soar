@@ -19,6 +19,29 @@
 <div class="alert alert-info">No closeout report was submitted for this day.</div>
 {% endif %}
 
+<h3>Duty Crew</h3>
+<ul class="list-unstyled">
+  {% if logsheet.duty_officer %}
+    <li><strong>Duty Officer:</strong> {{ logsheet.duty_officer.full_display_name }}</li>
+  {% endif %}
+  {% if logsheet.assistant_duty_officer %}
+    <li><strong>Assistant Duty Officer:</strong> {{ logsheet.assistant_duty_officer.full_display_name }}</li>
+  {% endif %}
+  {% if logsheet.duty_instructor %}
+    <li><strong>Duty Instructor:</strong> {{ logsheet.duty_instructor.full_display_name }}</li>
+  {% endif %}
+  {% if logsheet.surge_instructor %}
+    <li><strong>Surge Instructor:</strong> {{ logsheet.surge_instructor.full_display_name }}</li>
+  {% endif %}
+  {% if logsheet.tow_pilot %}
+    <li><strong>Tow Pilot:</strong> {{ logsheet.tow_pilot.full_display_name }}</li>
+  {% endif %}
+  {% if logsheet.surge_tow_pilot %}
+    <li><strong>Surge Tow Pilot:</strong> {{ logsheet.surge_tow_pilot.full_display_name }}</li>
+  {% endif %}
+</ul>
+
+
 {% if towplanes %}
 <h4 class="mt-4">Towplane Summary</h4>
 <table class="table table-bordered w-auto">
