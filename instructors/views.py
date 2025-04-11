@@ -1,8 +1,7 @@
 from django.shortcuts import render
-from members.decorators import active_member_required
+from instructors.decorators import instructor_required
 
-
-
-@active_member_required
-def index(request):
-    return render(request, "instructors/index.html")
+# instructors/views.py
+@instructor_required
+def instructors_home(request):
+    return render(request, "instructors/instructors_home.html")
