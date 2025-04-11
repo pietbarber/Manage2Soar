@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Training Syllabus</h1>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Title</th>
+        <th>Solo</th>
+        <th>Private</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lesson in lessons %}
+        <tr>
+          <td>{{ lesson.code }}</td>
+          <td>{{ lesson.title }}</td>
+          <td>{% if lesson.is_required_for_solo %}✅{% endif %}</td>
+          <td>{% if lesson.is_required_for_private %}✅{% endif %}</td>
+          <td>
+            <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
