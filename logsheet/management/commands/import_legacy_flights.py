@@ -10,6 +10,7 @@ from decimal import Decimal
 import psycopg2
 from django.conf import settings
 from logsheet.models import Airfield
+from logsheet.utils.aliases import resolve_towplane
 
 
 
@@ -168,8 +169,17 @@ class Command(BaseCommand):
         count = 0
         for row in rows:
             data = dict(zip(columns, row))
+            towplane_name = data.get("towplane") or ""
+            towplane_obj = None
+            
+            if towplane_name:
+                towplane_obj = resolve_towplane(data.get("towplane"), data.get("flight_date"), comment="")
+                if not towplane_obj:
+                    print(f"⚠️ No towplane matched for '{towplane_name}' on flight {data['flight_tracking_id']}")
+
             count += 1
-            print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
+            #print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
+            print (".")
 
             # --- Resolve related objects ---
             pilot = find_member_by_name(data["pilot"])
@@ -227,10 +237,10 @@ class Command(BaseCommand):
             )
             
             # Check for a dupe with same or null towplane
-            if possible_dupes.filter(tow_pilot=towpilot).exists() or possible_dupes.filter(tow_pilot__isnull=True).exists():
+            if possible_dupes.filter(towplane=towplane_obj).exists() or possible_dupes.filter(towplane__isnull=True).exists():
                 print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
                 possible_dupes.delete()
-            
+
             # --- Now create the new Flight ---
             flight = Flight(
                 logsheet=logsheet,
@@ -254,6 +264,8 @@ class Command(BaseCommand):
                 tow_pilot=towpilot,
                 guest_towpilot_name=data["towpilot"] if not towpilot and data["towpilot"] else "",
                 legacy_towpilot_name=data["towpilot"] or "",
+
+                towplane=towplane_obj,
             
                 release_altitude=data["release_altitude"] or None,
                 tow_cost_actual=parse_money(data["tow_cost"]),
