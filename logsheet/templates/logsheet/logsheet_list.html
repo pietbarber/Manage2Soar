@@ -11,9 +11,9 @@
   </form>
   <form method="get" class="mb-3 d-flex align-items-center">
     <label for="year" class="me-2">Show logsheets from:</label>
-    <select name="year" id="year" class="form-select form-select-sm me-2" onchange="this.form.submit()">
+    <select name="year" class="form-select w-auto" onchange="this.form.submit()">
       {% for y in available_years %}
-        <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+        <option value="{{ y }}" {% if year|stringformat:"s" == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
       {% endfor %}
     </select>
     {% if query %}
