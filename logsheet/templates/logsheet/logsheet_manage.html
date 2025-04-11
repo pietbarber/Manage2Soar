@@ -2,7 +2,7 @@
 
 {% block content %}
 {% load member_extras %}
-<h1>Manage Logsheet</h1>
+<h1>View / Manage Logsheet</h1>
 {% if messages %}
   <div class="container mt-3">
     {% for message in messages %}
@@ -13,6 +13,27 @@
     {% endfor %}
   </div>
 {% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 gap-3">
+  {% if previous_logsheet %}
+    <a href="{% url 'logsheet:manage' previous_logsheet.id %}" class="btn btn-outline-secondary">
+      ← Show Previous ({{ previous_logsheet.log_date }})
+    </a>
+  {% else %}
+    <span></span>
+  {% endif %}
+
+  <a href="{% url 'logsheet:index' %}" class="btn btn-outline-primary">
+    📋 Return to Logsheet List
+  </a>
+
+  {% if next_logsheet %}
+    <a href="{% url 'logsheet:manage' next_logsheet.id %}" class="btn btn-outline-secondary">
+      Show Next ({{ next_logsheet.log_date }}) →
+    </a>
+  {% endif %}
+</div>
+
 
 <div class="card">
   <div class="card-body">
@@ -35,8 +56,6 @@
 
     {% endif %}
   </div>
-</div>
-
 <!-- Three buttons for Duty Officer to manage logsheet-->
 <div class="d-flex flex-wrap gap-2 mb-3">
   <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn {% if logsheet.finalized %}btn-outline-success{% else %}btn-success{% endif %} me-2 mb-3">
@@ -76,6 +95,7 @@
       </button>
     </form>
   {% endif %}
+  </div>
 </div>
 
 
@@ -146,6 +166,10 @@
       </td>
 
       <td class="text-end">
+        <a href="{% url 'logsheet:flight_view' flight.id %}" class="btn btn-sm btn-outline-secondary">
+          View
+        </a>
+
         {% if not logsheet.finalized %}
         <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
            class="btn btn-sm btn-outline-secondary me-1"

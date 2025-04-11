@@ -77,6 +77,7 @@ def manage_logsheet(request, pk):
         .order_by("-landing_time", "-launch_time")
     )
 
+
     query = request.GET.get("q")
     if query:
         flights = flights.filter(
@@ -96,6 +97,7 @@ def manage_logsheet(request, pk):
             messages.error(request, "Cannot finalize. Closeout has not been completed.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
+   
         from logsheet.models import LogsheetPayment
         responsible_members = set()
         invalid_flights = []
@@ -219,7 +221,35 @@ def manage_logsheet(request, pk):
         "revisions": revisions,
 
     }
+     # Find previous logsheet
+    previous_logsheet = Logsheet.objects.filter(
+        log_date__lt=logsheet.log_date
+    ).order_by('-log_date').first()
+        
+    # Find next logsheet
+    next_logsheet = Logsheet.objects.filter(
+        log_date__gt=logsheet.log_date
+    ).order_by('log_date').first()
+    
+    # Add them to your context
+    context["previous_logsheet"] = previous_logsheet
+    context["next_logsheet"] = next_logsheet
+
     return render(request, "logsheet/logsheet_manage.html", context)
+
+
+
+#################################################
+# view_flight
+# This view handles the viewing of a specific flight within a logsheet.
+@active_member_required
+def view_flight(request, pk):
+    flight = get_object_or_404(Flight, pk=pk)
+
+    return render(request, "logsheet/flight_view.html", {
+        "flight": flight,
+    })
+
 
 
 #################################################

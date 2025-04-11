@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% load member_extras %}
+
+<h2>Flight Details</h2>
+<ul>
+  <li><strong>Date:</strong> {{ flight.logsheet.log_date }}</li>
+  <li><strong>Takeoff:</strong> {{ flight.launch_time }}</li>
+  <li><strong>Landing:</strong> {{ flight.landing_time }}</li>
+  <li><strong>Glider:</strong> {{ flight.glider }}</li>
+  <li><strong>Pilot:</strong> {{ flight.pilot.full_display_name }}</li>
+  <li><strong>Instructor:</strong> {{ flight.instructor.full_display_name }}</li>
+  <li><strong>Airfield:</strong> {{ flight.airfield }}</li>
+  <li><strong>Tow Altitude:</strong> {{ flight.release_altitude }} ft</li>
+</ul>
+{% endblock %}
