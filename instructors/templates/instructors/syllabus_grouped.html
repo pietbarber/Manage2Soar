@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Training Syllabus</h1>
+
+  {% if header %}
+    <section class="mb-4">
+      <h2>{{ header.title }}</h2>
+      <div class="border p-3 bg-light">{{ header.content|safe }}</div>
+    </section>
+  {% endif %}
+
+  {% if materials %}
+    <section class="mt-5">
+      <h2>{{ materials.title }}</h2>
+      <div class="border p-3 bg-light">{{ materials.content|safe }}</div>
+    </section>
+  {% endif %}
+
+
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th style="width:10%">Code</th>
+        <th style="width:45%">Title</th>
+        <th style="width:10%">Solo</th>
+        <th style="width:10%">Private</th>
+        <th style="width:25%">Admin</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for phase in phases %}
+        <tr class="table-primary">
+          <td colspan="5"><strong>{{ phase.number }} – {{ phase.name }}</strong></td>
+        </tr>
+        {% for lesson in phase.lessons.all %}
+          <tr>
+            <td>{{ lesson.code }}</td>
+            <td>{{ lesson.title }}</td>
+            <td>{% if lesson.is_required_for_solo %}✅{% endif %}</td>
+            <td>{% if lesson.is_required_for_private %}✅{% endif %}</td>
+            <td>
+              <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
