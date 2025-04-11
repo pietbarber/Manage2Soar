@@ -14,7 +14,7 @@
   </div>
 {% endif %}
 
-<div class="d-flex justify-content-between align-items-center mb-3 gap-3">
+<div class="d-flex justify-content-start mb-3 gap-2">
   {% if previous_logsheet %}
     <a href="{% url 'logsheet:manage' previous_logsheet.id %}" class="btn btn-outline-secondary">
       ← Show Previous ({{ previous_logsheet.log_date }})
@@ -35,8 +35,9 @@
 </div>
 
 
-<div class="card">
-  <div class="card-body">
+<div class="container-fluid">
+  <div class="card mb-3" style="max-width: 800px;">
+    <div class="card-body">
     <h5 class="card-title">Logsheet for {{ logsheet.log_date }}</h5>
     <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
@@ -95,6 +96,7 @@
       </button>
     </form>
   {% endif %}
+  </div>
   </div>
 </div>
 
@@ -165,7 +167,7 @@
         {% endif %}
       </td>
 
-      <td class="text-end">
+      <td class="text-left align-left">
         <a href="{% url 'logsheet:flight_view' flight.id %}" class="btn btn-sm btn-outline-secondary">
           View
         </a>
