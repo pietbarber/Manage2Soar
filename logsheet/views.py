@@ -251,10 +251,14 @@ def list_logsheets(request):
 
     if query:
         logsheets = logsheets.filter(
-            Q(log_date__icontains=query) |
-            Q(location__icontains=query) |
-            Q(created_by__username__icontains=query)
+            Q(airfield__identifier__icontains=query) |
+            Q(airfield__name__icontains=query) |
+            Q(created_by__username__icontains=query) |
+            Q(duty_officer__last_name__icontains=query) |
+            Q(tow_pilot__last_name__icontains=query) | 
+            Q(duty_instructor__last_name__icontains=query) 
         )
+    #logsheets = logsheets.filter(airfield__identifier__icontains="VG55")
 
     logsheets = logsheets.order_by("-log_date", "-created_at")
 

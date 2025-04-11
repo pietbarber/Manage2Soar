@@ -37,7 +37,7 @@
     {% for log in logsheets %}
     <tr>
       <td>{{ log.log_date }}</td>
-      <td>{{ log.location }}</td>
+      <td>{{ log.airfield }}</td>
       <td>{{ log.created_by }}</td>
       <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
       <td>{{ log.flights.count }}</td>
