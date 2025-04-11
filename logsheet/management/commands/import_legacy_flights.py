@@ -162,6 +162,7 @@ class Command(BaseCommand):
         )
 
         with conn.cursor() as cursor:
+            #cursor.execute("SELECT * FROM flight_info2 WHERE flight_date >= '2024-01-01' ORDER BY flight_date ASC")
             cursor.execute("SELECT * FROM flight_info2 ORDER BY flight_date ASC")
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
@@ -179,7 +180,8 @@ class Command(BaseCommand):
 
             count += 1
             #print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
-            print (".")
+            print (".", end="", flush=True)
+            print (f" {data['flight_date']} ") if count % 100 == 0 else None
 
             # --- Resolve related objects ---
             pilot = find_member_by_name(data["pilot"])
@@ -189,19 +191,23 @@ class Command(BaseCommand):
 
             # Glider by registration/N-number
             glider = resolve_glider(data["glider"], data["flight_date"])
-            airfield=Airfield.objects.get(identifier=data["field"].strip())
  
-            # Logsheet by date + field (assumes pre-imported or create-on-demand)
-            logsheet, _ = Logsheet.objects.get_or_create(
-                log_date=data["flight_date"],
-                airfield=airfield,
-                defaults={
-                    "created_by": import_user,
-                    "default_towplane": None,
-                    "duty_officer": None,
-                    "finalized": True
-                    },  # Required if creating — fill as needed
-            )
+            airfield = None
+            unknown_airfields = set()
+
+
+            field_raw = data.get("field")
+            if not field_raw or not isinstance(field_raw, str):
+                print(f"⚠️ Missing or invalid field value: {field_raw!r} — defaulting to KFRR")
+                airfield = Airfield.objects.get(identifier="KFRR")
+            else:
+                field_code = field_raw.strip().upper()
+                try:
+                    airfield = Airfield.objects.get(identifier=field_code)
+                except Airfield.DoesNotExist:
+                    print(f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') — defaulting to KFRR")
+                    airfield = Airfield.objects.get(identifier="KFRR")
+                    unknown_airfields.add(field_code)
 
             # Parse times
             def parse_time(t): return t if isinstance(t, time) else None
@@ -209,7 +215,6 @@ class Command(BaseCommand):
             # --- Deduplicate old flights ---
             towpilot = find_member_by_name(data["towpilot"])
             glider = resolve_glider(data["glider"], data["flight_date"])
-            airfield = Airfield.objects.get(identifier=data["field"].strip())
             launch_time = parse_time(data["takeoff_time"])
             landing_time = parse_time(data["landing_time"])
             
@@ -245,13 +250,16 @@ class Command(BaseCommand):
                existing_flight.delete()
 
             # --- Now create the new Flight ---
+            
+            print(f"📄 Attaching flight to {airfield.identifier} logsheet on {data['flight_date']}")
             flight = Flight(
                 logsheet=logsheet,
+                airfield=airfield,
                 glider=glider,
                 launch_time=launch_time,
                 landing_time=landing_time,
                 duration=None,
-            
+ 
                 pilot=pilot,
                 guest_pilot_name=data["pilot"] if not pilot else "",
                 legacy_pilot_name=data["pilot"],
@@ -273,7 +281,6 @@ class Command(BaseCommand):
                 release_altitude=data["release_altitude"] or None,
                 tow_cost_actual=parse_money(data["tow_cost"]),
                 rental_cost_actual=parse_money(data["flight_cost"]),
-                field=data["field"],
                 notes="",
             )
 
@@ -281,6 +288,8 @@ class Command(BaseCommand):
             flight.save()
 
         print(f"\n✅ Imported {count} flights.")
+        print("⚠️ Unknown airfield codes encountered:", sorted(unknown_airfields))
+
 
 
 def parse_money(val):

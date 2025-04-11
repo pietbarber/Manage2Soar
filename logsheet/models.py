@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 from tinymce.models import HTMLField
 
+
 ####################################################
 # Flight model
 #
@@ -66,8 +67,9 @@ class Flight(models.Model):
         choices=LaunchMethod.choices,
         default=LaunchMethod.TOWPLANE,
     )
+        # Airfield will need to go back in right here. 
+    airfield = models.ForeignKey("Airfield", on_delete=models.PROTECT, null=True)
 
-    field = models.CharField(max_length=100)  # Copy from logsheet or input per-flight
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
     notes = models.TextField(blank=True)
 
