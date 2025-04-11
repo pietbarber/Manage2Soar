@@ -235,11 +235,14 @@ class Command(BaseCommand):
                 landing_time=landing_time,
                 passenger=passenger,
             )
-            
-            # Check for a dupe with same or null towplane
-            if possible_dupes.filter(towplane=towplane_obj).exists() or possible_dupes.filter(towplane__isnull=True).exists():
-                print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
-                possible_dupes.delete()
+
+            # Look for existing matching flight
+            existing_flight = possible_dupes.first()
+
+            # Only delete if towplane is missing or incorrect
+            if existing_flight and (existing_flight.towplane is None or existing_flight.towplane != towplane_obj):
+               print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
+               existing_flight.delete()
 
             # --- Now create the new Flight ---
             flight = Flight(
