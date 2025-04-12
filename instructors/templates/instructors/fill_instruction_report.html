@@ -32,15 +32,13 @@
         </tr>
       </thead>
       <tbody>
-
-        {% for form in formset %}
+        {% for form, lesson in form_rows %}
         <tr>
-          <td>{{ form.lesson.value|default_if_none:"" }}</td>
-          <td>{{ form.lesson.label }}</td>
+          <td>{{ lesson.code }}</td>
+          <td>{{ lesson.title }}</td>
           <td>{{ form.score }}{{ form.lesson }}</td>
         </tr>
         {% endfor %}
-
       </tbody>
     </table>
 

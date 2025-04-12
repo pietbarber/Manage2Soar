@@ -85,23 +85,32 @@ def fill_instruction_report(request, student_id, report_date):
             messages.error(request, "There were errors in the form. Please review and correct them.")
             print("Report form errors:", report_form.errors)
             print("Formset errors:", formset.errors)
+
     else:
         # GET request
+        report_form = InstructionReportForm(instance=report)
         initial_data = []
+        lesson_objects = []
+
         for lesson in lessons:
             existing_score = LessonScore.objects.filter(report=report, lesson=lesson).first()
             initial_data.append({
                 "lesson": lesson.id,
                 "score": existing_score.score if existing_score else "",
             })
-
-        report_form = InstructionReportForm(instance=report)
+            lesson_objects.append(lesson)
+        
         formset = LessonScoreSimpleFormSet(initial=initial_data)
+
+        # Bundle each form with its lesson
+        form_rows = list(zip(formset.forms, lesson_objects))
+
 
     return render(request, "instructors/fill_instruction_report.html", {
         "student": student,
         "report_form": report_form,
         "formset": formset,
+        "form_rows": form_rows,
         "report_date": report_date,
     })
 
