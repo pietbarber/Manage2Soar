@@ -7,6 +7,7 @@ urlpatterns = [
     path("", views.instructors_home, name="index"),
     path("syllabus/", views.syllabus_overview_grouped, name="syllabus_overview"),
     path("syllabus/<str:code>/", views.syllabus_detail, name="syllabus_detail"),
+    path("report/<int:student_id>/", views.fill_instruction_report, name="fill_instruction_report"),
 
 ]
 

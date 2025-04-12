@@ -7,7 +7,7 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
-  <h2>{{ member|full_display_name }}</h2>
+  <h2>{{ member.full_display_name }}</h2>
   <div class="row">
     <div class="col-md-4">
       {% if member.profile_photo %}
@@ -30,7 +30,16 @@
   
     <div class="col-md-8">
       <ul class="list-group">
+ 
+        {% if request.user.instructor %}
         <li class="list-group-item">
+          <a href="{% url 'instructors:fill_instruction_report' member.id %}" class="btn btn-sm btn-outline-primary">
+            Create Instruction Report
+          </a>
+        </li>
+        {% endif %}
+
+       <li class="list-group-item">
             <strong>Email:</strong>
             {% if member.email and "@" in member.email %}
               <a href="mailto:{{ member.email }}">{{ member.email }}</a>

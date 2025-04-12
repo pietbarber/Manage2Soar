@@ -42,3 +42,47 @@ class SyllabusDocument(models.Model):
 
     def __str__(self):
         return self.title
+
+from django.db import models
+from tinymce.models import HTMLField
+from members.models import Member
+
+class InstructionReport(models.Model):
+    student = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="instruction_reports")
+    instructor = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="given_instruction_reports")
+    report_date = models.DateField()
+    report_text = HTMLField(blank=True)  # Instructor's summary / essay
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('student', 'instructor', 'report_date')
+        ordering = ['-report_date']
+
+    def __str__(self):
+        return f"{self.student.full_display_name} – {self.report_date} by {self.instructor.full_display_name}"
+    
+    from django.db import models
+from instructors.models import InstructionReport, TrainingLesson
+
+SCORE_CHOICES = [
+    ("1", "Introduced (Instructor flew)"),
+    ("2", "Practiced (with instructor help)"),
+    ("3", "Solo Standard"),
+    ("4", "Checkride Standard"),
+    ("!", "Needs Attention (!)")
+]
+
+class LessonScore(models.Model):
+    report = models.ForeignKey(InstructionReport, on_delete=models.CASCADE, related_name="lesson_scores")
+    lesson = models.ForeignKey(TrainingLesson, on_delete=models.CASCADE)
+    score = models.CharField(max_length=2, choices=SCORE_CHOICES)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('report', 'lesson')
+        ordering = ['lesson__code']
+
+    def __str__(self):
+        return f"{self.lesson.code} – {self.get_score_display()}"
+

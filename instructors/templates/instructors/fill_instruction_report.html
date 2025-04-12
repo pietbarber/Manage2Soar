@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+  <h1>Instruction Report for {{ student.full_display_name }} – {{ report_date }}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <h4>Session Summary</h4>
+    {{ report_form.report_text.label_tag }}
+    {{ report_form.report_text }}
+
+    <h4 class="mt-5">Lesson Scores</h4>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th style="width:10%">Code</th>
+          <th style="width:30%">Title</th>
+          <th style="width:15%">Score</th>
+          <th style="width:45%">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for form in formset %}
+          <tr>
+            <td>{{ form.instance.lesson.code }}</td>
+            <td>{{ form.instance.lesson.title }}</td>
+            <td>{{ form.score }}</td>
+            <td>{{ form.notes }}</td>
+            {{ form.lesson }}  {# Hidden field to retain link #}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <button type="submit" class="btn btn-success">Save Instruction Report</button>
+    <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-secondary">Cancel</a>
+  </form>
+{% endblock %}
