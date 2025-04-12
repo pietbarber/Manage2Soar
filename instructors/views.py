@@ -176,6 +176,7 @@ def member_training_grid(request, member_id):
         max_score = max((s for s in score_map.values() if s.isdigit()), default="")
         lesson_data.append({
             "label": f"{lesson.code} – {lesson.title}",
+            "phase": lesson.phase.name if lesson.phase else "Other",
             "scores": [score_map[d] for d in report_dates],
             "max_score": max_score
         })
