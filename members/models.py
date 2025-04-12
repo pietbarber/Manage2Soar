@@ -7,6 +7,8 @@ from django.utils.timezone import now
 from tinymce.models import HTMLField
 from .utils.avatar_generator import generate_identicon
 import os
+from django.contrib.auth.models import Group
+
 
 def biography_upload_path(instance, filename):
     return f'biography/{instance.member.username}/{filename}'
@@ -159,6 +161,8 @@ class Member(AbstractUser):
         return self.membership_status in ['active', 'student', 'ssef', 'fast', 'service']
 
     def save(self, *args, **kwargs):
+        self.is_staff = self.instructor or self.member_manager
+
         if not self.profile_photo:
             # Only generate if no photo already exists
             filename = f"profile_{self.username}.png"
@@ -171,6 +175,25 @@ class Member(AbstractUser):
             self.profile_photo = file_path
 
         super().save(*args, **kwargs)
+
+        if self.instructor:
+            try:
+                group = Group.objects.get(name="Instructor Admins")
+                if not self.groups.filter(id=group.id).exists():
+                    self.groups.add(group)
+            except Group.DoesNotExist:
+                pass  # optionally log this
+
+            # ✅ Assign member manager to Member Managers group
+        if self.member_manager:
+            try:
+                group = Group.objects.get(name="Member Managers")
+                if not self.groups.filter(id=group.id).exists():
+                    self.groups.add(group)
+            except Group.DoesNotExist:
+                pass
+
+
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
