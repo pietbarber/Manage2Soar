@@ -64,6 +64,12 @@ def fill_instruction_report(request, student_id, report_date):
     if report_date > timezone.now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
 
+    existing_scores = LessonScore.objects.filter(report=report).values_list("lesson_id", flat=True)
+    missing_lessons = TrainingLesson.objects.exclude(id__in=existing_scores)
+
+    for lesson in missing_lessons:
+        LessonScore.objects.create(report=report, lesson=lesson)
+
     if request.method == "POST":
         report_form = InstructionReportForm(request.POST, instance=report)
         formset = LessonScoreFormSet(request.POST, queryset=LessonScore.objects.filter(report=report))
