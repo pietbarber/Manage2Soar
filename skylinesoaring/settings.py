@@ -64,7 +64,8 @@ INSTALLED_APPS = [
     "instructors",
     "logsheet",
     "duty_roster",
-    "django.contrib.humanize"
+    "django.contrib.humanize",
+    "reversion"
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
