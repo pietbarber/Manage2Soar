@@ -33,7 +33,7 @@
  
         {% if request.user.instructor %}
         <li class="list-group-item">
-          <a href="{% url 'instructors:fill_instruction_report' member.id %}" class="btn btn-sm btn-outline-primary">
+          <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-sm btn-outline-primary">
             Create Instruction Report
           </a>
         </li>

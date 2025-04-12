@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Create Instruction Report for {{ student.full_display_name }}</h1>
+
+  <p>Select a date to log instruction for this student:</p>
+
+  {% if flights_by_date %}
+    <ul class="list-group mb-4">
+      {% for date, flights in flights_by_date %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{% url 'instructors:fill_instruction_report' student.id date %}">
+            {{ date|date:"F j, Y" }} ({{ flights|length }} flight{{ flights|length|pluralize }})
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No recent flights found with {{ student.first_name }}.</p>
+  {% endif %}
+
+  <hr>
+  <p>
+    Or log instruction for today:
+    <a href="{% url 'instructors:fill_instruction_report' student.id today %}" class="btn btn-sm btn-outline-primary">
+      Start Today’s Report
+    </a>
+  </p>
+{% endblock %}

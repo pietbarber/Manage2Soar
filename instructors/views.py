@@ -39,10 +39,18 @@ from .models import Member, InstructionReport, LessonScore, TrainingLesson
 from .forms import InstructionReportForm, LessonScoreFormSet
 from .decorators import instructor_required
 from .forms import LessonScoreForm
+from datetime import datetime
+from django.http import HttpResponseBadRequest
 
 
 @instructor_required
-def fill_instruction_report(request, student_id):
+def fill_instruction_report(request, student_id, report_date):
+
+    try:
+        report_date = datetime.strptime(report_date, "%Y-%m-%d").date()
+    except ValueError:
+        return HttpResponseBadRequest("Invalid report date format.")
+
     student = get_object_or_404(Member, pk=student_id)
     instructor = request.user
     report_date = now().date()
@@ -53,6 +61,9 @@ def fill_instruction_report(request, student_id):
 
     LessonScoreFormSet = modelformset_factory(LessonScore, form=LessonScoreForm, extra=0)
     lessons = TrainingLesson.objects.all().order_by("code")
+
+    if report_date > timezone.now().date():
+        return HttpResponseBadRequest("Report date cannot be in the future.")
 
     if request.method == "POST":
         report_form = InstructionReportForm(request.POST, instance=report)
@@ -75,3 +86,40 @@ def fill_instruction_report(request, student_id):
         "formset": formset,
         "report_date": report_date,
     })
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from logsheet.models import Flight, Logsheet
+from members.models import Member
+from datetime import timedelta
+from django.utils import timezone
+from collections import defaultdict
+
+@login_required
+def select_instruction_date(request, student_id):
+    instructor = request.user
+    student = get_object_or_404(Member, pk=student_id)
+
+    today = timezone.now().date()
+
+    recent_flights = Flight.objects.filter(
+        instructor=instructor,
+        pilot=student
+    ).select_related("logsheet")
+
+    # Use correct logsheet date field
+    recent_flights = [f for f in recent_flights if f.logsheet.log_date <= today]
+
+    # Group by date
+    flights_by_date = defaultdict(list)
+    for flight in recent_flights:
+        flights_by_date[flight.logsheet.log_date].append(flight) 
+
+    sorted_dates = sorted(flights_by_date.items(), reverse=True)
+
+    context = {
+        "student": student,
+        "flights_by_date": sorted_dates,
+        "today": today,
+    }
+    return render(request, "instructors/select_instruction_date.html", context)
