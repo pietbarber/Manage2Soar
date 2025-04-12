@@ -2,19 +2,37 @@
 {% block content %}
   <h1>Training Syllabus</h1>
 
-  {% if header %}
-    <section class="mb-4">
-      <h2>{{ header.title }}</h2>
-      <div class="border p-3 bg-light">{{ header.content|safe }}</div>
-    </section>
-  {% endif %}
+  <div class="accordion mb-4" id="syllabusAccordion">
+    {% if header %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingHeader">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHeader" aria-expanded="true" aria-controls="collapseHeader">
+            {{ header.title }}
+          </button>
+        </h2>
+        <div id="collapseHeader" class="accordion-collapse collapse" aria-labelledby="headingHeader" data-bs-parent="#syllabusAccordion">
+          <div class="accordion-body">
+            {{ header.content|safe }}
+          </div>
+        </div>
+      </div>
+    {% endif %}
 
-  {% if materials %}
-    <section class="mb-4">
-      <h2>{{ materials.title }}</h2>
-      <div class="border p-3 bg-light">{{ materials.content|safe }}</div>
-    </section>
-  {% endif %}
+    {% if materials %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingMaterials">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMaterials" aria-expanded="false" aria-controls="collapseMaterials">
+            {{ materials.title }}
+          </button>
+        </h2>
+        <div id="collapseMaterials" class="accordion-collapse collapse" aria-labelledby="headingMaterials" data-bs-parent="#syllabusAccordion">
+          <div class="accordion-body">
+            {{ materials.content|safe }}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
 
   <table class="table table-bordered">
     <thead>

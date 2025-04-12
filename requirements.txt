@@ -9,3 +9,4 @@ crispy-bootstrap4
 qrcode[pil]
 requests
 pydenticon
+django-reversion

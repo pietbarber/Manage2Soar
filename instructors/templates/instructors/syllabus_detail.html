@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ lesson.code }} – {{ lesson.title }}</h1>
+
+  <div class="mb-4">
+    {% if lesson.far_requirement %}
+      <p><strong>Required for Solo:</strong> {{ lesson.far_requirement }}</p>
+    {% endif %}
+    {% if lesson.pts_reference %}
+      <p><strong>Required for Private:</strong> {{ lesson.pts_reference }}</p>
+    {% endif %}
+  </div>
+
+  <div class="border p-3 bg-light">
+    {{ lesson.description|safe }}
+  </div>
+
+  <p class="mt-3">
+    <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-primary">Back to Syllabus</a>
+    <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-outline-secondary">Edit This Lesson</a>
+  </p>
+{% endblock %}

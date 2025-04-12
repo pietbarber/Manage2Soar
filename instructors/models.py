@@ -27,10 +27,10 @@ class TrainingLesson(models.Model):
         ordering = ["code"]
 
     def is_required_for_solo(self):
-        return self.far_requirement.startswith("61.87")
+        return bool(self.far_requirement)
 
     def is_required_for_private(self):
-        return self.pts_reference.startswith("61.107") or self.pts_reference.startswith("91.161")
+        return bool(self.pts_reference)
 
     def __str__(self):
         return f"{self.code} – {self.title}"
