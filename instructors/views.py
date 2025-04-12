@@ -24,3 +24,10 @@ def syllabus_overview_grouped(request):
         "header": header,
         "materials": materials,
     })
+
+from django.shortcuts import render, get_object_or_404
+
+@instructor_required
+def syllabus_detail(request, code):
+    lesson = get_object_or_404(TrainingLesson, code=code)
+    return render(request, "instructors/syllabus_detail.html", {"lesson": lesson})

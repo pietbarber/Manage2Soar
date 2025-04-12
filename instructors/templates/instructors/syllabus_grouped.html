@@ -10,12 +10,11 @@
   {% endif %}
 
   {% if materials %}
-    <section class="mt-5">
+    <section class="mb-4">
       <h2>{{ materials.title }}</h2>
       <div class="border p-3 bg-light">{{ materials.content|safe }}</div>
     </section>
   {% endif %}
-
 
   <table class="table table-bordered">
     <thead>
@@ -35,7 +34,9 @@
         {% for lesson in phase.lessons.all %}
           <tr>
             <td>{{ lesson.code }}</td>
-            <td>{{ lesson.title }}</td>
+            <td>
+              <a href="{% url 'instructors:syllabus_detail' lesson.code %}">{{ lesson.title }}</a>
+            </td>
             <td>{% if lesson.is_required_for_solo %}✅{% endif %}</td>
             <td>{% if lesson.is_required_for_private %}✅{% endif %}</td>
             <td>
