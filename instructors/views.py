@@ -53,7 +53,6 @@ def fill_instruction_report(request, student_id, report_date):
 
     student = get_object_or_404(Member, pk=student_id)
     instructor = request.user
-    report_date = now().date()
 
     report, created = InstructionReport.objects.get_or_create(
         student=student, instructor=instructor, report_date=report_date
