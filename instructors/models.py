@@ -77,7 +77,6 @@ class LessonScore(models.Model):
     report = models.ForeignKey(InstructionReport, on_delete=models.CASCADE, related_name="lesson_scores")
     lesson = models.ForeignKey(TrainingLesson, on_delete=models.CASCADE)
     score = models.CharField(max_length=2, choices=SCORE_CHOICES)
-    notes = models.TextField(blank=True)
 
     class Meta:
         unique_together = ('report', 'lesson')

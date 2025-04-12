@@ -37,6 +37,5 @@ class InstructionReportAdmin(admin.ModelAdmin):
 
 @admin.register(LessonScore)
 class LessonScoreAdmin(admin.ModelAdmin):
-    list_display = ("report", "lesson", "score", "notes")
+    list_display = ("report", "lesson", "score")
     list_filter = ("lesson", "score")
-    search_fields = ("notes",)

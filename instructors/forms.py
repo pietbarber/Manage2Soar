@@ -14,10 +14,9 @@ class InstructionReportForm(forms.ModelForm):
 class LessonScoreForm(forms.ModelForm):
     class Meta:
         model = LessonScore
-        fields = ["lesson", "score", "notes"]
+        fields = ["lesson", "score"]
         widgets = {
             "score": forms.Select(attrs={"class": "form-select"}),
-            "notes": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
         }
 
 LessonScoreFormSet = modelformset_factory(
