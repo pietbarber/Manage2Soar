@@ -189,3 +189,35 @@ def badge_board(request):
     return render(request, "members/badges.html", {
         "badges": badges
     })
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from instructors.models import InstructionReport, LessonScore, TrainingLesson
+
+@active_member_required
+def my_training_progress(request):
+    member = request.user
+    reports = InstructionReport.objects.filter(student=member).order_by("report_date").prefetch_related("lesson_scores__lesson")
+    lessons = TrainingLesson.objects.all().order_by("code")
+
+    report_dates = [r.report_date for r in reports]
+    lesson_data = []
+
+    for lesson in lessons:
+        score_map = {}
+        for report in reports:
+            score = report.lesson_scores.filter(lesson=lesson).first()
+            score_map[report.report_date] = score.score if score else ""
+
+        max_score = max((s for s in score_map.values() if s.isdigit()), default="")
+        lesson_data.append({
+            "label": f"{lesson.code} – {lesson.title}",
+            "scores": [score_map[d] for d in report_dates],
+            "max_score": max_score
+        })
+
+    return render(request, "shared/training_grid.html", {
+        "member": member,
+        "lesson_data": lesson_data,
+        "report_dates": report_dates,
+    })

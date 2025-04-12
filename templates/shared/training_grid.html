@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Training Progress for {{ member.full_display_name }}</h2>
+
+<table class="table table-bordered table-sm">
+  <thead>
+    <tr>
+      <th>Lesson</th>
+      {% for date in report_dates %}
+        <th>{{ date|date:"M d" }}</th>
+      {% endfor %}
+      <th>⭐ Max</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in lesson_data %}
+      <tr>
+        <td>{{ row.label }}</td>
+        {% for score in row.scores %}
+          <td class="text-center">
+            {% if score == "1" %}1️⃣
+            {% elif score == "2" %}2️⃣
+            {% elif score == "3" %}3️⃣
+            {% elif score == "4" %}4️⃣
+            {% elif score == "!" %}⚠️
+            {% else %}&mdash;{% endif %}
+          </td>
+        {% endfor %}
+        <td class="text-center">
+          {% if row.max_score == "1" %}1️⃣
+          {% elif row.max_score == "2" %}2️⃣
+          {% elif row.max_score == "3" %}3️⃣
+          {% elif row.max_score == "4" %}4️⃣
+          {% elif row.max_score == "!" %}⚠️
+          {% else %}&mdash;{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

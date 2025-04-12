@@ -6,6 +6,7 @@ from .views import member_list, member_edit
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import tinymce_image_upload
+from members import views as member_views
 
 app_name = "members"
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path("<int:member_id>/view/", views.member_view, name="member_view"),
     path('set-password/', views.set_password, name='set_password'),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
+    path("training-progress/", member_views.my_training_progress, name="training_progress"),
 
 
 

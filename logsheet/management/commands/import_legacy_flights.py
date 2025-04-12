@@ -30,9 +30,9 @@ GLIDER_ALIASES = [
     {"legacy_name": "CAPSTAN", "n_number": "N7475"},
     {"legacy_name": "Private", "n_number": "Unknown"},
 
-    {"legacy_name": "Bergfalke", "n_number": "N0002"}, # Asked Bill Burner for its current whereabouts
-    {"legacy_name": "1FW", "n_number": "N0004"}, # This is Fred Winters old LS4 that he crashed, and no record of its N number
-    {"legacy_name": "BG", "n_number": "N0005"},  # Mike Peterson, contacted to get N number. 
+    {"legacy_name": "Bergfalke", "n_number": "N9255X"}, # Asked Bill Burner for its current whereabouts
+    {"legacy_name": "1FW", "n_number": "Unknown"}, # This is Fred Winters old LS4 that he crashed, and no record of its N number
+    {"legacy_name": "BG", "n_number": "Unknown"},  # Mike Peterson, contacted to get N number. 
     {"legacy_name": "PM", "n_number": "N8RX"}, # This may be the same glider as SF
 
 

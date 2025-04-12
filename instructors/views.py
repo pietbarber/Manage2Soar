@@ -151,3 +151,40 @@ def select_instruction_date(request, student_id):
         "today": today,
     }
     return render(request, "instructors/select_instruction_date.html", context)
+
+from django.shortcuts import get_object_or_404, render
+from instructors.models import InstructionReport, LessonScore, TrainingLesson
+from members.models import Member
+from collections import defaultdict
+
+def member_training_grid(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    reports = InstructionReport.objects.filter(student=member).order_by("report_date").prefetch_related("lesson_scores__lesson")
+    lessons = TrainingLesson.objects.all().order_by("code")
+
+    # Dates of instruction sessions (chronological)
+    report_dates = [r.report_date for r in reports]
+
+    # Build grid: lesson -> {date -> score}
+    lesson_data = []
+    for lesson in lessons:
+        score_map = {}
+        for report in reports:
+            score = report.lesson_scores.filter(lesson=lesson).first()
+            score_map[report.report_date] = score.score if score else ""
+
+        max_score = max((s for s in score_map.values() if s.isdigit()), default="")
+        lesson_data.append({
+            "label": f"{lesson.code} – {lesson.title}",
+            "scores": [score_map[d] for d in report_dates],
+            "max_score": max_score
+        })
+
+    context = {
+        "member": member,
+        "lesson_data": lesson_data,
+        "report_dates": report_dates,
+    }
+    return render(request, "shared/training_grid.html", context)
+
+

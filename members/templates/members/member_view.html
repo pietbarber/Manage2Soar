@@ -81,7 +81,19 @@
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
 
-
+      {% if request.user == member or request.user.instructor %}
+      <div class="mt-3">
+      <a href="{% if request.user.instructor %}
+                  {% url 'instructors:member_training_grid' member.id %}
+               {% else %}
+                  {% url 'members:training_progress' %}
+               {% endif %}"
+         class="btn btn-outline-primary btn-sm my-2">
+        📊 View Training Progress
+      </a>
+      </div>
+    {% endif %}
+    
     <div class="mt-4">
       <h4>🏅 SSA Badges</h4>
       {% if member.badges.exists %}
