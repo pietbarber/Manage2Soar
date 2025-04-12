@@ -32,20 +32,22 @@ def syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     return render(request, "instructors/syllabus_detail.html", {"lesson": lesson})
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.forms import modelformset_factory
-from django.utils.timezone import now
-from .models import Member, InstructionReport, LessonScore, TrainingLesson
-from .forms import InstructionReportForm, LessonScoreFormSet
-from .decorators import instructor_required
-from .forms import LessonScoreForm
-from datetime import datetime
-from django.http import HttpResponseBadRequest
 
+from datetime import datetime
+from collections import defaultdict
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.utils.timezone import now
+from django.http import HttpResponseBadRequest
+from django.forms import formset_factory
+
+from instructors.decorators import instructor_required
+from instructors.forms import InstructionReportForm, LessonScoreSimpleForm, LessonScoreSimpleFormSet
+from instructors.models import InstructionReport, LessonScore, TrainingLesson
+from members.models import Member
 
 @instructor_required
 def fill_instruction_report(request, student_id, report_date):
-
     try:
         report_date = datetime.strptime(report_date, "%Y-%m-%d").date()
     except ValueError:
@@ -58,32 +60,43 @@ def fill_instruction_report(request, student_id, report_date):
         student=student, instructor=instructor, report_date=report_date
     )
 
-    LessonScoreFormSet = modelformset_factory(LessonScore, form=LessonScoreForm, extra=0)
-    lessons = TrainingLesson.objects.all().order_by("code")
-
-    if report_date > timezone.now().date():
+    if report_date > now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
 
-    existing_scores = LessonScore.objects.filter(report=report).values_list("lesson_id", flat=True)
-    missing_lessons = TrainingLesson.objects.exclude(id__in=existing_scores)
-
-    for lesson in missing_lessons:
-        LessonScore.objects.create(report=report, lesson=lesson)
+    lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
         report_form = InstructionReportForm(request.POST, instance=report)
-        formset = LessonScoreFormSet(request.POST, queryset=LessonScore.objects.filter(report=report))
+        formset = LessonScoreSimpleFormSet(request.POST)
 
         if report_form.is_valid() and formset.is_valid():
             report_form.save()
-            scores = formset.save(commit=False)
-            for score in scores:
-                score.report = report
-                score.save()
+            LessonScore.objects.filter(report=report).delete()
+
+            for form in formset.cleaned_data:
+                lesson = form.get("lesson")
+                score = form.get("score")
+                if lesson and score:
+                    LessonScore.objects.create(report=report, lesson=lesson, score=score)
+
+            messages.success(request, "Instruction report submitted successfully.")
             return redirect("instructors:syllabus_overview")
+        else:
+            messages.error(request, "There were errors in the form. Please review and correct them.")
+            print("Report form errors:", report_form.errors)
+            print("Formset errors:", formset.errors)
     else:
+        # GET request
+        initial_data = []
+        for lesson in lessons:
+            existing_score = LessonScore.objects.filter(report=report, lesson=lesson).first()
+            initial_data.append({
+                "lesson": lesson.id,
+                "score": existing_score.score if existing_score else "",
+            })
+
         report_form = InstructionReportForm(instance=report)
-        formset = LessonScoreFormSet(queryset=LessonScore.objects.filter(report=report))
+        formset = LessonScoreSimpleFormSet(initial=initial_data)
 
     return render(request, "instructors/fill_instruction_report.html", {
         "student": student,
@@ -91,6 +104,7 @@ def fill_instruction_report(request, student_id, report_date):
         "formset": formset,
         "report_date": report_date,
     })
+
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required

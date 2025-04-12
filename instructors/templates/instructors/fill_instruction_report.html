@@ -2,11 +2,22 @@
 {% load static %}
 {% block content %}
   <h1>Instruction Report for {{ student.full_display_name }} – {{ report_date }}</h1>
+  {% if messages %}
+  <div class="messages">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <form method="post">
     {% csrf_token %}
     {{ report_form.media }}
-
+    {{ formset.management_form }}
+    {% for form in formset %}
+    {{ form.non_field_errors }}
+    {{ form.errors }}
+    {% endfor %}
     <h4>Session Summary</h4>
     {{ report_form.report_text.label_tag }}
     {{ report_form.report_text }}
@@ -18,19 +29,18 @@
           <th style="width:10%">Code</th>
           <th style="width:30%">Title</th>
           <th style="width:15%">Score</th>
-          <th style="width:45%">Notes</th>
         </tr>
       </thead>
       <tbody>
+
         {% for form in formset %}
-          <tr>
-            <td>{{ form.instance.lesson.code }}</td>
-            <td>{{ form.instance.lesson.title }}</td>
-            <td>{{ form.score }}</td>
-            <td>{{ form.notes }}</td>
-            {{ form.lesson }}  {# Hidden field to retain link #}
-          </tr>
+        <tr>
+          <td>{{ form.lesson.value|default_if_none:"" }}</td>
+          <td>{{ form.lesson.label }}</td>
+          <td>{{ form.score }}{{ form.lesson }}</td>
+        </tr>
         {% endfor %}
+
       </tbody>
     </table>
 
