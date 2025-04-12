@@ -5,6 +5,7 @@
 
   <form method="post">
     {% csrf_token %}
+    {{ report_form.media }}
 
     <h4>Session Summary</h4>
     {{ report_form.report_text.label_tag }}

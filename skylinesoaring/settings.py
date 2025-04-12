@@ -260,15 +260,23 @@ handler403 = 'members.views.custom_permission_denied_view'
 TINYMCE_DEFAULT_CONFIG = {
     "height": 500,
     "menubar": "file edit view insert format tools table help",
-    "plugins": "image link media code lists",
+    "plugins": "image link media code lists table",
     "toolbar": (
         "undo redo | bold italic underline | alignleft aligncenter alignright | "
-        "bullist numlist outdent indent | link image media | code"
+        "bullist numlist outdent indent | link image media | table | code"
     ),
     "image_caption": True,
     "automatic_uploads": True,
     "file_picker_types": "image",
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
+    "table_default_attributes": {
+        "border": "1"
+    },
+    "table_toolbar": (
+        "tableprops cellprops | "
+        "tableinsertrowbefore tableinsertrowafter tabledeleterow | "
+        "tableinsertcolbefore tableinsertcolafter tabledeletecol"
+    ),
 }
 

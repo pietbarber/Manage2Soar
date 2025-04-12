@@ -1,13 +1,14 @@
 from django import forms
 from django.forms import modelformset_factory
 from .models import InstructionReport, LessonScore, TrainingLesson
+from tinymce.widgets import TinyMCE
 
 class InstructionReportForm(forms.ModelForm):
     class Meta:
         model = InstructionReport
         fields = ["report_text"]
         widgets = {
-            "report_text": forms.Textarea(attrs={"rows": 6, "class": "form-control"}),
+            "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
         }
 
 class LessonScoreForm(forms.ModelForm):
