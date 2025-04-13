@@ -82,7 +82,7 @@ def fill_instruction_report(request, student_id, report_date):
                     LessonScore.objects.create(report=report, lesson=lesson, score=score)
 
             messages.success(request, "Instruction report submitted successfully.")
-            return redirect("instructors:syllabus_overview")
+            return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
             messages.error(request, "There were errors in the form. Please review and correct them.")
             print("Report form errors:", report_form.errors)

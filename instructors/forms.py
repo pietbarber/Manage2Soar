@@ -6,7 +6,7 @@ from tinymce.widgets import TinyMCE
 class InstructionReportForm(forms.ModelForm):
     class Meta:
         model = InstructionReport
-        fields = ["report_text"]
+        fields = ["report_text", "simulator"]
         widgets = {
             "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
         }

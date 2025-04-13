@@ -20,19 +20,19 @@
   </div>
 
   <h4 class="mt-5">Lesson Scores</h4>
-  <table class="table table-bordered">
+  <table class="table table-bordered w-auto table-striped table-hover">
     <thead>
       <tr>
-        <th style="width:10%">Code</th>
-        <th style="width:30%">Title</th>
-        <th style="width:15%">Score</th>
+        <th>Code</th>
+        <th>Title</th>
+        <th>Score</th>
       </tr>
     </thead>
     <tbody>
-      {% for form in formset %}
+      {% for form, lesson in form_rows %}
         <tr>
-          <td>{{ form.instance.lesson.code }}</td>
-          <td>{{ form.instance.lesson.title }}</td>
+          <td class="text-end">{{ lesson.code }}</td>
+          <td class="text-end">{{ lesson.title }}</td>
           <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
         </tr>
       {% endfor %}
