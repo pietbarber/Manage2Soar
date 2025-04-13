@@ -277,3 +277,65 @@ def member_training_grid(request, member_id):
     }
 
     return render(request, "shared/training_grid.html", context)
+
+# instructors/views.py
+
+from django.shortcuts import get_object_or_404, render
+from django.utils.timezone import now
+from collections import defaultdict
+from instructors.decorators import member_or_instructor_required
+from instructors.models import InstructionReport, LessonScore
+from logsheet.models import Flight
+from members.models import Member
+
+@member_or_instructor_required
+def member_instruction_record(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    today = now().date()
+
+    reports = (
+        InstructionReport.objects
+        .filter(student=member)
+        .order_by("-report_date")
+        .prefetch_related("lesson_scores__lesson", "instructor")
+    )
+
+    # Map report_date -> list of flights
+    flights_by_date = defaultdict(list)
+    all_flights = (
+        Flight.objects
+        .filter(pilot=member)
+        .select_related("logsheet", "glider", "instructor")
+    )
+
+    for flight in all_flights:
+        log_date = flight.logsheet.log_date if flight.logsheet else None
+        if not log_date:
+            continue
+        flights_by_date[log_date].append(flight)
+
+    # Organize report blocks
+    report_blocks = []
+    for report in reports:
+        scores_by_code = defaultdict(list)
+        for score in report.lesson_scores.all():
+            scores_by_code[score.score].append(score.lesson.code)
+
+        # Group flights for this day
+        flights = flights_by_date.get(report.report_date, [])
+        flights.sort(key=lambda f: f.launch_time or f.id)
+
+        days_ago = (today - report.report_date).days
+
+        report_blocks.append({
+            "report": report,
+            "scores_by_code": dict(scores_by_code),
+            "flights": flights,
+            "days_ago": days_ago,
+        })
+
+    context = {
+        "member": member,
+        "report_blocks": report_blocks,
+    }
+    return render(request, "shared/member_instruction_record.html", context)

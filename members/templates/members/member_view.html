@@ -89,7 +89,10 @@
                   {% url 'members:training_progress' %}
                {% endif %}"
          class="btn btn-outline-primary btn-sm my-2">
-        📊 View Training Progress
+        📊 View Training Grid
+      </a>
+      <a href="{% url 'instructors:member_instruction_record' member.id %}" class="btn btn-outline-primary btn-sm my-1">
+        📘 View Instruction Record
       </a>
       </div>
     {% endif %}
