@@ -1,6 +1,8 @@
 from django.shortcuts import render
 from .decorators import instructor_required
 from .models import TrainingLesson, SyllabusDocument, TrainingPhase
+from members.decorators import active_member_required
+
 
 # instructors/views.py
 @instructor_required
@@ -116,14 +118,13 @@ def fill_instruction_report(request, student_id, report_date):
 
 
 from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from logsheet.models import Flight, Logsheet
 from members.models import Member
 from datetime import timedelta
 from django.utils import timezone
 from collections import defaultdict
 
-@login_required
+@active_member_required
 def select_instruction_date(request, student_id):
     instructor = request.user
     student = get_object_or_404(Member, pk=student_id)
@@ -157,35 +158,121 @@ from instructors.models import InstructionReport, LessonScore, TrainingLesson
 from members.models import Member
 from collections import defaultdict
 
+from datetime import date
+from django.utils.timezone import now
+from collections import defaultdict
+from members.models import Member
+from logsheet.models import Flight
+
+
+def get_instructor_initials(member):
+    initials = f"{member.first_name[0]}{member.last_name[0]}" if member.first_name and member.last_name else "??"
+    return initials.upper()
+
+from django.utils.timezone import now
+from collections import defaultdict
+from django.shortcuts import get_object_or_404, render
+from .models import InstructionReport, LessonScore, TrainingLesson
+from logsheet.models import Flight
+
 def member_training_grid(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
-    reports = InstructionReport.objects.filter(student=member).order_by("report_date").prefetch_related("lesson_scores__lesson")
+    reports = (
+        InstructionReport.objects
+        .filter(student=member)
+        .order_by("report_date")
+        .prefetch_related("lesson_scores__lesson", "instructor")
+    )
+
+    report_dates = [r.report_date for r in reports]
     lessons = TrainingLesson.objects.all().order_by("code")
 
-    # Dates of instruction sessions (chronological)
-    report_dates = [r.report_date for r in reports]
+    # Score lookup: (lesson_id, date) -> score
+    scores_lookup = {
+        (score.lesson_id, report.report_date): score.score
+        for report in reports
+        for score in report.lesson_scores.all()
+    }
 
-    # Build grid: lesson -> {date -> score}
+    # Flights per date for metadata
+    all_flights = Flight.objects.filter(pilot=member, logsheet__log_date__in=report_dates).select_related("logsheet", "instructor")
+    flights_by_date = defaultdict(list)
+    today = now().date()
+
+    for flight in all_flights:
+        if not flight.instructor:
+            continue
+        log_date = flight.logsheet.log_date
+        days_ago = (today - log_date).days
+        initials = "".join([s[0] for s in flight.instructor.full_display_name.split() if s])
+        altitude = flight.release_altitude or ""
+        flights_by_date[log_date].append({
+            "days_ago": days_ago,
+            "initials": initials,
+            "altitude": altitude,
+            "full_name": flight.instructor.full_display_name,
+        })
+
+    # Build grid rows
     lesson_data = []
     for lesson in lessons:
-        score_map = {}
-        for report in reports:
-            score = report.lesson_scores.filter(lesson=lesson).first()
-            score_map[report.report_date] = score.score if score else ""
-
-        max_score = max((s for s in score_map.values() if s.isdigit()), default="")
-        lesson_data.append({
+        row = {
             "label": f"{lesson.code} – {lesson.title}",
             "phase": lesson.phase.name if lesson.phase else "Other",
-            "scores": [score_map[d] for d in report_dates],
-            "max_score": max_score
+            "scores": [],
+            "max_score": ""
+        }
+        max_numeric = []
+
+        for date_obj in report_dates:
+            score = scores_lookup.get((lesson.id, date_obj), "")
+
+            if score.isdigit():
+                max_numeric.append(int(score))
+
+            flights = flights_by_date.get(date_obj, [])
+            if flights:
+                altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
+                initials = flights[0]["initials"]
+                tooltip = f"{flights[0]['full_name']} – {len(flights)} flight(s) – {flights[0]['days_ago']} days ago – {altitudes}"
+                label = f"{initials}<br>{flights[0]['days_ago']}<br>{altitudes}"
+            else:
+                tooltip = ""
+                label = ""
+
+            row["scores"].append({
+                "score": score,
+                "tooltip": tooltip,
+                "label": label,
+            })
+
+        row["max_score"] = str(max(max_numeric)) if max_numeric else ""
+        lesson_data.append(row)
+
+    # Build header info for each instruction date
+    column_metadata = []
+    for date_obj in report_dates:
+        flights = flights_by_date.get(date_obj, [])
+        if flights:
+            initials = flights[0]['initials']
+            days_ago = flights[0]['days_ago']
+            altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
+        else:
+            initials = ""
+            days_ago = ""
+            altitudes = ""
+        column_metadata.append({
+            "date": date_obj,
+            "initials": initials,
+            "days_ago": days_ago,
+            "altitudes": altitudes,
         })
 
     context = {
         "member": member,
         "lesson_data": lesson_data,
         "report_dates": report_dates,
+        "column_metadata": column_metadata,
     }
+
     return render(request, "shared/training_grid.html", context)
-
-

@@ -72,9 +72,30 @@
       .profile-bubble {
         display: inline-block;
       }
+
       td, th {
         border: 1px solid #dee2e6 !important;  /* force visible lines */
+        padding: 0.35rem !important;
+        text-align: center;
+        vertical-align: middle;
       }
+
+      /* Fix borders for colored cells */
+      .score-1,
+      .score-2,
+      .score-3,
+      .score-4,
+      .score-attn {
+        border: 1px solid #ccc !important;
+      }
+
+      /* Example background color tweaks */
+      .score-1 { background-color: #eee !important; }
+      .score-2 { background-color: #ddd !important; }
+      .score-3 { background-color: #ccc !important; }
+      .score-4 { background-color: #d1e7dd !important; }  /* soft green */
+      .score-attn { background-color: #f8d7da !important; } /* soft red */
+
     </style>
  
     <script>

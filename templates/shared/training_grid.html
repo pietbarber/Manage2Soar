@@ -1,41 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<style>
-  td, th {
-    border: 1px solid #ccc !important;
-    padding: 0.35rem !important;
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  /* Fix borders for colored cells */
-  .score-1,
-  .score-2,
-  .score-3,
-  .score-4,
-  .score-attn {
-    border: 1px solid #ccc !important;
-  }
-
-  /* Example background color tweaks */
-  .score-1 { background-color: #eee; }
-  .score-2 { background-color: #ddd; }
-  .score-3 { background-color: #ccc; }
-  .score-4 { background-color: #d1e7dd; }  /* soft green */
-  .score-attn { background-color: #f8d7da; } /* soft red */
-</style>
 <h2>Training Progress for {{ member.full_display_name }}</h2>
 
 <table class="table table-bordered table-sm border-dark-subtle">
   <thead>
     <tr>
-      <th>Lesson</th>
-      {% for date in report_dates %}
-        <th>{{ date|date:"M d" }}</th>
+      <th rowspan="2">Lesson</th>
+      {% for meta in column_metadata %}
+        <th>{{ meta.date|date:"M d" }}</th>
       {% endfor %}
-      <th>⭐ Max</th>
+      <th rowspan="2">⭐ Max</th>
+    </tr>
+    <tr>
+      {% for meta in column_metadata %}
+        <th class="small text-muted">
+          {{ meta.initials }}<br>
+          {{ meta.days_ago }}<br>
+          {{ meta.altitudes }}
+        </th>
+      {% endfor %}
     </tr>
   </thead>
+  
   <tbody>
     {% regroup lesson_data by phase as phase_groups %}
   
@@ -44,28 +30,29 @@
         <th class="text-start" colspan="{{ report_dates|length|add:'2' }}">{{ group.grouper }}</th>
       </tr>
   
-      {% for row in group.list %}
-        <tr>
-          <td class="text-end pe-2">{{ row.label }}</td>
-          {% for score in row.scores %}
+        {% for row in group.list %}
+          <tr>
+            <td class="text-end pe-2">{{ row.label }}</td>
+            {% for cell in row.scores %}
             <td class="text-center
-                {% if score == '1' %}bg-light text-muted
-                {% elif score == '2' %}bg-secondary-subtle text-white
-                {% elif score == '3' %}bg-secondary text-white
-                {% elif score == '4' %}bg-success-subtle fw-bold
-                {% elif score == '!' %}bg-warning text-dark fw-bold
-                {% else %}bg-white text-muted
+                {% if cell.score == '1' %}score-1
+                {% elif cell.score == '2' %}score-2
+                {% elif cell.score == '3' %}score-3
+                {% elif cell.score == '4' %}score-4
+                {% elif cell.score == '!' %}score-attn
                 {% endif %}
-            ">
-              {% if score == "1" %}1️⃣
-              {% elif score == "2" %}2️⃣
-              {% elif score == "3" %}3️⃣
-              {% elif score == "4" %}4️⃣
-              {% elif score == "!" %}⚠️
-              {% else %}&mdash;{% endif %}
+            " title="{{ cell.tooltip }}">
+              {% if cell.score == "1" %}1️⃣
+              {% elif cell.score == "2" %}2️⃣
+              {% elif cell.score == "3" %}3️⃣
+              {% elif cell.score == "4" %}4️⃣
+              {% elif cell.score == "!" %}⚠️
+              {% else %}&mdash;
+              {% endif %}
             </td>
           {% endfor %}
-  
+           
+       
           <td class="text-center border border-2 border-primary fw-bold">
             {% if row.max_score == "1" %}1️⃣
             {% elif row.max_score == "2" %}2️⃣
