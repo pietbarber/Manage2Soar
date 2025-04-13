@@ -83,17 +83,13 @@ class LessonScore(models.Model):
         unique_together = ('report', 'lesson')
         ordering = ['lesson__code']
 
-    def __str__(self):
-        return f"{self.lesson.code} – {self.get_score_display()}"
-
 class GroundInstruction(models.Model):
     student = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="ground_sessions")
     instructor = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="ground_given")
     date = models.DateField()
     location = models.CharField(max_length=100, blank=True, null=True)
     duration = models.DurationField(blank=True, null=True)
-    lessons = models.ManyToManyField(TrainingLesson, blank=True)
-    notes = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)  # will change to HTMLField shortly
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -102,3 +98,16 @@ class GroundInstruction(models.Model):
 
     def __str__(self):
         return f"{self.date} – {self.student} w/ {self.instructor}"
+
+
+class GroundLessonScore(models.Model):
+    session = models.ForeignKey("GroundInstruction", on_delete=models.CASCADE, related_name="lesson_scores")
+    lesson = models.ForeignKey("TrainingLesson", on_delete=models.CASCADE)
+    score = models.CharField(max_length=2, choices=SCORE_CHOICES)
+
+    class Meta:
+        unique_together = ("session", "lesson")
+        ordering = ["lesson__code"]
+
+    def __str__(self):
+        return f"{self.lesson.code} – {self.get_score_display()}"
