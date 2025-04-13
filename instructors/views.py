@@ -339,3 +339,29 @@ def member_instruction_record(request, member_id):
         "report_blocks": report_blocks,
     }
     return render(request, "shared/member_instruction_record.html", context)
+
+# instructors/views.py (continued)
+
+from django.contrib import messages
+from django.shortcuts import redirect
+from instructors.forms import GroundInstructionForm
+from instructors.models import GroundInstruction
+from instructors.decorators import instructor_required
+
+@instructor_required
+def log_ground_instruction(request):
+    if request.method == "POST":
+        form = GroundInstructionForm(request.POST, instructor=request.user)
+        if form.is_valid():
+            ground_inst = form.save(commit=False)
+            ground_inst.instructor = request.user
+            ground_inst.save()
+            form.save_m2m()
+            messages.success(request, "Ground instruction session logged successfully.")
+            return redirect("instructors:log_ground_instruction")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = GroundInstructionForm(instructor=request.user)
+
+    return render(request, "instructors/log_ground_instruction.html", {"form": form})

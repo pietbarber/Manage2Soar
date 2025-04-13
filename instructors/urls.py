@@ -11,6 +11,8 @@ urlpatterns = [
     path("report/<int:student_id>/<slug:report_date>/", views.fill_instruction_report, name="fill_instruction_report"),
     path("training-grid/<int:member_id>/", views.member_training_grid, name="member_training_grid"),
     path("instruction-record/<int:member_id>/", views.member_instruction_record, name="member_instruction_record"),
+    path("log-ground-instruction/", views.log_ground_instruction, name="log_ground_instruction"),
+
 ]
 
 
