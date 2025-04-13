@@ -39,3 +39,16 @@ class InstructionReportAdmin(admin.ModelAdmin):
 class LessonScoreAdmin(admin.ModelAdmin):
     list_display = ("report", "lesson", "score")
     list_filter = ("lesson", "score")
+
+from .models import GroundInstruction, GroundLessonScore
+
+class GroundLessonScoreInline(admin.TabularInline):
+    model = GroundLessonScore
+    extra = 0
+
+@admin.register(GroundInstruction)
+class GroundInstructionAdmin(admin.ModelAdmin):
+    list_display = ("student", "instructor", "date", "location", "duration")
+    list_filter = ("date", "instructor")
+    search_fields = ("student__first_name", "student__last_name", "instructor__first_name", "instructor__last_name")
+    inlines = [GroundLessonScoreInline]

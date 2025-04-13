@@ -360,8 +360,12 @@ def log_ground_instruction(request):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
+        print("POST data:", request.POST)
+
         form = GroundInstructionForm(request.POST)
         formset = GroundLessonScoreFormSet(request.POST)
+        formset.total_form_count()  # ✅ Critical for non-ModelForm formsets
+
 
         if form.is_valid() and formset.is_valid():
             session = form.save(commit=False)
@@ -383,6 +387,8 @@ def log_ground_instruction(request):
             messages.success(request, "Ground instruction session logged successfully.")
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
+            print("Form errors:", form.errors)
+            print("Formset errors:", formset.errors)
             messages.error(request, "Please correct the errors below.")
     else:
         form = GroundInstructionForm()
