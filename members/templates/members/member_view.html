@@ -89,7 +89,8 @@
       {% endif %}
       {% if request.user.instructor %}
       <div class="mt-3">
-      <a href="{% url 'instructors:log_ground_instruction' %}" class="btn btn-outline-primary btn-sm">
+        <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}"
+          class="btn btn-outline-primary btn-sm">
         ✍️ Log Ground Instruction
       </a>
       <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-sm btn-outline-primary">

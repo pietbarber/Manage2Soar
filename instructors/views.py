@@ -340,28 +340,60 @@ def member_instruction_record(request, member_id):
     }
     return render(request, "shared/member_instruction_record.html", context)
 
-# instructors/views.py (continued)
+# instructors/views.py (partial)
 
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.shortcuts import redirect
-from instructors.forms import GroundInstructionForm
-from instructors.models import GroundInstruction
+from django.utils.timezone import now
+from django.contrib.auth.decorators import login_required
+
+from instructors.forms import GroundInstructionForm, GroundLessonScoreFormSet
+from instructors.models import GroundInstruction, GroundLessonScore, TrainingLesson
 from instructors.decorators import instructor_required
+from members.models import Member
 
 @instructor_required
 def log_ground_instruction(request):
+    student_id = request.GET.get("student")
+    student = get_object_or_404(Member, pk=student_id) if student_id else None
+
+    lessons = TrainingLesson.objects.all().order_by("code")
+
     if request.method == "POST":
-        form = GroundInstructionForm(request.POST, instructor=request.user)
-        if form.is_valid():
-            ground_inst = form.save(commit=False)
-            ground_inst.instructor = request.user
-            ground_inst.save()
-            form.save_m2m()
+        form = GroundInstructionForm(request.POST)
+        formset = GroundLessonScoreFormSet(request.POST)
+
+        if form.is_valid() and formset.is_valid():
+            session = form.save(commit=False)
+            session.instructor = request.user
+            session.student = student
+            session.save()
+
+            for form_data in formset.cleaned_data:
+                lesson_id = form_data.get("lesson")
+                score = form_data.get("score")
+                if lesson_id and score:
+                    lesson = TrainingLesson.objects.get(pk=lesson_id)
+                    GroundLessonScore.objects.create(
+                        session=session,
+                        lesson=lesson,
+                        score=score
+                    )
+
             messages.success(request, "Ground instruction session logged successfully.")
-            return redirect("instructors:log_ground_instruction")
+            return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
             messages.error(request, "Please correct the errors below.")
     else:
-        form = GroundInstructionForm(instructor=request.user)
+        form = GroundInstructionForm()
+        initial_data = [{"lesson": lesson.id} for lesson in lessons]
+        formset = GroundLessonScoreFormSet(initial=initial_data)
 
-    return render(request, "instructors/log_ground_instruction.html", {"form": form})
+    form_rows = list(zip(formset.forms, lessons))
+
+    return render(request, "instructors/log_ground_instruction.html", {
+        "form": form,
+        "formset": formset,
+        "form_rows": form_rows,
+        "student": student,
+    })

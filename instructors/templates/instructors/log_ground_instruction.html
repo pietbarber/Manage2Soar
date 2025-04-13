@@ -1,7 +1,6 @@
 {% extends "base.html" %}
-{% load static %}
 {% block content %}
-<h2>Log Ground Instruction</h2>
+<h2>Log Ground Instruction for {{ student.full_display_name }}</h2>
 
 {% if messages %}
   {% for message in messages %}
@@ -14,10 +13,7 @@
 
 <form method="post">
   {% csrf_token %}
-  <div class="mb-3">
-    {{ form.student.label_tag }}
-    {{ form.student }}
-  </div>
+
   <div class="mb-3">
     {{ form.date.label_tag }}
     {{ form.date }}
@@ -30,17 +26,33 @@
     {{ form.duration.label_tag }}
     {{ form.duration }}
   </div>
-  <div class="mb-3">
-    <label>{{ form.lessons.label }}</label>
-    <div class="form-check">
-      {{ form.lessons }}
-    </div>
-  </div>
-  <div class="mb-3">
+
+  <h4 class="mt-4">Lesson Scores</h4>
+  <table class="table table-bordered table-striped table-sm w-auto">
+    <thead>
+      <tr>
+        <th class="text-start" style="width:10%">Code</th>
+        <th class="text-start" style="width:40%">Title</th>
+        <th style="width:20%">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for form, lesson in form_rows %}
+        <tr>
+          <td class="text-start">{{ lesson.code }}</td>
+          <td class="text-start">{{ lesson.title }}</td>
+          <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="mb-4">
     {{ form.notes.label_tag }}
     {{ form.notes }}
   </div>
 
-  <button type="submit" class="btn btn-success">Log Ground Instruction</button>
+  <button type="submit" class="btn btn-success">Save Ground Instruction</button>
+  <a href="{% url 'members:member_view' student.id %}" class="btn btn-secondary">Cancel</a>
 </form>
 {% endblock %}
