@@ -5,17 +5,23 @@
 {% for block in report_blocks %}
   <div class="card mb-4">
     <div class="card-header bg-light">
-      <strong>{{ block.report.report_date|date:"F j, Y" }}</strong>
+      <strong>
+        {% if block.type == "ground" %}
+          🧠 Ground Instruction – {{ block.report.date|date:"F j, Y" }}
+        {% else %}
+          ✈️ Flight Instruction – {{ block.report.report_date|date:"F j, Y" }}
+        {% endif %}
+      </strong>
       <span class="text-muted">({{ block.days_ago }} days ago)</span>
     </div>
     <div class="card-body">
 
       {% if block.flights %}
-      <h5>✈️ Flight Instruction</h5>
+      <h5>🛫 Flights</h5>
       <ul class="list-group mb-3">
         {% for flight in block.flights %}
           <li class="list-group-item">
-            <strong>Glider:</strong> {{ flight.glider.n_number }} – 
+            <strong>Glider:</strong> {{ flight.glider.n_number }} –
             <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
             <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
             <strong>Duration:</strong> {{ flight.duration|default:"?" }}
@@ -23,14 +29,15 @@
         {% endfor %}
       </ul>
       {% endif %}
-
+      
       {% if block.scores_by_code %}
       <h5>🎯 Performance Results</h5>
       {% for score, codes in block.scores_by_code.items %}
+      {% if codes %}
         <p>
           <strong>
             {% if score == "1" %}Introduced:
-            {% elif score == "2" %}Performed:
+            {% elif score == "2" %}Practiced:
             {% elif score == "3" %}Solo Proficient:
             {% elif score == "4" %}Checkride Standard:
             {% elif score == "!" %}Critical Issue:
@@ -39,7 +46,9 @@
           </strong>
           {{ codes|join:", " }}
         </p>
-      {% endfor %}
+      {% endif %}
+    {% endfor %}
+    
       {% endif %}
 
       {% if block.report.report_text %}
@@ -47,22 +56,27 @@
       <div class="border p-3 bg-white">
         {{ block.report.report_text|safe }}
       </div>
-      {% endif %}
-
-      {% if block.ground_notes %}
-      <h5>📚 Ground Instruction Notes</h5>
-      <div class="border p-3 bg-light">
-        {{ block.ground_notes|safe }}
+      {% elif block.report.notes %}
+      <h5>📝 Notes</h5>
+      <div class="border p-3 bg-white">
+        {{ block.report.notes|safe }}
       </div>
       {% endif %}
 
     </div>
     <div class="card-footer text-muted small">
-        Submitted by {{ block.report.instructor.full_display_name }}. 
-        Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }} 
-        {% if block.report.updated_at %}Updated at {{ block.report.updated_at|date:"Y-m-d H:i:s" }}{% endif %}
+      Submitted by {{ block.report.instructor.full_display_name }}.
+      {% if block.type == "flight" %}
+        Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
+        {% if block.report.updated_at %}
+          – Updated {{ block.report.updated_at|date:"Y-m-d H:i:s" }}
+        {% endif %}
+      {% else %}
+        {% if block.report.created_at %}
+          Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
+        {% endif %}
+      {% endif %}
     </div>
   </div>
 {% endfor %}
-
 {% endblock %}

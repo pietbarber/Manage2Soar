@@ -288,57 +288,85 @@ from instructors.models import InstructionReport, LessonScore
 from logsheet.models import Flight
 from members.models import Member
 
-@member_or_instructor_required
+
+##########################################################
+from collections import defaultdict
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from instructors.models import InstructionReport, LessonScore, GroundInstruction, GroundLessonScore
+from members.models import Member
+from logsheet.models import Flight
+
+
 def member_instruction_record(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
-    today = now().date()
 
-    reports = (
+    instruction_reports = (
         InstructionReport.objects
         .filter(student=member)
         .order_by("-report_date")
-        .prefetch_related("lesson_scores__lesson", "instructor")
+        .prefetch_related("lesson_scores__lesson")
     )
 
-    # Map report_date -> list of flights
-    flights_by_date = defaultdict(list)
-    all_flights = (
-        Flight.objects
-        .filter(pilot=member)
-        .select_related("logsheet", "glider", "instructor")
+    ground_sessions = (
+        GroundInstruction.objects
+        .filter(student=member)
+        .order_by("-date")
+        .prefetch_related("lesson_scores__lesson")
     )
 
-    for flight in all_flights:
-        log_date = flight.logsheet.log_date if flight.logsheet else None
-        if not log_date:
-            continue
-        flights_by_date[log_date].append(flight)
+    blocks = []
 
-    # Organize report blocks
-    report_blocks = []
-    for report in reports:
+    for report in instruction_reports:
+        scores = report.lesson_scores.all()
         scores_by_code = defaultdict(list)
-        for score in report.lesson_scores.all():
-            scores_by_code[score.score].append(score.lesson.code)
 
-        # Group flights for this day
-        flights = flights_by_date.get(report.report_date, [])
-        flights.sort(key=lambda f: f.launch_time or f.id)
+        for s in scores:
+            print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
+            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
 
-        days_ago = (today - report.report_date).days
+        flights = Flight.objects.filter(
+            instructor=report.instructor,
+            pilot=report.student,
+            logsheet__log_date=report.report_date
+        )
+        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
 
-        report_blocks.append({
+        blocks.append({
+            "type": "flight",
             "report": report,
-            "scores_by_code": dict(scores_by_code),
+            "days_ago": (timezone.now().date() - report.report_date).days,
             "flights": flights,
-            "days_ago": days_ago,
+            "scores_by_code": scores_by_code,
         })
 
-    context = {
+    for session in ground_sessions:
+        scores_by_code = defaultdict(list)
+
+        for s in session.lesson_scores.all():
+            print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
+            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
+
+        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
+        blocks.append({
+            "type": "ground",
+            "report": session,
+            "days_ago": (timezone.now().date() - session.date).days,
+            "flights": None,
+            "scores_by_code": scores_by_code,
+        })
+
+    blocks.sort(
+        key=lambda b: b["report"].report_date if b["type"] == "flight" else b["report"].date,
+        reverse=True,
+    )
+
+    return render(request, "shared/member_instruction_record.html", {
         "member": member,
-        "report_blocks": report_blocks,
-    }
-    return render(request, "shared/member_instruction_record.html", context)
+        "report_blocks": blocks,
+    })
+
+##########################################################
 
 # instructors/views.py (partial)
 
