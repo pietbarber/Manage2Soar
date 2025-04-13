@@ -8,7 +8,7 @@ import base64
 from .utils.vcard_tools import generate_vcard_qr
 from .forms import MemberProfilePhotoForm
 from django.core.paginator import Paginator
-from members.constants import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
 from django.db.models import Prefetch
 
 

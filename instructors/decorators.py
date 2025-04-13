@@ -1,6 +1,9 @@
 # instructors/decorators.py
 from functools import wraps
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, render, redirect
+from members.models import Member
+from members.constants.membership import ALLOWED_MEMBERSHIP_STATUSES
+from django.http import HttpResponseForbidden
 
 def instructor_required(view_func):
     @wraps(view_func)
@@ -14,18 +17,37 @@ def instructor_required(view_func):
         if user.is_superuser:
             return view_func(request, *args, **kwargs)
 
-        allowed_statuses = [
-            "Full Member", "Student Member", "Family Member", "Service Member",
-            "Founding Member", "Honorary Member", "Emeritus Member",
-            "SSEF Member", "Temporary Member", "Introductory Member"
-        ]
-
-        if getattr(user, "membership_status", None) not in allowed_statuses:
+        if getattr(user, "membership_status", None) not in ALLOWED_MEMBERSHIP_STATUSES:
             return render(request, "403.html", status=403)
 
         if not getattr(user, "instructor", False):
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+
+def member_or_instructor_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, member_id, *args, **kwargs):
+        member = get_object_or_404(Member, pk=member_id)
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect("login")
+
+        # ✅ Allow superusers
+        if user.is_superuser:
+            return view_func(request, member_id, *args, **kwargs)
+
+        if getattr(user, "membership_status", None) not in ALLOWED_MEMBERSHIP_STATUSES:
+            return render(request, "403.html", status=403)
+
+        if user == member or getattr(user, "instructor", False):
+            return view_func(request, member_id, *args, **kwargs)
+
+        return render(request, "403.html", status=403)
 
     return wrapper

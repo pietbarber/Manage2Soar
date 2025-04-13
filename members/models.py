@@ -44,7 +44,7 @@ class Member(AbstractUser):
     # A = FAST Member
     # S = Service Member
 
-    from members.constants import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
+    from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 
     membership_status = models.CharField(
         max_length=20,
