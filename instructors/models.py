@@ -52,6 +52,7 @@ class InstructionReport(models.Model):
     instructor = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="given_instruction_reports")
     report_date = models.DateField()
     report_text = HTMLField(blank=True)  # Instructor's summary / essay
+    simulator = models.BooleanField(default=False)  # 🖥️ Simulator session flag
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
