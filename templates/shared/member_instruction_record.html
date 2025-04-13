@@ -49,6 +49,13 @@
       </div>
       {% endif %}
 
+      {% if block.ground_notes %}
+      <h5>📚 Ground Instruction Notes</h5>
+      <div class="border p-3 bg-light">
+        {{ block.ground_notes|safe }}
+      </div>
+      {% endif %}
+
     </div>
     <div class="card-footer text-muted small">
         Submitted by {{ block.report.instructor.full_display_name }}. 

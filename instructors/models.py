@@ -89,7 +89,7 @@ class GroundInstruction(models.Model):
     date = models.DateField()
     location = models.CharField(max_length=100, blank=True, null=True)
     duration = models.DurationField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)  # will change to HTMLField shortly
+    notes = HTMLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

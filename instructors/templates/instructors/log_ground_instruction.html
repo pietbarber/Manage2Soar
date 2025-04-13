@@ -11,6 +11,7 @@
   {% endfor %}
 {% endif %}
 
+{{ form.media }}
 <form method="post">
   {% csrf_token %}
 
@@ -27,31 +28,31 @@
     {{ form.duration }}
   </div>
 
-  <h4 class="mt-4">Lesson Scores</h4>
-  <table class="table table-bordered table-striped table-sm w-auto">
-    <thead>
-      <tr>
-        <th class="text-start" style="width:10%">Code</th>
-        <th class="text-start" style="width:40%">Title</th>
-        <th style="width:20%">Score</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for form, lesson in form_rows %}
-        <tr>
-          <td class="text-start">{{ lesson.code }}</td>
-          <td class="text-start">{{ lesson.title }}</td>
-          <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
   <div class="mb-4">
     {{ form.notes.label_tag }}
     {{ form.notes }}
   </div>
 
+
+  <h4 class="mt-4">Lesson Scores</h4>
+  <table class="table table-bordered table-striped table-sm w-auto">
+    <thead>
+      <tr>
+        <th class="text-end">Code</th>
+        <th class="text-end">Title</th>
+        <th>Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for form, lesson in form_rows %}
+        <tr>
+          <td class="text-end">{{ lesson.code }}</td>
+          <td class="text-end">{{ lesson.title }}</td>
+          <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   <button type="submit" class="btn btn-success">Save Ground Instruction</button>
   <a href="{% url 'members:member_view' student.id %}" class="btn btn-secondary">Cancel</a>
 </form>
