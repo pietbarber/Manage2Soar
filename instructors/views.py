@@ -123,26 +123,26 @@ from members.models import Member
 from datetime import timedelta
 from django.utils import timezone
 from collections import defaultdict
+from datetime import timedelta
 
 @active_member_required
 def select_instruction_date(request, student_id):
     instructor = request.user
     student = get_object_or_404(Member, pk=student_id)
-
     today = timezone.now().date()
+    cutoff = today - timedelta(days=30)  # ✨ Only show flights in last 30 days
 
     recent_flights = Flight.objects.filter(
         instructor=instructor,
-        pilot=student
+        pilot=student,
+        logsheet__log_date__gte=cutoff,  # 💥 date filtering here
+        logsheet__log_date__lte=today
     ).select_related("logsheet")
-
-    # Use correct logsheet date field
-    recent_flights = [f for f in recent_flights if f.logsheet.log_date <= today]
 
     # Group by date
     flights_by_date = defaultdict(list)
     for flight in recent_flights:
-        flights_by_date[flight.logsheet.log_date].append(flight) 
+        flights_by_date[flight.logsheet.log_date].append(flight)
 
     sorted_dates = sorted(flights_by_date.items(), reverse=True)
 
@@ -205,11 +205,11 @@ def member_training_grid(request, member_id):
         log_date = flight.logsheet.log_date
         days_ago = (today - log_date).days
         initials = "".join([s[0] for s in flight.instructor.full_display_name.split() if s])
-        altitude = flight.release_altitude or ""
+        #altitude = flight.release_altitude or ""
         flights_by_date[log_date].append({
             "days_ago": days_ago,
             "initials": initials,
-            "altitude": altitude,
+            #"altitude": altitude,
             "full_name": flight.instructor.full_display_name,
         })
 
@@ -223,6 +223,7 @@ def member_training_grid(request, member_id):
             "max_score": ""
         }
         max_numeric = []
+        altitudes=""
 
         for date_obj in report_dates:
             score = scores_lookup.get((lesson.id, date_obj), "")
@@ -232,7 +233,7 @@ def member_training_grid(request, member_id):
 
             flights = flights_by_date.get(date_obj, [])
             if flights:
-                altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
+                #altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
                 initials = flights[0]["initials"]
                 tooltip = f"{flights[0]['full_name']} – {len(flights)} flight(s) – {flights[0]['days_ago']} days ago – {altitudes}"
                 label = f"{initials}<br>{flights[0]['days_ago']}<br>{altitudes}"
@@ -256,16 +257,16 @@ def member_training_grid(request, member_id):
         if flights:
             initials = flights[0]['initials']
             days_ago = flights[0]['days_ago']
-            altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
+            #altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
         else:
             initials = ""
             days_ago = ""
-            altitudes = ""
+            #altitudes = ""
         column_metadata.append({
             "date": date_obj,
             "initials": initials,
             "days_ago": days_ago,
-            "altitudes": altitudes,
+            #"altitudes": altitudes,
         })
 
     context = {
