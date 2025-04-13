@@ -36,7 +36,7 @@ class GroundInstructionForm(forms.ModelForm):
         fields = ["date", "location", "duration", "notes"]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
-            "duration": forms.TimeInput(attrs={"type": "time"}),
+            "duration": forms.TextInput(attrs={"placeholder": "HH:MM"}),
             "notes": TinyMCE(attrs={"rows": 6}),
         }
 
