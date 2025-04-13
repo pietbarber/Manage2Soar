@@ -85,3 +85,19 @@ class LessonScore(models.Model):
     def __str__(self):
         return f"{self.lesson.code} – {self.get_score_display()}"
 
+class GroundInstruction(models.Model):
+    student = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="ground_sessions")
+    instructor = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="ground_given")
+    date = models.DateField()
+    location = models.CharField(max_length=100, blank=True, null=True)
+    duration = models.DurationField(blank=True, null=True)
+    lessons = models.ManyToManyField(TrainingLesson, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.date} – {self.student} w/ {self.instructor}"
