@@ -3,7 +3,7 @@ from members.models import Member
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 from tinymce.models import HTMLField
-
+from django.conf import settings
 
 ####################################################
 # Flight model
@@ -286,6 +286,17 @@ class Glider(models.Model):
     picture = models.ImageField(upload_to="glider_photos/", blank=True, null=True)
     rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
     max_rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Uncheck to hide this glider from flight entry dropdowns"
+    )
+
+    owners = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="gliders_owned",
+        blank=True,
+        help_text="Members who own this glider"
+    )
 
     def __str__(self):
         parts = []
