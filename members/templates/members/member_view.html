@@ -55,12 +55,12 @@
           {{ member.country }}
         </li>
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li> 
-        {% if member.glider_owned %}
+        <!--{% if member.glider_owned %}
         <li class="list-group-item"><strong>Glider:</strong> {{ member.glider_owned }}</li>
-        {% endif %}
-        {% if member.second_glider_owned %}
+        {% endif %}-->
+        <!--{% if member.second_glider_owned %}
         <li class="list-group-item"><strong>Second Glider:</strong> {{ member.second_glider_owned }}</li>
-        {% endif %}
+        {% endif %}-->
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
