@@ -30,6 +30,9 @@ class Command(BaseCommand):
             host=legacy.get('HOST', ''),
             port=legacy.get('PORT', ''),
         )
+
+        conn.set_client_encoding('WIN1252')  # <--- this is an official psycopg2 method
+
         cursor = conn.cursor()
 
         try:
@@ -55,7 +58,7 @@ class Command(BaseCommand):
                    r.report, r.lastupdated
             FROM student_syllabus3 s
             LEFT JOIN instructor_reports2 r
-              ON s.handle = r.student
+              ON s.handle = r.handle
              AND s.instructor = r.instructor
              AND s.signoff_date = r.report_date
         """)
@@ -74,8 +77,8 @@ class Command(BaseCommand):
             report_obj, created = InstructionReport.objects.get_or_create(
                 student=student,
                 instructor=instructor_member,
-                date=date,
-                defaults={'report': ''}
+                report_date=date,
+                defaults={'report_text': ''}
             )
 
             for number, mode, report_html, updated in items:
@@ -89,10 +92,13 @@ class Command(BaseCommand):
                 # If this row carries the actual narrative...
                 if report_html:
                     if updated is not None and updated < HTML_CUTOFF_EPOCH:
-                        report_obj.report = f"<pre>{report_html}</pre>"
+                        new_report_text = f"<pre>{report_html}</pre>"
                     else:
-                        report_obj.report = report_html
-                    report_obj.save()
+                        new_report_text = report_html
+                    if report_obj.report_text != new_report_text:
+                        report_obj.report_text = new_report_text
+                        report_obj.save()
+                        print("✍️ updated narrative", end="", flush=True)
 
             status = "✅ Created" if created else "↺ Updated"
             self.stdout.write(f"{status}: {student} / {instructor_member} / {date}")
