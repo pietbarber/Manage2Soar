@@ -22,6 +22,21 @@
     <table class="table table-borderless align-middle">
       <tbody>
         <tr>
+          <th scope="row" class="text-end">Glider*</th>
+          <td>
+            <select name="{{ form.glider.name }}" id="{{ form.glider.id_for_label }}" class="form-select">
+              <option value="">---------</option>
+              {% for glider in form.glider.field.queryset %}
+                <option value="{{ glider.pk }}" data-seats="{{ glider.seats }}"
+                  {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ glider }}
+                </option>
+              {% endfor %}
+            </select>
+            {{ form.glider.errors }}
+          </td>
+        </tr>
+        <tr>
           <th scope="row" class="text-end">Pilot*</th>
           <td>
             {{ form.pilot }}
@@ -51,14 +66,7 @@
           </td>
         </tr>
 
-        <tr>
-          <th scope="row" class="text-end">Glider*</th>
-          <td>
-            {{ form.glider }}
-            {{ form.glider.errors }}
-          </td>
-        </tr>
-        <tr>
+       <tr>
           <th scope="row" class="text-end">Towpilot</th>
           <td>
             {{ form.tow_pilot }}

@@ -221,30 +221,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>
-  function togglePassengerFields() {
-    const instructor = document.getElementById("id_instructor");
-    const passenger = document.getElementById("id_passenger");
-    const passengerName = document.getElementById("id_passenger_name");
-
-    const instructorSelected = instructor && instructor.value !== "";
-
-    if (passenger) passenger.disabled = instructorSelected;
-    if (passengerName) passengerName.disabled = instructorSelected;
-  }
-
-  document.addEventListener("DOMContentLoaded", function () {
-    const modal = document.getElementById("flightModal");
-    modal.addEventListener("shown.bs.modal", function () {
-      togglePassengerFields();
-      const instructor = document.getElementById("id_instructor");
-      if (instructor) {
-        instructor.addEventListener("change", togglePassengerFields);
-      }
-    });
-  });
-
-</script>
 
 <script>
   document.getElementById("flightModal").addEventListener("shown.bs.modal", function () {
@@ -269,8 +245,6 @@
   });
 </script>
 
-
-
 <script>
   const flightModal = document.getElementById("flightModal");
 
@@ -286,6 +260,34 @@
     .then(response => response.text())
     .then(html => {
       document.getElementById("flightModalContent").innerHTML = html;
+
+      // 🚨 Important: DOM inside modal is now ready, attach glider logic here
+      const gliderField = flightModal.querySelector("#id_glider");
+      const instructorField = flightModal.querySelector("#id_instructor");
+      const passengerField = flightModal.querySelector("#id_passenger");
+      const passengerNameField = flightModal.querySelector("#id_passenger_name");
+
+      function updateSeatDependentFields() {
+        const selectedOption = gliderField.options[gliderField.selectedIndex];
+        const numSeats = parseInt(selectedOption.dataset.seats || "2");
+
+        const isSingleSeat = numSeats === 1;
+
+        [instructorField, passengerField, passengerNameField].forEach(field => {
+          field.disabled = isSingleSeat;
+        });
+
+        if (isSingleSeat) {
+          instructorField.value = "";
+          passengerField.value = "";
+          passengerNameField.value = "";
+        }
+      }
+
+      if (gliderField) {
+        gliderField.addEventListener("change", updateSeatDependentFields);
+        updateSeatDependentFields(); // Run on modal load
+      }
     });
   });
 </script>
