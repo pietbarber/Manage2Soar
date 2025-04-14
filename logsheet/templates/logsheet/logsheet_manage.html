@@ -261,36 +261,51 @@
     .then(html => {
       document.getElementById("flightModalContent").innerHTML = html;
 
-      // 🚨 Important: DOM inside modal is now ready, attach glider logic here
+      // 🚨 DOM inside modal is now ready, attach glider/instructor logic here
       const gliderField = flightModal.querySelector("#id_glider");
       const instructorField = flightModal.querySelector("#id_instructor");
       const passengerField = flightModal.querySelector("#id_passenger");
       const passengerNameField = flightModal.querySelector("#id_passenger_name");
 
-      function updateSeatDependentFields() {
-        const selectedOption = gliderField.options[gliderField.selectedIndex];
-        const numSeats = parseInt(selectedOption.dataset.seats || "2");
+      function updateFlightFormFields() {
+        const selectedGlider = gliderField.options[gliderField.selectedIndex];
+        const numSeats = parseInt(selectedGlider?.dataset.seats || "2");
+        const instructorSelected = instructorField && instructorField.value !== "";
 
         const isSingleSeat = numSeats === 1;
 
-        [instructorField, passengerField, passengerNameField].forEach(field => {
-          field.disabled = isSingleSeat;
-        });
-
         if (isSingleSeat) {
+          instructorField.disabled = true;
+          passengerField.disabled = true;
+          passengerNameField.disabled = true;
           instructorField.value = "";
           passengerField.value = "";
           passengerNameField.value = "";
+        } else {
+          instructorField.disabled = false;
+
+          if (instructorSelected) {
+            passengerField.disabled = true;
+            passengerNameField.disabled = true;
+            passengerField.value = "";
+            passengerNameField.value = "";
+          } else {
+            passengerField.disabled = false;
+            passengerNameField.disabled = false;
+          }
         }
       }
 
-      if (gliderField) {
-        gliderField.addEventListener("change", updateSeatDependentFields);
-        updateSeatDependentFields(); // Run on modal load
+      if (gliderField && instructorField) {
+        gliderField.addEventListener("change", updateFlightFormFields);
+        instructorField.addEventListener("change", updateFlightFormFields);
+        updateFlightFormFields(); // Run once on modal load
       }
     });
   });
 </script>
+
+
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/logsheet_manage.html</code>
