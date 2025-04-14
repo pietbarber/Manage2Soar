@@ -156,12 +156,26 @@
         {% endif %}
       </td>
       <td>{{ flight.glider }}</td>
-      <td>{{ flight.towplane }}</td>
+      <td>
+          {% if flight.towplane %}
+            {{ flight.towplane }}
+          {% elif flight.is_incomplete %}
+            <span class="badge bg-dark text-light" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
+              ⚠️ Missing data
+            </span>
+          {% endif %}
+      </td>
       <td>
           {% if flight.release_altitude %}
-            {{ flight.release_altitude }} ft</td>
+            {{ flight.release_altitude }} ft
+          {% elif flight.is_incomplete %}
+            <span class="badge bg-dark text-light" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
+              ⚠️ Missing data
+            </span>
           {% endif %}
-     <td>
+          
+      </td>
+      <td>
         {% if flight.duration %}
           {{ flight.duration }}
         {% endif %}

@@ -85,6 +85,26 @@ class Flight(models.Model):
     tow_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     rental_cost_actual = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
 
+    def is_incomplete(self):
+        return (
+            self.landing_time is not None and (
+                self.release_altitude is None or
+                self.towplane is None or
+                self.towpilot is None
+            )
+        )
+
+    def get_missing_fields(self):
+        missing = []
+        if self.landing_time is not None:
+            if not self.release_altitude:
+                missing.append("release altitude")
+            if not self.towplane:
+                missing.append("towplane")
+            if not self.tow_pilot:
+                missing.append("tow pilot")
+        return missing
+
     @property
     def status(self):
         if self.landing_time:
