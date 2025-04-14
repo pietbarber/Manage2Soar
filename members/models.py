@@ -26,6 +26,8 @@ class Biography(models.Model):
         return f"Biography of {self.member.get_full_name()}"
 
 
+
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 class Member(AbstractUser):
    # Here are the legacy codes from the old database,
     # which you can use for reference when we do the migration
@@ -43,8 +45,6 @@ class Member(AbstractUser):
     # T = Transient Member
     # A = FAST Member
     # S = Service Member
-
-    from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 
     membership_status = models.CharField(
         max_length=20,
@@ -164,7 +164,7 @@ class Member(AbstractUser):
 
 
     def is_active_member(self):
-        return self.membership_status in ['active', 'student', 'ssef', 'fast', 'service']
+        return self.membership_status in DEFAULT_ACTIVE_STATUSES
 
     def save(self, *args, **kwargs):
         self.is_staff = self.instructor or self.member_manager
@@ -199,10 +199,8 @@ class Member(AbstractUser):
             except Group.DoesNotExist:
                 pass
 
-
-
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return self.full_display_name
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)

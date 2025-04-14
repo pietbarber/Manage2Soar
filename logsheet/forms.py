@@ -7,6 +7,18 @@ from members.models import Member
 from django.utils.timezone import localtime, now
 from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+def get_active_members_with_role(role_flag: str = None):
+    qs = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+    if role_flag:
+        qs = qs.filter(**{role_flag: True})
+    return qs.order_by("last_name", "first_name")
+
+def get_active_members():
+    return Member.objects.filter(
+        membership_status__in=DEFAULT_ACTIVE_STATUSES
+    ).order_by("last_name", "first_name")
 
 
 # FlightForm
@@ -58,11 +70,12 @@ class FlightForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True)
+        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "registration") 
         # Filter instructors only
-        self.fields["instructor"].queryset = Member.objects.filter(instructor=True)
-        self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True)
-        self.fields["split_with"].queryset = Member.objects.filter(is_active=True).order_by("last_name")
+        self.fields["pilot"].queryset = get_active_members()
+        self.fields["instructor"].queryset = get_active_members_with_role("instructor")
+        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        self.fields["split_with"].queryset = get_active_members()
         if not self.instance.pk:
             self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
 
@@ -122,13 +135,13 @@ class CreateLogsheetForm(forms.ModelForm):
             self.fields["airfield"].initial = default_airfield
 
         # Setup filtered querysets for each duty crew role
-        self.fields["duty_officer"].queryset = Member.objects.filter(duty_officer=True).order_by("last_name")
-        self.fields["assistant_duty_officer"].queryset = Member.objects.filter(assistant_duty_officer=True).order_by("last_name")
-        self.fields["duty_instructor"].queryset = Member.objects.filter(instructor=True).order_by("last_name")
-        self.fields["surge_instructor"].queryset = Member.objects.filter(instructor=True).order_by("last_name")
-        self.fields["tow_pilot"].queryset = Member.objects.filter(towpilot=True).order_by("last_name")
-        self.fields["surge_tow_pilot"].queryset = Member.objects.filter(towpilot=True).order_by("last_name")
-        self.fields["default_towplane"].queryset = Towplane.objects.all().order_by("name", "registration")
+        self.fields["duty_officer"].queryset = get_active_members_with_role("duty_officer")
+        self.fields["assistant_duty_officer"].queryset = get_active_members_with_role("assistant_duty_officer")
+        self.fields["duty_instructor"].queryset = get_active_members_with_role("instructor")
+        self.fields["surge_instructor"].queryset = get_active_members_with_role("instructor")
+        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        self.fields["surge_tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        self.fields["default_towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "registration") 
 
         # Optional: set widget styles for dropdowns
         for name in [
