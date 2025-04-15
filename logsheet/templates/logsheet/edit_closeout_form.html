@@ -40,19 +40,19 @@
 {% endif %}
     {{ form.non_field_errors }}
 
-    <table class="table table-borderless align-middle">
+    <table class="table table-borderless align-middle text-start">
       <tbody>
         <tr>
           <th scope="row" class="text-end">{{ form.safety_issues.label_tag }}</th>
-          <td>{{ form.safety_issues }} {{ form.safety_issues.errors }}</td>
+          <td class="text-start">{{ form.safety_issues }} {{ form.safety_issues.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ form.equipment_issues.label_tag }}</th>
-          <td>{{ form.equipment_issues }} {{ form.equipment_issues.errors }}</td>
+          <td class="text-start">{{ form.equipment_issues }} {{ form.equipment_issues.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ form.operations_summary.label_tag }}</th>
-          <td>{{ form.operations_summary }} {{ form.operations_summary.errors }}</td>
+          <td class="text-start">{{ form.operations_summary }} {{ form.operations_summary.errors }}</td>
         </tr>
 
         <tr><td colspan="2"><hr class="my-3"></td></tr>
@@ -60,27 +60,27 @@
 
         <tr>
           <th scope="row" class="text-end">{{ duty_form.duty_officer.label_tag }}</th>
-          <td>{{ duty_form.duty_officer }} {{ duty_form.duty_officer.errors }}</td>
+          <td class="text-start">{{ duty_form.duty_officer }} {{ duty_form.duty_officer.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.assistant_duty_officer.label_tag }}</th>
-          <td>{{ duty_form.assistant_duty_officer }} {{ duty_form.assistant_duty_officer.errors }}</td>
+          <td class="text-start">{{ duty_form.assistant_duty_officer }} {{ duty_form.assistant_duty_officer.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.duty_instructor.label_tag }}</th>
-          <td>{{ duty_form.duty_instructor }} {{ duty_form.duty_instructor.errors }}</td>
+          <td class="text-start">{{ duty_form.duty_instructor }} {{ duty_form.duty_instructor.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.surge_instructor.label_tag }}</th>
-          <td>{{ duty_form.surge_instructor }} {{ duty_form.surge_instructor.errors }}</td>
+          <td class="text-start">{{ duty_form.surge_instructor }} {{ duty_form.surge_instructor.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.tow_pilot.label_tag }}</th>
-          <td>{{ duty_form.tow_pilot }} {{ duty_form.tow_pilot.errors }}</td>
+          <td class="text-start">{{ duty_form.tow_pilot }} {{ duty_form.tow_pilot.errors }}</td>
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ duty_form.surge_tow_pilot.label_tag }}</th>
-          <td>{{ duty_form.surge_tow_pilot }} {{ duty_form.surge_tow_pilot.errors }}</td>
+          <td class="text-start">{{ duty_form.surge_tow_pilot }} {{ duty_form.surge_tow_pilot.errors }}</td>
         </tr>
 
         {% if formset %}
@@ -101,23 +101,23 @@
 
           <tr>
             <th class="text-end">Towplane</th>
-            <td>{{ towform.towplane }} {{ towform.towplane.errors }}</td>
+            <td class="text-start">{{ towform.towplane }} {{ towform.towplane.errors }}</td>
           </tr>
           <tr>
             <th class="text-end">Start Tach</th>
-            <td>{{ towform.start_tach }} {{ towform.start_tach.errors }}</td>
+            <td class="text-start">{{ towform.start_tach }} {{ towform.start_tach.errors }}</td>
           </tr>
           <tr>
             <th class="text-end">End Tach</th>
-            <td>{{ towform.end_tach }} {{ towform.end_tach.errors }}</td>
+            <td class="text-start">{{ towform.end_tach }} {{ towform.end_tach.errors }}</td>
           </tr>
           <tr>
             <th class="text-end">Fuel Added</th>
-            <td>{{ towform.fuel_added }} {{ towform.fuel_added.errors }} US gal</td>
+            <td class="text-start">{{ towform.fuel_added }} {{ towform.fuel_added.errors }} US gal</td>
           </tr>
           <tr>
             <th class="text-end">Notes</th>
-            <td>{{ towform.notes }} {{ towform.notes.errors }}</td>
+            <td class="text-start">{{ towform.notes }} {{ towform.notes.errors }}</td>
           </tr>
           <tr><td colspan="2"><hr></td></tr>
           {% endfor %}
