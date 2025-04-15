@@ -38,7 +38,7 @@
 <div class="container-fluid">
   <div class="card mb-3" style="max-width: 800px;">
     <div class="card-body">
-    <h5 class="card-title">Logsheet for {{ logsheet.log_date }}</h5>
+    <h5 class="card-title" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">Logsheet for {{ logsheet.log_date }}</h5>
     <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
     <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
     {% if logsheet.revisions.exists %}
@@ -177,7 +177,11 @@
           
       </td>
       <td>
-        {% if flight.duration %}
+        {% if not flight.landing_time %}
+        <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
+          🕒 —
+        </span>
+        {% else %}
           {{ flight.duration }}
         {% endif %}
       </td>
@@ -373,11 +377,45 @@
 
       const towPilotField = document.getElementById("id_tow_pilot");
       towPilotField && promoteTowPilots();
-
-      
-
     });
   });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const clockEmojis = ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"];
+    let emojiIndex = 0;
+  
+    function pad(n) {
+      return n < 10 ? '0' + n : n;
+    }
+  
+    function updateLiveDurations() {
+      const now = new Date();
+      document.querySelectorAll(".live-duration").forEach(el => {
+        const launch = new Date(el.dataset.launch);
+        const diffMs = now - launch;
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const emoji = clockEmojis[emojiIndex % clockEmojis.length];
+  
+        el.textContent = `${emoji} ${hours}:${pad(minutes)}`;
+      });
+  
+      emojiIndex++;
+    }
+
+    const logsheetDate = document.getElementById("logsheetContainer")?.dataset?.logsheetDate;
+    const today = new Date().toISOString().split("T")[0];
+
+    if (logsheetDate !== today) {
+      console.log("⏱️ Skipping live duration updates — logsheet is from a different day.");
+      return;
+    }
+
+    updateLiveDurations();               // Run immediately
+    setInterval(updateLiveDurations, 5000); // Update every 60 seconds
+  });
+
 </script>
 
 
