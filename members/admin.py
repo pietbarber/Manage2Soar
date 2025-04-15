@@ -80,15 +80,28 @@ class MemberAdmin(UserAdmin):
     inlines = [MemberBadgeInline]
 
     list_display = ("last_name", "first_name", "email", "membership_status")
-    search_fields = ("first_name", "last_name", "email")
-    list_filter = ("membership_status", "instructor", "towpilot")
+    search_fields = ("first_name", "last_name", "email", "username")
+    list_filter = ("membership_status", "instructor", "towpilot", "director", "member_manager")
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        ("Personal info", {"fields": ("first_name", "last_name", "email")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
-        ("Membership", {"fields": ("membership_status", "instructor", "towpilot")}),
-        ("Important dates", {"fields": ("last_login", "date_joined")}),
+        ("Personal Info", {"fields": (
+            "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
+            "email", "phone", "mobile_phone", "emergency_contact"
+        )}),
+        ("Membership", {"fields": (
+            "membership_status", "date_joined",
+            "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
+            "director", "member_manager", "webmaster", "secretary", "treasurer"
+        )}),
+        ("Other Info", {"fields": (
+            "address", "city", "state_code", "state_freeform", "zip_code", "country",
+            "SSA_member_number", "glider_rating", "private_notes", "public_notes"
+        )}),
+        ("Permissions", {"fields": (
+            "is_active", "is_staff", "is_superuser", "groups", "user_permissions"
+        )}),
+        ("Important Dates", {"fields": ("last_login",)}),
     )
 
     add_fieldsets = (
