@@ -310,11 +310,41 @@
         }
       }
 
+     function promoteGliderOwners() {
+        const gliderField = document.getElementById("id_glider");
+        const pilotField = document.getElementById("id_pilot");
+      
+        const selectedOption = gliderField.options[gliderField.selectedIndex];
+        const ownerIds = (selectedOption.dataset.ownerIds || "").split(",").filter(Boolean);
+      
+        if (ownerIds.length === 0) return;
+      
+        const options = Array.from(pilotField.options);
+        const owners = [];
+        const nonOwners = [];
+      
+        for (let option of options) {
+          if (ownerIds.includes(option.value)) {
+            owners.push(option);
+          } else {
+            nonOwners.push(option);
+          }
+        }
+      
+        // Clear and reinsert with owners first
+        pilotField.innerHTML = "";
+        owners.concat(nonOwners).forEach(opt => pilotField.appendChild(opt));
+      }
       if (gliderField && instructorField) {
         gliderField.addEventListener("change", updateFlightFormFields);
         instructorField.addEventListener("change", updateFlightFormFields);
         updateFlightFormFields(); // Run once on modal load
       }
+      gliderField.addEventListener("change", function () {
+        updateFlightFormFields();  // your existing logic
+        promoteGliderOwners();     // new logic
+      });
+ 
     });
   });
 </script>

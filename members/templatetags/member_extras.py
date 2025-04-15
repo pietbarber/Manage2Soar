@@ -67,6 +67,9 @@ def render_duties(member):
 
     return ' '.join(duties) if duties else "-"
 
+@register.filter
+def pluck_ids(members):
+    return [str(member.pk) for member in members]
 
 @register.simple_tag
 def duty_emoji_legend():

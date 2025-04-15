@@ -8,6 +8,9 @@ from django.utils.timezone import localtime, now
 from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from django.db.models import Case, When, Value, IntegerField
+from logsheet.models import Glider
+
 
 def get_active_members_with_role(role_flag: str = None):
     qs = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
@@ -76,6 +79,33 @@ class FlightForm(forms.ModelForm):
         self.fields["instructor"].queryset = get_active_members_with_role("instructor")
         self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
         self.fields["split_with"].queryset = get_active_members()
+        glider_obj = None
+        if "glider" in self.initial or "glider" in self.data:
+            glider_id = self.initial.get("glider") or self.data.get("glider")
+            try:
+                glider_obj = Glider.objects.get(pk=glider_id)
+                owner_ids = glider_obj.owners.values_list("pk", flat=True)
+            except Glider.DoesNotExist:
+                owner_ids = []
+    
+            self.fields["pilot"].queryset = Member.objects.filter(
+                membership_status__in=DEFAULT_ACTIVE_STATUSES
+            ).annotate(
+                owner_rank=Case(
+                    When(pk__in=owner_ids, then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField()
+                )
+            ).order_by("owner_rank", "last_name", "first_name")
+
+        else:
+            self.fields["pilot"].queryset = get_active_members()
+
+        if not self.initial.get("pilot") and not self.data.get("pilot"):
+            if glider_obj and glider_obj.owners.count() == 1:
+                self.initial["pilot"] = glider_obj.owners.first().pk
+
+
         if not self.instance.pk:
             self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
 
