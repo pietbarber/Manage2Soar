@@ -106,6 +106,7 @@
 {% if not logsheet.finalized %}
 <a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
    class="btn btn-sm btn-primary mb-3"
+   data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
    data-bs-toggle="modal"
    data-bs-target="#flightModal"
    data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
@@ -310,6 +311,31 @@
         }
       }
 
+      function promoteTowPilots() {
+        const towPilotField = document.getElementById("id_tow_pilot");
+        const modalTrigger = document.querySelector("[data-bs-target='#flightModal']");
+        const pilotIdsRaw = modalTrigger?.getAttribute("data-tow-pilot-ids") || "";
+        const towPilotIds = pilotIdsRaw.split(",").filter(Boolean);
+      
+        if (towPilotIds.length === 0) return;
+      
+        const options = Array.from(towPilotField.options);
+        const promoted = [];
+        const others = [];
+      
+        for (let option of options) {
+          if (towPilotIds.includes(option.value)) {
+            promoted.push(option);
+          } else {
+            others.push(option);
+          }
+        }
+      
+        towPilotField.innerHTML = "";
+        promoted.concat(others).forEach(opt => towPilotField.appendChild(opt));
+      }
+
+
      function promoteGliderOwners() {
         const gliderField = document.getElementById("id_glider");
         const pilotField = document.getElementById("id_pilot");
@@ -344,7 +370,12 @@
         updateFlightFormFields();  // your existing logic
         promoteGliderOwners();     // new logic
       });
- 
+
+      const towPilotField = document.getElementById("id_tow_pilot");
+      towPilotField && promoteTowPilots();
+
+      
+
     });
   });
 </script>
