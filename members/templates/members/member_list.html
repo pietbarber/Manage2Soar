@@ -33,9 +33,6 @@
             <th>Duties</th>
             <th>Email</th>
             <th>View
-            {% if user.is_staff %}
-            <br>Edit 
-            {% endif %}
             </th>
         </tr>
         </tr>
@@ -69,9 +66,6 @@
                 <a href="mailto:{{ member.email }}">{{ member.email }}</a>
             </td>
             <td>
-                {% if user.is_staff %}
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'members:member_edit' member.id %}">Edit</a>
-                {% endif %}
                 <a href="{% url 'members:member_view' member.id %}" class="btn btn-outline-primary btn-sm">View</a>
             </td>
         </tr>

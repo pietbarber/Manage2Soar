@@ -51,25 +51,6 @@ def member_list(request):
         "selected_roles": selected_roles,
     })
 
-@active_member_required
-def member_edit(request, pk):
-    member = get_object_or_404(Member, pk=pk)
-    if not request.user.is_staff and request.user != member.user:
-        messages.error(request, "You do not have permission to edit this member.")
-        return redirect('members:member_list')
-
-    if request.method == "POST":
-        form = MemberForm(request.POST, request.FILES, instance=member)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Member information updated.")
-            return redirect('members:member_list')
-    else:
-        form = MemberForm(instance=member)
-
-    return render(request, "members/member_edit.html", {"form": form, "member": member})
-
-
 
 @active_member_required
 def member_view(request, member_id):
