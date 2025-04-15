@@ -79,6 +79,19 @@ class FlightForm(forms.ModelForm):
         self.fields["instructor"].queryset = get_active_members_with_role("instructor")
         self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
         self.fields["split_with"].queryset = get_active_members()
+
+        COMMON_ALTITUDES = [3000, 1500, 2000, 2500, 4000]
+        ALL_ALTITUDES = list(range(0, 7100, 100))
+
+        # Remove common ones from the base list to avoid duplicates
+        remaining = [alt for alt in ALL_ALTITUDES if alt not in COMMON_ALTITUDES]
+
+        self.fields["release_altitude"].choices = (
+            [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES] +
+            [('', '──────────')] +  # Optional visual divider
+            [(alt, f"{alt} ft") for alt in remaining]
+        )
+
         glider_obj = None
         if "glider" in self.initial or "glider" in self.data:
             glider_id = self.initial.get("glider") or self.data.get("glider")
