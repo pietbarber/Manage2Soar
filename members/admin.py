@@ -7,7 +7,7 @@ from .models import Badge
 from django.utils.html import format_html
 from django.contrib import admin
 from .models import Member, Badge, MemberBadge
-
+from reversion.admin import VersionAdmin
 
 
 from django.contrib import admin
@@ -73,7 +73,7 @@ class MemberBadgeInline(admin.TabularInline):
     extra = 0
 
 @admin.register(Member)
-class MemberAdmin(UserAdmin):
+class MemberAdmin(VersionAdmin, UserAdmin):
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
     model = Member
