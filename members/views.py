@@ -1,17 +1,32 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.urls import reverse
-from .models import Member, Biography
-from .forms import MemberForm, BiographyForm, SetPasswordForm
-from .decorators import active_member_required
 import base64
-from .utils.vcard_tools import generate_vcard_qr
-from .forms import MemberProfilePhotoForm
+import os
+
+from django.urls import reverse
+from django.conf import settings
 from django.core.paginator import Paginator
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
 from django.db.models import Prefetch
+from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
 
+from .forms import BiographyForm, SetPasswordForm, MemberProfilePhotoForm
+from instructors.models import InstructionReport, TrainingLesson
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
+from .models import Badge, MemberBadge
+from .models import Member, Biography
+from .utils.vcard_tools import generate_vcard_qr
+from .decorators import active_member_required
 
+#########################
+# member_list() View
+
+# Renders a list of all members, typically grouped or filtered by membership status
+# or role (e.g., instructor, tow pilot, director). Intended for logged-in users.
+
+# Can be used to browse, link to member profiles, or assign operational roles.
+
+@active_member_required
 def member_list(request):
     selected_statuses = request.GET.getlist("status")
 
@@ -51,6 +66,20 @@ def member_list(request):
         "selected_roles": selected_roles,
     })
 
+#########################
+# member_view() View
+
+# Renders the detail page for a specific member. Displays information such as
+# their roles, contact details, badges, and optionally, biography content.
+
+# Only accessible to logged-in users.
+
+# Arguments:
+# - request: the HTTP request object
+# - username: the member's username (used to look up the Member object)
+
+# Raises:
+# - Http404 if the user does not exist
 
 @active_member_required
 def member_view(request, member_id):
@@ -86,9 +115,21 @@ def member_view(request, member_id):
         },
     )
 
+#########################
+# biography_view() View
+
+# Displays the HTML biography of a given member, if one exists.
+# Supports optional image uploads and rich text formatting.
+
+# Variables:
+# - username: slug used to identify the member
+# - member: the Member object matching the username
+# - biography: associated Biography model object for the member, if present
+
+# Raises:
+# - Http404 if the member or biography does not exist
 
 @active_member_required
-
 def biography_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     biography, _ = Biography.objects.get_or_create(member=member)
@@ -109,15 +150,37 @@ def biography_view(request, member_id):
         "member": member,
         "can_edit": can_edit
     })
-from django.shortcuts import render
+
+#########################
+# home() View
+
+# This view renders the homepage template (home.html). It is typically used
+# as the root URL of the site ("/") and currently requires no authentication.
+
+# It is defined in members/views.py but mapped in the project-wide urls.py:
+# path("", member_views.home, name="home")
+
+# This page may be repurposed later to act as a dashboard or post-login landing page.
 
 def home(request):
     return render(request, "home.html")
 
+#########################
+# set_password() View
 
-@active_member_required
-def duty_roster(request):
-    return render(request, "members/duty_roster.html")
+# Allows a logged-in user to set or change their password. This is typically
+# used when a member is transitioning from OAuth or legacy authentication 
+# to a Django-managed password.
+
+# Methods:
+# - GET: renders a password change form
+# - POST: processes the password form and saves the new password
+
+# Variables:
+# - form: instance of PasswordChangeForm bound to the logged-in user
+# - messages.success: displays a confirmation if the password is successfully changed
+
+# Redirects to home page on success.
 
 @active_member_required
 def set_password(request):
@@ -133,10 +196,23 @@ def set_password(request):
         form = SetPasswordForm()
     return render(request, "members/set_password.html", {"form": form})
 
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import os
-from django.conf import settings
+#########################
+# tinymce_image_upload() View
+
+# Handles image uploads via TinyMCE's file picker. Stores images under
+# media/biography/<username>/ for the currently logged-in user.
+
+# Methods:
+# - POST: accepts an image file uploaded from the TinyMCE editor
+
+# Variables:
+# - image: the uploaded file from the POST request
+# - fs: Django FileSystemStorage instance targeting the user's biography folder
+# - filename: saved filename with a sanitized name
+# - url: public URL to the uploaded image
+
+# Returns a JSON response containing the file URL for use in the editor.
+# Only accessible to logged-in users.
 
 @csrf_exempt
 def tinymce_image_upload(request):
@@ -151,7 +227,16 @@ def tinymce_image_upload(request):
         return JsonResponse({'location': url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-from .models import Badge, MemberBadge
+#########################
+# badge_board() View
+
+# Displays a public-facing badge leaderboard showing members and their earned badges.
+# Members are typically grouped or ranked by the number of badges, categories, or date awarded.
+
+# Only accessible to logged-in users.
+
+# Variables:
+# - members: queryset of all members, prefetching badge relationships
 
 @active_member_required
 def badge_board(request):
@@ -171,9 +256,19 @@ def badge_board(request):
         "badges": badges
     })
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from instructors.models import InstructionReport, LessonScore, TrainingLesson
+#########################
+# my_training_progress() View
+
+# Displays the training progress grid for the currently logged-in user,
+# summarizing flight and ground lesson scores by date and topic.
+
+# Only accessible to logged-in users who are enrolled in a training program.
+
+# Variables:
+# - member: the currently logged-in user
+# - instruction_reports: related flight instruction reports for the user
+# - ground_sessions: related ground instruction sessions
+# - lessons: full list of training lessons for row alignment in the grid
 
 @active_member_required
 def my_training_progress(request):
