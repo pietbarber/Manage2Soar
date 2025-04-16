@@ -10,3 +10,4 @@ qrcode[pil]
 requests
 pydenticon
 django-reversion
+pytest-django
