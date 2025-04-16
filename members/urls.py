@@ -13,7 +13,6 @@ urlpatterns = [
     path("", views.member_list, name="member_list"),
     path("badges/", views.badge_board, name="badge_board"),
     path('<int:member_id>/biography/', views.biography_view, name='biography_view'),
-    path('duty_roster/', views.duty_roster, name='duty_roster'),
     path('tinymce/', include('tinymce.urls')),
     path("<int:member_id>/view/", views.member_view, name="member_view"),
     path('set-password/', views.set_password, name='set_password'),
