@@ -8,6 +8,7 @@ from tinymce.models import HTMLField
 from .utils.avatar_generator import generate_identicon
 import os
 from django.contrib.auth.models import Group
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 
 
 def biography_upload_path(instance, filename):
@@ -26,11 +27,39 @@ class Biography(models.Model):
         return f"Biography of {self.member.get_full_name()}"
 
 
+#########################
+# Member Model
 
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
+# Extends Django's AbstractUser to represent a club member.
+# Includes personal information, contact details, SSA membership info,
+# club roles, and membership status.
+
+# Fields:
+# - middle_initial: optional middle initial
+# - name_suffix: suffix (Jr., Sr., III, etc.)
+# - nickname: alternate first name or call sign
+# - phone / mobile_phone: contact numbers
+# - emergency_contact: emergency contact info
+# - address, city, state_code/state_freeform, zip_code, country: mailing address
+# - membership_status: current member status (active, student, etc.)
+# - SSA_member_number: Soaring Society of America ID
+# - glider_rating: pilot certification level (student, private, commercial)
+# - public_notes: viewable by all logged-in users
+# - private_notes: visible only to officers/managers
+# - profile_photo: optional image used in member directory
+# - instructor / towpilot / duty_officer / assistant_duty_officer: role booleans
+# - director / treasurer / secretary / webmaster / member_manager: club management roles
+# - legacy_username: preserved for linking imported data
+# - date_joined: original join date
+# - last_updated_by: tracks last editor of this record
+# - badges: M2M relation to awarded badges
+# - biography: optional related biography object
+
+# Methods:
+# - is_active_member(): Returns True if the member has a qualifying active membership status
+
 class Member(AbstractUser):
-   # Here are the legacy codes from the old database,
-    # which you can use for reference when we do the migration
+    # Here are the legacy codes from the old database,
     # Legacy status codes:
     # M = Full Member
     # U = Student Member
@@ -146,6 +175,10 @@ class Member(AbstractUser):
             name += "†"
         return " ".join(name.split())  # Normalize spaces
 
+    #################
+    # is_active_member(self)
+    # Returns True if the member's membership_status is in DEFAULT_ACTIVE_STATUSES.
+    # Used for filtering members in operational roles and UI.
 
     def is_active_member(self):
         return self.membership_status in DEFAULT_ACTIVE_STATUSES
@@ -183,8 +216,26 @@ class Member(AbstractUser):
             except Group.DoesNotExist:
                 pass
 
+    ##################################
+    #  def __str__ 
+    # Returns a readable name for the member, (the full display name)
+    # Used in admin dropdowns and member selectors. 
     def __str__(self):
         return self.full_display_name
+
+#########################
+# Badge Model
+
+# Defines all possible badges that can be earned by members, such as SSA badges (A, B, C, etc.)
+# or club-specific awards.
+
+# Fields:
+# - name: full name of the badge (e.g., "SSA A Badge")
+# - code: short identifier (e.g., "A")
+# - description: text explanation of the badge
+# - category: optional grouping for organizational purposes
+
+# Used in a many-to-many relationship with members through MemberBadge.
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -198,6 +249,16 @@ class Badge(models.Model):
     def __str__(self):
         return self.name
 
+#########################
+# MemberBadge Model
+
+# Links a Member to a Badge. Represents a badge that has been earned.
+
+# Fields:
+# - member: foreign key to the Member who earned the badge
+# - badge: the badge awarded
+# - date_awarded: optional date of award
+# - notes: optional comment for internal use
 
 class MemberBadge(models.Model):
     member = models.ForeignKey('Member', on_delete=models.CASCADE, related_name='badges')
