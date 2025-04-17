@@ -28,5 +28,6 @@ def test_create_username_fallback_to_email():
 def test_set_default_membership_status_sets_pending():
     user = Member.objects.create(username="testuser", membership_status="")
     set_default_membership_status(None, user)
+    user.save()  # ✅ Save the updated status
     user.refresh_from_db()
     assert user.membership_status == "Pending"

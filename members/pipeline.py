@@ -84,10 +84,10 @@ def create_username(strategy, details, backend, user=None, *args, **kwargs):
 # This prevents users from defaulting to full member access, and provides
 # a clean, typo-free base profile for further editing.
 
-def set_default_membership_status(backend, user=None, **kwargs):
-    if user and user.membership_status is None:
+def set_default_membership_status(strategy, user, *args, **kwargs):
+    if not user.membership_status or user.membership_status.strip() == "":
         user.membership_status = "Pending"
-        user.save()
+
 
 #########################
 # fetch_google_profile_picture() Pipeline Function
