@@ -17,7 +17,7 @@ class MemberModelTests(TestCase):
         self.assertFalse(m.is_active_member())
 
     def test_is_active_member_true_for_student(self):
-        m = Member(membership_status="student")
+        m = Member(membership_status="Student Member")
         self.assertTrue(m.is_active_member())
 
 class SetPasswordFormTests(TestCase):
@@ -37,9 +37,12 @@ class SetPasswordFormTests(TestCase):
 
 class BiographyModelTests(TestCase):
     def test_biography_str_repr(self):
-        member = Member(username="jdoe", first_name="John", last_name="Doe")
-        bio = Biography(member=member, body="<p>Hello!</p>")
-        self.assertEqual(str(bio), "Biography for jdoe")
+        member = Member.objects.create(username="jdoe", first_name="John", last_name="Doe")
+        bio = Biography(member=member)
+        bio.content = "<p>Hello!</p>"  # ✅ use 'content' instead of 'body'
+        self.assertEqual(str(bio), "Biography of John Doe")
+
+
 
 class MemberViewsTests(TestCase):
     def test_home_page_loads(self):
