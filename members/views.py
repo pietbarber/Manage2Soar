@@ -214,6 +214,7 @@ def set_password(request):
 # Returns a JSON response containing the file URL for use in the editor.
 # Only accessible to logged-in users.
 
+@active_member_required
 @csrf_exempt
 def tinymce_image_upload(request):
     if request.method == 'POST' and request.FILES.get('file'):
