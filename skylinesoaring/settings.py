@@ -232,6 +232,13 @@ AUTHENTICATION_BACKENDS = (
 DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']  # Or your real domain in production
 
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = "noreply@skylinesoaring.org"
+EMAIL_SUBJECT_PREFIX = "[Skyline] "
+
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
