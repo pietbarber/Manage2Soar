@@ -17,7 +17,7 @@ class MemberModelTests(TestCase):
         self.assertFalse(m.is_active_member())
 
     def test_is_active_member_true_for_student(self):
-        m = Member(membership_status="Student")
+        m = Member(membership_status="student")
         self.assertTrue(m.is_active_member())
 
 class SetPasswordFormTests(TestCase):

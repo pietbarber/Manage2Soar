@@ -159,11 +159,17 @@ class Member(AbstractUser):
             return self.profile_photo.url
         return reverse('pydenticon', kwargs={'username': self.username})
 
-
+    ##################################
+    # full_display_name
+    #
+    # Return the member's display name for UI usage. 
+    # If a nickname exists, use it in place of the first name. 
+    # Example: 'Sam Gilbert' instead of 'Bret "Sam" Gilbert' 
+    #
     @property
     def full_display_name(self):
         if self.nickname:
-            first = f'{self.first_name} "{self.nickname}"'
+            first = f'{self.nickname}'
         else:
             first = self.first_name
 
