@@ -104,17 +104,20 @@ class Command(BaseCommand):
             self.stdout.write(f"{status}: {student} / {instructor_member} / {date}")
 
     def import_ground_instruction(self, cursor):
+        from instructors.models import GroundLessonScore  # local import to avoid circularity
+    
         self.stdout.write(self.style.NOTICE("Importing ground instruction sessions..."))
-
+    
         cursor.execute("""
-            SELECT pilot, instructor, inst_date, duration, location
+            SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
             FROM ground_inst
         """)
-
-        for pilot, instructor, date, duration, location in cursor.fetchall():
+        sessions = cursor.fetchall()
+    
+        for pilot, instructor, date, duration, location, tracking_id in sessions:
             student = self.resolve_member(pilot)
             instructor_member = self.resolve_member(instructor)
-
+    
             gi, created = GroundInstruction.objects.get_or_create(
                 student=student,
                 instructor=instructor_member,
@@ -125,7 +128,30 @@ class Command(BaseCommand):
                     'notes': ''
                 }
             )
-
+    
+            # Attach notes from instructor_reports2 — only if not used in InstructionReport
+            cursor.execute("""
+                SELECT report
+                FROM instructor_reports2
+                WHERE handle = %s AND instructor = %s AND report_date = %s
+            """, (pilot, instructor, date))
+            row = cursor.fetchone()
+    
+            if row and row[0]:
+                legacy_report_text = row[0].strip()
+    
+                # Check for deduplication: is this report already in a flight record?
+                exists = InstructionReport.objects.filter(
+                    student=student,
+                    instructor=instructor_member,
+                    report_date=date,
+                    report_text__iexact=legacy_report_text
+                ).exists()
+    
+                if not exists and (gi.notes or '').strip() != legacy_report_text:
+                    gi.notes = legacy_report_text
+                    gi.save()
+                    print("📝 Ground essay attached", end="", flush=True)
+    
             status = "✅ Created" if created else "↺ Skipped (exists)"
             self.stdout.write(f"{status}: {student} / {instructor_member} / {date}")
-
