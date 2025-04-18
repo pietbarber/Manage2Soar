@@ -111,3 +111,44 @@ class GroundLessonScore(models.Model):
 
     def __str__(self):
         return f"{self.lesson.code} – {self.get_score_display()}"
+
+from django.db import models
+from members.models import Member
+
+class ClubQualificationType(models.Model):
+    code = models.CharField(max_length=30, unique=True)  # e.g. 'CFI', 'ASK-Back'
+    name = models.CharField(max_length=100)              # Human-friendly name
+    icon = models.ImageField(upload_to='quals/icons/', null=True, blank=True)
+    applies_to = models.CharField(
+        max_length=10,
+        choices=[('student', 'Student'), ('rated', 'Rated'), ('both', 'Both')],
+        default='both'
+    )
+    is_obsolete = models.BooleanField(default=False)
+    tooltip = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class MemberQualification(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE)
+    qualification = models.ForeignKey(ClubQualificationType, on_delete=models.CASCADE)
+    is_qualified = models.BooleanField(default=True)
+    instructor = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='issued_quals'
+    )
+    date_awarded = models.DateField(null=True, blank=True)
+    expiration_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    imported = models.BooleanField(default=False)  # track legacy-imported quals
+
+    class Meta:
+        unique_together = ('member', 'qualification')
+
+    def __str__(self):
+        return f"{self.member} – {self.qualification.code}"
