@@ -68,7 +68,7 @@ GLIDER_ALIASES = [
     {"legacy_name": "AE", "n_number": "N343JG"},
     {"legacy_name": "160", "n_number": "N8627R"},
     {"legacy_name": "GWZ", "n_number": "N15BT"},
-    {"legacy_name": "SM", "n_number": "N2617H"},
+    {"legacy_name": "SM", "n_number": "N2671H"},
     {"legacy_name": "SG", "n_number": "D-KUHR"},
     {"legacy_name": "SZ", "n_number": "N483SZ"},
     {"legacy_name": "SGS 2-33", "n_number": "N2724H"},
