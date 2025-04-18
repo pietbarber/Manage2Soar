@@ -52,3 +52,19 @@ class GroundInstructionAdmin(admin.ModelAdmin):
     list_filter = ("date", "instructor")
     search_fields = ("student__first_name", "student__last_name", "instructor__first_name", "instructor__last_name")
     inlines = [GroundLessonScoreInline]
+
+from django.contrib import admin
+from .models import ClubQualificationType, MemberQualification
+
+@admin.register(ClubQualificationType)
+class ClubQualificationTypeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'applies_to', 'is_obsolete')
+    search_fields = ('code', 'name')
+    list_filter = ('applies_to', 'is_obsolete')
+
+@admin.register(MemberQualification)
+class MemberQualificationAdmin(admin.ModelAdmin):
+    list_display = ('member', 'qualification', 'is_qualified', 'date_awarded', 'expiration_date', 'imported')
+    search_fields = ('member__username', 'qualification__code')
+    list_filter = ('is_qualified', 'imported', 'qualification__code')
+    autocomplete_fields = ('member', 'qualification', 'instructor')
