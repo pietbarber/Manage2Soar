@@ -30,7 +30,6 @@ urlpatterns = [
     path('members/', include('members.urls')),
     path('logsheet/', include('logsheet.urls')),
     path('instructors/', include('instructors.urls')),
-    path('duty_roster/', include('duty_roster.urls')),
     path('login/', auth_views.LoginView.as_view(), name='login'),  # ← add this!
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('oauth/', include('social_django.urls', namespace='social')),
@@ -39,6 +38,7 @@ urlpatterns = [
     path("password-reset/done/", auth_views.PasswordResetDoneView.as_view(), name="password_reset_done"),
     path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
     path("reset/done/", auth_views.PasswordResetCompleteView.as_view(), name="password_reset_complete"),
+    path("roster/", include("duty_roster.urls")),
 
 
 
