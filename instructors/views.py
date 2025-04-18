@@ -85,8 +85,8 @@ def fill_instruction_report(request, student_id, report_date):
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
             messages.error(request, "There were errors in the form. Please review and correct them.")
-            print("Report form errors:", report_form.errors)
-            print("Formset errors:", formset.errors)
+            #print("Report form errors:", report_form.errors)
+            #print("Formset errors:", formset.errors)
 
     else:
         # GET request
@@ -322,7 +322,7 @@ def member_instruction_record(request, member_id):
         scores_by_code = defaultdict(list)
 
         for s in scores:
-            print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
+            #print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
             scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
 
         flights = Flight.objects.filter(
@@ -344,7 +344,6 @@ def member_instruction_record(request, member_id):
         scores_by_code = defaultdict(list)
 
         for s in session.lesson_scores.all():
-            print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
             scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
 
         scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
@@ -388,7 +387,7 @@ def log_ground_instruction(request):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
-        print("POST data:", request.POST)
+        #print("POST data:", request.POST)
 
         form = GroundInstructionForm(request.POST)
         formset = GroundLessonScoreFormSet(request.POST)
@@ -415,8 +414,8 @@ def log_ground_instruction(request):
             messages.success(request, "Ground instruction session logged successfully.")
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
-            print("Form errors:", form.errors)
-            print("Formset errors:", formset.errors)
+            #print("Form errors:", form.errors)
+            #print("Formset errors:", formset.errors)
             messages.error(request, "Please correct the errors below.")
     else:
         form = GroundInstructionForm()

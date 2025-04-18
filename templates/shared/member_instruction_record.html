@@ -14,56 +14,61 @@
       </strong>
       <span class="text-muted">({{ block.days_ago }} days ago)</span>
     </div>
+
     <div class="card-body">
 
       {% if block.flights %}
-      <h5>🛫 Flights</h5>
-      <ul class="list-group mb-3">
-        {% for flight in block.flights %}
-          <li class="list-group-item">
-            <strong>Glider:</strong> {{ flight.glider.n_number }} –
-            <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
-            <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
-            <strong>Duration:</strong> {{ flight.duration|default:"?" }}
-          </li>
-        {% endfor %}
-      </ul>
+        <h5>🛫 Flights</h5>
+        <ul class="list-group mb-3">
+          {% for flight in block.flights %}
+            <li class="list-group-item">
+              <strong>Glider:</strong> {{ flight.glider.n_number }} –
+              <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
+              <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
+              <strong>Duration:</strong> {{ flight.duration|default:"?" }}
+            </li>
+          {% endfor %}
+        </ul>
       {% endif %}
-      
-      {% if block.scores_by_code %}
-      <h5>🎯 Performance Results</h5>
-      {% for score, codes in block.scores_by_code.items %}
-      {% if codes %}
-        <p>
-          <strong>
-            {% if score == "1" %}Introduced:
-            {% elif score == "2" %}Practiced:
-            {% elif score == "3" %}Solo Proficient:
-            {% elif score == "4" %}Checkride Standard:
-            {% elif score == "!" %}Critical Issue:
-            {% else %}{{ score }}:
-            {% endif %}
-          </strong>
-          {{ codes|join:", " }}
-        </p>
-      {% endif %}
-    {% endfor %}
     
+      {% if block.scores_by_code %}
+        <h5>🎯 Performance Results</h5>
+        {% for score, codes in block.scores_by_code.items %}
+          {% if codes %}
+            <p>
+              <strong>
+                {% if score == "1" %}Introduced:
+                {% elif score == "2" %}Practiced:
+                {% elif score == "3" %}Solo Proficient:
+                {% elif score == "4" %}Checkride Standard:
+                {% elif score == "!" %}Critical Issue:
+                {% else %}{{ score }}:
+                {% endif %}
+              </strong>
+              {{ codes|join:", " }}
+            </p>
+          {% endif %}
+        {% endfor %}
+      {% elif block.type == "ground" %}
+        <p class="text-muted"><em>No performance scores recorded for this ground session.</em></p>
       {% endif %}
-
+    
       {% if block.report.report_text %}
-      <h5>📝 Instructor Essay</h5>
-      <div class="border p-3 bg-white">
-        {{ block.report.report_text|safe }}
-      </div>
+        <h5>📝 Instructor Essay</h5>
+        <div class="border p-3 bg-white">
+          {{ block.report.report_text|safe }}
+        </div>
       {% elif block.report.notes %}
-      <h5>📝 Notes</h5>
-      <div class="border p-3 bg-white">
-        {{ block.report.notes|safe }}
-      </div>
+        <h5>📝 Notes</h5>
+        <div class="border p-3 bg-white">
+          {{ block.report.notes|safe }}
+        </div>
+      {% elif block.type == "ground" %}
+        <p class="text-muted"><em>No notes provided for this ground session.</em></p>
       {% endif %}
-
+    
     </div>
+    
     <div class="card-footer text-muted small">
       Submitted by {{ block.report.instructor.full_display_name }}.
       {% if block.type == "flight" %}
