@@ -268,6 +268,21 @@ class Towplane(models.Model):
     def __str__(self):
         status = " (Inactive)" if not self.is_active else ""
         return f"{self.name} ({self.registration})"
+    
+    @property
+    def is_grounded(self):
+        return MaintenanceIssue.objects.filter(
+            towplane=self,
+            grounded=True,
+            resolved=False
+        ).exists()
+
+    def get_active_issues(self):
+        return MaintenanceIssue.objects.filter(
+            towplane=self,
+            resolved=False
+        )
+
 
 ####################################################
 # Glider model
@@ -290,6 +305,7 @@ class Glider(models.Model):
         default=True,
         help_text="Uncheck to hide this glider from flight entry dropdowns"
     )
+    club_owned = models.BooleanField(default=True)
 
     owners = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -307,6 +323,20 @@ class Glider(models.Model):
         if self.model:
             parts.append(self.model)
         return " / ".join(parts)
+    @property
+    def is_grounded(self):
+        return MaintenanceIssue.objects.filter(
+            glider=self,
+            grounded=True,
+            resolved=False
+        ).exists()
+
+    def get_active_issues(self):
+        return MaintenanceIssue.objects.filter(
+            glider=self,
+            resolved=False
+        )
+
     
 
 ####################################################
@@ -441,3 +471,52 @@ class TowplaneCloseout(models.Model):
         return f"{self.towplane.registration} on {self.logsheet.log_date}"
 
 
+from django.db import models
+from members.models import Member
+from logsheet.models import Glider, Towplane
+
+
+class MaintenanceIssue(models.Model):
+    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
+    towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
+    reported_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
+    report_date = models.DateField(auto_now_add=True)
+    description = models.TextField()
+    grounded = models.BooleanField(default=False)
+    resolved = models.BooleanField(default=False)
+    resolution_notes = models.TextField(blank=True)
+    resolved_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="resolved_maintenance")
+    resolved_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-report_date']
+
+    def __str__(self):
+        aircraft = self.glider or self.towplane
+        label = f"{aircraft}"
+        return f"{label} - {'Grounded' if self.grounded else 'Open'} - {self.description[:40]}"
+
+
+class MaintenanceDeadline(models.Model):
+    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
+    towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
+    item = models.CharField(max_length=100)  # e.g., "Annual Inspection", "Transponder Cert"
+    due_date = models.DateField()
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['due_date']
+
+    def __str__(self):
+        aircraft = self.glider or self.towplane
+        return f"{aircraft} – {self.item} due {self.due_date}"
+
+
+class AircraftMeister(models.Model):
+    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
+    towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE)
+
+    def __str__(self):
+        aircraft = self.glider or self.towplane
+        return f"{self.member} – {aircraft}"

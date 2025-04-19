@@ -14,6 +14,7 @@ from logsheet.utils.aliases import resolve_towplane
 
 
 
+
 GLIDER_ALIASES = [
 
     {"legacy_name": "XZ", "start": "2000-01-02", "end": "2019-07-01", "n_number": "N27SN"},
@@ -71,7 +72,7 @@ GLIDER_ALIASES = [
     {"legacy_name": "SM", "n_number": "N2671H"},
     {"legacy_name": "SG", "n_number": "D-KUHR"},
     {"legacy_name": "SZ", "n_number": "N483SZ"},
-    {"legacy_name": "SGS 2-33", "n_number": "N2724H"},
+    {"legacy_name": "SGS 2-33", "n_number": "N2743H"},
     {"legacy_name": "CP", "n_number": "N1XE"},
     {"legacy_name": "UU", "n_number": "N11UU"},
 ]

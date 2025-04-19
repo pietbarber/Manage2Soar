@@ -73,12 +73,21 @@ class FlightForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "registration") 
         # Filter instructors only
         self.fields["pilot"].queryset = get_active_members()
         self.fields["instructor"].queryset = get_active_members_with_role("instructor")
         self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
         self.fields["split_with"].queryset = get_active_members()
+
+        active_towplanes = Towplane.objects.filter(is_active=True)
+        self.fields["towplane"].queryset = active_towplanes.exclude(
+            id__in=[tp.id for tp in active_towplanes if tp.is_grounded]
+        ).order_by("name", "registration")
+
+        active_gliders = Glider.objects.filter(is_active=True)
+        self.fields["glider"].queryset = active_gliders.exclude(
+            id__in=[g.id for g in active_gliders if g.is_grounded]
+        ).order_by("n_number")
 
         COMMON_ALTITUDES = [3000, 1500, 2000, 2500, 4000]
         ALL_ALTITUDES = list(range(0, 7100, 100))

@@ -180,3 +180,8 @@ class MemberAdmin(VersionAdmin, UserAdmin):
             "fields": ("username", "email", "first_name", "last_name", "password1", "password2"),
         }),
     )
+    def get_search_results(self, request, queryset, search_term):
+        from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+        queryset = queryset.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        return super().get_search_results(request, queryset, search_term)
+
