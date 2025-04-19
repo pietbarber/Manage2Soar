@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield, LogsheetCloseout, TowplaneCloseout, LogsheetPayment
 from django.utils.html import format_html
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeister
 
 
 # Admin configuration for managing Towplane objects
@@ -13,6 +14,10 @@ class TowplaneAdmin(admin.ModelAdmin):
     list_display = ("name", "registration", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name", "registration")
+    def get_search_results(self, request, queryset, search_term):
+        queryset = queryset.filter(is_active=True)
+        return super().get_search_results(request, queryset, search_term)
+
 
 
 # Admin configuration for Glider objects. 
@@ -24,6 +29,10 @@ class TowplaneAdmin(admin.ModelAdmin):
 class GliderAdmin(admin.ModelAdmin):
     list_display = ("competition_number", "n_number", "model", "make", "seats", "club_owned")
     search_fields = ("competition_number", "n_number", "model", "make", "club_owned")
+    def get_search_results(self, request, queryset, search_term):
+        queryset = queryset.filter(is_active=True, club_owned=True)
+        return super().get_search_results(request, queryset, search_term)
+
 
 # The flight table is where most of the action for the logsheet lives. 
 # This is a stop-gap to edit the database directly from the admin interface, 
@@ -120,8 +129,6 @@ class LogsheetPaymentAdmin(admin.ModelAdmin):
     search_fields = ('member__first_name', 'member__last_name', 'note')
     autocomplete_fields = ('member', 'logsheet')
 
-from django.contrib import admin
-from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeister
 
 @admin.register(MaintenanceIssue)
 class MaintenanceIssueAdmin(admin.ModelAdmin):
@@ -130,6 +137,12 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
     list_filter = ('grounded', 'resolved')
     autocomplete_fields = ('glider', 'towplane', 'reported_by', 'resolved_by')
     readonly_fields = ('report_date',)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "glider":
+            from logsheet.models import Glider
+            kwargs["queryset"] = Glider.objects.filter(is_active=True, club_owned=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def aircraft_display(self, obj):
         return obj.glider or obj.towplane
@@ -142,6 +155,7 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
 
     def description_short(self, obj):
         return obj.description[:50] + ('...' if len(obj.description) > 50 else '')
+
 
 
 @admin.register(MaintenanceDeadline)
