@@ -1,5 +1,6 @@
 import base64
 import os
+from datetime import date
 
 from django.urls import reverse
 from django.conf import settings
@@ -122,6 +123,7 @@ def member_view(request, member_id):
             "can_edit": can_edit,
             "biography": biography,
             "qualifications": qualifications,
+            "today": date.today(),
         },
     )
 

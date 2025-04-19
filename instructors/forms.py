@@ -1,9 +1,13 @@
 from django import forms
 from .models import MemberQualification, ClubQualificationType
-from members.models import Member
-from django.forms import modelformset_factory
 from .models import InstructionReport, LessonScore, TrainingLesson
 from tinymce.widgets import TinyMCE
+from datetime import date
+from instructors.models import GroundInstruction, GroundLessonScore, TrainingLesson, SCORE_CHOICES
+from tinymce.widgets import TinyMCE
+from datetime import timedelta
+from django.forms import formset_factory
+from instructors.models import TrainingLesson, SCORE_CHOICES
 
 class InstructionReportForm(forms.ModelForm):
     class Meta:
@@ -13,7 +17,6 @@ class InstructionReportForm(forms.ModelForm):
             "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
         }
 
-from instructors.models import TrainingLesson, SCORE_CHOICES
 
 class LessonScoreSimpleForm(forms.Form):
     lesson = forms.ModelChoiceField(queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput())
@@ -23,15 +26,7 @@ class LessonScoreSimpleForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
-from django.forms import formset_factory
 LessonScoreSimpleFormSet = formset_factory(LessonScoreSimpleForm, extra=0)
-
-from django import forms
-from instructors.models import GroundInstruction, GroundLessonScore, TrainingLesson, SCORE_CHOICES
-from members.models import Member
-from tinymce.widgets import TinyMCE
-from django.forms import formset_factory
-from datetime import timedelta
 
 class GroundInstructionForm(forms.ModelForm):
     class Meta:
@@ -82,13 +77,13 @@ GroundLessonScoreFormSet = formset_factory(
     validate_max=False
 )
 
-
 class QualificationAssignForm(forms.ModelForm):
     class Meta:
         model = MemberQualification
-        fields = ['qualification', 'is_qualified', 'expiration_date', 'notes']
+        fields = ['qualification', 'is_qualified', 'expiration_date', 'date_awarded', 'notes']
         widgets = {
             'expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            'date_awarded': forms.DateInput(attrs={'type': 'date'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
         }
 
@@ -96,17 +91,25 @@ class QualificationAssignForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.instructor = instructor
         self.student = student
+        self.fields['date_awarded'].label = "Date Awarded (optional)"
+        self.fields['expiration_date'].label = "Expiration Date (optional)"
+
+    from datetime import date  # at the top of forms.py
 
     def save(self, commit=True):
+        date_awarded = self.cleaned_data.get('date_awarded') or date.today()
+    
         instance, _ = MemberQualification.objects.update_or_create(
             member=self.student,
             qualification=self.cleaned_data['qualification'],
             defaults={
                 'is_qualified': self.cleaned_data['is_qualified'],
                 'expiration_date': self.cleaned_data['expiration_date'],
+                'date_awarded': date_awarded,
                 'notes': self.cleaned_data['notes'],
                 'instructor': self.instructor,
                 'imported': False,
             }
         )
         return instance
+

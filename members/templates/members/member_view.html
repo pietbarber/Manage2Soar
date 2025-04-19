@@ -122,24 +122,46 @@
               {% if qualifications %}
                 <ul class="list-group">
                   {% for q in qualifications %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                      <span>
+
+
+                  <li class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div class="d-flex align-items-start">
                         {% if q.qualification.icon %}
-                          <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" width="24" height="24" class="me-2">
+                          <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" width="24" height="24" class="me-2 mt-1">
                         {% endif %}
-                        <strong>{{ q.qualification.name }}</strong>
-                        {% if q.notes %}
-                          <div class="text-muted small">{{ q.notes }}</div>
-                        {% endif %}
-                      </span>
-                      <span class="text-muted">
+                        <div>
+                          <strong>{{ q.qualification.name }}</strong><br>
+                          <small class="text-muted">
+                            {% if q.date_awarded %}
+                              Awarded {{ q.date_awarded|date:"Y-m-d" }}
+                            {% endif %}
+                            {% if q.instructor %}
+                              by {{ q.instructor.full_display_name }}
+                            {% endif %}
+                          </small>
+                          {% if q.notes %}
+                            <div class="text-muted small">{{ q.notes }}</div>
+                          {% endif %}
+                        </div>
+                      </div>
+                      <div>
                         {% if q.expiration_date %}
-                          <span class="badge bg-warning">Expires {{ q.expiration_date|date:"M Y" }}</span>
+                          {% if q.expiration_date < today %}
+                            <span class="badge bg-danger">Expired {{ q.expiration_date|date:"Y-m-d" }}</span>
+                          {% else %}
+                            <span class="badge bg-warning">Expires {{ q.expiration_date|date:"Y-m-d" }}</span>
+                          {% endif %}
                         {% else %}
                           <span class="badge bg-success">Permanent</span>
                         {% endif %}
-                      </span>
-                    </li>
+                      </div>
+                    </div>
+                  </li>
+                  
+
+
+
                   {% endfor %}
                 </ul>
               {% else %}

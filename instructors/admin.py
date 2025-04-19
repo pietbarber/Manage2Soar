@@ -61,6 +61,7 @@ class ClubQualificationTypeAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'applies_to', 'is_obsolete')
     search_fields = ('code', 'name')
     list_filter = ('applies_to', 'is_obsolete')
+    ordering = ('code',)
 
 @admin.register(MemberQualification)
 class MemberQualificationAdmin(admin.ModelAdmin):
