@@ -51,7 +51,7 @@
         </li>
         {% endif %}
         <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> 
-          {{ member.city }}, {{ member.state_code }} {{ member.state_freeform }} {{ member.zip_code }}<br>
+          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }} {% endif %} {{ member.zip_code }}<br>
           {{ member.country }}
         </li>
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li> 
@@ -107,7 +107,7 @@
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingQuals">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseQuals" aria-expanded="false" aria-controls="collapseQuals">
-              Qualifications (click to expand)
+              Qualifications
               <span class="ms-3">
                 {% for q in qualifications %}
                   {% if q.qualification.icon %}
