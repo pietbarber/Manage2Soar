@@ -17,6 +17,7 @@ from .models import Badge, MemberBadge
 from .models import Member, Biography
 from .utils.vcard_tools import generate_vcard_qr
 from .decorators import active_member_required
+from instructors.models import MemberQualification
 
 #########################
 # member_list() View
@@ -94,6 +95,14 @@ def member_view(request, member_id):
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
 
+    qualifications = (
+        MemberQualification.objects
+        .filter(member=member, is_qualified=True)
+        .select_related('qualification', 'instructor')
+        .order_by('qualification__code')
+    )
+
+
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
@@ -112,6 +121,7 @@ def member_view(request, member_id):
             "is_self": is_self,
             "can_edit": can_edit,
             "biography": biography,
+            "qualifications": qualifications,
         },
     )
 

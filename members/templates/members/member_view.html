@@ -96,55 +96,96 @@
       <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-sm btn-outline-primary">
          Create Instruction Report
       </a>
+      <a href="{% url 'instructors:assign_qualification' member.id %}" class="btn btn-sm btn-outline-primary">
+        ➕ Assign Qualification
+      </a>
       </div>
       {% endif %}
-    
-    <div class="mt-4">
-      <h4>🏅 SSA Badges</h4>
-      {% if member.badges.exists %}
-        <div class="row">
-          {% for badge in member.badges.all %}
-            {% if badge.badge.name in "'A Badge','B Badge','C Badge','Bronze Badge'" %}
-              <div class="col-auto mb-2 text-center" style="width: 110px;" text-align="center">
-                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}"
-                     class="img-thumbnail" style="max-width: 100px;">
-                <div class="small">{{ badge.badge.name }}</div>
-                <div class="text-muted small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
-        <div class="row">
-          {% for badge in member.badges.all %}
-            {% if badge.badge.name in "'FAI Silver Badge','FAI Gold Badge','FAI Diamond Badge'" %}
-              <div class="col-auto mb-2 text-center" style="width: 110px;" text-align="center">
-                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}"
-                     class="img-thumbnail" style="max-width: 100px;">
-                <div class="small">{{ badge.badge.name }}</div>
-                <div class="text-muted small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
-    </div>
 
-  <div class="row mt-3">
-    {% for badge in member.badges.all %}
-      {% if badge.badge.name in "Silver,Gold,Diamond" %}
-        <div class="col-auto mb-2">
-          <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail" style="max-width: 150px;">
-          <div class="text-center small">{{ badge.badge.name }}</div>
-          <div class="text-muted small">
-            Awarded: {{ badge.date_awarded|date:"Y-m-d" }}
+<!-- QUALIFICATIONS HERE -->
+      <div class="accordion mb-4" id="qualificationAccordion">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingQuals">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseQuals" aria-expanded="false" aria-controls="collapseQuals">
+              Qualifications (click to expand)
+              <span class="ms-3">
+                {% for q in qualifications %}
+                  {% if q.qualification.icon %}
+                    <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" title="{{ q.qualification.name }}" width="24" height="24" class="ms-1">
+                  {% endif %}
+                {% endfor %}
+              </span>
+            </button>
+          </h2>
+          <div id="collapseQuals" class="accordion-collapse collapse" aria-labelledby="headingQuals" data-bs-parent="#qualificationAccordion">
+            <div class="accordion-body">
+              {% if qualifications %}
+                <ul class="list-group">
+                  {% for q in qualifications %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <span>
+                        {% if q.qualification.icon %}
+                          <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" width="24" height="24" class="me-2">
+                        {% endif %}
+                        <strong>{{ q.qualification.name }}</strong>
+                        {% if q.notes %}
+                          <div class="text-muted small">{{ q.notes }}</div>
+                        {% endif %}
+                      </span>
+                      <span class="text-muted">
+                        {% if q.expiration_date %}
+                          <span class="badge bg-warning">Expires {{ q.expiration_date|date:"M Y" }}</span>
+                        {% else %}
+                          <span class="badge bg-success">Permanent</span>
+                        {% endif %}
+                      </span>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <p class="text-muted"><em>No qualifications recorded.</em></p>
+              {% endif %}
+            </div>
           </div>
         </div>
-      {% endif %}
-    {% endfor %}
-  </div>
-{% else %}
-  <p class="text-muted">No badges awarded yet.</p>
-{% endif %}
- 
+      </div>
+<!-- BADGES HERE -->
+      <div class="accordion mb-4" id="ssaBadgeAccordion">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingBadges">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
+              🏅 SSA Badges
+              <span class="ms-3">
+                {% for badge in member.badges.all %}
+                  {% if badge.badge.image %}
+                  <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" width="24" height="24" class="ms-1" title="{{ badge.badge.name }}">
+                  {% endif %}
+                {% endfor %}
+              </span>
+            </button>
+          </h2>
+          <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges" data-bs-parent="#ssaBadgeAccordion">
+            <div class="accordion-body">
+              {% if member.badges.exists %}
+                <div class="row row-cols-auto g-3 justify-content-start">
+                  {% for badge in member.badges.all %}
+                    <div class="col text-center">
+                      {% if badge.badge.image %}
+                      <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail mb-1" style="max-width: 100px;">
+                      {% endif %}
+                      <div class="small">{{ badge.badge.name }}</div>
+                      <div class="text-muted small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="text-muted">No badges awarded yet.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      
 
 
 

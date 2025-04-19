@@ -1,4 +1,6 @@
 from django import forms
+from .models import MemberQualification, ClubQualificationType
+from members.models import Member
 from django.forms import modelformset_factory
 from .models import InstructionReport, LessonScore, TrainingLesson
 from tinymce.widgets import TinyMCE
@@ -79,3 +81,32 @@ GroundLessonScoreFormSet = formset_factory(
     validate_min=False,
     validate_max=False
 )
+
+
+class QualificationAssignForm(forms.ModelForm):
+    class Meta:
+        model = MemberQualification
+        fields = ['qualification', 'is_qualified', 'expiration_date', 'notes']
+        widgets = {
+            'expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, instructor=None, student=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instructor = instructor
+        self.student = student
+
+    def save(self, commit=True):
+        instance, _ = MemberQualification.objects.update_or_create(
+            member=self.student,
+            qualification=self.cleaned_data['qualification'],
+            defaults={
+                'is_qualified': self.cleaned_data['is_qualified'],
+                'expiration_date': self.cleaned_data['expiration_date'],
+                'notes': self.cleaned_data['notes'],
+                'instructor': self.instructor,
+                'imported': False,
+            }
+        )
+        return instance

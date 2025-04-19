@@ -1,7 +1,21 @@
-from django.shortcuts import render
+
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 from .decorators import instructor_required
-from .models import TrainingLesson, SyllabusDocument, TrainingPhase
+from django.contrib import messages
+from django.forms import formset_factory
+from django.http import HttpResponseBadRequest
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from django.utils.timezone import now
+from instructors.decorators import member_or_instructor_required, instructor_required
+from instructors.forms import InstructionReportForm, LessonScoreSimpleForm, LessonScoreSimpleFormSet, QualificationAssignForm, GroundInstructionForm, GroundLessonScoreFormSet
+from instructors.models import InstructionReport, LessonScore, GroundInstruction, GroundLessonScore, TrainingLesson, SyllabusDocument, TrainingPhase
+from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
+from members.models import Member
+from django.contrib.auth.decorators import user_passes_test
+
 
 
 # instructors/views.py
@@ -27,26 +41,12 @@ def syllabus_overview_grouped(request):
         "materials": materials,
     })
 
-from django.shortcuts import render, get_object_or_404
 
 @instructor_required
 def syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     return render(request, "instructors/syllabus_detail.html", {"lesson": lesson})
 
-
-from datetime import datetime
-from collections import defaultdict
-from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib import messages
-from django.utils.timezone import now
-from django.http import HttpResponseBadRequest
-from django.forms import formset_factory
-
-from instructors.decorators import instructor_required
-from instructors.forms import InstructionReportForm, LessonScoreSimpleForm, LessonScoreSimpleFormSet
-from instructors.models import InstructionReport, LessonScore, TrainingLesson
-from members.models import Member
 
 @instructor_required
 def fill_instruction_report(request, student_id, report_date):
@@ -117,14 +117,6 @@ def fill_instruction_report(request, student_id, report_date):
     })
 
 
-from django.shortcuts import render, get_object_or_404
-from logsheet.models import Flight, Logsheet
-from members.models import Member
-from datetime import timedelta
-from django.utils import timezone
-from collections import defaultdict
-from datetime import timedelta
-
 @active_member_required
 def select_instruction_date(request, student_id):
     instructor = request.user
@@ -153,27 +145,10 @@ def select_instruction_date(request, student_id):
     }
     return render(request, "instructors/select_instruction_date.html", context)
 
-from django.shortcuts import get_object_or_404, render
-from instructors.models import InstructionReport, LessonScore, TrainingLesson
-from members.models import Member
-from collections import defaultdict
-
-from datetime import date
-from django.utils.timezone import now
-from collections import defaultdict
-from members.models import Member
-from logsheet.models import Flight
-
-
 def get_instructor_initials(member):
     initials = f"{member.first_name[0]}{member.last_name[0]}" if member.first_name and member.last_name else "??"
     return initials.upper()
 
-from django.utils.timezone import now
-from collections import defaultdict
-from django.shortcuts import get_object_or_404, render
-from .models import InstructionReport, LessonScore, TrainingLesson
-from logsheet.models import Flight
 
 def member_training_grid(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
@@ -280,24 +255,6 @@ def member_training_grid(request, member_id):
 
 # instructors/views.py
 
-from django.shortcuts import get_object_or_404, render
-from django.utils.timezone import now
-from collections import defaultdict
-from instructors.decorators import member_or_instructor_required
-from instructors.models import InstructionReport, LessonScore
-from logsheet.models import Flight
-from members.models import Member
-
-
-##########################################################
-from collections import defaultdict
-from django.shortcuts import get_object_or_404, render
-from django.utils import timezone
-from instructors.models import InstructionReport, LessonScore, GroundInstruction, GroundLessonScore
-from members.models import Member
-from logsheet.models import Flight
-
-
 def member_instruction_record(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
 
@@ -368,17 +325,6 @@ def member_instruction_record(request, member_id):
 ##########################################################
 
 # instructors/views.py (partial)
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.utils.timezone import now
-from django.contrib.auth.decorators import login_required
-
-from instructors.forms import GroundInstructionForm, GroundLessonScoreFormSet
-from instructors.models import GroundInstruction, GroundLessonScore, TrainingLesson
-from instructors.decorators import instructor_required
-from members.models import Member
-
 @instructor_required
 def log_ground_instruction(request):
     student_id = request.GET.get("student")
@@ -429,4 +375,26 @@ def log_ground_instruction(request):
         "formset": formset,
         "form_rows": form_rows,
         "student": student,
+    })
+
+
+def is_instructor(user):
+    return user.is_authenticated and user.instructor
+
+@active_member_required
+@user_passes_test(is_instructor)
+def assign_qualification(request, member_id):
+    student = get_object_or_404(Member, pk=member_id)
+
+    if request.method == 'POST':
+        form = QualificationAssignForm(request.POST, instructor=request.user, student=student)
+        if form.is_valid():
+            form.save()
+            return redirect('members:member_view', member_id=member_id)
+    else:
+        form = QualificationAssignForm(instructor=request.user, student=student)
+
+    return render(request, 'instructors/assign_qualification.html', {
+        'form': form,
+        'student': student,
     })
