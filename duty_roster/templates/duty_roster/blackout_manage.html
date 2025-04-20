@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🗓️ Blackout Dates</h2>
+  <p class="text-muted">Use this form to indicate which dates you <strong>cannot</strong> be scheduled for duty.</p>
+
+  <form method="post" class="mb-4">
+    {% csrf_token %}
+    <div class="row g-2">
+      <div class="col-md-4">{{ form.date }}</div>
+      <div class="col-md-6">{{ form.note }}</div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Add</button>
+      </div>
+    </div>
+  </form>
+
+  <h4>🚫 Your Current Blackout Dates</h4>
+  {% if existing %}
+    <ul class="list-group">
+      {% for b in existing %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ b.date|date:"l, F j, Y" }}{% if b.note %} – <em>{{ b.note }}</em>{% endif %}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You have not set any blackout dates yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
