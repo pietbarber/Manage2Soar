@@ -37,10 +37,16 @@ class Command(BaseCommand):
             pref.dont_schedule = str(raw.get("dont-schedule", "")).lower() in ["true", "1", "yes"]
 
             if raw.get("last-duty-date"):
-                try:
-                    pref.last_duty_date = datetime.strptime(raw["last-duty-date"], "%Y-%m-%d").date()
-                except ValueError:
-                    self.stdout.write(self.style.WARNING(f"Bad last-duty-date for {name}: {raw['last-duty-date']}"))
+                date_str = raw["last-duty-date"]
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
+                    try:
+                        pref.last_duty_date = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    self.stdout.write(self.style.WARNING(f"Bad last-duty-date for {name}: {date_str}"))
+
             pref.save()
 
             # DutyPairing
