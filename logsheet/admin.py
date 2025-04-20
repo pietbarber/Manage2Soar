@@ -25,13 +25,19 @@ class TowplaneAdmin(admin.ModelAdmin):
 # If a new glider is acquired by the club, we need to add it here.
 # If a member gets a new glider, it also needs to be added here. 
 # If the rental rate for any of our gliders change, those updates need to go here. 
+
 @admin.register(Glider)
 class GliderAdmin(admin.ModelAdmin):
     list_display = ("competition_number", "n_number", "model", "make", "seats", "club_owned")
-    search_fields = ("competition_number", "n_number", "model", "make", "club_owned")
-    def get_search_results(self, request, queryset, search_term):
-        queryset = queryset.filter(is_active=True, club_owned=True)
-        return super().get_search_results(request, queryset, search_term)
+    search_fields = ("n_number", "competition_number", "make", "model")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Show all gliders in the Django admin
+        if request.path.startswith("/admin/"):
+            return qs
+        # Elsewhere (like in forms), only show club-owned gliders
+        return qs.filter(club_owned=True)
 
 
 # The flight table is where most of the action for the logsheet lives. 
