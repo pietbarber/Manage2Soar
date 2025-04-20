@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📅 Blackout Calendar</h2>
+  <p class="text-muted">Select any dates you are unavailable for duty. This view includes the next 3 months.</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="row">
+      {% for month in months %}
+      <div class="col-12 col-md-4 mb-4">
+        <h4>{{ month.label }}</h4>
+        <div class="table-responsive">
+          <table class="table table-bordered text-center">
+            <thead>
+              <tr>
+                <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for week in month.calendar %}
+              <tr>
+                {% for day in week %}
+                <td class="align-middle">
+                  {% if day %}
+                    <label>
+                      <input type="checkbox" name="blackout_dates" value="{{ day|date:"Y-m-d" }}"
+                             {% if day in existing_dates %}checked{% endif %}>
+                      <br><small>{{ day.day }}</small>
+                    </label>
+                  {% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-end">
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
