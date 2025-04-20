@@ -497,19 +497,27 @@ class MaintenanceIssue(models.Model):
         return f"{label} - {'Grounded' if self.grounded else 'Open'} - {self.description[:40]}"
 
 
-class MaintenanceDeadline(models.Model):
-    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
-    towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
-    item = models.CharField(max_length=100)  # e.g., "Annual Inspection", "Transponder Cert"
-    due_date = models.DateField()
-    notes = models.TextField(blank=True)
+DEADLINE_TYPES = [
+    ("annual", "Annual Inspection"),
+    ("condition", "Condition Inspection"),
+    ("parachute", "Parachute Repack"),
+    ("transponder", "Transponder Inspection"),
+    ("letter", "Program Letter"),
+]
 
-    class Meta:
-        ordering = ['due_date']
+class MaintenanceDeadline(models.Model):
+    glider = models.ForeignKey(Glider, on_delete=models.CASCADE, blank=True, null=True)
+    towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE, blank=True, null=True)
+    description = models.CharField(
+        max_length=32,
+        choices=DEADLINE_TYPES,
+        help_text="Select type of maintenance deadline."
+    )
+    due_date = models.DateField()
 
     def __str__(self):
         aircraft = self.glider or self.towplane
-        return f"{aircraft} – {self.item} due {self.due_date}"
+        return f"{aircraft} – {self.get_description_display()} due {self.due_date}"
 
 
 class AircraftMeister(models.Model):

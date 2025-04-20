@@ -163,16 +163,22 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
         return obj.description[:50] + ('...' if len(obj.description) > 50 else '')
 
 
-
 @admin.register(MaintenanceDeadline)
 class MaintenanceDeadlineAdmin(admin.ModelAdmin):
-    list_display = ('aircraft_display', 'item', 'due_date')
-    search_fields = ('glider__n_number', 'towplane__n_number', 'item')
-    autocomplete_fields = ('glider', 'towplane')
+    list_display = ("aircraft_n_number", "aircraft_type", "description", "due_date")
+    list_filter = ("description", "due_date")
+    search_fields = ("glider__n_number", "towplane__registration")
 
-    def aircraft_display(self, obj):
-        return obj.glider or obj.towplane
-    aircraft_display.short_description = "Aircraft"
+    autocomplete_fields = ("glider", "towplane")
+
+    def aircraft_n_number(self, obj):
+        return obj.glider.n_number if obj.glider else obj.towplane.registration
+    aircraft_n_number.short_description = "N-Number"
+
+    def aircraft_type(self, obj):
+        return "Glider" if obj.glider else "Towplane"
+    aircraft_type.short_description = "Type"
+
 
 
 @admin.register(AircraftMeister)
