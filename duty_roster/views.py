@@ -13,14 +13,6 @@ from django.http import HttpResponse
 def roster_home(request):
     return HttpResponse("Duty Roster Home")
 
-from django.shortcuts import render, redirect
-from django.utils.timezone import now
-from django.conf import settings
-from .models import MemberBlackout
-from datetime import date, timedelta
-import calendar
-from members.decorators import active_member_required
-
 @active_member_required
 def blackout_manage(request):
     member = request.user
@@ -59,10 +51,11 @@ def blackout_manage(request):
             date.fromisoformat(d)
             for d in request.POST.getlist("blackout_dates")
         )
+        default_note = request.POST.get("default_note", "").strip()
 
         # Add new blackouts
         for d in submitted - existing_dates:
-            MemberBlackout.objects.create(member=member, date=d)
+            MemberBlackout.objects.create(member=member, date=d, note=default_note)
 
         # Remove unselected ones
         for d in existing_dates - submitted:
