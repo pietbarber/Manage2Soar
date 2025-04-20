@@ -5,6 +5,16 @@
   <h2>📅 Blackout Calendar</h2>
   <p class="text-muted">Select any dates you are unavailable for duty. This view includes the next 3 months.</p>
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-success">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
   <form method="post">
     {% csrf_token %}
     <div class="row">
@@ -24,11 +34,17 @@
                 {% for day in week %}
                 <td class="align-middle">
                   {% if day %}
-                    <label>
-                      <input type="checkbox" name="blackout_dates" value="{{ day|date:"Y-m-d" }}"
-                             {% if day in existing_dates %}checked{% endif %}>
-                      <br><small>{{ day.day }}</small>
-                    </label>
+                    {% if day.weekday == 6 or day.weekday == 0 %} {# Sunday or Saturday #}
+                      <label>
+                        <input type="checkbox" name="blackout_dates" value="{{ day|date:"Y-m-d" }}"
+                               {% if day in existing_dates %}checked{% endif %}>
+                        <br><small>{{ day.day }}</small>
+                      </label>
+                    {% else %}
+                      <div class="text-muted small" style="opacity: 0.5;">
+                        {{ day.day }}
+                      </div>
+                    {% endif %}
                   {% endif %}
                 </td>
                 {% endfor %}
@@ -46,8 +62,54 @@
       <input type="text" class="form-control" name="default_note" id="defaultNote" placeholder="e.g., SchnitzelCon 2025">
     </div>
 
+    <hr class="my-5">
+    <h3>🧭 Duty Assignment Preferences</h3>
+
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="dont_schedule" id="dontSchedule" onchange="document.getElementById('suspendReason').disabled = !this.checked">
+          <label class="form-check-label" for="dontSchedule">
+            Please do not assign me to duty at all
+          </label>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <input type="text" class="form-control" name="suspended_reason" id="suspendReason" placeholder="e.g., Medical leave, travel abroad..." disabled>
+      </div>
+    </div>
+
+    <hr class="my-4">
+
+    <div class="mb-3">
+      <label for="preferredDay" class="form-label">Preferred duty day:</label>
+      <select name="preferred_day" class="form-select" id="preferredDay">
+        <option value="">No preference</option>
+        <option value="sat">Saturday</option>
+        <option value="sun">Sunday</option>
+      </select>
+    </div>
+
+    <div class="row">
+      {% for role, label in role_percent_choices %}
+      <div class="col-md-6 mb-3">
+        <label for="{{ role }}_percent" class="form-label">How often would you like to serve as {{ label }}?</label>
+        <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
+          {% for val in percent_options %}
+            <option value="{{ val }}"
+              {% if role == 'instructor' and preference.instructor == val %}selected{% endif %}
+              {% if role == 'duty_officer' and preference.duty_officer == val %}selected{% endif %}
+              {% if role == 'ado' and preference.ado == val %}selected{% endif %}
+              {% if role == 'towpilot' and preference.towpilot == val %}selected{% endif %}
+            >{{ val }}%</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+
     <div class="text-end">
-      <button type="submit" class="btn btn-primary">Save Changes</button>
+      <button type="submit" class="btn btn-primary">Save All Changes</button>
     </div>
   </form>
 </div>
