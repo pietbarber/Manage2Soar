@@ -1,78 +1,68 @@
 import json
 import difflib
 from django.core.management.base import BaseCommand
+from datetime import datetime
 from members.models import Member
 from duty_roster.models import DutyPreference, DutyPairing, DutyAvoidance, MemberBlackout
-from datetime import datetime
-
 
 class Command(BaseCommand):
-    help = "Import duty preference and constraint data from membership.json"
+    help = "Import duty constraints and preferences from a legacy membership.json file"
 
     def add_arguments(self, parser):
-        parser.add_argument("path", type=str, help="Path to membership.json")
+        parser.add_argument("json_file", type=str)
 
     def handle(self, *args, **options):
-        path = options["path"]
-        with open(path, "r", encoding="utf-8") as f:
+        with open(options["json_file"], "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        all_members = list(Member.objects.all())
-        name_map = {m.full_display_name.lower(): m for m in all_members}
+        members = list(Member.objects.all())
+        name_map = {m.full_display_name: m for m in members}
+        name_list = list(name_map.keys())
 
-        def resolve_name(raw_name):
-            candidates = list(name_map.keys())
-            best = difflib.get_close_matches(raw_name.lower(), candidates, n=1, cutoff=0.85)
-            return name_map[best[0]] if best else None
+        def resolve(name):
+            matches = difflib.get_close_matches(name, name_list, n=1, cutoff=0.85)
+            return name_map[matches[0]] if matches else None
 
-        self.stdout.write(self.style.NOTICE(f"Processing {len(data)} member entries..."))
-
-        for entry in data:
-            raw_name = entry.get("name")
-            if not raw_name:
-                continue
-
-            member = resolve_name(raw_name)
+        for raw in data:
+            name = raw.get("name")
+            member = resolve(name)
             if not member:
-                self.stderr.write(self.style.ERROR(f"❌ Could not resolve: {raw_name}"))
+                self.stdout.write(self.style.WARNING(f"Skipping {name} (no handle)"))
                 continue
 
-            # Import DutyPreference
-            preferred_day = entry.get("preferred-day")
-            comment = entry.get("web-comment") or entry.get("comment")
-            if preferred_day or comment:
-                DutyPreference.objects.update_or_create(
-                    member=member,
-                    defaults={"preferred_day": preferred_day.lower() if preferred_day else None,
-                              "comment": comment}
-                )
+            # DutyPreference
+            pref, _ = DutyPreference.objects.get_or_create(member=member)
+            pref.preferred_day = raw.get("preferred-day") or pref.preferred_day
+            pref.comment = raw.get("comment") or raw.get("web-comment") or pref.comment
+            pref.dont_schedule = str(raw.get("dont-schedule", "")).lower() in ["true", "1", "yes"]
 
-            # Import DutyPairing
-            pair_name = entry.get("schedule-with-member")
-            if pair_name:
-                pair_member = resolve_name(pair_name)
-                if pair_member:
-                    DutyPairing.objects.get_or_create(member=member, pair_with=pair_member)
-                else:
-                    self.stderr.write(self.style.WARNING(f"Could not resolve pair-with-member: {pair_name}"))
+            if raw.get("last-duty-date"):
+                try:
+                    pref.last_duty_date = datetime.strptime(raw["last-duty-date"], "%Y-%m-%d").date()
+                except ValueError:
+                    self.stdout.write(self.style.WARNING(f"Bad last-duty-date for {name}: {raw['last-duty-date']}"))
+            pref.save()
 
-            # Import DutyAvoidance
-            avoid_name = entry.get("dont-schedule-with-member")
-            if avoid_name:
-                avoid_member = resolve_name(avoid_name)
+            # DutyPairing
+            pair_with = raw.get("schedule-with-member")
+            if pair_with:
+                other = resolve(pair_with)
+                if other:
+                    DutyPairing.objects.get_or_create(member=member, pair_with=other)
+
+            # DutyAvoidance
+            avoid = raw.get("dont-schedule-with-member")
+            if avoid:
+                avoid_member = resolve(avoid)
                 if avoid_member:
                     DutyAvoidance.objects.get_or_create(member=member, avoid_with=avoid_member)
-                else:
-                    self.stderr.write(self.style.WARNING(f"Could not resolve dont-schedule-with-member: {avoid_name}"))
 
-            blackouts = entry.get("blackouts", [])
-            for date_str in blackouts:
+            # MemberBlackout
+            for bdate in raw.get("blackouts", []):
                 try:
-                    d = datetime.strptime(date_str, "%m/%d/%Y").date()
-                    MemberBlackout.objects.get_or_create(member=member, date=d)
+                    blackout_date = datetime.strptime(bdate, "%m/%d/%Y").date()
+                    MemberBlackout.objects.get_or_create(member=member, date=blackout_date)
                 except ValueError:
-                    self.stderr.write(self.style.WARNING(f"Invalid blackout date for {member}: {date_str}"))
-            
-            self.stdout.write(f"✅ Imported preferences for {member.full_display_name}")
+                    self.stdout.write(self.style.WARNING(f"Invalid blackout date for {name}: {bdate}"))
 
-        self.stdout.write(self.style.SUCCESS("🎯 All duty constraints imported."))
+            self.stdout.write(self.style.SUCCESS(f"✅ Imported constraints for {name}"))
