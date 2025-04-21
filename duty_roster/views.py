@@ -57,6 +57,17 @@ def blackout_manage(request):
         ("ado", "Assistant Duty Officer"),
         ("towpilot", "Tow Pilot"),
     ]
+    role_percent_choices = []
+    if member.instructor:
+        role_percent_choices.append(("instructor", "Flight Instructor"))
+    if member.duty_officer:
+        role_percent_choices.append(("duty_officer", "Duty Officer"))
+    if member.assistant_duty_officer:
+        role_percent_choices.append(("ado", "Assistant Duty Officer"))
+    if member.towpilot:
+        role_percent_choices.append(("towpilot", "Tow Pilot"))
+
+
 
     # Get pairings and avoidances
     pair_with = Member.objects.filter(pairing_target__member=member)
@@ -107,6 +118,7 @@ def blackout_manage(request):
             "avoid_with": avoid_with,
             "max_assignments_choices": [1,2,3,4],
             "preference": preference,
+            "role_percent_choices": role_percent_choices
         }
         form = DutyPreferenceForm(initial=initial)
 
@@ -122,4 +134,5 @@ def blackout_manage(request):
         "all_other_members": all_other_members,
         "form": form,
         "max_assignments_choices": [1,2,3,4],
+        "role_percent_choices": role_percent_choices
     })

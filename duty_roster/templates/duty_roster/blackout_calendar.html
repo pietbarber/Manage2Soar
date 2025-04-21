@@ -98,30 +98,38 @@
     <div class="mb-3">
       <label for="maxAssignments" class="form-label">Maximum times you'd like to be assigned per month:</label>
       <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
-  <option value="" disabled {% if preference.max_assignments_per_month == None %}selected{% endif %}>-- select --</option>
-  {% for val in max_assignments_choices %}
-    <option value="{{ val }}" {% if val|stringformat:'s' == preference.max_assignments_per_month|stringformat:'s' %}selected{% endif %}>{{ val }}</option>
-  {% endfor %}
-</select>
+      <option value="" disabled {% if preference.max_assignments_per_month == None %}selected{% endif %}>-- select --</option>
+      {% for val in max_assignments_choices %}
+        <option value="{{ val }}" {% if val|stringformat:'s' == preference.max_assignments_per_month|stringformat:'s' %}selected{% endif %}>{{ val }}</option>
+      {% endfor %}
+      </select>
     </div>
 
+
+    {% if role_percent_choices|length > 1 %}
+    <h5 class="mt-4">Duty Role Percentage Breakdown</h5>
+    <p class="text-muted">Total must add up to 100% if you want to be scheduled.</p>
+  
     <div class="row">
       {% for role, label in role_percent_choices %}
-      <div class="col-md-6 mb-3">
-        <label for="{{ role }}_percent" class="form-label">How often would you like to serve as {{ label }}?</label>
-        <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
-          {% for val in percent_options %}
-            <option value="{{ val }}"
-              {% if role == 'instructor' and preference.instructor_percent == val %}selected{% endif %}
-              {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
-              {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
-              {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
-            >{{ val }}%</option>
-          {% endfor %}
-        </select>
-      </div>
+        <div class="col-md-6 mb-3">
+          <label for="{{ role }}_percent" class="form-label">How often would you like to serve as {{ label }}?</label>
+          <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
+            {% for val in percent_options %}
+              <option value="{{ val }}"
+                {% if role == 'instructor' and preference.instructor_percent == val %}selected{% endif %}
+                {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
+                {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
+                {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
+              >{{ val }}%</option>
+            {% endfor %}
+          </select>
+        </div>
       {% endfor %}
     </div>
+  {% endif %}
+  
+
 
     <hr class="my-4">
 
