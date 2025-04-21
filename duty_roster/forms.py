@@ -24,27 +24,33 @@ class MemberBlackoutForm(forms.ModelForm):
         return instance
 
 class DutyPreferenceForm(forms.ModelForm):
-    pair_with = forms.ModelMultipleChoiceField(
-        queryset=Member.objects.filter(is_active=True),
-        required=False,
-        widget=forms.SelectMultiple(attrs={"class": "form-select"})
-    )
-
-    avoid_with = forms.ModelMultipleChoiceField(
-        queryset=Member.objects.filter(is_active=True),
-        required=False,
-        widget=forms.SelectMultiple(attrs={"class": "form-select"})
-    )
-
     class Meta:
         model = DutyPreference
         fields = [
-            "preferred_day",
             "dont_schedule",
             "scheduling_suspended",
             "suspended_reason",
+            "preferred_day",
+            "comment",
             "instructor_percent",
             "duty_officer_percent",
             "ado_percent",
             "towpilot_percent",
+            "max_assignments_per_month",
         ]
+        widgets = {
+            "suspended_reason": forms.TextInput(attrs={"placeholder": "Optional"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        total = (
+            cleaned_data.get("instructor_percent", 0)
+            + cleaned_data.get("duty_officer_percent", 0)
+            + cleaned_data.get("ado_percent", 0)
+            + cleaned_data.get("towpilot_percent", 0)
+        )
+        if total not in (0, 100):
+            raise forms.ValidationError("Your total duty percentages must add up to 100% or be all 0.")
+        return cleaned_data
+

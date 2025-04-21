@@ -47,6 +47,9 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(self.style.WARNING(f"Bad last-duty-date for {name}: {date_str}"))
 
+            if pref.max_assignments_per_month in (None, 0):
+                pref.max_assignments_per_month = 2
+
             pref.save()
 
             # DutyPairing

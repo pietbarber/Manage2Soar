@@ -79,8 +79,6 @@
       </div>
     </div>
 
-    <hr class="my-4">
-
     <div class="mb-3">
       <label for="preferredDay" class="form-label">Preferred duty day:</label>
       <select name="preferred_day" class="form-select" id="preferredDay">
@@ -89,6 +87,16 @@
         <option value="sun">Sunday</option>
       </select>
     </div>
+
+    <div class="mb-3">
+      <label for="maxAssignments" class="form-label">Maximum times you'd like to be assigned per month:</label>
+      <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
+        {% for val in max_assignments_choices %}
+          <option value="{{ val }}" {% if preference.max_assignments_per_month == val %}selected{% endif %}>{{ val }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
 
     <div class="row">
       {% for role, label in role_percent_choices %}

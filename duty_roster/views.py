@@ -103,6 +103,7 @@ def blackout_manage(request):
             "towpilot_percent": preference.towpilot_percent if preference else 0,
             "pair_with": pair_with,
             "avoid_with": avoid_with,
+            "max_assignments_choices": [1,2,3,4],
         }
         form = DutyPreferenceForm(initial=initial)
 
@@ -122,4 +123,5 @@ def blackout_manage(request):
         "avoid_with": avoid_with,
         "all_other_members": all_other_members,
         "form": form,
+        "max_assignments_choices": [1,2,3,4],
     })

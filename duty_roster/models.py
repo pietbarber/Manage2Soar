@@ -61,6 +61,7 @@ class DutyPreference(models.Model):
     duty_officer_percent = models.PositiveIntegerField(default=0)
     ado_percent = models.PositiveIntegerField(default=0)
     towpilot_percent = models.PositiveIntegerField(default=0)
+    max_assignments_per_month = models.PositiveIntegerField(default=2)  # NEW FIELD
 
     def __str__(self):
         return f"Preferences for {self.member.full_display_name}"

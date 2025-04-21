@@ -36,7 +36,6 @@ class Command(BaseCommand):
             }
 
             assignments_per_member = defaultdict(int)
-            MAX_ASSIGNMENTS_PER_MONTH = 2
             schedule_output = []
 
             def last_duty_sort_key(m):
@@ -47,7 +46,7 @@ class Command(BaseCommand):
                 p = preferences.get(member.id)
                 if not p:
                     return False
-                if p.dont_schedule:
+                if p.dont_schedule or p.scheduling_suspended:
                     return False
                 if role == "instructor" and (not member.instructor or p.instructor_percent == 0):
                     return False
@@ -72,10 +71,9 @@ class Command(BaseCommand):
                         continue
 
                     weight = percent
-                    # Bonus if paired member is already scheduled today
                     for assigned in assigned_today:
                         if assigned.id in pairings.get(m.id, set()) or m.id in pairings.get(assigned.id, set()):
-                            weight *= 3  # boost priority
+                            weight *= 3
                             break
 
                     candidates.append(m)
@@ -97,7 +95,7 @@ class Command(BaseCommand):
                         if eligible_for(role, m)
                         and (m.id, ops_day) not in blackouts
                         and m not in assigned_today
-                        and assignments_per_member[m.id] < MAX_ASSIGNMENTS_PER_MONTH
+                        and assignments_per_member[m.id] < preferences.get(m.id).max_assignments_per_month
                     ]
                     random.shuffle(eligible)
                     eligible.sort(key=last_duty_sort_key)
