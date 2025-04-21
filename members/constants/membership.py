@@ -1,7 +1,9 @@
 # members/constants/membership.py
 
 ALLOWED_MEMBERSHIP_STATUSES = [
+    "Charter Member",
     "Full Member",
+    "Probationary Member",
     "Student Member",
     "Family Member",
     "Service Member",
@@ -9,6 +11,7 @@ ALLOWED_MEMBERSHIP_STATUSES = [
     "Honorary Member",
     "Emeritus Member",
     "SSEF Member",
+    "Transient Member",
     "Temporary Member",
     "Introductory Member",
 ]
