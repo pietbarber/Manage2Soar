@@ -17,6 +17,13 @@
 
   <form method="post">
     {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
     <div class="row">
       {% for month in months %}
       <div class="col-12 col-md-4 mb-4">
@@ -91,12 +98,12 @@
     <div class="mb-3">
       <label for="maxAssignments" class="form-label">Maximum times you'd like to be assigned per month:</label>
       <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
-        {% for val in max_assignments_choices %}
-          <option value="{{ val }}" {% if preference.max_assignments_per_month == val %}selected{% endif %}>{{ val }}</option>
-        {% endfor %}
-      </select>
+  <option value="" disabled {% if preference.max_assignments_per_month == None %}selected{% endif %}>-- select --</option>
+  {% for val in max_assignments_choices %}
+    <option value="{{ val }}" {% if val|stringformat:'s' == preference.max_assignments_per_month|stringformat:'s' %}selected{% endif %}>{{ val }}</option>
+  {% endfor %}
+</select>
     </div>
-
 
     <div class="row">
       {% for role, label in role_percent_choices %}
@@ -105,10 +112,10 @@
         <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
           {% for val in percent_options %}
             <option value="{{ val }}"
-              {% if role == 'instructor' and preference.instructor == val %}selected{% endif %}
-              {% if role == 'duty_officer' and preference.duty_officer == val %}selected{% endif %}
-              {% if role == 'ado' and preference.ado == val %}selected{% endif %}
-              {% if role == 'towpilot' and preference.towpilot == val %}selected{% endif %}
+              {% if role == 'instructor' and preference.instructor_percent == val %}selected{% endif %}
+              {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
+              {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
+              {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
             >{{ val }}%</option>
           {% endfor %}
         </select>

@@ -18,6 +18,8 @@ def roster_home(request):
 @active_member_required
 def blackout_manage(request):
     member = request.user
+    preference, _ = DutyPreference.objects.get_or_create(member=member)
+
     existing = MemberBlackout.objects.filter(member=member)
     existing_dates = set(b.date for b in existing)
 
@@ -82,10 +84,10 @@ def blackout_manage(request):
             DutyPairing.objects.filter(member=member).delete()
             DutyAvoidance.objects.filter(member=member).delete()
 
-            for m in form.cleaned_data["pair_with"]:
+            for m in form.cleaned_data.get("pair_with", []):
                 DutyPairing.objects.get_or_create(member=member, pair_with=m)
 
-            for m in form.cleaned_data["avoid_with"]:
+            for m in form.cleaned_data.get("avoid_with", []):
                 DutyAvoidance.objects.get_or_create(member=member, avoid_with=m)
 
             messages.success(request, "Preferences saved successfully.")
@@ -104,6 +106,7 @@ def blackout_manage(request):
             "pair_with": pair_with,
             "avoid_with": avoid_with,
             "max_assignments_choices": [1,2,3,4],
+            "preference": preference,
         }
         form = DutyPreferenceForm(initial=initial)
 
@@ -113,12 +116,7 @@ def blackout_manage(request):
         "today": today,
         "percent_options": percent_options,
         "role_percent_choices": role_percent_choices,
-        "preference": {
-            "instructor": preference.instructor_percent if preference else 0,
-            "duty_officer": preference.duty_officer_percent if preference else 0,
-            "ado": preference.ado_percent if preference else 0,
-            "towpilot": preference.towpilot_percent if preference else 0,
-        } if preference else {},
+        "preference": preference,
         "pair_with": pair_with,
         "avoid_with": avoid_with,
         "all_other_members": all_other_members,
