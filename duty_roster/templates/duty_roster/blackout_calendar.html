@@ -44,7 +44,8 @@
                     {% if day.weekday == 6 or day.weekday == 0 %} {# Sunday or Saturday #}
                       <label>
                         <input type="checkbox" name="blackout_dates" value="{{ day|date:"Y-m-d" }}"
-                               {% if day in existing_dates %}checked{% endif %}>
+                               {% if day in existing_dates %}checked{% endif %}
+                               {% if day < today %}disabled{% endif %}>
                         <br><small>{{ day.day }}</small>
                       </label>
                     {% else %}
