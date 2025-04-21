@@ -1,5 +1,7 @@
 from django import forms
-from .models import MemberBlackout
+from members.models import Member
+from .models import MemberBlackout, DutyPreference
+
 
 class MemberBlackoutForm(forms.ModelForm):
     class Meta:
@@ -20,3 +22,29 @@ class MemberBlackoutForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+class DutyPreferenceForm(forms.ModelForm):
+    pair_with = forms.ModelMultipleChoiceField(
+        queryset=Member.objects.filter(is_active=True),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select"})
+    )
+
+    avoid_with = forms.ModelMultipleChoiceField(
+        queryset=Member.objects.filter(is_active=True),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select"})
+    )
+
+    class Meta:
+        model = DutyPreference
+        fields = [
+            "preferred_day",
+            "dont_schedule",
+            "scheduling_suspended",
+            "suspended_reason",
+            "instructor_percent",
+            "duty_officer_percent",
+            "ado_percent",
+            "towpilot_percent",
+        ]

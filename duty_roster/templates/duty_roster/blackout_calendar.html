@@ -108,6 +108,30 @@
       {% endfor %}
     </div>
 
+    <hr class="my-4">
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="pairWith" class="form-label">Prefer to work with:</label>
+        <select name="pair_with" id="pairWith" class="form-select" multiple>
+          {% for m in all_other_members %}
+            <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Use Ctrl (Windows) or ⌘ (Mac) to select multiple members.</div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="avoidWith" class="form-label">Please avoid scheduling me with:</label>
+        <select name="avoid_with" id="avoidWith" class="form-select" multiple>
+          {% for m in all_other_members %}
+            <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">If there's someone you clash with or need to avoid, select them here.</div>
+      </div>
+    </div>
+
     <div class="text-end">
       <button type="submit" class="btn btn-primary">Save All Changes</button>
     </div>
