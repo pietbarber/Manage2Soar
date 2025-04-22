@@ -158,3 +158,17 @@ class DutySwapOffer(models.Model):
 
     def __str__(self):
         return f"{self.offered_by.full_display_name} → {self.swap_request.role} on {self.swap_request.original_date}"
+
+class OpsIntent(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE)
+    date = models.DateField()
+    available_as = models.JSONField(default=list)  # e.g. ["towpilot", "glider_pilot", "instructor"]
+    glider = models.ForeignKey("logsheet.Glider", null=True, blank=True, on_delete=models.SET_NULL)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("member", "date")
+
+    def __str__(self):
+        return f"{self.member.full_display_name} available on {self.date}"

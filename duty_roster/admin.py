@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import DutyDay, DutySlot, MemberBlackout
-from .models import DutyPreference, DutyPairing, DutyAvoidance, DutyAssignment, InstructionSlot, DutySwapRequest, DutySwapOffer
+from .models import DutyPreference, DutyPairing, DutyAvoidance, DutyAssignment, InstructionSlot, DutySwapRequest, DutySwapOffer, OpsIntent
 
 @admin.register(DutyDay)
 class DutyDayAdmin(admin.ModelAdmin):
@@ -71,3 +71,9 @@ class DutySwapOfferAdmin(admin.ModelAdmin):
         "offered_by__first_name", "offered_by__last_name",
         "swap_request__requester__first_name", "swap_request__requester__last_name"
     )
+
+@admin.register(OpsIntent)
+class OpsIntentAdmin(admin.ModelAdmin):
+    list_display = ("member", "date", "available_as", "glider", "created_at")
+    list_filter = ("date",)
+    search_fields = ("member__first_name", "member__last_name")
