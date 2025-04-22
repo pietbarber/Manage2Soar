@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import DutyDay, DutySlot, MemberBlackout
-from .models import DutyPreference, DutyPairing, DutyAvoidance
+from .models import DutyPreference, DutyPairing, DutyAvoidance, DutyAssignment, InstructionSlot
 
 @admin.register(DutyDay)
 class DutyDayAdmin(admin.ModelAdmin):
@@ -43,3 +43,16 @@ class DutyAvoidanceAdmin(admin.ModelAdmin):
     list_display = ("member", "avoid_with")
     autocomplete_fields = ["member", "avoid_with"]
     search_fields = ("member__first_name", "member__last_name", "avoid_with__first_name", "avoid_with__last_name")
+
+@admin.register(DutyAssignment)
+class DutyAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("date", "location", "duty_officer", "instructor", "tow_pilot", "is_scheduled", "is_confirmed")
+
+@admin.register(InstructionSlot)
+class InstructionSlotAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "student", "instructor", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = (
+        "student__first_name", "student__last_name",
+        "instructor__first_name", "instructor__last_name",
+    )

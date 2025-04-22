@@ -80,3 +80,40 @@ class DutyAvoidance(models.Model):
 
     def __str__(self):
         return f"{self.member.full_display_name} must not work with {self.avoid_with.full_display_name}"
+
+
+class DutyAssignment(models.Model):
+    date = models.DateField(unique=True)
+
+    # Primary duty roles
+    duty_officer = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_duty_officer")
+    assistant_duty_officer = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_ado")
+    instructor = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_instructor")
+    surge_instructor = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_surge_instructor")
+    tow_pilot = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_tow_pilot")
+    surge_tow_pilot = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_surge_tow_pilot")
+
+    # Location & scheduling
+    location = models.ForeignKey("logsheet.Airfield", null=True, blank=True, on_delete=models.SET_NULL)
+    is_scheduled = models.BooleanField(default=True)  # True = scheduled ops, False = ad-hoc
+    is_confirmed = models.BooleanField(default=True)  # Only used if is_scheduled is False
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"
+
+class InstructionSlot(models.Model):
+    assignment = models.ForeignKey("DutyAssignment", on_delete=models.CASCADE, related_name='instruction_slots')
+    student = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='instruction_requests')
+    instructor = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_students')
+
+    STATUS_CHOICES = [
+        ('scheduled', 'Scheduled'),
+        ('waitlist', 'Waitlist'),
+        ('cancelled', 'Cancelled'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waitlist')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.student.full_display_name} for {self.assignment.date} ({self.status})"
