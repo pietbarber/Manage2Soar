@@ -1,7 +1,6 @@
 from .models import Logsheet, Airfield
 from django.core.exceptions import ValidationError
 from django import forms
-from django.core.exceptions import ValidationError
 from .models import Logsheet, Flight, Towplane, LogsheetCloseout, TowplaneCloseout
 from members.models import Member
 from django.utils.timezone import localtime, now
@@ -9,7 +8,7 @@ from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from django.db.models import Case, When, Value, IntegerField
-from logsheet.models import Glider
+from logsheet.models import MaintenanceIssue, Glider, Towplane
 
 
 def get_active_members_with_role(role_flag: str = None):
@@ -238,3 +237,21 @@ TowplaneCloseoutFormSet = modelformset_factory(
         "notes": TinyMCE(mce_attrs={"height": 300}),
     }
 )
+
+class MaintenanceIssueForm(forms.ModelForm):
+    class Meta:
+        model = MaintenanceIssue
+        fields = ["glider", "towplane", "description", "grounded"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
+            "grounded": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "glider": forms.Select(attrs={"class": "form-select"}),
+            "towplane": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only show club-owned and active gliders and towplanes
+        self.fields["glider"].queryset = Glider.objects.filter(club_owned=True, is_active=True)
+        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True)
+

@@ -48,8 +48,16 @@
         </tr>
         <tr>
           <th scope="row" class="text-end">{{ form.equipment_issues.label_tag }}</th>
-          <td class="text-start">{{ form.equipment_issues }} {{ form.equipment_issues.errors }}</td>
+          <td class="text-start">{{ form.equipment_issues }} {{ form.equipment_issues.errors }}
+
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addIssueModal">
+          ➕ Add Maintenance Issue
+        </button>
+        
+        </td>
         </tr>
+
+
         <tr>
           <th scope="row" class="text-end">{{ form.operations_summary.label_tag }}</th>
           <td class="text-start">{{ form.operations_summary }} {{ form.operations_summary.errors }}</td>
@@ -131,6 +139,54 @@
     <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">Cancel</a>
   </div>
 </form>
+
+<!-- Add Maintenance Issue Modal -->
+<div class="modal fade" id="addIssueModal" tabindex="-1" aria-labelledby="addIssueModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'logsheet:add_maintenance_issue' logsheet.id %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="addIssueModalLabel">Report New Maintenance Issue</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Fields here -->
+          <div class="mb-3">
+            <label for="glider" class="form-label">Glider</label>
+            <select name="glider" id="glider" class="form-select">
+              <option value="">----------</option>
+              {% for g in gliders %}
+                <option value="{{ g.id }}">{{ g }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="towplane" class="form-label">Towplane</label>
+            <select name="towplane" id="towplane" class="form-select">
+              <option value="">----------</option>
+              {% for t in towplanes %}
+                <option value="{{ t.id }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="grounded" id="grounded">
+            <label class="form-check-label" for="grounded">Ground Aircraft</label>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Issue Description</label>
+            <textarea name="description" id="description" rows="5" class="form-control"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-danger">Submit Issue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 
 
 <footer style="font-size: 0.8em; color: gray;">

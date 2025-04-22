@@ -14,8 +14,7 @@ urlpatterns = [
     path("manage/<int:pk>/finances/", views.manage_logsheet_finances, name="manage_logsheet_finances"),
     path("manage/<int:pk>/closeout/", views.edit_logsheet_closeout, name="edit_logsheet_closeout"),
     path("manage/<int:pk>/view-closeout/", views.view_logsheet_closeout, name="view_logsheet_closeout"),
+    path("logsheet/<int:logsheet_id>/add-issue/", views.add_maintenance_issue, name="add_maintenance_issue"),
+
 
 ] 
-
-from django.conf.urls import handler403
-handler403 = "django.views.defaults.permission_denied"

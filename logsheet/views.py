@@ -2,12 +2,15 @@ from django.http import HttpResponseForbidden
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Logsheet, Flight, LogsheetCloseout
-from .forms import CreateLogsheetForm, FlightForm, LogsheetCloseoutForm, LogsheetDutyCrewForm
-from .models import Logsheet
-from members.decorators import active_member_required
 from django.db.models import Q
-from django.http import JsonResponse
+from django.core.paginator import Paginator
+from datetime import datetime
+from django.http import HttpResponseForbidden
+from django.shortcuts import get_object_or_404, render, redirect
+from members.decorators import active_member_required
+from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight
+from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
+
 
 
 #################################################
@@ -98,7 +101,6 @@ def manage_logsheet(request, pk):
             return redirect("logsheet:manage", pk=logsheet.pk)
 
    
-        from logsheet.models import LogsheetPayment
         responsible_members = set()
         invalid_flights = []
 
@@ -267,8 +269,6 @@ def view_flight(request, pk):
 # Returns:
 #    HttpResponse: Renders the logsheet list page with the filtered or unfiltered list of logsheets.
 
-from django.core.paginator import Paginator
-from datetime import datetime
 
 @active_member_required
 def list_logsheets(request):
@@ -634,14 +634,6 @@ def edit_logsheet_closeout(request, pk):
         "form": form
     })
 
-from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm
-
-from django.http import HttpResponseForbidden, JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
-from .models import Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane
-from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet
-from django.forms import modelformset_factory
-
 @active_member_required
 def edit_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
@@ -684,6 +676,9 @@ def edit_logsheet_closeout(request, pk):
         "form": form,
         "duty_form": duty_form,
         "formset": formset,
+        "gliders": Glider.objects.filter(club_owned=True, is_active=True).order_by("n_number"),
+        "towplanes": Towplane.objects.filter(is_active=True).order_by("registration"),
+
     })
 
 @active_member_required
@@ -696,3 +691,23 @@ def view_logsheet_closeout(request, pk):
         "closeout": closeout,
         "towplanes": towplanes,
     })
+
+@require_POST
+@active_member_required
+def add_maintenance_issue(request, logsheet_id):
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_id)
+    form = MaintenanceIssueForm(request.POST)
+
+    if form.is_valid():
+        issue = form.save(commit=False)
+        if not issue.glider and not issue.towplane:
+            messages.error(request, "Please select either a glider or a towplane.")
+            return redirect("logsheet:edit_logsheet_closeout", pk=logsheet_id)
+
+        issue.reported_by = request.user
+        issue.save()
+        messages.success(request, "Maintenance issue submitted successfully.")
+    else:
+        messages.error(request, "Failed to submit maintenance issue.")
+    return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.id)
+
