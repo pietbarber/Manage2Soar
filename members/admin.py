@@ -149,9 +149,9 @@ class MemberAdmin(VersionAdmin, UserAdmin):
     model = Member
     inlines = [MemberBadgeInline]
 
-    list_display = ("last_name", "first_name", "email", "membership_status")
+    list_display = ("last_name", "first_name", "email", "membership_status", "instructor", "towpilot", "rostermeister")
     search_fields = ("first_name", "last_name", "email", "username")
-    list_filter = ("membership_status", "instructor", "towpilot", "director", "member_manager")
+    list_filter = ("membership_status", "instructor", "towpilot", "director", "member_manager", "rostermeister")
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
@@ -162,7 +162,8 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         ("Membership", {"fields": (
             "membership_status", "date_joined",
             "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
-            "director", "member_manager", "webmaster", "secretary", "treasurer"
+            "director", "member_manager", "rostermeister",
+            "webmaster", "secretary", "treasurer"
         )}),
         ("Other Info", {"fields": (
             "address", "city", "state_code", "state_freeform", "zip_code", "country",
@@ -180,8 +181,8 @@ class MemberAdmin(VersionAdmin, UserAdmin):
             "fields": ("username", "email", "first_name", "last_name", "password1", "password2"),
         }),
     )
+
     def get_search_results(self, request, queryset, search_term):
         from members.constants.membership import DEFAULT_ACTIVE_STATUSES
         queryset = queryset.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
         return super().get_search_results(request, queryset, search_term)
-

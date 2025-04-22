@@ -142,6 +142,7 @@ class Member(AbstractUser):
     webmaster = models.BooleanField(default=False)
     director = models.BooleanField(default=False)
     member_manager = models.BooleanField(default=False)
+    rostermeister = models.BooleanField(default=False)
 
     joined_club = models.DateField(blank=True, null=True)
     emergency_contact = models.TextField(blank=True, null=True)
@@ -191,7 +192,6 @@ class Member(AbstractUser):
 
     def save(self, *args, **kwargs):
         self.is_staff = self.instructor or self.member_manager
-
         if not self.profile_photo:
             # Only generate if no photo already exists
             filename = f"profile_{self.username}.png"
@@ -203,7 +203,19 @@ class Member(AbstractUser):
 
             self.profile_photo = file_path
 
-        super().save(*args, **kwargs)
+        if self.rostermeister:
+            try:
+                group = Group.objects.get(name="Rostermeisters")
+                if not self.groups.filter(id=group.id).exists():
+                    self.groups.add(group)
+            except Group.DoesNotExist:
+                pass  # Or log if needed
+        else:
+            try:
+                group = Group.objects.get(name="Rostermeisters")
+                self.groups.remove(group)
+            except Group.DoesNotExist:
+                pass
 
         if self.instructor:
             try:
@@ -211,9 +223,14 @@ class Member(AbstractUser):
                 if not self.groups.filter(id=group.id).exists():
                     self.groups.add(group)
             except Group.DoesNotExist:
-                pass  # optionally log this
-
-            # ✅ Assign member manager to Member Managers group
+                pass
+        else:
+            try:
+                group = Group.objects.get(name="Instructor Admins")
+                self.groups.remove(group)
+            except Group.DoesNotExist:
+                pass
+        
         if self.member_manager:
             try:
                 group = Group.objects.get(name="Member Managers")
@@ -221,6 +238,14 @@ class Member(AbstractUser):
                     self.groups.add(group)
             except Group.DoesNotExist:
                 pass
+        else:
+            try:
+                group = Group.objects.get(name="Member Managers")
+                self.groups.remove(group)
+            except Group.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
 
     ##################################
     #  def __str__ 
