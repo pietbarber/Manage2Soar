@@ -425,7 +425,8 @@ class LogsheetPayment(models.Model):
         choices=[
             ("account", "On Account"), 
             ("check", "Check"),
-            ("zelle", "Zelle")
+            ("zelle", "Zelle"),
+            ("cash", "Cash")
             ],
         null=True,
         blank=True
