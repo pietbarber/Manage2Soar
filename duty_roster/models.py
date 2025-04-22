@@ -117,3 +117,21 @@ class InstructionSlot(models.Model):
 
     def __str__(self):
         return f"{self.student.full_display_name} for {self.assignment.date} ({self.status})"
+
+class DutySwapRequest(models.Model):
+    ROLE_CHOICES = [
+        ("DO", "Duty Officer"),
+        ("ADO", "Assistant Duty Officer"),
+        ("INSTRUCTOR", "Instructor"),
+        ("TOW", "Tow Pilot"),
+    ]
+
+    requester = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="swap_requests")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    original_date = models.DateField()
+    is_emergency = models.BooleanField(default=False)  # IMSAFE, medical, etc.
+    is_fulfilled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.role} swap for {self.original_date} by {self.requester.full_display_name}"

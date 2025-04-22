@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import DutyDay, DutySlot, MemberBlackout
-from .models import DutyPreference, DutyPairing, DutyAvoidance, DutyAssignment, InstructionSlot
+from .models import DutyPreference, DutyPairing, DutyAvoidance, DutyAssignment, InstructionSlot, DutySwapRequest
 
 @admin.register(DutyDay)
 class DutyDayAdmin(admin.ModelAdmin):
@@ -56,3 +56,9 @@ class InstructionSlotAdmin(admin.ModelAdmin):
         "student__first_name", "student__last_name",
         "instructor__first_name", "instructor__last_name",
     )
+
+@admin.register(DutySwapRequest)
+class DutySwapRequestAdmin(admin.ModelAdmin):
+    list_display = ("original_date", "role", "requester", "is_emergency", "is_fulfilled", "created_at")
+    list_filter = ("role", "is_emergency", "is_fulfilled")
+    search_fields = ("requester__first_name", "requester__last_name")
