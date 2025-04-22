@@ -134,5 +134,8 @@ def blackout_manage(request):
         "all_other_members": all_other_members,
         "form": form,
         "max_assignments_choices": [1,2,3,4],
-        "role_percent_choices": role_percent_choices
+        "role_percent_choices": role_percent_choices,
+        "all_possible_roles": ["instructor", "duty_officer", "ado", "towpilot"],
+        "shown_roles": [r[0] for r in role_percent_choices],
+
     })
