@@ -135,3 +135,26 @@ class DutySwapRequest(models.Model):
 
     def __str__(self):
         return f"{self.role} swap for {self.original_date} by {self.requester.full_display_name}"
+
+class DutySwapOffer(models.Model):
+    swap_request = models.ForeignKey("DutySwapRequest", on_delete=models.CASCADE, related_name="offers")
+    offered_by = models.ForeignKey(Member, on_delete=models.CASCADE)
+
+    OFFER_TYPE_CHOICES = [
+        ("cover", "Cover (I'll take your shift)"),
+        ("swap", "Swap (I'll take yours if you take mine)"),
+    ]
+    offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES)
+    proposed_swap_date = models.DateField(null=True, blank=True)  # Used only if offer_type == 'swap'
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
+    ]
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.offered_by.full_display_name} → {self.swap_request.role} on {self.swap_request.original_date}"
