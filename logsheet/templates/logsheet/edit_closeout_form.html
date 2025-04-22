@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% load humanize %}
+<!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
 
 {% block content %}
 {% load member_extras %}
+<!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
 
 
 <div class="modal-header">
@@ -53,7 +55,43 @@
         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addIssueModal">
           ➕ Add Maintenance Issue
         </button>
-        
+
+        {% if maintenance_issues %}
+          <div class="mt-4">
+            <h5 class="mb-3 text-start">🛠️ Maintenance Issues Reported for This Day</h5>
+            <table class="table table-bordered w-100">
+              <tbody>
+                {% for issue in maintenance_issues %}
+                  <tr>
+                    <td>
+                      <div class="text-start">
+                        <strong>
+                          {% if issue.glider %}Glider: {{ issue.glider }}{% elif issue.towplane %}Towplane: {{ issue.towplane }}{% endif %}
+                        </strong>
+                        {% if issue.grounded %}
+                          <span class="badge bg-danger ms-2">Grounded</span>
+                        {% endif %}
+                        <div class="text-muted small mt-1">
+                          Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date }}
+                        </div>
+                        <div class="mt-2">{{ issue.description|linebreaks }}</div>
+                        {% if issue.resolved %}
+                          <div class="mt-2">
+                            <span class="badge bg-success">Resolved</span>
+                            <div class="text-muted small">Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date }}</div>
+                            <div class="mt-1">{{ issue.resolution_notes|linebreaks }}</div>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+
         </td>
         </tr>
 

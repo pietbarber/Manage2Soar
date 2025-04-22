@@ -8,7 +8,7 @@ from datetime import datetime
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
-from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight
+from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue
 from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
 
 
@@ -614,30 +614,8 @@ def manage_logsheet_finances(request, pk):
 @active_member_required
 def edit_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-
-    if logsheet.finalized and not request.user.is_superuser:
-        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
-
     closeout, _ = LogsheetCloseout.objects.get_or_create(logsheet=logsheet)
-
-    if request.method == "POST":
-        form = LogsheetCloseoutForm(request.POST, instance=closeout)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Closeout updated.")
-            return redirect("logsheet:manage", pk=pk)
-    else:
-        form = LogsheetCloseoutForm(instance=closeout)
-
-    return render(request, "logsheet/edit_closeout_form.html", {
-        "logsheet": logsheet,
-        "form": form
-    })
-
-@active_member_required
-def edit_logsheet_closeout(request, pk):
-    logsheet = get_object_or_404(Logsheet, pk=pk)
-    closeout, _ = LogsheetCloseout.objects.get_or_create(logsheet=logsheet)
+    maintenance_issues = MaintenanceIssue.objects.filter(logsheet=logsheet).select_related("reported_by", "glider", "towplane")
 
     if logsheet.finalized and not request.user.is_superuser:
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
@@ -678,18 +656,21 @@ def edit_logsheet_closeout(request, pk):
         "formset": formset,
         "gliders": Glider.objects.filter(club_owned=True, is_active=True).order_by("n_number"),
         "towplanes": Towplane.objects.filter(is_active=True).order_by("registration"),
+        "maintenance_issues": maintenance_issues
 
     })
 
 @active_member_required
 def view_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
+    maintenance_issues = MaintenanceIssue.objects.filter(logsheet=logsheet).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
     towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
     return render(request, "logsheet/view_closeout.html", {
         "logsheet": logsheet,
         "closeout": closeout,
         "towplanes": towplanes,
+        "maintenance_issues": maintenance_issues
     })
 
 @require_POST
@@ -705,6 +686,7 @@ def add_maintenance_issue(request, logsheet_id):
             return redirect("logsheet:edit_logsheet_closeout", pk=logsheet_id)
 
         issue.reported_by = request.user
+        issue.logsheet = logsheet
         issue.save()
         messages.success(request, "Maintenance issue submitted successfully.")
     else:

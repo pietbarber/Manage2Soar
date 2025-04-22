@@ -482,6 +482,8 @@ class MaintenanceIssue(models.Model):
     towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
     reported_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
     report_date = models.DateField(auto_now_add=True)
+    logsheet = models.ForeignKey("Logsheet", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_issues")
+
     description = models.TextField()
     grounded = models.BooleanField(default=False)
     resolved = models.BooleanField(default=False)

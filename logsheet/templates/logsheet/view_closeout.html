@@ -41,6 +41,32 @@
   {% endif %}
 </ul>
 
+{% if maintenance_issues %}
+  <hr>
+  <h4 class="mt-4">🛠️ Maintenance Issues Reported</h4>
+  <ul class="list-group mb-4">
+    {% for issue in maintenance_issues %}
+      <li class="list-group-item">
+        <strong>
+          {% if issue.glider %}Glider: {{ issue.glider }}{% elif issue.towplane %}Towplane: {{ issue.towplane }}{% endif %}
+        </strong>
+        {% if issue.grounded %}
+          <span class="badge bg-danger ms-2">Grounded</span>
+        {% endif %}
+        <div class="text-muted small">Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date }}</div>
+        <div class="mt-2">{{ issue.description|linebreaks }}</div>
+        {% if issue.resolved %}
+          <div class="mt-2">
+            <span class="badge bg-success">Resolved</span>
+            <div class="text-muted small">Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date }}</div>
+            <div class="mt-1">{{ issue.resolution_notes|linebreaks }}</div>
+          </div>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 
 {% if towplanes %}
 <h4 class="mt-4">Towplane Summary</h4>
