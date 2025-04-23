@@ -1,0 +1,22 @@
+<form 
+  hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}"
+  hx-target="#ops-intent-response"
+  hx-swap="innerHTML"
+>
+  {% csrf_token %}
+  <p class="mb-1">I plan to fly this day. My intent:</p>
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="available_as" value="instruction" id="wantInstruction">
+    <label class="form-check-label" for="wantInstruction">I want instruction</label>
+  </div>
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="available_as" value="club" id="wantClub">
+    <label class="form-check-label" for="wantClub">I want to fly a club glider</label>
+  </div>
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="available_as" value="private" id="wantPrivate">
+    <label class="form-check-label" for="wantPrivate">I’ll be flying a private glider</label>
+  </div>
+
+  <button type="submit" class="btn btn-sm btn-primary mt-2">✅ Submit</button>
+</form>

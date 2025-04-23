@@ -215,22 +215,35 @@ def calendar_day_detail(request, year, month, day):
         "intents": intents,
     })
 
-
 @require_POST
 def ops_intent_toggle(request, year, month, day):
     if not request.user.is_authenticated:
         return HttpResponse("Not authorized", status=403)
 
     day_date = date(year, month, day)
-    intent, created = OpsIntent.objects.get_or_create(member=request.user, date=day_date)
 
-    if not created:
-        # Already existed — remove it
-        intent.delete()
-        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
-        response += f'<button hx-post="{request.path}" hx-target="#ops-intent-response" hx-swap="innerHTML" class="btn btn-sm btn-primary">🛩️ I Plan to Fly This Day</button>'
-    else:
+    available_as = request.POST.getlist("available_as") or []
+    if available_as:
+        OpsIntent.objects.update_or_create(
+            member=request.user,
+            date=day_date,
+            defaults={"available_as": available_as}
+        )
         response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
         response += f'<button hx-post="{request.path}" hx-target="#ops-intent-response" hx-swap="innerHTML" class="btn btn-sm btn-danger">Cancel Intent</button>'
+    else:
+        OpsIntent.objects.filter(member=request.user, date=day_date).delete()
+        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
+        response += f'<form hx-get="{request.path}form/" hx-target="#ops-intent-response" hx-swap="innerHTML">'
+        response += f'<button type="submit" class="btn btn-sm btn-primary">🛩️ I Plan to Fly This Day</button></form>'
 
     return HttpResponse(response)
+
+def ops_intent_form(request, year, month, day):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthorized", status=403)
+
+    day_date = date(year, month, day)
+    return render(request, "duty_roster/ops_intent_form.html", {
+        "day": day_date,
+    })
