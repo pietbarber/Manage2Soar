@@ -71,10 +71,9 @@ class DutyAssignmentForm(forms.ModelForm):
         # Optional: Limit dropdowns to members with the right roles
         from members.constants.membership import DEFAULT_ACTIVE_STATUSES
         active_members = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
-
-        self.fields["instructor"].queryset = active_members.filter(instructor=True)
-        self.fields["surge_instructor"].queryset = active_members.filter(instructor=True)
-        self.fields["tow_pilot"].queryset = active_members.filter(towpilot=True)
-        self.fields["surge_tow_pilot"].queryset = active_members.filter(towpilot=True)
-        self.fields["duty_officer"].queryset = active_members.filter(duty_officer=True)
-        self.fields["assistant_duty_officer"].queryset = active_members.filter(assistant_duty_officer=True)
+        self.fields["instructor"].queryset = active_members.filter(instructor=True).order_by("last_name", "first_name")
+        self.fields["surge_instructor"].queryset = active_members.filter(instructor=True).order_by("last_name", "first_name")
+        self.fields["tow_pilot"].queryset = active_members.filter(towpilot=True).order_by("last_name", "first_name")
+        self.fields["surge_tow_pilot"].queryset = active_members.filter(towpilot=True).order_by("last_name", "first_name")
+        self.fields["duty_officer"].queryset = active_members.filter(duty_officer=True).order_by("last_name", "first_name")
+        self.fields["assistant_duty_officer"].queryset = active_members.filter(assistant_duty_officer=True).order_by("last_name", "first_name")

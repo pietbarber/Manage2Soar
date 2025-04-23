@@ -7,12 +7,11 @@ from datetime import date, timedelta
 import calendar
 from calendar import Calendar, monthrange
 from members.decorators import active_member_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from .models import DutyAssignment
 from django.shortcuts import get_object_or_404
 from .models import OpsIntent
 from django.views.decorators.http import require_POST
-from django.http import HttpResponse
 from django.core.mail import send_mail
 from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance
 from .forms import DutyAssignmentForm, DutyPreferenceForm
@@ -325,7 +324,7 @@ def assignment_save_form(request, year, month, day):
     if form.is_valid():
         form.save()
         # Reload the full modal so crew updates show
-        return calendar_day_detail(request, year, month, day)
+        return JsonResponse({"reload": True})
     else:
         return render(request, "duty_roster/assignment_edit_form.html", {
             "form": form,

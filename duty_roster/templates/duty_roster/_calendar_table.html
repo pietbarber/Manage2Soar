@@ -1,3 +1,6 @@
+{% load duty_extras %}
+
+
 <table class="table table-bordered calendar w-full text-sm">
     <thead>
       <tr>
@@ -22,9 +25,15 @@
 
           <strong>{{ day.day }}</strong><br>
           {% if day in assignments_by_date %}
-            {% with a=assignments_by_date.day %}
-              {% if a.instructor %}👨‍🏫 {{ a.instructor.first_name }}<br>{% endif %}
-              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.first_name }}<br>{% endif %}
+            {% with a=assignments_by_date|dict_get:day %}
+            <div class="text-xs mt-1 text-start leading-snug">
+              {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
+              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
+              {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
+              {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
+              {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
+              {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
+            </div>
             {% endwith %}
           {% endif %}
         </td>
