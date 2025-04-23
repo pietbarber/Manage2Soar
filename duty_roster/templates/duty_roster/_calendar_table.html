@@ -33,6 +33,22 @@
       >
 
         <strong>{{ day.day }}</strong><br>
+
+          {% if surge_needed_by_date|dict_get:day %}
+            {% with surge=surge_needed_by_date|dict_get:day %}
+              <div class="mt-1 text-red-600 text-xs">
+                {% if surge.instructor %}
+                <span title="At least 3 students are requesting instruction">🚨🎓</span>
+              {% endif %}
+              {% if surge.towpilot %}
+                <span title="High demand for tows – surge tow pilot may be needed">🚨🛩️</span>
+              {% endif %}
+
+              </div>
+            {% endwith %}
+          {% endif %}
+
+
         {% if day in assignments_by_date %}
           {% with a=assignments_by_date|dict_get:day %}
           <div class="text-xs mt-1 text-start leading-snug">

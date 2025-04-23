@@ -1,19 +1,19 @@
-from django.shortcuts import render, redirect
+
+import calendar
+from calendar import Calendar, monthrange
+from collections import defaultdict
+from datetime import date, timedelta
 from django.utils.timezone import now
 from django.conf import settings
 from django.contrib import messages
-from members.models import Member
-from datetime import date, timedelta
-import calendar
-from calendar import Calendar, monthrange
-from members.decorators import active_member_required
-from django.http import HttpResponse, JsonResponse
-from .models import DutyAssignment
-from django.shortcuts import get_object_or_404
-from .models import OpsIntent
-from django.views.decorators.http import require_POST
 from django.core.mail import send_mail
-from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
+from members.models import Member
+from members.decorators import active_member_required
+from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment
+
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 
 # Create your views here.
@@ -177,6 +177,35 @@ def duty_calendar_view(request, year=None, month=None):
 
     prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
 
+    # After building `weeks` for the calendar
+    visible_dates = [day for week in weeks for day in week]
+    
+    # Then safely run these:
+    instruction_count = defaultdict(int)
+    tow_count = defaultdict(int)
+    
+    intents = OpsIntent.objects.filter(date__in=visible_dates)
+
+    for intent in intents:
+        roles = intent.available_as or []
+        if "instruction" in roles:
+            instruction_count[intent.date] += 1
+        if "private" in roles or "club" in roles:
+            tow_count[intent.date] += 1
+
+
+    surge_needed_by_date = {}
+    import pprint
+
+    for day in visible_dates:
+        day_date = day if isinstance(day, date) else day.date()
+        surge_needed_by_date[day_date] = {
+            "instructor": instruction_count[day_date] > 3,
+            "towpilot": tow_count[day_date] >= 6,
+        }
+
+    pprint.pprint(surge_needed_by_date)
+
     context = {
         "year": year,
         "month": month,
@@ -187,6 +216,7 @@ def duty_calendar_view(request, year=None, month=None):
         "next_year": next_year,
         "next_month": next_month,
         "today": today,
+        "surge_needed_by_date": surge_needed_by_date,
     }
 
     if request.htmx:
@@ -268,7 +298,7 @@ def maybe_notify_surge_instructor(day_date):
     intents = OpsIntent.objects.filter(date=day_date)
     instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
 
-    if instruction_count >= 3:
+    if instruction_count > 3:
         send_mail(
             subject=f"Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
             message=f"There are currently {instruction_count} pilots requesting instruction for {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge instructor.",
