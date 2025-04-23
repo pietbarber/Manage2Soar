@@ -194,21 +194,25 @@ def duty_calendar_view(request, year=None, month=None):
         return render(request, "duty_roster/_calendar_body.html", context)
     return render(request, "duty_roster/calendar.html", context)
 
-
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
     assignment = DutyAssignment.objects.filter(date=day_date).first()
 
+    # Show current user intent status
     intent_exists = False
+    can_submit_intent = request.user.is_authenticated and day_date >= date.today()
     if request.user.is_authenticated:
-        can_submit_intent = day_date >= date.today()
         intent_exists = OpsIntent.objects.filter(member=request.user, date=day_date).exists()
+
+    # Pull all intents for the day
+    intents = OpsIntent.objects.filter(date=day_date).select_related("member").order_by("member__last_name")
 
     return render(request, "duty_roster/calendar_day_modal.html", {
         "day": day_date,
         "assignment": assignment,
         "intent_exists": intent_exists,
-        "can_submit_intent": can_submit_intent
+        "can_submit_intent": can_submit_intent,
+        "intents": intents,
     })
 
 

@@ -53,3 +53,16 @@
   {% endif %}
   </div>
 {% endif %}
+
+{% if intents %}
+  <hr>
+  <h6 class="font-semibold">🛫 Pilots Planning to Fly:</h6>
+  <ul class="list-disc ps-4">
+    {% for intent in intents %}
+      <li>{{ intent.member.full_display_name }}</li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <hr>
+  <p class="text-gray-600 italic">No one has declared intent yet.</p>
+{% endif %}
