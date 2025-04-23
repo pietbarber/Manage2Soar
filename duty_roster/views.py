@@ -7,10 +7,14 @@ from .forms import DutyPreferenceForm
 from members.models import Member
 from datetime import date, timedelta
 import calendar
+from calendar import Calendar
 from members.decorators import active_member_required
+from django.http import HttpResponse
+from calendar import monthrange
+from .models import DutyAssignment
+
 
 # Create your views here.
-from django.http import HttpResponse
 
 def roster_home(request):
     return HttpResponse("Duty Roster Home")
@@ -137,5 +141,30 @@ def blackout_manage(request):
         "role_percent_choices": role_percent_choices,
         "all_possible_roles": ["instructor", "duty_officer", "ado", "towpilot"],
         "shown_roles": [r[0] for r in role_percent_choices],
+
+    })
+
+
+# duty_roster/views.py
+
+
+def duty_calendar_view(request, year=None, month=None):
+    today = date.today()
+
+    year = int(year) if year else today.year
+    month = int(month) if month else today.month
+
+    # First day and number of days in this month
+    cal = Calendar(firstweekday=6)  # Defaults to starting weeks on Sunday
+    weeks = cal.monthdatescalendar(year, month)
+
+    assignments = DutyAssignment.objects.filter(date__month=month, date__year=year)
+    assignments_by_date = {a.date: a for a in assignments}
+
+    return render(request, "duty_roster/calendar.html", {
+        "year": year,
+        "month": month,
+        "weeks": weeks,
+        "assignments_by_date": {a.date: a for a in assignments},
 
     })

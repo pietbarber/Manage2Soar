@@ -6,5 +6,7 @@ app_name = "duty_roster"
 urlpatterns = [
     path("", views.roster_home, name="roster_home"),
     path("blackout/", views.blackout_manage, name="blackout_manage"),
+    path("calendar/", views.duty_calendar_view, name="duty_calendar"),
+    path("calendar/<int:year>/<int:month>/", views.duty_calendar_view, name="duty_calendar_month"),
 
 ]
