@@ -14,8 +14,10 @@
           hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
           hx-target="#modal-body"
           hx-swap="innerHTML"
-          data-bs-toggle="modal"
-          data-bs-target="#calendarModal"
+          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+          hx-target="#modal-body"
+          hx-swap="innerHTML"
+          onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
         >
 
           <strong>{{ day.day }}</strong><br>

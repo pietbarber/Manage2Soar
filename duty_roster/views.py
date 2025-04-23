@@ -12,6 +12,10 @@ from members.decorators import active_member_required
 from django.http import HttpResponse
 from .models import DutyAssignment
 from django.shortcuts import get_object_or_404
+from .models import OpsIntent
+from django.views.decorators.http import require_POST
+from django.http import HttpResponse
+
 
 # Create your views here.
 
@@ -195,7 +199,34 @@ def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
     assignment = DutyAssignment.objects.filter(date=day_date).first()
 
+    intent_exists = False
+    if request.user.is_authenticated:
+        can_submit_intent = day_date >= date.today()
+        intent_exists = OpsIntent.objects.filter(member=request.user, date=day_date).exists()
+
     return render(request, "duty_roster/calendar_day_modal.html", {
         "day": day_date,
         "assignment": assignment,
+        "intent_exists": intent_exists,
+        "can_submit_intent": can_submit_intent
     })
+
+
+@require_POST
+def ops_intent_toggle(request, year, month, day):
+    if not request.user.is_authenticated:
+        return HttpResponse("Not authorized", status=403)
+
+    day_date = date(year, month, day)
+    intent, created = OpsIntent.objects.get_or_create(member=request.user, date=day_date)
+
+    if not created:
+        # Already existed — remove it
+        intent.delete()
+        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
+        response += f'<button hx-post="{request.path}" hx-target="#ops-intent-response" hx-swap="innerHTML" class="btn btn-sm btn-primary">🛩️ I Plan to Fly This Day</button>'
+    else:
+        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        response += f'<button hx-post="{request.path}" hx-target="#ops-intent-response" hx-swap="innerHTML" class="btn btn-sm btn-danger">Cancel Intent</button>'
+
+    return HttpResponse(response)

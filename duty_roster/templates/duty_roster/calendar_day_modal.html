@@ -10,3 +10,46 @@
 {% else %}
   <p>No duty crew assigned for this date.</p>
 {% endif %}
+
+<hr>
+{% if user.is_authenticated %}
+  <div id="ops-intent-response">
+    {% if intent_exists %}
+      <p class="text-green-700">✅ You're already marked as planning to fly this day.</p>
+      <form 
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
+        hx-target="#ops-intent-response" 
+        hx-swap="innerHTML"
+      >
+      {% csrf_token %}
+      <button 
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
+        hx-target="#ops-intent-response" 
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-danger"
+      >
+        Cancel Intent
+      </button>
+      </form>
+    {% else %}
+    {% if can_submit_intent %}
+      <form 
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
+        hx-target="#ops-intent-response" 
+        hx-swap="innerHTML"
+      >
+      {% csrf_token %}
+      <button 
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
+        hx-target="#ops-intent-response" 
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-primary"
+      >
+        🛩️ I Plan to Fly This Day
+      </button>
+    {% else %}
+      <p class="text-gray-500 italic">🕓 This date is in the past. You can no longer declare intent.</p>
+    {% endif %}
+  {% endif %}
+  </div>
+{% endif %}

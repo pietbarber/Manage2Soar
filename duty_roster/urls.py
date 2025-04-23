@@ -9,5 +9,6 @@ urlpatterns = [
     path("calendar/", views.duty_calendar_view, name="duty_calendar"),
     path("calendar/<int:year>/<int:month>/", views.duty_calendar_view, name="duty_calendar_month"),
     path("calendar/day/<int:year>/<int:month>/<int:day>/", views.calendar_day_detail, name="calendar_day_detail"),
+    path("calendar/day/<int:year>/<int:month>/<int:day>/intent/", views.ops_intent_toggle, name="ops_intent_toggle"),
 
 ]
