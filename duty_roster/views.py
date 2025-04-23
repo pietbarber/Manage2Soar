@@ -2,8 +2,6 @@ from django.shortcuts import render, redirect
 from django.utils.timezone import now
 from django.conf import settings
 from django.contrib import messages
-from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance
-from .forms import DutyPreferenceForm
 from members.models import Member
 from datetime import date, timedelta
 import calendar
@@ -16,6 +14,8 @@ from .models import OpsIntent
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse
 from django.core.mail import send_mail
+from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance
+from .forms import DutyAssignmentForm, DutyPreferenceForm
 
 # Create your views here.
 
@@ -298,3 +298,36 @@ def maybe_notify_surge_towpilot(day_date):
         )
         assignment.tow_surge_notified = True
         assignment.save()
+
+def assignment_edit_form(request, year, month, day):
+    if not request.user.is_authenticated or not request.user.rostermeister:
+        return HttpResponse("Forbidden", status=403)
+
+    day_date = date(year, month, day)
+    assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+
+    form = DutyAssignmentForm(instance=assignment)
+
+    return render(request, "duty_roster/assignment_edit_form.html", {
+        "form": form,
+        "day": day_date,
+    })
+
+@require_POST
+def assignment_save_form(request, year, month, day):
+    if not request.user.is_authenticated or not request.user.rostermeister:
+        return HttpResponse("Forbidden", status=403)
+
+    day_date = date(year, month, day)
+    assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+
+    form = DutyAssignmentForm(request.POST, instance=assignment)
+    if form.is_valid():
+        form.save()
+        # Reload the full modal so crew updates show
+        return calendar_day_detail(request, year, month, day)
+    else:
+        return render(request, "duty_roster/assignment_edit_form.html", {
+            "form": form,
+            "day": day_date,
+        })

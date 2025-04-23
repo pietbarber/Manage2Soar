@@ -1,0 +1,19 @@
+<form 
+  method="post"
+  hx-post="{% url 'duty_roster:assignment_save_form' year=day.year month=day.month day=day.day %}" 
+  hx-target="#assignment-edit-slot" 
+  hx-swap="innerHTML"
+>
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-sm btn-success">✅ Save</button>
+  <button 
+    type="button" 
+    class="btn btn-sm btn-secondary" 
+    hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}" 
+    hx-target="#modal-body"
+    hx-swap="innerHTML"
+  >
+    Cancel
+  </button>
+</form>

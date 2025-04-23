@@ -10,18 +10,34 @@
 {% else %}
   <p>No duty crew assigned for this date.</p>
 {% endif %}
+
 {% if show_surge_alert %}
   <div class="alert alert-warning mb-3">
     ⚠️ <strong>Surge Instructor Recommended:</strong> 
     At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} of them want instruction.
   </div>
 {% endif %}
+
 {% if show_tow_surge_alert %}
   <div class="alert alert-warning mb-3">
     ⚠️ <strong>Surge Tow Pilot Recommended:</strong> At least {{ tow_count }} pilots plan to fly gliders requiring a tow.
   </div>
 {% endif %}
 
+{% if user.is_authenticated and user.rostermeister %}
+  <hr>
+  <div id="assignment-edit-slot">
+    <form 
+      hx-get="{% url 'duty_roster:assignment_edit_form' year=day.year month=day.month day=day.day %}" 
+      hx-target="#assignment-edit-slot" 
+      hx-swap="innerHTML"
+    >
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        ✏️ Edit Duty Crew
+      </button>
+    </form>
+  </div>
+{% endif %}
 <hr>
 {% if user.is_authenticated %}
   <div id="ops-intent-response">
