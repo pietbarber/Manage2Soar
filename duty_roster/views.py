@@ -7,10 +7,9 @@ from .forms import DutyPreferenceForm
 from members.models import Member
 from datetime import date, timedelta
 import calendar
-from calendar import Calendar
+from calendar import Calendar, monthrange
 from members.decorators import active_member_required
 from django.http import HttpResponse
-from calendar import monthrange
 from .models import DutyAssignment
 
 
@@ -148,23 +147,45 @@ def blackout_manage(request):
 # duty_roster/views.py
 
 
+
+def get_adjacent_months(year, month):
+    # Previous month
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+
+    # Next month
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+
+    return prev_year, prev_month, next_year, next_month
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
-
     year = int(year) if year else today.year
     month = int(month) if month else today.month
 
-    # First day and number of days in this month
-    cal = Calendar(firstweekday=6)  # Defaults to starting weeks on Sunday
+    cal = calendar.Calendar(firstweekday=6)
     weeks = cal.monthdatescalendar(year, month)
+    first_visible_day = weeks[0][0]
+    last_visible_day = weeks[-1][-1]
+    assignments = DutyAssignment.objects.filter(date__range=(first_visible_day, last_visible_day))
 
-    assignments = DutyAssignment.objects.filter(date__month=month, date__year=year)
+
     assignments_by_date = {a.date: a for a in assignments}
 
-    return render(request, "duty_roster/calendar.html", {
+    prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
+
+    context = {
         "year": year,
         "month": month,
         "weeks": weeks,
-        "assignments_by_date": {a.date: a for a in assignments},
+        "assignments_by_date": assignments_by_date,
+        "prev_year": prev_year,
+        "prev_month": prev_month,
+        "next_year": next_year,
+        "next_month": next_month,
+    }
 
-    })
+    if request.htmx:
+        return render(request, "duty_roster/_calendar_body.html", context)
+    return render(request, "duty_roster/calendar.html", context)

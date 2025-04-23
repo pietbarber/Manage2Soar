@@ -1,0 +1,26 @@
+<div id="calendar-body">
+    <div class="flex justify-between items-center mb-4">
+      <button 
+        hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
+        hx-target="#calendar-body"
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-outline"
+      >
+        « Prev
+      </button>
+  
+      <span class="font-semibold text-lg">📅 {{ year }} / {{ month }}</span>
+  
+      <button 
+        hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
+        hx-target="#calendar-body"
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-outline"
+      >
+        Next »
+      </button>
+    </div>
+  
+    {% include "duty_roster/_calendar_table.html" %}
+  </div>
+  

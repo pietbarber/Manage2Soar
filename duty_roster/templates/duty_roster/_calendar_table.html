@@ -1,0 +1,26 @@
+<table class="table table-bordered calendar w-full text-sm">
+    <thead>
+      <tr>
+        <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th>
+        <th>Thu</th><th>Fri</th><th>Sat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+      <tr>
+        {% for day in week %}
+        <td class="p-2 align-top border {% if day.month != month %}bg-gray-200 text-gray-400{% endif %}">
+          <strong>{{ day.day }}</strong><br>
+          {% if day in assignments_by_date %}
+            {% with a=assignments_by_date.day %}
+              {% if a.instructor %}👨‍🏫 {{ a.instructor.first_name }}<br>{% endif %}
+              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.first_name }}<br>{% endif %}
+            {% endwith %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  

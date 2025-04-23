@@ -11,3 +11,4 @@ requests
 pydenticon
 django-reversion
 pytest-django
+django-htmx
