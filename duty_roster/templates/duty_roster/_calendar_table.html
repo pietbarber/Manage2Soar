@@ -9,7 +9,15 @@
       {% for week in weeks %}
       <tr>
         {% for day in week %}
-        <td class="p-2 align-top border {% if day.month != month %}bg-gray-200 text-gray-400{% endif %}">
+        <td 
+          class="p-2 align-top border cursor-pointer hover:bg-blue-100 {% if day.month != month %}bg-gray-200 text-gray-400{% endif %}"
+          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+          hx-target="#modal-body"
+          hx-swap="innerHTML"
+          data-bs-toggle="modal"
+          data-bs-target="#calendarModal"
+        >
+
           <strong>{{ day.day }}</strong><br>
           {% if day in assignments_by_date %}
             {% with a=assignments_by_date.day %}

@@ -11,7 +11,7 @@ from calendar import Calendar, monthrange
 from members.decorators import active_member_required
 from django.http import HttpResponse
 from .models import DutyAssignment
-
+from django.shortcuts import get_object_or_404
 
 # Create your views here.
 
@@ -189,3 +189,13 @@ def duty_calendar_view(request, year=None, month=None):
     if request.htmx:
         return render(request, "duty_roster/_calendar_body.html", context)
     return render(request, "duty_roster/calendar.html", context)
+
+
+def calendar_day_detail(request, year, month, day):
+    day_date = date(year, month, day)
+    assignment = DutyAssignment.objects.filter(date=day_date).first()
+
+    return render(request, "duty_roster/calendar_day_modal.html", {
+        "day": day_date,
+        "assignment": assignment,
+    })
