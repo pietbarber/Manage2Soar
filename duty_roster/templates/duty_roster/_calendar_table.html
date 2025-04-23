@@ -1,45 +1,54 @@
+
 {% load duty_extras %}
+{% load static %}
 
+<table class="w-full text-sm table-fixed border border-gray-300 border-collapse">
+  <thead>
+    <tr class="bg-gray-200 text-gray-700">
+      <th class="p-2 border border-gray-300">Sun</th>
+      <th class="p-2 border border-gray-300">Mon</th>
+      <th class="p-2 border border-gray-300">Tue</th>
+      <th class="p-2 border border-gray-300">Wed</th>
+      <th class="p-2 border border-gray-300">Thu</th>
+      <th class="p-2 border border-gray-300">Fri</th>
+      <th class="p-2 border border-gray-300">Sat</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for week in weeks %}
+    <tr>
+      {% for day in week %}
 
-<table class="table table-bordered calendar w-full text-sm">
-    <thead>
-      <tr>
-        <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th>
-        <th>Thu</th><th>Fri</th><th>Sat</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for week in weeks %}
-      <tr>
-        {% for day in week %}
-        <td 
-          class="p-2 align-top border cursor-pointer hover:bg-blue-100 {% if day.month != month %}bg-gray-200 text-gray-400{% endif %}"
-          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
-          hx-target="#modal-body"
-          hx-swap="innerHTML"
-          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
-          hx-target="#modal-body"
-          hx-swap="innerHTML"
-          onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
-        >
-
-          <strong>{{ day.day }}</strong><br>
-          {% if day in assignments_by_date %}
-            {% with a=assignments_by_date|dict_get:day %}
-            <div class="text-xs mt-1 text-start leading-snug">
-              {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
-              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
-              {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
-              {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
-              {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
-              {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
-            </div>
-            {% endwith %}
+      <td
+        class="p-2 align-top border border-gray-300 cursor-pointer hover:bg-blue-100
+          {% if day < today %}
+            bg-gray-200 text-gray-500
+          {% elif day not in assignments_by_date and day.month == month %}
+            bg-gray-100 text-gray-600
           {% endif %}
-        </td>
-        {% endfor %}
-      </tr>
+        "
+        hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+        hx-target="#modal-body"
+        hx-swap="innerHTML"
+        onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
+      >
+
+        <strong>{{ day.day }}</strong><br>
+        {% if day in assignments_by_date %}
+          {% with a=assignments_by_date|dict_get:day %}
+          <div class="text-xs mt-1 text-start leading-snug">
+            {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
+            {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
+            {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
+            {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
+            {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
+            {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
+          </div>
+          {% endwith %}
+        {% endif %}
+      </td>
       {% endfor %}
-    </tbody>
-  </table>
-  
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

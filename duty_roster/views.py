@@ -173,7 +173,6 @@ def duty_calendar_view(request, year=None, month=None):
     last_visible_day = weeks[-1][-1]
     assignments = DutyAssignment.objects.filter(date__range=(first_visible_day, last_visible_day))
 
-
     assignments_by_date = {a.date: a for a in assignments}
 
     prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
@@ -187,6 +186,7 @@ def duty_calendar_view(request, year=None, month=None):
         "prev_month": prev_month,
         "next_year": next_year,
         "next_month": next_month,
+        "today": today,
     }
 
     if request.htmx:
