@@ -10,6 +10,17 @@
 {% else %}
   <p>No duty crew assigned for this date.</p>
 {% endif %}
+{% if show_surge_alert %}
+  <div class="alert alert-warning mb-3">
+    ⚠️ <strong>Surge Instructor Recommended:</strong> 
+    At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} of them want instruction.
+  </div>
+{% endif %}
+{% if show_tow_surge_alert %}
+  <div class="alert alert-warning mb-3">
+    ⚠️ <strong>Surge Tow Pilot Recommended:</strong> At least {{ tow_count }} pilots plan to fly gliders requiring a tow.
+  </div>
+{% endif %}
 
 <hr>
 {% if user.is_authenticated %}

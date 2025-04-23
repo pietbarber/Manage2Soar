@@ -46,8 +46,12 @@ class DutyAvoidanceAdmin(admin.ModelAdmin):
 
 @admin.register(DutyAssignment)
 class DutyAssignmentAdmin(admin.ModelAdmin):
-    list_display = ("date", "location", "duty_officer", "instructor", "tow_pilot", "is_scheduled", "is_confirmed")
-
+    list_display = (
+        "date", "location", "duty_officer", 
+        "instructor", "tow_pilot", 
+        "is_scheduled", "is_confirmed",
+        "surge_notified", "tow_surge_notified"
+    )
 @admin.register(InstructionSlot)
 class InstructionSlotAdmin(admin.ModelAdmin):
     list_display = ("assignment", "student", "instructor", "status", "created_at")

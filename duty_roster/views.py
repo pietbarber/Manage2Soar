@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404
 from .models import OpsIntent
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse
-
+from django.core.mail import send_mail
 
 # Create your views here.
 
@@ -207,12 +207,23 @@ def calendar_day_detail(request, year, month, day):
     # Pull all intents for the day
     intents = OpsIntent.objects.filter(date=day_date).select_related("member").order_by("member__last_name")
 
+    # Check for instruction-specific intent
+    instruction_intent_count = sum(1 for i in intents if "instruction" in i.available_as)
+    tow_count = sum(1 for i in intents if "club" in i.available_as or "private" in i.available_as)
+
+    show_surge_alert = instruction_intent_count > 3
+    show_tow_surge_alert = tow_count >= 6
+
     return render(request, "duty_roster/calendar_day_modal.html", {
         "day": day_date,
         "assignment": assignment,
         "intent_exists": intent_exists,
         "can_submit_intent": can_submit_intent,
         "intents": intents,
+        "show_surge_alert": show_surge_alert,
+        "instruction_intent_count": instruction_intent_count,
+        "tow_count": tow_count,
+        "show_tow_surge_alert": show_tow_surge_alert,
     })
 
 @require_POST
@@ -236,6 +247,8 @@ def ops_intent_toggle(request, year, month, day):
         response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
         response += f'<form hx-get="{request.path}form/" hx-target="#ops-intent-response" hx-swap="innerHTML">'
         response += f'<button type="submit" class="btn btn-sm btn-primary">🛩️ I Plan to Fly This Day</button></form>'
+    maybe_notify_surge_instructor(day_date)
+    maybe_notify_surge_towpilot(day_date)
 
     return HttpResponse(response)
 
@@ -247,3 +260,41 @@ def ops_intent_form(request, year, month, day):
     return render(request, "duty_roster/ops_intent_form.html", {
         "day": day_date,
     })
+
+def maybe_notify_surge_instructor(day_date):
+    assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+    if assignment.surge_notified:
+        return
+
+    intents = OpsIntent.objects.filter(date=day_date)
+    instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
+
+    if instruction_count >= 3:
+        send_mail(
+            subject=f"Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
+            message=f"There are currently {instruction_count} pilots requesting instruction for {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge instructor.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=["instructors@skylinesoaring.org"],
+            fail_silently=True,
+        )
+        assignment.surge_notified = True
+        assignment.save()
+
+def maybe_notify_surge_towpilot(day_date):
+    assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+    if assignment.tow_surge_notified:
+        return
+
+    intents = OpsIntent.objects.filter(date=day_date)
+    tow_count = sum(1 for i in intents if "club" in i.available_as or "private" in i.available_as)
+
+    if tow_count >= 6:
+        send_mail(
+            subject=f"Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
+            message=f"There are currently {tow_count} pilots planning flights requiring tows on {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge tow pilot.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=["towpilots@skylinesoaring.org"],
+            fail_silently=True,
+        )
+        assignment.tow_surge_notified = True
+        assignment.save()
