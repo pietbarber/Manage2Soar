@@ -2,7 +2,7 @@
 {% load duty_extras %}
 {% load static %}
 
-<table class="w-full text-sm table-fixed border border-gray-300 border-collapse">
+<table style="width: 100%; max-width: 1200px; margin: 0 auto; table-layout: fixed; border-collapse: collapse;" border="1">
   <thead>
     <tr class="bg-gray-200 text-gray-700">
       <th class="p-2 border border-gray-300">Sun</th>
@@ -18,14 +18,13 @@
     {% for week in weeks %}
     <tr>
       {% for day in week %}
-
-      <td
-        class="p-2 align-top border border-gray-300 cursor-pointer hover:bg-blue-100
-          {% if day < today %}
-            bg-gray-200 text-gray-500
-          {% elif day not in assignments_by_date and day.month == month %}
-            bg-gray-100 text-gray-600
-          {% endif %}
+      <td 
+      class="
+        p-2 align-top border cursor-pointer hover:bg-blue-100
+        {% if day < today %} past-day
+        {% elif day not in assignments_by_date and day.month == month %} future-no-ops
+        {% elif day == today %} today
+        {% endif %}
         "
         hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
         hx-target="#modal-body"
