@@ -59,16 +59,64 @@
       </button>
       </form>
     {% else %}
+     
+      {% if user.towpilot and not assignment.tow_pilot and not assignment.is_confirmed and not assignment.is_scheduled %}
+      <form method="post"
+            hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+            hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) location.reload();"
+            class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger w-full">
+          🛩️ I am willing to tow
+        </button>
+      </form>
+      {% endif %}
+      {% if user.duty_officer and not assignment.duty_officer and not assignment.is_confirmed and not assignment.is_scheduled %}
+      <form method="post"
+            hx-post="{% url 'duty_roster:calendar_dutyofficer_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+            hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) location.reload();"
+            class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning w-full">
+          📋 I will serve as Duty Officer
+        </button>
+      </form>
+    {% endif %} 
+   
+    {% if user.instructor and not assignment.instructor and not assignment.is_scheduled %}
+    <form method="post"
+        hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+        hx-on="htmx:afterRequest: location.reload();"
+        class="mt-3">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success w-full">
+      🎓 I am willing to instruct today
+    </button>
+    </form>
+    {% endif %}
+
+    {% if user.assistant_duty_officer and not assignment.assistant_duty_officer and not assignment.is_scheduled %}
+    <form method="post"
+        hx-post="{% url 'duty_roster:calendar_ado_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+        hx-on="htmx:afterRequest: location.reload();"
+        class="mt-3">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary w-full">
+      💪 I can serve as Assistant Duty Officer
+    </button>
+    </form>
+    {% endif %}
+
     {% if can_submit_intent %}
     <form 
-  hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}" 
-  hx-target="#ops-intent-response" 
-  hx-swap="innerHTML"
->
-  <button type="submit" class="btn btn-sm btn-primary">
+      hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}" 
+      hx-target="#ops-intent-response" 
+      hx-swap="innerHTML"
+    >
+    <button type="submit" class="btn btn-sm btn-primary">
     🛩️ I Plan to Fly This Day
-  </button>
-</form>
+    </button>
+    </form>
 
     {% else %}
       <p class="text-gray-500 italic">🕓 This date is in the past. You can no longer declare intent.</p>

@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import send_mail
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
 from members.models import Member
@@ -404,3 +404,79 @@ def calendar_ad_hoc_confirm(request, year, month, day):
     )
 
     return JsonResponse({"reload": True })
+
+
+@require_POST
+@active_member_required
+def calendar_tow_signup(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+
+    # Validate that user is allowed
+    member = request.user
+    if not member.towpilot:
+        return HttpResponseForbidden("You are not a tow pilot.")
+
+    # Assign as tow pilot if none already assigned
+    if not assignment.tow_pilot:
+        assignment.tow_pilot = member
+
+        # Auto-confirm if both roles filled
+        if assignment.duty_officer and not assignment.is_confirmed and not assignment.is_scheduled:
+            assignment.is_confirmed = True
+
+        assignment.save()
+
+    return JsonResponse({"reload": True})
+
+@require_POST
+@active_member_required
+def calendar_dutyofficer_signup(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+
+    member = request.user
+    if not member.duty_officer:
+        return HttpResponseForbidden("You are not a duty officer.")
+
+    if not assignment.duty_officer:
+        assignment.duty_officer = member
+
+        if assignment.tow_pilot and not assignment.is_confirmed and not assignment.is_scheduled:
+            assignment.is_confirmed = True
+
+        assignment.save()
+
+    return JsonResponse({"reload": True})
+
+@require_POST
+@active_member_required
+def calendar_instructor_signup(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+
+    member = request.user
+    if not member.instructor:
+        return HttpResponseForbidden("You are not an instructor.")
+
+    if not assignment.instructor:
+        assignment.instructor = member
+        assignment.save()
+
+    return HttpResponse(status=204)
+
+@require_POST
+@active_member_required
+def calendar_ado_signup(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+
+    member = request.user
+    if not member.assistant_duty_officer:
+        return HttpResponseForbidden("You are not an assistant duty officer.")
+
+    if not assignment.assistant_duty_officer:
+        assignment.assistant_duty_officer = member
+        assignment.save()
+
+    return HttpResponse(status=204)

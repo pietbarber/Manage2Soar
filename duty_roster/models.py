@@ -92,8 +92,8 @@ class DutyAssignment(models.Model):
     surge_instructor = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_surge_instructor")
     tow_pilot = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_tow_pilot")
     surge_tow_pilot = models.ForeignKey(Member, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_surge_tow_pilot")
-    surge_notified = models.BooleanField(default=False)         # for instructor
-    tow_surge_notified = models.BooleanField(default=False)     # for tow pilot
+    surge_notified = models.BooleanField(default=False)         # for instructor emails
+    tow_surge_notified = models.BooleanField(default=False)     # for tow pilot emails
 
     # Location & scheduling
     location = models.ForeignKey("logsheet.Airfield", null=True, blank=True, on_delete=models.SET_NULL)
