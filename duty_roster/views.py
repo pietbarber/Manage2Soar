@@ -9,12 +9,12 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from members.models import Member
 from members.decorators import active_member_required
 from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment
-
 from .forms import DutyAssignmentForm, DutyPreferenceForm
+from django.template.loader import render_to_string
 
 # Create your views here.
 
@@ -195,7 +195,6 @@ def duty_calendar_view(request, year=None, month=None):
 
 
     surge_needed_by_date = {}
-    import pprint
 
     for day in visible_dates:
         day_date = day if isinstance(day, date) else day.date()
@@ -203,8 +202,6 @@ def duty_calendar_view(request, year=None, month=None):
             "instructor": instruction_count[day_date] > 3,
             "towpilot": tow_count[day_date] >= 6,
         }
-
-    pprint.pprint(surge_needed_by_date)
 
     context = {
         "year": year,
@@ -360,3 +357,29 @@ def assignment_save_form(request, year, month, day):
             "form": form,
             "day": day_date,
         })
+
+
+@require_GET
+def calendar_ad_hoc_start(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+
+    # Extra safety check
+    if day_obj <= date.today():
+        return HttpResponse(status=400)
+
+    html = render_to_string("duty_roster/calendar_ad_hoc_start.html", {
+        "date": day_obj
+    })
+    return HttpResponse(html)
+
+@require_POST
+def calendar_ad_hoc_confirm(request, year, month, day):
+    day_obj = date(int(year), int(month), int(day))
+
+    # Make sure it's still a valid future date
+    if day_obj <= date.today():
+        return HttpResponse(status=400)
+
+    assignment, created = DutyAssignment.objects.get_or_create(date=day_obj)
+
+    return HttpResponse("<p><strong>Ad-hoc operations proposed for this day.</strong></p><p>You can now declare intent to fly or suggest a duty crew.</p>")

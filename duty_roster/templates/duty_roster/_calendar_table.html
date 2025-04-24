@@ -26,7 +26,11 @@
         {% elif day == today %} today
         {% endif %}
         "
-        hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+        {% if day not in assignments_by_date and day > today %}
+          hx-get="{% url 'duty_roster:calendar_ad_hoc_start' year=day.year month=day.month day=day.day %}"
+        {% else %}
+          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+        {% endif %}
         hx-target="#modal-body"
         hx-swap="innerHTML"
         onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
@@ -38,7 +42,7 @@
             {% with surge=surge_needed_by_date|dict_get:day %}
               <div class="mt-1 text-red-600 text-xs">
                 {% if surge.instructor %}
-                <span title="At least 3 students are requesting instruction">🚨🎓</span>
+                <span title="At least 4 students are requesting instruction">🚨🎓</span>
               {% endif %}
               {% if surge.towpilot %}
                 <span title="High demand for tows – surge tow pilot may be needed">🚨🛩️</span>
@@ -48,19 +52,18 @@
             {% endwith %}
           {% endif %}
 
-
-        {% if day in assignments_by_date %}
-          {% with a=assignments_by_date|dict_get:day %}
-          <div class="text-xs mt-1 text-start leading-snug">
-            {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
-            {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
-            {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
-            {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
-            {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
-            {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
-          </div>
-          {% endwith %}
-        {% endif %}
+          {% if day in assignments_by_date %}
+            {% with a=assignments_by_date|dict_get:day %}
+            <div class="text-xs mt-1 text-start leading-snug">
+              {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
+              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
+              {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
+              {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
+              {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
+              {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
+            </div>
+            {% endwith %}
+          {% endif %}
       </td>
       {% endfor %}
     </tr>

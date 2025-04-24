@@ -13,5 +13,7 @@ urlpatterns = [
     path("calendar/day/<int:year>/<int:month>/<int:day>/intent/form/", views.ops_intent_form, name="ops_intent_form"),
     path("calendar/day/<int:year>/<int:month>/<int:day>/edit/", views.assignment_edit_form, name="assignment_edit_form"),
     path("calendar/day/<int:year>/<int:month>/<int:day>/save/", views.assignment_save_form, name="assignment_save_form"),
+    path("calendar/ad-hoc/<int:year>/<int:month>/<int:day>/", views.calendar_ad_hoc_start, name="calendar_ad_hoc_start"),
+    path("calendar/ad-hoc/confirm/<int:year>/<int:month>/<int:day>/", views.calendar_ad_hoc_confirm, name="calendar_ad_hoc_confirm"),
 
 ]
