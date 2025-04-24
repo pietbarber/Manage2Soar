@@ -7,12 +7,13 @@
     <p>No operations are currently scheduled for this day.</p>
     <p>Would you like to request ad-hoc operations?</p>
     <form method="post" 
-          hx-post="{% url 'duty_roster:calendar_ad_hoc_confirm' year=date.year month=date.month day=date.day %}"
-          hx-target="#modal-body"
-          hx-swap="innerHTML">
+      hx-post="{% url 'duty_roster:calendar_ad_hoc_confirm' year=date.year month=date.month day=date.day %}"
+      hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) location.reload();"
+      >
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">Yes, request operations</button>
       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
     </form>
+
   </div>
   

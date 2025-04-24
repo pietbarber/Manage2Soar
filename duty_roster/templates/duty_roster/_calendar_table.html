@@ -55,6 +55,14 @@
           {% if day in assignments_by_date %}
             {% with a=assignments_by_date|dict_get:day %}
             <div class="text-xs mt-1 text-start leading-snug">
+              {% if not a.confirmed and not a.is_confirmed %}
+              <div class="text-orange-600 font-bold mb-1">
+                🚧 Not Confirmed<br>
+                {% if not a.tow_pilot %}🛩️ Tow Pilot Missing<br>{% endif %}
+                {% if not a.duty_officer %}📋 Duty Officer Missing<br>{% endif %}
+              </div>
+              {% endif %}
+
               {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
               {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
               {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}

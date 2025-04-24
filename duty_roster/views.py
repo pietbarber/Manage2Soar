@@ -15,6 +15,8 @@ from members.decorators import active_member_required
 from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 from django.template.loader import render_to_string
+from logsheet.models import Airfield
+
 
 # Create your views here.
 
@@ -349,6 +351,15 @@ def assignment_save_form(request, year, month, day):
 
     form = DutyAssignmentForm(request.POST, instance=assignment)
     if form.is_valid():
+        assignment = form.save(commit=False)
+
+        # Check for tow pilot to confirm ad-hoc day
+        if not assignment.is_confirmed and not assignment.is_scheduled:
+            if assignment.tow_pilot and assignment.duty_officer:
+                assignment.is_confirmed = True
+
+        assignment.save()
+
         form.save()
         # Reload the full modal so crew updates show
         return JsonResponse({"reload": True})
@@ -367,9 +378,11 @@ def calendar_ad_hoc_start(request, year, month, day):
     if day_obj <= date.today():
         return HttpResponse(status=400)
 
-    html = render_to_string("duty_roster/calendar_ad_hoc_start.html", {
-        "date": day_obj
-    })
+    html = render_to_string(
+        "duty_roster/calendar_ad_hoc_start.html", 
+        {"date": day_obj},
+        request=request,
+    )
     return HttpResponse(html)
 
 @require_POST
@@ -379,7 +392,15 @@ def calendar_ad_hoc_confirm(request, year, month, day):
     # Make sure it's still a valid future date
     if day_obj <= date.today():
         return HttpResponse(status=400)
+    default_airfield = Airfield.objects.get(identifier="KFRR")
 
-    assignment, created = DutyAssignment.objects.get_or_create(date=day_obj)
+    assignment, created = DutyAssignment.objects.get_or_create(
+        date=day_obj,
+        defaults={
+            "location": default_airfield,
+            "is_scheduled": False,
+            "is_confirmed": False,
+        }
+    )
 
-    return HttpResponse("<p><strong>Ad-hoc operations proposed for this day.</strong></p><p>You can now declare intent to fly or suggest a duty crew.</p>")
+    return JsonResponse({"reload": True })
