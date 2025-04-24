@@ -16,6 +16,7 @@ from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, 
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 from django.template.loader import render_to_string
 from logsheet.models import Airfield
+from duty_roster.utils.email import notify_ops_status
 
 
 # Create your views here.
@@ -402,7 +403,7 @@ def calendar_ad_hoc_confirm(request, year, month, day):
             "is_confirmed": False,
         }
     )
-
+    notify_ops_status(assignment)
     return JsonResponse({"reload": True })
 
 
@@ -421,11 +422,8 @@ def calendar_tow_signup(request, year, month, day):
     if not assignment.tow_pilot:
         assignment.tow_pilot = member
 
-        # Auto-confirm if both roles filled
-        if assignment.duty_officer and not assignment.is_confirmed and not assignment.is_scheduled:
-            assignment.is_confirmed = True
-
         assignment.save()
+        notify_ops_status(assignment)
 
     return JsonResponse({"reload": True})
 
@@ -442,10 +440,8 @@ def calendar_dutyofficer_signup(request, year, month, day):
     if not assignment.duty_officer:
         assignment.duty_officer = member
 
-        if assignment.tow_pilot and not assignment.is_confirmed and not assignment.is_scheduled:
-            assignment.is_confirmed = True
-
         assignment.save()
+        notify_ops_status(assignment)
 
     return JsonResponse({"reload": True})
 

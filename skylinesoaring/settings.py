@@ -232,11 +232,15 @@ AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
 )
 
-DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']  # Or your real domain in production
 
+
+DEBUG = True
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    SITE_URL = "http://127.0.0.1:8000"
+else: 
+    SITE_URL = "https://members.skylinesoaring.org"
 
 DEFAULT_FROM_EMAIL = "noreply@skylinesoaring.org"
 EMAIL_SUBJECT_PREFIX = "[Skyline] "
