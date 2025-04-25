@@ -1,9 +1,9 @@
 from django.db import models
-from members.models import Member
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta, date
 from tinymce.models import HTMLField
 from django.conf import settings
+from members.models import Member
 
 ####################################################
 # Flight model
@@ -472,14 +472,11 @@ class TowplaneCloseout(models.Model):
         return f"{self.towplane.registration} on {self.logsheet.log_date}"
 
 
-from django.db import models
-from members.models import Member
-from logsheet.models import Glider, Towplane
 
 
 class MaintenanceIssue(models.Model):
-    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
-    towplane = models.ForeignKey(Towplane, null=True, blank=True, on_delete=models.CASCADE)
+    glider = models.ForeignKey("logsheet.Glider", null=True, blank=True, on_delete=models.CASCADE)
+    towplane = models.ForeignKey("logsheet.Towplane", null=True, blank=True, on_delete=models.CASCADE)
     reported_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
     report_date = models.DateField(auto_now_add=True)
     logsheet = models.ForeignKey("Logsheet", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_issues")
