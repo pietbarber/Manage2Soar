@@ -706,9 +706,10 @@ def equipment_list(request):
 @active_member_required
 def maintenance_issues(request):
     open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related("glider", "towplane")
-    return render(request, "logsheet/maintenance_issues.html", {
+    return render(request, "logsheet/maintenance_list.html", {
         "open_issues": open_issues,
     })
+
 
 @active_member_required
 def mark_issue_resolved(request, issue_id):
