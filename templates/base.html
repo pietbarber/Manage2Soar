@@ -138,13 +138,17 @@
           </li>
 
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="logsheetDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link dropdown-toggle" href="#" id="dutyrosterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Duty Roster
             </a>
             <ul class="dropdown-menu" aria-labelledby="dutyrosterDropdown">
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">Blackout Dates</a>
               </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}">📅 Calendar</a>
+              </li>
+
             </ul>
           </li>
           <li class="nav-item dropdown">
@@ -156,12 +160,23 @@
               <li><a class="dropdown-item" href="{% url 'logsheet:create' %}">Create New</a></li>
             </ul>
           </li>
-          
+         
           {% if user.is_authenticated and user.instructor %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'instructors:index' %}">Instructor Tools</a>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="instructorDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Instructor Tools
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="instructorDropdown">
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'instructors:index' %}">🏠 Instructor Home</a>
+              </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'instructors:syllabus_overview' %}">📚 Syllabus Overview</a>
+              </li>
+            </ul>
           </li>
           {% endif %}
+
         </ul>
  
         <!-- Right side: Welcome + Logout -->
