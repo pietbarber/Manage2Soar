@@ -1,0 +1,28 @@
+
+<form 
+  method="post" 
+  hx-trigger="submit"
+  hx-swap="none"
+  hx-post="{% url 'duty_roster:calendar_cancel_ops_day' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+  hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) { location.reload(); }"
+>
+  {% csrf_token %}
+  <div class="p-4">
+    <h2 class="text-lg font-bold mb-4">🚫 Cancel Operations for {{ assignment.date|date:"l, F j, Y" }}</h2>
+
+    <div class="mb-4">
+      <label for="reason" class="block font-semibold mb-2">Reason for cancellation:</label>
+      <p class="text-sm text-gray-600 mt-1"><textarea id="reason" name="reason" rows="4" required minlength="10" class="w-full border rounded p-2"></textarea></p>
+      <p class="text-sm text-gray-600 mt-1">Please explain why operations are being canceled. Minimum 10 characters.</p>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button type="button" class="btn btn-secondary" onclick="bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();">
+        Nevermind
+      </button>
+      <button type="submit" class="btn btn-danger">
+        Confirm Cancellation
+      </button>
+    </div>
+  </div>
+</form>

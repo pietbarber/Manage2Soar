@@ -1,4 +1,3 @@
-
 import calendar
 from calendar import Calendar, monthrange
 from collections import defaultdict
@@ -7,7 +6,7 @@ from django.utils.timezone import now
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import send_mail
-from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
 from members.models import Member
@@ -253,6 +252,8 @@ def calendar_day_detail(request, year, month, day):
         "instruction_intent_count": instruction_intent_count,
         "tow_count": tow_count,
         "show_tow_surge_alert": show_tow_surge_alert,
+        "today": date.today(),
+
     })
 
 @require_POST
@@ -476,3 +477,51 @@ def calendar_ado_signup(request, year, month, day):
         assignment.save()
 
     return HttpResponse(status=204)
+
+
+@require_POST
+@active_member_required
+def calendar_cancel_ops_day(request, year, month, day):
+    from datetime import date
+    
+    ops_date = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=ops_date)
+
+    # Check that it's an ad-hoc day
+    if assignment.is_scheduled:
+        return HttpResponseBadRequest("Cannot cancel scheduled operations.")
+
+    reason = request.POST.get("reason", "").strip()
+    if not reason or len(reason) < 10:
+        return HttpResponseBadRequest("Cancellation reason is required and must be at least 10 characters.")
+
+    canceller_name = request.user.full_display_name
+
+    body = (
+        f"Operations for {ops_date.strftime('%A, %B %d, %Y')} have been canceled.\n\n"
+        f"Canceled by: {canceller_name}\n\n"
+        f"Reason:\n{reason}\n\n"
+        f"Stay safe and we'll see you next time!"
+    )
+
+    # Send to members@skylinesoaring.org
+    send_mail(
+        subject=f"[Skyline Soaring] Operations Canceled – {ops_date.strftime('%B %d')}",
+        message=body,
+        from_email="noreply@skylinesoaring.org",
+        recipient_list=["members@skylinesoaring.org"],
+    )
+
+    # Delete the DutyAssignment entry
+    assignment.delete()
+
+    return JsonResponse({"reload": True})
+
+@active_member_required
+def calendar_cancel_ops_modal(request, year, month, day):
+    from datetime import date
+
+    ops_date = date(int(year), int(month), int(day))
+    assignment = get_object_or_404(DutyAssignment, date=ops_date)
+
+    return render(request, "duty_roster/calendar_cancel_modal.html", {"assignment": assignment})

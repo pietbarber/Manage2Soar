@@ -1,5 +1,21 @@
 <h5>{{ day|date:"l, F j, Y" }}</h5>
 
+{% if user.is_authenticated %}
+  {% if assignment and not assignment.is_scheduled and assignment.date >= today %}
+    <div class="mt-4 p-2 border-t">
+      <h3 class="text-md font-semibold mb-2">Admin Options</h3>
+      <button 
+        class="btn btn-danger w-full"
+        hx-get="{% url 'duty_roster:calendar_cancel_ops_modal' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+        hx-target="#modal-body"
+        hx-swap="innerHTML"
+      >
+       ✋ Cancel Operations for this day ✋
+      </button>
+    </div>
+  {% endif %}
+{% endif %}
+ 
 {% if assignment %}
   <p><strong>Instructor:</strong> {{ assignment.instructor|default:"—" }}</p>
   <p><strong>Surge Instructor:</strong> {{ assignment.surge_instructor|default:"—" }}</p>
