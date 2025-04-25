@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
+{% load logsheet_tags %}
+
 
 {% block content %}
 <div class="container mt-4">
@@ -55,13 +57,23 @@
 
         {% if user.is_authenticated %}
         <td>
-          {% comment %}
-          Here, if you later want "Resolve" button, insert it.
-          For now, placeholder.
-          {% endcomment %}
-          <button class="btn btn-sm btn-outline-success" disabled>✍️ Coming Soon</button>
-        </td>
+          {% if issue|can_be_resolved_by:user %}
+            <form 
+              method="post" 
+              action="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
+              hx-post="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
+              hx-target="closest tr"
+              hx-swap="outerHTML"
+            >
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm">✅ Mark Resolved</button>
+            </form>
+          {% endif %}
+
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" disabled>✍️ No Access</button>
         {% endif %}
+        </td>
 
       </tr>
       {% empty %}

@@ -499,6 +499,16 @@ class MaintenanceIssue(models.Model):
         label = f"{aircraft}"
         return f"{label} - {'Grounded' if self.grounded else 'Open'} - {self.description[:40]}"
 
+    def can_be_resolved_by(self, user):
+        if user.is_superuser:
+            return True
+        if self.glider and user.id in self.glider.aircraftmeister_set.values_list('member_id', flat=True):
+            return True
+        if self.towplane and user.id in self.towplane.aircraftmeister_set.values_list('member_id', flat=True):
+            return True
+        return False
+
+
 
 DEADLINE_TYPES = [
     ("annual", "Annual Inspection"),

@@ -18,6 +18,8 @@ urlpatterns = [
     path("equipment/", views.equipment_list, name="equipment_list"),
     path("maintenance-issues/", views.maintenance_issues, name="maintenance_issues"),
     path("maintenance-issues/resolve/<int:issue_id>/", views.mark_issue_resolved, name="mark_issue_resolved"),
+    path("maintenance-issues/resolve/<int:issue_id>/modal/", views.resolve_maintenance_modal, name="resolve_maintenance_modal"),
+    path("maintenance/resolve/<int:issue_id>/", views.maintenance_mark_resolved, name="maintenance_mark_resolved"),
 
 
 ] 

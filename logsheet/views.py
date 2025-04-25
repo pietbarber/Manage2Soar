@@ -1,15 +1,17 @@
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
+from django.utils import timezone
+from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 from django.core.paginator import Paginator
 from datetime import datetime
-from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
 from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister
 from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
+
 
 
 
@@ -732,3 +734,51 @@ def mark_issue_resolved(request, issue_id):
 
     messages.success(request, "Maintenance issue marked as resolved.")
     return redirect("logsheet:maintenance_issues")
+
+
+
+
+@active_member_required
+def resolve_maintenance_modal(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
+
+    return render(request, "logsheet/maintenance_resolve_modal.html", {
+        "issue": issue
+    })
+
+@require_POST
+@active_member_required
+def resolve_maintenance_issue(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
+
+    # (same permission checks as before)
+
+    notes = request.POST.get("notes", "").strip()
+
+    issue.resolved = True
+    issue.resolved_by = request.user
+    issue.resolved_date = timezone.now().date()
+    if notes:
+        issue.resolution_notes = notes
+    elif not issue.resolution_notes:
+        issue.resolution_notes = "Resolved via equipment page."
+
+    issue.save()
+
+    return JsonResponse({"reload": True})
+
+@require_POST
+@active_member_required
+def maintenance_mark_resolved(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
+
+    user = request.user
+    if not issue.can_be_resolved_by(user):
+        return HttpResponseForbidden("You're not authorized to resolve this issue.")
+
+    issue.resolved = True
+    issue.resolved_by = user
+    issue.resolved_date = now().date()
+    issue.save()
+
+    return JsonResponse({"reload": True})
