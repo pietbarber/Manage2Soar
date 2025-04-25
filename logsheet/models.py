@@ -301,7 +301,7 @@ class Glider(models.Model):
     n_number = models.CharField(max_length=20, unique=True)  # Registration (e.g. N123AB)
     competition_number = models.CharField(max_length=10, blank=True)
     seats = models.PositiveIntegerField(default=2)
-    picture = models.ImageField(upload_to="glider_photos/", blank=True, null=True)
+    photo = models.ImageField(upload_to="glider_photos/", blank=True, null=True)
     rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
     max_rental_rate = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
     is_active = models.BooleanField(

@@ -1,13 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">Active Club Aircraft</h2>
+
+<h2 class="text-2xl font-semibold mb-4">Skyline Fleet</h2>
 
 <h3 class="text-xl font-bold mt-6">Gliders</h3>
 <table class="table table-striped">
-  <thead><tr><th>N-Number</th><th>Make</th><th>Model</th><th>Status</th></tr></thead>
+  <thead><tr><th>Photo</th><th>N-Number</th><th>Make</th><th>Model</th><th>Status</th></tr></thead>
   <tbody>
     {% for g in gliders %}
     <tr>
+      <td>
+        {% if g.photo %}
+        <img 
+          src="{{ g.photo.url }}" 
+          alt="Glider Photo" 
+          style="max-width: 150px; max-height: 150px; cursor: pointer;"
+          class="rounded shadow"
+          onclick="showFullImage('{{ g.photo.url }}')"
+        >
+
+        {% else %}
+          ✈️ No Photo
+        {% endif %}
+      </td>
       <td>{{ g.n_number }}</td>
       <td>{{ g.make }}</td>
       <td>{{ g.model }}</td>
@@ -25,10 +40,24 @@
 
 <h3 class="text-xl font-bold mt-6">Towplanes</h3>
 <table class="table table-striped">
-  <thead><tr><th>N-Number</th><th>Make</th><th>Model</th><th>Status</th></tr></thead>
+  <thead><tr><th>Photo</th><th>N-Number</th><th>Make</th><th>Model</th><th>Status</th></tr></thead>
   <tbody>
     {% for t in towplanes %}
     <tr>
+      <td>
+        {% if t.photo %}
+        <img 
+        src="{{ t.photo.url }}" 
+        alt="Tow Plane Photo" 
+        style="max-width: 150px; max-height: 150px; cursor: pointer;"
+        class="rounded shadow"
+        onclick="showFullImage('{{ t.photo.url }}')"
+        >
+
+        {% else %}
+          ✈️ No Photo
+        {% endif %}
+      </td>
       <td>{{ t.n_number }}</td>
       <td>{{ t.make }}</td>
       <td>{{ t.model }}</td>
@@ -42,5 +71,31 @@
     </tr>
     {% endfor %}
   </tbody>
+  <script>
+    function showFullImage(url) {
+      document.getElementById('modalImage').src = url;
+      var modal = new bootstrap.Modal(document.getElementById('photoModal'));
+      modal.show();
+    }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll("table").forEach(function(table) {
+          new Tablesort(table);
+        });
+      });
+    </script>
+    
+  <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-body p-0">
+          <img id="modalImage" src="" class="img-fluid rounded" alt="Aircraft Photo">
+        </div>
+      </div>
+    </div>
+  </div>
+
 </table>
 {% endblock %}
