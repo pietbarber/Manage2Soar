@@ -11,9 +11,9 @@ from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeist
 # with the admin interface here. 
 @admin.register(Towplane)
 class TowplaneAdmin(admin.ModelAdmin):
-    list_display = ("name", "registration", "is_active")
+    list_display = ("name", "n_number", "is_active")
     list_filter = ("is_active",)
-    search_fields = ("name", "registration")
+    search_fields = ("name", "n_number")
     def get_search_results(self, request, queryset, search_term):
         queryset = queryset.filter(is_active=True)
         return super().get_search_results(request, queryset, search_term)
@@ -167,12 +167,12 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
 class MaintenanceDeadlineAdmin(admin.ModelAdmin):
     list_display = ("aircraft_n_number", "aircraft_type", "description", "due_date")
     list_filter = ("description", "due_date")
-    search_fields = ("glider__n_number", "towplane__registration")
+    search_fields = ("glider__n_number", "towplane__n_number")
 
     autocomplete_fields = ("glider", "towplane")
 
     def aircraft_n_number(self, obj):
-        return obj.glider.n_number if obj.glider else obj.towplane.registration
+        return obj.glider.n_number if obj.glider else obj.towplane.n_number
     aircraft_n_number.short_description = "N-Number"
 
     def aircraft_type(self, obj):

@@ -259,15 +259,18 @@ class RevisionLog(models.Model):
 #
 class Towplane(models.Model):
     name = models.CharField(max_length=100)
-    registration = models.CharField(max_length=50)  # e.g., N-number
+    make = models.CharField(max_length=100, blank=True, null=True)
+    model = models.CharField(max_length=100, blank=True, null=True)
+    n_number = models.CharField(max_length=50)  # e.g., N-number
     photo = models.ImageField(upload_to="towplane_photos/", blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    club_owned = models.BooleanField(default=False)
     class Meta:
         ordering = ["name"]
 
     def __str__(self):
         status = " (Inactive)" if not self.is_active else ""
-        return f"{self.name} ({self.registration})"
+        return f"{self.name} ({self.n_number})"
     
     @property
     def is_grounded(self):
@@ -469,7 +472,7 @@ class TowplaneCloseout(models.Model):
         unique_together = ("logsheet", "towplane")
 
     def __str__(self):
-        return f"{self.towplane.registration} on {self.logsheet.log_date}"
+        return f"{self.towplane.n_number} on {self.logsheet.log_date}"
 
 
 

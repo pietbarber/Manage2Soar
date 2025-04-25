@@ -81,7 +81,7 @@ class FlightForm(forms.ModelForm):
         active_towplanes = Towplane.objects.filter(is_active=True)
         self.fields["towplane"].queryset = active_towplanes.exclude(
             id__in=[tp.id for tp in active_towplanes if tp.is_grounded]
-        ).order_by("name", "registration")
+        ).order_by("name", "n_number")
 
         active_gliders = Glider.objects.filter(is_active=True)
         self.fields["glider"].queryset = active_gliders.exclude(
@@ -146,7 +146,7 @@ class FlightForm(forms.ModelForm):
 #        - Filters active airfields for "airfield".
 #        - Filters members based on their roles for duty crew fields (e.g., duty officer, instructor, tow pilot).
 #        - Orders members by last name for better usability.
-#        - Orders towplanes by name and registration.
+#        - Orders towplanes by name and n_number.
 #        - Sets the default airfield to "KFRR" if it exists.
 #        - Applies consistent widget styles for dropdown fields.
 class CreateLogsheetForm(forms.ModelForm):
@@ -192,7 +192,7 @@ class CreateLogsheetForm(forms.ModelForm):
         self.fields["surge_instructor"].queryset = get_active_members_with_role("instructor")
         self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
         self.fields["surge_tow_pilot"].queryset = get_active_members_with_role("towpilot")
-        self.fields["default_towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "registration") 
+        self.fields["default_towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "n_number") 
 
         # Optional: set widget styles for dropdowns
         for name in [

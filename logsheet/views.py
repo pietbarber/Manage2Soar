@@ -8,7 +8,7 @@ from datetime import datetime
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
-from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue
+from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister
 from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
 
 
@@ -655,7 +655,7 @@ def edit_logsheet_closeout(request, pk):
         "duty_form": duty_form,
         "formset": formset,
         "gliders": Glider.objects.filter(club_owned=True, is_active=True).order_by("n_number"),
-        "towplanes": Towplane.objects.filter(is_active=True).order_by("registration"),
+        "towplanes": Towplane.objects.filter(is_active=True).order_by("n_number"),
         "maintenance_issues": maintenance_issues
 
     })
@@ -693,3 +693,41 @@ def add_maintenance_issue(request, logsheet_id):
         messages.error(request, "Failed to submit maintenance issue.")
     return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.id)
 
+
+@active_member_required
+def equipment_list(request):
+    gliders = Glider.objects.filter(is_active=True, club_owned=True).order_by("n_number")
+    towplanes = Towplane.objects.filter(is_active=True, club_owned=True).order_by("n_number")
+    return render(request, "logsheet/equipment_list.html", {
+        "gliders": gliders,
+        "towplanes": towplanes,
+    })
+
+@active_member_required
+def maintenance_issues(request):
+    open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related("glider", "towplane")
+    return render(request, "logsheet/maintenance_issues.html", {
+        "open_issues": open_issues,
+    })
+
+@active_member_required
+def mark_issue_resolved(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, pk=issue_id)
+
+    # Check if this user is the AircraftMeister for the aircraft
+    member = request.user
+    if issue.glider:
+        if not AircraftMeister.objects.filter(glider=issue.glider, meister=member).exists():
+            messages.error(request, "You are not authorized to resolve issues for this glider.")
+            return redirect("logsheet:maintenance_issues")
+    elif issue.towplane:
+        if not AircraftMeister.objects.filter(towplane=issue.towplane, meister=member).exists():
+            messages.error(request, "You are not authorized to resolve issues for this towplane.")
+            return redirect("logsheet:maintenance_issues")
+
+    issue.resolved = True
+    issue.grounded = False  # in case it was grounded
+    issue.save()
+
+    messages.success(request, "Maintenance issue marked as resolved.")
+    return redirect("logsheet:maintenance_issues")
