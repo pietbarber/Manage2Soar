@@ -28,9 +28,9 @@
       <td>{{ g.model }}</td>
       <td>
         {% if g.is_grounded %}
-          <span class="text-red-600 font-semibold">Grounded</span>
+        <span class="badge bg-danger">Grounded</span>
         {% else %}
-          <span class="text-green-600 font-semibold">Flying</span>
+        <span class="badge bg-primary">Available</span>
         {% endif %}
       </td>
     </tr>
@@ -63,9 +63,9 @@
       <td>{{ t.model }}</td>
       <td>
         {% if t.is_grounded %}
-          <span class="text-red-600 font-semibold">Grounded</span>
+        <span class="text-danger fw-bold">Grounded</span>
         {% else %}
-          <span class="text-green-600 font-semibold">Flying</span>
+        <span class="badge bg-primary">Available</span>
         {% endif %}
       </td>
     </tr>
