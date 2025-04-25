@@ -1,22 +1,17 @@
-
-<div class="modal-header">
-    <h5 class="modal-title">Resolve Maintenance Issue</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<form 
+  method="post" 
+  hx-post="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
+  hx-target="body"
+  hx-swap="none"
+  hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) { 
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).hide(); 
+    setTimeout(() => { location.reload(); }, 300);
+  }"
+>
+  {% csrf_token %}
+  <h5>Resolve Maintenance Issue</h5>
+  <textarea name="resolution_notes" required class="form-control" placeholder="Describe the fix..."></textarea>
+  <div class="d-flex justify-content-end mt-2">
+    <button type="submit" class="btn btn-success">✅ Resolve</button>
   </div>
-  
-  <div class="modal-body">
-    <form 
-      method="post"
-      hx-post="{% url 'logsheet:resolve_maintenance_issue' issue.id %}"
-      hx-target="#modal-body"
-      hx-swap="innerHTML"
-    >
-      {% csrf_token %}
-      <div class="mb-3">
-        <label for="notes" class="form-label">Resolution Notes (optional)</label>
-        <textarea name="notes" id="notes" rows="4" class="form-control"></textarea>
-      </div>
-  
-      <button type="submit" class="btn btn-success w-full">✅ Confirm Resolution</button>
-    </form>
-  </div>
+</form>

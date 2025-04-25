@@ -782,3 +782,28 @@ def maintenance_mark_resolved(request, issue_id):
     issue.save()
 
     return JsonResponse({"reload": True})
+
+@active_member_required
+def maintenance_resolve_modal(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
+    return render(request, "logsheet/maintenance_resolve_modal.html", {"issue": issue})
+
+@require_POST
+@active_member_required
+def maintenance_mark_resolved(request, issue_id):
+    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
+
+    if not issue.can_be_resolved_by(request.user):
+        return HttpResponseForbidden("You're not allowed to resolve this issue.")
+
+    resolution_notes = request.POST.get("resolution_notes", "").strip()
+    if not resolution_notes:
+        return JsonResponse({"error": "Resolution notes are required."}, status=400)
+
+    issue.resolved = True
+    issue.resolved_by = request.user
+    issue.resolved_date = now().date()
+    issue.resolution_notes = resolution_notes
+    issue.save()
+
+    return JsonResponse({"reload": True})

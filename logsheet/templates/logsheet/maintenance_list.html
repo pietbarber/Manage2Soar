@@ -58,16 +58,16 @@
         {% if user.is_authenticated %}
         <td>
           {% if issue|can_be_resolved_by:user %}
-            <form 
-              method="post" 
-              action="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
-              hx-post="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
-              hx-target="closest tr"
-              hx-swap="outerHTML"
-            >
-              {% csrf_token %}
-              <button type="submit" class="btn btn-success btn-sm">✅ Mark Resolved</button>
-            </form>
+          <button 
+            class="btn btn-success btn-sm"
+            hx-get="{% url 'logsheet:maintenance_resolve_modal' issue.id %}"
+            hx-target="#modal-body"
+            hx-swap="innerHTML"
+            onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
+          >
+            ✅ Mark Resolved
+          </button>
+
           {% endif %}
 
         {% else %}
@@ -85,7 +85,13 @@
   </table>
 
 </div>
-
+<div class="modal fade" id="calendarModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" id="modal-body">
+        <!-- HTMX will swap here -->
+      </div>
+    </div>
+  </div>
 <!-- Table Sorting -->
 <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
 <script>

@@ -16,10 +16,8 @@ urlpatterns = [
     path("manage/<int:pk>/view-closeout/", views.view_logsheet_closeout, name="view_logsheet_closeout"),
     path("logsheet/<int:logsheet_id>/add-issue/", views.add_maintenance_issue, name="add_maintenance_issue"),
     path("equipment/", views.equipment_list, name="equipment_list"),
-    path("maintenance-issues/", views.maintenance_issues, name="maintenance_issues"),
-    path("maintenance-issues/resolve/<int:issue_id>/", views.mark_issue_resolved, name="mark_issue_resolved"),
-    path("maintenance-issues/resolve/<int:issue_id>/modal/", views.resolve_maintenance_modal, name="resolve_maintenance_modal"),
+    path("maintenance/", views.maintenance_issues, name="maintenance_issues"),
+    path("maintenance/resolve-modal/<int:issue_id>/", views.maintenance_resolve_modal, name="maintenance_resolve_modal"),
     path("maintenance/resolve/<int:issue_id>/", views.maintenance_mark_resolved, name="maintenance_mark_resolved"),
-
 
 ] 
