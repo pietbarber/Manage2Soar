@@ -66,7 +66,8 @@ INSTALLED_APPS = [
     "duty_roster",
     "django.contrib.humanize",
     "reversion",
-    "django_htmx"
+    "django_htmx",
+    "django_extensions"
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
