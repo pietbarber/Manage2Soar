@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Maintenance Deadlines{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h1 class="mb-4">⏰ Maintenance Deadlines</h1>
+
+  {% if deadlines %}
+  <div class="table-responsive">
+    <table class="table table-striped table-bordered table-hover align-middle text-sm" id="deadlines-table">
+      <thead class="table-light">
+        <tr>
+          <th>Aircraft</th>
+          <th>Due Date</th>
+          <th>Task</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for deadline in deadlines %}
+        <tr>
+          <td>
+            {% if deadline.glider %}
+              ⛵ {{ deadline.glider }}
+            {% elif deadline.towplane %}
+              🛩️ {{ deadline.towplane }}
+            {% endif %}
+          </td>
+          <td>{{ deadline.due_date }}</td>
+          <td>{{ deadline.description }}</td>
+          <td>
+            {% if deadline.due_date < today %}
+              <span class="badge bg-danger">Overdue</span>
+            {% elif deadline.due_date <= today_plus_30 %}
+              <span class="badge bg-warning text-dark">Imminent!</span>
+            {% else %}
+              <span class="badge bg-success">Later</span>
+            {% endif %}
+
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-info">✅ No maintenance deadlines in the next 90 days!</div>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<script>
+  new Tablesort(document.getElementById('deadlines-table'));
+</script>
+{% endblock %}

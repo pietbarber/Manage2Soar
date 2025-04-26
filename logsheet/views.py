@@ -1,5 +1,6 @@
 from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
+from datetime import timedelta, date
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.contrib import messages
@@ -9,7 +10,7 @@ from django.core.paginator import Paginator
 from datetime import datetime
 from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
-from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister
+from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister, MaintenanceDeadline
 from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
 
 
@@ -807,3 +808,25 @@ def maintenance_mark_resolved(request, issue_id):
     issue.save()
 
     return JsonResponse({"reload": True})
+
+@active_member_required
+def maintenance_deadlines(request):
+    today = date.today()
+    today_plus_30 = today + timedelta(days=30)
+
+    all_deadlines = MaintenanceDeadline.objects.all().select_related('glider', 'towplane')
+    sorted_deadlines = sorted(
+        all_deadlines,
+        key=lambda d: (
+            0 if d.due_date < today else 
+            1 if (d.due_date - today).days <= 30 else 
+            2,
+            d.due_date
+        )
+    )
+
+    return render(request, "logsheet/maintenance_deadlines.html", {
+        "deadlines": sorted_deadlines,
+        "today": today,
+        "today_plus_30": today_plus_30,
+    })
