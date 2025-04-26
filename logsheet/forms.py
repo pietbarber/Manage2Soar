@@ -248,6 +248,15 @@ class MaintenanceIssueForm(forms.ModelForm):
             "glider": forms.Select(attrs={"class": "form-select"}),
             "towplane": forms.Select(attrs={"class": "form-select"}),
         }
+    def clean(self):
+        cleaned_data = super().clean()
+        glider = cleaned_data.get("glider")
+        towplane = cleaned_data.get("towplane")
+
+        if not glider and not towplane:
+            raise forms.ValidationError("You must select either a glider or a towplane.")
+
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
