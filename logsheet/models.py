@@ -460,6 +460,23 @@ class LogsheetCloseout(models.Model):
 ####################################################
 # TowplaneCloseout model
 #
+# This model tracks end-of-day towplane operations for each logsheet.
+# Includes starting and ending tachometer readings, total tach time, 
+# fuel added during operations, and any operational notes.
+#
+# Fields:
+# - logsheet: The associated logsheet for the closeout.
+# - towplane: The towplane being closed out.
+# - start_tach: Starting tach reading at beginning of day.
+# - end_tach: Ending tach reading at end of day.
+# - tach_time: Total flight time for the towplane for the day.
+# - fuel_added: Amount of fuel added to the towplane during the day.
+# - notes: Any operational comments or anomalies.
+#
+# Methods:
+# - __str__: Returns a string showing the towplane and date.
+#
+
 class TowplaneCloseout(models.Model):
     logsheet = models.ForeignKey(Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
@@ -475,6 +492,26 @@ class TowplaneCloseout(models.Model):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"
 
 
+####################################################
+# MaintenanceIssue model
+#
+# This model tracks reported maintenance issues for gliders or towplanes.
+# Issues can be open or resolved, and can optionally ground an aircraft.
+# Each issue is linked to a logsheet if reported during operations.
+#
+# Fields:
+# - glider / towplane: The affected aircraft.
+# - description: Text description of the problem.
+# - grounded: Whether the issue grounds the aircraft.
+# - resolved: Whether the issue has been addressed.
+# - resolution_notes: How the issue was resolved.
+# - reported_by / resolved_by: Members who reported or resolved the issue.
+# - logsheet: Optional link to the logsheet where it was reported.
+#
+# Methods:
+# - __str__: Returns a summary of the issue.
+# - can_be_resolved_by(user): Checks if a given user can resolve the issue.
+#
 
 
 class MaintenanceIssue(models.Model):
@@ -518,6 +555,21 @@ DEADLINE_TYPES = [
     ("letter", "Program Letter"),
 ]
 
+####################################################
+# MaintenanceDeadline model
+#
+# Tracks scheduled maintenance deadlines for gliders or towplanes.
+# Each deadline represents a recurring inspection or repack requirement.
+#
+# Fields:
+# - glider / towplane: The affected aircraft.
+# - description: Type of deadline (annual, transponder, parachute, etc.).
+# - due_date: When the deadline is due.
+#
+# Methods:
+# - __str__: Returns a readable summary of the upcoming deadline.
+#
+
 class MaintenanceDeadline(models.Model):
     glider = models.ForeignKey(Glider, on_delete=models.CASCADE, blank=True, null=True)
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE, blank=True, null=True)
@@ -532,6 +584,20 @@ class MaintenanceDeadline(models.Model):
         aircraft = self.glider or self.towplane
         return f"{aircraft} – {self.get_description_display()} due {self.due_date}"
 
+####################################################
+# AircraftMeister model
+#
+# Associates a Member with responsibility for a glider or towplane.
+# Aircraft Meisters are authorized to resolve maintenance issues
+# on the aircraft they are assigned to.
+#
+# Fields:
+# - glider / towplane: The aircraft they oversee.
+# - member: The assigned member (meister).
+#
+# Methods:
+# - __str__: Returns the member and aircraft they oversee.
+#
 
 class AircraftMeister(models.Model):
     glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)

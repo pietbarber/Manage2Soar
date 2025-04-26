@@ -114,14 +114,27 @@ class TowRateAdmin(admin.ModelAdmin):
     list_editable = ("price",)
     ordering = ("altitude",)
 
+# Admin configuration for LogsheetCloseout objects
+# Allows viewing and managing closeout reports for each logsheet,
+# including safety issues, equipment issues, and operations summaries.
+# Primarily used for reference; not commonly edited after creation.
+
 @admin.register(LogsheetCloseout)
 class LogsheetCloseoutAdmin(admin.ModelAdmin):
     list_display = ("logsheet",)
+
+# Admin configuration for TowplaneCloseout objects
+# Used to manage end-of-day tachometer readings, fuel logs,
+# and operational notes for each towplane per logsheet.
+# Tach times and fuel records are recorded here.
 
 @admin.register(TowplaneCloseout)
 class TowplaneCloseoutAdmin(admin.ModelAdmin):
     list_display = ("logsheet", "towplane")
 
+# Admin configuration for LogsheetPayment objects
+# Displays and manages payment methods associated with each member's flight charges.
+# Useful for tracking which members paid by account, check, Zelle, or cash.
 
 @admin.register(LogsheetPayment)
 class LogsheetPaymentAdmin(admin.ModelAdmin):
@@ -135,6 +148,11 @@ class LogsheetPaymentAdmin(admin.ModelAdmin):
     search_fields = ('member__first_name', 'member__last_name', 'note')
     autocomplete_fields = ('member', 'logsheet')
 
+# Admin configuration for MaintenanceIssue objects
+# Manages maintenance issues reported against gliders and towplanes.
+# Displays whether the issue is grounded, resolved, and a short description.
+# Allows filtering by status and searching by aircraft or description.
+# Also restricts glider and towplane choices to active club-owned aircraft.
 
 @admin.register(MaintenanceIssue)
 class MaintenanceIssueAdmin(admin.ModelAdmin):
@@ -162,6 +180,10 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
     def description_short(self, obj):
         return obj.description[:50] + ('...' if len(obj.description) > 50 else '')
 
+# Admin configuration for MaintenanceDeadline objects
+# Displays upcoming maintenance deadlines for gliders and towplanes.
+# Used to manage and track important inspections like annuals, transponders, and parachute repacks.
+# Allows filtering and searching by aircraft and deadline type.
 
 @admin.register(MaintenanceDeadline)
 class MaintenanceDeadlineAdmin(admin.ModelAdmin):
@@ -180,6 +202,10 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
     aircraft_type.short_description = "Type"
 
 
+# Admin configuration for AircraftMeister objects
+# Assigns members as Meisters (responsible caretakers) for specific gliders or towplanes.
+# Meisters are authorized to resolve maintenance issues for their assigned aircraft.
+# Allows quick lookup by aircraft or member.
 
 @admin.register(AircraftMeister)
 class AircraftMeisterAdmin(admin.ModelAdmin):

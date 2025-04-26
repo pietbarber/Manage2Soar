@@ -204,6 +204,22 @@ class CreateLogsheetForm(forms.ModelForm):
             self.fields[name].required = False
             self.fields[name].widget.attrs.update({"class": "form-select"})
 
+######################################################
+# LogsheetCloseoutForm
+#
+# Handles the editing of logsheet closeout reports.
+# Allows the duty officer to enter safety issues, equipment issues, 
+# and a summary of operations for the day's flights.
+#
+# Fields:
+# - safety_issues: Text field (TinyMCE rich text).
+# - equipment_issues: Text field (TinyMCE rich text).
+# - operations_summary: Text field (TinyMCE rich text).
+#
+# Widgets:
+# - TinyMCE editor is used for all fields for better formatting.
+#
+
 class LogsheetCloseoutForm(forms.ModelForm):
     class Meta:
         model = LogsheetCloseout
@@ -215,6 +231,22 @@ class LogsheetCloseoutForm(forms.ModelForm):
 
         }
 
+######################################################
+# LogsheetDutyCrewForm
+#
+# Allows updating the assigned duty crew for a given logsheet.
+# Covers duty officer, assistant duty officer, duty instructors, and tow pilots.
+#
+# Fields:
+# - duty_officer
+# - assistant_duty_officer
+# - duty_instructor
+# - surge_instructor
+# - tow_pilot
+# - surge_tow_pilot
+#
+# Standard form with default select dropdowns.
+#
 
 class LogsheetDutyCrewForm(forms.ModelForm):
     class Meta:
@@ -228,6 +260,24 @@ class LogsheetDutyCrewForm(forms.ModelForm):
             "surge_tow_pilot",
         ]
 
+######################################################
+# TowplaneCloseoutFormSet
+#
+# A formset for entering end-of-day towplane closeout data.
+# Allows editing multiple TowplaneCloseout entries at once, including
+# tachometer readings, fuel added, and operational notes.
+#
+# Fields:
+# - towplane
+# - start_tach
+# - end_tach
+# - fuel_added
+# - notes
+#
+# Widgets:
+# - TinyMCE editor used for the 'notes' field.
+#
+
 
 TowplaneCloseoutFormSet = modelformset_factory(
     TowplaneCloseout,
@@ -237,6 +287,27 @@ TowplaneCloseoutFormSet = modelformset_factory(
         "notes": TinyMCE(mce_attrs={"height": 300}),
     }
 )
+
+######################################################
+# MaintenanceIssueForm
+#
+# Handles the reporting of new maintenance issues for gliders or towplanes.
+# Validates that at least one aircraft is selected when reporting an issue.
+#
+# Fields:
+# - glider
+# - towplane
+# - description
+# - grounded
+#
+# Widgets:
+# - Textarea for description.
+# - Checkbox for grounded status.
+# - Select dropdowns for aircraft.
+#
+# Methods:
+# - clean: Ensures either a glider or a towplane is selected.
+#
 
 class MaintenanceIssueForm(forms.ModelForm):
     class Meta:
