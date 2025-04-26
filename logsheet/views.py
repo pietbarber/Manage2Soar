@@ -432,31 +432,38 @@ def delete_flight(request, logsheet_pk, flight_pk):
     messages.success(request, "Flight deleted.")
     return redirect("logsheet:manage", pk=logsheet_pk)
 
+
 #################################################
 # manage_logsheet_finances
-
-# This view handles the financial management of a specific logsheet.
-# 
-# It allows active members to:
-# - View a detailed breakdown of flight costs for all flights in the logsheet.
-# - Display costs based on whether the logsheet is finalized (actual costs) or not (calculated costs).
-# - Summarize financial data per pilot, including the number of flights, tow costs, rental costs, and total costs.
-# - Calculate and display charges for each member, considering cost-sharing arrangements (e.g., even splits, tow-only splits, rental-only splits, or full responsibility).
-# - Update payment methods and notes for each member.
-# - Finalize the logsheet, locking in all costs and ensuring all responsible members have a payment method.
-# 
-# Methods:
-# - flight_costs(f): Determines the tow, rental, and total costs for a flight based on whether the logsheet is finalized.
-# - POST handling:
-#   - Finalize: Ensures all responsible members have payment methods, locks in costs, and finalizes the logsheet.
-#   - Update payment methods: Saves payment methods and notes for each member.
-# 
+#
+# Purpose:
+# Handles the financial management of a specific logsheet.
+# Allows active members to:
+# - View detailed breakdowns of flight costs.
+# - Display actual costs if finalized, or calculated costs if pending.
+# - Summarize financial data per pilot: flights, tow costs, rental costs, total costs.
+# - Calculate and distribute charges per member, accounting for split-payment arrangements.
+# - Update payment methods and notes for each responsible member.
+# - Finalize the logsheet, locking in all costs and validating payment information.
+#
+# Internal Methods:
+# - flight_costs(flight): Returns tow, rental, and total costs depending on finalization state.
+#
+# POST Handling:
+# - "Finalize" request:
+#   - Verifies all responsible members have payment methods.
+#   - Locks in flight costs.
+#   - Marks the logsheet as finalized.
+# - "Update" request:
+#   - Saves updated payment methods and notes per member.
+#
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
-#    pk (int): The primary key of the logsheet to manage finances for.
-# 
+# - request (HttpRequest): The incoming HTTP request (GET or POST).
+# - pk (int): Primary key of the logsheet to manage.
+#
 # Returns:
-#    HttpResponse: Renders the financial management page with detailed cost breakdowns, pilot summaries, and member charges.
+# - HttpResponse: Renders the financial management page with cost breakdowns, summaries, and member charges.
+#################################################
 
 @active_member_required
 def manage_logsheet_finances(request, pk):
@@ -613,6 +620,30 @@ def manage_logsheet_finances(request, pk):
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
 
+#################################################
+# edit_logsheet_closeout
+#
+# Purpose:
+# Allows active members to edit the closeout information for a specific logsheet.
+# Updates include final duty crew assignments, towplane closeouts, and maintenance issues.
+# Editing is blocked if the logsheet is finalized, unless the user is a superuser.
+#
+# Behavior:
+# - Ensures that each towplane used on the logsheet has a TowplaneCloseout record.
+# - Displays forms for:
+#   - Logsheet closeout information (essay, end-of-day notes, etc.)
+#   - Duty crew updates (Duty Officer, Assistant, Instructor, etc.)
+#   - Towplane closeouts (tach times, maintenance notes)
+# - Processes POST submissions for all three form sections.
+# - Saves updates and redirects to the logsheet management page on success.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request (GET or POST).
+# - pk (int): Primary key of the logsheet to edit.
+#
+# Returns:
+# - HttpResponse: Renders the closeout editing form page or redirects after successful save.
+#################################################
 
 @active_member_required
 def edit_logsheet_closeout(request, pk):
@@ -663,6 +694,27 @@ def edit_logsheet_closeout(request, pk):
 
     })
 
+#################################################
+# view_logsheet_closeout
+#
+# Purpose:
+# Displays the closeout summary for a specific logsheet in a read-only format.
+# Provides details on duty crew assignments, towplane closeouts, and maintenance issues.
+#
+# Behavior:
+# - Fetches the associated LogsheetCloseout if it exists.
+# - Retrieves all TowplaneCloseout records linked to the logsheet.
+# - Retrieves all MaintenanceIssue records linked to the logsheet.
+# - Renders a summary page showing the final state of the day's operations.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+# - pk (int): Primary key of the logsheet to view.
+#
+# Returns:
+# - HttpResponse: Renders the closeout summary page.
+#################################################
+
 @active_member_required
 def view_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
@@ -675,6 +727,29 @@ def view_logsheet_closeout(request, pk):
         "towplanes": towplanes,
         "maintenance_issues": maintenance_issues
     })
+
+
+#################################################
+# add_maintenance_issue
+#
+# Purpose:
+# Allows active members to submit a new maintenance issue during logsheet closeout.
+# Issues must be associated with either a glider or a towplane.
+#
+# Behavior:
+# - Accepts POST data from the MaintenanceIssueForm.
+# - Validates the form and ensures a glider or towplane is selected.
+# - Assigns the reporting member and associates the issue with the current logsheet.
+# - Saves the issue and displays success or error messages.
+# - Redirects back to the logsheet closeout editing page.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request containing maintenance issue data.
+# - logsheet_id (int): Primary key of the logsheet to associate the issue with.
+#
+# Returns:
+# - HttpResponseRedirect: Redirects to the edit closeout page after submission attempt.
+#################################################
 
 @require_POST
 @active_member_required
@@ -696,6 +771,24 @@ def add_maintenance_issue(request, logsheet_id):
         messages.error(request, "Failed to submit maintenance issue.")
     return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.id)
 
+#################################################
+# equipment_list
+#
+# Purpose:
+# Displays a list of active, club-owned gliders and towplanes.
+# Intended for member reference during flight operations and equipment checks.
+#
+# Behavior:
+# - Fetches all active, club-owned gliders, sorted by N-number.
+# - Fetches all active, club-owned towplanes, sorted by N-number.
+# - Renders the equipment list page with separate sections for gliders and towplanes.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+#
+# Returns:
+# - HttpResponse: Renders the equipment list page.
+#################################################
 
 @active_member_required
 def equipment_list(request):
@@ -706,12 +799,52 @@ def equipment_list(request):
         "towplanes": towplanes,
     })
 
+#################################################
+# maintenance_issues
+#
+# Purpose:
+# Displays a list of all unresolved (open) maintenance issues.
+# Intended for duty officers and maintenance personnel to review outstanding problems.
+#
+# Behavior:
+# - Fetches all unresolved MaintenanceIssue records.
+# - Prefetches related glider and towplane information for display efficiency.
+# - Renders the maintenance issue list page.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+#
+# Returns:
+# - HttpResponse: Renders the maintenance issues list page.
+#################################################
+
 @active_member_required
 def maintenance_issues(request):
     open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related("glider", "towplane")
     return render(request, "logsheet/maintenance_list.html", {
         "open_issues": open_issues,
     })
+
+#################################################
+# mark_issue_resolved
+#
+# Purpose:
+# Allows authorized Aircraft Meisters to mark maintenance issues as resolved.
+# Ensures only the assigned Meister for a glider or towplane can resolve its issues.
+#
+# Behavior:
+# - Checks whether the logged-in member is an Aircraft Meister for the associated glider or towplane.
+# - If authorized, marks the maintenance issue as resolved and clears any grounding status.
+# - Displays success or error messages based on the outcome.
+# - Redirects back to the maintenance issues list after completion.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - HttpResponseRedirect: Redirects to the maintenance issues list after attempting to resolve.
+#################################################
 
 
 @active_member_required
@@ -737,6 +870,24 @@ def mark_issue_resolved(request, issue_id):
     return redirect("logsheet:maintenance_issues")
 
 
+#################################################
+# resolve_maintenance_modal
+#
+# Purpose:
+# Renders a modal window for resolving a specific maintenance issue.
+# Allows members to view issue details and enter resolution notes via a popup form.
+#
+# Behavior:
+# - Fetches the targeted MaintenanceIssue by ID.
+# - Renders the maintenance_resolve_modal.html template with the issue details.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - HttpResponse: Renders the modal popup template for maintenance resolution.
+#################################################
 
 
 @active_member_required
@@ -746,6 +897,30 @@ def resolve_maintenance_modal(request, issue_id):
     return render(request, "logsheet/maintenance_resolve_modal.html", {
         "issue": issue
     })
+
+#################################################
+# resolve_maintenance_issue
+#
+# Purpose:
+# Processes a POST request to mark a maintenance issue as resolved.
+# Allows members to add optional resolution notes during the resolution process.
+#
+# Behavior:
+# - Fetches the MaintenanceIssue by ID.
+# - (Permission checks assumed same as modal trigger; only active members allowed.)
+# - Records the resolving member and the resolution date.
+# - Saves resolution notes if provided, or applies a default note if none exist.
+# - Marks the issue as resolved and saves the update.
+# - Returns a JSON response signaling the frontend to reload.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request containing resolution notes.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - JsonResponse: {"reload": True} to trigger a page or modal reload on the client side.
+#################################################
+
 
 @require_POST
 @active_member_required
@@ -768,6 +943,30 @@ def resolve_maintenance_issue(request, issue_id):
 
     return JsonResponse({"reload": True})
 
+#################################################
+# maintenance_mark_resolved
+#
+# Purpose:
+# Processes a POST request to mark a maintenance issue as resolved.
+# Ensures that only authorized users (based on AircraftMeister rules) can resolve the issue.
+#
+# Behavior:
+# - Fetches the MaintenanceIssue by ID.
+# - Checks if the current user is authorized to resolve the issue using `can_be_resolved_by()`.
+# - If unauthorized, returns an HTTP 403 Forbidden response.
+# - If authorized, records the resolving user and the resolution date.
+# - Saves the resolution and returns a JSON response to trigger a reload.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - JsonResponse: {"reload": True} if successfully resolved.
+# - HttpResponseForbidden: If the user is not authorized to resolve the issue.
+#################################################
+
+
 @require_POST
 @active_member_required
 def maintenance_mark_resolved(request, issue_id):
@@ -784,10 +983,58 @@ def maintenance_mark_resolved(request, issue_id):
 
     return JsonResponse({"reload": True})
 
+#################################################
+# maintenance_resolve_modal
+#
+# Purpose:
+# Renders a modal window to display a maintenance issue's details for resolution.
+# Used to present issue information and collect resolution notes from authorized users.
+#
+# Behavior:
+# - Fetches the MaintenanceIssue by ID.
+# - Renders the maintenance_resolve_modal.html template with the issue context.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - HttpResponse: Renders the maintenance resolution modal popup.
+#################################################
+
+
 @active_member_required
 def maintenance_resolve_modal(request, issue_id):
     issue = get_object_or_404(MaintenanceIssue, id=issue_id)
     return render(request, "logsheet/maintenance_resolve_modal.html", {"issue": issue})
+
+
+#################################################
+# maintenance_mark_resolved
+#
+# Purpose:
+# Processes a POST request to mark a maintenance issue as resolved, requiring resolution notes.
+# Ensures that only authorized users can resolve the issue and enforces submission of notes.
+#
+# Behavior:
+# - Fetches the MaintenanceIssue by ID.
+# - Verifies that the user is authorized to resolve the issue using `can_be_resolved_by()`.
+# - If unauthorized, returns an HTTP 403 Forbidden response.
+# - Requires non-empty resolution notes; if missing, returns a 400 Bad Request JSON error.
+# - Records the resolving user, date, and resolution notes.
+# - Saves the issue and returns a JSON response to trigger frontend reload.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request.
+# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+#
+# Returns:
+# - JsonResponse: 
+#     - {"reload": True} if successfully resolved.
+#     - {"error": "..."} with HTTP 400 if notes are missing.
+# - HttpResponseForbidden: If the user is not authorized to resolve the issue.
+#################################################
+
 
 @require_POST
 @active_member_required
@@ -808,6 +1055,30 @@ def maintenance_mark_resolved(request, issue_id):
     issue.save()
 
     return JsonResponse({"reload": True})
+
+#################################################
+# maintenance_deadlines
+#
+# Purpose:
+# Displays a sorted list of upcoming maintenance deadlines for gliders and towplanes.
+# Highlights overdue deadlines, deadlines due within 30 days, and future deadlines beyond 30 days.
+#
+# Behavior:
+# - Fetches all MaintenanceDeadline records.
+# - Sorts deadlines into three groups:
+#   - Overdue (due before today)
+#   - Due soon (within the next 30 days)
+#   - Due later (more than 30 days out)
+# - Within each group, sorts by due date ascending.
+# - Renders the maintenance_deadlines.html template with the sorted deadlines.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+#
+# Returns:
+# - HttpResponse: Renders the maintenance deadlines list page.
+#################################################
+
 
 @active_member_required
 def maintenance_deadlines(request):
