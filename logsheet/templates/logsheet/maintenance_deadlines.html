@@ -28,7 +28,7 @@
             {% endif %}
           </td>
           <td>{{ deadline.due_date }}</td>
-          <td>{{ deadline.description }}</td>
+          <td>{{ deadline.get_description_display }}</td>
           <td>
             {% if deadline.due_date < today %}
               <span class="badge bg-danger">Overdue</span>
