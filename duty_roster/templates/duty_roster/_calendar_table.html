@@ -2,85 +2,71 @@
 {% load duty_extras %}
 {% load static %}
 {% if user.rostermeister %}
-  <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
-     class="btn btn-primary mb-3">
-    Propose Duty Roster
-  </a>
+  <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" class="btn btn-primary mb-3">Propose Duty Roster</a>
 {% endif %}
 
-<table style="width: 100%; max-width: 1200px; margin: 0 auto; table-layout: fixed; border-collapse: collapse;" border="1">
-  <thead>
-    <tr class="bg-gray-200 text-gray-700">
-      <th class="p-2 border border-gray-300">Sun</th>
-      <th class="p-2 border border-gray-300">Mon</th>
-      <th class="p-2 border border-gray-300">Tue</th>
-      <th class="p-2 border border-gray-300">Wed</th>
-      <th class="p-2 border border-gray-300">Thu</th>
-      <th class="p-2 border border-gray-300">Fri</th>
-      <th class="p-2 border border-gray-300">Sat</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for week in weeks %}
-    <tr>
-      {% for day in week %}
-      <td 
-      class="
-        p-2 align-top border cursor-pointer hover:bg-blue-100
-        {% if day < today %} past-day
-        {% elif day not in assignments_by_date and day.month == month %} future-no-ops
-        {% elif day == today %} today
-        {% endif %}
-        "
-        {% if day not in assignments_by_date and day > today %}
-          hx-get="{% url 'duty_roster:calendar_ad_hoc_start' year=day.year month=day.month day=day.day %}"
-        {% else %}
-          hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
-        {% endif %}
-        hx-target="#modal-body"
-        hx-swap="innerHTML"
-        onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();"
-      >
-
-        <strong>{{ day.day }}</strong><br>
-
-          {% if surge_needed_by_date|dict_get:day %}
-            {% with surge=surge_needed_by_date|dict_get:day %}
-              <div class="mt-1 text-red-600 text-xs">
-                {% if surge.instructor %}
-                <span title="At least 4 students are requesting instruction">🚨🎓</span>
+<div class="container my-3">
+  <div class="table-responsive">
+    <table class="table table-bordered mb-0" style="table-layout: fixed;">
+      <thead class="thead-light">
+        <tr>
+          <th class="text-center">Sun</th>
+          <th class="text-center">Mon</th>
+          <th class="text-center">Tue</th>
+          <th class="text-center">Wed</th>
+          <th class="text-center">Thu</th>
+          <th class="text-center">Fri</th>
+          <th class="text-center">Sat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in weeks %}
+        <tr>
+          {% for day in week %}
+          <td class="align-top text-start {% if day < today %}table-secondary{% elif day not in assignments_by_date and day.month == month %}future-no-ops{% elif day == today %}table-primary{% endif %}"
+              {% if day not in assignments_by_date and day > today %}
+                hx-get="{% url 'duty_roster:calendar_ad_hoc_start' year=day.year month=day.month day=day.day %}"
+              {% else %}
+                hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
               {% endif %}
-              {% if surge.towpilot %}
-                <span title="High demand for tows - surge tow pilot may be needed">🚨🛩️</span>
-              {% endif %}
+              hx-target="#modal-body"
+              hx-swap="innerHTML"
+              onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();">
+            <strong>{{ day.day }}</strong><br>
 
-              </div>
-            {% endwith %}
-          {% endif %}
+            {% if surge_needed_by_date|dict_get:day %}
+              {% with surge=surge_needed_by_date|dict_get:day %}
+                <div class="mt-1 text-danger small">
+                  {% if surge.instructor %}<span title="At least 4 students requesting instruction">🚨🎓</span>{% endif %}
+                  {% if surge.towpilot %}<span title="High demand for tows">🚨🛩️</span>{% endif %}
+                </div>
+              {% endwith %}
+            {% endif %}
 
-          {% if day in assignments_by_date %}
-            {% with a=assignments_by_date|dict_get:day %}
-            <div class="text-xs mt-1 text-start leading-snug">
-              {% if not a.confirmed and not a.is_confirmed %}
-              <div class="text-orange-600 font-bold mb-1">
-                🚧 Not Confirmed<br>
-                {% if not a.tow_pilot %}🛩️ Tow Pilot Missing<br>{% endif %}
-                {% if not a.duty_officer %}📋 Duty Officer Missing<br>{% endif %}
-              </div>
-              {% endif %}
-
-              {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
-              {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
-              {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
-              {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
-              {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
-              {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
-            </div>
-            {% endwith %}
-          {% endif %}
-      </td>
-      {% endfor %}
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+            {% if day in assignments_by_date %}
+              {% with a=assignments_by_date|dict_get:day %}
+                {% if not a.confirmed and not a.is_confirmed %}
+                  <div class="text-warning font-weight-bold mb-1 small">
+                    🚧 Not Confirmed<br>
+                    {% if not a.tow_pilot %}🛩️ Tow Pilot Missing<br>{% endif %}
+                    {% if not a.duty_officer %}📋 Duty Officer Missing<br>{% endif %}
+                  </div>
+                {% endif %}
+                <div class="small">
+                  {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
+                  {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
+                  {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
+                  {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
+                  {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
+                  {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
+                </div>
+              {% endwith %}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
