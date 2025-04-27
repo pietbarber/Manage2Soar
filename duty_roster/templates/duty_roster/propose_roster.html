@@ -1,14 +1,21 @@
 {% extends "base.html" %}
 {% load roster_extras %}
 {% block content %}
-<h2>📝 Proposed Duty Roster — {{ month }} / {{ year }} (Draft)</h2>
+
+{% if incomplete %}
+  <div class="alert alert-warning">
+    ⚠️ Could not fully auto‐generate a complete roster for {{ month }}/{{ year }}.
+    Showing weekend dates so you can review (or try “🔄 Roll Again”).
+  </div>
+{% endif %}
+<h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
 <form method="post">{% csrf_token %}
   <table class="table">
     <thead>
       <tr>
         <th>Date</th>
-        {% for slot_name in draft.0.slots.keys %}
-          <th>{{ slot_name|title }}</th>
+        {% for role in DEFAULT_ROLES %}
+          <th>{{ role|title }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -16,12 +23,12 @@
       {% for entry in draft %}
         <tr>
           <td>{{ entry.date }}</td>
-          {% for mem_id in entry.slots.values %}
+          {% for role in DEFAULT_ROLES %}
             <td>
-              {% if mem_id %}
-                {{ mem_id|get_member_name }}
+              {% if entry.slots|dict_get:role %}
+                {{ entry.slots|dict_get:role|get_member_name }}
               {% else %}
-                —  
+                —
               {% endif %}
             </td>
           {% endfor %}

@@ -20,6 +20,8 @@ from django.contrib.auth.decorators import user_passes_test
 from .roster_generator import generate_roster  # your existing generation logic
 from datetime import date as dt_date
 from django.utils import timezone
+from members.constants.membership import DEFAULT_ROLES
+
 
 
 # Create your views here.
@@ -536,11 +538,6 @@ def is_rostermeister(user):
 @active_member_required
 @user_passes_test(is_rostermeister)
 def propose_roster(request):
-    """
-    View to propose, roll, and publish duty roster drafts.
-    Stores a JSON-serializable draft in session with date as ISO strings.
-    """
-    # Determine year/month
     year = request.GET.get('year')
     month = request.GET.get('month')
     if year and month:
@@ -548,62 +545,40 @@ def propose_roster(request):
     else:
         today = timezone.now().date()
         year, month = today.year, today.month
-
-    # Load or generate draft
+    incomplete = False
     if request.method == 'POST':
         action = request.POST.get('action')
         draft = request.session.get('proposed_roster', [])
-
         if action == 'roll':
-            # regenerate and resave session
             raw = generate_roster(year, month)
-            # convert dates to ISO strings for session
-            draft = [
-                {'date': entry['date'].isoformat(), 'slots': entry['slots']}
-                for entry in raw
-            ]
+            if not raw:
+                cal = calendar.Calendar()
+                weekend_dates = [d for d in cal.itermonthdates(year, month) if d.month == month and d.weekday() in (5, 6)]
+                raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}} for d in weekend_dates]
+                incomplete = True
+            draft = [{'date': e['date'].isoformat(), 'slots': e['slots']} for e in raw]
             request.session['proposed_roster'] = draft
-
         elif action == 'publish':
-            for entry in draft:
-                # parse ISO date back to date object
-                entry_date = dt_date.fromisoformat(entry['date'])
-                day_obj, _ = DutyDay.objects.get_or_create(date=entry_date)
-
-                for role, mem_id in entry['slots'].items():
-                    if not mem_id:
-                        continue
-                    member = Member.objects.get(pk=mem_id)
-                    DutySlot.objects.create(
-                        duty_day=day_obj,
-                        role=role,
-                        member=member
-                    )
-            # clear draft
+            DutySlot.objects.filter(duty_day__date__year=year, duty_day__date__month=month).delete()
+            for e in request.session.get('proposed_roster', []):
+                edt = dt_date.fromisoformat(e['date'])
+                day_obj, _ = DutyDay.objects.get_or_create(date=edt)
+                for role, mem in e['slots'].items():
+                    if mem:
+                        DutySlot.objects.create(duty_day=day_obj, role=role, member=Member.objects.get(pk=mem))
             request.session.pop('proposed_roster', None)
             return redirect('duty_roster:calendar')
-
         elif action == 'cancel':
             request.session.pop('proposed_roster', None)
             return redirect('duty_roster:calendar')
-
     else:
-        # initial GET
         raw = generate_roster(year, month)
-        draft = [
-            {'date': entry['date'].isoformat(), 'slots': entry['slots']}
-            for entry in raw
-        ]
+        if not raw:
+            cal = calendar.Calendar()
+            weekend_dates = [d for d in cal.itermonthdates(year, month) if d.month == month and d.weekday() in (5, 6)]
+            raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}} for d in weekend_dates]
+            incomplete = True
+        draft = [{'date': e['date'].isoformat(), 'slots': e['slots']} for e in raw]
         request.session['proposed_roster'] = draft
-
-    # Parse draft dates for display
-    display_draft = [
-        {'date': dt_date.fromisoformat(entry['date']), 'slots': entry['slots']}
-        for entry in draft
-    ]
-
-    return render(request, 'duty_roster/propose_roster.html', {
-        'draft': display_draft,
-        'year': year,
-        'month': month,
-    })
+    display_draft = [{'date': dt_date.fromisoformat(e['date']), 'slots': e['slots']} for e in request.session.get('proposed_roster', [])]
+    return render(request, 'duty_roster/propose_roster.html', {'draft': display_draft, 'year': year, 'month': month, 'incomplete': incomplete, 'DEFAULT_ROLES': DEFAULT_ROLES})

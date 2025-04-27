@@ -73,3 +73,10 @@ STATUS_ALIASES = {
     "pending": ["Pending"],
     "deceased": ["Deceased"],
 }
+
+DEFAULT_ROLES = [
+    'instructor',
+    'duty_officer',
+    'assistant_duty_officer',
+    'towpilot',
+]
