@@ -105,7 +105,17 @@
       {% endfor %}
       </select>
     </div>
-
+    <div class="form-check">
+      <input type="checkbox"
+             name="allow_weekend_double"
+             id="id_allow_weekend_double"
+             class="form-check-input"
+             {% if pref.allow_weekend_double %}checked{% endif %}>
+      <label for="id_allow_weekend_double" class="form-check-label">
+        I'm OK being scheduled both days of a weekend
+      </label>
+    </div>
+    
 
     {% if role_percent_choices|length > 1 %}
     <h5 class="mt-4">Duty Role Percentage Breakdown</h5>

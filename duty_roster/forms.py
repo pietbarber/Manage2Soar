@@ -36,6 +36,7 @@ class DutyPreferenceForm(forms.ModelForm):
             "ado_percent",
             "towpilot_percent",
             "max_assignments_per_month",
+            "allow_weekend_double"
         ]
         widgets = {
             "suspended_reason": forms.TextInput(attrs={"placeholder": "Optional"}),

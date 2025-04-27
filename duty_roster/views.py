@@ -1,32 +1,30 @@
 import calendar
 from calendar import Calendar, monthrange
 from collections import defaultdict
-from datetime import date, timedelta
-from django.utils.timezone import now
-from django.conf import settings
+from datetime import date as dt_date, date, timedelta
+
+from django.urls import reverse
 from django.contrib import messages
+from django.conf import settings
+from django.contrib.auth.decorators import user_passes_test
+from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
+from django.template.loader import render_to_string
+from django.utils import timezone
+
 from members.models import Member
 from members.decorators import active_member_required
 from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment, DutyDay, DutySlot
 from .forms import DutyAssignmentForm, DutyPreferenceForm
-from django.template.loader import render_to_string
 from logsheet.models import Airfield
 from duty_roster.utils.email import notify_ops_status
-from django.contrib.auth.decorators import user_passes_test
-from .roster_generator import generate_roster  # your existing generation logic
-from datetime import date as dt_date
-from django.utils import timezone
+from .roster_generator import generate_roster
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
-from django.urls import reverse
-from django.contrib import messages
 
 
-
-# Create your views here.
 
 def roster_home(request):
     return HttpResponse("Duty Roster Home")
@@ -43,123 +41,101 @@ def blackout_manage(request):
     def generate_calendar(year, month):
         cal = calendar.Calendar()
         month_days = cal.itermonthdates(year, month)
-        weeks = []
-        week = []
+        weeks, week = [], []
         for day in month_days:
             if len(week) == 7:
-                weeks.append(week)
-                week = []
+                weeks.append(week); week = []
             week.append(day if day.month == month else None)
         if week:
-            while len(week) < 7:
-                week.append(None)
+            while len(week) < 7: week.append(None)
             weeks.append(week)
         return weeks
 
     months = []
     for i in range(3):
-        next_month = (today.replace(day=1) + timedelta(days=32 * i)).replace(day=1)
-        calendar_data = generate_calendar(next_month.year, next_month.month)
+        m1 = (today.replace(day=1) + timedelta(days=32*i)).replace(day=1)
         months.append({
-            "label": next_month.strftime("%B %Y"),
-            "calendar": calendar_data,
+            'label': m1.strftime('%B %Y'),
+            'calendar': generate_calendar(m1.year, m1.month),
         })
 
-    preference = DutyPreference.objects.filter(member=member).first()
-    percent_options = [0, 25, 33, 50, 66, 75, 100]
-    role_percent_choices = [
-        ("instructor", "Instructor"),
-        ("duty_officer", "Duty Officer"),
-        ("ado", "Assistant Duty Officer"),
-        ("towpilot", "Tow Pilot"),
-    ]
-    role_percent_choices = []
-    if member.instructor:
-        role_percent_choices.append(("instructor", "Flight Instructor"))
-    if member.duty_officer:
-        role_percent_choices.append(("duty_officer", "Duty Officer"))
-    if member.assistant_duty_officer:
-        role_percent_choices.append(("ado", "Assistant Duty Officer"))
-    if member.towpilot:
-        role_percent_choices.append(("towpilot", "Tow Pilot"))
+    percent_options = [0,25,33,50,66,75,100]
+    role_choices = []
+    if member.instructor: role_choices.append(('instructor','Flight Instructor'))
+    if member.duty_officer: role_choices.append(('duty_officer','Duty Officer'))
+    if member.assistant_duty_officer: role_choices.append(('ado','Assistant Duty Officer'))
+    if member.towpilot: role_choices.append(('towpilot','Tow Pilot'))
 
-
-
-    # Get pairings and avoidances
     pair_with = Member.objects.filter(pairing_target__member=member)
     avoid_with = Member.objects.filter(avoid_target__member=member)
-    all_other_members = Member.objects.exclude(id=member.id).filter(is_active=True).order_by("last_name", "first_name")
+    all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
-    if request.method == "POST":
-        blackout_dates = set(date.fromisoformat(d) for d in request.POST.getlist("blackout_dates"))
-        default_note = request.POST.get("default_note", "").strip()
-
+    if request.method == 'POST':
+        blackout_dates = set(date.fromisoformat(d) for d in request.POST.getlist('blackout_dates'))
+        note = request.POST.get('default_note','').strip()
         for d in blackout_dates - existing_dates:
-            MemberBlackout.objects.get_or_create(member=member, date=d, defaults={"note": default_note})
-
+            MemberBlackout.objects.get_or_create(member=member, date=d, defaults={'note': note})
         for d in existing_dates - blackout_dates:
             MemberBlackout.objects.filter(member=member, date=d).delete()
 
         form = DutyPreferenceForm(request.POST)
         if form.is_valid():
-            dp, _ = DutyPreference.objects.update_or_create(
+            data = form.cleaned_data
+            DutyPreference.objects.update_or_create(
                 member=member,
-                defaults=form.cleaned_data
+                defaults={
+                    'preferred_day': data['preferred_day'],
+                    'comment': data['comment'],
+                    'dont_schedule': data['dont_schedule'],
+                    'scheduling_suspended': data['scheduling_suspended'],
+                    'suspended_reason': data['suspended_reason'],
+                    'last_duty_date': data['last_duty_date'],
+                    'instructor_percent': data['instructor_percent'],
+                    'duty_officer_percent': data['duty_officer_percent'],
+                    'ado_percent': data['ado_percent'],
+                    'towpilot_percent': data['towpilot_percent'],
+                    'max_assignments_per_month': data['max_assignments_per_month'],
+                    'allow_weekend_double': data.get('allow_weekend_double', False),
+                }
             )
-
-            # Pairings and avoidances
             DutyPairing.objects.filter(member=member).delete()
             DutyAvoidance.objects.filter(member=member).delete()
+            for m in data.get('pair_with', []): DutyPairing.objects.create(member=member, pair_with=m)
+            for m in data.get('avoid_with', []): DutyAvoidance.objects.create(member=member, avoid_with=m)
 
-            for m in form.cleaned_data.get("pair_with", []):
-                DutyPairing.objects.get_or_create(member=member, pair_with=m)
-
-            for m in form.cleaned_data.get("avoid_with", []):
-                DutyAvoidance.objects.get_or_create(member=member, avoid_with=m)
-
-            messages.success(request, "Preferences saved successfully.")
-            return redirect("duty_roster:blackout_manage")
-
+            messages.success(request, 'Preferences saved successfully.')
+            return redirect('duty_roster:blackout_manage')
     else:
         initial = {
-            "preferred_day": preference.preferred_day if preference else None,
-            "dont_schedule": preference.dont_schedule if preference else False,
-            "scheduling_suspended": preference.scheduling_suspended if preference else False,
-            "suspended_reason": preference.suspended_reason if preference else "",
-            "instructor_percent": preference.instructor_percent if preference else 0,
-            "duty_officer_percent": preference.duty_officer_percent if preference else 0,
-            "ado_percent": preference.ado_percent if preference else 0,
-            "towpilot_percent": preference.towpilot_percent if preference else 0,
-            "pair_with": pair_with,
-            "avoid_with": avoid_with,
-            "max_assignments_choices": [1,2,3,4],
-            "preference": preference,
-            "role_percent_choices": role_percent_choices
+            'preferred_day': preference.preferred_day,
+            'comment': preference.comment,
+            'dont_schedule': preference.dont_schedule,
+            'scheduling_suspended': preference.scheduling_suspended,
+            'suspended_reason': preference.suspended_reason,
+            'last_duty_date': preference.last_duty_date,
+            'instructor_percent': preference.instructor_percent,
+            'duty_officer_percent': preference.duty_officer_percent,
+            'ado_percent': preference.ado_percent,
+            'towpilot_percent': preference.towpilot_percent,
+            'max_assignments_per_month': preference.max_assignments_per_month,
+            'allow_weekend_double': preference.allow_weekend_double,
+            'pair_with': pair_with,
+            'avoid_with': avoid_with,
         }
         form = DutyPreferenceForm(initial=initial)
 
-    return render(request, "duty_roster/blackout_calendar.html", {
-        "months": months,
-        "existing_dates": existing_dates,
-        "today": today,
-        "percent_options": percent_options,
-        "role_percent_choices": role_percent_choices,
-        "preference": preference,
-        "pair_with": pair_with,
-        "avoid_with": avoid_with,
-        "all_other_members": all_other_members,
-        "form": form,
-        "max_assignments_choices": [1,2,3,4],
-        "role_percent_choices": role_percent_choices,
-        "all_possible_roles": ["instructor", "duty_officer", "ado", "towpilot"],
-        "shown_roles": [r[0] for r in role_percent_choices],
-
+    return render(request, 'duty_roster/blackout_calendar.html', {
+        'months': months,
+        'existing_dates': existing_dates,
+        'today': today,
+        'percent_options': percent_options,
+        'role_percent_choices': role_choices,
+        'preference': preference,
+        'pair_with': pair_with,
+        'avoid_with': avoid_with,
+        'all_other_members': all_other,
+        'form': form,
     })
-
-
-# duty_roster/views.py
-
-
 
 def get_adjacent_months(year, month):
     # Previous month
