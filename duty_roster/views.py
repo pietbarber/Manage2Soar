@@ -245,26 +245,55 @@ def ops_intent_toggle(request, year, month, day):
     if not request.user.is_authenticated:
         return HttpResponse("Not authorized", status=403)
 
+    from django.utils import timezone
     day_date = date(year, month, day)
-
     available_as = request.POST.getlist("available_as") or []
+
+    # ─── 14-day instruction rule ──────────────────────────
+    if "instruction" in available_as:
+        days_until = (day_date - timezone.now().date()).days
+        if days_until > 14:
+            # rebuild the “I plan to fly” button
+            response  = '<p class="text-red-700">⏰ You may only request instruction within 14 days of the flying date.</p>'
+            response += (
+                f'<form hx-get="{request.path}form/" '
+                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
+                '<button type="submit" class="btn btn-sm btn-primary">'
+                '🛩️ I Plan to Fly This Day</button></form>'
+            )
+            return HttpResponse(response)
+    # ───────────────────────────────────────────────────────
+
+    # now the normal toggle logic...
     if available_as:
         OpsIntent.objects.update_or_create(
             member=request.user,
             date=day_date,
             defaults={"available_as": available_as}
         )
-        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
-        response += f'<button hx-post="{request.path}" hx-target="#ops-intent-response" hx-swap="innerHTML" class="btn btn-sm btn-danger">Cancel Intent</button>'
+        response  = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        response += (
+            f'<button hx-post="{request.path}" '
+            'hx-target="#ops-intent-response" '
+            'hx-swap="innerHTML" '
+            'class="btn btn-sm btn-danger">'
+            'Cancel Intent</button>'
+        )
     else:
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
-        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
-        response += f'<form hx-get="{request.path}form/" hx-target="#ops-intent-response" hx-swap="innerHTML">'
-        response += f'<button type="submit" class="btn btn-sm btn-primary">🛩️ I Plan to Fly This Day</button></form>'
+        response  = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
+        response += (
+            f'<form hx-get="{request.path}form/" '
+            'hx-target="#ops-intent-response" hx-swap="innerHTML">'
+            '<button type="submit" class="btn btn-sm btn-primary">'
+            '🛩️ I Plan to Fly This Day</button></form>'
+        )
+
     maybe_notify_surge_instructor(day_date)
     maybe_notify_surge_towpilot(day_date)
 
     return HttpResponse(response)
+
 
 def ops_intent_form(request, year, month, day):
     if not request.user.is_authenticated:
