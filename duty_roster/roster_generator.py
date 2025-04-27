@@ -25,40 +25,50 @@ def generate_roster(year=None, month=None):
     for p in DutyPairing.objects.all():
         pairings[p.member_id].add(p.pair_with_id)
     blackouts = {(b.member_id, b.date) for b in MemberBlackout.objects.filter(date__year=year, date__month=month)}
-    assignments_per_member = defaultdict(int)
-    def last_duty_sort_key(m):
+    assignments = defaultdict(int)
+    def last_key(m):
         p = prefs.get(m.id)
         return getattr(p, 'last_duty_date', date(1900, 1, 1))
-    def eligible_for(role, member, day, assigned):
-        p = prefs.get(member.id)
+    def eligible(role, m, day, assigned):
+        p = prefs.get(m.id)
         if not p or p.dont_schedule or p.scheduling_suspended:
             return False
-        if (member.id, day) in blackouts:
+        if (m.id, day) in blackouts:
             return False
-        for other in assigned:
-            if (member.id, other.id) in avoidances or (other.id, member.id) in avoidances:
+        for o in assigned:
+            if (m.id, o.id) in avoidances or (o.id, m.id) in avoidances:
                 return False
-        flag = getattr(member, role, False)
-        pct = getattr(p, 'ado_percent', 0) if role == 'assistant_duty_officer' else getattr(p, f'{role}_percent', 0)
+        if m in assigned:
+            return False
+        flag = getattr(m, role, False)
+        pct = (
+            getattr(p, 'ado_percent', 0)
+            if role == 'assistant_duty_officer'
+            else getattr(p, f'{role}_percent', 0)
+        )
         if not flag or pct == 0:
             return False
-        if assignments_per_member[member.id] >= getattr(p, 'max_assignments_per_month', 0):
-            return False
-        if member in assigned:
+        if assignments[m.id] >= getattr(p, 'max_assignments_per_month', 0):
             return False
         return True
-    def weighted_choice(cands, role, assigned):
+    def choose(cands, role, assigned):
         weights = []
         for m in cands:
             p = prefs.get(m.id)
-            base = getattr(p, 'ado_percent', 0) if role == 'assistant_duty_officer' else getattr(p, f'{role}_percent', 0)
+            base = (
+                getattr(p, 'ado_percent', 0)
+                if role == 'assistant_duty_officer'
+                else getattr(p, f'{role}_percent', 0)
+            )
             w = base
-            for a in assigned:
-                if a.id in pairings.get(m.id, set()) or m.id in pairings.get(a.id, set()):
+            for o in assigned:
+                if o.id in pairings.get(m.id, set()) or m.id in pairings.get(o.id, set()):
                     w *= 3
                     break
             weights.append(w)
-        return None if not weights or sum(weights) == 0 else random.choices(cands, weights=weights, k=1)[0]
+        if not weights or sum(weights) == 0:
+            return None
+        return random.choices(cands, weights=weights, k=1)[0]
     schedule = []
     last_assigned = {role: None for role in DEFAULT_ROLES}
     for day in weekend_dates:
@@ -67,15 +77,15 @@ def generate_roster(year=None, month=None):
         for role in DEFAULT_ROLES:
             cands = [
                 m for m in members
-                if eligible_for(role, m, day, assigned_today)
+                if eligible(role, m, day, assigned_today)
                 and m.id != last_assigned.get(role)
             ]
-            cands.sort(key=last_duty_sort_key)
-            chosen = weighted_choice(cands, role, assigned_today)
-            if chosen:
-                assigned_today.add(chosen)
-                assignments_per_member[chosen.id] += 1
-                slots[role] = chosen.id
+            cands.sort(key=last_key)
+            sel = choose(cands, role, assigned_today)
+            if sel:
+                assigned_today.add(sel)
+                assignments[sel.id] += 1
+                slots[role] = sel.id
             else:
                 slots[role] = None
         schedule.append({'date': day, 'slots': slots})

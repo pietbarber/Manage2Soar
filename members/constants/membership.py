@@ -80,3 +80,10 @@ DEFAULT_ROLES = [
     'assistant_duty_officer',
     'towpilot',
 ]
+
+ROLE_FIELD_MAP = {
+    'instructor':                'instructor',
+    'duty_officer':              'duty_officer',
+    'assistant_duty_officer':    'assistant_duty_officer',
+    'towpilot':                  'tow_pilot',
+}

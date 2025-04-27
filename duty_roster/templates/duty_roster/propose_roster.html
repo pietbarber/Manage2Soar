@@ -9,7 +9,11 @@
   </div>
 {% endif %}
 <h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
-<form method="post">{% csrf_token %}
+<form method="post">
+  {% csrf_token %}
+<input type="hidden" name="year"  value="{{ year }}">
+<input type="hidden" name="month" value="{{ month }}">
+
   <table class="table">
     <thead>
       <tr>

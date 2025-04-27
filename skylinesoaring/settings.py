@@ -104,6 +104,7 @@ def login_required_middleware(get_response):
     return middleware
 
 ROOT_URLCONF = "skylinesoaring.urls"
+DEFAULT_AIRFIELD_ID = 1 
 
 TEMPLATES = [
     {
