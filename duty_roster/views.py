@@ -240,37 +240,77 @@ def calendar_day_detail(request, year, month, day):
 
     })
 
+
 @require_POST
 def ops_intent_toggle(request, year, month, day):
     if not request.user.is_authenticated:
         return HttpResponse("Not authorized", status=403)
 
     from django.utils import timezone
+    from django.core.mail import send_mail
+    from django.conf import settings
+
     day_date = date(year, month, day)
+
+    # remember prior intent so we only email on true cancellations
+    old_intent = OpsIntent.objects.filter(member=request.user, date=day_date).first()
+    old_available = old_intent.available_as if old_intent else []
+
     available_as = request.POST.getlist("available_as") or []
 
-    # ─── 14-day instruction rule ──────────────────────────
+    # enforce 14-day rule for instruction
     if "instruction" in available_as:
         days_until = (day_date - timezone.now().date()).days
         if days_until > 14:
-            # rebuild the “I plan to fly” button
-            response  = '<p class="text-red-700">⏰ You may only request instruction within 14 days of the flying date.</p>'
+            response  = '<p class="text-red-700">⏰ You can only request instruction within 14 days of your duty date.</p>'
             response += (
                 f'<form hx-get="{request.path}form/" '
+                'hx-post="{request.path}"'
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
                 '<button type="submit" class="btn btn-sm btn-primary">'
                 '🛩️ I Plan to Fly This Day</button></form>'
             )
             return HttpResponse(response)
-    # ───────────────────────────────────────────────────────
 
-    # now the normal toggle logic...
+    # SIGNUP FLOW
     if available_as:
         OpsIntent.objects.update_or_create(
             member=request.user,
             date=day_date,
             defaults={"available_as": available_as}
         )
+
+        # who’s signed up now?
+        intents = OpsIntent.objects.filter(date=day_date)
+        students = [i.member.full_display_name for i in intents if "instruction" in i.available_as]
+
+        assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+        duty_inst = assignment.instructor
+        surge_inst = assignment.surge_instructor
+
+        # do we need surge? (you choose your own threshold)
+        need_surge = len(students) > 3
+
+        # build the email
+        subject = f"Instruction Signup on {day_date:%b %d}"
+        body = (
+            f"Student {request.user.full_display_name} signed up for instruction on "
+            f"{day_date:%B %d, %Y}.\n"
+            "Others signed up: " + (", ".join(students) or "None") + "\n"
+        )
+        if need_surge:
+            body += "Surge instructor may be needed.\n"
+
+        # recipients: duty instructor plus (if exists) surge instructor
+        recipients = []
+        if duty_inst and duty_inst.email:
+            recipients.append(duty_inst.email)
+        if surge_inst and surge_inst.email:
+            recipients.append(surge_inst.email)
+
+        if recipients:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True)
+
         response  = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
         response += (
             f'<button hx-post="{request.path}" '
@@ -279,7 +319,21 @@ def ops_intent_toggle(request, year, month, day):
             'class="btn btn-sm btn-danger">'
             'Cancel Intent</button>'
         )
+
+    # CANCELLATION FLOW
     else:
+        # only email cancellation if they had previously requested instruction
+        if "instruction" in old_available:
+            assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
+            duty_inst = assignment.instructor
+            if duty_inst and duty_inst.email:
+                subject = f"Instruction Cancellation on {day_date:%b %d}"
+                body = (
+                    f"Student {request.user.full_display_name} cancelled their instruction signup "
+                    f"for {day_date:%B %d, %Y}."
+                )
+                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [duty_inst.email], fail_silently=True)
+
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
         response  = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
         response += (
@@ -289,10 +343,13 @@ def ops_intent_toggle(request, year, month, day):
             '🛩️ I Plan to Fly This Day</button></form>'
         )
 
+    # still check for surges across the board
     maybe_notify_surge_instructor(day_date)
     maybe_notify_surge_towpilot(day_date)
 
     return HttpResponse(response)
+
+
 
 
 def ops_intent_form(request, year, month, day):
