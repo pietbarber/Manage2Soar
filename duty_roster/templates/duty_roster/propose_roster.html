@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load roster_extras %}
+{% block content %}
+<h2>📝 Proposed Duty Roster — {{ month }} / {{ year }} (Draft)</h2>
+<form method="post">{% csrf_token %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        {% for slot_name in draft.0.slots.keys %}
+          <th>{{ slot_name|title }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in draft %}
+        <tr>
+          <td>{{ entry.date }}</td>
+          {% for mem_id in entry.slots.values %}
+            <td>
+              {% if mem_id %}
+                {{ mem_id|get_member_name }}
+              {% else %}
+                —  
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button name="action" value="publish" class="btn btn-success">✅ Accept & Publish</button>
+  <button name="action" value="roll"    class="btn btn-secondary">🔄 Roll Again</button>
+  <button name="action" value="cancel"  class="btn btn-danger">❌ Cancel</button>
+</form>
+{% endblock %}

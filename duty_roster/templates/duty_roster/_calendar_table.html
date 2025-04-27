@@ -1,6 +1,12 @@
 
 {% load duty_extras %}
 {% load static %}
+{% if user.rostermeister %}
+  <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
+     class="btn btn-primary mb-3">
+    Propose Duty Roster
+  </a>
+{% endif %}
 
 <table style="width: 100%; max-width: 1200px; margin: 0 auto; table-layout: fixed; border-collapse: collapse;" border="1">
   <thead>
@@ -45,7 +51,7 @@
                 <span title="At least 4 students are requesting instruction">🚨🎓</span>
               {% endif %}
               {% if surge.towpilot %}
-                <span title="High demand for tows – surge tow pilot may be needed">🚨🛩️</span>
+                <span title="High demand for tows - surge tow pilot may be needed">🚨🛩️</span>
               {% endif %}
 
               </div>

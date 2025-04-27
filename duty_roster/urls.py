@@ -24,4 +24,7 @@ urlpatterns = [
     path("calendar/ad-hoc/cancel/<int:year>/<int:month>/<int:day>/", views.calendar_cancel_ops_modal, name="calendar_cancel_ops_modal"),
     path("calendar/ad-hoc/cancel/confirm/<int:year>/<int:month>/<int:day>/", views.calendar_cancel_ops_day, name="calendar_cancel_ops_day"),
 
+    path('propose-roster/', views.propose_roster, name='propose_roster'),
+
+
 ]

@@ -11,11 +11,15 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
 from members.models import Member
 from members.decorators import active_member_required
-from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment
+from .models import MemberBlackout, DutyPreference, DutyPairing, DutyAvoidance, OpsIntent, DutyAssignment, DutyDay, DutySlot
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 from django.template.loader import render_to_string
 from logsheet.models import Airfield
 from duty_roster.utils.email import notify_ops_status
+from django.contrib.auth.decorators import user_passes_test
+from .roster_generator import generate_roster  # your existing generation logic
+from datetime import date as dt_date
+from django.utils import timezone
 
 
 # Create your views here.
@@ -525,3 +529,81 @@ def calendar_cancel_ops_modal(request, year, month, day):
     assignment = get_object_or_404(DutyAssignment, date=ops_date)
 
     return render(request, "duty_roster/calendar_cancel_modal.html", {"assignment": assignment})
+
+def is_rostermeister(user):
+    return user.is_authenticated and user.rostermeister
+
+@active_member_required
+@user_passes_test(is_rostermeister)
+def propose_roster(request):
+    """
+    View to propose, roll, and publish duty roster drafts.
+    Stores a JSON-serializable draft in session with date as ISO strings.
+    """
+    # Determine year/month
+    year = request.GET.get('year')
+    month = request.GET.get('month')
+    if year and month:
+        year, month = int(year), int(month)
+    else:
+        today = timezone.now().date()
+        year, month = today.year, today.month
+
+    # Load or generate draft
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        draft = request.session.get('proposed_roster', [])
+
+        if action == 'roll':
+            # regenerate and resave session
+            raw = generate_roster(year, month)
+            # convert dates to ISO strings for session
+            draft = [
+                {'date': entry['date'].isoformat(), 'slots': entry['slots']}
+                for entry in raw
+            ]
+            request.session['proposed_roster'] = draft
+
+        elif action == 'publish':
+            for entry in draft:
+                # parse ISO date back to date object
+                entry_date = dt_date.fromisoformat(entry['date'])
+                day_obj, _ = DutyDay.objects.get_or_create(date=entry_date)
+
+                for role, mem_id in entry['slots'].items():
+                    if not mem_id:
+                        continue
+                    member = Member.objects.get(pk=mem_id)
+                    DutySlot.objects.create(
+                        duty_day=day_obj,
+                        role=role,
+                        member=member
+                    )
+            # clear draft
+            request.session.pop('proposed_roster', None)
+            return redirect('duty_roster:calendar')
+
+        elif action == 'cancel':
+            request.session.pop('proposed_roster', None)
+            return redirect('duty_roster:calendar')
+
+    else:
+        # initial GET
+        raw = generate_roster(year, month)
+        draft = [
+            {'date': entry['date'].isoformat(), 'slots': entry['slots']}
+            for entry in raw
+        ]
+        request.session['proposed_roster'] = draft
+
+    # Parse draft dates for display
+    display_draft = [
+        {'date': dt_date.fromisoformat(entry['date']), 'slots': entry['slots']}
+        for entry in draft
+    ]
+
+    return render(request, 'duty_roster/propose_roster.html', {
+        'draft': display_draft,
+        'year': year,
+        'month': month,
+    })
