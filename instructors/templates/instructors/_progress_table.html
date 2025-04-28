@@ -17,23 +17,22 @@
           <a href="{% url 'instructors:member_instruction_record' m.id %}">Record</a>
         </td>
         <td style="min-width:160px;">
-            {% if show_solo_bar|default:True %}
-              {# new: stash the dynamic percent in --pct #}
-              <div class="progress mb-1" style="--pct: {{ row.solo_pct }}%; height:1em;">
-                <div class="progress-bar bg-success" role="progressbar"
-                     style="width: var(--pct);"></div>
-                <div class="progress-bar bg-secondary" role="progressbar"
-                     style="width: calc(100% - var(--pct));"></div>
-              </div>
-
-            {% endif %}
-              <div class="progress mb-1" style="--pct: {{ row.rating_pct }}%; height:1em;">
-                <div class="progress-bar bg-success" role="progressbar"
-                     style="width: var(--pct);"></div>
-                <div class="progress-bar bg-secondary" role="progressbar"
-                     style="width: calc(100% - var(--pct));"></div>
-              </div>
-
+          {% if show_solo_bar|default:True %}
+          <div class="progress mb-1"
+              style="--pct: {{ row.solo_pct }}%; height:1em;"
+              data-bs-toggle="tooltip"
+              title="Solo progress: {{ row.solo_pct }}%">
+            <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+          </div>
+          {% endif %}
+          <div class="progress"
+              style="--pct: {{ row.rating_pct }}%; height:1em;"
+              data-bs-toggle="tooltip"
+              title="Rating progress: {{ row.rating_pct }}%">
+            <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+          </div>
         </td>
         <td>{{ row.member.last_flight|date:"Y-m-d" }}</td>
       </tr>
