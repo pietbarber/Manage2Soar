@@ -74,3 +74,11 @@ td, th {
 .score-4 { background-color: #d1e7dd !important; }  /* soft green */
 .score-attn { background-color: #f8d7da !important; } /* soft red */
 
+/* baseline.css */
+.progress {
+  background: #666;     /* your grey “track” */
+  border-radius: 0.25em;
+  overflow: hidden;
+  position: relative;
+  /* remove any height or width rules—you’ll drive height in the template and width via var(--pct) */
+}

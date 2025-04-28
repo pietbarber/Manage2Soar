@@ -15,6 +15,15 @@ from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
 from members.models import Member
 from django.contrib.auth.decorators import user_passes_test
+from instructors.models import (
+     InstructionReport, LessonScore, GroundInstruction, GroundLessonScore,
+     TrainingLesson, SyllabusDocument, TrainingPhase
+)
+from django.db.models import Count, Max
+from members.models import Member
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+
 
 
 
@@ -397,4 +406,88 @@ def assign_qualification(request, member_id):
     return render(request, 'instructors/assign_qualification.html', {
         'form': form,
         'student': student,
+    })
+
+@instructor_required
+def instructors_home(request):
+     return render(request, "instructors/instructors_home.html")
+
+@instructor_required
+def progress_dashboard(request):
+    # 1) split “students” vs “rated” by glider_rating
+    students_qs = (
+        Member.objects
+        .filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES,
+            glider_rating='student'
+        )
+        .annotate(
+            last_flight=Max('flights_as_pilot__logsheet__log_date'),
+            report_count=Count('instruction_reports')
+        )
+        .order_by('last_name')
+    )
+    rated_qs = (
+        Member.objects
+        .filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        .exclude(glider_rating='student')
+        .annotate(
+            last_flight=Max('flights_as_pilot__logsheet__log_date'),
+            report_count=Count('instruction_reports')
+        )
+        .order_by('last_name')
+    )
+
+    # 2) figure out which lessons count for solo vs rating
+    all_lessons = TrainingLesson.objects.all()
+    solo_ids = {l.id for l in all_lessons if l.is_required_for_solo()}
+    rating_ids = {l.id for l in all_lessons if l.is_required_for_private()}
+    total_solo = len(solo_ids)
+    total_rating = len(rating_ids)
+
+    # 3) percentage helper
+    def compute_progress(member):
+        flight_done = set(
+            LessonScore.objects
+            .filter(report__student=member, score__in=['3','4'])
+            .values_list('lesson_id', flat=True)
+        )
+        ground_done = set(
+            GroundLessonScore.objects
+            .filter(session__student=member, score__in=['3','4'])
+            .values_list('lesson_id', flat=True)
+        )
+        completed = flight_done | ground_done
+
+        solo_pct = int(len(completed & solo_ids) / total_solo * 100) if total_solo else 0
+        rating_pct = int(len(completed & rating_ids) / total_rating * 100) if total_rating else 0
+        return solo_pct, rating_pct
+
+    # 4) build context lists
+    students_data = []
+    for m in students_qs:
+        solo_pct, rating_pct = compute_progress(m)
+        students_data.append({
+            'member': m,
+            'solo_pct': solo_pct,
+            'solo_rem': 100 - solo_pct,       # <— new
+            'rating_pct': rating_pct,
+            'rating_rem': 100 - rating_pct,   # <— new
+        })
+
+    rated_data = []
+    for m in rated_qs:
+        solo_pct, rating_pct = compute_progress(m)
+        rated_data.append({
+            'member': m,
+            'solo_pct': solo_pct,
+            'solo_rem': 100 - solo_pct,
+            'rating_pct': rating_pct,
+            'rating_rem': 100 - rating_pct,
+        })
+
+    return render(request, 'instructors/progress_dashboard.html', {
+        'students_data': students_data,
+        'rated_data':   rated_data,
     })

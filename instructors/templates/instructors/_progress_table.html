@@ -1,0 +1,42 @@
+<table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Pilot</th>
+        <th>Reports</th>
+        <th>Progress</th>
+        <th>Last Flight</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in data %}
+      {% with m=row.member %}
+      <tr>
+        <td>{{ m.full_display_name }}</td>
+        <td>
+        </td>
+        <td style="min-width:160px;">
+            {% if show_solo_bar|default:True %}
+              {# new: stash the dynamic percent in --pct #}
+              <div class="progress mb-1" style="--pct: {{ row.solo_pct }}%; height:1em;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width: var(--pct);"></div>
+                <div class="progress-bar bg-secondary" role="progressbar"
+                     style="width: calc(100% - var(--pct));"></div>
+              </div>
+
+            {% endif %}
+              <div class="progress mb-1" style="--pct: {{ row.rating_pct }}%; height:1em;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width: var(--pct);"></div>
+                <div class="progress-bar bg-secondary" role="progressbar"
+                     style="width: calc(100% - var(--pct));"></div>
+              </div>
+
+        </td>
+        <td>{{ row.member.last_flight|date:"Y-m-d" }}</td>
+      </tr>
+      {% endwith %}
+    {% endfor %}
+    </tbody>
+  </table>
+  
