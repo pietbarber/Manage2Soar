@@ -274,6 +274,9 @@ LOGGING = {
 handler403 = 'members.views.custom_permission_denied_view'
 
 TINYMCE_DEFAULT_CONFIG = {
+    "relative_urls": False,         # turn off relative URLs
+    "remove_script_host": False,    # strip protocol+host
+    "convert_urls": True,           # Ensure URLs are run through TinyMCE's converter
     "height": 500,
     "menubar": "file edit view insert format tools table help",
     "plugins": "image link media code lists table",

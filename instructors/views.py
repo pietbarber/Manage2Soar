@@ -9,8 +9,17 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.utils.timezone import now
 from instructors.decorators import member_or_instructor_required, instructor_required
-from instructors.forms import InstructionReportForm, LessonScoreSimpleForm, LessonScoreSimpleFormSet, QualificationAssignForm, GroundInstructionForm, GroundLessonScoreFormSet
-from instructors.models import InstructionReport, LessonScore, GroundInstruction, GroundLessonScore, TrainingLesson, SyllabusDocument, TrainingPhase
+from instructors.forms import (
+    InstructionReportForm, LessonScoreSimpleForm, 
+    LessonScoreSimpleFormSet, QualificationAssignForm, 
+    GroundInstructionForm, GroundLessonScoreFormSet, 
+    SyllabusDocumentForm
+)
+from instructors.models import (
+    InstructionReport, LessonScore, GroundInstruction, 
+    GroundLessonScore, TrainingLesson, SyllabusDocument, 
+    TrainingPhase
+)
 from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
 from members.models import Member
@@ -512,4 +521,22 @@ def progress_dashboard(request):
     return render(request, 'instructors/progress_dashboard.html', {
         'students_data': students_data,
         'rated_data':   rated_data,
+    })
+
+
+@instructor_required
+def edit_syllabus_document(request, slug):
+    doc = get_object_or_404(SyllabusDocument, slug=slug)
+    if request.method == 'POST':
+        form = SyllabusDocumentForm(request.POST, instance=doc)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Syllabus document updated.')
+            return redirect('instructors:syllabus_overview')
+    else:
+        form = SyllabusDocumentForm(instance=doc)
+
+    return render(request, 'instructors/edit_syllabus_document.html', {
+        'form': form,
+        'doc': doc,
     })

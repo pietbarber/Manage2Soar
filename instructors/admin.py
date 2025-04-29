@@ -2,6 +2,9 @@ from django.contrib import admin
 from .models import TrainingLesson, TrainingPhase, SyllabusDocument
 import reversion
 from reversion.admin import VersionAdmin
+from tinymce.widgets import TinyMCE
+from tinymce.models import HTMLField
+
 
 
 @admin.register(TrainingLesson)
@@ -20,6 +23,19 @@ class TrainingPhaseAdmin(VersionAdmin):
 class SyllabusDocumentAdmin(VersionAdmin):
     list_display = ("slug", "title")
     search_fields = ("slug", "title", "content")
+    formfield_overrides = {
+        # apply only to HTMLField fields
+        HTMLField: {
+            'widget': TinyMCE(
+                mce_attrs={
+                    'relative_urls': False,
+                    'remove_script_host': True,
+                    'convert_urls': True,
+                }
+            )
+        },
+    }
+
 
 from django.contrib import admin
 from .models import InstructionReport, LessonScore

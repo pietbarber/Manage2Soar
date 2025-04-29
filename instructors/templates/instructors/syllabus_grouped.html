@@ -11,7 +11,14 @@
           </button>
         </h2>
         <div id="collapseHeader" class="accordion-collapse collapse" aria-labelledby="headingHeader" data-bs-parent="#syllabusAccordion">
-          <div class="accordion-body">
+          <div class="accordion-body position-relative">
+            {% if user.instructor %}
+            <a href="{% url 'admin:instructors_syllabusdocument_change' header.pk %}"
+               class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2">
+              Edit
+            </a>
+            {% endif %}
+
             {{ header.content|safe }}
           </div>
         </div>
@@ -26,7 +33,14 @@
           </button>
         </h2>
         <div id="collapseMaterials" class="accordion-collapse collapse" aria-labelledby="headingMaterials" data-bs-parent="#syllabusAccordion">
-          <div class="accordion-body">
+          <div class="accordion-body position-relative">
+            {% if user.instructor %}
+            <a href="{% url 'admin:instructors_syllabusdocument_change' materials.pk %}"
+               class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2">
+              Edit
+            </a>
+            {% endif %}
+
             {{ materials.content|safe }}
           </div>
         </div>

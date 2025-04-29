@@ -7,7 +7,7 @@ from instructors.models import GroundInstruction, GroundLessonScore, TrainingLes
 from tinymce.widgets import TinyMCE
 from datetime import timedelta
 from django.forms import formset_factory
-from instructors.models import TrainingLesson, SCORE_CHOICES
+from instructors.models import TrainingLesson, SCORE_CHOICES, SyllabusDocument
 
 class InstructionReportForm(forms.ModelForm):
     class Meta:
@@ -68,6 +68,12 @@ class GroundLessonScoreSimpleForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={"class": "form-select"})
     )
+
+class SyllabusDocumentForm(forms.ModelForm):
+    class Meta:
+        model = SyllabusDocument
+        fields = ['title', 'content']
+
 
 GroundLessonScoreFormSet = formset_factory(
     GroundLessonScoreSimpleForm,
