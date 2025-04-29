@@ -22,22 +22,22 @@
           && google.visualization
           && typeof google.visualization.ColumnChart === 'function') {
         clearInterval(poller);
-        console.log("✅ google.visualization.ColumnChart ready, drawing charts");
+        //console.log("✅ google.visualization.ColumnChart ready, drawing charts");
         initInstructionCharts();
       } else if (tries >= maxTries) {
         clearInterval(poller);
-        console.error("❌ Timeout waiting for google.visualization.ColumnChart");
+        //console.error("❌ Timeout waiting for google.visualization.ColumnChart");
       }
     }, pollInterval);
   
     function initInstructionCharts(){
-      console.log("▶ initInstructionCharts called");
+      //console.log("▶ initInstructionCharts called");
       const container = document.getElementById('charts-container');
       if (!container) {
-        console.warn("❗ No #charts-container found – aborting");
+        //console.warn("❗ No #charts-container found – aborting");
         return;
       }
-      console.log("raw data-attributes:", container.dataset);
+      //console.log("raw data-attributes:", container.dataset);
   
       let dates, solo, rating, anchors;
       try {
@@ -45,12 +45,11 @@
         solo    = JSON.parse(container.dataset.solo);
         rating  = JSON.parse(container.dataset.rating);
         anchors = JSON.parse(container.dataset.anchors);
-        console.log("parsed dates:", dates);
+        //console.log("parsed dates:", dates);
       } catch(err) {
-        console.error("🚨 JSON.parse failed:", err, container.dataset.dates);
+        //console.error("🚨 JSON.parse failed:", err, container.dataset.dates);
         return;
       }
- // ... inside initInstructionCharts(), where you call drawColumnChart:
 
 // Solo chart
 drawColumnChart(
