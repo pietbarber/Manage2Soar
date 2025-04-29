@@ -24,30 +24,20 @@
 <script src="{% static 'js/instruction_charts.js' %}"></script>
 
 
-
 {% for block in report_blocks %}
   {% if block.type == "flight" %}
-    <div id="flight-{{ block.report.report_date }}">
-      {# existing flight‐report markup #}
-    </div>
-    {% else %}
-    <div id="ground-{{ block.report.date }}">
-      {# existing ground‐session markup #}
-    </div>
+    <div id="flight-{{ block.report.report_date|date:"Y-m-d" }}" class="card mb-4">
+  {% else %}
+    <div id="ground-{{ block.report.date|date:"Y-m-d" }}" class="card mb-4">
   {% endif %}
 
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <strong>
-        {% if block.type == "ground" %}
-          🧠 Ground Instruction - {{ block.report.date|date:"F j, Y" }}
+      <div class="card-header">
+        {% if block.type == "flight" %}
+          ✈️ Flight Instruction - {{ block.report.report_date }} ({{ block.days_ago }} days ago)
         {% else %}
-          ✈️ Flight Instruction - {{ block.report.report_date|date:"F j, Y" }}
+          📝 Ground Instruction - {{ block.report.date }} ({{ block.days_ago }} days ago)
         {% endif %}
-      </strong>
-      <span class="text-muted">({{ block.days_ago }} days ago)</span>
-    </div>
-
+      </div>
     <div class="card-body">
 
       {% if block.flights %}
