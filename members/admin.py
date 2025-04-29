@@ -144,6 +144,8 @@ class MemberBadgeInline(admin.TabularInline):
 
 @admin.register(Member)
 class MemberAdmin(VersionAdmin, UserAdmin):
+    readonly_fields = ("profile_photo_preview",) 
+
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
     model = Member
@@ -157,6 +159,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         (None, {"fields": ("username", "password")}),
         ("Personal Info", {"fields": (
             "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
+            "profile_photo", "profile_photo_preview",
             "email", "phone", "mobile_phone", "emergency_contact"
         )}),
         ("Membership", {"fields": (
@@ -181,6 +184,16 @@ class MemberAdmin(VersionAdmin, UserAdmin):
             "fields": ("username", "email", "first_name", "last_name", "password1", "password2"),
         }),
     )
+
+    def profile_photo_preview(self, obj):
+        if obj.profile_photo:
+            return format_html(
+                '<img src="{}" style="max-height:200px; border:1px solid #ccc;" />',
+                obj.profile_photo.url
+            )
+        return ""
+    profile_photo_preview.short_description = "Current Photo"
+
 
     def get_search_results(self, request, queryset, search_term):
         from members.constants.membership import DEFAULT_ACTIVE_STATUSES
