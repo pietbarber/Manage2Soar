@@ -1,8 +1,12 @@
 
+import itertools
+import json
+
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from .decorators import instructor_required
 from django.contrib import messages
+from django.db.models import Q
 from django.forms import formset_factory
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
@@ -31,6 +35,7 @@ from instructors.models import (
 from django.db.models import Count, Max
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
 
 
 # Training Syllabus links available to the public, no instructor login required. 
@@ -292,76 +297,6 @@ def member_training_grid(request, member_id):
     }
 
     return render(request, "shared/training_grid.html", context)
-
-# instructors/views.py
-
-def member_instruction_record(request, member_id):
-    member = get_object_or_404(Member, pk=member_id)
-
-    instruction_reports = (
-        InstructionReport.objects
-        .filter(student=member)
-        .order_by("-report_date")
-        .prefetch_related("lesson_scores__lesson")
-    )
-
-    ground_sessions = (
-        GroundInstruction.objects
-        .filter(student=member)
-        .order_by("-date")
-        .prefetch_related("lesson_scores__lesson")
-    )
-
-    blocks = []
-
-    for report in instruction_reports:
-        scores = report.lesson_scores.all()
-        scores_by_code = defaultdict(list)
-
-        for s in scores:
-            #print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
-            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
-
-        flights = Flight.objects.filter(
-            instructor=report.instructor,
-            pilot=report.student,
-            logsheet__log_date=report.report_date
-        )
-        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
-
-        blocks.append({
-            "type": "flight",
-            "report": report,
-            "days_ago": (timezone.now().date() - report.report_date).days,
-            "flights": flights,
-            "scores_by_code": scores_by_code,
-        })
-
-    for session in ground_sessions:
-        scores_by_code = defaultdict(list)
-
-        for s in session.lesson_scores.all():
-            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
-
-        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
-        blocks.append({
-            "type": "ground",
-            "report": session,
-            "days_ago": (timezone.now().date() - session.date).days,
-            "flights": None,
-            "scores_by_code": scores_by_code,
-        })
-
-    blocks.sort(
-        key=lambda b: b["report"].report_date if b["type"] == "flight" else b["report"].date,
-        reverse=True,
-    )
-
-    return render(request, "shared/member_instruction_record.html", {
-        "member": member,
-        "report_blocks": blocks,
-    })
-
 ##########################################################
 
 # instructors/views.py (partial)
@@ -540,3 +475,151 @@ def edit_syllabus_document(request, slug):
         'form': form,
         'doc': doc,
     })
+
+
+
+def member_instruction_record(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+
+    instruction_reports = (
+        InstructionReport.objects
+        .filter(student=member)
+        .order_by("-report_date")
+        .prefetch_related("lesson_scores__lesson")
+    )
+
+    ground_sessions = (
+        GroundInstruction.objects
+        .filter(student=member)
+        .order_by("-date")
+        .prefetch_related("lesson_scores__lesson")
+    )
+
+    # ── BUILD A TIMELINE OF ALL SESSIONS ──
+    # 1) Grab all flight‐instruction reports and ground sessions
+    flight_reports = list(
+        InstructionReport.objects
+            .filter(student=member)
+            .order_by("report_date")
+            .values_list("report_date", flat=True)
+    )
+    ground_reports = list(
+        GroundInstruction.objects
+            .filter(student=member)
+            .order_by("date")
+            .values_list("date", flat=True)
+    )
+    # 2) Merge into a single sorted list of dates with tags
+    sessions = []
+    for d in flight_reports:
+        sessions.append({"date": d, "type": "flight"})
+    for d in ground_reports:
+        sessions.append({"date": d, "type": "ground"})
+    sessions.sort(key=lambda x: x["date"])
+
+    # 3) Precompute solo‐required vs rating‐required lesson IDs
+    lessons = TrainingLesson.objects.all()
+    solo_ids = {L.id for L in lessons if L.is_required_for_solo()}
+    rating_ids = {L.id for L in lessons if L.is_required_for_private()}
+    total_solo = len(solo_ids) or 1
+    total_rating = len(rating_ids) or 1
+
+    # 4) Find the date of first true “solo” (flight with no instructor)
+    first_solo = (
+        Flight.objects
+        .filter(pilot=member, instructor__isnull=True)
+        .order_by("logsheet__log_date")
+        .values_list("logsheet__log_date", flat=True)
+        .first()
+    )
+    first_solo_str = first_solo.strftime("%Y-%m-%d") if first_solo else ""
+
+    # 5) Build the chart arrays
+    chart_dates = []
+    chart_solo = []
+    chart_rating = []
+    chart_anchors = []
+
+    for sess in sessions:
+        d = sess["date"]
+        chart_dates.append(d.strftime("%Y-%m-%d"))
+        chart_anchors.append(f"{sess['type']}-{d.strftime('%Y-%m-%d')}")
+        # cumulative lesson_scores up to this date
+        flight_done = set(
+            LessonScore.objects
+            .filter(report__student=member, report__report_date__lte=d, score__in=["3","4"])
+            .values_list("lesson_id", flat=True)
+        )
+        ground_done = set(
+            GroundLessonScore.objects
+            .filter(session__student=member, session__date__lte=d, score__in=["3","4"])
+            .values_list("lesson_id", flat=True)
+        )
+        completed = flight_done | ground_done
+        chart_solo.append(int(len(completed & solo_ids) / total_solo * 100))
+        chart_rating.append(int(len(completed & rating_ids) / total_rating * 100))
+
+
+
+
+    blocks = []
+
+    for report in instruction_reports:
+        scores = report.lesson_scores.all()
+        scores_by_code = defaultdict(list)
+
+        for s in scores:
+            #print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
+            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
+
+        flights = Flight.objects.filter(
+            instructor=report.instructor,
+            pilot=report.student,
+            logsheet__log_date=report.report_date
+        )
+        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
+
+        blocks.append({
+            "type": "flight",
+            "report": report,
+            "days_ago": (timezone.now().date() - report.report_date).days,
+            "flights": flights,
+            "scores_by_code": scores_by_code,
+        })
+
+    for session in ground_sessions:
+        scores_by_code = defaultdict(list)
+
+        for s in session.lesson_scores.all():
+            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
+
+        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
+        blocks.append({
+            "type": "ground",
+            "report": session,
+            "days_ago": (timezone.now().date() - session.date).days,
+            "flights": None,
+            "scores_by_code": scores_by_code,
+        })
+
+    blocks.sort(
+        key=lambda b: b["report"].report_date if b["type"] == "flight" else b["report"].date,
+        reverse=True,
+    )
+
+
+    return render(request, "shared/member_instruction_record.html", {
+        "member": member,
+        "report_blocks": blocks,
+        "chart_dates":     chart_dates,
+        "chart_solo":      chart_solo,
+        "chart_rating":    chart_rating,
+        "chart_anchors":   chart_anchors,
+        "first_solo_str":  first_solo_str,
+        "chart_dates_json":   json.dumps(chart_dates),
+        "chart_solo_json":    json.dumps(chart_solo),
+        "chart_rating_json":  json.dumps(chart_rating),
+        "chart_anchors_json": json.dumps(chart_anchors),
+
+    })
+
