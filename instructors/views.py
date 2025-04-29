@@ -405,29 +405,39 @@ def progress_dashboard(request):
         .order_by('last_name')
     )
 
-    # 2) figure out which lessons count for solo vs rating
-    all_lessons = TrainingLesson.objects.all()
-    solo_ids = {l.id for l in all_lessons if l.is_required_for_solo()}
-    rating_ids = {l.id for l in all_lessons if l.is_required_for_private()}
-    total_solo = len(solo_ids)
-    total_rating = len(rating_ids)
+    # 2) Precompute which lessons count for solo vs rating
+    all_lessons   = TrainingLesson.objects.all()
+    solo_ids      = {l.id for l in all_lessons if l.is_required_for_solo()}
+    rating_ids    = {l.id for l in all_lessons if l.is_required_for_private()}
+    total_solo    = len(solo_ids)
+    total_rating  = len(rating_ids)
 
-    # 3) percentage helper
+    # 3) percentage helper: solo = scores 3 or 4; rating = scores 4 only
     def compute_progress(member):
-        flight_done = set(
+        # lessons passed to solo standard
+        solo_done = set(
             LessonScore.objects
             .filter(report__student=member, score__in=['3','4'])
             .values_list('lesson_id', flat=True)
-        )
-        ground_done = set(
+        ) | set(
             GroundLessonScore.objects
             .filter(session__student=member, score__in=['3','4'])
             .values_list('lesson_id', flat=True)
         )
-        completed = flight_done | ground_done
 
-        solo_pct = int(len(completed & solo_ids) / total_solo * 100) if total_solo else 0
-        rating_pct = int(len(completed & rating_ids) / total_rating * 100) if total_rating else 0
+        # lessons passed to checkride standard (rating)
+        rating_done = set(
+            LessonScore.objects
+            .filter(report__student=member, score='4')
+            .values_list('lesson_id', flat=True)
+        ) | set(
+            GroundLessonScore.objects
+            .filter(session__student=member, score='4')
+            .values_list('lesson_id', flat=True)
+        )
+
+        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100) if total_solo   else 0
+        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100) if total_rating else 0
         return solo_pct, rating_pct
 
     # 4) build context lists
