@@ -82,3 +82,12 @@ td, th {
   position: relative;
   /* remove any height or width rules—you’ll drive height in the template and width via var(--pct) */
 }
+
+/* Ensure all card bodies wrap text normally */
+.card-body {
+  /* revert any inherited nowrap */
+  white-space: normal !important;
+  /* break long words if necessary */
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+}

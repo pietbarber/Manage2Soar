@@ -9,13 +9,13 @@
      data-rating='{{ chart_rating_json|safe }}'
      data-anchors='{{ chart_anchors_json|safe }}'
      data-firstsolo="{{ first_solo_str }}"
-     style="overflow-x:auto; white-space:nowrap; margin-bottom:2rem;"
+     style="overflow-x:auto; margin-bottom:2rem;"
 >
-<div style="overflow-x:auto; margin-bottom:1rem;">
-  <div id="solo_chart"   style="height:150px; min-width:2000px;"></div>
+<div style="width:100%; overflow-x:auto; margin-bottom:1rem;">
+  <div id="solo_chart"   style="height:150px; width:100%;"></div>
 </div>
-<div style="overflow-x:auto; margin-bottom:2rem;">
-  <div id="rating_chart" style="height:150px; min-width:2000px;"></div>
+<div style="width:100%; overflow-x:auto; margin-bottom:2rem;">
+  <div id="rating_chart" style="height:150px; width:100%;"></div>
 </div>
 
 
@@ -78,12 +78,12 @@
     
       {% if block.report.report_text %}
         <h5>📝 Instructor Essay</h5>
-        <div class="border p-3 bg-white">
+        <div class="border p-3 bg-white card-body">
           {{ block.report.report_text|safe }}
         </div>
       {% elif block.report.notes %}
         <h5>📝 Notes</h5>
-        <div class="border p-3 bg-white">
+        <div class="border p-3 bg-white card-body">
           {{ block.report.notes|safe }}
         </div>
       {% elif block.type == "ground" %}

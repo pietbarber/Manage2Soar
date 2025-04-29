@@ -2,6 +2,7 @@
     <thead>
       <tr>
         <th>Pilot</th>
+        <th>Sessions</th>
         <th>Reports</th>
         <th>Progress</th>
         <th>Last Flight</th>
@@ -12,6 +13,8 @@
       {% with m=row.member %}
       <tr>
         <td>{{ m.full_display_name }}</td>
+        <td class="text-end">{{ row.report_count }}</td>  {# render it #}
+
         <td>
           <a href="{% url 'instructors:member_training_grid'      m.id %}">Grid</a>
           <a href="{% url 'instructors:member_instruction_record' m.id %}">Record</a>

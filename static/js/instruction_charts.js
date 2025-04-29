@@ -83,6 +83,8 @@ drawColumnChart(
    
     }
   
+
+
     function drawColumnChart(containerId, labels, values, anchors, highlightLabel, seriesLabel, barColor, highlightColor, options){
       const dt = new google.visualization.DataTable();
       dt.addColumn('string','Session');

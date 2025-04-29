@@ -389,7 +389,7 @@ def progress_dashboard(request):
         )
         .annotate(
             last_flight=Max('flights_as_pilot__logsheet__log_date'),
-            report_count=Count('instruction_reports')
+            report_count=Count('instruction_reports', distinct=True)
         )
         .order_by('last_name')
     )
@@ -400,7 +400,7 @@ def progress_dashboard(request):
         .exclude(glider_rating='student')
         .annotate(
             last_flight=Max('flights_as_pilot__logsheet__log_date'),
-            report_count=Count('instruction_reports')
+            report_count=Count('instruction_reports', distinct=True)
         )
         .order_by('last_name')
     )
@@ -435,23 +435,22 @@ def progress_dashboard(request):
     for m in students_qs:
         solo_pct, rating_pct = compute_progress(m)
         students_data.append({
-            'member': m,
-            'solo_pct': solo_pct,
-            'solo_rem': 100 - solo_pct,       # <— new
-            'rating_pct': rating_pct,
-            'rating_rem': 100 - rating_pct,   # <— new
+            'member':      m,
+            'report_count': m.report_count,      # ← pull in the annotated count
+            'solo_pct':    solo_pct,
+            'rating_pct':  rating_pct,
         })
 
     rated_data = []
     for m in rated_qs:
         solo_pct, rating_pct = compute_progress(m)
         rated_data.append({
-            'member': m,
-            'solo_pct': solo_pct,
-            'solo_rem': 100 - solo_pct,
-            'rating_pct': rating_pct,
-            'rating_rem': 100 - rating_pct,
+            'member':      m,
+            'report_count': m.report_count,
+            'solo_pct':    solo_pct,
+            'rating_pct':  rating_pct,
         })
+
 
     return render(request, 'instructors/progress_dashboard.html', {
         'students_data': students_data,
