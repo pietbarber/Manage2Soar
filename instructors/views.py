@@ -543,7 +543,7 @@ def member_instruction_record(request, member_id):
     )
     first_solo_str = first_solo.strftime("%Y-%m-%d") if first_solo else ""
 
-    # 5) Build the chart arrays
+    # 5) Build the chart arrays with independent solo (3 or 4) vs rating (4 only)
     chart_dates = []
     chart_solo = []
     chart_rating = []
@@ -551,24 +551,51 @@ def member_instruction_record(request, member_id):
 
     for sess in sessions:
         d = sess["date"]
+        # record the date+anchor
         chart_dates.append(d.strftime("%Y-%m-%d"))
         chart_anchors.append(f"{sess['type']}-{d.strftime('%Y-%m-%d')}")
-        # cumulative lesson_scores up to this date
-        flight_done = set(
+
+        # solo‐standard completed (score 3 or 4)
+        flight_solo = set(
             LessonScore.objects
-            .filter(report__student=member, report__report_date__lte=d, score__in=["3","4"])
-            .values_list("lesson_id", flat=True)
+                .filter(report__student=member,
+                        report__report_date__lte=d,
+                        score__in=["3","4"])
+                .values_list("lesson_id", flat=True)
         )
-        ground_done = set(
+        ground_solo = set(
             GroundLessonScore.objects
-            .filter(session__student=member, session__date__lte=d, score__in=["3","4"])
-            .values_list("lesson_id", flat=True)
+                .filter(session__student=member,
+                        session__date__lte=d,
+                        score__in=["3","4"])
+                .values_list("lesson_id", flat=True)
         )
-        completed = flight_done | ground_done
-        chart_solo.append(int(len(completed & solo_ids) / total_solo * 100))
-        chart_rating.append(int(len(completed & rating_ids) / total_rating * 100))
+        solo_done = flight_solo | ground_solo
 
+        # rating‐standard completed (score 4 only)
+        flight_rating = set(
+            LessonScore.objects
+                .filter(report__student=member,
+                        report__report_date__lte=d,
+                        score="4")
+                .values_list("lesson_id", flat=True)
+        )
+        ground_rating = set(
+            GroundLessonScore.objects
+                .filter(session__student=member,
+                        session__date__lte=d,
+                        score="4")
+                .values_list("lesson_id", flat=True)
+        )
+        rating_done = flight_rating | ground_rating
 
+        # compute percentages against their own totals
+        chart_solo.append(
+            int(len(solo_done & solo_ids) / total_solo * 100)
+        )
+        chart_rating.append(
+            int(len(rating_done & rating_ids) / total_rating * 100)
+        )
 
 
     blocks = []
