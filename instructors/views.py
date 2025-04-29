@@ -600,42 +600,116 @@ def member_instruction_record(request, member_id):
 
     blocks = []
 
+    # ── Flight‐instruction reports ──
     for report in instruction_reports:
-        scores = report.lesson_scores.all()
-        scores_by_code = defaultdict(list)
-
-        for s in scores:
-            #print("  - Score:", repr(s.score), "| Code:", repr(s.lesson.code))
-            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
-
-        flights = Flight.objects.filter(
-            instructor=report.instructor,
-            pilot=report.student,
-            logsheet__log_date=report.report_date
+        d = report.report_date
+        # cumulative “solo” (3 or 4) up to date d
+        flight_solo = set(
+            LessonScore.objects.filter(
+                report__student=member,
+                report__report_date__lte=d,
+                score__in=["3","4"]
+            ).values_list("lesson_id", flat=True)
         )
-        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
-
+        ground_solo = set(
+            GroundLessonScore.objects.filter(
+                session__student=member,
+                session__date__lte=d,
+                score__in=["3","4"]
+            ).values_list("lesson_id", flat=True)
+        )
+        solo_done = flight_solo | ground_solo
+    
+        # cumulative “rating” (4 only) up to date d
+        flight_rate = set(
+            LessonScore.objects.filter(
+                report__student=member,
+                report__report_date__lte=d,
+                score="4"
+            ).values_list("lesson_id", flat=True)
+        )
+        ground_rate = set(
+            GroundLessonScore.objects.filter(
+                session__student=member,
+                session__date__lte=d,
+                score="4"
+            ).values_list("lesson_id", flat=True)
+        )
+        rating_done = flight_rate | ground_rate
+    
+        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100)
+        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
+    
+        missing_solo   = TrainingLesson.objects.filter(id__in=solo_ids - solo_done).order_by("code")
+        missing_rating = TrainingLesson.objects.filter(id__in=rating_ids - rating_done).order_by("code")
+    
         blocks.append({
-            "type": "flight",
-            "report": report,
-            "days_ago": (timezone.now().date() - report.report_date).days,
-            "flights": flights,
-            "scores_by_code": scores_by_code,
+            "type":           "flight",
+            "report":         report,
+            "days_ago":       (timezone.now().date() - d).days,
+            "flights":        Flight.objects.filter(
+                                  instructor=report.instructor,
+                                  pilot=report.student,
+                                  logsheet__log_date=d
+                              ),
+            "scores_by_code": { str(s.score): [] for s in report.lesson_scores.all() },  # your existing logic
+            "solo_pct":       solo_pct,
+            "rating_pct":     rating_pct,
+            "missing_solo":   missing_solo,
+            "missing_rating": missing_rating,
         })
 
+    # ── Ground‐instruction sessions ──
     for session in ground_sessions:
-        scores_by_code = defaultdict(list)
-
-        for s in session.lesson_scores.all():
-            scores_by_code[str(s.score)].append(s.lesson.code)  # ✅ normalize as str
-
-        scores_by_code = dict(scores_by_code)  # ✅ convert defaultdict to regular dict
+        d = session.date
+        flight_solo = set(
+            LessonScore.objects.filter(
+                report__student=member,
+                report__report_date__lte=d,
+                score__in=["3","4"]
+            ).values_list("lesson_id", flat=True)
+        )
+        ground_solo = set(
+            GroundLessonScore.objects.filter(
+                session__student=member,
+                session__date__lte=d,
+                score__in=["3","4"]
+            ).values_list("lesson_id", flat=True)
+        )
+        solo_done = flight_solo | ground_solo
+    
+        flight_rate = set(
+            LessonScore.objects.filter(
+                report__student=member,
+                report__report_date__lte=d,
+                score="4"
+            ).values_list("lesson_id", flat=True)
+        )
+        ground_rate = set(
+            GroundLessonScore.objects.filter(
+                session__student=member,
+                session__date__lte=d,
+                score="4"
+            ).values_list("lesson_id", flat=True)
+        )
+        rating_done = flight_rate | ground_rate
+    
+        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100)
+        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
+    
+        missing_solo   = TrainingLesson.objects.filter(id__in=solo_ids - solo_done).order_by("code")
+        missing_rating = TrainingLesson.objects.filter(id__in=rating_ids - rating_done).order_by("code")
+    
         blocks.append({
-            "type": "ground",
-            "report": session,
-            "days_ago": (timezone.now().date() - session.date).days,
-            "flights": None,
-            "scores_by_code": scores_by_code,
+            "type":           "ground",
+            "report":         session,
+            "days_ago":       (timezone.now().date() - d).days,
+            "flights":        None,
+            "scores_by_code": { str(s.score): [] for s in session.lesson_scores.all() },
+            "solo_pct":       solo_pct,
+            "rating_pct":     rating_pct,
+            "missing_solo":   missing_solo,
+            "missing_rating": missing_rating,
         })
 
     blocks.sort(

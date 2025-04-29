@@ -40,6 +40,44 @@
       </div>
     <div class="card-body">
 
+
+      {# mini progress bars #}
+      <td style="min-width:160px;">
+        <div class="progress mb-1"
+             style="--pct: {{ block.solo_pct }}%; height:1em; max-width:300px;">
+          <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+          <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+        </div>
+      
+        <div class="progress"
+             style="--pct: {{ block.rating_pct }}%; height:1em; max-width:300px;">
+          <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+          <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+        </div>
+      </td>
+      
+
+      {# “still needs…” messages #}
+      {% if block.missing_solo %}
+        <p class="mb-1">
+          Solo progress: still needs a (3) or (4) in
+          {% for lesson in block.missing_solo %}
+            <a href="{% url 'public_syllabus_detail' lesson.code %}">{{ lesson.code }}</a>{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        </p>
+      {% endif %}
+      {% if block.missing_rating %}
+        <p class="mb-3">
+          Rating progress: still needs a (4) in
+          {% for lesson in block.missing_rating %}
+            <a href="{% url 'public_syllabus_detail' lesson.code %}">{{ lesson.code }}</a>{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        </p>
+      {% endif %}
+    
+
+
+
       {% if block.flights %}
         <h5>🛫 Flights</h5>
         <ul class="list-group mb-3">
