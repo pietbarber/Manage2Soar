@@ -7,7 +7,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header" id="headingHeader">
           <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHeader" aria-expanded="true" aria-controls="collapseHeader">
-            {{ header.title }}
+            Show the Introduction to {{ header.title }}
           </button>
         </h2>
         <div id="collapseHeader" class="accordion-collapse collapse" aria-labelledby="headingHeader" data-bs-parent="#syllabusAccordion">
@@ -22,7 +22,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header" id="headingMaterials">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMaterials" aria-expanded="false" aria-controls="collapseMaterials">
-            {{ materials.title }}
+            Show the {{ materials.title }}
           </button>
         </h2>
         <div id="collapseMaterials" class="accordion-collapse collapse" aria-labelledby="headingMaterials" data-bs-parent="#syllabusAccordion">
@@ -37,29 +37,51 @@
   <table class="table table-bordered">
     <thead>
       <tr>
-        <th style="width:10%">Code</th>
-        <th style="width:45%">Title</th>
-        <th style="width:10%">Solo</th>
-        <th style="width:10%">Private</th>
-        <th style="width:25%">Admin</th>
+        <th class="table-secondary">Code</th>
+        <th>Title</th>
+        <th class="table-secondary">Required for Solo</th>
+        <th class="table-secondary">Required for Private</th>
+        {% if public %}<th style="width:25%">Instructor Sign-off and Date</th>{% endif %}
+        {% if not public %}<th style="width:25%">Admin</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for phase in phases %}
         <tr class="table-primary">
-          <td colspan="5"><strong>{{ phase.number }} – {{ phase.name }}</strong></td>
+          <td colspan="5"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
         </tr>
         {% for lesson in phase.lessons.all %}
           <tr>
-            <td>{{ lesson.code }}</td>
-            <td>
-              <a href="{% url 'instructors:syllabus_detail' lesson.code %}">{{ lesson.title }}</a>
+            <td class="table-secondary">{{ lesson.code }}</td>
+            <td class="text-end">
+            {% if public %}
+              {# Public visitors get the TRAINING/Syllabus/... URL #}
+              <a href="{% url 'public_syllabus_detail' lesson.code %}">
+                {{ lesson.title }}
+              </a>
+            {% else %}
+              {# Instructors still use the protected instructors/ URL #}
+              <a href="{% url 'instructors:syllabus_detail' lesson.code %}">
+                {{ lesson.title }}
+              </a>
+            {% endif %}
             </td>
-            <td>{% if lesson.is_required_for_solo %}✅{% endif %}</td>
-            <td>{% if lesson.is_required_for_private %}✅{% endif %}</td>
+            {% if public %}
+            <td class="table-secondary"> {{ lesson.far_requirement }}</td>
+            <td class="table-secondary"> {{ lesson.pts_reference }}</td>
+            {% else %}
+            <td class="table-secondary">{% if lesson.is_required_for_solo %}✅{% endif %}</td>
+            <td class="table-secondary">{% if lesson.is_required_for_private %}✅{% endif %}</td>
+            {% endif %}
+            {% if public %}
+            <td>
+              
+            </td>
+            {% else %}
             <td>
               <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
             </td>
+            {% endif %}
           </tr>
         {% endfor %}
       {% endfor %}
