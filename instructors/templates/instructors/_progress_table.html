@@ -1,46 +1,52 @@
 <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Pilot</th>
-        <th>Sessions</th>
-        <th>Reports</th>
+  <thead>
+    <tr>
+      <th>Pilot</th>
+      <th>Sessions</th>
+      <th>Reports</th>
+      {% if show_progress %}
         <th>Progress</th>
-        <th>Last Flight</th>
-      </tr>
-    </thead>
-    <tbody>
+      {% endif %}
+      <th>Last Flight</th>
+    </tr>
+  </thead>
+  <tbody>
     {% for row in data %}
       {% with m=row.member %}
       <tr>
         <td>{{ m.full_display_name }}</td>
-        <td class="text-end">{{ row.report_count }}</td>  {# render it #}
-
+        <td class="text-end">{{ row.report_count }}</td>
         <td>
           <a href="{% url 'instructors:member_training_grid'      m.id %}">Grid</a>
           <a href="{% url 'instructors:member_instruction_record' m.id %}">Record</a>
         </td>
+
+        {% if show_progress %}
         <td style="min-width:160px;">
           {% if show_solo_bar|default:True %}
           <div class="progress mb-1"
-              style="--pct: {{ row.solo_pct }}%; height:1em;"
-              data-bs-toggle="tooltip"
-              title="Solo progress: {{ row.solo_pct }}%">
+               style="--pct: {{ row.solo_pct }}%; height:1em;"
+               data-bs-toggle="tooltip"
+               title="Solo progress: {{ row.solo_pct }}%">
             <div class="progress-bar bg-success" style="width: var(--pct);"></div>
-            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+            <div class="progress-bar bg-secondary"
+                 style="width: calc(100% - var(--pct));"></div>
           </div>
           {% endif %}
           <div class="progress"
-              style="--pct: {{ row.rating_pct }}%; height:1em;"
-              data-bs-toggle="tooltip"
-              title="Rating progress: {{ row.rating_pct }}%">
+               style="--pct: {{ row.rating_pct }}%; height:1em;"
+               data-bs-toggle="tooltip"
+               title="Rating progress: {{ row.rating_pct }}%">
             <div class="progress-bar bg-success" style="width: var(--pct);"></div>
-            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+            <div class="progress-bar bg-secondary"
+                 style="width: calc(100% - var(--pct));"></div>
           </div>
         </td>
-        <td>{{ row.member.last_flight|date:"Y-m-d" }}</td>
+        {% endif %}
+
+        <td class="text-end">{{ row.member.last_flight|date:"Y-m-d" }}</td>
       </tr>
       {% endwith %}
     {% endfor %}
-    </tbody>
-  </table>
-  
+  </tbody>
+</table>
