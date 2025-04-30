@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ lesson.code }} – {{ lesson.title }}</h1>
+<div class="position-relative">
+
+  {# QR code in the top-right corner #}
+  <a href="{% url 'public_syllabus_detail' lesson.code %}">
+    <img src="{% url 'public_syllabus_qr' lesson.code %}"
+         alt="QR code for {{ lesson.code }}"
+         class="position-absolute top-0 end-0 m-3"
+         style="width: 100px; height: auto;"/>
+  </a>
+
+
+  <h1>{{ lesson.code }} - {{ lesson.title }}</h1>
+
 
   <div class="mb-4">
     {% if lesson.far_requirement %}

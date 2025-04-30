@@ -32,18 +32,21 @@ urlpatterns = [
     path('logsheet/', include('logsheet.urls')),
     path('instructors/', include('instructors.urls')),
     path("duty_roster/", include("duty_roster.urls")),
-    path('login/', auth_views.LoginView.as_view(), name='login'),  # ← add this!
+    path('login/', auth_views.LoginView.as_view(), name='login'), 
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('oauth/', include('social_django.urls', namespace='social')),
-    path("", member_views.home, name="home"),  # ← This should point to home, not member_list
+    path("", member_views.home, name="home"), 
     path("password-reset/", auth_views.PasswordResetView.as_view(), name="password_reset"),
     path("password-reset/done/", auth_views.PasswordResetDoneView.as_view(), name="password_reset_done"),
     path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
     path("reset/done/", auth_views.PasswordResetCompleteView.as_view(), name="password_reset_complete"),
 
+    path("TRAINING/Syllabus/full/", instr_views.public_syllabus_full, name="public_syllabus_full"),
     path("TRAINING/Syllabus/",                 instr_views.public_syllabus_overview, name="public_syllabus_overview"),
     path("TRAINING/Syllabus/<str:code>.shtml", instr_views.public_syllabus_detail,   name="public_syllabus_detail"),
     path("TRAINING/Syllabus/<str:code>/", instr_views.public_syllabus_detail,   name="public_syllabus_detail"),
+    path("TRAINING/Syllabus/<str:code>/qr.png", instr_views.public_syllabus_qr, name="public_syllabus_qr"),
+
 
 
 ]

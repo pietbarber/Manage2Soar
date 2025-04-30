@@ -1,10 +1,14 @@
 
 import itertools
 import json
-
+from django.urls import reverse
+import qrcode
+from io import BytesIO
+from django.http import HttpResponse 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from .decorators import instructor_required
+from django.views.decorators.http import require_POST, require_GET
 from django.contrib import messages
 from django.db.models import Q
 from django.forms import formset_factory
@@ -733,3 +737,25 @@ def member_instruction_record(request, member_id):
 
     })
 
+
+def public_syllabus_qr(request, code):
+    url = request.build_absolute_uri(
+        reverse('public_syllabus_detail', args=[code])
+    )
+    img = qrcode.make(url)
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    return HttpResponse(buf.getvalue(), content_type='image/png')
+
+@require_GET
+def public_syllabus_full(request):
+    # grab header/materials as before
+    phases    = TrainingPhase.objects.prefetch_related("lessons").all()
+    header    = SyllabusDocument.objects.filter(slug="header").first()
+    materials = SyllabusDocument.objects.filter(slug="materials").first()
+    # all lessons in order
+    lessons   = TrainingLesson.objects.order_by("code").all()
+
+    return render(request,
+                  "instructors/syllabus_full.html",
+                  {"phases": phases, "header": header, "materials": materials, "lessons": lessons})

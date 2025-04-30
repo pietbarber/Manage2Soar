@@ -1,0 +1,22 @@
+
+ /* Narrow the browser’s print margins to 0.5 cm all around */
+@page {
+    margin: 0.5cm;
+  }
+  
+  /* Make sure the html/body take up the full page */
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Remove any leftover container padding or width caps */
+  @media print {
+    .container, .container-fluid, .syllabus-full, .lesson-section {
+      width: fit-content !important;
+      max-width: fit-content !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  }
+   
