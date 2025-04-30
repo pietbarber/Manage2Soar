@@ -48,7 +48,7 @@
   </div>
 {% endif %}
 
-{# — Club Qualifications — #}
+<!-- Qualifications Summary -->
 {% with qs=member.memberqualification_set.all %}
   {% if qs %}
     <h5>Qualifications:</h5>
@@ -76,6 +76,52 @@
     </div>
   {% endif %}
 {% endwith %}
+
+<!-- Flying Summary -->
+<h3>Flying Summary:</h3>
+<table class="table table-sm table-bordered mb-4">
+  <thead class="table-dark">
+    <tr>
+      <th rowspan="2">Glider</th>
+      <th colspan="3">Solo Flights</th>
+      <th colspan="3">With Instructor</th>
+      <th colspan="3">Instruction Given</th>
+      <th colspan="3">Total Flights</th>
+    </tr>
+    <tr>
+      <th>#</th><th>Time</th><th>Last Flight</th>
+      <th>#</th><th>Time</th><th>Last Flight</th>
+      <th>#</th><th>Time</th><th>Last Flight</th>
+      <th>#</th><th>Time</th><th>Last Flight</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in flights_summary %}
+    <tr class="{% if forloop.last %}table-secondary fw-bold{% endif %}">
+      <td>{{ s.n_number }}</td>
+      <td class="text-end">{{ s.solo_count }}</td>
+      <td class="text-end">{{ s.solo_time }}</td>
+      <td class="text-end">{{ s.solo_last|default_if_none:"" }}</td>
+
+      <td class="text-end">{{ s.with_count }}</td>
+      <td class="text-end">{{ s.with_time }}</td>
+      <td class="text-end">{{ s.with_last|default_if_none:"" }}</td>
+
+      <td class="text-end">{{ s.given_count }}</td>
+      <td class="text-end">{{ s.given_time }}</td>
+      <td class="text-end">{{ s.given_last|default_if_none:"" }}</td>
+
+      <td class="text-end">{{ s.total_count }}</td>
+      <td class="text-end">{{ s.total_time }}</td>
+      <td class="text-end">{{ s.total_last|default_if_none:"" }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="13" class="text-center">No flights on record</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 
 {% for block in report_blocks %}

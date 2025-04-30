@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from .decorators import instructor_required
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Count, Max, Sum, F, Q, Value
 from django.forms import formset_factory
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
@@ -39,6 +39,8 @@ from instructors.models import (
 from django.db.models import Count, Max
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from instructors.utils import get_flight_summary_for_member
+
 
 
 
@@ -501,6 +503,17 @@ def member_instruction_record(request, member_id):
         pk=member_id
     )
 
+
+    # ── Flying summary by glider ──
+    flights = (
+        Flight.objects
+              .filter(pilot=member)
+              .select_related("logsheet", "aircraft")
+    )
+
+    flights_summary = get_flight_summary_for_member(member)
+
+
     instruction_reports = (
         InstructionReport.objects
         .filter(student=member)
@@ -731,6 +744,7 @@ def member_instruction_record(request, member_id):
 
     return render(request, "shared/member_instruction_record.html", {
         "member": member,
+        "flights_summary": flights_summary,
         "report_blocks": blocks,
         "chart_dates":     chart_dates,
         "chart_solo":      chart_solo,
