@@ -272,10 +272,10 @@ class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='badge_images/', blank=True, null=True)
     description = HTMLField(blank=True)
-    order = models.PositiveIntegerField(default=0)  # 👈 Add this!
+    order = models.PositiveIntegerField(default=0) 
 
     class Meta:
-        ordering = ['order']  # 👈 Ensure badges come out in the desired order
+        ordering = ['order'] 
 
     def __str__(self):
         return self.name

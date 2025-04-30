@@ -2,7 +2,6 @@
 {% load static %}
 {% block content %}
 <h2>Instruction Record for {{ member.full_display_name }}</h2>
-
 <div id="charts-container"
      data-dates='{{ chart_dates_json|safe }}'
      data-solo='{{ chart_solo_json|safe }}'
@@ -22,6 +21,61 @@
 
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="{% static 'js/instruction_charts.js' %}"></script>
+
+<!-- Badges -->
+{# — Badges Earned — #}
+{% if member.badges.all %}
+  <h5>Badges:</h5>
+  <div class="mb-3">
+    {% for mb in member.badges.all %}
+      {% if mb.badge.image %}
+        <img src="{{ mb.badge.image.url }}"
+             alt="{{ mb.badge.name }}"
+             title="{{ mb.badge.name }}"
+             class="me-2"
+             style="height:2rem; width:auto;"
+             data-bs-toggle="tooltip"
+             data-bs-placement="top" />
+      {% else %}
+        <span class="badge bg-secondary me-1"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              title="{{ mb.badge.name }}">
+          {{ mb.badge.name }}
+        </span>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}
+
+{# — Club Qualifications — #}
+{% with qs=member.memberqualification_set.all %}
+  {% if qs %}
+    <h5>Qualifications:</h5>
+    <div class="mb-4">
+      {% for mq in qs %}
+        {% with q=mq.qualification %}
+          {% if q.icon %}
+            <img src="{{ q.icon.url }}"
+                 alt="{{ q.name }}"
+                 title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}"
+                 class="me-2"
+                 style="height:2rem; width:auto;"
+                 data-bs-toggle="tooltip"
+                 data-bs-placement="top" />
+          {% else %}
+            <span class="badge bg-info text-dark me-1"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}">
+              {{ q.code }}
+            </span>
+          {% endif %}
+        {% endwith %}
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 
 {% for block in report_blocks %}

@@ -492,7 +492,14 @@ def edit_syllabus_document(request, slug):
 
 
 def member_instruction_record(request, member_id):
-    member = get_object_or_404(Member, pk=member_id)
+    member = get_object_or_404(
+        Member.objects
+              .prefetch_related(
+                 'badges__badge', 
+                 'memberqualification_set__qualification'
+              ),
+        pk=member_id
+    )
 
     instruction_reports = (
         InstructionReport.objects
@@ -759,3 +766,4 @@ def public_syllabus_full(request):
     return render(request,
                   "instructors/syllabus_full.html",
                   {"phases": phases, "header": header, "materials": materials, "lessons": lessons})
+
