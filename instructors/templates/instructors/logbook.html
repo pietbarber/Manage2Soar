@@ -19,7 +19,7 @@
       <tr>
         <th>Date</th><th>#</th><th>Model</th><th>Glider</th>
         <th>A</th><th>G</th><th>S</th>
-        <th>Release</th><th>Max</th><th>Airfield</th>
+        <th>Release</th><th>Max</th><th>Location</th>
         <th class="text-end">Gnd Inst</th>
         <th class="text-end">Dual</th>
         <th class="text-end">Solo</th>
@@ -42,13 +42,13 @@
           <td class="text-end">{{ r.release }}</td>
           <td class="text-end">{{ r.maxh }}</td>
           <td>{{ r.airfield }}</td>
-          <td class="text-end">{{ r.ground_inst|floatformat:2 }}</td>
-          <td class="text-end">{{ r.dual_received|floatformat:2 }}</td>
-          <td class="text-end">{{ r.solo|floatformat:2 }}</td>
-          <td class="text-end">{{ r.pic|floatformat:2 }}</td>
-          <td class="text-end">{{ r.inst_given|floatformat:2 }}</td>
-          <td class="text-end">{{ r.total|floatformat:2 }}</td>
-          <td>{{ r.comments }}</td>
+          <td class="text-end">{{ r.ground_inst }}</td>
+          <td class="text-end">{{ r.dual_received }}</td>
+          <td class="text-end">{{ r.solo }}</td>
+          <td class="text-end">{{ r.pic }}</td>
+          <td class="text-end">{{ r.inst_given }}</td>
+          <td class="text-end">{{ r.total }}</td>
+          <td class="text-start">{{ r.comments }}</td>
         </tr>
       {% endfor %}
   
@@ -60,12 +60,12 @@
         <td class="text-end">{{ page.sums.G }}</td>
         <td class="text-end">{{ page.sums.S }}</td>
         <td colspan="3"></td>
-        <td class="text-end">{{ page.sums.ground_inst|floatformat:2 }}</td>
-        <td class="text-end">{{ page.sums.dual_received|floatformat:2 }}</td>
-        <td class="text-end">{{ page.sums.solo|floatformat:2 }}</td>
-        <td class="text-end">{{ page.sums.pic|floatformat:2 }}</td>
-        <td class="text-end">{{ page.sums.inst_given|floatformat:2 }}</td>
-        <td class="text-end">{{ page.sums.total|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.ground_inst }}</td>
+        <td class="text-end">{{ page.sums.dual_received }}</td>
+        <td class="text-end">{{ page.sums.solo }}</td>
+        <td class="text-end">{{ page.sums.pic }}</td>
+        <td class="text-end">{{ page.sums.inst_given }}</td>
+        <td class="text-end">{{ page.sums.total }}</td>
         <td></td>
       </tr>
   
@@ -77,18 +77,17 @@
         <td class="text-end">{{ page.cumulative.G }}</td>
         <td class="text-end">{{ page.cumulative.S }}</td>
         <td colspan="3"></td>
-        <td class="text-end">{{ page.cumulative.ground_inst|floatformat:2 }}</td>
-        <td class="text-end">{{ page.cumulative.dual_received|floatformat:2 }}</td>
-        <td class="text-end">{{ page.cumulative.solo|floatformat:2 }}</td>
-        <td class="text-end">{{ page.cumulative.pic|floatformat:2 }}</td>
-        <td class="text-end">{{ page.cumulative.inst_given|floatformat:2 }}</td>
-        <td class="text-end">{{ page.cumulative.total|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.ground_inst }}</td>
+        <td class="text-end">{{ page.cumulative.dual_received }}</td>
+        <td class="text-end">{{ page.cumulative.solo }}</td>
+        <td class="text-end">{{ page.cumulative.pic }}</td>
+        <td class="text-end">{{ page.cumulative.inst_given }}</td>
+        <td class="text-end">{{ page.cumulative.total }}</td>
         <td></td>
       </tr>
   
     </tbody>
   </table>
-  
 
   {% if not forloop.last %}
     <div class="page-break"></div>

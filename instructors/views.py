@@ -784,6 +784,14 @@ def public_syllabus_full(request):
 
 @active_member_required
 def member_logbook(request):
+
+    def format_hhmm(duration):
+        if not duration:
+            return ""
+        total_minutes = int(duration.total_seconds() // 60)
+        h, m = divmod(total_minutes, 60)
+        return f"{h}:{m:02d}"
+
     member = request.user
 
     # 1) Fetch all flights & ground sessions for this member
@@ -813,8 +821,7 @@ def member_logbook(request):
     first_pax = flights.filter(passenger__isnull=False).order_by('logsheet__log_date').first()
     rating_date = first_pax.logsheet.log_date if first_pax else None
 
-    # 3) Merge flights+grounds by (date, instructor) to one row
-
+    # 3) Flatten flights & grounds into a single timeline of events
     events = []
     for f in flights:
         events.append({"type": "flight", "obj": f, "date": f.logsheet.log_date})
@@ -822,108 +829,161 @@ def member_logbook(request):
         events.append({"type": "ground", "obj": g, "date": g.date})
     events.sort(key=lambda e: e["date"])
 
-    # 4) Build one row per event
+    # 4) Build one row per event, formatting all times as H:MM
     rows = []
     flight_no = 0
 
     for ev in events:
+        date = ev["date"]
+
         if ev["type"] == "flight":
             f = ev["obj"]
-            flight_no += 1
-            # start a fresh row
-            row = {
-                "date":        ev["date"],
-                "flight_no":   flight_no,
-                "model":       f.glider.model if f.glider else 'Private',
-                "n_number":    f.glider.n_number if f.glider else "Private",
-                "A":           1 if f.launch_method=="tow" else 0,
-                "G":           1 if f.launch_method=="winch" else 0,
-                "S":           1 if f.launch_method=="self" else 0,
-                "release":     f.release_altitude or "",
-                "maxh":        "", # always blank
-                "airfield":    f.airfield.identifier if f.airfield else "",
-                "ground_inst": 0.0,
-                "dual_received": 0.0,
-                "solo":          0.0,
-                "pic":           0.0,
-                "inst_given":    0.0,
-                "total":         0.0,
-                "comments":      "",
-            }
-            # allocate flight time
-            dur = (f.duration.total_seconds()/3600) if f.duration else 0.0
-            row["total"] = dur
-            # pilot vs instructor vs passenger logic
+            is_pilot = (f.pilot_id == member.id)
+            if is_pilot:
+                flight_no += 1
 
-            # - you as pilot -
+            # compute raw minute counts
+            dur_m      = int(f.duration.total_seconds()//60) if f.duration else 0
+            dual_m     = solo_m = pic_m = inst_m = 0
+
+            # allocate time by role
             if f.pilot_id == member.id:
                 if f.instructor:
-                    if rating_date and ev["date"] >= rating_date:
-                        row["pic"] = dur
+                    if rating_date and date >= rating_date:
+                        pic_m += dur_m
                     else:
-                        row["dual_received"] = dur
+                        dual_m += dur_m
                 else:
-                    row["solo"] = dur
-                    row["pic"]  = dur
-            # - you as instructor - 
+                    solo_m += dur_m
+                    pic_m  += dur_m
             elif f.instructor_id == member.id:
-                row["inst_given"] = dur
-                student = f.pilot or f.passenger
-                row["comments"] = student.full_display_name if student else ""
-            # - you as pilot and carrying a passenger, show passenger name -
+                inst_m = dur_m
+            # passengers get no time allocations
+
+            # build the row
+            row = {
+                "date":        date,
+                "flight_no":   flight_no if is_pilot else "",
+                "model":       f.glider.model           if f.glider else "",
+                "n_number":    f.glider.n_number        if f.glider else "Private",
+                "A":           1 if f.launch_method=="tow"   else 0,
+                "G":           1 if f.launch_method=="winch" else 0,
+                "S":           1 if f.launch_method=="self"  else 0,
+                "release":     f.release_altitude or "",
+                "maxh":        "",  # always blank
+                "airfield":    f.airfield.identifier if f.airfield else "",
+                "ground_inst": "",
+                "ground_inst_m": 0,
+                "dual_received": format_hhmm(timedelta(minutes=dual_m)),
+                "solo":          format_hhmm(timedelta(minutes=solo_m)),
+                "pic":           format_hhmm(timedelta(minutes=pic_m)),
+                "inst_given":    format_hhmm(timedelta(minutes=inst_m)),
+                "total":         format_hhmm(timedelta(minutes=dur_m)),
+                # raw-minute fields for summing
+                "dual_received_m": dual_m,
+                "solo_m":          solo_m,
+                "pic_m":           pic_m,
+                "inst_given_m":    inst_m,
+                "total_m":         dur_m,
+                "comments":      "",
+            }
+
+            # passenger name when you're PIC
             if f.pilot_id == member.id and f.passenger:
                 row["comments"] = f.passenger.full_display_name
+            # student name when you're instructing
+            elif f.instructor_id == member.id and f.pilot:
+                row["comments"] = f.pilot.full_display_name
+
             rows.append(row)
 
-        else:  # ground session
+        else:  # ground instruction
             g = ev["obj"]
+            gm = int(g.duration.total_seconds()//60) if g.duration else 0
             row = {
-                "date":        ev["date"],
-                "flight_no":   "",
-                "n_number":    "",
-                "A":           0, "G": 0, "S": 0,
-                "release":     "",
-                "maxh":        "",
-                "airfield":    "",
-                "ground_inst": (g.duration.total_seconds()/3600) if g.duration else 0.0,
-                "dual_received": 0.0,
-                "solo":          0.0,
-                "pic":           0.0,
-                "inst_given":    0.0,
-                "total":         0.0,
+                "date":         date,
+                "flight_no":    "",
+                "model":        "",
+                "n_number":     "",
+                "A":            0, "G": 0, "S": 0,
+                "release":      "",
+                "maxh":         "",
+                "location":     g.location,
                 "comments":      ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
+
+                "ground_inst":      format_hhmm(timedelta(minutes=gm)),
+                "dual_received":    "",
+                "solo":             "",
+                "pic":              "",
+                "inst_given":       "",
+                "total":            "",
+                "comments":         ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
+                # raw-minute fields (all zero except ground_inst_m)
+                "ground_inst_m":    gm,
+                "dual_received_m":  0,
+                "solo_m":           0,
+                "pic_m":            0,
+                "inst_given_m":     0,
+                "total_m":          0,
             }
             rows.append(row)
 
     # 5) Paginate into 10-row pages with per-page totals
+
     pages = []
-    cumulative = {
-        'ground_inst':0, 'dual_received':0, 'solo':0,
-        'pic':0, 'inst_given':0, 'total':0,
+    cumulative_m = {
+        'ground_inst_m':0, 'dual_received_m':0, 'solo_m':0,
+        'pic_m':0, 'inst_given_m':0, 'total_m':0,
         'A':0, 'G':0, 'S':0
     }
 
     for idx in range(0, len(rows), 10):
         chunk = rows[idx:idx+10]
-        sums = {
-            'ground_inst':   sum(r['ground_inst']   for r in chunk),
-            'dual_received': sum(r['dual_received'] for r in chunk),
-            'solo':          sum(r['solo']          for r in chunk),
-            'pic':           sum(r['pic']           for r in chunk),
-            'inst_given':    sum(r['inst_given']    for r in chunk),
-            'total':         sum(r['total']         for r in chunk),
-            'A':             sum(r['A'] for r in chunk),
-            'G':             sum(r['G'] for r in chunk),
-            'S':             sum(r['S'] for r in chunk),
+
+        # sum raw-minute columns and A/G/S flags
+        sums_m = {
+            'ground_inst_m': sum(r['ground_inst_m'] for r in chunk),
+            'dual_received_m': sum(r['dual_received_m'] for r in chunk),
+            'solo_m':          sum(r['solo_m']          for r in chunk),
+            'pic_m':           sum(r['pic_m']           for r in chunk),
+            'inst_given_m':    sum(r['inst_given_m']    for r in chunk),
+            'total_m':         sum(r['total_m']         for r in chunk),
+            'A':               sum(r['A'] for r in chunk),
+            'G':               sum(r['G'] for r in chunk),
+            'S':               sum(r['S'] for r in chunk),
         }
-        # update running cumulative totals
-        for key, val in sums.items():
-            cumulative[key] += val
-        pages.append({
-            'rows':       chunk,
-            'sums':       sums,
-            'cumulative': cumulative.copy()
-        })
+
+        # update running raw-minute totals
+        for k, v in sums_m.items():
+            cumulative_m[k] += v
+
+        # now format H:MM for display
+        sums = {
+            'ground_inst':   format_hhmm(timedelta(minutes=sums_m['ground_inst_m'])),
+            'dual_received': format_hhmm(timedelta(minutes=sums_m['dual_received_m'])),
+            'solo':          format_hhmm(timedelta(minutes=sums_m['solo_m'])),
+            'pic':           format_hhmm(timedelta(minutes=sums_m['pic_m'])),
+            'inst_given':    format_hhmm(timedelta(minutes=sums_m['inst_given_m'])),
+            'total':         format_hhmm(timedelta(minutes=sums_m['total_m'])),
+            'A':             sums_m['A'],
+            'G':             sums_m['G'],
+            'S':             sums_m['S'],
+        }
+
+        # and running totals formatted
+        cumulative = {
+            'ground_inst':   format_hhmm(timedelta(minutes=cumulative_m['ground_inst_m'])),
+            'dual_received': format_hhmm(timedelta(minutes=cumulative_m['dual_received_m'])),
+            'solo':          format_hhmm(timedelta(minutes=cumulative_m['solo_m'])),
+            'pic':           format_hhmm(timedelta(minutes=cumulative_m['pic_m'])),
+            'inst_given':    format_hhmm(timedelta(minutes=cumulative_m['inst_given_m'])),
+            'total':         format_hhmm(timedelta(minutes=cumulative_m['total_m'])),
+            'A':             cumulative_m['A'],
+            'G':             cumulative_m['G'],
+            'S':             cumulative_m['S'],
+        }
+
+        pages.append({'rows': chunk, 'sums': sums, 'cumulative': cumulative})
 
     return render(request, "instructors/logbook.html", {
         "member": member,
