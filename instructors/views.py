@@ -834,12 +834,13 @@ def member_logbook(request):
             row = {
                 "date":        ev["date"],
                 "flight_no":   flight_no,
+                "model":       f.glider.model if f.glider else 'Private',
                 "n_number":    f.glider.n_number if f.glider else "Private",
                 "A":           1 if f.launch_method=="tow" else 0,
                 "G":           1 if f.launch_method=="winch" else 0,
                 "S":           1 if f.launch_method=="self" else 0,
                 "release":     f.release_altitude or "",
-                "maxh":        f.release_altitude or "",
+                "maxh":        "", # always blank
                 "airfield":    f.airfield.identifier if f.airfield else "",
                 "ground_inst": 0.0,
                 "dual_received": 0.0,
@@ -853,6 +854,8 @@ def member_logbook(request):
             dur = (f.duration.total_seconds()/3600) if f.duration else 0.0
             row["total"] = dur
             # pilot vs instructor vs passenger logic
+
+            # - you as pilot -
             if f.pilot_id == member.id:
                 if f.instructor:
                     if rating_date and ev["date"] >= rating_date:
@@ -862,11 +865,14 @@ def member_logbook(request):
                 else:
                     row["solo"] = dur
                     row["pic"]  = dur
+            # - you as instructor - 
             elif f.instructor_id == member.id:
                 row["inst_given"] = dur
                 student = f.pilot or f.passenger
                 row["comments"] = student.full_display_name if student else ""
-            # passengers get no columns
+            # - you as pilot and carrying a passenger, show passenger name -
+            if f.pilot_id == member.id and f.passenger:
+                row["comments"] = f.passenger.full_display_name
             rows.append(row)
 
         else:  # ground session
@@ -891,6 +897,12 @@ def member_logbook(request):
 
     # 5) Paginate into 10-row pages with per-page totals
     pages = []
+    cumulative = {
+        'ground_inst':0, 'dual_received':0, 'solo':0,
+        'pic':0, 'inst_given':0, 'total':0,
+        'A':0, 'G':0, 'S':0
+    }
+
     for idx in range(0, len(rows), 10):
         chunk = rows[idx:idx+10]
         sums = {
@@ -900,8 +912,18 @@ def member_logbook(request):
             'pic':           sum(r['pic']           for r in chunk),
             'inst_given':    sum(r['inst_given']    for r in chunk),
             'total':         sum(r['total']         for r in chunk),
+            'A':             sum(r['A'] for r in chunk),
+            'G':             sum(r['G'] for r in chunk),
+            'S':             sum(r['S'] for r in chunk),
         }
-        pages.append({'rows': chunk, 'sums': sums})
+        # update running cumulative totals
+        for key, val in sums.items():
+            cumulative[key] += val
+        pages.append({
+            'rows':       chunk,
+            'sums':       sums,
+            'cumulative': cumulative.copy()
+        })
 
     return render(request, "instructors/logbook.html", {
         "member": member,

@@ -13,10 +13,11 @@
 <h2>Logbook for {{ member.full_display_name }}</h2>
 
 {% for page in pages %}
-  <table class="table table-bordered table-sm mb-1">
+
+<table class="table table-bordered table-sm mb-1">
     <thead class="table-dark">
       <tr>
-        <th>Date</th><th>#</th><th>Glider</th>
+        <th>Date</th><th>#</th><th>Model</th><th>Glider</th>
         <th>A</th><th>G</th><th>S</th>
         <th>Release</th><th>Max</th><th>Airfield</th>
         <th class="text-end">Gnd Inst</th>
@@ -30,29 +31,35 @@
     </thead>
     <tbody>
       {% for r in page.rows %}
-      <tr>
-        <td>{{ r.date|date:"Y-m-d" }}</td>
-        <td class="text-end">{{ r.flight_no }}</td>
-        <td>{{ r.n_number }}</td>
-        <td class="text-end">{{ r.A }}</td>
-        <td class="text-end">{{ r.G }}</td>
-        <td class="text-end">{{ r.S }}</td>
-        <td class="text-end">{{ r.release }}</td>
-        <td class="text-end">{{ r.maxh }}</td>
-        <td>{{ r.airfield }}</td>
-        <td class="text-end">{{ r.ground_inst|floatformat:2 }}</td>
-        <td class="text-end">{{ r.dual_received|floatformat:2 }}</td>
-        <td class="text-end">{{ r.solo|floatformat:2 }}</td>
-        <td class="text-end">{{ r.pic|floatformat:2 }}</td>
-        <td class="text-end">{{ r.inst_given|floatformat:2 }}</td>
-        <td class="text-end">{{ r.total|floatformat:2 }}</td>
-        <td>{{ r.comments }}</td>
-      </tr>
+        <tr>
+          <td>{{ r.date|date:"Y-m-d" }}</td>
+          <td class="text-end">{{ r.flight_no }}</td>
+          <td>{{ r.model }}</td>
+          <td>{{ r.n_number }}</td>
+          <td class="text-end">{{ r.A }}</td>
+          <td class="text-end">{{ r.G }}</td>
+          <td class="text-end">{{ r.S }}</td>
+          <td class="text-end">{{ r.release }}</td>
+          <td class="text-end">{{ r.maxh }}</td>
+          <td>{{ r.airfield }}</td>
+          <td class="text-end">{{ r.ground_inst|floatformat:2 }}</td>
+          <td class="text-end">{{ r.dual_received|floatformat:2 }}</td>
+          <td class="text-end">{{ r.solo|floatformat:2 }}</td>
+          <td class="text-end">{{ r.pic|floatformat:2 }}</td>
+          <td class="text-end">{{ r.inst_given|floatformat:2 }}</td>
+          <td class="text-end">{{ r.total|floatformat:2 }}</td>
+          <td>{{ r.comments }}</td>
+        </tr>
       {% endfor %}
-
-      {# Page totals row #}
+  
+      {# Page Totals #}
       <tr class="table-secondary fw-bold">
-        <td colspan="9" class="text-end">Page Totals:</td>
+        <td colspan="3" class="text-end">Page Totals:</td>
+        <td></td>
+        <td class="text-end">{{ page.sums.A }}</td>
+        <td class="text-end">{{ page.sums.G }}</td>
+        <td class="text-end">{{ page.sums.S }}</td>
+        <td colspan="3"></td>
         <td class="text-end">{{ page.sums.ground_inst|floatformat:2 }}</td>
         <td class="text-end">{{ page.sums.dual_received|floatformat:2 }}</td>
         <td class="text-end">{{ page.sums.solo|floatformat:2 }}</td>
@@ -61,8 +68,27 @@
         <td class="text-end">{{ page.sums.total|floatformat:2 }}</td>
         <td></td>
       </tr>
+  
+      {# Running Totals #}
+      <tr class="table-info fw-bold">
+        <td colspan="3" class="text-end">Running Totals:</td>
+        <td></td>
+        <td class="text-end">{{ page.cumulative.A }}</td>
+        <td class="text-end">{{ page.cumulative.G }}</td>
+        <td class="text-end">{{ page.cumulative.S }}</td>
+        <td colspan="3"></td>
+        <td class="text-end">{{ page.cumulative.ground_inst|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.dual_received|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.solo|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.pic|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.inst_given|floatformat:2 }}</td>
+        <td class="text-end">{{ page.cumulative.total|floatformat:2 }}</td>
+        <td></td>
+      </tr>
+  
     </tbody>
   </table>
+  
 
   {% if not forloop.last %}
     <div class="page-break"></div>
