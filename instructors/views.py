@@ -834,67 +834,89 @@ def member_logbook(request):
     flight_no = 0
 
     for ev in events:
-        date = ev["date"]
-
         if ev["type"] == "flight":
             f = ev["obj"]
-            is_pilot = (f.pilot_id == member.id)
-            if is_pilot:
+            date = ev["date"]
+    
+            # Roles
+            is_pilot      = (f.pilot_id      == member.id)
+            is_instructor = (f.instructor_id == member.id)
+            is_passenger  = (f.passenger_id  == member.id)
+    
+            # 1) Flight #: increment for pilot OR instructor
+            if is_pilot or is_instructor:
                 flight_no += 1
-
-            # compute raw minute counts
-            dur_m      = int(f.duration.total_seconds()//60) if f.duration else 0
-            dual_m     = solo_m = pic_m = inst_m = 0
-
-            # allocate time by role
-            if f.pilot_id == member.id:
+    
+            # Raw minutes
+            dur_m   = int(f.duration.total_seconds()//60) if f.duration else 0
+            dual_m  = solo_m = pic_m = inst_m = 0
+            comments = ""
+    
+            # 2) Pilot logic: instruction received vs lesson codes
+            if is_pilot:
                 if f.instructor:
+                    # Received dual / PIC
                     if rating_date and date >= rating_date:
                         pic_m += dur_m
                     else:
                         dual_m += dur_m
+    
+                    # Look up the instructor report
+                    rpt = InstructionReport.objects.filter(
+                        student=member,
+                        instructor=f.instructor,
+                        report_date=date
+                    ).first()
+    
+                    if rpt:
+                        codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
+                        comments = f"{','.join(codes)} /s/ {f.instructor.full_display_name}"
+                    else:
+                        comments = "instruction received"
                 else:
+                    # Solo flight
                     solo_m += dur_m
                     pic_m  += dur_m
-            elif f.instructor_id == member.id:
-                inst_m = dur_m
-            # passengers get no time allocations
+    
+            # 3) Passenger logic: show "Pilot (You)"
+            elif is_passenger:
+                comments = f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
 
-            # build the row
+            # 4) Instructor logic: inst_given + PIC
+            elif is_instructor:
+                inst_m += dur_m
+                pic_m  += dur_m
+                student = f.pilot or f.passenger
+                if student:
+                    comments = student.full_display_name
+    
+            # Build the row
             row = {
-                "date":        date,
-                "flight_no":   flight_no if is_pilot else "",
-                "model":       f.glider.model           if f.glider else "",
-                "n_number":    f.glider.n_number        if f.glider else "Private",
-                "A":           1 if f.launch_method=="tow"   else 0,
-                "G":           1 if f.launch_method=="winch" else 0,
-                "S":           1 if f.launch_method=="self"  else 0,
-                "release":     f.release_altitude or "",
-                "maxh":        "",  # always blank
-                "airfield":    f.airfield.identifier if f.airfield else "",
-                "ground_inst": "",
-                "ground_inst_m": 0,
-                "dual_received": format_hhmm(timedelta(minutes=dual_m)),
-                "solo":          format_hhmm(timedelta(minutes=solo_m)),
-                "pic":           format_hhmm(timedelta(minutes=pic_m)),
-                "inst_given":    format_hhmm(timedelta(minutes=inst_m)),
-                "total":         format_hhmm(timedelta(minutes=dur_m)),
-                # raw-minute fields for summing
-                "dual_received_m": dual_m,
-                "solo_m":          solo_m,
-                "pic_m":           pic_m,
-                "inst_given_m":    inst_m,
-                "total_m":         dur_m,
-                "comments":      "",
+                "date":           date,
+                "flight_no":      flight_no if (is_pilot or is_instructor) else "",
+                "model":          f.glider.model    if f.glider else "",
+                "n_number":       f.glider.n_number if f.glider else "Private",
+                "A":              1 if f.launch_method=="tow"   else 0,
+                "G":              1 if f.launch_method=="winch" else 0,
+                "S":              1 if f.launch_method=="self"  else 0,
+                "release":        f.release_altitude or "",
+                "maxh":           "",  # always blank
+                "airfield":       f.airfield.identifier if f.airfield else "",
+                "ground_inst":    "",  # flight row
+                "dual_received":  format_hhmm(timedelta(minutes=dual_m)),
+                "solo":           format_hhmm(timedelta(minutes=solo_m)),
+                "pic":            format_hhmm(timedelta(minutes=pic_m)),
+                "inst_given":     format_hhmm(timedelta(minutes=inst_m)),
+                "total":          format_hhmm(timedelta(minutes=dur_m)),
+                # raw-minute keys for page/run totals
+                "ground_inst_m":  0,
+                "dual_received_m":dual_m,
+                "solo_m":         solo_m,
+                "pic_m":          pic_m,
+                "inst_given_m":   inst_m,
+                "total_m":        dur_m,
+                "comments":       comments,
             }
-
-            # passenger name when you're PIC
-            if f.pilot_id == member.id and f.passenger:
-                row["comments"] = f.passenger.full_display_name
-            # student name when you're instructing
-            elif f.instructor_id == member.id and f.pilot:
-                row["comments"] = f.pilot.full_display_name
-
             rows.append(row)
 
         else:  # ground instruction
