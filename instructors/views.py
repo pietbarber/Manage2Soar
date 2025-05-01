@@ -790,122 +790,104 @@ def member_logbook(request):
     flights = Flight.objects.filter(pilot=member).select_related(
         'glider','instructor','airfield','logsheet','passenger'
     ).order_by('logsheet__log_date')
+
+    # 1) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
+    from django.db.models import Q
+    flights = (
+        Flight.objects
+        .filter(
+            Q(pilot=member) |
+            Q(instructor=member) |
+            Q(passenger=member)
+        )
+        .select_related('glider','instructor','passenger','airfield','logsheet')
+        .order_by('logsheet__log_date')
+    )
+
     grounds = GroundInstruction.objects.filter(student=member).prefetch_related(
         'lesson_scores__lesson'
     ).order_by('date')
+
 
     # 2) Approximate rating_date = first time they carried a passenger
     first_pax = flights.filter(passenger__isnull=False).order_by('logsheet__log_date').first()
     rating_date = first_pax.logsheet.log_date if first_pax else None
 
     # 3) Merge flights+grounds by (date, instructor) to one row
-    entries = OrderedDict()
+
+    events = []
     for f in flights:
-        key = (f.logsheet.log_date, f.instructor and f.instructor.id)
-        entries.setdefault(key, {'date': f.logsheet.log_date,
-                                 'instructor': f.instructor,
-                                 'flights': [], 'grounds': []})
-        entries[key]['flights'].append(f)
-
+        events.append({"type": "flight", "obj": f, "date": f.logsheet.log_date})
     for g in grounds:
-        key = (g.date, g.instructor and g.instructor.id)
-        entries.setdefault(key, {'date': g.date,
-                                 'instructor': g.instructor,
-                                 'flights': [], 'grounds': []})
-        entries[key]['grounds'].append(g)
+        events.append({"type": "ground", "obj": g, "date": g.date})
+    events.sort(key=lambda e: e["date"])
 
-    # 4) Build a list of rows with exactly the fields you need
+    # 4) Build one row per event
     rows = []
     flight_no = 0
 
-    for (date, _), grp in entries.items():
-        flight_no += 1
-        row = {
-            'date': date,
-            'flight_no': flight_no,
-            'n_number': '',
-            'A': 0, 'G': 0, 'S': 0,
-            'release': '',
-            'maxh': '',
-            'airfield': '',
-            'ground_inst': 0.0,
-            'dual_received': 0.0,
-            'solo': 0.0,
-            'pic': 0.0,
-            'inst_given': 0.0,
-            'total': 0.0,
-            'comments': '',
-        }
-
-        # 4a) Flights
-        total_flight_time = 0.0
-        for f in grp['flights']:
-            # duration in hours
-            dur = (f.duration.total_seconds() / 3600) if f.duration else 0.0
-            total_flight_time += dur
-
-            # A/G/S flags
-            if f.launch_method == 'tow':
-                row['A'] = 1
-            elif f.launch_method == 'winch':
-                row['G'] = 1
-            elif f.launch_method == 'self':
-                row['S'] = 1
-
-            # glider info
-            if f.glider:
-                row['n_number'] = f.glider.n_number
-            else:
-                row['n_number'] = "Private"
-
-            row['release'] = f.release_altitude or ''
-            row['maxh'] = f.release_altitude or ''
-            row['airfield'] = f.airfield.name if f.airfield else ''
-
-            # dual vs solo vs PIC
-            if f.instructor:
-                # student flying with an instructor
-                if rating_date and date >= rating_date:
-                    # time with instructor after rating_date counts as PIC
-                    row['pic'] += dur
+    for ev in events:
+        if ev["type"] == "flight":
+            f = ev["obj"]
+            flight_no += 1
+            # start a fresh row
+            row = {
+                "date":        ev["date"],
+                "flight_no":   flight_no,
+                "n_number":    f.glider.n_number if f.glider else "Private",
+                "A":           1 if f.launch_method=="tow" else 0,
+                "G":           1 if f.launch_method=="winch" else 0,
+                "S":           1 if f.launch_method=="self" else 0,
+                "release":     f.release_altitude or "",
+                "maxh":        f.release_altitude or "",
+                "airfield":    f.airfield.identifier if f.airfield else "",
+                "ground_inst": 0.0,
+                "dual_received": 0.0,
+                "solo":          0.0,
+                "pic":           0.0,
+                "inst_given":    0.0,
+                "total":         0.0,
+                "comments":      "",
+            }
+            # allocate flight time
+            dur = (f.duration.total_seconds()/3600) if f.duration else 0.0
+            row["total"] = dur
+            # pilot vs instructor vs passenger logic
+            if f.pilot_id == member.id:
+                if f.instructor:
+                    if rating_date and ev["date"] >= rating_date:
+                        row["pic"] = dur
+                    else:
+                        row["dual_received"] = dur
                 else:
-                    # pre-rating or true dual counts as dual received
-                    row['dual_received'] += dur
-                # also, if this member *is* the instructor
-                if f.instructor == member:
-                    row['inst_given'] += dur
-            else:
-                # purely solo
-                row['solo'] += dur
-                row['pic']  += dur
+                    row["solo"] = dur
+                    row["pic"]  = dur
+            elif f.instructor_id == member.id:
+                row["inst_given"] = dur
+                student = f.pilot or f.passenger
+                row["comments"] = student.full_display_name if student else ""
+            # passengers get no columns
+            rows.append(row)
 
-        row['total'] = total_flight_time
-
-        # 4b) Ground instruction
-        ground_hours = sum(
-            (g.duration.total_seconds() / 3600) for g in grp['grounds']
-            if g.duration
-        )
-        row['ground_inst'] = ground_hours
-
-        # 4c) Comments: lesson codes + /s/ instructor name
-        codes = []
-        if grp['flights']:
-            for f in grp['flights']:
-                rpt = InstructionReport.objects.filter(
-                    student=member,
-                    instructor=f.instructor,
-                    report_date=f.logsheet.log_date
-                ).first()
-                if rpt:
-                    codes.extend(ls.lesson.code for ls in rpt.lesson_scores.all())
-                    codes.append(f"/s/ {f.instructor.full_display_name}")
-        elif grp['grounds']:
-            for g in grp['grounds']:
-                codes.extend(ls.lesson.code for ls in g.lesson_scores.all())
-        row['comments'] = ", ".join(codes)
-
-        rows.append(row)
+        else:  # ground session
+            g = ev["obj"]
+            row = {
+                "date":        ev["date"],
+                "flight_no":   "",
+                "n_number":    "",
+                "A":           0, "G": 0, "S": 0,
+                "release":     "",
+                "maxh":        "",
+                "airfield":    "",
+                "ground_inst": (g.duration.total_seconds()/3600) if g.duration else 0.0,
+                "dual_received": 0.0,
+                "solo":          0.0,
+                "pic":           0.0,
+                "inst_given":    0.0,
+                "total":         0.0,
+                "comments":      ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
+            }
+            rows.append(row)
 
     # 5) Paginate into 10-row pages with per-page totals
     pages = []
