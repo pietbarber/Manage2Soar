@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block head_extra %}
+  <style>
+    @page { size: landscape; margin: 0.5cm; }
+    .page-break { page-break-before: always; }
+    table { width: 100%; font-size: 0.85rem; }
+    th, td { white-space: nowrap; padding: 0.2rem 0.4rem; }
+    .text-end { text-align: right; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<h2>Logbook for {{ member.full_display_name }}</h2>
+
+{% for page in pages %}
+  <table class="table table-bordered table-sm mb-1">
+    <thead class="table-dark">
+      <tr>
+        <th>Date</th><th>#</th><th>Glider</th>
+        <th>A</th><th>G</th><th>S</th>
+        <th>Release</th><th>Max</th><th>Airfield</th>
+        <th class="text-end">Gnd Inst</th>
+        <th class="text-end">Dual</th>
+        <th class="text-end">Solo</th>
+        <th class="text-end">PIC</th>
+        <th class="text-end">Inst</th>
+        <th class="text-end">Total</th>
+        <th>Comments</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in page.rows %}
+      <tr>
+        <td>{{ r.date|date:"Y-m-d" }}</td>
+        <td class="text-end">{{ r.flight_no }}</td>
+        <td>{{ r.n_number }}</td>
+        <td class="text-end">{{ r.A }}</td>
+        <td class="text-end">{{ r.G }}</td>
+        <td class="text-end">{{ r.S }}</td>
+        <td class="text-end">{{ r.release }}</td>
+        <td class="text-end">{{ r.maxh }}</td>
+        <td>{{ r.airfield }}</td>
+        <td class="text-end">{{ r.ground_inst|floatformat:2 }}</td>
+        <td class="text-end">{{ r.dual_received|floatformat:2 }}</td>
+        <td class="text-end">{{ r.solo|floatformat:2 }}</td>
+        <td class="text-end">{{ r.pic|floatformat:2 }}</td>
+        <td class="text-end">{{ r.inst_given|floatformat:2 }}</td>
+        <td class="text-end">{{ r.total|floatformat:2 }}</td>
+        <td>{{ r.comments }}</td>
+      </tr>
+      {% endfor %}
+
+      {# Page totals row #}
+      <tr class="table-secondary fw-bold">
+        <td colspan="9" class="text-end">Page Totals:</td>
+        <td class="text-end">{{ page.sums.ground_inst|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.dual_received|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.solo|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.pic|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.inst_given|floatformat:2 }}</td>
+        <td class="text-end">{{ page.sums.total|floatformat:2 }}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% if not forloop.last %}
+    <div class="page-break"></div>
+  {% endif %}
+{% endfor %}
+{% endblock %}
