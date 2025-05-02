@@ -11,6 +11,16 @@ import psycopg2
 from django.conf import settings
 from logsheet.models import Airfield
 from logsheet.utils.aliases import resolve_towplane
+import logging
+
+# —————— configure a logger for this script ——————
+logger = logging.getLogger("import_legacy_flights")
+logger.setLevel(logging.INFO)
+fh = logging.FileHandler("import_legacy_flights.log")
+fh.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
 
 
@@ -55,6 +65,7 @@ GLIDER_ALIASES = [
     {"legacy_name": "470", "n_number": "N470BD"},
     {"legacy_name": "HR", "n_number": "N84HR"},
     {"legacy_name": "SF", "n_number": "N8RX"},
+    {"legacy_name": "517", "n_number": "N1137S"},
     {"legacy_name": "LAK12", "n_number": "N12LY"},
     {"legacy_name": "N12LY", "n_number": "N12LY"},
     {"legacy_name": "LAK-12", "n_number": "N12LY"},
@@ -101,13 +112,22 @@ def resolve_glider(legacy_name, flight_date):
     print(f"⚠️  Glider not resolved for legacy name '{legacy_name}' on {flight_date}")
     return None
 
+
+
+#########################################
+#  find_member_by_name
+# 
+# Tries to match a name to legacy_username first, then falls back to first_name + last name. 
+
 def find_member_by_name(name):
-    """
-    Tries to match a name to legacy_username first, then falls back to first_name + last_name.
-    """
     if not name:
         return None
     name = name.strip()
+
+    # 0) direct username match
+    user = Member.objects.filter(username__iexact=name).first()
+    if user:
+        return user
 
     # 1. Match legacy_username
     member = Member.objects.filter(legacy_username__iexact=name).first()
@@ -247,6 +267,14 @@ class Command(BaseCommand):
 
             # Only delete if towplane is missing or incorrect
             if existing_flight and (existing_flight.towplane is None or existing_flight.towplane != towplane_obj):
+               logger.warning(
+                   "Removing old flight id=%s date=%s pilot=%s (towplane changed from %s to %s)",
+                   existing_flight.id,
+                   data['flight_date'],
+                   data['pilot'],
+                   existing_flight.towplane.identifier if existing_flight.towplane else None,
+                   towplane_obj.identifier if towplane_obj else None
+               )
                print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
                existing_flight.delete()
 
@@ -285,7 +313,7 @@ class Command(BaseCommand):
                 notes="",
             )
 
-            flight.launch_method = infer_launch_method(data["towpilot"])
+            flight.launch_method = infer_launch_method(data["towplane"])
             flight.save()
 
         print(f"\n✅ Imported {count} flights.")
@@ -302,15 +330,12 @@ def parse_money(val):
         return None
 
 
-def infer_launch_method(towpilot_name):
-    if not towpilot_name:
-        return "tow"
-    towpilot_name = towpilot_name.lower()
-    if "winch" in towpilot_name:
+def infer_launch_method(towplane_name):
+    text = (towplane_name or "").strip().lower()
+    if "winch" in text:
         return "winch"
-    elif "self-launch" in towpilot_name:
+    if "self" in text or "sl" in text:
         return "self"
-    elif "other" in towpilot_name:
+    if "other" in text:
         return "other"
-    else:
-        return "tow"
+    return "tow"
