@@ -7,7 +7,7 @@ import qrcode
 from io import BytesIO
 from django.http import HttpResponse 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from .decorators import instructor_required
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib import messages
@@ -821,13 +821,26 @@ def member_logbook(request):
     first_pax = flights.filter(passenger__isnull=False).order_by('logsheet__log_date').first()
     rating_date = first_pax.logsheet.log_date if first_pax else None
 
-    # 3) Flatten flights & grounds into a single timeline of events
+    # 3) Flatten flights & grounds into a single timeline of events, capturing time
     events = []
     for f in flights:
-        events.append({"type": "flight", "obj": f, "date": f.logsheet.log_date})
+        events.append({
+            "type": "flight",
+            "obj":   f,
+            "date":  f.logsheet.log_date,
+            "time":  f.launch_time or time(0, 0)
+        })
     for g in grounds:
-        events.append({"type": "ground", "obj": g, "date": g.date})
-    events.sort(key=lambda e: e["date"])
+        events.append({
+            "type": "ground",
+            "obj":   g,
+            "date":  g.date,
+            # ground sessions have no takeoff time; sort them first
+            "time":  time(0, 0)
+        })
+    # sort by date then time
+    events.sort(key=lambda e: (e["date"], e["time"]))
+
 
     # 4) Build one row per event, formatting all times as H:MM
     rows = []
@@ -878,11 +891,11 @@ def member_logbook(request):
                     solo_m += dur_m
                     pic_m  += dur_m
     
-            # 3) Passenger logic: show "Pilot (You)"
+            # 5) Passenger logic: show "Pilot (You)"
             elif is_passenger:
                 comments = f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
 
-            # 4) Instructor logic: inst_given + PIC
+            # 6) Instructor logic: inst_given + PIC
             elif is_instructor:
                 inst_m += dur_m
                 pic_m  += dur_m
