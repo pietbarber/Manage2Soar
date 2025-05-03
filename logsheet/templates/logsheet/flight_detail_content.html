@@ -1,10 +1,13 @@
 <div class="modal-header">
 <h2>Flight Details</h2>
-<p><strong>Flight ID:</strong> {{ flight.id }}</p>
+{% if is_modal %}
+<br><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{% endif %} 
 </div>
 <div class="modal-body">
 <h4>📅 General Info</h4>
 <ul>
+  <li><strong>Flight ID:</strong> {{ flight.id }}</li>
   <li><strong>Date:</strong> {{ flight.logsheet.log_date }}</li>
   <li><strong>Airfield:</strong> {{ flight.airfield }}</li>
   <li><strong>Glider:</strong> {{ flight.glider }}</li>
@@ -74,6 +77,9 @@
 <h4>📝 Notes</h4>
 <p>{{ flight.notes|linebreaksbr }}</p>
 </div>
+
+{% if is_modal %}
 <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 </div>
+{% endif %}
