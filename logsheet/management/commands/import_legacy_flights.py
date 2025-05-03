@@ -36,6 +36,7 @@ GLIDER_ALIASES = [
     {"legacy_name": "SGS 1-36", "n_number": "N3617B"},
     {"legacy_name": "6E", "n_number": "N6108J"},
     {"legacy_name": "N341KS", "n_number": "N341KS"},
+    {"legacy_name": "ASK-21", "n_number": "N341KS"},
     {"legacy_name": "N321K", "n_number": "N321K"},
     {"legacy_name": "N2671H", "n_number": "N2671H"},
     {"legacy_name": "CAPSTAN", "n_number": "N7475"},
