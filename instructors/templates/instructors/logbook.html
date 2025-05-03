@@ -47,8 +47,15 @@
           <td class="text-end">{{ r.solo }}</td>
           <td class="text-end">{{ r.pic }}</td>
           <td class="text-end">{{ r.inst_given }}</td>
-          <td class="text-end">{{ r.total }}</td>
-          <td class="text-start">{{ r.comments }}</td>
+          <td class="text-end">
+            {% if r.is_passenger %}
+              [{{ r.total }}]
+            {% else %}
+              {{ r.total }}
+            {% endif %}
+          </td>
+
+          <td class="text-start">{{ r.comments|safe }}</td>
         </tr>
       {% endfor %}
   
@@ -66,6 +73,8 @@
         <td class="text-end">{{ page.sums.pic }}</td>
         <td class="text-end">{{ page.sums.inst_given }}</td>
         <td class="text-end">{{ page.sums.total }}</td>
+        </td>
+
         <td></td>
       </tr>
   

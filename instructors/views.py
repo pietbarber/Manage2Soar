@@ -799,7 +799,7 @@ def member_logbook(request):
         'glider','instructor','airfield','logsheet','passenger'
     ).order_by('logsheet__log_date')
 
-    # 1) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
+    # 2) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
     from django.db.models import Q
     flights = (
         Flight.objects
@@ -817,11 +817,11 @@ def member_logbook(request):
     ).order_by('date')
 
 
-    # 2) Approximate rating_date = first time they carried a passenger
+    # 3) Approximate rating_date = first time they carried a passenger
     first_pax = flights.filter(passenger__isnull=False).order_by('logsheet__log_date').first()
     rating_date = first_pax.logsheet.log_date if first_pax else None
 
-    # 3) Flatten flights & grounds into a single timeline of events, capturing time
+    # 4) Flatten flights & grounds into a single timeline of events, capturing time
     events = []
     for f in flights:
         events.append({
@@ -842,7 +842,7 @@ def member_logbook(request):
     events.sort(key=lambda e: (e["date"], e["time"]))
 
 
-    # 4) Build one row per event, formatting all times as H:MM
+    # 5) Build one row per event, formatting all times as H:MM
     rows = []
     flight_no = 0
 
@@ -856,7 +856,7 @@ def member_logbook(request):
             is_instructor = (f.instructor_id == member.id)
             is_passenger  = (f.passenger_id  == member.id)
     
-            # 1) Flight #: increment for pilot OR instructor
+            # 5a) Flight #: increment for pilot OR instructor
             if is_pilot or is_instructor:
                 flight_no += 1
     
@@ -865,7 +865,7 @@ def member_logbook(request):
             dual_m  = solo_m = pic_m = inst_m = 0
             comments = ""
     
-            # 2) Pilot logic: instruction received vs lesson codes
+            # 5b) Pilot logic: instruction received vs lesson codes
             if is_pilot:
                 if f.instructor:
                     # Received dual / PIC
@@ -883,7 +883,7 @@ def member_logbook(request):
     
                     if rpt:
                         codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
-                        comments = f"{','.join(codes)} /s/ {f.instructor.full_display_name}"
+                        comments = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
                     else:
                         comments = "instruction received"
                 else:
@@ -891,27 +891,28 @@ def member_logbook(request):
                     solo_m += dur_m
                     pic_m  += dur_m
     
-            # 5) Passenger logic: show "Pilot (You)"
+            # 6) Passenger logic: show "Pilot (You)"
             elif is_passenger:
                 comments = f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
 
-            # 6) Instructor logic: inst_given + PIC
+            # 7) Instructor logic: inst_given + PIC
             elif is_instructor:
                 inst_m += dur_m
                 pic_m  += dur_m
                 student = f.pilot or f.passenger
                 if student:
                     comments = student.full_display_name
-    
+ 
             # Build the row
             row = {
                 "date":           date,
                 "flight_no":      flight_no if (is_pilot or is_instructor) else "",
                 "model":          f.glider.model    if f.glider else "",
                 "n_number":       f.glider.n_number if f.glider else "Private",
-                "A":              1 if f.launch_method=="tow"   else 0,
-                "G":              1 if f.launch_method=="winch" else 0,
-                "S":              1 if f.launch_method=="self"  else 0,
+                "is_passenger":   is_passenger,
+                "A":              (1 if f.launch_method=="tow"   else 0) if not is_passenger else 0,
+                "G":              (1 if f.launch_method=="winch" else 0) if not is_passenger else 0,
+                "S":              (1 if f.launch_method=="self"  else 0) if not is_passenger else 0,
                 "release":        f.release_altitude or "",
                 "maxh":           "",  # always blank
                 "airfield":       f.airfield.identifier if f.airfield else "",
@@ -923,11 +924,11 @@ def member_logbook(request):
                 "total":          format_hhmm(timedelta(minutes=dur_m)),
                 # raw-minute keys for page/run totals
                 "ground_inst_m":  0,
-                "dual_received_m":dual_m,
-                "solo_m":         solo_m,
-                "pic_m":          pic_m,
-                "inst_given_m":   inst_m,
-                "total_m":        dur_m,
+                "dual_received_m":dual_m if not is_passenger else 0,
+                "solo_m":         solo_m if not is_passenger else 0,
+                "pic_m":          pic_m if not is_passenger else 0,
+                "inst_given_m":   inst_m if not is_passenger else 0,
+                "total_m":        dur_m if not is_passenger else 0,
                 "comments":       comments,
             }
             rows.append(row)
@@ -940,6 +941,7 @@ def member_logbook(request):
                 "flight_no":    "",
                 "model":        "",
                 "n_number":     "",
+                "is_passenger": False,
                 "A":            0, "G": 0, "S": 0,
                 "release":      "",
                 "maxh":         "",
@@ -963,36 +965,36 @@ def member_logbook(request):
             }
             rows.append(row)
 
-    # 5) Paginate into 10-row pages with per-page totals
-
+    # 8) Paginate into 10-row pages with per-page totals
     pages = []
-    cumulative_m = {
-        'ground_inst_m':0, 'dual_received_m':0, 'solo_m':0,
-        'pic_m':0, 'inst_given_m':0, 'total_m':0,
-        'A':0, 'G':0, 'S':0
-    }
-
+    cumulative_m = {k: 0 for k in (
+        'ground_inst_m','dual_received_m','solo_m','pic_m','inst_given_m','total_m','A','G','S'
+    )}
+    
     for idx in range(0, len(rows), 10):
         chunk = rows[idx:idx+10]
-
-        # sum raw-minute columns and A/G/S flags
+    
+        # filter out passenger‐only rows once
+        non_passenger = [r for r in chunk if not r['is_passenger']]
+    
+        # now sum across that filtered list
         sums_m = {
-            'ground_inst_m': sum(r['ground_inst_m'] for r in chunk),
-            'dual_received_m': sum(r['dual_received_m'] for r in chunk),
-            'solo_m':          sum(r['solo_m']          for r in chunk),
-            'pic_m':           sum(r['pic_m']           for r in chunk),
-            'inst_given_m':    sum(r['inst_given_m']    for r in chunk),
-            'total_m':         sum(r['total_m']         for r in chunk),
-            'A':               sum(r['A'] for r in chunk),
-            'G':               sum(r['G'] for r in chunk),
-            'S':               sum(r['S'] for r in chunk),
+            'ground_inst_m':   sum(r['ground_inst_m']   for r in non_passenger),
+            'dual_received_m': sum(r['dual_received_m'] for r in non_passenger),
+            'solo_m':          sum(r['solo_m']          for r in non_passenger),
+            'pic_m':           sum(r['pic_m']           for r in non_passenger),
+            'inst_given_m':    sum(r['inst_given_m']    for r in non_passenger),
+            'total_m':         sum(r['total_m']         for r in non_passenger),
+            'A':               sum(r['A']               for r in non_passenger),
+            'G':               sum(r['G']               for r in non_passenger),
+            'S':               sum(r['S']               for r in non_passenger),
         }
-
-        # update running raw-minute totals
+    
+        # update running raw‐minute totals
         for k, v in sums_m.items():
             cumulative_m[k] += v
-
-        # now format H:MM for display
+    
+        # format for display…
         sums = {
             'ground_inst':   format_hhmm(timedelta(minutes=sums_m['ground_inst_m'])),
             'dual_received': format_hhmm(timedelta(minutes=sums_m['dual_received_m'])),
@@ -1004,8 +1006,7 @@ def member_logbook(request):
             'G':             sums_m['G'],
             'S':             sums_m['S'],
         }
-
-        # and running totals formatted
+    
         cumulative = {
             'ground_inst':   format_hhmm(timedelta(minutes=cumulative_m['ground_inst_m'])),
             'dual_received': format_hhmm(timedelta(minutes=cumulative_m['dual_received_m'])),
@@ -1017,7 +1018,6 @@ def member_logbook(request):
             'G':             cumulative_m['G'],
             'S':             cumulative_m['S'],
         }
-
         pages.append({'rows': chunk, 'sums': sums, 'cumulative': cumulative})
 
     return render(request, "instructors/logbook.html", {
