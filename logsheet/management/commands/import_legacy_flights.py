@@ -233,89 +233,55 @@ class Command(BaseCommand):
 
             # Parse times
             def parse_time(t): return t if isinstance(t, time) else None
-
-            # --- Deduplicate old flights ---
-            towpilot = find_member_by_name(data["towpilot"])
-            glider = resolve_glider(data["glider"], data["flight_date"])
-            launch_time = parse_time(data["takeoff_time"])
-            landing_time = parse_time(data["landing_time"])
-            
-            # Fetch or create the Logsheet
             logsheet, _ = Logsheet.objects.get_or_create(
-                log_date=data["flight_date"],
-                airfield=airfield,
-                defaults={
+                log_date = data["flight_date"],
+                airfield  = airfield,
+                defaults  = {
                     "created_by": import_user,
-                    "default_towplane": None,
-                    "duty_officer": None,
-                    "finalized": True,
+                    "finalized":  True,
                 },
             )
-            
-            # Try to find an existing matching flight
-            possible_dupes = Flight.objects.filter(
+
+            # --- Upsert the Flight so this import is idempotent ---
+            # ensure we have parse_time, launch_time, landing_time, logsheet already
+            defaults = {
+                "airfield":               airfield,
+                "glider":                 resolve_glider(data["glider"], data["flight_date"]),
+                "duration":               None,
+                "guest_pilot_name":       data["pilot"]      if not pilot      else "",
+                "legacy_pilot_name":      data["pilot"]      or "",
+                "guest_instructor_name":  data["instructor"] if not instructor else "",
+                "legacy_instructor_name": data["instructor"] or "",
+                "passenger":             passenger,
+                "passenger_name":        data["passenger"] or "",
+                "legacy_passenger_name": data["passenger"] or "",
+                "tow_pilot":              towpilot,
+                "guest_towpilot_name":    data["towpilot"]   if not towpilot   else "",
+                "legacy_towpilot_name":   data["towpilot"]   or "",
+                "towplane":               towplane_obj,
+                "release_altitude":       data["release_altitude"] or None,
+                "tow_cost_actual":        parse_money(data["tow_cost"]),
+                "rental_cost_actual":     parse_money(data["flight_cost"]),
+                "notes":                  "",
+                "launch_method":          infer_launch_method(data.get("towplane")),
+            }
+
+            flight, created = Flight.objects.update_or_create(
                 logsheet=logsheet,
-                glider=glider,
                 pilot=pilot,
                 instructor=instructor,
-                launch_time=launch_time,
-                landing_time=landing_time,
+                glider       = glider,
+                towplane     = towplane_obj,
+                launch_time=parse_time(data["takeoff_time"]),
+                landing_time=parse_time(data["landing_time"]),
                 passenger=passenger,
+                defaults=defaults
             )
+            if created:
+                logger.info("➕ Created flight id=%s on %s", flight.id, data['flight_date'])
+            else:
+                logger.info("♻️ Updated flight id=%s on %s", flight.id, data['flight_date'])
 
-            # Look for existing matching flight
-            existing_flight = possible_dupes.first()
-
-            # Only delete if towplane is missing or incorrect
-            if existing_flight and (existing_flight.towplane is None or existing_flight.towplane != towplane_obj):
-               logger.warning(
-                   "Removing old flight id=%s date=%s pilot=%s (towplane changed from %s to %s)",
-                   existing_flight.id,
-                   data['flight_date'],
-                   data['pilot'],
-                   existing_flight.towplane.identifier if existing_flight.towplane else None,
-                   towplane_obj.identifier if towplane_obj else None
-               )
-               print(f"🧹 Removing old flight to re-import with updated towplane: {data['flight_date']} / {data['pilot']}")
-               existing_flight.delete()
-
-            # --- Now create the new Flight ---
-            
-            print(f"📄 Attaching flight to {airfield.identifier} logsheet on {data['flight_date']}")
-            flight = Flight(
-                logsheet=logsheet,
-                airfield=airfield,
-                glider=glider,
-                launch_time=launch_time,
-                landing_time=landing_time,
-                duration=None,
- 
-                pilot=pilot,
-                guest_pilot_name=data["pilot"] if not pilot else "",
-                legacy_pilot_name=data["pilot"],
-            
-                instructor=instructor,
-                guest_instructor_name=data["instructor"] if not instructor and data["instructor"] else "",
-                legacy_instructor_name=data["instructor"] or "",
-            
-                passenger=passenger,
-                passenger_name=data["passenger"] if not passenger and data["passenger"] else "",
-                legacy_passenger_name=data["passenger"] or "",
-            
-                tow_pilot=towpilot,
-                guest_towpilot_name=data["towpilot"] if not towpilot and data["towpilot"] else "",
-                legacy_towpilot_name=data["towpilot"] or "",
-
-                towplane=towplane_obj,
-            
-                release_altitude=data["release_altitude"] or None,
-                tow_cost_actual=parse_money(data["tow_cost"]),
-                rental_cost_actual=parse_money(data["flight_cost"]),
-                notes="",
-            )
-
-            flight.launch_method = infer_launch_method(data["towplane"])
-            flight.save()
 
         print(f"\n✅ Imported {count} flights.")
         print("⚠️ Unknown airfield codes encountered:", sorted(unknown_airfields))
