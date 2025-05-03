@@ -33,7 +33,18 @@
       {% for r in page.rows %}
         <tr>
           <td>{{ r.date|date:"Y-m-d" }}</td>
-          <td class="text-end">{{ r.flight_no }}</td>
+          <td class="text-end">{{ r.flight_no }}
+            {% if r.flight_id %}
+
+            <button
+            class="btn btn-sm btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#flightModal"
+            hx-get="{% url 'logsheet:flight_view' r.flight_id %}"
+            hx-target="#flightModal .modal-content"
+            hx-trigger="click"
+          >🔍</button>
+          {% endif %}</td>
           <td>{{ r.model }}</td>
           <td>{{ r.n_number }}</td>
           <td class="text-end">{{ r.A }}</td>
@@ -102,4 +113,12 @@
     <div class="page-break"></div>
   {% endif %}
 {% endfor %}
+
+<div class="modal fade" id="flightModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content"><!-- HTMX will swap in flight_view.html here --></div>
+  </div>
+</div>
+
+
 {% endblock %}

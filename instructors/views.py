@@ -849,6 +849,7 @@ def member_logbook(request):
     for ev in events:
         if ev["type"] == "flight":
             f = ev["obj"]
+            flight_id = f.id
             date = ev["date"]
     
             # Roles
@@ -905,6 +906,7 @@ def member_logbook(request):
  
             # Build the row
             row = {
+                "flight_id":      flight_id,
                 "date":           date,
                 "flight_no":      flight_no if (is_pilot or is_instructor) else "",
                 "model":          f.glider.model    if f.glider else "",
