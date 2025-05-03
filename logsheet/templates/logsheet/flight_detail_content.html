@@ -1,0 +1,79 @@
+<div class="modal-header">
+<h2>Flight Details</h2>
+<p><strong>Flight ID:</strong> {{ flight.id }}</p>
+</div>
+<div class="modal-body">
+<h4>📅 General Info</h4>
+<ul>
+  <li><strong>Date:</strong> {{ flight.logsheet.log_date }}</li>
+  <li><strong>Airfield:</strong> {{ flight.airfield }}</li>
+  <li><strong>Glider:</strong> {{ flight.glider }}</li>
+</ul>
+
+<h4>👨‍✈️ Pilot & Instructor</h4>
+<ul>
+  <li><strong>Pilot:</strong> 
+    {% if flight.pilot %}
+      {{ flight.pilot.full_display_name }}
+    {% else %}
+      {{ flight.guest_pilot_name }}
+    {% endif %}
+  </li>
+
+  <li><strong>Instructor:</strong>
+    {% if flight.instructor %}
+      {{ flight.instructor.full_display_name }}
+    {% else %}
+      {{ flight.guest_instructor_name }}
+    {% endif %}
+  </li>
+
+  {% if flight.passenger %}
+    <li><strong>Passenger:</strong> {{ flight.passenger.full_display_name }}</li>
+  {% elif flight.passenger_name %}
+    <li><strong>Passenger (Guest):</strong> {{ flight.passenger_name }}</li>
+  {% endif %}
+</ul>
+
+<h4>🛫 Flight Times</h4>
+<ul>
+  <li><strong>Takeoff Time:</strong> {{ flight.launch_time }}</li>
+  <li><strong>Landing Time:</strong> {{ flight.landing_time }}</li>
+  <li><strong>Duration:</strong> {{ flight.duration }}</li>
+  <li><strong>Release Altitude:</strong> {{ flight.release_altitude }} ft</li>
+</ul>
+<h4>🚀 Launch Method</h4>
+<ul>
+  <li>
+    <strong>Launch Method:</strong>
+    {% if flight.guest_towpilot_name == "N-A Winch" or flight.towplane is None %}
+      Winch
+    {% else %}
+      Tow
+<h4>Tow Info</h4>
+<ul>
+  <li><strong>Towplane:</strong> {{ flight.towplane }}</li>
+
+  <li><strong>Tow Pilot:</strong>
+    {% if flight.tow_pilot %}
+      {{ flight.tow_pilot.full_display_name }}
+    {% else %}
+      {{ flight.guest_towpilot_name }}
+    {% endif %}
+  </li>
+</ul>
+    {% endif %}
+  </li>
+</ul>
+<h4>💰 Costs</h4>
+<ul>
+  <li><strong>Tow Cost:</strong> {{ flight.tow_cost_actual|floatformat:2 }}</li>
+  <li><strong>Rental Cost:</strong> {{ flight.rental_cost_actual|floatformat:2 }}</li>
+</ul>
+
+<h4>📝 Notes</h4>
+<p>{{ flight.notes|linebreaksbr }}</p>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>

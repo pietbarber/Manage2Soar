@@ -29,13 +29,7 @@ from instructors import views as instr_views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('members/', include('members.urls')),
-    path(
-        'logsheet/',
-        include(
-            ('logsheet.urls', 'logsheet'),  # the first 'logsheet' is app_name
-            namespace='logsheet'             # this enables logsheet:flight_view
-        )
-    ),
+    path('logsheet/',include(('logsheet.urls', 'logsheet'), namespace='logsheet')),
     path('instructors/', include('instructors.urls')),
     path("duty_roster/", include("duty_roster.urls")),
     path('login/', auth_views.LoginView.as_view(), name='login'), 

@@ -247,13 +247,15 @@ def manage_logsheet(request, pk):
 #################################################
 # view_flight
 # This view handles the viewing of a specific flight within a logsheet.
+
 @active_member_required
 def view_flight(request, pk):
     flight = get_object_or_404(Flight, pk=pk)
-
-    return render(request, "logsheet/flight_view.html", {
-        "flight": flight,
-    })
+    # If this is an HTMX request, render only the modal body
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "logsheet/flight_detail_content.html", {"flight": flight})
+    # Otherwise, render the full page as before
+    return render(request, "logsheet/flight_view.html", {"flight": flight})
 
 
 
