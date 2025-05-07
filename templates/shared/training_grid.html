@@ -17,7 +17,7 @@
       {% for meta in column_metadata %}
         <th>{{ meta.date|date:"M d" }}</th>
       {% endfor %}
-      <th rowspan="2">⭐ Max</th>
+      <th rowspan="2" class="max_score">⭐ Max</th>
     </tr>
     <tr>
       {% for meta in column_metadata %}
@@ -50,23 +50,22 @@
                 {% elif cell.score == '!' %}score-attn
                 {% endif %}
             " title="{{ cell.tooltip }}">
-              {% if cell.score == "1" %}1️⃣
-              {% elif cell.score == "2" %}2️⃣
-              {% elif cell.score == "3" %}3️⃣
-              {% elif cell.score == "4" %}4️⃣
-              {% elif cell.score == "!" %}⚠️
+              {% if cell.score == "1" %} <img src="/static/images/blob1.png">
+              {% elif cell.score == "2" %} <img src="/static/images/blob2.png">
+              {% elif cell.score == "3" %} <img src="/static/images/blob3.png">
+              {% elif cell.score == "4" %} <img src="/static/images/blob4.png">
+              {% elif cell.score == "!" %}️ <img src="/static/images/blob5.png">
               {% else %}&mdash;
               {% endif %}
             </td>
           {% endfor %}
            
        
-          <td class="text-center border border-2 border-primary fw-bold">
-            {% if row.max_score == "1" %}1️⃣
-            {% elif row.max_score == "2" %}2️⃣
-            {% elif row.max_score == "3" %}3️⃣
-            {% elif row.max_score == "4" %}4️⃣
-            {% elif row.max_score == "!" %}⚠️
+          <td class="text-center border border-2 border-primary fw-bold max_score">
+              {% if row.max_score == "1" %} <img src="/static/images/blob1.png">
+              {% elif row.max_score == "2" %} <img src="/static/images/blob2.png">
+              {% elif row.max_score == "3" %} <img src="/static/images/blob3.png">
+              {% elif row.max_score == "4" %} <img src="/static/images/blob4.png">
             {% else %}&mdash;{% endif %}
           </td>
         </tr>

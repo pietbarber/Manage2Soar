@@ -58,21 +58,16 @@ td, th {
   vertical-align: middle;
 }
 
-/* Fix borders for colored cells */
-.score-1,
-.score-2,
-.score-3,
-.score-4,
-.score-attn {
-  border: 1px solid #ccc !important;
-}
-
 /* Example background color tweaks */
-.score-1 { background-color: #eee !important; }
-.score-2 { background-color: #ddd !important; }
-.score-3 { background-color: #ccc !important; }
-.score-4 { background-color: #d1e7dd !important; }  /* soft green */
-.score-attn { background-color: #f8d7da !important; } /* soft red */
+/* .score-1 { background-color: #eee !important; }
+.score-2 { background-color: #bbb !important; }
+.score-3 { background-color: #888 !important; }
+.score-4 { background-color: rgb(15, 175, 15) !important; }
+.score-attn { background-color: #f8d7da !important; }
+*/
+
+.max_score { background-color: rgba(27, 206, 27, 0.459) !important;}
+.ground_instruction { background-color: rgba(179, 206, 27, 0.459) !important;}
 
 /* baseline.css */
 .progress {
