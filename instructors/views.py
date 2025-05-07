@@ -891,6 +891,10 @@ def member_logbook(request):
                     # Solo flight
                     solo_m += dur_m
                     pic_m  += dur_m
+                    if f.passenger:
+                        comments = f"{f.passenger.full_display_name}" 
+                    elif f.passenger_name:
+                        comments = f"{f.passenger_name}"
     
             # 6) Passenger logic: show "Pilot (You)"
             elif is_passenger:
@@ -903,7 +907,7 @@ def member_logbook(request):
                 student = f.pilot or f.passenger
                 if student:
                     comments = student.full_display_name
- 
+
             # Build the row
             row = {
                 "flight_id":      flight_id,
@@ -938,17 +942,24 @@ def member_logbook(request):
         else:  # ground instruction
             g = ev["obj"]
             gm = int(g.duration.total_seconds()//60) if g.duration else 0
+                # build the lesson list + instructor tag
+            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
+            comments = ", ".join(codes)
+            if g.instructor:
+                comments += f" /s/ {g.instructor.full_display_name}"
+
             row = {
                 "date":         date,
                 "flight_no":    "",
                 "model":        "",
                 "n_number":     "",
                 "is_passenger": False,
-                "A":            0, "G": 0, "S": 0,
-                "release":      "",
-                "maxh":         "",
-                "location":     g.location,
-                "comments":      ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
+
+                "A":             0, "G": 0, "S": 0,
+                "release":       "",
+                "maxh":          "",
+                "location":      g.location or "",
+                "comments":      comments,
 
                 "ground_inst":      format_hhmm(timedelta(minutes=gm)),
                 "dual_received":    "",
