@@ -97,15 +97,30 @@
     </div>
 
     <div class="mb-3">
-      <label for="maxAssignments" class="form-label">Maximum times you'd like to be assigned per month:</label>
-      <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
-      <option value="" disabled {% if preference.max_assignments_per_month == None %}selected{% endif %}>-- select --</option>
-      {% for val in max_assignments_choices %}
-        <option value="{{ val }}" {% if val|stringformat:'s' == preference.max_assignments_per_month|stringformat:'s' %}selected{% endif %}>{{ val }}</option>
+      <label for="maxAssignments" class="form-label">
+        Maximum times you'd like to be assigned per month:
+      </label>
+      <select
+        name="max_assignments_per_month"
+        id="maxAssignments"
+        class="form-select"
+      >
+        <option value="" disabled
+          {% if not preference.max_assignments_per_month %}selected{% endif %}
+        >-- select --</option>
+
+        {% for val,label in max_assignments_choices %}
+        <option value="{{ val }}"
+          {% if val == preference.max_assignments_per_month %}selected{% endif %}
+        >{{ label }}</option>
       {% endfor %}
-      </select>
+      
+
     </div>
-    <div class="form-check">
+    
+
+
+   <div class="form-check">
       <input type="checkbox"
              name="allow_weekend_double"
              id="id_allow_weekend_double"

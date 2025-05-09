@@ -34,6 +34,10 @@ def blackout_manage(request):
     member = request.user
     preference, _ = DutyPreference.objects.get_or_create(member=member)
 
+    max_choices = preference._meta \
+        .get_field('max_assignments_per_month') \
+        .choices
+
     existing = MemberBlackout.objects.filter(member=member)
     existing_dates = set(b.date for b in existing)
 
@@ -69,6 +73,7 @@ def blackout_manage(request):
     pair_with = Member.objects.filter(pairing_target__member=member)
     avoid_with = Member.objects.filter(avoid_target__member=member)
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
+
 
     if request.method == 'POST':
         blackout_dates = set(date.fromisoformat(d) for d in request.POST.getlist('blackout_dates'))
@@ -135,7 +140,11 @@ def blackout_manage(request):
         'avoid_with': avoid_with,
         'all_other_members': all_other,
         'form': form,
+        # pass the choices into the template:
+        'max_assignments_choices': max_choices,
     })
+
+
 
 def get_adjacent_months(year, month):
     # Previous month

@@ -61,7 +61,13 @@ class DutyPreference(models.Model):
     duty_officer_percent = models.PositiveIntegerField(default=0)
     ado_percent = models.PositiveIntegerField(default=0)
     towpilot_percent = models.PositiveIntegerField(default=0)
-    max_assignments_per_month = models.PositiveIntegerField(default=2)
+    MAX_ASSIGN_CHOICES = [(i, str(i)) for i in range(0, 13)]  # 0–12 times
+    max_assignments_per_month = models.PositiveIntegerField(
+        choices=MAX_ASSIGN_CHOICES,
+        default=2,
+        help_text="How many times per month you’d like to be scheduled"
+    )
+
     allow_weekend_double     = models.BooleanField(
         default=False,
         help_text="I'm fine being scheduled both Saturday and Sunday on the same weekend"

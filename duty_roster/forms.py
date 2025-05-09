@@ -23,6 +23,12 @@ class MemberBlackoutForm(forms.ModelForm):
         return instance
 
 class DutyPreferenceForm(forms.ModelForm):
+    max_assignments_per_month = forms.ChoiceField(
+        choices=[(i, str(i)) for i in range(0, 13)],  # 0–12
+        label="Max assignments per month",
+        initial=lambda: DutyPreference._meta.get_field('max_assignments_per_month').default
+    )
+ 
     class Meta:
         model = DutyPreference
         fields = [
