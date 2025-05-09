@@ -1,22 +1,30 @@
+/* print_syllabus.css */
 
- /* Narrow the browser’s print margins to 0.5 cm all around */
+/* 1) Truly zero out the page margins */
 @page {
-    margin: 0.5cm;
-  }
-  
-  /* Make sure the html/body take up the full page */
+  size: auto;
+  margin: 0;
+}
+
+@media print {
+  /* 2) Kill any body padding/margin and force full width */
   html, body {
     margin: 0;
     padding: 0;
+    width: 100%;
   }
-  
-  /* Remove any leftover container padding or width caps */
-  @media print {
-    .container, .container-fluid, .syllabus-full, .lesson-section {
-      width: fit-content !important;
-      max-width: fit-content !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
+
+  /* 3) Override Bootstrap’s container caps so it really stretches edge-to-edge */
+  .container,
+  .container-fluid,
+  .syllabus-full,
+  .lesson-section {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-   
+
+  /* (Optional) hide any navbars, buttons, etc */
+  .no-print { display: none !important; }
+}
