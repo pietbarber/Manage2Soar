@@ -2,7 +2,19 @@
 {% block title %}Needed for Checkride — {{ student.full_display_name }}{% endblock %}
 
 {% block content %}
-<h1>Still Needed for Checkride: {{ student.full_display_name }}</h1>
+<h1>
+    Checkride Requirements for {{ student.full_display_name }}
+    <small class="text-muted">
+      (Block {{ flight_metrics.block }}
+        {% if flight_metrics.block == 'A' %}
+          - &lt;40 h total glider time
+        {% else %}
+          - ≥40 h total glider time
+        {% endif %}
+      )
+    </small>
+  </h1>
+
 
 <table class="table table-striped">
     <thead>
@@ -25,4 +37,144 @@
     </tbody>
   </table>
 
-{% endblock %}
+
+  <h2>Aeronautical Experience Requirements (§61.109(f))</h2>
+  <ol type ="1" start="1">
+  <li>If the applicant for a private pilot certificate with a glider category rating has not logged at least 40 hours of flight time as a pilot in a heavier-than-air aircraft, the applicant must log at least 10 hours of flight time in a glider in the areas of operation listed in § 61.107(b)(6) of this part, and that flight time must include at least—</li>
+  <ol type ="i">
+  <li>20 flights in a glider in the areas of operations listed in § 61.107(b)(6) of this part, including at least 3 training flights with an authorized instructor in a glider in preparation for the practical test that must have been performed within the preceding 2 calendar months from the month of the test; and</li>
+  <li>2 hours of solo flight time in a glider in the areas of operation listed in § 61.107(b)(6) of this part, with not less than 10 launches and landings being performed.</li>
+  </ol>
+  </ol>
+  <table class="table table-bordered w-75">
+    <thead>
+      <tr>
+        <th class="text-end">Requirement</th>
+        <th>Needs</th>
+        <th>Has</th>
+        <th>Meets?</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td class="text-end">Total Glider Flights</td>
+          <td>{{ flight_metrics.required.total_flights }}</td>
+          <td>{{ flight_metrics.total_flights }}</td>
+          <td>
+            {% if flight_metrics.total_flights >= flight_metrics.required.total_flights %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-end">Training Flights Since {{ window_start }}</td>
+          <td>{{ flight_metrics.required.instr_recent }}</td>
+          <td>{{ flight_metrics.instr_recent }}</td>
+          <td>
+            {% if flight_metrics.instr_recent >= flight_metrics.required.instr_recent %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+            <td class="text-end">Total Glider Flight Time (h)</td>
+            <td>{{ flight_metrics.required.total_time }}</td>
+            <td>{{ flight_metrics.total_hours|floatformat:1 }}</td>
+            <td>
+              {% if flight_metrics.total_hours >= flight_metrics.required.total_time %}
+                ✅
+              {% else %}
+                ❌
+              {% endif %}
+            </td>
+          </tr>
+        <tr>
+          <td class="text-end">Solo Flight Time (h)</td>
+          <td>{{ flight_metrics.required.solo_hours }}</td>
+          <td>{{ flight_metrics.solo_hours|floatformat:1 }}</td>
+          <td>
+            {% if flight_metrics.solo_hours >= flight_metrics.required.solo_hours %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-end">Solo Launches/Landings</td>
+          <td>{{ flight_metrics.required.solo_flights }}</td>
+          <td>{{ flight_metrics.solo_flights }}</td>
+          <td>
+            {% if flight_metrics.solo_flights >= flight_metrics.required.solo_flights %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+  <ol type="1" start="2">
+  <li>If the applicant has logged at least 40 hours of flight time in a heavier-than-air aircraft, the applicant must log at least 3 hours of flight time in a glider in the areas of operation listed in § 61.107(b)(6) of this part, and that flight time must include at least—</li>
+  <ol type="i">
+  <li>10 solo flights in a glider in the areas of operation listed in § 61.107(b)(6) of this part; and</li>
+  <li>(ii) 3 training flights with an authorized instructor in a glider in preparation for the practical test that must have been performed within the preceding 2 calendar months from the month of the test.</li>
+  </ol>
+  </ol>
+
+  <table class="table table-bordered w-75">
+    <thead>
+      <tr>
+        <th class="text-end">Requirement</th>
+        <th>Needs</th>
+        <th>Has</th>
+        <th>Meets?</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-end">Total Glider Flight Time (h)</td>
+            <td>{{ flight_metrics.required.total_time }}</td>
+            <td>{{ flight_metrics.total_hours|floatformat:1 }}</td>
+            <td>
+              {% if flight_metrics.total_hours >= flight_metrics.required.total_time %}
+                ✅
+              {% else %}
+                ❌
+              {% endif %}
+            </td>
+          </tr>
+
+        <tr>
+          <td class="text-end">Solo Flights</td>
+          <td>{{ flight_metrics.required.solo_flights }}</td>
+          <td>{{ flight_metrics.solo_flights }}</td>
+          <td>
+            {% if flight_metrics.solo_flights >= flight_metrics.required.solo_flights %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+            <td class="text-end">Training Flights Since {{ window_start }}</td>
+            <td>{{ flight_metrics.required.instr_recent }}</td>
+            <td>{{ flight_metrics.instr_recent }}</td>
+            <td>
+              {% if flight_metrics.instr_recent >= flight_metrics.required.instr_recent %}
+                ✅
+              {% else %}
+                ❌
+              {% endif %}
+            </td>
+        </tr>
+    </tbody>
+  </table>
+
+  {% endblock %}

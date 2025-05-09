@@ -40,6 +40,11 @@ from instructors.models import (
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from instructors.utils import get_flight_summary_for_member
+from collections import namedtuple
+from datetime import date
+from dateutil.relativedelta import relativedelta
+
+
 
 
 
@@ -1109,7 +1114,7 @@ def _build_signoff_records(student, threshold_scores, requirement_check):
 
     return records
 
-
+@active_member_required
 def needed_for_solo(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
 
@@ -1127,11 +1132,11 @@ def needed_for_solo(request, member_id):
         'required_score': 3,
     })
 
-
+@active_member_required
 def needed_for_checkride(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
 
-    # Checkride (rating) standard is score of 4 only
+    # 1) Build the sign-off records as before
     threshold = ['4']
     records = _build_signoff_records(
         student,
@@ -1139,8 +1144,108 @@ def needed_for_checkride(request, member_id):
         requirement_check=lambda l: l.is_required_for_private()
     )
 
+    # 2) Compute the 2-calendar-month window
+    today          = date.today()
+    first_of_month = today.replace(day=1)
+    window_start   = first_of_month - relativedelta(months=2)
+
+    # 3) Fetch all this student's glider flights
+    flights = Flight.objects.filter(pilot=student)
+
+    # 4) Total flight hours (sum launch→landing)
+    total_hours = 0.0
+    for f in flights:
+        if f.launch_time and f.landing_time:
+            delta = (datetime.combine(f.logsheet.log_date, f.landing_time)
+                     - datetime.combine(f.logsheet.log_date, f.launch_time))
+            total_hours += delta.total_seconds() / 3600.0
+
+    total_flights = flights.count()
+
+    # 5) Solo flights/hours
+    solo_qs         = flights.filter(instructor__isnull=True)
+    solo_flights   = solo_qs.count()
+    solo_hours     = sum(
+        ((datetime.combine(f.logsheet.log_date, f.landing_time)
+          - datetime.combine(f.logsheet.log_date, f.launch_time))
+         .total_seconds() / 3600.0)
+        for f in solo_qs
+        if f.launch_time and f.landing_time
+    )
+
+    # 6) Instructor-led flights in last 2 calendar months
+    instr_qs = flights.filter(
+        instructor__isnull=False,
+        logsheet__log_date__gte=window_start
+    )
+    
+    instr_recent        = instr_qs.count()
+    # Grab the distinct dates, newest first
+    instr_recent_dates  = list(
+        instr_qs
+        .order_by('-logsheet__log_date')
+        .values_list('logsheet__log_date', flat=True)
+        .distinct()
+    )
+    
+    # 7) Decide which block applies
+    Metrics = namedtuple('Metrics', [
+        'block',          # 'A' for <40h, 'B' for ≥40h
+        'total_hours',
+        'total_flights',
+        'total_time',
+        'solo_hours',
+        'solo_flights',
+        'instr_recent',
+        'instr_recent_dates',
+        'required'
+    ])
+
+    if total_hours >= 40:
+        # Block B: ≥40h heavier-than-air → need 10 solo flights + 3 recent training flights
+        required = {
+            'total_time':    3,    # need 3 h total glider time
+            'solo_flights': 10,
+            'instr_recent':  3,
+        }
+        metrics = Metrics(
+            block='B',
+            total_hours=total_hours,
+            total_flights=total_flights,
+            total_time=total_hours,        # current total time
+            solo_hours=solo_hours,
+            solo_flights=solo_flights,
+            instr_recent=instr_recent,
+            instr_recent_dates=instr_recent_dates,
+            required=required
+        )
+
+    else:
+        # Block A: <40h → need 20 flights, incl 3 recent training; and 2h solo +10 launches
+        required = {
+            'total_time':    10,   # need 10 h total glider time
+            'total_flights': 20,
+            'instr_recent':  3,
+            'solo_hours':    2,
+            'solo_flights': 10,
+        }
+        metrics = Metrics(
+            block='A',
+            total_hours=total_hours,
+            total_flights=total_flights,
+            total_time=total_hours,        # current total time
+            solo_hours=solo_hours,
+            solo_flights=solo_flights,
+            instr_recent=instr_recent,
+            instr_recent_dates=instr_recent_dates,
+            required=required
+        )
+
+
     return render(request, 'instructors/needed_for_checkride.html', {
-        'student': student,
-        'records': records,
+        'student':        student,
+        'records':        records,
         'required_score': 4,
+        'flight_metrics': metrics,
+        'window_start':   window_start,
     })
