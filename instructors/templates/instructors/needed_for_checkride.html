@@ -2,19 +2,7 @@
 {% block title %}Needed for Checkride — {{ student.full_display_name }}{% endblock %}
 
 {% block content %}
-<h1>
-    Checkride Requirements for {{ student.full_display_name }}
-    <small class="text-muted">
-      (Block {{ flight_metrics.block }}
-        {% if flight_metrics.block == 'A' %}
-          - &lt;40 h total glider time
-        {% else %}
-          - ≥40 h total glider time
-        {% endif %}
-      )
-    </small>
-  </h1>
-
+<h1>Checkride Requirements for {{ student.full_display_name }}</h1>
 
 <table class="table table-striped">
     <thead>
