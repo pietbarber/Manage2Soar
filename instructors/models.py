@@ -1,5 +1,6 @@
 from django.db import models
 from tinymce.models import HTMLField
+from members.models import Member
 class TrainingPhase(models.Model):
     number = models.PositiveSmallIntegerField()
     name = models.CharField(max_length=100)
@@ -43,9 +44,6 @@ class SyllabusDocument(models.Model):
     def __str__(self):
         return self.title
 
-from django.db import models
-from tinymce.models import HTMLField
-from members.models import Member
 
 class InstructionReport(models.Model):
     student = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="instruction_reports")
@@ -63,8 +61,6 @@ class InstructionReport(models.Model):
     def __str__(self):
         return f"{self.student.full_display_name} – {self.report_date} by {self.instructor.full_display_name}"
     
-    from django.db import models
-from instructors.models import InstructionReport, TrainingLesson
 
 SCORE_CHOICES = [
     ("1", "Introduced (Instructor flew)"),
@@ -111,9 +107,6 @@ class GroundLessonScore(models.Model):
 
     def __str__(self):
         return f"{self.lesson.code} – {self.get_score_display()}"
-
-from django.db import models
-from members.models import Member
 
 class ClubQualificationType(models.Model):
     code = models.CharField(max_length=30, unique=True)  # e.g. 'CFI', 'ASK-Back'

@@ -1037,3 +1037,110 @@ def member_logbook(request):
         "member": member,
         "pages": pages,
     })
+
+
+###########################
+#
+# _build_signoff_records
+#
+# student: Member instance
+# threshold_scores: list of score strings e.g. ['3','4'] or ['4']
+# requirement_check: a lambda taking a lesson and returning bool
+#                    e.g. lambda l: l.is_required_for_solo()
+
+ 
+def _build_signoff_records(student, threshold_scores, requirement_check):
+    records = []
+
+    for lesson in TrainingLesson.objects.order_by('phase', 'code'):
+        # 1) Skip lessons not required
+        if not requirement_check(lesson):
+            continue
+
+        # 2) Fetch latest flight-based signoff
+        flight_entry = (
+            LessonScore.objects
+            .filter(
+                report__student=student,
+                lesson=lesson,
+                score__in=threshold_scores
+            )
+            .select_related('report__instructor', 'report')
+            .order_by('-report__report_date')
+            .first()
+        )
+
+        # 3) Fetch latest ground-based signoff
+        ground_entry = (
+            GroundLessonScore.objects
+            .filter(
+                session__student=student,
+                lesson=lesson,
+                score__in=threshold_scores
+            )
+            .select_related('session__instructor', 'session')
+            .order_by('-session__date')
+            .first()
+        )
+
+        # 4) Pick whichever has the newer date
+        best_date = None
+        best_instr = None
+
+        if flight_entry and ground_entry:
+            if flight_entry.report.report_date >= ground_entry.session.date:
+                best_date = flight_entry.report.report_date
+                best_instr = flight_entry.report.instructor
+            else:
+                best_date = ground_entry.session.date
+                best_instr = ground_entry.session.instructor
+        elif flight_entry:
+            best_date = flight_entry.report.report_date
+            best_instr = flight_entry.report.instructor
+        elif ground_entry:
+            best_date = ground_entry.session.date
+            best_instr = ground_entry.session.instructor
+
+        records.append({
+            'lesson':    lesson,
+            'date':      best_date,
+            'instructor': best_instr,
+        })
+
+    return records
+
+
+def needed_for_solo(request, member_id):
+    student = get_object_or_404(Member, pk=member_id)
+
+    # Solo standard is score of 3 or 4
+    threshold = ['3','4']
+    records = _build_signoff_records(
+        student,
+        threshold_scores=threshold,
+        requirement_check=lambda l: l.is_required_for_solo()
+    )
+
+    return render(request, 'instructors/needed_for_solo.html', {
+        'student': student,
+        'records': records,
+        'required_score': 3,
+    })
+
+
+def needed_for_checkride(request, member_id):
+    student = get_object_or_404(Member, pk=member_id)
+
+    # Checkride (rating) standard is score of 4 only
+    threshold = ['4']
+    records = _build_signoff_records(
+        student,
+        threshold_scores=threshold,
+        requirement_check=lambda l: l.is_required_for_private()
+    )
+
+    return render(request, 'instructors/needed_for_checkride.html', {
+        'student': student,
+        'records': records,
+        'required_score': 4,
+    })

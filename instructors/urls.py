@@ -15,6 +15,8 @@ urlpatterns = [
     path("log-ground-instruction/",   views.log_ground_instruction,   name="log_ground_instruction"),
     path("assign-qualification/<int:member_id>/", views.assign_qualification,     name="assign_qualification"),
     path("logbook/", views.member_logbook, name="member_logbook"),
+    path( 'students/<int:member_id>/needed-for-solo/', views.needed_for_solo, name='needed_for_solo'),
+    path( 'students/<int:member_id>/needed-for-checkride/', views.needed_for_checkride, name='needed_for_checkride'),
 
 ]
 
