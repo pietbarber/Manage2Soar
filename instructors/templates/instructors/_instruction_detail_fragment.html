@@ -1,0 +1,28 @@
+<div class="modal-header">
+    <h5 class="modal-title">
+      Training Record: {{ report.report_date }} with {{ report.instructor.full_display_name }}
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="modal-body">
+    {% if report.lesson_scores.all %}
+      <ul class="list-group">
+        {% for ls in report.lesson_scores.all %}
+          <li class="list-group-item">
+            {{ ls.lesson.code }} – {{ ls.lesson.title }}: {{ ls.get_score_display }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">No training record found for this date.</p>
+    {% endif %}
+  </div>
+{# New instructor essay block #}
+  {% if report.report_text %}
+    <hr>
+    <h6>Instructor Notes</h6>
+    <div>
+      {{ report.report_text|safe }}
+    </div>
+  {% endif %}
+</div>

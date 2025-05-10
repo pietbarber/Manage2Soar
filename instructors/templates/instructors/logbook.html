@@ -65,8 +65,20 @@
               {{ r.total }}
             {% endif %}
           </td>
-
-          <td class="text-start">{{ r.comments|safe }}</td>
+          <td class="text-start">
+            {{ r.comments|safe }}
+          
+            {% if r.report_id %}
+              <button
+                class="btn btn-sm btn-outline-secondary ms-1"
+                data-bs-toggle="modal"
+                data-bs-target="#trainingModal"
+                hx-get="{% url 'instructors:instruction_report_detail' r.report_id %}"
+                hx-target="#trainingModal .modal-content"
+                hx-trigger="click"
+              >🔍</button>
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
   
@@ -118,6 +130,13 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
     {% comment %}HTMX will drop in the content fragment here{% endcomment %}
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="trainingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <!-- HTMX will swap in the training-report fragment here -->
     </div>
   </div>
 </div>

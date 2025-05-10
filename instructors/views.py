@@ -864,7 +864,10 @@ def member_logbook(request):
             is_pilot      = (f.pilot_id      == member.id)
             is_instructor = (f.instructor_id == member.id)
             is_passenger  = (f.passenger_id  == member.id)
-    
+
+            # Always initialize report_id
+            report_id = None
+ 
             # 5a) Flight #: increment for pilot OR instructor
             if is_pilot or is_instructor:
                 flight_no += 1
@@ -889,12 +892,14 @@ def member_logbook(request):
                         instructor=f.instructor,
                         report_date=date
                     ).first()
-    
+
                     if rpt:
                         codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
-                        comments = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
+                        comments    = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
+                        report_id   = rpt.id
                     else:
-                        comments = "instruction received"
+                        comments  = "instruction received"
+                        report_id = None
                 else:
                     # Solo flight
                     solo_m += dur_m
@@ -943,6 +948,8 @@ def member_logbook(request):
                 "pic_m":          pic_m if not is_passenger else 0,
                 "inst_given_m":   inst_m if not is_passenger else 0,
                 "total_m":        dur_m if not is_passenger else 0,
+                "report_id":      report_id,
+
                 "comments":       comments,
             }
             rows.append(row)
@@ -1251,4 +1258,20 @@ def needed_for_checkride(request, member_id):
         'required_score': 4,
         'flight_metrics': metrics,
         'window_start':   window_start,
+    })
+
+
+from django.shortcuts import get_object_or_404, render
+from .models import InstructionReport
+
+def instruction_report_detail(request, report_id):
+    """
+    Returns a fragment listing the lessons & scores for a given InstructionReport.
+    """
+    rpt = get_object_or_404(
+        InstructionReport.objects.prefetch_related('lesson_scores__lesson'),
+        pk=report_id
+    )
+    return render(request, 'instructors/_instruction_detail_fragment.html', {
+        'report': rpt,
     })
