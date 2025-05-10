@@ -456,10 +456,13 @@ def progress_dashboard(request):
     for m in students_qs:
         solo_pct, rating_pct = compute_progress(m)
         students_data.append({
-            'member':      m,
-            'report_count': m.report_count,      # ← pull in the annotated count
-            'solo_pct':    solo_pct,
-            'rating_pct':  rating_pct,
+            'member':         m,
+            'report_count':   m.report_count,
+            'solo_pct':       solo_pct,
+            'rating_pct':     rating_pct,
+            # add these two URLs so the template doesn’t have to call {% url ... %}
+            'solo_url':       reverse('instructors:needed_for_solo',       args=[m.pk]),
+            'checkride_url':  reverse('instructors:needed_for_checkride',  args=[m.pk]),
         })
 
     rated_data = []
