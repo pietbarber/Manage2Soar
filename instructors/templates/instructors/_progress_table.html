@@ -14,47 +14,56 @@
     {% for row in data %}
       {% with m=row.member %}
       <tr>
-        <td>{{ m.full_display_name }}</td>
+        <td>
+          <a href="{% url 'members:member_view' m.pk %}"
+             class="text-decoration-none text-dark">
+            {{ m.full_display_name }}
+          </a>
+        </td>
+
         <td class="text-end">{{ row.report_count }}</td>
 
-           <td>
-             <div class="dropdown">
-                 <a class="dropdown-toggle text-decoration-none"
-                    href="#"
-                    role="button"
-                    id="dropdownMenuLink-{{ row.member.pk }}"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false">
-                    Info
-                 </a>
-                 <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink-{{ row.member.pk }}">
-                   <li>
-                     <a class="dropdown-item"
-                        href="{% url 'instructors:member_training_grid' row.member.pk %}">
-                       Syllabus Grid
-                     </a>
-                   </li>
-                   <li>
-                     <a class="dropdown-item"
-                        href="{% url 'instructors:member_instruction_record' row.member.pk %}">
-                       Training Record
-                     </a>
-                   </li>
-                   <li>
-                     <a class="dropdown-item"
-                        href="{{ row.solo_url }}">
-                       🛫 Needs for Solo
-                     </a>
-                   </li>
-                   <li>
-                      <a class="dropdown-item"
-                         href="{{ row.checkride_url }}">
-                         🏁 Needs for Checkride
-                      </a>
-                    </li>
-                 </ul>
-                </div>
-             </td>
+        <td>
+          <div class="dropdown">
+            <a class="dropdown-toggle text-decoration-none"
+               href="#"
+               role="button"
+               id="dropdownMenuLink-{{ row.member.pk }}"
+               data-bs-toggle="dropdown"
+               aria-expanded="false">
+              Info
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink-{{ row.member.pk }}">
+              <li>
+                <a class="dropdown-item"
+                   href="{% url 'instructors:member_training_grid' row.member.pk %}">
+                  Syllabus Grid
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item"
+                   href="{% url 'instructors:member_instruction_record' row.member.pk %}">
+                  Training Record
+                </a>
+              </li>
+             {% if show_progress %}
+              <li>
+                <a class="dropdown-item"
+                   href="{{ row.solo_url }}">
+                  🛫 Needs Before Solo
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item"
+                   href="{{ row.checkride_url }}">
+                  🏁 Needs Before Checkride
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </td>
+        
 
         {% if show_progress %}
         <td style="min-width:160px;">
