@@ -70,31 +70,46 @@ def member_list(request):
 
 #########################
 # member_view() View
-
-# Renders the detail page for a specific member. Displays information such as
-# their roles, contact details, badges, and optionally, biography content.
-
-# Only accessible to logged-in users.
-
+# Renders the detail page for a specific member.
+# Displays member profile details including roles, contact info, badges,
+# QR code, biography, qualifications, and solo/checkride need buttons when applicable.
+# Access restricted to active members via @active_member_required.
+#
 # Arguments:
 # - request: the HTTP request object
-# - username: the member's username (used to look up the Member object)
-
+# - member_id: the primary key of the Member object to display
+#
+# Context Variables Provided to Template:
+# - member: Member instance
+# - show_need_buttons: bool indicating whether to display solo/checkride buttons
+# - qr_base64: Base64-encoded QR code for vCard download
+# - form: MemberProfilePhotoForm instance (if editing own profile) or None
+# - is_self: bool, True if the viewer is the member
+# - can_edit: bool, True if the user can edit this profile
+# - biography: MemberBiography instance or None
+# - qualifications: QuerySet of MemberQualification objects
+# - today: current date
+#
 # Raises:
-# - Http404 if the user does not exist
+# - Http404 if no Member exists with the given member_id
+#########################
+
 
 @active_member_required
 def member_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     is_self = request.user == member
     can_edit = is_self or request.user.is_superuser
-        # Biography logic (if you have one)
+
+    # Decide whether to show solo/checkride buttons
+    show_need_buttons = member.glider_rating not in ('private', 'commercial')
+
+    # Biography logic
     biography = getattr(member, "biography", None)
 
     # QR code generation
     qr_png = generate_vcard_qr(member)
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
-
 
     qualifications = (
         MemberQualification.objects
@@ -102,7 +117,6 @@ def member_view(request, member_id):
         .select_related('qualification', 'instructor')
         .order_by('qualification__code')
     )
-
 
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
@@ -112,20 +126,23 @@ def member_view(request, member_id):
             return redirect("members:member_view", member_id=member.id)
     else:
         form = MemberProfilePhotoForm(instance=member) if is_self else None
-    return render(
-        request,
-        "members/member_view.html",
-        {
-            "member": member,
-            "qr_base64": qr_base64,
-            "form": form,
-            "is_self": is_self,
-            "can_edit": can_edit,
-            "biography": biography,
-            "qualifications": qualifications,
-            "today": date.today(),
-        },
-    )
+
+    context = {
+        "member": member,
+        "qr_base64": qr_base64,
+        "form": form,
+        "is_self": is_self,
+        "can_edit": can_edit,
+        "biography": biography,
+        "qualifications": qualifications,
+        "today": date.today(),
+        # new flag for template
+        "show_need_buttons": show_need_buttons,
+    }
+    return render(request, "members/member_view.html", context)
+
+
+
 
 #########################
 # biography_view() View

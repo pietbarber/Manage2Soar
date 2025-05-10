@@ -67,24 +67,18 @@
       </ul>
 
       {% if request.user == member or request.user.instructor %}
-
-      {# Only show these links for students who aren't yet rated #}
-      {% if member %}
-      
-        
-        <a class="btn btn-warning"
-           href="{% url 'instructors:needed_for_solo' member.id %}">
-          What's still needed to solo?
-        </a>
-      
-        {# Checkride requirements link #}
-        <a class="btn btn-danger"
-           href="{% url 'instructors:needed_for_checkride' member.id %}">
-          What's still needed for checkride?
-        </a>
-      
+        {% if show_need_buttons %}
+          {% if not member.solo_date %}
+            <a class="btn btn-warning" href="{% url 'instructors:needed_for_solo' member.id %}">
+              What's still needed to solo?
+            </a>
+          {% endif %}
+        {% if not member.checkride_date %}
+          <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
+            What's still needed for checkride?
+          </a>
+        {% endif %}
       {% endif %}
-      
 
       <div class="mt-3">
       <a href="{% if request.user.instructor %}
