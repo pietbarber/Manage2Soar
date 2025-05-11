@@ -479,12 +479,46 @@ def progress_dashboard(request):
             'solo_pct':    solo_pct,
             'rating_pct':  rating_pct,
         })
+    cutoff = date.today() - timedelta(days=30)
+    flights_qs = Flight.objects.filter(
+        instructor=request.user,
+        logsheet__log_date__gte=cutoff
+    ).select_related('pilot', 'logsheet')
 
+    # Build one pending report per student+date
+    seen = set()
+    pending_reports = []
+    for f in flights_qs:
+        key = (f.pilot_id, f.logsheet.log_date)
+        if key in seen:
+            continue
+        seen.add(key)
 
+        # Skip if already filed
+        already = InstructionReport.objects.filter(
+            student=f.pilot,
+            instructor=request.user,
+            report_date=f.logsheet.log_date
+        ).exists()
+        if already:
+            continue
+
+        pending_reports.append({
+            'pilot':      f.pilot,
+            'date':       f.logsheet.log_date,
+            'report_url': reverse(
+                              'instructors:fill_instruction_report',
+                              args=[f.pilot.pk, f.logsheet.log_date]
+                          ),
+        })
+
+    # ————————————————————————————————
     return render(request, 'instructors/progress_dashboard.html', {
-        'students_data': students_data,
-        'rated_data':   rated_data,
+        'pending_reports': pending_reports,
+        'students_data':   students_data,
+        'rated_data':      rated_data,
     })
+
 
 
 @instructor_required
@@ -813,7 +847,6 @@ def member_logbook(request):
     ).order_by('logsheet__log_date')
 
     # 2) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
-    from django.db.models import Q
     flights = (
         Flight.objects
         .filter(
@@ -1266,8 +1299,6 @@ def needed_for_checkride(request, member_id):
     })
 
 
-from django.shortcuts import get_object_or_404, render
-from .models import InstructionReport
 
 def instruction_report_detail(request, report_id):
     """

@@ -2,6 +2,36 @@
 {% block content %}
 <h1>Student Progress Reports</h1>
 
+{% if pending_reports %}
+  <div class="alert alert-warning">
+    You have {{ pending_reports|length }} reports to file in the last 30 days:
+  </div>
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-light">
+      <tr>
+        <th>Pilot</th>
+        <th>Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pending_reports %}
+      <tr>
+        <td>{{ p.pilot.full_display_name }}</td>
+        <td>{{ p.date|date:"Y-m-d" }}</td>
+        <td>
+          <a class="btn btn-sm btn-primary"
+             href="{{ p.report_url }}">
+            Fill Report
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+
 <div class="row">
   <div class="col-md-6">
     <h2>Active Students</h2>
