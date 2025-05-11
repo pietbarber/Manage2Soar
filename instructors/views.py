@@ -116,9 +116,16 @@ def fill_instruction_report(request, student_id, report_date):
     student = get_object_or_404(Member, pk=student_id)
     instructor = request.user
 
-    report, created = InstructionReport.objects.get_or_create(
-        student=student, instructor=instructor, report_date=report_date
-    )
+
+    # 1) On GET: only retrieve, do NOT create a stub
+    try:
+        report = InstructionReport.objects.get(
+            student=student, instructor=instructor, report_date=report_date
+        )
+        created = False
+    except InstructionReport.DoesNotExist:
+        report = None
+        created = False
 
     if report_date > now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
@@ -126,16 +133,24 @@ def fill_instruction_report(request, student_id, report_date):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
+        # 2) Now *create* if it didn’t exist
+        if report is None:
+            report = InstructionReport(
+                student=student, instructor=instructor, report_date=report_date
+            )
+
         report_form = InstructionReportForm(request.POST, instance=report)
-        formset = LessonScoreSimpleFormSet(request.POST)
+        formset     = LessonScoreSimpleFormSet(request.POST)
 
         if report_form.is_valid() and formset.is_valid():
-            report_form.save()
-            LessonScore.objects.filter(report=report).delete()
+            # save the InstructionReport (new or existing)
+            report = report_form.save()
 
+            # clear & recreate the LessonScores
+            LessonScore.objects.filter(report=report).delete()
             for form in formset.cleaned_data:
                 lesson = form.get("lesson")
-                score = form.get("score")
+                score  = form.get("score")
                 if lesson and score:
                     LessonScore.objects.create(report=report, lesson=lesson, score=score)
 
@@ -143,37 +158,28 @@ def fill_instruction_report(request, student_id, report_date):
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
             messages.error(request, "There were errors in the form. Please review and correct them.")
-            #print("Report form errors:", report_form.errors)
-            #print("Formset errors:", formset.errors)
-
     else:
-        # GET request
+        # GET: build empty form/formset (report may be None)
         report_form = InstructionReportForm(instance=report)
         initial_data = []
-        lesson_objects = []
-
         for lesson in lessons:
-            existing_score = LessonScore.objects.filter(report=report, lesson=lesson).first()
-            initial_data.append({
-                "lesson": lesson.id,
-                "score": existing_score.score if existing_score else "",
-            })
-            lesson_objects.append(lesson)
-        
-        formset = LessonScoreSimpleFormSet(initial=initial_data)
+            if report:
+                existing = LessonScore.objects.filter(report=report, lesson=lesson).first()
+                val = existing.score if existing else ""
+            else:
+                val = ""
+            initial_data.append({"lesson": lesson.id, "score": val})
 
-        # Bundle each form with its lesson
-        form_rows = list(zip(formset.forms, lesson_objects))
-
+        formset   = LessonScoreSimpleFormSet(initial=initial_data)
+        form_rows = list(zip(formset.forms, lessons))
 
     return render(request, "instructors/fill_instruction_report.html", {
-        "student": student,
-        "report_form": report_form,
-        "formset": formset,
-        "form_rows": form_rows,
-        "report_date": report_date,
+        "student":      student,
+        "report_form":  report_form,
+        "formset":      formset,
+        "form_rows":    form_rows,
+        "report_date":  report_date,
     })
-
 
 @active_member_required
 def select_instruction_date(request, student_id):
