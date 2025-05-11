@@ -6,6 +6,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views import tinymce_image_upload
 from members import views as member_views
+from django.shortcuts import redirect
+
 
 app_name = "members"
 
@@ -17,12 +19,10 @@ urlpatterns = [
     path("<int:member_id>/view/", views.member_view, name="member_view"),
     path('set-password/', views.set_password, name='set_password'),
     path("tinymce-upload/", tinymce_image_upload, name="tinymce_image_upload"),
-    path("training-progress/", member_views.my_training_progress, name="training_progress"),
+    path('training-progress/', lambda req: redirect('instructors:member_training_grid', req.user.pk), name='training_progress',
 
 
-
-
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+)] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 from django.conf.urls import handler403
 

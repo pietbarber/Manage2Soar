@@ -4,6 +4,8 @@ import json
 from collections import OrderedDict
 from django.urls import reverse
 import qrcode
+from django.core.exceptions import PermissionDenied
+
 from io import BytesIO
 from django.http import HttpResponse 
 from collections import defaultdict
@@ -205,7 +207,7 @@ def get_instructor_initials(member):
     initials = f"{member.first_name[0]}{member.last_name[0]}" if member.first_name and member.last_name else "??"
     return initials.upper()
 
-
+@active_member_required
 def member_training_grid(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     reports = (
@@ -214,6 +216,9 @@ def member_training_grid(request, member_id):
         .order_by("report_date")
         .prefetch_related("lesson_scores__lesson", "instructor")
     )
+    if request.user != member and not request.user.instructor:
+        raise PermissionDenied
+
 
     report_dates = [r.report_date for r in reports]
     lessons = TrainingLesson.objects.all().order_by("code")
