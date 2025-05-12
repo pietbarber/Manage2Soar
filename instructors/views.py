@@ -37,7 +37,7 @@ from members.models import Member
 from django.contrib.auth.decorators import user_passes_test
 from instructors.models import (
      InstructionReport, LessonScore, GroundInstruction, GroundLessonScore,
-     TrainingLesson, SyllabusDocument, TrainingPhase
+     TrainingLesson, SyllabusDocument, TrainingPhase, StudentProgressSnapshot
 )
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
@@ -400,8 +400,11 @@ def assign_qualification(request, member_id):
 def instructors_home(request):
      return render(request, "instructors/instructors_home.html")
 
+############################################
+
 @instructor_required
 def progress_dashboard(request):
+    # ————————————————————————————————
     # 1) split “students” vs “rated” by glider_rating
     students_qs = (
         Member.objects
@@ -417,8 +420,7 @@ def progress_dashboard(request):
     )
     rated_qs = (
         Member.objects
-        .filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        .filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
         .exclude(glider_rating='student')
         .annotate(
             last_flight=Max('flights_as_pilot__logsheet__log_date'),
@@ -427,71 +429,57 @@ def progress_dashboard(request):
         .order_by('last_name')
     )
 
-    # 2) Precompute which lessons count for solo vs rating
-    all_lessons   = TrainingLesson.objects.all()
-    solo_ids      = {l.id for l in all_lessons if l.is_required_for_solo()}
-    rating_ids    = {l.id for l in all_lessons if l.is_required_for_private()}
-    total_solo    = len(solo_ids)
-    total_rating  = len(rating_ids)
+    # ————————————————————————————————
+    # 2) Bulk‐fetch all snapshots for those members
+    member_ids = list(students_qs.values_list('pk', flat=True)) + \
+                 list(rated_qs.values_list('pk', flat=True))
+    snapshots = StudentProgressSnapshot.objects \
+        .filter(student_id__in=member_ids) \
+        .select_related('student')
+    snapshot_map = {snap.student_id: snap for snap in snapshots}
 
-    # 3) percentage helper: solo = scores 3 or 4; rating = scores 4 only
-    def compute_progress(member):
-        # lessons passed to solo standard
-        solo_done = set(
-            LessonScore.objects
-            .filter(report__student=member, score__in=['3','4'])
-            .values_list('lesson_id', flat=True)
-        ) | set(
-            GroundLessonScore.objects
-            .filter(session__student=member, score__in=['3','4'])
-            .values_list('lesson_id', flat=True)
-        )
-
-        # lessons passed to checkride standard (rating)
-        rating_done = set(
-            LessonScore.objects
-            .filter(report__student=member, score='4')
-            .values_list('lesson_id', flat=True)
-        ) | set(
-            GroundLessonScore.objects
-            .filter(session__student=member, score='4')
-            .values_list('lesson_id', flat=True)
-        )
-
-        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100) if total_solo   else 0
-        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100) if total_rating else 0
-        return solo_pct, rating_pct
-
-    # 4) build context lists
+    # ————————————————————————————————
+    # 3) Build context lists using the snapshots
     students_data = []
     for m in students_qs:
-        solo_pct, rating_pct = compute_progress(m)
+        snap = snapshot_map.get(m.pk)
+        solo_pct   = int((snap.solo_progress   or 0.0) * 100) if snap else 0
+        rating_pct = int((snap.checkride_progress or 0.0) * 100) if snap else 0
+        sessions   = snap.sessions if snap else 0
+
         students_data.append({
-            'member':         m,
-            'report_count':   m.report_count,
-            'solo_pct':       solo_pct,
-            'rating_pct':     rating_pct,
-            # add these two URLs so the template doesn’t have to call {% url ... %}
-            'solo_url':       reverse('instructors:needed_for_solo',       args=[m.pk]),
-            'checkride_url':  reverse('instructors:needed_for_checkride',  args=[m.pk]),
+            'member':        m,
+            'report_count':  m.report_count,
+            'solo_pct':      solo_pct,
+            'rating_pct':    rating_pct,
+            'sessions':      sessions,
+            'solo_url':      reverse('instructors:needed_for_solo',      args=[m.pk]),
+            'checkride_url': reverse('instructors:needed_for_checkride', args=[m.pk]),
         })
 
     rated_data = []
     for m in rated_qs:
-        solo_pct, rating_pct = compute_progress(m)
+        snap = snapshot_map.get(m.pk)
+        solo_pct   = int((snap.solo_progress   or 0.0) * 100) if snap else 0
+        rating_pct = int((snap.checkride_progress or 0.0) * 100) if snap else 0
+        sessions   = snap.sessions if snap else 0
+
         rated_data.append({
-            'member':      m,
+            'member':       m,
             'report_count': m.report_count,
-            'solo_pct':    solo_pct,
-            'rating_pct':  rating_pct,
+            'solo_pct':     solo_pct,
+            'rating_pct':   rating_pct,
+            'sessions':     sessions,
         })
+
+    # ————————————————————————————————
+    # 4) Pending reports (unchanged)
     cutoff = date.today() - timedelta(days=30)
     flights_qs = Flight.objects.filter(
         instructor=request.user,
         logsheet__log_date__gte=cutoff
     ).select_related('pilot', 'logsheet')
 
-    # Build one pending report per student+date
     seen = set()
     pending_reports = []
     for f in flights_qs:
@@ -499,8 +487,6 @@ def progress_dashboard(request):
         if key in seen:
             continue
         seen.add(key)
-
-        # Skip if already filed
         already = InstructionReport.objects.filter(
             student=f.pilot,
             instructor=request.user,
@@ -513,9 +499,9 @@ def progress_dashboard(request):
             'pilot':      f.pilot,
             'date':       f.logsheet.log_date,
             'report_url': reverse(
-                              'instructors:fill_instruction_report',
-                              args=[f.pilot.pk, f.logsheet.log_date]
-                          ),
+                'instructors:fill_instruction_report',
+                args=[f.pilot.pk, f.logsheet.log_date]
+            ),
         })
 
     # ————————————————————————————————
@@ -525,7 +511,7 @@ def progress_dashboard(request):
         'rated_data':      rated_data,
     })
 
-
+######################################################
 
 @instructor_required
 def edit_syllabus_document(request, slug):

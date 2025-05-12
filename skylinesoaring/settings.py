@@ -61,13 +61,13 @@ INSTALLED_APPS = [
     "social_django",
     "tinymce",
     "members",
-    "instructors",
     "logsheet",
     "duty_roster",
     "django.contrib.humanize",
     "reversion",
     "django_htmx",
-    "django_extensions"
+    "django_extensions",
+    "instructors.apps.InstructorsConfig",
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"

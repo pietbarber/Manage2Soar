@@ -1,13 +1,14 @@
+{% load map_filters %}
 <table class="table table-striped">
   <thead>
     <tr>
       <th>Pilot</th>
-      <th>Sessions</th>
-      <th>Reports</th>
+      <th class="text-end">Sessions</th>
+      <th class="text-end">Reports</th>
       {% if show_progress %}
         <th>Progress</th>
       {% endif %}
-      <th>Last Flight</th>
+      <th class="text-end">Last Flight</th>
     </tr>
   </thead>
   <tbody>
@@ -21,6 +22,8 @@
           </a>
         </td>
 
+        {# now showing sessions and reports #}
+        <td class="text-end">{{ row.sessions }}</td>
         <td class="text-end">{{ row.report_count }}</td>
 
         <td>
@@ -28,21 +31,21 @@
             <a class="dropdown-toggle text-decoration-none"
                href="#"
                role="button"
-               id="dropdownMenuLink-{{ row.member.pk }}"
+               id="dropdownMenuLink-{{ m.pk }}"
                data-bs-toggle="dropdown"
                aria-expanded="false">
               Info
             </a>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink-{{ row.member.pk }}">
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuLink-{{ m.pk }}">
               <li>
                 <a class="dropdown-item"
-                   href="{% url 'instructors:member_training_grid' row.member.pk %}">
+                   href="{% url 'instructors:member_training_grid' m.pk %}">
                   Syllabus Grid
                 </a>
               </li>
               <li>
                 <a class="dropdown-item"
-                   href="{% url 'instructors:member_instruction_record' row.member.pk %}">
+                   href="{% url 'instructors:member_instruction_record' m.pk %}">
                   Training Record
                 </a>
               </li>
@@ -64,10 +67,8 @@
           </div>
         </td>
         
-
         {% if show_progress %}
         <td style="min-width:160px;">
-          {% if show_solo_bar|default:True %}
           <div class="progress mb-1"
                style="--pct: {{ row.solo_pct }}%; height:1em;"
                data-bs-toggle="tooltip"
@@ -76,7 +77,6 @@
             <div class="progress-bar bg-secondary"
                  style="width: calc(100% - var(--pct));"></div>
           </div>
-          {% endif %}
           <div class="progress"
                style="--pct: {{ row.rating_pct }}%; height:1em;"
                data-bs-toggle="tooltip"
@@ -88,7 +88,7 @@
         </td>
         {% endif %}
 
-        <td class="text-end">{{ row.member.last_flight|date:"Y-m-d" }}</td>
+        <td class="text-end">{{ m.last_flight|date:"Y-m-d" }}</td>
       </tr>
       {% endwith %}
     {% endfor %}

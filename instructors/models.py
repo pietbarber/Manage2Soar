@@ -145,3 +145,13 @@ class MemberQualification(models.Model):
 
     def __str__(self):
         return f"{self.member} – {self.qualification.code}"
+
+class StudentProgressSnapshot(models.Model):
+    student = models.OneToOneField(Member, on_delete=models.CASCADE)
+    solo_progress = models.FloatField(default=0.0)       # 0.0 to 1.0
+    checkride_progress = models.FloatField(default=0.0)  # 0.0 to 1.0
+    sessions = models.IntegerField(default=0)            # total instructor sessions
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Progress for {self.student.full_display_name}"
