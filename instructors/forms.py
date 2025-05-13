@@ -1,13 +1,23 @@
 from django import forms
-from .models import MemberQualification, ClubQualificationType
-from .models import InstructionReport, LessonScore, TrainingLesson
-from tinymce.widgets import TinyMCE
 from datetime import date
-from instructors.models import GroundInstruction, GroundLessonScore, TrainingLesson, SCORE_CHOICES
 from tinymce.widgets import TinyMCE
 from datetime import timedelta
 from django.forms import formset_factory
-from instructors.models import TrainingLesson, SCORE_CHOICES, SyllabusDocument
+from .models import (
+    MemberQualification, ClubQualificationType, InstructionReport, 
+    LessonScore, TrainingLesson, GroundInstruction, 
+    GroundLessonScore, TrainingLesson, SCORE_CHOICES,
+    SyllabusDocument
+)
+
+####################################################
+# InstructionReportForm
+#
+# A ModelForm for creating and editing an InstructionReport.
+# Fields:
+# - report_text: HTML summary of the session (TinyMCE widget).
+# - simulator: Boolean flag for simulator sessions.
+####################################################
 
 class InstructionReportForm(forms.ModelForm):
     class Meta:
@@ -17,6 +27,14 @@ class InstructionReportForm(forms.ModelForm):
             "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
         }
 
+####################################################
+# LessonScoreSimpleForm
+#
+# A simple Form to capture a single lesson score entry.
+# Fields:
+# - lesson: Hidden ModelChoiceField for TrainingLesson.
+# - score: Select field for SCORE_CHOICES with optional blank.
+####################################################
 
 class LessonScoreSimpleForm(forms.Form):
     lesson = forms.ModelChoiceField(queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput())
@@ -26,7 +44,25 @@ class LessonScoreSimpleForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
+####################################################
+# LessonScoreSimpleFormSet
+#
+# A FormSet factory for LessonScoreSimpleForm with no extra forms.
+####################################################
+
 LessonScoreSimpleFormSet = formset_factory(LessonScoreSimpleForm, extra=0)
+
+
+####################################################
+# GroundInstructionForm
+#
+# A ModelForm for logging a ground instruction session.
+# Fields:
+# - date: Date of session (HTML date input).
+# - location: Optional location text.
+# - duration: Text input parsed into timedelta.
+# - notes: HTMLField for detailed notes (TinyMCE widget).
+####################################################
 
 class GroundInstructionForm(forms.ModelForm):
     class Meta:
@@ -61,6 +97,16 @@ class GroundInstructionForm(forms.ModelForm):
 
         raise forms.ValidationError("Invalid format for duration.")
 
+
+####################################################
+# GroundLessonScoreSimpleForm
+#
+# A simple Form to capture a ground lesson score.
+# Fields:
+# - lesson: Hidden integer field for lesson ID.
+# - score: Select field for SCORE_CHOICES with optional blank.
+####################################################
+
 class GroundLessonScoreSimpleForm(forms.Form):
     lesson = forms.IntegerField(widget=forms.HiddenInput())
     score = forms.ChoiceField(
@@ -69,11 +115,26 @@ class GroundLessonScoreSimpleForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
+
+####################################################
+# SyllabusDocumentForm
+#
+# A ModelForm for editing SyllabusDocument entries.
+# Fields:
+# - title: Document title.
+# - content: HTML content (TinyMCE widget).
+####################################################
+
 class SyllabusDocumentForm(forms.ModelForm):
     class Meta:
         model = SyllabusDocument
         fields = ['title', 'content']
 
+####################################################
+# GroundLessonScoreFormSet
+#
+# A FormSet factory for GroundLessonScoreSimpleForm with no extra forms.
+####################################################
 
 GroundLessonScoreFormSet = formset_factory(
     GroundLessonScoreSimpleForm,
@@ -82,6 +143,14 @@ GroundLessonScoreFormSet = formset_factory(
     validate_min=False,
     validate_max=False
 )
+
+####################################################
+# QualificationAssignForm
+#
+# A ModelForm for assigning or updating a MemberQualification.
+# Custom init to store instructor and student context.
+# Overrides save() to update_or_create qualification record.
+####################################################
 
 class QualificationAssignForm(forms.ModelForm):
     class Meta:

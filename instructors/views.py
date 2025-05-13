@@ -49,6 +49,18 @@ from dateutil.relativedelta import relativedelta
 
 
 
+####################################################
+# public_syllabus_overview
+#
+# Renders a grouped view of all training phases and associated
+# syllabus documents ('header', 'materials') for public access.
+# No login required.
+#
+# Context:
+# - phases: Queryset of TrainingPhase with prefetch 'lessons'.
+# - header: SyllabusDocument with slug 'header'.
+# - materials: SyllabusDocument with slug 'materials'.
+####################################################
 
 
 # Training Syllabus links available to the public, no instructor login required. 
@@ -65,6 +77,20 @@ def public_syllabus_overview(request):
         "public": True,
     })
 
+####################################################
+# public_syllabus_detail
+#
+# Displays detailed HTML content for a single lesson identified
+# by its code. Accessible without authentication.
+#
+# Parameters:
+# - code: TrainingLesson.code
+#
+# Context:
+# - lesson: Retrieved TrainingLesson instance.
+# - public: True flag for template logic.
+####################################################
+
 def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     return render(request, "instructors/syllabus_detail.html", {
@@ -74,18 +100,35 @@ def public_syllabus_detail(request, code):
 
 
 
+####################################################
+# instructors_home
+#
+# Dashboard landing page for instructors.
+# Requires instructor login.
+####################################################
 
-# instructors/views.py
 @instructor_required
 def instructors_home(request):
     return render(request, "instructors/instructors_home.html")
 
+####################################################
+# syllabus_overview
+#
+# Lists all TrainingLesson entries in code order.
+# For authenticated instructors.
+####################################################
 
 @instructor_required
 def syllabus_overview(request):
     lessons = TrainingLesson.objects.all().order_by("code")
     return render(request, "instructors/syllabus_overview.html", {"lessons": lessons})
 
+####################################################
+# syllabus_overview_grouped
+#
+# Grouped syllabus view by phase, includes header/materials.
+# For authenticated instructors.
+####################################################
 
 @instructor_required
 def syllabus_overview_grouped(request):
@@ -99,12 +142,31 @@ def syllabus_overview_grouped(request):
         "materials": materials,
     })
 
+####################################################
+# syllabus_detail
+#
+# Shows HTML content for a specific lesson code.
+# Accessible to instructors only.
+####################################################
 
 @instructor_required
 def syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     return render(request, "instructors/syllabus_detail.html", {"lesson": lesson})
 
+####################################################
+# fill_instruction_report
+#
+# GET: Presents a form for an existing or new InstructionReport
+#       for a student on a given date.
+# POST: Validates and saves report and associated LessonScores.
+#
+# Parameters:
+# - student_id: Member PK of the student.
+# - report_date: String YYYY-MM-DD.
+#
+# Template: instructors/fill_instruction_report.html
+####################################################
 
 @instructor_required
 def fill_instruction_report(request, student_id, report_date):
@@ -181,6 +243,13 @@ def fill_instruction_report(request, student_id, report_date):
         "report_date":  report_date,
     })
 
+####################################################
+# select_instruction_date
+#
+# Displays dates of recent flights (last 30 days) for selecting
+# an instruction report to fill. Requires active member status.
+####################################################
+
 @active_member_required
 def select_instruction_date(request, student_id):
     instructor = request.user
@@ -209,13 +278,51 @@ def select_instruction_date(request, student_id):
     }
     return render(request, "instructors/select_instruction_date.html", context)
 
+# instructors/views.py (continued)
+
+####################################################
+# get_instructor_initials
+#
+# Utility function to derive two-letter uppercase initials
+# from a Member's first and last names. Returns '??' if
+# either name part is missing.
+#
+# Parameters:
+# - member: Member instance
+#
+# Returns:
+# - String of two uppercase letters or '??'
+####################################################
 def get_instructor_initials(member):
-    initials = f"{member.first_name[0]}{member.last_name[0]}" if member.first_name and member.last_name else "??"
+    initials = (
+        f"{member.first_name[0]}{member.last_name[0]}"
+        if member.first_name and member.last_name else "??"
+    )
     return initials.upper()
 
+####################################################
+# member_training_grid
+#
+# Displays a grid of lesson progress for a given student,
+# combining flight-based InstructionReport data and ground
+# instruction sessions into a unified training grid.
+#
+# Requires the requester to be the student or an instructor.
+#
+# Parameters:
+# - request: HttpRequest
+# - member_id: PK of the student Member
+#
+# Context:
+# - member: Member instance whose grid is shown
+# - lesson_data: List of dicts with 'label', 'phase', 'scores', 'max_score'
+# - report_dates: Ordered list of dates for grid columns
+# - column_metadata: List of dicts with 'date', 'initials', 'days_ago'
+####################################################
 @active_member_required
 def member_training_grid(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
+    # Fetch all reports and prefetch lesson scores and instructors
     reports = (
         InstructionReport.objects
         .filter(student=member)
@@ -225,37 +332,35 @@ def member_training_grid(request, member_id):
     if request.user != member and not request.user.instructor:
         raise PermissionDenied
 
-
+    # Extract sorted report dates
     report_dates = [r.report_date for r in reports]
     lessons = TrainingLesson.objects.all().order_by("code")
 
-    # Score lookup: (lesson_id, date) -> score
+    # Build lookup for scores by (lesson_id, date)
     scores_lookup = {
-        (score.lesson_id, report.report_date): score.score
-        for report in reports
-        for score in report.lesson_scores.all()
+        (sc.lesson_id, rep.report_date): sc.score
+        for rep in reports for sc in rep.lesson_scores.all()
     }
 
-    # Flights per date for metadata
-    all_flights = Flight.objects.filter(pilot=member, logsheet__log_date__in=report_dates).select_related("logsheet", "instructor")
+    # Fetch flights for metadata (instructor initials, days ago)
+    flights = (
+        Flight.objects
+        .filter(pilot=member, logsheet__log_date__in=report_dates)
+        .select_related("logsheet", "instructor")
+    )
     flights_by_date = defaultdict(list)
     today = now().date()
-
-    for flight in all_flights:
-        if not flight.instructor:
+    for f in flights:
+        if not f.instructor:
             continue
-        log_date = flight.logsheet.log_date
-        days_ago = (today - log_date).days
-        initials = "".join([s[0] for s in flight.instructor.full_display_name.split() if s])
-        #altitude = flight.release_altitude or ""
-        flights_by_date[log_date].append({
-            "days_ago": days_ago,
-            "initials": initials,
-            #"altitude": altitude,
-            "full_name": flight.instructor.full_display_name,
+        d = f.logsheet.log_date
+        flights_by_date[d].append({
+            "days_ago": (today - d).days,
+            "initials": "".join([n[0] for n in f.instructor.full_display_name.split()]),
+            "full_name": f.instructor.full_display_name,
         })
 
-    # Build grid rows
+    # Compose grid rows per lesson
     lesson_data = []
     for lesson in lessons:
         row = {
@@ -264,109 +369,89 @@ def member_training_grid(request, member_id):
             "scores": [],
             "max_score": ""
         }
-        max_numeric = []
-        altitudes=""
-
-        for date_obj in report_dates:
-            score = scores_lookup.get((lesson.id, date_obj), "")
-
+        max_scores = []
+        for d in report_dates:
+            score = scores_lookup.get((lesson.id, d), "")
             if score.isdigit():
-                max_numeric.append(int(score))
-
-            flights = flights_by_date.get(date_obj, [])
-            if flights:
-                #altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
-                initials = flights[0]["initials"]
-                tooltip = f"{flights[0]['full_name']} – {len(flights)} flight(s) – {flights[0]['days_ago']} days ago – {altitudes}"
-                label = f"{initials}<br>{flights[0]['days_ago']}<br>{altitudes}"
+                max_scores.append(int(score))
+            meta = flights_by_date.get(d, [])
+            if meta:
+                info = meta[0]
+                label = f"{info['initials']}<br>{info['days_ago']}"
+                tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
             else:
-                tooltip = ""
-                label = ""
-
-            row["scores"].append({
-                "score": score,
-                "tooltip": tooltip,
-                "label": label,
-            })
-
-        row["max_score"] = str(max(max_numeric)) if max_numeric else ""
+                label = tooltip = ""
+            row["scores"].append({"score": score, "label": label, "tooltip": tooltip})
+        row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
-    # Build header info for each instruction date
+    # Build column metadata for template headers
     column_metadata = []
-    for date_obj in report_dates:
-        flights = flights_by_date.get(date_obj, [])
-        if flights:
-            initials = flights[0]['initials']
-            days_ago = flights[0]['days_ago']
-            #altitudes = " + ".join(str(f["altitude"]) for f in flights if f["altitude"])
-        else:
-            initials = ""
-            days_ago = ""
-            #altitudes = ""
+    for d in report_dates:
+        meta = flights_by_date.get(d, [{}])[0]
         column_metadata.append({
-            "date": date_obj,
-            "initials": initials,
-            "days_ago": days_ago,
-            #"altitudes": altitudes,
+            "date": d,
+            "initials": meta.get("initials", ""),
+            "days_ago": meta.get("days_ago", ""),
         })
 
-    context = {
+    return render(request, "shared/training_grid.html", {
         "member": member,
         "lesson_data": lesson_data,
         "report_dates": report_dates,
         "column_metadata": column_metadata,
-    }
+    })
 
-    return render(request, "shared/training_grid.html", context)
-##########################################################
-
-# instructors/views.py (partial)
+####################################################
+# log_ground_instruction
+#
+# Presents a form to record a ground instruction session and its scores,
+# then saves the session and associated lesson scores.
+#
+# GET: Shows blank formset for each lesson.
+# POST: Validates and saves GroundInstruction and GroundLessonScore.
+#
+# Context:
+# - form: GroundInstructionForm
+# - formset: GroundLessonScoreFormSet
+# - form_rows: paired list of (form, lesson) tuples for rendering
+# - student: Member instance (or None)
+####################################################
 @instructor_required
 def log_ground_instruction(request):
     student_id = request.GET.get("student")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
-
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
-        #print("POST data:", request.POST)
-
         form = GroundInstructionForm(request.POST)
         formset = GroundLessonScoreFormSet(request.POST)
-        formset.total_form_count()  # ✅ Critical for non-ModelForm formsets
-
+        formset.total_form_count()  # ensures management form counts
 
         if form.is_valid() and formset.is_valid():
             session = form.save(commit=False)
             session.instructor = request.user
             session.student = student
             session.save()
-
-            for form_data in formset.cleaned_data:
-                lesson_id = form_data.get("lesson")
-                score = form_data.get("score")
-                if lesson_id and score:
-                    lesson = TrainingLesson.objects.get(pk=lesson_id)
+            # Create scores for each submitted lesson
+            for entry in formset.cleaned_data:
+                lid = entry.get("lesson")
+                sc = entry.get("score")
+                if lid and sc:
+                    lesson = TrainingLesson.objects.get(pk=lid)
                     GroundLessonScore.objects.create(
-                        session=session,
-                        lesson=lesson,
-                        score=score
+                        session=session, lesson=lesson, score=sc
                     )
-
             messages.success(request, "Ground instruction session logged successfully.")
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
-            #print("Form errors:", form.errors)
-            #print("Formset errors:", formset.errors)
             messages.error(request, "Please correct the errors below.")
     else:
         form = GroundInstructionForm()
-        initial_data = [{"lesson": lesson.id} for lesson in lessons]
-        formset = GroundLessonScoreFormSet(initial=initial_data)
+        initial = [{"lesson": l.id} for l in lessons]
+        formset = GroundLessonScoreFormSet(initial=initial)
 
     form_rows = list(zip(formset.forms, lessons))
-
     return render(request, "instructors/log_ground_instruction.html", {
         "form": form,
         "formset": formset,
@@ -375,8 +460,46 @@ def log_ground_instruction(request):
     })
 
 
+
+####################################################
+# is_instructor
+#
+# Test function to determine if a user has instructor privileges.
+# Used with @user_passes_test for view access control.
+#
+# Parameters:
+# - user: Django User instance
+#
+# Returns:
+# - Boolean: True if authenticated and user.instructor flag is set
+####################################################
+
+
 def is_instructor(user):
     return user.is_authenticated and user.instructor
+
+
+####################################################
+# assign_qualification
+#
+# Assigns or revokes a club qualification for a given member.
+# Accessible only to active members who are instructors.
+#
+# URL Parameters:
+# - member_id: PK of the Member to assign qualification
+#
+# POST Behavior:
+# - Validates QualificationAssignForm with instructor and student context
+# - Saves form and redirects to member view on success
+#
+# GET Behavior:
+# - Instantiates empty form prepopulated with instructor and student
+# - Renders 'assign_qualification.html'
+#
+# Context:
+# - form: QualificationAssignForm instance
+# - student: Member instance being qualified
+####################################################
 
 @active_member_required
 @user_passes_test(is_instructor)
@@ -400,7 +523,22 @@ def assign_qualification(request, member_id):
 def instructors_home(request):
      return render(request, "instructors/instructors_home.html")
 
-############################################
+####################################################
+# progress_dashboard
+#
+# Renders the instructor dashboard showing two sections:
+#  - Active student members ('student')
+#  - Active rated pilots (non-students)
+#
+# The view fetches snapshots of precomputed progress, combining
+# solo and checkride percentages and session counts.
+# Also lists any pending reports in the last 30 days.
+#
+# Context:
+# - pending_reports: List of dicts with 'pilot', 'date', 'report_url'
+# - students_data: List of dicts with per-student 'solo_pct', 'rating_pct', 'sessions', 'solo_url', 'checkride_url'
+# - rated_data: Same as students_data but for rated members
+####################################################
 
 @instructor_required
 def progress_dashboard(request):
@@ -509,7 +647,16 @@ def progress_dashboard(request):
         'rated_data':      rated_data,
     })
 
-######################################################
+####################################################
+# edit_syllabus_document
+#
+# Allows instructors to edit a SyllabusDocument identified by slug.
+# GET: Shows form with existing content. POST: Saves updates.
+#
+# Context:
+# - form: SyllabusDocumentForm instance
+# - doc: SyllabusDocument instance
+####################################################
 
 @instructor_required
 def edit_syllabus_document(request, slug):
@@ -529,6 +676,22 @@ def edit_syllabus_document(request, slug):
     })
 
 
+####################################################
+# member_instruction_record
+#
+# Displays a detailed timeline and summary of all instruction
+# (flight reports and ground sessions) for a student.
+# Includes flight summaries, chart data for progress over time,
+# and blocks of session detail.
+#
+# Context:
+# - member: Member instance
+# - flights_summary: Output of get_flight_summary_for_member
+# - report_blocks: List of dicts describing each session block
+# - chart_dates, chart_solo, chart_rating, chart_anchors: Lists for charting
+# - first_solo_str: Date string of first solo flight
+# - *_json: JSON-encoded chart data for frontend JS
+####################################################
 
 def member_instruction_record(request, member_id):
     member = get_object_or_404(
@@ -795,6 +958,16 @@ def member_instruction_record(request, member_id):
 
     })
 
+####################################################
+# public_syllabus_qr
+#
+# Generates and returns a QR code PNG that links to the
+# public detail view of a given syllabus lesson code.
+#
+# Parameters:
+# - request: HttpRequest
+# - code: TrainingLesson.code string
+####################################################
 
 def public_syllabus_qr(request, code):
     url = request.build_absolute_uri(
@@ -804,6 +977,16 @@ def public_syllabus_qr(request, code):
     buf = BytesIO()
     img.save(buf, format='PNG')
     return HttpResponse(buf.getvalue(), content_type='image/png')
+
+####################################################
+# public_syllabus_full
+#
+# Displays the full syllabus for public consumption, including
+# header, materials, and all lessons in code order.
+#
+# Parameters:
+# - request: HttpRequest
+####################################################
 
 @require_GET
 def public_syllabus_full(request):
@@ -818,6 +1001,16 @@ def public_syllabus_full(request):
                   "instructors/syllabus_full.html",
                   {"phases": phases, "header": header, "materials": materials, "lessons": lessons})
 
+####################################################
+# member_logbook
+#
+# Renders a combined logbook timeline for the current user,
+# merging flight events and ground instruction into pages
+# with minutes, counts, and event details.
+#
+# Parameters:
+# - request: HttpRequest
+####################################################
 
 @active_member_required
 def member_logbook(request):
@@ -1082,15 +1275,17 @@ def member_logbook(request):
     })
 
 
-###########################
-#
+####################################################
 # _build_signoff_records
 #
-# student: Member instance
-# threshold_scores: list of score strings e.g. ['3','4'] or ['4']
-# requirement_check: a lambda taking a lesson and returning bool
-#                    e.g. lambda l: l.is_required_for_solo()
-
+# Internal helper to assemble the latest sign-off date and instructor
+# for each lesson required under a given standard (solo or rating).
+#
+# Parameters:
+# - student: Member instance
+# - threshold_scores: list of score strings to include
+# - requirement_check: callable(lesson) -> bool
+####################################################
  
 def _build_signoff_records(student, threshold_scores, requirement_check):
     records = []
@@ -1152,6 +1347,17 @@ def _build_signoff_records(student, threshold_scores, requirement_check):
 
     return records
 
+####################################################
+# needed_for_solo
+#
+# Displays the list of lessons a student still needs to achieve
+# solo standard (score 3 or 4) along with existing sign-offs.
+#
+# Parameters:
+# - request: HttpRequest
+# - member_id: PK of the student Member
+####################################################
+
 @active_member_required
 def needed_for_solo(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
@@ -1169,6 +1375,17 @@ def needed_for_solo(request, member_id):
         'records': records,
         'required_score': 3,
     })
+
+####################################################
+# needed_for_checkride
+#
+# Shows lessons and flight-hour metrics required for a private
+# checkride, including two-calendar-month window and thresholds.
+#
+# Parameters:
+# - request: HttpRequest
+# - member_id: PK of the student Member
+####################################################
 
 @active_member_required
 def needed_for_checkride(request, member_id):
@@ -1289,6 +1506,16 @@ def needed_for_checkride(request, member_id):
     })
 
 
+####################################################
+# instruction_report_detail
+#
+# Returns an HTML fragment listing all the LessonScores for a given
+# InstructionReport, used for AJAX detail panels.
+#
+# Parameters:
+# - request: HttpRequest
+# - report_id: PK of the InstructionReport
+####################################################
 
 def instruction_report_detail(request, report_id):
     """

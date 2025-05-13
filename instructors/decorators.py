@@ -5,6 +5,23 @@ from members.models import Member
 from members.constants.membership import ALLOWED_MEMBERSHIP_STATUSES
 from django.http import HttpResponseForbidden
 
+
+####################################################
+# instructor_required
+#
+# Decorator to restrict view access to authenticated instructors.
+# Allows superusers, then checks:
+# - membership_status in ALLOWED_MEMBERSHIP_STATUSES
+# - user.instructor flag True
+# Redirects unauthenticated users to login;
+# renders 403.html for forbidden access.
+#
+# Usage:
+# @instructor_required
+# def my_view(request, ...):
+#     ...
+####################################################
+
 def instructor_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
@@ -27,6 +44,22 @@ def instructor_required(view_func):
 
     return wrapper
 
+####################################################
+# member_or_instructor_required
+#
+# Decorator to restrict view access to either:
+# - the member matching member_id URL arg
+# - any instructor (or superuser)
+# Ensures authenticated, valid membership, then
+# checks user == member or user.instructor.
+# Redirects unauthenticated to login;
+# renders 403.html for forbidden access.
+#
+# Usage:
+# @member_or_instructor_required
+# def my_view(request, member_id, ...):
+#     ...
+####################################################
 
 
 def member_or_instructor_required(view_func):
