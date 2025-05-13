@@ -4,6 +4,11 @@ Detailed descriptions of all Django models in the **instructors** app.
 
 ---
 
+## Entity Relationship Diagram
+
+![Instructors Erd](instructors.png)
+---
+
 ## TrainingPhase
 
 High-level grouping for lessons in the syllabus (e.g., "Before We Fly").
