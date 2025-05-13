@@ -7,7 +7,7 @@ from django.db.models import Count, Sum, Max, F, Value
 from django.db.models.functions import Coalesce
 from django.db.models.fields import DurationField
 from logsheet.models import Flight
-from .models import StudentProgressSnapshot, GroundInstruction, GroundLessonScore, TrainingLesson
+from .models import StudentProgressSnapshot, GroundInstruction, GroundLessonScore, TrainingLesson, InstructionReport, LessonScore
 
 def get_flight_summary_for_member(member):
     pilot_qs = Flight.objects.filter(pilot=member, glider__isnull=False)
@@ -93,7 +93,7 @@ def get_flight_summary_for_member(member):
 
     ##################################
     # Rebuild the progress snapshot for a given student:
-    #  - sessions: count of both Flight.instructor sessions AND GroundInstruction sessions
+    #  - sessions: count of both InstructionReport sessions AND GroundInstruction sessions
     #  - solo_progress: fraction of solo-required lessons scored ≥3
     #  - checkride_progress: fraction of checkride-required lessons scored ==4
 
@@ -101,37 +101,62 @@ def update_student_progress_snapshot(student):
     snapshot, _ = StudentProgressSnapshot.objects.get_or_create(student=student)
 
     # 1. Count sessions
-    flight_sessions = Flight.objects.filter(instructor=student).count()
+    # ✅ Count flight-based reports instead of Flight objects
+    report_sessions = InstructionReport.objects.filter(student=student).count()
+    # ✅ Count ground sessions
     ground_sessions = GroundInstruction.objects.filter(student=student).count()
-    snapshot.sessions = flight_sessions + ground_sessions
+    # ✅ Sum them both
+    snapshot.sessions = report_sessions + ground_sessions
 
-    # 2. Build lesson ID sets in Python
-    lessons       = TrainingLesson.objects.all()
-    solo_ids      = [l.id for l in lessons if l.far_requirement]
-    rating_ids    = [l.id for l in lessons if l.is_required_for_private()]
+    print(f"DEBUG {student}: reports={report_sessions}, ground={ground_sessions}")
 
-    solo_total    = len(solo_ids)
-    rating_total  = len(rating_ids)
+    # 2) figure out which lessons count
+    lessons     = list(TrainingLesson.objects.all())
+    solo_ids    = [l.id for l in lessons if l.far_requirement]
+    rating_ids  = [l.id for l in lessons if l.is_required_for_private()]
 
-    # 3. Count completed scores using those ID lists
-    solo_completed = GroundLessonScore.objects.filter(
-        session__student=student,
-        lesson_id__in=solo_ids,
-        score__gte=3
-    ).count()
+    solo_total   = len(solo_ids)
+    rating_total = len(rating_ids)
 
-    rating_completed = GroundLessonScore.objects.filter(
-        session__student=student,
-        lesson_id__in=rating_ids,
-        score=4
-    ).count()
+    # 3) fetch distinct lesson IDs from both score tables
+    ls_solo = set(
+        LessonScore.objects
+        .filter(report__student=student,
+                lesson_id__in=solo_ids,
+                score__gte=3)
+        .values_list('lesson_id', flat=True)
+    )
+    gs_solo = set(
+        GroundLessonScore.objects
+        .filter(session__student=student,
+                lesson_id__in=solo_ids,
+                score__gte=3)
+        .values_list('lesson_id', flat=True)
+    )
 
-    # 4. Compute ratios (guard divide-by-zero)
-    snapshot.solo_progress      = (solo_completed  / solo_total)   if solo_total   else 0.0
-    snapshot.checkride_progress = (rating_completed / rating_total) if rating_total else 0.0
+    ls_rating = set(
+        LessonScore.objects
+        .filter(report__student=student,
+                lesson_id__in=rating_ids,
+                score=4)
+        .values_list('lesson_id', flat=True)
+    )
+    gs_rating = set(
+        GroundLessonScore.objects
+        .filter(session__student=student,
+                lesson_id__in=rating_ids,
+                score=4)
+        .values_list('lesson_id', flat=True)
+    )
 
-    # 5. Timestamp & save
+    # 4) combine and compute ratios
+    solo_done    = ls_solo.union(gs_solo)
+    rating_done  = ls_rating.union(gs_rating)
+
+    snapshot.solo_progress      = (len(solo_done)   / solo_total)   if solo_total   else 0.0
+    snapshot.checkride_progress = (len(rating_done) / rating_total) if rating_total else 0.0
+
+    # 5) timestamp & save
     snapshot.last_updated = timezone.now()
     snapshot.save()
-
     return snapshot

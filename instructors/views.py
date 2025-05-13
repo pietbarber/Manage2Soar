@@ -414,17 +414,16 @@ def progress_dashboard(request):
         )
         .annotate(
             last_flight=Max('flights_as_pilot__logsheet__log_date'),
-            report_count=Count('instruction_reports', distinct=True)
         )
         .order_by('last_name')
     )
+
     rated_qs = (
         Member.objects
         .filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
         .exclude(glider_rating='student')
         .annotate(
             last_flight=Max('flights_as_pilot__logsheet__log_date'),
-            report_count=Count('instruction_reports', distinct=True)
         )
         .order_by('last_name')
     )
@@ -449,7 +448,6 @@ def progress_dashboard(request):
 
         students_data.append({
             'member':        m,
-            'report_count':  m.report_count,
             'solo_pct':      solo_pct,
             'rating_pct':    rating_pct,
             'sessions':      sessions,
@@ -466,11 +464,11 @@ def progress_dashboard(request):
 
         rated_data.append({
             'member':       m,
-            'report_count': m.report_count,
             'solo_pct':     solo_pct,
             'rating_pct':   rating_pct,
             'sessions':     sessions,
         })
+
 
     # ————————————————————————————————
     # 4) Pending reports (unchanged)
