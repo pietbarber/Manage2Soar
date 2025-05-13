@@ -47,6 +47,7 @@ This roadmap outlines current and future development goals for the Skyline Soari
 - QuickBooks Online CSV export for finalized logsheets.
 - Student Written Tests for pre-solo, and new solos. 
 - Super Fancy Charts and plots for all club activity
+- **Future-Piet**: Investigate D3.js (or similar) for interactive dashboards and ERD diagrams.  
 
 
 ---
