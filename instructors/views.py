@@ -10,6 +10,7 @@ from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta, time
 
+from django import forms
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse 
 from django.views.generic import FormView
@@ -1535,6 +1536,11 @@ def instruction_report_detail(request, report_id):
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class    = TestBuilderForm
+    pass_percentage = forms.DecimalField(
+        max_digits=5, decimal_places=2,
+        initial=100,
+        help_text="Minimum % score required to pass"
+    )
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
@@ -1572,7 +1578,7 @@ class CreateWrittenTestView(FormView):
         from django.utils import timezone
         tmpl = WrittenTestTemplate.objects.create(
             name=f"Test by {self.request.user} on {timezone.now().date()}",
-            pass_percentage=100,
+            pass_percentage=data['pass_percentage'],
             created_by=self.request.user
         )
     
@@ -1636,3 +1642,16 @@ class CreateWrittenTestView(FormView):
     
         # 5) Redirect into the quiz runner
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
+
+class TestBuilderForm(forms.Form):
+    pass_percentage = forms.DecimalField(
+        max_digits=5, decimal_places=2,
+        initial=100,
+        help_text="Minimum % score required to pass"
+    )
+
+    student = forms.ModelChoiceField(
+        queryset=Member.objects.filter(is_active=True),
+        help_text="Who should take this test",
+        widget=forms.Select(attrs={'class':'form-select'})
+    )

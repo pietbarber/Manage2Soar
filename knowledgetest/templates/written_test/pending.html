@@ -1,0 +1,14 @@
+{% for asn in assignments %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <strong>{{ asn.template.name }}</strong>
+      assigned on {{ asn.assigned_at|date:"M j, Y" }} by {{ asn.instructor }}
+      <a href="{% url 'knowledgetest:quiz-start' asn.template.pk %}"
+         class="btn btn-sm btn-primary float-end">
+        Start Test
+      </a>
+    </div>
+  </div>
+{% empty %}
+  <p>No tests pending. 🎉</p>
+{% endfor %}

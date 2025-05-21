@@ -1,9 +1,22 @@
 {% extends "base.html" %}
 
 {% block content %}
+
+
   <div class="text-center mt-5">
     <h1 class="display-4">Welcome to the Skyline Soaring Members Site 🛫</h1>
     <p class="lead">This is the future home of the club dashboard.</p>
     <p>Check the navigation bar to access members, duty rosters, log sheets, and more.</p>
   </div>
+  {% if user.is_authenticated %}
+
+  {% if pending_tests_count > 0 %}
+  <div class="alert alert-info">
+    You have {{ pending_tests_count }} written test{{ pending_tests_count|pluralize }} waiting —
+    <a href="{% url 'knowledgetest:quiz-pending' %}">take them now</a>.
+  </div>
+  {% endif %}
+
+{% endif %}
+
 {% endblock %}

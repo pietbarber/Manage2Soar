@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import FormView
 from django.utils import timezone
+from django.views.generic import ListView
 
 from knowledgetest.models import (
     WrittenTestTemplate,
@@ -11,9 +12,11 @@ from knowledgetest.models import (
     Question,
     WrittenTestAttempt,
     WrittenTestAnswer, 
-    QuestionCategory
+    QuestionCategory,
+    WrittenTestAssignment
 )
 from knowledgetest.forms import TestSubmissionForm, TestBuilderForm
+
 
 PRESETS = {
 
@@ -84,7 +87,36 @@ class WrittenTestSubmitView(View):
         score = (correct / total) * 100 if total else 0
         attempt.score_percentage = score
         attempt.passed = score >= float(tmpl.pass_percentage)
+
         attempt.save()
+
+        # 1) Mark any assignment complete
+        from .models import WrittenTestAssignment
+        try:
+            asn = WrittenTestAssignment.objects.get(
+                template=tmpl, student=request.user, completed=False
+            )
+            asn.attempt = attempt
+            asn.completed = True
+            asn.save(update_fields=['attempt','completed'])
+        except WrittenTestAssignment.DoesNotExist:
+            pass
+
+        # 2) Log into InstructionReport, using the instructor who created the test
+        from instructors.models import InstructionReport
+        proctor = tmpl.created_by  # this is the instructor who built the template
+        if proctor:
+            InstructionReport.objects.create(
+                student=request.user,
+                instructor=proctor,
+                report_date=timezone.now().date(),
+                report_text=(
+                    f'Written test "{tmpl.name}" completed: '
+                    f'{attempt.score_percentage:.0f}% '
+                    f'({"Passed" if attempt.passed else "Failed"})'
+                )
+            )
+
         return redirect('knowledgetest:quiz-result', attempt.pk)
 
 class WrittenTestResultView(DetailView):
@@ -132,6 +164,12 @@ class CreateWrittenTestView(FormView):
             created_by=self.request.user
         )
 
+        assignment = WrittenTestAssignment.objects.create(
+            template=tmpl,
+            student=form.cleaned_data['student'],
+            instructor=self.request.user
+        )
+
         order = 1
         # 3. First, include forced questions
         for qnum in must:
@@ -161,3 +199,14 @@ class CreateWrittenTestView(FormView):
 
         # 5. Redirect to the quiz start
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
+
+
+class PendingTestsView(ListView):
+    template_name = "written_test/pending.html"
+    context_object_name = 'assignments'
+
+    def get_queryset(self):
+        return WrittenTestAssignment.objects.filter(
+            student=self.request.user,
+            completed=False
+        ).select_related('template')

@@ -155,3 +155,36 @@ class WrittenTestAnswer(models.Model):
 
     def __str__(self):
         return f"{self.attempt.student} - Q{self.question.qnum}: {self.selected_answer}"
+    
+class WrittenTestAssignment(models.Model):
+    template = models.ForeignKey(
+        WrittenTestTemplate,
+        on_delete=models.CASCADE,
+        related_name='assignments'
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='assigned_written_tests'
+    )
+    instructor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='issued_written_tests'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    completed = models.BooleanField(default=False)
+    attempt = models.OneToOneField(
+        WrittenTestAttempt,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+'
+    )
+
+    class Meta:
+        unique_together = ('template','student')
+
+    def __str__(self):
+        return f"{self.template.name} → {self.student}"

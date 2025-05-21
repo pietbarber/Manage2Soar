@@ -182,17 +182,27 @@ def biography_view(request, member_id):
 
 #########################
 # home() View
-
-# This view renders the homepage template (home.html). It is typically used
-# as the root URL of the site ("/") and currently requires no authentication.
-
-# It is defined in members/views.py but mapped in the project-wide urls.py:
-# path("", member_views.home, name="home")
-
-# This page may be repurposed later to act as a dashboard or post-login landing page.
+#
+# Renders the homepage template (home.html). This view handles the root URL ("/")
+# and requires no authentication to access. It now also calculates and provides
+# the count of pending written tests assigned to the current user as
+# 'pending_tests_count' in the template context.
+#
+# Defined in members/views.py and mapped in the project-wide urls.py:
+#     path("", member_views.home, name="home")
+#
+# Future enhancements may include turning this into a full dashboard,
+# displaying pending tests, recent instruction reports, and other user-specific data.
 
 def home(request):
-    return render(request, "home.html")
+    pending_count = 0
+    if request.user.is_authenticated:
+        pending_count = request.user.assigned_written_tests.filter(
+            completed=False
+        ).count()
+    return render(request, "home.html", {
+        "pending_tests_count": pending_count,
+    })
 
 #########################
 # set_password() View
