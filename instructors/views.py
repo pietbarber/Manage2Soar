@@ -1,24 +1,30 @@
 
+
 import itertools
 import json
-from collections import OrderedDict
-from django.urls import reverse
+from collections import namedtuple, OrderedDict
 import qrcode
-from django.core.exceptions import PermissionDenied
-
+import random, re
 from io import BytesIO
-from django.http import HttpResponse 
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta, time
-from .decorators import instructor_required
+
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse 
+from django.views.generic import FormView
 from django.views.decorators.http import require_POST, require_GET
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib import messages
 from django.db.models import Count, Max, Sum, F, Q, Value
 from django.forms import formset_factory
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
+
 from instructors.decorators import member_or_instructor_required, instructor_required
 from instructors.forms import (
     InstructionReportForm, LessonScoreSimpleForm, 
@@ -26,25 +32,21 @@ from instructors.forms import (
     GroundInstructionForm, GroundLessonScoreFormSet, 
     SyllabusDocumentForm
 )
+from instructors.utils import get_flight_summary_for_member
 from instructors.models import (
     InstructionReport, LessonScore, GroundInstruction, 
     GroundLessonScore, TrainingLesson, SyllabusDocument, 
-    TrainingPhase
+    TrainingPhase, StudentProgressSnapshot
 )
 from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
 from members.models import Member
-from django.contrib.auth.decorators import user_passes_test
-from instructors.models import (
-     InstructionReport, LessonScore, GroundInstruction, GroundLessonScore,
-     TrainingLesson, SyllabusDocument, TrainingPhase, StudentProgressSnapshot
-)
-from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-from instructors.utils import get_flight_summary_for_member
-from collections import namedtuple
-from datetime import date
-from dateutil.relativedelta import relativedelta
+
+from knowledgetest.forms import TestBuilderForm
+from knowledgetest.models import QuestionCategory, Question, WrittenTestTemplate, WrittenTestTemplateQuestion
+from knowledgetest.views import PRESETS
+
 
 
 
@@ -1528,3 +1530,109 @@ def instruction_report_detail(request, report_id):
     return render(request, 'instructors/_instruction_detail_fragment.html', {
         'report': rpt,
     })
+
+@method_decorator(instructor_required, name='dispatch')
+class CreateWrittenTestView(FormView):
+    template_name = "written_test/create.html"
+    form_class    = TestBuilderForm
+
+    def get_form_kwargs(self):
+        kw = super().get_form_kwargs()
+        preset_key = self.request.GET.get('preset')  # might be None
+        if preset_key:
+            preset_dict = PRESETS.get(preset_key.upper())
+        else:
+            preset_dict = None
+        kw['preset'] = preset_dict
+        return kw
+
+    def get_context_data(self, **ctx):
+        ctx = super().get_context_data(**ctx)
+        ctx['presets'] = PRESETS.keys()
+        return ctx
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+    
+        # 1) Parse forced‐in questions
+        import re
+        must = [int(n) for n in re.findall(r'\d+', data.get('must_include', ''))]
+    
+        # 2) Gather per‐category weights
+        from knowledgetest.models import Question, WrittenTestTemplate, WrittenTestTemplateQuestion
+        weights = {
+            code: data[f'weight_{code}']
+            for code in QuestionCategory.objects.values_list('code', flat=True)
+            if data[f'weight_{code}'] > 0
+        }
+        total_weights = sum(weights.values())
+    
+        # 3) Create the template
+        from knowledgetest.models import WrittenTestTemplate
+        from django.utils import timezone
+        tmpl = WrittenTestTemplate.objects.create(
+            name=f"Test by {self.request.user} on {timezone.now().date()}",
+            pass_percentage=100,
+            created_by=self.request.user
+        )
+    
+        order = 1
+        # — include forced questions first —
+        for qnum in must:
+            try:
+                q = Question.objects.get(pk=qnum)
+                WrittenTestTemplateQuestion.objects.create(
+                    template=tmpl, question=q, order=order
+                )
+                order += 1
+            except Question.DoesNotExist:
+                # skip invalid Q-numbers
+                continue
+    
+    
+        # 4a) If they asked for more than 50 total, clamp to 50
+        if total_weights > 50:
+            # how many more we can pick
+            slots = 50 - len(must)
+            # union of all questions in selected categories, excluding forced ones
+            pool = Question.objects.filter(
+                category__code__in=weights.keys()
+            ).exclude(qnum__in=must)
+    
+            pool_list = list(pool)
+            if len(pool_list) < slots:
+                messages.warning(
+                    self.request,
+                    f"Only {len(pool_list)} questions available in chosen sections; "
+                    f"requested {total_weights}, will use {len(pool_list)} remaining slots."
+                )
+            # sample up to 'slots'
+            chosen = random.sample(pool_list, min(slots, len(pool_list)))
+            for q in chosen:
+                WrittenTestTemplateQuestion.objects.create(
+                    template=tmpl, question=q, order=order
+                )
+                order += 1
+    
+        else:
+            # 4b) Otherwise, honor each category’s weight
+            for code, cnt in weights.items():
+                pool = list(
+                    Question.objects
+                            .filter(category__code=code)
+                            .exclude(qnum__in=must)
+                )
+                if len(pool) < cnt:
+                    messages.warning(
+                        self.request,
+                        f"Only {len(pool)} questions available in section '{code}', "
+                        f"{cnt} requested."
+                    )
+                for q in random.sample(pool, min(cnt, len(pool))):
+                    WrittenTestTemplateQuestion.objects.create(
+                        template=tmpl, question=q, order=order
+                    )
+                    order += 1
+    
+        # 5) Redirect into the quiz runner
+        return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))

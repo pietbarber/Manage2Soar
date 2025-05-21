@@ -14,20 +14,22 @@
 
   <form id="quiz-form" action="{{ submit_url }}" method="post">
     {% csrf_token %}
-    {{ form.answers if form }}
+    {% if form %}{{ form.answers }}{% endif %}
     <input type="hidden" id="answers-input" name="answers" />
-
-    <!-- Quiz widget root -->
-    <div id="quiz-root"
-         data-questions='{{ questions_json|escapejs }}'
-    ></div>
-
-    <div class="mt-4">
-      <button type="submit" class="btn btn-primary">Submit Test</button>
-    </div>
+  
+    {# Now we embed a pure JSON array, not a quoted string #}
+    {{ questions|json_script:"questions-data" }}
+    <div id="quiz-root"></div>
+    <button type="submit" class="btn btn-primary">Submit Test</button>
   </form>
+   
 </div>
 
 <!-- React bundle for quiz.js -->
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="{% static 'js/quiz.js' %}"></script>
+
+
 {% endblock %}

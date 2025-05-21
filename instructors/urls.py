@@ -1,5 +1,7 @@
 from django.urls import path
 from . import views
+from .views import CreateWrittenTestView
+
 
 app_name = "instructors"
 
@@ -18,6 +20,7 @@ urlpatterns = [
     path('students/<int:member_id>/needed-for-solo/', views.needed_for_solo, name='needed_for_solo'),
     path('students/<int:member_id>/needed-for-checkride/', views.needed_for_checkride, name='needed_for_checkride'),
     path('reports/<int:report_id>/detail/', views.instruction_report_detail, name='instruction_report_detail'),
+    path( 'tests/create/', CreateWrittenTestView.as_view(), name='create-written-test'),
 
 ]
 
