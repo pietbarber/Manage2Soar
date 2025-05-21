@@ -47,6 +47,7 @@ urlpatterns = [
     path("TRAINING/Syllabus/<str:code>/", instr_views.public_syllabus_detail,   name="public_syllabus_detail"),
     path("TRAINING/Syllabus/<str:code>/qr.png", instr_views.public_syllabus_qr, name="public_syllabus_qr"),
 
+    path("", include('knowledgetest.urls'))
 
 
 ]

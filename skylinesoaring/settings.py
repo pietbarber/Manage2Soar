@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "django_extensions",
     "instructors.apps.InstructorsConfig",
+    "knowledgetest"
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"

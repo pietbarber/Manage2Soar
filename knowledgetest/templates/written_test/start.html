@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>{{ template.name }}</h2>
+  <p>{{ template.description }}</p>
+
+  {% if form and form.non_field_errors %}
+    <div class="alert alert-danger">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <form id="quiz-form" action="{{ submit_url }}" method="post">
+    {% csrf_token %}
+    {{ form.answers if form }}
+    <input type="hidden" id="answers-input" name="answers" />
+
+    <!-- Quiz widget root -->
+    <div id="quiz-root"
+         data-questions='{{ questions_json|escapejs }}'
+    ></div>
+
+    <div class="mt-4">
+      <button type="submit" class="btn btn-primary">Submit Test</button>
+    </div>
+  </form>
+</div>
+
+<!-- React bundle for quiz.js -->
+<script src="{% static 'js/quiz.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>Results: {{ attempt.template.name }}</h2>
+  <p>
+    Score: <strong>{{ attempt.score_percentage }}%</strong>
+    {% if attempt.passed %}
+      <span class="badge bg-success">Passed</span>
+    {% else %}
+      <span class="badge bg-danger">Failed</span>
+    {% endif %}
+  </p>
+  <hr/>
+
+  <div class="list-group">
+    {% for ans in attempt.answers.all %}
+    <div class="list-group-item">
+      <strong>Q{{ ans.question.qnum }}.</strong>
+      <div class="question-text">
+        {{ ans.question.question_text|safe }}
+      </div>
+      Your answer:
+      <span class="{% if ans.is_correct %}text-success{% else %}text-danger{% endif %}">
+        {{ ans.selected_answer }}
+      </span>
+      &mdash; Correct:
+      <strong>{{ ans.question.correct_answer }}</strong>
+      {% if ans.question.explanation %}
+        <div class="explanation mt-2 text-muted">
+          {{ ans.question.explanation|safe }}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  
+
+
+  </div>
+</div>
+{% endblock %}
