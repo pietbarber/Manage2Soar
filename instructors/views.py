@@ -9,6 +9,7 @@ from io import BytesIO
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta, time
+from django.db import transaction
 
 from django import forms
 from django.core.exceptions import PermissionDenied
@@ -37,7 +38,7 @@ from instructors.utils import get_flight_summary_for_member
 from instructors.models import (
     InstructionReport, LessonScore, GroundInstruction, 
     GroundLessonScore, TrainingLesson, SyllabusDocument, 
-    TrainingPhase, StudentProgressSnapshot
+    TrainingPhase, StudentProgressSnapshot 
 )
 from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
@@ -45,8 +46,12 @@ from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 
 from knowledgetest.forms import TestBuilderForm
-from knowledgetest.models import QuestionCategory, Question, WrittenTestTemplate, WrittenTestTemplateQuestion
+from knowledgetest.models import (
+    QuestionCategory, Question, WrittenTestTemplate, 
+    WrittenTestTemplateQuestion, WrittenTestAssignment
+)
 from knowledgetest.views import PRESETS
+
 
 
 
@@ -1532,24 +1537,20 @@ def instruction_report_detail(request, report_id):
         'report': rpt,
     })
 
+
+
 @method_decorator(instructor_required, name='dispatch')
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
     form_class    = TestBuilderForm
-    pass_percentage = forms.DecimalField(
-        max_digits=5, decimal_places=2,
-        initial=100,
-        help_text="Minimum % score required to pass"
-    )
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
-        preset_key = self.request.GET.get('preset')  # might be None
+        preset_key = self.request.GET.get('preset')
         if preset_key:
-            preset_dict = PRESETS.get(preset_key.upper())
+            kw['preset'] = PRESETS.get(preset_key.upper())
         else:
-            preset_dict = None
-        kw['preset'] = preset_dict
+            kw['preset'] = None
         return kw
 
     def get_context_data(self, **ctx):
@@ -1559,31 +1560,38 @@ class CreateWrittenTestView(FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
-    
-        # 1) Parse forced‐in questions
-        import re
-        must = [int(n) for n in re.findall(r'\d+', data.get('must_include', ''))]
-    
-        # 2) Gather per‐category weights
-        from knowledgetest.models import Question, WrittenTestTemplate, WrittenTestTemplateQuestion
+        # 1. Pull weights & must_include
+        must = []
+        if data['must_include']:
+            import re
+            must = [int(n) for n in re.findall(r'\d+', data['must_include'])]
         weights = {
             code: data[f'weight_{code}']
             for code in QuestionCategory.objects.values_list('code', flat=True)
             if data[f'weight_{code}'] > 0
         }
-        total_weights = sum(weights.values())
-    
-        # 3) Create the template
-        from knowledgetest.models import WrittenTestTemplate
-        from django.utils import timezone
-        tmpl = WrittenTestTemplate.objects.create(
-            name=f"Test by {self.request.user} on {timezone.now().date()}",
-            pass_percentage=data['pass_percentage'],
-            created_by=self.request.user
+        total = sum(weights.values())
+        if total > 50:
+            form.add_error(None, "Cannot select more than 50 questions total.")
+            return self.form_invalid(form)
+
+        # 2. Build a template
+        with transaction.atomic():
+            tmpl = WrittenTestTemplate.objects.create(
+                name=f"Test by {self.request.user} on {timezone.now().date()}",
+                pass_percentage=data['pass_percentage'],
+                created_by=self.request.user
+            )
+        print("📝 Debug: creating assignment for student:", data.get('student'))
+
+        WrittenTestAssignment.objects.create(
+            template=tmpl,
+            student=data['student'],
+            instructor=self.request.user
         )
-    
+
         order = 1
-        # — include forced questions first —
+        # 3. First, include forced questions
         for qnum in must:
             try:
                 q = Question.objects.get(pk=qnum)
@@ -1592,55 +1600,24 @@ class CreateWrittenTestView(FormView):
                 )
                 order += 1
             except Question.DoesNotExist:
-                # skip invalid Q-numbers
                 continue
-    
-    
-        # 4a) If they asked for more than 50 total, clamp to 50
-        if total_weights > 50:
-            # how many more we can pick
-            slots = 50 - len(must)
-            # union of all questions in selected categories, excluding forced ones
-            pool = Question.objects.filter(
-                category__code__in=weights.keys()
-            ).exclude(qnum__in=must)
-    
-            pool_list = list(pool)
-            if len(pool_list) < slots:
-                messages.warning(
-                    self.request,
-                    f"Only {len(pool_list)} questions available in chosen sections; "
-                    f"requested {total_weights}, will use {len(pool_list)} remaining slots."
-                )
-            # sample up to 'slots'
-            chosen = random.sample(pool_list, min(slots, len(pool_list)))
+
+        # 4. Then, for each category, randomly choose unanswered ones
+        import random
+        for code, cnt in weights.items():
+            pool = list(
+                Question.objects
+                        .filter(category__code=code)
+                        .exclude(qnum__in=must)
+            )
+            chosen = random.sample(pool, min(cnt, len(pool)))
             for q in chosen:
                 WrittenTestTemplateQuestion.objects.create(
                     template=tmpl, question=q, order=order
                 )
                 order += 1
-    
-        else:
-            # 4b) Otherwise, honor each category’s weight
-            for code, cnt in weights.items():
-                pool = list(
-                    Question.objects
-                            .filter(category__code=code)
-                            .exclude(qnum__in=must)
-                )
-                if len(pool) < cnt:
-                    messages.warning(
-                        self.request,
-                        f"Only {len(pool)} questions available in section '{code}', "
-                        f"{cnt} requested."
-                    )
-                for q in random.sample(pool, min(cnt, len(pool))):
-                    WrittenTestTemplateQuestion.objects.create(
-                        template=tmpl, question=q, order=order
-                    )
-                    order += 1
-    
-        # 5) Redirect into the quiz runner
+
+        # 5. Redirect to the quiz start
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
 
 class TestBuilderForm(forms.Form):

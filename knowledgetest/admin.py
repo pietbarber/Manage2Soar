@@ -9,7 +9,8 @@ from .models import (
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,
     WrittenTestAttempt,
-    WrittenTestAnswer
+    WrittenTestAnswer,
+    WrittenTestAssignment
 )
 
 # Inline for template-question relationship
@@ -21,10 +22,16 @@ class TemplateQuestionInline(admin.TabularInline):
 
 @admin.register(WrittenTestTemplate)
 class WrittenTestTemplateAdmin(admin.ModelAdmin):
-    list_display = ['name', 'pass_percentage', 'time_limit', 'created_by', 'created_at']
+    list_display = ['name', 'pass_percentage', 'assigned_to', 'created_by', 'created_at']
     search_fields = ['name', 'description']
     list_filter = ['pass_percentage']
     inlines = [TemplateQuestionInline]
+
+    def assigned_to(self, obj):
+        # Show the full display name for each assigned student
+        students = [assignment.student.full_display_name for assignment in obj.assignments.all()]
+        return ", ".join(students) if students else '-'
+    assigned_to.short_description = 'Assigned To'
 
 @admin.register(QuestionCategory)
 class QuestionCategoryAdmin(admin.ModelAdmin):

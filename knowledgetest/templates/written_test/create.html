@@ -14,8 +14,33 @@
       <a href="?preset={{ p }}" class="btn btn-sm btn-outline-secondary">{{ p }}</a>
     {% endfor %}
   </p>
+
   <form method="post">
     {% csrf_token %}
+
+    <div class="mb-4">
+      {{ form.student.label_tag }}  
+      {{ form.student }}
+      {% for error in form.student.errors %}
+      <div class="invalid-feedback d-block">{{ error }}</div>
+      {% endfor %}
+
+      {% if form.student.help_text %}
+        <small class="form-text text-muted">{{ form.student.help_text }}</small>
+      {% endif %}
+    </div>
+    <div class="mb-4">
+      {{ form.pass_percentage.label_tag }}
+      {{ form.pass_percentage }}
+      {% for err in form.pass_percentage.errors %}
+        <div class="invalid-feedback d-block">{{ err }}</div>
+      {% endfor %}
+      {% if form.pass_percentage.help_text %}
+        <small class="form-text text-muted">{{ form.pass_percentage.help_text }}</small>
+      {% endif %}
+    </div>
+    
+
     <table class="table table-bordered">
       <thead>
         <tr>
