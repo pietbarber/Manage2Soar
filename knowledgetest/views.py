@@ -205,6 +205,16 @@ class WrittenTestSubmitView(View):
         attempt.passed = score >= float(tmpl.pass_percentage)
 
         attempt.save()
+        # Build a breakdown of how many questions per category were on this test
+        from django.db.models import Count
+        breakdown_qs = attempt.answers.values(
+            'question__category__code'
+        ).annotate(num=Count('pk'))
+        breakdown = [
+            f"{entry['question__category__code']} ({entry['num']})"
+            for entry in breakdown_qs
+        ]
+        breakdown_txt = ", ".join(breakdown)
 
         # 1) Mark any assignment complete
         try:
@@ -218,19 +228,30 @@ class WrittenTestSubmitView(View):
             pass
 
         # 2) Log into InstructionReport, using the instructor who created the test
-        proctor = tmpl.created_by  # this is the instructor who built the template
+        proctor = tmpl.created_by
         if proctor:
+            # build a subject‐count breakdown
+            from django.db.models import Count
+            breakdown_qs = attempt.answers.values(
+                'question__category__code'
+            ).annotate(num=Count('pk'))
+            breakdown_list = [
+                f"{entry['question__category__code']} ({entry['num']})"
+                for entry in breakdown_qs
+            ]
+            breakdown_txt = ", ".join(breakdown_list)
+
             InstructionReport.objects.create(
                 student=request.user,
                 instructor=proctor,
                 report_date=timezone.now().date(),
                 report_text=(
-                    f'Written test "{tmpl.name}" completed: '
+                    f'Written test \"{tmpl.name}\" completed: '
                     f'{attempt.score_percentage:.0f}% '
-                    f'({"Passed" if attempt.passed else "Failed"})'
+                    f'({"Passed" if attempt.passed else "Failed"}). '
+                    f'Subject breakdown: {breakdown_txt}.'
                 )
             )
-
         return redirect('knowledgetest:quiz-result', attempt.pk)
 
 class WrittenTestResultView(DetailView):
