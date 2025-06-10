@@ -7,7 +7,7 @@
     <thead>
       <tr>
         <th class="text-end">Lesson</th>
-        <th>Regulation</th>
+        <th>Solo Regulation</th>
         <th>Date</th>
         <th>Signed-off By</th>
       </tr>
@@ -16,7 +16,7 @@
       {% for rec in records %}
         <tr class="{% if not rec.date %}table-warning{% else %}table-success{% endif %}">
           <td class="text-end">{{ rec.lesson.code }} - {{ rec.lesson.title }}</td>
-          <td>{{ rec.lesson.pts_reference }}</td>
+          <td>{{ rec.lesson.far_requirement }}</td>
           <td>{{ rec.date|default:"—" }}</td>
           <td>{{ rec.instructor.full_display_name|default:"—" }}</td>
         </tr>
