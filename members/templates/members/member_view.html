@@ -7,7 +7,18 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
-  <h2>{{ member.full_display_name }}</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>{{ member.full_display_name }}</h2>
+    {% if request.user.rostermeister or request.user.is_staff %}
+      <a 
+        href="{% url 'admin:members_member_change' member.id %}" 
+        class="btn btn-success btn-sm"
+      >
+        Edit this member
+      </a>
+    {% endif %}
+  </div>
+
   <div class="row">
     <div class="col-md-4">
       {% if member.profile_photo %}
