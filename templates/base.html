@@ -79,6 +79,9 @@
             <ul class="dropdown-menu" aria-labelledby="logsheetDropdown">
               <li><a class="dropdown-item" href="{% url 'logsheet:index' %}">Manage Log Sheets</a></li>
               <li><a class="dropdown-item" href="{% url 'logsheet:create' %}">Create New</a></li>
+              {% if user.is_authenticated %}
+              <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">Analytics</a></li>
+              {% endif %}
             </ul>
           </li>
          
@@ -122,7 +125,6 @@
 
             </ul>
           </li>
-          
 
         </ul>
  

@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "members",
     "logsheet",
     "duty_roster",
+    "analytics",
     "django.contrib.humanize",
     "reversion",
     "django_htmx",

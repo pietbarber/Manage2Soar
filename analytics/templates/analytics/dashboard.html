@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">Operations Analytics</h2>
+    <span class="text-muted">Hi {{ user_name }}</span>
+  </div>
+
+  <p class="lead">Starter dashboard (logged-in only). Real charts coming next.</p>
+
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Flights per Month (placeholder)</h5>
+          <canvas id="flightsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Hours per Month (placeholder)</h5>
+          <canvas id="hoursChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Placeholder data; we’ll replace with Django-provided arrays shortly.
+const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const flights = [5,7,9,3,6,8,12,14,9,7,6,5];
+const hours =   [3,5,4,2,6,7,10,11,9,6,4,3];
+
+new Chart(document.getElementById('flightsChart'), {
+  type: 'bar',
+  data: { labels: months, datasets: [{ label: 'Flights', data: flights }] }
+});
+
+new Chart(document.getElementById('hoursChart'), {
+  type: 'bar',
+  data: { labels: months, datasets: [{ label: 'Hours', data: hours }] }
+});
+</script>
+{% endblock %}
