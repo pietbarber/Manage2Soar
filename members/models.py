@@ -9,6 +9,7 @@ from .utils.avatar_generator import generate_identicon
 import os
 from django.contrib.auth.models import Group
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
+from django.db import transaction
 
 
 def biography_upload_path(instance, filename):
@@ -157,7 +158,11 @@ class Member(AbstractUser):
     def profile_image_url(self):
         from django.urls import reverse
         if self.profile_photo:
-            return self.profile_photo.url
+            # If it's a FieldFile, it has .url; if it's a str, build a URL
+            if hasattr(self.profile_photo, "url"):
+                return self.profile_photo.url  # type: ignore[attr-defined]
+            # Fallback for string paths
+            return f"{settings.MEDIA_URL}{self.profile_photo}"
         return reverse('pydenticon', kwargs={'username': self.username})
 
     ##################################
@@ -190,62 +195,45 @@ class Member(AbstractUser):
     def is_active_member(self):
         return self.membership_status in DEFAULT_ACTIVE_STATUSES
 
+    def _desired_group_names(self):
+        names = []
+        if self.rostermeister:
+            names.append("Rostermeisters")
+        if self.instructor:
+            names.append("Instructor Admins")
+        if self.member_manager:
+            names.append("Member Managers")
+        return names
+
+    def _sync_groups(self):
+        # Only safe after PK exists
+        if not self.pk:
+            return
+        desired = []
+        for name in self._desired_group_names():
+            grp, _ = Group.objects.get_or_create(name=name)
+            desired.append(grp)
+        # Atomic replace; avoids add/remove churn
+        self.groups.set(desired)
+
     def save(self, *args, **kwargs):
+        # 1) pre-save flags
         self.is_staff = self.instructor or self.member_manager
+    
+        # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
-            # Only generate if no photo already exists
             filename = f"profile_{self.username}.png"
             file_path = os.path.join('generated_avatars', filename)
-
-            # Prevent overwriting if avatar already exists
             if not os.path.exists(os.path.join('media', file_path)):
                 generate_identicon(self.username, file_path)
-
             self.profile_photo = file_path
-
-        if self.rostermeister:
-            try:
-                group = Group.objects.get(name="Rostermeisters")
-                if not self.groups.filter(id=group.id).exists():
-                    self.groups.add(group)
-            except Group.DoesNotExist:
-                pass  # Or log if needed
-        else:
-            try:
-                group = Group.objects.get(name="Rostermeisters")
-                self.groups.remove(group)
-            except Group.DoesNotExist:
-                pass
-
-        if self.instructor:
-            try:
-                group = Group.objects.get(name="Instructor Admins")
-                if not self.groups.filter(id=group.id).exists():
-                    self.groups.add(group)
-            except Group.DoesNotExist:
-                pass
-        else:
-            try:
-                group = Group.objects.get(name="Instructor Admins")
-                self.groups.remove(group)
-            except Group.DoesNotExist:
-                pass
-        
-        if self.member_manager:
-            try:
-                group = Group.objects.get(name="Member Managers")
-                if not self.groups.filter(id=group.id).exists():
-                    self.groups.add(group)
-            except Group.DoesNotExist:
-                pass
-        else:
-            try:
-                group = Group.objects.get(name="Member Managers")
-                self.groups.remove(group)
-            except Group.DoesNotExist:
-                pass
-
+    
+        # 3) persist first – get a PK
         super().save(*args, **kwargs)
+    
+        # 4) now safe to touch M2M
+        transaction.on_commit(self._sync_groups)
+
 
     ##################################
     #  def __str__ 
