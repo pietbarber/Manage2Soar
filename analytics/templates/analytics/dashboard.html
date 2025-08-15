@@ -1,51 +1,192 @@
 {% extends "base.html" %}
 {% load static %}
+{% load json_script %}
 
 {% block content %}
 <div class="container mt-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="mb-0">Operations Analytics</h2>
-    <span class="text-muted">Hi {{ user_name }}</span>
   </div>
 
-  <p class="lead">Starter dashboard (logged-in only). Real charts coming next.</p>
+  <form class="row g-2 mb-4">
+    <div class="col-auto">
+      <label class="form-label">Start</label>
+      <input class="form-control" type="number" name="start" value="{{ start }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label">End</label>
+      <input class="form-control" type="number" name="end" value="{{ end }}">
+    </div>
+    <div class="col-auto form-check mt-4">
+      <input class="form-check-input" type="checkbox" id="all" name="all" value="1" {% if not finalized %}checked{% endif %}>
+      <label class="form-check-label" for="all">Include unfinalized</label>
+    </div>
+    <div class="col-auto mt-4">
+      <button class="btn btn-primary">Update</button>
+    </div>
+  </form>
 
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">Flights per Month (placeholder)</h5>
-          <canvas id="flightsChart"></canvas>
+  {% if years|length == 0 %}
+    <div class="alert alert-warning">
+      <strong>No data</strong> for the selected range{% if finalized %} with “finalized only”{% endif %}.
+      Try broadening the years or check “Include unfinalized”.
+    </div>
+  {% else %}
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Cumulative Flights by Julian Day</h5>
+        <div class="chart-box"><canvas id="cumuChart"></canvas></div>
+        <div class="small text-muted mt-2">
+          Current year is emphasized. Hover any day to see the running total for that year.
         </div>
       </div>
     </div>
-
-    <div class="col-md-6 mb-4">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">Hours per Month (placeholder)</h5>
-          <canvas id="hoursChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
+  {% endif %}
 </div>
+
+<style>
+.chart-box { height: 440px; position: relative; }
+#cumuChart { width: 100% !important; height: 100% !important; display: block; }
+</style>
+
+{{ labels|json_script:"labels-data" }}
+{{ years|json_script:"years-data" }}
+{{ data|json_script:"data-by-year" }}
+{{ totals|json_script:"totals-data" }}
+{{ instr|json_script:"instr-data" }}
+{{ current_year|json_script:"current-year" }}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Placeholder data; we’ll replace with Django-provided arrays shortly.
-const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const flights = [5,7,9,3,6,8,12,14,9,7,6,5];
-const hours =   [3,5,4,2,6,7,10,11,9,6,4,3];
+/* globals Chart */
+const labels      = JSON.parse(document.getElementById("labels-data").textContent || "[]");
+const years       = JSON.parse(document.getElementById("years-data").textContent || "[]");
+const dataByYear  = JSON.parse(document.getElementById("data-by-year").textContent || "{}");
+const totals      = JSON.parse(document.getElementById("totals-data").textContent || "{}");
+const instr       = JSON.parse(document.getElementById("instr-data").textContent || "{}");
+const currentYear = JSON.parse(document.getElementById("current-year").textContent || "0");
 
-new Chart(document.getElementById('flightsChart'), {
-  type: 'bar',
-  data: { labels: months, datasets: [{ label: 'Flights', data: flights }] }
+// month anchors used for x tick labels and vertical gridlines
+const anchors = {1:"Jan",32:"Feb",60:"Mar",91:"Apr",121:"May",152:"Jun",182:"Jul",213:"Aug",244:"Sep",274:"Oct",305:"Nov",335:"Dec"};
+
+// deterministic color per year
+function colorForYear(y) {
+  const base = (y * 9301 + 49297) % 233280;
+  const hue = (base / 233280) * 360;
+  return `hsl(${hue}, 60%, 45%)`;
+}
+
+// day-of-year today (local)
+function doyToday() {
+  const t = new Date();
+  return Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 86400000); // 1..366
+}
+
+// build datasets; truncate current year's points *after today* to null (no flat line)
+const todayYear = new Date().getFullYear();
+const todayDoy  = doyToday();
+
+const datasets = years.map((y) => {
+  const c = colorForYear(y);
+  const isCurrent = y === currentYear;
+  const arr = (dataByYear[String(y)] || []).slice();
+
+  if (isCurrent && y === todayYear) {
+    for (let i = todayDoy; i < arr.length; i++) arr[i] = null;  // keep 0..(today-1), null thereafter
+  }
+
+  return {
+    label: String(y),
+    data: arr,
+    borderColor: c,
+    backgroundColor: c,
+    tension: 0.2,
+    borderWidth: isCurrent ? 3 : 1.5,
+    borderDash: isCurrent ? undefined : [5, 4],
+    pointRadius: isCurrent ? 3 : 0,
+    pointHoverRadius: isCurrent ? 5 : 3,
+    pointBackgroundColor: isCurrent ? "#fff" : undefined,
+    pointBorderColor: isCurrent ? c : undefined,
+    pointBorderWidth: isCurrent ? 2 : 0,
+    spanGaps: false,
+  };
 });
 
-new Chart(document.getElementById('hoursChart'), {
-  type: 'bar',
-  data: { labels: months, datasets: [{ label: 'Hours', data: hours }] }
-});
+// compute y cap using visible values (ignore nulls)
+const flatMax = datasets.reduce((m, ds) => {
+  const vals = (ds.data || []).filter(v => v != null);
+  return Math.max(m, vals.length ? Math.max(...vals) : 0);
+}, 0);
+const yMax = Math.max(10, Math.ceil((flatMax * 1.05) / 50) * 50);
+
+// nuke any prior chart safely (dev hot reloads)
+if (window.cumuChart && typeof window.cumuChart.destroy === "function") {
+  window.cumuChart.destroy();
+} else {
+  window.cumuChart = null;
+}
+
+const ctx = document.getElementById("cumuChart")?.getContext?.("2d");
+if (ctx) {
+  window.cumuChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", intersect: false },
+      plugins: {
+        legend: { position: "left", labels: { boxWidth: 18 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              if (!items.length) return "";
+              const i = items[0];
+              const y = Number(i.dataset.label);
+              const doy = labels[i.dataIndex];
+              const d  = new Date(y, 0, doy);
+              const month = d.toLocaleString(undefined, { month: "short" });
+              const day = d.getDate();
+              return `${y} • Day ${doy} (${month} ${day})`;
+            },
+            label: (item) => {
+              const y = String(item.dataset.label);
+              const val = item.parsed.y;
+              const tot = totals[y] ?? val;
+              const ins = instr[y] ?? 0;
+              const pct = tot ? Math.round((ins / tot) * 100) : 0;
+              return ` ${val} flights (total ${tot}, ${ins} instruction • ${pct}%)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "Julian Day (1–365)" },
+          ticks: {
+            callback: (_, idx) => anchors[labels[idx]] || "",
+            maxRotation: 0,
+            autoSkip: false
+          },
+          // draw vertical gridlines only at month starts
+          grid: {
+            color: (ctx) => {
+              const i = ctx.index;
+              const labelVal = labels[i];
+              return anchors[labelVal] ? undefined : "rgba(0,0,0,0)"; // transparent for non-anchors
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          max: yMax,
+          ticks: { precision: 0 },
+          title: { display: true, text: "Cumulative Flights" }
+        }
+      }
+    }
+  });
+}
 </script>
 {% endblock %}

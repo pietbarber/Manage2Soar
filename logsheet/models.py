@@ -90,7 +90,7 @@ class Flight(models.Model):
             self.landing_time is not None and (
                 self.release_altitude is None or
                 self.towplane is None or
-                self.towpilot is None
+                self.tow_pilot is None
             )
         )
 
@@ -545,6 +545,12 @@ class MaintenanceIssue(models.Model):
             return True
         return False
 
+class DeadlineType(models.TextChoices):
+    ANNUAL      = "annual",      "Annual Inspection"
+    CONDITION   = "condition",   "Condition Inspection"
+    PARACHUTE   = "parachute",   "Parachute Repack"
+    TRANSPONDER = "transponder", "Transponder Inspection"
+    LETTER      = "letter",      "Program Letter"
 
 
 DEADLINE_TYPES = [
@@ -570,19 +576,26 @@ DEADLINE_TYPES = [
 # - __str__: Returns a readable summary of the upcoming deadline.
 #
 
+DEADLINE_TYPES = DeadlineType.choices
+
 class MaintenanceDeadline(models.Model):
     glider = models.ForeignKey(Glider, on_delete=models.CASCADE, blank=True, null=True)
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE, blank=True, null=True)
-    description = models.CharField(
-        max_length=32,
-        choices=DEADLINE_TYPES,
-        help_text="Select type of maintenance deadline."
-    )
+    description = models.CharField(max_length=32, choices=DeadlineType.choices)
     due_date = models.DateField()
+
+    @property
+    def description_label(self) -> str:
+        # Pylance-friendly label without relying on Django’s dynamic get_*_display
+        try:
+            return DeadlineType(self.description).label
+        except ValueError:
+            return self.description  # fallback if legacy/unknown value sneaks in
 
     def __str__(self):
         aircraft = self.glider or self.towplane
-        return f"{aircraft} – {self.get_description_display()} due {self.due_date}"
+        return f"{aircraft} - {self.description_label} due {self.due_date:%Y-%m-%d}"
+
 
 ####################################################
 # AircraftMeister model
