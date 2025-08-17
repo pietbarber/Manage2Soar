@@ -43,6 +43,19 @@
     </div>
   {% endif %}
 </div>
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Flights by Year by Aircraft</h5>
+    <div class="chart-box">
+      <canvas id="byAcftChart"></canvas>
+    </div>
+    <div id="byAcftStatus" class="small text-muted mt-2">
+      Club ships shown individually; non-club ships are bucketed as <em>Private</em>.
+      Flights with no identified glider appear as <em>Unknown</em>.
+      Low-volume ships beyond the top N are grouped as <em>Other</em> (only if applicable).
+    </div>
+  </div>
+</div>
 
 <style>
 .chart-box { height: 440px; position: relative; }
@@ -55,6 +68,11 @@
 {{ totals|json_script:"totals-data" }}
 {{ instr|json_script:"instr-data" }}
 {{ current_year|json_script:"current-year" }}
+{{ fy_years|json_script:"fy-years" }}
+{{ fy_categories|json_script:"fy-cats" }}
+{{ fy_matrix|json_script:"fy-matrix" }}
+
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -189,4 +207,89 @@ if (ctx) {
   });
 }
 </script>
+<script>
+/* ===== Stacked Bar: Flights by Year by Aircraft ===== */
+const fyYears = JSON.parse(document.getElementById("fy-years")?.textContent || "[]");
+const fyCats  = JSON.parse(document.getElementById("fy-cats")?.textContent  || "[]");
+const fyMat   = JSON.parse(document.getElementById("fy-matrix")?.textContent|| "{}");
+
+function setByAcftStatus(msg){ const el=document.getElementById("byAcftStatus"); if(el) el.textContent=msg || ""; }
+
+// Guard: no data? show a note and skip chart init
+if (!fyYears.length || !fyCats.length) {
+  setByAcftStatus("No aircraft data for the selected range.");
+} else {
+  /* Colorblind-friendly, widely spaced hues via golden angle.
+     Reserved categories get fixed colors for clarity. */
+  function colorForCategory(cat, idx) {
+    if (cat === "Private")  return "#BDBDBD"; // light gray
+    if (cat === "Other")    return "#9E9E9E"; // darker gray
+    if (cat === "Unknown")  return "#8E44AD"; // purple
+    const hue = (idx * 137.508) % 360;
+    return `hsl(${hue}, 65%, 48%)`;
+  }
+
+  const datasets = fyCats.map((cat, i) => ({
+    label: cat,
+    data: (fyMat[cat] || []).map(v => Number(v) || 0),
+    backgroundColor: colorForCategory(cat, i),
+    borderColor: colorForCategory(cat, i),
+    borderWidth: 1,
+  }));
+
+  // Total per year (stacked sum) → nice padded y cap
+  const yearlyTotals = fyYears.map((_, i) =>
+    datasets.reduce((sum, ds) => sum + (Number(ds.data[i]) || 0), 0)
+  );
+  const barMax  = Math.max(0, ...yearlyTotals);
+  const barYMax = Math.max(10, Math.ceil((barMax * 1.10) / 50) * 50);
+
+  // Clean up old chart (dev hot reloads)
+  if (window.byAcftChart && typeof window.byAcftChart.destroy === "function") {
+    window.byAcftChart.destroy();
+  }
+
+  const byCtx = document.getElementById("byAcftChart")?.getContext?.("2d");
+  if (!byCtx) {
+    setByAcftStatus("Canvas not found.");
+  } else {
+    window.byAcftChart = new Chart(byCtx, {
+      type: "bar",
+      data: { labels: fyYears.map(String), datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: "left" },
+          tooltip: {
+            callbacks: {
+              title: (items) => (items[0]?.label ?? ""),
+              label: (item) => ` ${item.dataset.label}: ${item.formattedValue}`,
+              footer: (items) => {
+                const i = items[0]?.dataIndex ?? 0;
+                const total = yearlyTotals[i] || 0;
+                return `Total: ${total}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, title: { display: true, text: "Year" } },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            suggestedMax: barYMax,
+            title: { display: true, text: "Flights" },
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+    setByAcftStatus(""); // clear any previous note
+  }
+}
+</script>
+
+
 {% endblock %}
