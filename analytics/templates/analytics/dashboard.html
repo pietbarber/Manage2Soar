@@ -87,6 +87,17 @@
     </div>
   </div>
 </div>
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Private Glider Utilization (excludes club ships)</h5>
+    <div class="chart-box" style="height: 520px;">
+      <canvas id="utilPrivChart"></canvas>
+    </div>
+    <div id="utilPrivStatus" class="small text-muted mt-2">
+      Each private ship listed individually. Date range matches the selector above.
+    </div>
+  </div>
+</div>
 
 <style>
 .chart-box { height: 440px; position: relative; }
@@ -106,6 +117,10 @@
 {{ util_flights|json_script:"util-flights" }}
 {{ util_hours|json_script:"util-hours" }}
 {{ util_avg_minutes|json_script:"util-avgm" }}
+{{ utilp_names|json_script:"utilp-names" }}
+{{ utilp_flights|json_script:"utilp-flights" }}
+{{ utilp_hours|json_script:"utilp-hours" }}
+{{ utilp_avg_minutes|json_script:"utilp-avgm" }}
 
 
 
@@ -401,5 +416,75 @@ if (!uNames.length) {
 }
 </script>
 
+<script>
+/* ===== Private-only Utilization ===== */
+const pNames    = JSON.parse(document.getElementById("utilp-names")?.textContent || "[]");
+const pFlights  = JSON.parse(document.getElementById("utilp-flights")?.textContent || "[]");
+const pHours    = JSON.parse(document.getElementById("utilp-hours")?.textContent || "[]");
+const pAvgMins  = JSON.parse(document.getElementById("utilp-avgm")?.textContent || "[]");
+function setUtilPrivStatus(msg){const el=document.getElementById("utilPrivStatus"); if(el) el.textContent=msg||"";}
+
+if (!pNames.length) {
+  setUtilPrivStatus("No private-ship utilization data for the selected period.");
+} else {
+  const C_FLIGHTS = "#e74c3c"; // red
+  const C_HOURS   = "#3498db"; // blue
+  const C_AVG     = "#8bc34a"; // green
+
+  const xMax = Math.max(
+    1,
+    Math.max(...pFlights.map(Number)),
+    Math.max(...pHours.map(Number)),
+    Math.max(...pAvgMins.map(Number))
+  );
+  const padMax = Math.ceil((xMax * 1.05) / 20) * 20;
+
+  const data = {
+    labels: pNames,
+    datasets: [
+      { label: "Total Flights", data: pFlights, backgroundColor: C_FLIGHTS, borderColor: C_FLIGHTS, borderWidth: 1 },
+      { label: "Total Hours",   data: pHours,   backgroundColor: C_HOURS,   borderColor: C_HOURS,   borderWidth: 1 },
+      { label: "Avg Flight (min)", data: pAvgMins, backgroundColor: C_AVG, borderColor: C_AVG, borderWidth: 1 },
+    ]
+  };
+
+  if (window.utilPrivChart && typeof window.utilPrivChart.destroy === "function") window.utilPrivChart.destroy();
+
+  const ctx = document.getElementById("utilPrivChart")?.getContext?.("2d");
+  if (!ctx) {
+    setUtilPrivStatus("Canvas not found.");
+  } else {
+    window.utilPrivChart = new Chart(ctx, {
+      type: "bar",
+      data,
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: "right" },
+          tooltip: {
+            callbacks: {
+              label: (item) => {
+                const ds = item.dataset.label;
+                const v = Number(item.formattedValue);
+                if (ds === "Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
+                if (ds === "Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
+                return ` ${ds}: ${v}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, suggestedMax: padMax, ticks: { precision: 0 }, title: { display: true, text: "Flights / Hours / Minutes (scaled)" } },
+          y: { ticks: { autoSkip: false } }
+        }
+      }
+    });
+    setUtilPrivStatus("");
+  }
+}
+</script>
 
 {% endblock %}

@@ -68,7 +68,16 @@ def dashboard(request):
     util_end   = util_end or today
     
     util = queries.glider_utilization(util_start, util_end, finalized_only=finalized_only, top_n=12)
-    
+ 
+    util_private = queries.glider_utilization(
+        util_start, util_end,
+        finalized_only=finalized_only,
+        top_n=12,
+        fleet="private",
+        bucket_private=False,     # list each private ship individually
+        include_unknown=False,    # omit null-glider flights
+    )
+   
     # add to context
     fy_years = cast(list[int], by_acft_raw.get("years") or [])
     fy_categories = cast(list[str], by_acft_raw.get("categories") or [])
@@ -87,7 +96,6 @@ def dashboard(request):
         "ops_days": ops_days_map,
         "current_year": current_year,
 
-        # stacked bar inputs
         "fy_years": fy_years,
         "fy_categories": fy_categories,
         "fy_matrix": fy_matrix,
@@ -99,7 +107,12 @@ def dashboard(request):
         "util_avg_minutes": util.get("avg_minutes", []),
         "util_start": util_start.isoformat(),
         "util_end": util_end.isoformat(),
- 
+
+        "utilp_names": util_private.get("names", []),
+        "utilp_flights": util_private.get("flights", []),
+        "utilp_hours": util_private.get("hours", []),
+        "utilp_avg_minutes": util_private.get("avg_minutes", []),
+
     }
  
     return render(request, "analytics/dashboard.html", ctx)

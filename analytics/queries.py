@@ -6,6 +6,7 @@ from typing import Dict, Any, TypedDict, List
 from django.db.models import Count, Q, F, Sum, Avg, DurationField
 from django.db.models.functions import ExtractYear, Coalesce
 from django.db.models.expressions import ExpressionWrapper
+from logsheet.models import Flight
 
 FINALIZED_ONLY = Q(logsheet__finalized=True)
 LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
@@ -86,18 +87,15 @@ def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, fin
 
 
 def flights_by_year_by_aircraft(start_year: int, end_year: int, *, finalized_only=True, top_n=10):
-    """
-    Pivot data for a stacked bar:
-      {
-        "years": [2015, ...],
-        "categories": ["N341KS","N321K","GROB 103","Private","Other",...],
-        "matrix": {category: [counts aligned to years]},
-        "totals_by_cat": {category: total across all years},
-      }
-    Buckets non-club ships (glider.club_owned == False) into "Private".
-    Low-volume ships beyond top_n are grouped under "Other".
-    """
-    from logsheet.models import Flight  # local to avoid accidental circulars
+    # Pivot data for a stacked bar:
+    #  {
+    #    "years": [2015, ...],
+    #    "categories": ["N341KS","N321K","GROB 103","Private","Other",...],
+    #    "matrix": {category: [counts aligned to years]},
+    #    "totals_by_cat": {category: total across all years},
+    #  }
+    # Buckets non-club ships (glider.club_owned == False) into "Private".
+    # Low-volume ships beyond top_n are grouped under "Other".
 
     FINALIZED_ONLY = Q(logsheet__finalized=True)
     LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
@@ -197,13 +195,19 @@ def glider_utilization(
     *,
     finalized_only: bool = True,
     top_n: int = 12,
+    fleet: str = "all",               # "all" | "club" | "private"
+    bucket_private: bool = True,      # True → non-club into "Private"; False → list individually
+    include_unknown: bool = True,     # include flights with null glider as "Unknown"
 ) -> GliderUtilization:
     """
-    Compute flights, total hours, and avg flight minutes per glider in a date range.
-    - Club ships shown individually (by comp#, then N-number, then Make/Model).
-    - Non-club ships (glider.club_owned == False) -> 'Private'.
-    - Flights with null glider -> 'Unknown'.
-    - Ships beyond top_n (by flights) grouped as 'Other'.
+    Flights / total hours / avg minutes per glider in a date range.
+
+    - fleet="all": club ships shown individually; non-club can be bucketed as "Private".
+    - fleet="club": include only glider.club_owned=True.
+    - fleet="private": include only glider.club_owned=False (and include_unknown controls nulls).
+
+    - When bucket_private=False, private ships are listed individually (no "Private" bucket).
+    - Ships beyond top_n (by flights) grouped as "Other".
     """
     from logsheet.models import Flight  # local import to avoid cycles
 
@@ -214,16 +218,24 @@ def glider_utilization(
     if finalized_only:
         qs = qs.filter(FINALIZED_ONLY)
 
+    # Date filtering + duration choice
     qs = qs.annotate(
         ops_date=F("logsheet__log_date"),
         dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
     ).annotate(
-        # use explicit duration if present, else computed difference
         dur=Coalesce(F("duration"), F("dur_diff")),
     ).filter(
         ops_date__gte=start_date,
         ops_date__lte=end_date,
     )
+
+    # Fleet filter
+    if fleet == "club":
+        qs = qs.filter(glider__club_owned=True)
+    elif fleet == "private":
+        qs = qs.filter(glider__club_owned=False)
+        if not include_unknown:
+            qs = qs.filter(glider__isnull=False)
 
     rows = (
         qs.values(
@@ -243,10 +255,13 @@ def glider_utilization(
     )
 
     def label_from_row(r: Dict[str, Any]) -> str:
+        # Unknown (null glider)
         if r["glider_id"] is None:
             return "Unknown"
-        if r.get("glider__club_owned") is False:
+        # Non-club → either bucket or identify individually
+        if r.get("glider__club_owned") is False and bucket_private:
             return "Private"
+        # Build an identifier (comp # → N-number → Make/Model)
         ident = (r.get("glider__competition_number") or "").strip().upper()
         if not ident:
             ident = (r.get("glider__n_number") or "").strip().upper()
@@ -256,21 +271,27 @@ def glider_utilization(
             ident = " ".join(p for p in (make, model) if p) or "Unknown"
         return ident
 
-    # aggregate by label (so multiple rows for same label are summed)
+    # Aggregate into a label→metrics map
     agg: Dict[str, Dict[str, float]] = {}
     for r in rows:
         lab = label_from_row(r)
+        if lab == "Unknown" and not include_unknown:
+            continue
         a = agg.setdefault(lab, {"flights": 0, "seconds": 0.0})
         a["flights"] += int(r["flights"] or 0)
-        # r["total_dur"] is a datetime.timedelta (or None)
         if r["total_dur"] is not None:
             a["seconds"] += float(r["total_dur"].total_seconds())
 
     if not agg:
         return {"names": [], "flights": [], "hours": [], "avg_minutes": [], "start": start_date.isoformat(), "end": end_date.isoformat()}
 
-    # split out special buckets and rank others by flights
-    special = {"Private", "Unknown"}
+    # Split special buckets and rank others by flights
+    special = set()
+    if bucket_private:
+        special.add("Private")
+    if include_unknown:
+        special.add("Unknown")
+
     specials_present = [k for k in special if k in agg]
     normal = [k for k in agg.keys() if k not in special]
     normal.sort(key=lambda k: (-agg[k]["flights"], k))
@@ -279,7 +300,10 @@ def glider_utilization(
     tail = normal[top_n:]
 
     names: List[str] = head[:]
-    names.extend([s for s in ("Private", "Unknown") if s in specials_present])
+    # Keep specials at the end in a consistent order
+    for s in ("Private", "Unknown"):
+        if s in specials_present:
+            names.append(s)
     if tail:
         names.append("Other")
 
@@ -290,7 +314,7 @@ def glider_utilization(
             hours = d["seconds"] / 3600.0
             avg_min = int(round((d["seconds"] / 60.0 / flights), 0)) if flights else 0
             return {"flights": flights, "hours": hours, "avg_min": avg_min}
-        # Other = sum of tail
+        # "Other" sums the tail
         flights = sum(int(agg[k]["flights"]) for k in tail)
         seconds = sum(float(agg[k]["seconds"]) for k in tail)
         hours = seconds / 3600.0
@@ -303,8 +327,8 @@ def glider_utilization(
     for n in names:
         s = calc_series_for(n)
         flights.append(s["flights"])
-        hours.append(round(s["hours"], 1))       # 1 decimal feels right
-        avg_minutes.append(int(s["avg_min"]))    # whole minutes like your chart
+        hours.append(round(s["hours"], 1))
+        avg_minutes.append(int(s["avg_min"]))
 
     return {
         "names": names,
