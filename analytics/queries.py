@@ -335,10 +335,28 @@ def glider_utilization(
         "end": end_date.isoformat(),
     }
 
-def _username_map(ids: List[int]) -> Dict[int, str]:
+def _display_name_map(ids: List[int]) -> Dict[int, str]:
+    """
+    Return {user_id: display_name} using:
+    - user.full_display_name if present
+    - else get_full_name()
+    - else username
+    """
     User = get_user_model()
-    rows = User.objects.filter(id__in=ids).values("id", "username")
-    return {r["id"]: r["username"] for r in rows}
+    users = User.objects.filter(id__in=ids)
+
+    out: Dict[int, str] = {}
+    for u in users:
+        uid = int(getattr(u, "pk"))  # use pk instead of id (Pylance-safe)
+
+        disp = getattr(u, "full_display_name", None)
+        if not disp:
+            full = (getattr(u, "get_full_name", lambda: "")() or "").strip()
+            disp = full if full else getattr(u, "get_username", lambda: "")()
+
+        out[uid] = str(disp)
+    return out
+
 
 # 1) Flying days by member (any role)
 def flying_days_by_member(
@@ -380,7 +398,7 @@ def flying_days_by_member(
 
     # Map IDs -> usernames once
     User = get_user_model()
-    name_map = {u["id"]: u["username"] for u in User.objects.filter(id__in=ids).values("id", "username")}
+    name_map = _display_name_map(ids)  # uses full_display_name → full_name → username
 
     rows: List[tuple] = []
     for m in ids:
@@ -492,7 +510,7 @@ def pilot_glider_flights(start_date: date, end_date: date, *, finalized_only=Tru
               .order_by("-n", "pilot_id"))
 
     ids = [r["pilot_id"] for r in rows if r["n"] >= min_flights]
-    name_map = _username_map(ids)
+    name_map = _display_name_map(ids)
 
     names = [name_map[i] for i in ids if i in name_map]
     counts = [int(r["n"]) for r in rows if r["pilot_id"] in name_map]
