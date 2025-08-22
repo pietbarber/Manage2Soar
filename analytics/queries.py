@@ -401,8 +401,20 @@ def flying_days_by_member(
 
 # 2) Flight duration distribution (CDF) for glider flights
 def flight_duration_distribution(start_date: date, end_date: date, *, finalized_only=True, max_points=400) -> Dict[str, Any]:
-    # CDF of flight durations (hours). Also returns median minutes and % over 1h/2h/3h.
-    # Returns { "x_hours": [...], "cdf_pct": [...], "median_min": int, "pct_gt": {1:float,2:float,3:float} }
+    """
+    Survival curve of flight durations: percent of flights with duration >= x (in hours).
+    Also returns the median (minutes) and shares over 1h/2h/3h.
+
+    Returns
+    -------
+    {
+      "points": [{"x": hours, "y": pct_ge}],   # survival points (for plotting)
+      "x_hours": [...], "cdf_pct": [...],      # kept for backward compat
+      "median_min": int,
+      "pct_gt": {1: float, 2: float, 3: float},
+    }
+    """
+    from logsheet.models import Flight
 
     qs = Flight.objects.filter(LANDED_ONLY)
     if finalized_only:
@@ -417,7 +429,7 @@ def flight_duration_distribution(start_date: date, end_date: date, *, finalized_
         ops_date__gte=start_date, ops_date__lte=end_date
     ).values_list("dur", flat=True)
 
-    secs = []
+    secs: list[float] = []
     for d in qs:
         if d is not None:
             s = float(d.total_seconds())
@@ -425,30 +437,43 @@ def flight_duration_distribution(start_date: date, end_date: date, *, finalized_
                 secs.append(s)
 
     if not secs:
-        return {"x_hours": [], "cdf_pct": [], "median_min": 0, "pct_gt": {1:0.0,2:0.0,3:0.0}}
+        return {"points": [], "x_hours": [], "cdf_pct": [], "median_min": 0, "pct_gt": {1: 0.0, 2: 0.0, 3: 0.0}}
 
-    secs.sort()
+    secs.sort()                      # ascending
     n = len(secs)
 
-    # Downsample to ~max_points via quantiles
+    # Downsample by rank but compute SURVIVAL: pct of flights with duration >= x
     step = max(1, n // max_points)
-    picked = secs[0:n:step]
-    x_hours = [round(s/3600.0, 3) for s in picked]
-    cdf_pct = [round((i+1)/n*100.0, 2) for i in range(0, len(picked))]
+    points: list[dict] = []
+    for j in range(0, n, step):
+        xh = secs[j] / 3600.0
+        pct_ge = (n - j) / n * 100.0          # survival at x = secs[j]
+        points.append({"x": round(xh, 3), "y": round(pct_ge, 2)})
 
-    # Median & tails
-    mid = secs[n//2] if n % 2 == 1 else 0.5*(secs[n//2-1] + secs[n//2])
-    median_min = int(round(mid/60.0))
+    # Ensure last point reaches ~0% at the maximum duration
+    if points[-1]["x"] < secs[-1] / 3600.0:
+        points.append({"x": round(secs[-1] / 3600.0, 3), "y": round(1.0 / n * 100.0, 2)})
 
+    # Median (same as before)
+    mid = secs[n // 2] if n % 2 == 1 else 0.5 * (secs[n // 2 - 1] + secs[n // 2])
+    median_min = int(round(mid / 60.0))
+
+    import bisect
     def pct_over(hours: float) -> float:
-        threshold = hours*3600.0
-        # number strictly greater than threshold
-        import bisect
+        threshold = hours * 3600.0
         k = bisect.bisect_right(secs, threshold)
-        return round((n - k)/n*100.0, 1)
+        return round((n - k) / n * 100.0, 1)
 
     pct_gt = {1: pct_over(1.0), 2: pct_over(2.0), 3: pct_over(3.0)}
-    return {"x_hours": x_hours, "cdf_pct": cdf_pct, "median_min": median_min, "pct_gt": pct_gt}
+
+    # For backward compat: build CDF arrays from survival points
+    x_hours = [p["x"] for p in points]
+    cdf_pct = [round(100.0 - p["y"], 2) for p in points]
+
+    return {"points": points, "x_hours": x_hours, "cdf_pct": cdf_pct, "median_min": median_min, "pct_gt": pct_gt}
+
+
+
 
 # 3) Non-instruction glider flights by pilot
 def pilot_glider_flights(start_date: date, end_date: date, *, finalized_only=True, min_flights=2) -> Dict[str, Any]:

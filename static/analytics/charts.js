@@ -25,20 +25,39 @@
     });
   }
 
-  function makeCDF(canvasId, x, pct, { color="#5dade2", xTitle="Duration (hours)" }={}) {
-    const ctx = $(canvasId)?.getContext?.("2d"); if (!ctx) return null;
+  function makeCDF(canvasId, points, { color="#5dade2", xTitle="Duration (hours)" } = {}) {
+    const ctx = document.getElementById(canvasId)?.getContext?.("2d");
+    if (!ctx) return null;
+  
+    const topBand = points.map(p => ({ x: p.x, y: 0 }));     // now: fill down from 0%
+
     return new Chart(ctx, {
       type: "line",
-      data: { labels: x, datasets: [{ data: pct, fill: true, tension: 0.2, borderColor: color, backgroundColor: color }]},
+      data: {
+        datasets: [
+          { data: topBand, borderWidth: 0, pointRadius: 0, fill: false },
+          { data: points, fill: "-1", tension: 0.2, borderColor: color, backgroundColor: color }
+        ]
+      },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } },
+        parsing: true,
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false } },
         scales: {
-          x: { title: { display: true, text: xTitle }},
-          y: { beginAtZero: true, suggestedMax: 100, title: { display: true, text: "Percent of flights (≤ x)" }, ticks: { callback: v => `${v}%` } }
+          x: { type: "linear", title: { display: true, text: xTitle } },
+          y: {
+            reverse: true,       // 0% at top, 100% at bottom
+            min: 0, max: 100,
+            title: { display: true, text: "Percent of flights (≥ x)" },
+            ticks: { callback: (v) => `${v}%` }
+          }
         }
       }
     });
   }
+
 
   // ----- chart initializers -----
   function initCumulative(d) {
@@ -151,10 +170,18 @@
   }
 
   function initDuration(d) {
-    const x=d.x_hours||[], cdf=d.cdf_pct||[], med=d.median_min||0, p=d.pct_gt||{"1":0,"2":0,"3":0};
-    if (!x.length) { $("durStatus") && ( $("durStatus").textContent = "No duration data for the selected period." ); return; }
-    makeCDF("durChart", x, cdf, { color:"#5dade2" });
-    $("durStatus") && ( $("durStatus").textContent = `Median = ${med} min • Over 1h: ${p["1"]}% • Over 2h: ${p["2"]}% • Over 3h: ${p["3"]}%` );
+    const pts = Array.isArray(d.points) && d.points.length
+      ? d.points
+      : (Array.isArray(d.x_hours) ? d.x_hours.map((x,i)=>({x, y:(d.cdf_pct||[])[i]||0})) : []);
+  
+    if (!pts.length) { const el=document.getElementById("durStatus"); if(el) el.textContent="No duration data for the selected period."; return; }
+  
+    if (window.durChart?.destroy) window.durChart.destroy();
+    window.durChart = makeCDF("durChart", pts, { color:"#5dade2" });
+  
+    const med = d.median_min || 0, p = d.pct_gt || {"1":0,"2":0,"3":0};
+    const s = document.getElementById("durStatus");
+    if (s) s.textContent = `Median = ${med} min • Over 1h: ${p["1"]}% • Over 2h: ${p["2"]}% • Over 3h: ${p["3"]}%`;
   }
 
   // public

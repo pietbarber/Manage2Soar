@@ -123,7 +123,8 @@ def dashboard(request):
         "dur_cdf_pct": dur.get("cdf_pct", []),
         "dur_median_min": dur.get("median_min", 0),
         "dur_pct_gt": dur.get("pct_gt", {1:0.0,2:0.0,3:0.0}),
-    
+        "dur_points": dur.get("points", []),
+ 
         # pilot flights (non-instruction)
         "pgf_names": pgf.get("names", []),
         "pgf_counts": pgf.get("counts", []),
@@ -165,11 +166,13 @@ def dashboard(request):
             "counts": ctx.get("pgf_counts", []),
         },
         "duration": {
+            "points": ctx.get("dur_points", []),
             "x_hours": ctx.get("dur_x_hours", []),
             "cdf_pct": ctx.get("dur_cdf_pct", []),
             "median_min": ctx.get("dur_median_min", 0),
             "pct_gt": ctx.get("dur_pct_gt", {"1":0,"2":0,"3":0}),
         },
+
     }
 
     ctx["analytics_data"] = analytics_data
