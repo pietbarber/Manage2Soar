@@ -56,6 +56,37 @@
     </div>
   </div>
 </div>
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-end">
+      <h5 class="card-title mb-3">Glider Utilization</h5>
+      <form class="row g-2 align-items-end" method="get">
+        <div class="col-auto">
+          <label class="form-label small mb-1">From</label>
+          <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1">To</label>
+          <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
+        </div>
+        {# preserve finalized toggle and main years if present #}
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
+        <div class="col-auto">
+          <button class="btn btn-outline-primary btn-sm">Update</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="chart-box" style="height: 520px;">
+      <canvas id="utilChart"></canvas>
+    </div>
+    <div id="utilStatus" class="small text-muted mt-2">
+      Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.
+    </div>
+  </div>
+</div>
 
 <style>
 .chart-box { height: 440px; position: relative; }
@@ -71,6 +102,10 @@
 {{ fy_years|json_script:"fy-years" }}
 {{ fy_categories|json_script:"fy-cats" }}
 {{ fy_matrix|json_script:"fy-matrix" }}
+{{ util_names|json_script:"util-names" }}
+{{ util_flights|json_script:"util-flights" }}
+{{ util_hours|json_script:"util-hours" }}
+{{ util_avg_minutes|json_script:"util-avgm" }}
 
 
 
@@ -287,6 +322,81 @@ if (!fyYears.length || !fyCats.length) {
       }
     });
     setByAcftStatus(""); // clear any previous note
+  }
+}
+</script>
+<script>
+/* ===== Glider Utilization (horizontal grouped bars) ===== */
+const uNames = JSON.parse(document.getElementById("util-names")?.textContent || "[]");
+const uFlights = JSON.parse(document.getElementById("util-flights")?.textContent || "[]");
+const uHours = JSON.parse(document.getElementById("util-hours")?.textContent || "[]");
+const uAvgMins = JSON.parse(document.getElementById("util-avgm")?.textContent || "[]");
+function setUtilStatus(msg){const el=document.getElementById("utilStatus"); if(el) el.textContent=msg||"";}
+
+if (!uNames.length) {
+  setUtilStatus("No utilization data for the selected period.");
+} else {
+  // colors like your screenshot
+  const C_FLIGHTS = "#e74c3c"; // red
+  const C_HOURS   = "#3498db"; // blue
+  const C_AVG     = "#8bc34a"; // green
+
+  // one axis for simplicity; flights dominate, others still readable
+  const xMax = Math.max(1,
+    Math.max(...uFlights.map(Number)),
+    Math.max(...uHours.map(Number)),
+    Math.max(...uAvgMins.map(Number))
+  );
+  const padMax = Math.ceil((xMax * 1.05) / 20) * 20;
+
+  const utilData = {
+    labels: uNames,
+    datasets: [
+      { label: "Total Flights", data: uFlights, backgroundColor: C_FLIGHTS, borderColor: C_FLIGHTS, borderWidth: 1 },
+      { label: "Total Hours",   data: uHours,   backgroundColor: C_HOURS,   borderColor: C_HOURS,   borderWidth: 1 },
+      { label: "Avg Flight (min)", data: uAvgMins, backgroundColor: C_AVG, borderColor: C_AVG, borderWidth: 1 },
+    ]
+  };
+
+  if (window.utilChart && typeof window.utilChart.destroy === "function") window.utilChart.destroy();
+
+  const uctx = document.getElementById("utilChart")?.getContext?.("2d");
+  if (!uctx) {
+    setUtilStatus("Canvas not found.");
+  } else {
+    window.utilChart = new Chart(uctx, {
+      type: "bar",
+      data: utilData,
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: "right" },
+          tooltip: {
+            callbacks: {
+              label: (item) => {
+                const ds = item.dataset.label;
+                const v = Number(item.formattedValue);
+                if (ds === "Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
+                if (ds === "Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
+                return ` ${ds}: ${v}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            suggestedMax: padMax,
+            title: { display: true, text: "Flights / Hours / Minutes (scaled)" },
+            ticks: { precision: 0 }
+          },
+          y: { ticks: { autoSkip: false } }
+        }
+      }
+    });
   }
 }
 </script>

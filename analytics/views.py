@@ -1,5 +1,5 @@
 # analytics/views.py
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, cast
 from django.shortcuts import render
 from django.contrib.auth.decorators import user_passes_test
@@ -50,7 +50,26 @@ def dashboard(request):
             start, end, finalized_only=finalized_only, top_n=10
         ) or {}
     )
-
+    # --- Glider utilization date range (defaults to YTD) ---
+    def _parse_dt(s: str | None) -> date | None:
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(s).date()
+        except Exception:
+            return None
+    
+    util_start = _parse_dt(request.GET.get("util_start"))
+    util_end   = _parse_dt(request.GET.get("util_end"))
+    
+    today = date.today()
+    default_start = date(today.year, 1, 1)
+    util_start = util_start or default_start
+    util_end   = util_end or today
+    
+    util = queries.glider_utilization(util_start, util_end, finalized_only=finalized_only, top_n=12)
+    
+    # add to context
     fy_years = cast(list[int], by_acft_raw.get("years") or [])
     fy_categories = cast(list[str], by_acft_raw.get("categories") or [])
     fy_matrix = cast(Dict[str, list[int]], by_acft_raw.get("matrix") or {})
@@ -74,5 +93,13 @@ def dashboard(request):
         "fy_matrix": fy_matrix,
 
         "user_name": getattr(request.user, "full_display_name", request.user.get_username()),
+        "util_names": util.get("names", []),
+        "util_flights": util.get("flights", []),
+        "util_hours": util.get("hours", []),
+        "util_avg_minutes": util.get("avg_minutes", []),
+        "util_start": util_start.isoformat(),
+        "util_end": util_end.isoformat(),
+ 
     }
+ 
     return render(request, "analytics/dashboard.html", ctx)
