@@ -31,460 +31,111 @@
       <strong>No data</strong> for the selected range{% if finalized %} with “finalized only”{% endif %}.
       Try broadening the years or check “Include unfinalized”.
     </div>
-  {% else %}
-    <div class="card mb-4">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Cumulative Flights by Julian Day</h5>
-        <div class="chart-box"><canvas id="cumuChart"></canvas></div>
-        <div class="small text-muted mt-2">
-          Current year is emphasized. Hover any day to see the running total for that year.
+  {% endif %}
+
+  <!-- Cumulative -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Cumulative Flights by Julian Day</h5>
+      <div class="chart-box"><canvas id="cumuChart"></canvas></div>
+      <div class="small text-muted mt-2">Current year is emphasized. Hover any day to see the running total for that year.</div>
+    </div>
+  </div>
+
+  <!-- Flights by Year by Aircraft -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Flights by Year by Aircraft</h5>
+      <div class="chart-box"><canvas id="byAcftChart"></canvas></div>
+      <div id="byAcftStatus" class="small text-muted mt-2">
+        Club ships shown individually; non-club ships bucketed as <em>Private</em>. Flights with no identified glider appear as <em>Unknown</em>. Low-volume ships beyond the top N are grouped as <em>Other</em>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Utilization + Private Utilization -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-end">
+        <h5 class="card-title mb-3">Glider Utilization</h5>
+        <form class="row g-2 align-items-end" method="get">
+          <div class="col-auto">
+            <label class="form-label small mb-1">From</label>
+            <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">To</label>
+            <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
+          </div>
+          <input type="hidden" name="start" value="{{ start }}">
+          <input type="hidden" name="end" value="{{ end }}">
+          {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
+          <div class="col-auto">
+            <button class="btn btn-outline-primary btn-sm">Update</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="chart-box" style="height:520px;"><canvas id="utilChart"></canvas></div>
+      <div id="utilStatus" class="small text-muted mt-2">Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.</div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Private Glider Utilization (excludes club ships)</h5>
+      <div class="chart-box" style="height:520px;"><canvas id="utilPrivChart"></canvas></div>
+      <div id="utilPrivStatus" class="small text-muted mt-2">Each private ship listed individually. Date range matches the selector above.</div>
+    </div>
+  </div>
+
+  <!-- Member activity -->
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Flying Days by Member</h5>
+          <div class="chart-box" style="height:560px;"><canvas id="fdChart"></canvas></div>
+          <div class="small text-muted mt-2" id="fdStatus"></div>
         </div>
       </div>
     </div>
-  {% endif %}
-</div>
-<div class="card mb-4">
-  <div class="card-body">
-    <h5 class="card-title mb-3">Flights by Year by Aircraft</h5>
-    <div class="chart-box">
-      <canvas id="byAcftChart"></canvas>
-    </div>
-    <div id="byAcftStatus" class="small text-muted mt-2">
-      Club ships shown individually; non-club ships are bucketed as <em>Private</em>.
-      Flights with no identified glider appear as <em>Unknown</em>.
-      Low-volume ships beyond the top N are grouped as <em>Other</em> (only if applicable).
-    </div>
-  </div>
-</div>
-<div class="card mb-4">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-end">
-      <h5 class="card-title mb-3">Glider Utilization</h5>
-      <form class="row g-2 align-items-end" method="get">
-        <div class="col-auto">
-          <label class="form-label small mb-1">From</label>
-          <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
+    <div class="col-lg-6">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Glider Flights by Pilot (non-instruction)</h5>
+          <div class="chart-box" style="height:560px;"><canvas id="pgfChart"></canvas></div>
+          <div class="small text-muted mt-2" id="pgfStatus"></div>
         </div>
-        <div class="col-auto">
-          <label class="form-label small mb-1">To</label>
-          <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Flight Duration Distribution</h5>
+          <div class="chart-box" style="height:380px;"><canvas id="durChart"></canvas></div>
+          <div class="small text-muted mt-2" id="durStatus"></div>
         </div>
-        {# preserve finalized toggle and main years if present #}
-        <input type="hidden" name="start" value="{{ start }}">
-        <input type="hidden" name="end" value="{{ end }}">
-        {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
-        <div class="col-auto">
-          <button class="btn btn-outline-primary btn-sm">Update</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="chart-box" style="height: 520px;">
-      <canvas id="utilChart"></canvas>
-    </div>
-    <div id="utilStatus" class="small text-muted mt-2">
-      Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.
-    </div>
-  </div>
-</div>
-<div class="card mb-4">
-  <div class="card-body">
-    <h5 class="card-title mb-3">Private Glider Utilization (excludes club ships)</h5>
-    <div class="chart-box" style="height: 520px;">
-      <canvas id="utilPrivChart"></canvas>
-    </div>
-    <div id="utilPrivStatus" class="small text-muted mt-2">
-      Each private ship listed individually. Date range matches the selector above.
+      </div>
     </div>
   </div>
 </div>
 
 <style>
-.chart-box { height: 440px; position: relative; }
-#cumuChart { width: 100% !important; height: 100% !important; display: block; }
+  .chart-box { height: 440px; position: relative; }
+  #cumuChart { width: 100% !important; height: 100% !important; display: block; }
 </style>
 
-{{ labels|json_script:"labels-data" }}
-{{ years|json_script:"years-data" }}
-{{ data|json_script:"data-by-year" }}
-{{ totals|json_script:"totals-data" }}
-{{ instr|json_script:"instr-data" }}
-{{ current_year|json_script:"current-year" }}
-{{ fy_years|json_script:"fy-years" }}
-{{ fy_categories|json_script:"fy-cats" }}
-{{ fy_matrix|json_script:"fy-matrix" }}
-{{ util_names|json_script:"util-names" }}
-{{ util_flights|json_script:"util-flights" }}
-{{ util_hours|json_script:"util-hours" }}
-{{ util_avg_minutes|json_script:"util-avgm" }}
-{{ utilp_names|json_script:"utilp-names" }}
-{{ utilp_flights|json_script:"utilp-flights" }}
-{{ utilp_hours|json_script:"utilp-hours" }}
-{{ utilp_avg_minutes|json_script:"utilp-avgm" }}
+{# one single JSON blob with everything #}
+{{ analytics_data|json_script:"analytics-data" }}
 
-
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-/* globals Chart */
-const labels      = JSON.parse(document.getElementById("labels-data").textContent || "[]");
-const years       = JSON.parse(document.getElementById("years-data").textContent || "[]");
-const dataByYear  = JSON.parse(document.getElementById("data-by-year").textContent || "{}");
-const totals      = JSON.parse(document.getElementById("totals-data").textContent || "{}");
-const instr       = JSON.parse(document.getElementById("instr-data").textContent || "{}");
-const currentYear = JSON.parse(document.getElementById("current-year").textContent || "0");
-
-// month anchors used for x tick labels and vertical gridlines
-const anchors = {1:"Jan",32:"Feb",60:"Mar",91:"Apr",121:"May",152:"Jun",182:"Jul",213:"Aug",244:"Sep",274:"Oct",305:"Nov",335:"Dec"};
-
-// deterministic color per year
-function colorForYear(y) {
-  const base = (y * 9301 + 49297) % 233280;
-  const hue = (base / 233280) * 360;
-  return `hsl(${hue}, 60%, 45%)`;
-}
-
-// day-of-year today (local)
-function doyToday() {
-  const t = new Date();
-  return Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 86400000); // 1..366
-}
-
-// build datasets; truncate current year's points *after today* to null (no flat line)
-const todayYear = new Date().getFullYear();
-const todayDoy  = doyToday();
-
-const datasets = years.map((y) => {
-  const c = colorForYear(y);
-  const isCurrent = y === currentYear;
-  const arr = (dataByYear[String(y)] || []).slice();
-
-  if (isCurrent && y === todayYear) {
-    for (let i = todayDoy; i < arr.length; i++) arr[i] = null;  // keep 0..(today-1), null thereafter
-  }
-
-  return {
-    label: String(y),
-    data: arr,
-    borderColor: c,
-    backgroundColor: c,
-    tension: 0.2,
-    borderWidth: isCurrent ? 3 : 1.5,
-    borderDash: isCurrent ? undefined : [5, 4],
-    pointRadius: isCurrent ? 3 : 0,
-    pointHoverRadius: isCurrent ? 5 : 3,
-    pointBackgroundColor: isCurrent ? "#fff" : undefined,
-    pointBorderColor: isCurrent ? c : undefined,
-    pointBorderWidth: isCurrent ? 2 : 0,
-    spanGaps: false,
-  };
-});
-
-// compute y cap using visible values (ignore nulls)
-const flatMax = datasets.reduce((m, ds) => {
-  const vals = (ds.data || []).filter(v => v != null);
-  return Math.max(m, vals.length ? Math.max(...vals) : 0);
-}, 0);
-const yMax = Math.max(10, Math.ceil((flatMax * 1.05) / 50) * 50);
-
-// nuke any prior chart safely (dev hot reloads)
-if (window.cumuChart && typeof window.cumuChart.destroy === "function") {
-  window.cumuChart.destroy();
-} else {
-  window.cumuChart = null;
-}
-
-const ctx = document.getElementById("cumuChart")?.getContext?.("2d");
-if (ctx) {
-  window.cumuChart = new Chart(ctx, {
-    type: "line",
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      interaction: { mode: "nearest", intersect: false },
-      plugins: {
-        legend: { position: "left", labels: { boxWidth: 18 } },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              if (!items.length) return "";
-              const i = items[0];
-              const y = Number(i.dataset.label);
-              const doy = labels[i.dataIndex];
-              const d  = new Date(y, 0, doy);
-              const month = d.toLocaleString(undefined, { month: "short" });
-              const day = d.getDate();
-              return `${y} • Day ${doy} (${month} ${day})`;
-            },
-            label: (item) => {
-              const y = String(item.dataset.label);
-              const val = item.parsed.y;
-              const tot = totals[y] ?? val;
-              const ins = instr[y] ?? 0;
-              const pct = tot ? Math.round((ins / tot) * 100) : 0;
-              return ` ${val} flights (total ${tot}, ${ins} instruction • ${pct}%)`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          title: { display: true, text: "Julian Day (1–365)" },
-          ticks: {
-            callback: (_, idx) => anchors[labels[idx]] || "",
-            maxRotation: 0,
-            autoSkip: false
-          },
-          // draw vertical gridlines only at month starts
-          grid: {
-            color: (ctx) => {
-              const i = ctx.index;
-              const labelVal = labels[i];
-              return anchors[labelVal] ? undefined : "rgba(0,0,0,0)"; // transparent for non-anchors
-            }
-          }
-        },
-        y: {
-          beginAtZero: true,
-          max: yMax,
-          ticks: { precision: 0 },
-          title: { display: true, text: "Cumulative Flights" }
-        }
-      }
-    }
+{# scripts: Chart.js + our single initializer, both deferred #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="{% static 'analytics/charts.js' %}" defer></script>
+<script defer>
+  window.addEventListener("DOMContentLoaded", () => {
+    const ALL = JSON.parse(document.getElementById("analytics-data").textContent || "{}");
+    window.AnalyticsCharts?.initAll(ALL);
   });
-}
 </script>
-<script>
-/* ===== Stacked Bar: Flights by Year by Aircraft ===== */
-const fyYears = JSON.parse(document.getElementById("fy-years")?.textContent || "[]");
-const fyCats  = JSON.parse(document.getElementById("fy-cats")?.textContent  || "[]");
-const fyMat   = JSON.parse(document.getElementById("fy-matrix")?.textContent|| "{}");
-
-function setByAcftStatus(msg){ const el=document.getElementById("byAcftStatus"); if(el) el.textContent=msg || ""; }
-
-// Guard: no data? show a note and skip chart init
-if (!fyYears.length || !fyCats.length) {
-  setByAcftStatus("No aircraft data for the selected range.");
-} else {
-  /* Colorblind-friendly, widely spaced hues via golden angle.
-     Reserved categories get fixed colors for clarity. */
-  function colorForCategory(cat, idx) {
-    if (cat === "Private")  return "#BDBDBD"; // light gray
-    if (cat === "Other")    return "#9E9E9E"; // darker gray
-    if (cat === "Unknown")  return "#8E44AD"; // purple
-    const hue = (idx * 137.508) % 360;
-    return `hsl(${hue}, 65%, 48%)`;
-  }
-
-  const datasets = fyCats.map((cat, i) => ({
-    label: cat,
-    data: (fyMat[cat] || []).map(v => Number(v) || 0),
-    backgroundColor: colorForCategory(cat, i),
-    borderColor: colorForCategory(cat, i),
-    borderWidth: 1,
-  }));
-
-  // Total per year (stacked sum) → nice padded y cap
-  const yearlyTotals = fyYears.map((_, i) =>
-    datasets.reduce((sum, ds) => sum + (Number(ds.data[i]) || 0), 0)
-  );
-  const barMax  = Math.max(0, ...yearlyTotals);
-  const barYMax = Math.max(10, Math.ceil((barMax * 1.10) / 50) * 50);
-
-  // Clean up old chart (dev hot reloads)
-  if (window.byAcftChart && typeof window.byAcftChart.destroy === "function") {
-    window.byAcftChart.destroy();
-  }
-
-  const byCtx = document.getElementById("byAcftChart")?.getContext?.("2d");
-  if (!byCtx) {
-    setByAcftStatus("Canvas not found.");
-  } else {
-    window.byAcftChart = new Chart(byCtx, {
-      type: "bar",
-      data: { labels: fyYears.map(String), datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { position: "left" },
-          tooltip: {
-            callbacks: {
-              title: (items) => (items[0]?.label ?? ""),
-              label: (item) => ` ${item.dataset.label}: ${item.formattedValue}`,
-              footer: (items) => {
-                const i = items[0]?.dataIndex ?? 0;
-                const total = yearlyTotals[i] || 0;
-                return `Total: ${total}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: { stacked: true, title: { display: true, text: "Year" } },
-          y: {
-            stacked: true,
-            beginAtZero: true,
-            suggestedMax: barYMax,
-            title: { display: true, text: "Flights" },
-            ticks: { precision: 0 }
-          }
-        }
-      }
-    });
-    setByAcftStatus(""); // clear any previous note
-  }
-}
-</script>
-<script>
-/* ===== Glider Utilization (horizontal grouped bars) ===== */
-const uNames = JSON.parse(document.getElementById("util-names")?.textContent || "[]");
-const uFlights = JSON.parse(document.getElementById("util-flights")?.textContent || "[]");
-const uHours = JSON.parse(document.getElementById("util-hours")?.textContent || "[]");
-const uAvgMins = JSON.parse(document.getElementById("util-avgm")?.textContent || "[]");
-function setUtilStatus(msg){const el=document.getElementById("utilStatus"); if(el) el.textContent=msg||"";}
-
-if (!uNames.length) {
-  setUtilStatus("No utilization data for the selected period.");
-} else {
-  // colors like your screenshot
-  const C_FLIGHTS = "#e74c3c"; // red
-  const C_HOURS   = "#3498db"; // blue
-  const C_AVG     = "#8bc34a"; // green
-
-  // one axis for simplicity; flights dominate, others still readable
-  const xMax = Math.max(1,
-    Math.max(...uFlights.map(Number)),
-    Math.max(...uHours.map(Number)),
-    Math.max(...uAvgMins.map(Number))
-  );
-  const padMax = Math.ceil((xMax * 1.05) / 20) * 20;
-
-  const utilData = {
-    labels: uNames,
-    datasets: [
-      { label: "Total Flights", data: uFlights, backgroundColor: C_FLIGHTS, borderColor: C_FLIGHTS, borderWidth: 1 },
-      { label: "Total Hours",   data: uHours,   backgroundColor: C_HOURS,   borderColor: C_HOURS,   borderWidth: 1 },
-      { label: "Avg Flight (min)", data: uAvgMins, backgroundColor: C_AVG, borderColor: C_AVG, borderWidth: 1 },
-    ]
-  };
-
-  if (window.utilChart && typeof window.utilChart.destroy === "function") window.utilChart.destroy();
-
-  const uctx = document.getElementById("utilChart")?.getContext?.("2d");
-  if (!uctx) {
-    setUtilStatus("Canvas not found.");
-  } else {
-    window.utilChart = new Chart(uctx, {
-      type: "bar",
-      data: utilData,
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { position: "right" },
-          tooltip: {
-            callbacks: {
-              label: (item) => {
-                const ds = item.dataset.label;
-                const v = Number(item.formattedValue);
-                if (ds === "Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
-                if (ds === "Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
-                return ` ${ds}: ${v}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            beginAtZero: true,
-            suggestedMax: padMax,
-            title: { display: true, text: "Flights / Hours / Minutes (scaled)" },
-            ticks: { precision: 0 }
-          },
-          y: { ticks: { autoSkip: false } }
-        }
-      }
-    });
-  }
-}
-</script>
-
-<script>
-/* ===== Private-only Utilization ===== */
-const pNames    = JSON.parse(document.getElementById("utilp-names")?.textContent || "[]");
-const pFlights  = JSON.parse(document.getElementById("utilp-flights")?.textContent || "[]");
-const pHours    = JSON.parse(document.getElementById("utilp-hours")?.textContent || "[]");
-const pAvgMins  = JSON.parse(document.getElementById("utilp-avgm")?.textContent || "[]");
-function setUtilPrivStatus(msg){const el=document.getElementById("utilPrivStatus"); if(el) el.textContent=msg||"";}
-
-if (!pNames.length) {
-  setUtilPrivStatus("No private-ship utilization data for the selected period.");
-} else {
-  const C_FLIGHTS = "#e74c3c"; // red
-  const C_HOURS   = "#3498db"; // blue
-  const C_AVG     = "#8bc34a"; // green
-
-  const xMax = Math.max(
-    1,
-    Math.max(...pFlights.map(Number)),
-    Math.max(...pHours.map(Number)),
-    Math.max(...pAvgMins.map(Number))
-  );
-  const padMax = Math.ceil((xMax * 1.05) / 20) * 20;
-
-  const data = {
-    labels: pNames,
-    datasets: [
-      { label: "Total Flights", data: pFlights, backgroundColor: C_FLIGHTS, borderColor: C_FLIGHTS, borderWidth: 1 },
-      { label: "Total Hours",   data: pHours,   backgroundColor: C_HOURS,   borderColor: C_HOURS,   borderWidth: 1 },
-      { label: "Avg Flight (min)", data: pAvgMins, backgroundColor: C_AVG, borderColor: C_AVG, borderWidth: 1 },
-    ]
-  };
-
-  if (window.utilPrivChart && typeof window.utilPrivChart.destroy === "function") window.utilPrivChart.destroy();
-
-  const ctx = document.getElementById("utilPrivChart")?.getContext?.("2d");
-  if (!ctx) {
-    setUtilPrivStatus("Canvas not found.");
-  } else {
-    window.utilPrivChart = new Chart(ctx, {
-      type: "bar",
-      data,
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { position: "right" },
-          tooltip: {
-            callbacks: {
-              label: (item) => {
-                const ds = item.dataset.label;
-                const v = Number(item.formattedValue);
-                if (ds === "Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
-                if (ds === "Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
-                return ` ${ds}: ${v}`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: { beginAtZero: true, suggestedMax: padMax, ticks: { precision: 0 }, title: { display: true, text: "Flights / Hours / Minutes (scaled)" } },
-          y: { ticks: { autoSkip: false } }
-        }
-      }
-    });
-    setUtilPrivStatus("");
-  }
-}
-</script>
-
 {% endblock %}

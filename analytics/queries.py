@@ -1,12 +1,17 @@
 from collections import defaultdict
 from datetime import date
+from itertools import chain
+
 from django.db.models.functions import Extract, ExtractYear
 from logsheet.models import Flight
-from typing import Dict, Any, TypedDict, List
+from typing import Dict, Any, TypedDict, List, Tuple
 from django.db.models import Count, Q, F, Sum, Avg, DurationField
 from django.db.models.functions import ExtractYear, Coalesce
 from django.db.models.expressions import ExpressionWrapper
 from logsheet.models import Flight
+from django.db.models.functions import Coalesce
+from django.contrib.auth import get_user_model
+
 
 FINALIZED_ONLY = Q(logsheet__finalized=True)
 LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
@@ -96,9 +101,6 @@ def flights_by_year_by_aircraft(start_year: int, end_year: int, *, finalized_onl
     #  }
     # Buckets non-club ships (glider.club_owned == False) into "Private".
     # Low-volume ships beyond top_n are grouped under "Other".
-
-    FINALIZED_ONLY = Q(logsheet__finalized=True)
-    LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
 
     qs = Flight.objects.filter(LANDED_ONLY)
     if finalized_only:
@@ -199,20 +201,14 @@ def glider_utilization(
     bucket_private: bool = True,      # True → non-club into "Private"; False → list individually
     include_unknown: bool = True,     # include flights with null glider as "Unknown"
 ) -> GliderUtilization:
-    """
-    Flights / total hours / avg minutes per glider in a date range.
+    # Flights / total hours / avg minutes per glider in a date range.
 
-    - fleet="all": club ships shown individually; non-club can be bucketed as "Private".
-    - fleet="club": include only glider.club_owned=True.
-    - fleet="private": include only glider.club_owned=False (and include_unknown controls nulls).
+    # - fleet="all": club ships shown individually; non-club can be bucketed as "Private".
+    # - fleet="club": include only glider.club_owned=True.
+    # - fleet="private": include only glider.club_owned=False (and include_unknown controls nulls).
 
-    - When bucket_private=False, private ships are listed individually (no "Private" bucket).
-    - Ships beyond top_n (by flights) grouped as "Other".
-    """
-    from logsheet.models import Flight  # local import to avoid cycles
-
-    FINALIZED_ONLY = Q(logsheet__finalized=True)
-    LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
+    # - When bucket_private=False, private ships are listed individually (no "Private" bucket).
+    # - Ships beyond top_n (by flights) grouped as "Other".
 
     qs = Flight.objects.filter(LANDED_ONLY)
     if finalized_only:
@@ -338,3 +334,141 @@ def glider_utilization(
         "start": start_date.isoformat(),
         "end": end_date.isoformat(),
     }
+
+def _username_map(ids: List[int]) -> Dict[int, str]:
+    User = get_user_model()
+    rows = User.objects.filter(id__in=ids).values("id", "username")
+    return {r["id"]: r["username"] for r in rows}
+
+# 1) Flying days by member (any role)
+def flying_days_by_member(
+    start_date: date,
+    end_date: date,
+    *,
+    finalized_only: bool = True,
+    min_days: int = 2,
+) -> Dict[str, Any]:
+    """
+    Count distinct ops days per member where they flew as pilot OR instructor OR tow pilot.
+    Returns { "names": [...], "days": [...], "ops_days_total": int }
+    """
+    from logsheet.models import Flight
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date
+    )
+
+    # Pull distinct (member_id, ops_date) pairs per role
+    pilot_pairs = qs.filter(pilot__isnull=False).values_list("pilot_id", "ops_date").distinct()
+    instr_pairs = qs.filter(instructor__isnull=False).values_list("instructor_id", "ops_date").distinct()
+    tow_pairs   = qs.filter(tow_pilot__isnull=False).values_list("tow_pilot_id", "ops_date").distinct()
+
+    # Union in Python and count distinct days per member
+    days_by_member: Dict[int, set] = defaultdict(set)
+    for mid, d in chain(pilot_pairs, instr_pairs, tow_pairs):
+        if mid is not None and d is not None:
+            days_by_member[int(mid)].add(d)
+
+    # Filter by threshold and sort desc by days, then by username
+    ids = [m for m, s in days_by_member.items() if len(s) >= min_days]
+    if not ids:
+        return {"names": [], "days": [], "ops_days_total": int(qs.values("ops_date").distinct().count())}
+
+    # Map IDs -> usernames once
+    User = get_user_model()
+    name_map = {u["id"]: u["username"] for u in User.objects.filter(id__in=ids).values("id", "username")}
+
+    rows: List[tuple] = []
+    for m in ids:
+        nm = name_map.get(m)
+        if nm:
+            rows.append((nm, len(days_by_member[m])))
+
+    # sort by days desc, then name asc
+    rows.sort(key=lambda t: (-t[1], t[0]))
+
+    names = [t[0] for t in rows]
+    days  = [int(t[1]) for t in rows]
+
+    ops_days_total = int(qs.values("ops_date").distinct().count())
+    return {"names": names, "days": days, "ops_days_total": ops_days_total}
+
+
+
+# 2) Flight duration distribution (CDF) for glider flights
+def flight_duration_distribution(start_date: date, end_date: date, *, finalized_only=True, max_points=400) -> Dict[str, Any]:
+    # CDF of flight durations (hours). Also returns median minutes and % over 1h/2h/3h.
+    # Returns { "x_hours": [...], "cdf_pct": [...], "median_min": int, "pct_gt": {1:float,2:float,3:float} }
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    qs = qs.annotate(
+        ops_date=F("logsheet__log_date"),
+        dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
+    ).annotate(
+        dur=Coalesce(F("duration"), F("dur_diff"))
+    ).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date
+    ).values_list("dur", flat=True)
+
+    secs = []
+    for d in qs:
+        if d is not None:
+            s = float(d.total_seconds())
+            if s > 0:
+                secs.append(s)
+
+    if not secs:
+        return {"x_hours": [], "cdf_pct": [], "median_min": 0, "pct_gt": {1:0.0,2:0.0,3:0.0}}
+
+    secs.sort()
+    n = len(secs)
+
+    # Downsample to ~max_points via quantiles
+    step = max(1, n // max_points)
+    picked = secs[0:n:step]
+    x_hours = [round(s/3600.0, 3) for s in picked]
+    cdf_pct = [round((i+1)/n*100.0, 2) for i in range(0, len(picked))]
+
+    # Median & tails
+    mid = secs[n//2] if n % 2 == 1 else 0.5*(secs[n//2-1] + secs[n//2])
+    median_min = int(round(mid/60.0))
+
+    def pct_over(hours: float) -> float:
+        threshold = hours*3600.0
+        # number strictly greater than threshold
+        import bisect
+        k = bisect.bisect_right(secs, threshold)
+        return round((n - k)/n*100.0, 1)
+
+    pct_gt = {1: pct_over(1.0), 2: pct_over(2.0), 3: pct_over(3.0)}
+    return {"x_hours": x_hours, "cdf_pct": cdf_pct, "median_min": median_min, "pct_gt": pct_gt}
+
+# 3) Non-instruction glider flights by pilot
+def pilot_glider_flights(start_date: date, end_date: date, *, finalized_only=True, min_flights=2) -> Dict[str, Any]:
+    # Count glider flights per pilot where no instructor is on the flight.
+    # Returns { "names": [...], "counts": [...] }
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    rows = (qs.annotate(ops_date=F("logsheet__log_date"))
+              .filter(ops_date__gte=start_date, ops_date__lte=end_date,
+                      pilot__isnull=False, instructor__isnull=True)
+              .values("pilot_id")
+              .annotate(n=Count("id"))
+              .order_by("-n", "pilot_id"))
+
+    ids = [r["pilot_id"] for r in rows if r["n"] >= min_flights]
+    name_map = _username_map(ids)
+
+    names = [name_map[i] for i in ids if i in name_map]
+    counts = [int(r["n"]) for r in rows if r["pilot_id"] in name_map]
+    return {"names": names, "counts": counts}

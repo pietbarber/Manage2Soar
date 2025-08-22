@@ -66,9 +66,7 @@ def dashboard(request):
     default_start = date(today.year, 1, 1)
     util_start = util_start or default_start
     util_end   = util_end or today
-    
     util = queries.glider_utilization(util_start, util_end, finalized_only=finalized_only, top_n=12)
- 
     util_private = queries.glider_utilization(
         util_start, util_end,
         finalized_only=finalized_only,
@@ -78,10 +76,12 @@ def dashboard(request):
         include_unknown=False,    # omit null-glider flights
     )
    
-    # add to context
     fy_years = cast(list[int], by_acft_raw.get("years") or [])
     fy_categories = cast(list[str], by_acft_raw.get("categories") or [])
     fy_matrix = cast(Dict[str, list[int]], by_acft_raw.get("matrix") or {})
+    fdays = queries.flying_days_by_member(util_start, util_end, finalized_only=finalized_only, min_days=2) or {}
+    dur   = queries.flight_duration_distribution(util_start, util_end, finalized_only=finalized_only) or {}
+    pgf   = queries.pilot_glider_flights(util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
 
     ctx = {
         "year": end,
@@ -113,6 +113,65 @@ def dashboard(request):
         "utilp_hours": util_private.get("hours", []),
         "utilp_avg_minutes": util_private.get("avg_minutes", []),
 
+        # flying days
+        "fd_names": fdays.get("names", []),
+        "fd_days": fdays.get("days", []),
+        "fd_ops_total": fdays.get("ops_days_total", 0),
+
+        # duration distribution
+        "dur_x_hours": dur.get("x_hours", []),
+        "dur_cdf_pct": dur.get("cdf_pct", []),
+        "dur_median_min": dur.get("median_min", 0),
+        "dur_pct_gt": dur.get("pct_gt", {1:0.0,2:0.0,3:0.0}),
+    
+        # pilot flights (non-instruction)
+        "pgf_names": pgf.get("names", []),
+        "pgf_counts": pgf.get("counts", []),
+
     }
+    analytics_data = {
+        "cumulative": {
+            "labels": labels,
+            "years": years_list,
+            "data": data_json,
+            "totals": totals_json,
+            "instr": instr_json,
+            "current_year": current_year,
+        },
+        "by_acft": {
+            "years": ctx.get("fy_years", []),
+            "cats": ctx.get("fy_categories", []),
+            "matrix": ctx.get("fy_matrix", {}),
+        },
+        "util": {
+            "names": ctx.get("util_names", []),
+            "flights": ctx.get("util_flights", []),
+            "hours": ctx.get("util_hours", []),
+            "avgm": ctx.get("util_avg_minutes", []),
+        },
+        "util_priv": {
+            "names": ctx.get("utilp_names", []),
+            "flights": ctx.get("utilp_flights", []),
+            "hours": ctx.get("utilp_hours", []),
+            "avgm": ctx.get("utilp_avg_minutes", []),
+        },
+        "fdays": {
+            "names": ctx.get("fd_names", []),
+            "days": ctx.get("fd_days", []),
+            "ops_total": ctx.get("fd_ops_total", 0),
+        },
+        "pgf": {
+            "names": ctx.get("pgf_names", []),
+            "counts": ctx.get("pgf_counts", []),
+        },
+        "duration": {
+            "x_hours": ctx.get("dur_x_hours", []),
+            "cdf_pct": ctx.get("dur_cdf_pct", []),
+            "median_min": ctx.get("dur_median_min", 0),
+            "pct_gt": ctx.get("dur_pct_gt", {"1":0,"2":0,"3":0}),
+        },
+    }
+
+    ctx["analytics_data"] = analytics_data
  
     return render(request, "analytics/dashboard.html", ctx)
