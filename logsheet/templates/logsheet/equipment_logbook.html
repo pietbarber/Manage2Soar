@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">
+            {{ object_type|capfirst }} Logbook — {{ object }}
+        </h2>
+    </div>
+
+    <p class="text-muted mt-1">
+        Daily flights with per‑day and running totals, plus maintenance & deadlines aligned to dates.
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="white-space:nowrap;">Date</th>
+                    <th class="text-end">Flights</th>
+                    <th class="text-end">Day Time</th>
+                    <th class="text-end">Cumulative</th>
+                    <th>Events</th>
+                    <th>Logsheet</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in daily %}
+                {% with d=row.day %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ d }}</td>
+                    <td class="text-end">{{ row.flights }}</td>
+                    <td class="text-end">{{ row.day_time }}</td>
+                    <td class="text-end">{{ row.cum_time }}</td>
+                    <td>
+                        {% if issues_by_day.d %}
+                        <div class="mb-1 fw-semibold">Maintenance Items</div>
+                        <ul class="mb-1">
+                            {% for it in issues_by_day.d %}
+                            <li>
+                                #{{ it.id }} — {{ it.description }}
+                                {% if it.grounded %}<span class="badge bg-danger">Grounding</span>{% endif %}
+                                {% if it.resolved %}<span class="badge bg-success">Resolved{% if it.resolved_date %} {{
+                                    it.resolved_date }}{% endif %}</span>{% else %}
+                                <span class="badge bg-warning text-dark">Open</span>{% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        {% if deadlines_by_day.d %}
+                        <div class="mb-1 fw-semibold">Deadlines</div>
+                        <ul class="mb-0">
+                            {% for dl in deadlines_by_day.d %}
+                            <li>
+                                {{ dl.description }} — due {{ dl.due_date }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+
+                        {% if not issues_by_day.d and not deadlines_by_day.d %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.logsheet_id %}
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'logsheet:manage' row.logsheet_id %}">
+                            View Logsheet
+                        </a>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-muted">No flights recorded.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

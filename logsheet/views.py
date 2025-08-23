@@ -12,13 +12,14 @@ from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
 from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister, MaintenanceDeadline
 from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
-
-
+from .models import RevisionLog
+from django.db.models import Count, Sum, F, Window, Value, OrderBy
+from django.db.models.functions import TruncDate
 
 
 #################################################
 # index
-# This function might have been abandoned.  Considering updating it or deleting it. 
+# This function might have been abandoned.  Considering updating it or deleting it.
 @active_member_required
 def index(request):
     return render(request, "logsheet/index.html")
@@ -26,15 +27,15 @@ def index(request):
 
 #################################################
 # Handles the creation of a new logsheet.
-# 
+#
 # This view is accessible only to active members due to the `@active_member_required` decorator.
 # It processes both GET and POST requests:
 # - For GET requests, it initializes an empty `CreateLogsheetForm` and renders the logsheet creation page.
 # - For POST requests, it validates the submitted form data, creates a new logsheet instance, associates it with the currently logged-in user, and saves it to the database. If successful, it redirects the user to the logsheet management page and displays a success message.
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
-# 
+#
 # Returns:
 #    HttpResponse: Renders the logsheet creation page with the form for GET requests.
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful creation of a logsheet.
@@ -47,7 +48,8 @@ def create_logsheet(request):
             logsheet = form.save(commit=False)
             logsheet.created_by = request.user
             logsheet.save()
-            messages.success(request, f"Logsheet for {logsheet.log_date} at {logsheet.airfield} created.")
+            messages.success(
+                request, f"Logsheet for {logsheet.log_date} at {logsheet.airfield} created.")
             return redirect("logsheet:manage", pk=logsheet.pk)
     else:
         form = CreateLogsheetForm()
@@ -58,31 +60,31 @@ def create_logsheet(request):
 # manage_logsheet
 
 # This view handles the management of a specific logsheet.
-# 
+#
 # It allows active members to:
 # - View all flights associated with the logsheet, with optional filtering by pilot or instructor name.
 # - Add new flights to the logsheet (if not finalized).
 # - Finalize the logsheet, locking in all calculated costs as actual costs.
 # - Reopen a finalized logsheet for revision (superusers only).
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
 #    pk (int): The primary key of the logsheet to manage.
-# 
+#
 # Returns:
 #    HttpResponse: Renders the logsheet management page with the list of flights and a form for adding flights.
 #    HttpResponseRedirect: Redirects to the same page after performing actions like finalizing, revising, or adding flights.
 
+
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    #flights = logsheet.flights.select_related("pilot", "glider").all().order_by("launch_time")
     flights = (
-        logsheet.flights
+        Flight.objects
         .select_related("pilot", "glider")
+        .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
     )
-
 
     query = request.GET.get("q")
     if query:
@@ -100,10 +102,10 @@ def manage_logsheet(request, pk):
 
         # 🔒 REQUIRE CLOSEOUT BEFORE FINALIZATION
         if not hasattr(logsheet, "closeout"):
-            messages.error(request, "Cannot finalize. Closeout has not been completed.")
+            messages.error(
+                request, "Cannot finalize. Closeout has not been completed.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
-   
         responsible_members = set()
         invalid_flights = []
 
@@ -122,15 +124,20 @@ def manage_logsheet(request, pk):
 
              # Validate required fields before finalization
             if not flight.landing_time:
-                invalid_flights.append(f"Flight #{flight.id} is missing a landing time.")
+                invalid_flights.append(
+                    f"Flight #{flight.id} is missing a landing time.")
             if not flight.release_altitude:
-                invalid_flights.append(f"Flight #{flight.id} is missing a release altitude.")
+                invalid_flights.append(
+                    f"Flight #{flight.id} is missing a release altitude.")
             if not flight.towplane:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
+                invalid_flights.append(
+                    f"Flight #{flight.id} is missing a tow plane.")
             if not flight.tow_pilot:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
+                invalid_flights.append(
+                    f"Flight #{flight.id} is missing a tow pilot.")
             if not flight.launch_time:
-                invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
+                invalid_flights.append(
+                    f"Flight #{flight.id} is missing a launch time.")
 
             # Enforce required duty crew before finalization
             required_roles = {
@@ -139,12 +146,14 @@ def manage_logsheet(request, pk):
                 "duty_instructor": logsheet.duty_instructor,
             }
 
-            missing_roles = [label.replace("_", " ").title() for label, value in required_roles.items() if not value]
+            missing_roles = [label.replace("_", " ").title(
+            ) for label, value in required_roles.items() if not value]
 
             if missing_roles:
                 messages.error(
                     request,
-                    "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles)
+                    "Cannot finalize. Missing duty crew: " +
+                    ", ".join(missing_roles)
                 )
                 return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -153,7 +162,8 @@ def manage_logsheet(request, pk):
         # Check if all responsible members have a payment method set
         for member in responsible_members:
             try:
-                payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
+                payment = LogsheetPayment.objects.get(
+                    logsheet=logsheet, member=member)
                 if not payment.payment_method:
                     missing.append(member)
             except LogsheetPayment.DoesNotExist:
@@ -169,13 +179,14 @@ def manage_logsheet(request, pk):
         if missing:
             messages.error(
                 request,
-                "Cannot finalize. Missing payment method for: " + ", ".join(str(m) for m in missing)
+                "Cannot finalize. Missing payment method for: " +
+                ", ".join(str(m) for m in missing)
             )
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
         # Lock in cost values
-        # That means take the temporary values we calculated for the costs 
-        # and place them in these other variables that get perma-written to the database. 
+        # That means take the temporary values we calculated for the costs
+        # and place them in these other variables that get perma-written to the database.
         for flight in flights:
             if flight.tow_cost_actual is None:
                 flight.tow_cost_actual = flight.tow_cost_calculated
@@ -186,20 +197,21 @@ def manage_logsheet(request, pk):
         logsheet.finalized = True
         logsheet.save()
         from .models import RevisionLog  # if not already imported
-        
+
         RevisionLog.objects.create(
             logsheet=logsheet,
             revised_by=request.user,
             note="Logsheet finalized"
         )
-        
-        messages.success(request, "Logsheet has been finalized and all costs locked in.")
+
+        messages.success(
+            request, "Logsheet has been finalized and all costs locked in.")
         return redirect("logsheet:manage", pk=logsheet.pk)
 
     # If the logsheet is finalized, prevent adding new flights
     # This check is done here to ensure that only superusers can reopen finalized logbooks
     # If there is a "revise", then we'll remove the finalized status
-    # and the logsheet can be returned to editing status.  
+    # and the logsheet can be returned to editing status.
     elif request.method == "POST":
         from .models import RevisionLog
 
@@ -207,7 +219,7 @@ def manage_logsheet(request, pk):
             if request.user.is_superuser:
                 logsheet.finalized = False
                 logsheet.save()
-        
+
                 RevisionLog.objects.create(
                     logsheet=logsheet,
                     revised_by=request.user,
@@ -218,7 +230,15 @@ def manage_logsheet(request, pk):
                 return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
-    revisions = logsheet.revisions.select_related("revised_by").order_by("-revised_at")
+    revisions = logsheet.revisions.select_related(
+        "revised_by").order_by("-revised_at")
+    revisions = (
+        RevisionLog.objects
+        .select_related("revised_by")
+        .filter(logsheet=logsheet)
+        .order_by("-revised_at")
+    )
+
     context = {
         "logsheet": logsheet,
         "flights": flights,
@@ -226,22 +246,21 @@ def manage_logsheet(request, pk):
         "revisions": revisions,
 
     }
-     # Find previous logsheet
+    # Find previous logsheet
     previous_logsheet = Logsheet.objects.filter(
         log_date__lt=logsheet.log_date
     ).order_by('-log_date').first()
-        
+
     # Find next logsheet
     next_logsheet = Logsheet.objects.filter(
         log_date__gt=logsheet.log_date
     ).order_by('log_date').first()
-    
+
     # Add them to your context
     context["previous_logsheet"] = previous_logsheet
     context["next_logsheet"] = next_logsheet
 
     return render(request, "logsheet/logsheet_manage.html", context)
-
 
 
 #################################################
@@ -253,27 +272,26 @@ def view_flight(request, pk):
     flight = get_object_or_404(Flight, pk=pk)
     is_modal = (request.headers.get("HX-Request") == "true")
     if is_modal:
-        return render(request, 
+        return render(request,
                       "logsheet/flight_detail_content.html",
                       {"flight": flight, "is_modal": True})
-    return render(request, 
+    return render(request,
                   "logsheet/flight_view.html",
                   {"flight": flight, "is_modal": False})
-
 
 
 #################################################
 # list_logsheets
 
 # This view handles the listing of all logsheets.
-# 
+#
 # It allows active members to:
 # - View a list of all logsheets, optionally filtered by a search query.
 # - Search logsheets by log date, location, or the username of the creator.
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
-# 
+#
 # Returns:
 #    HttpResponse: Renders the logsheet list page with the filtered or unfiltered list of logsheets.
 
@@ -281,7 +299,8 @@ def view_flight(request, pk):
 @active_member_required
 def list_logsheets(request):
     query = request.GET.get("q", "")
-    year = request.GET.get("year", str(datetime.now().year))  # Default to current year
+    # Default to current year
+    year = request.GET.get("year", str(datetime.now().year))
     logsheets = Logsheet.objects.all()
 
     if year:
@@ -293,10 +312,10 @@ def list_logsheets(request):
             Q(airfield__name__icontains=query) |
             Q(created_by__username__icontains=query) |
             Q(duty_officer__last_name__icontains=query) |
-            Q(tow_pilot__last_name__icontains=query) | 
-            Q(duty_instructor__last_name__icontains=query) 
+            Q(tow_pilot__last_name__icontains=query) |
+            Q(duty_instructor__last_name__icontains=query)
         )
-    #logsheets = logsheets.filter(airfield__identifier__icontains="VG55")
+    # logsheets = logsheets.filter(airfield__identifier__icontains="VG55")
 
     logsheets = logsheets.order_by("-log_date", "-created_at")
 
@@ -326,19 +345,20 @@ def list_logsheets(request):
 # edit_flight
 
 # This view handles the editing of an existing flight within a specific logsheet.
-# 
+#
 # It allows active members to:
 # - Edit the details of a flight associated with a logsheet.
 # - Prevent edits if the logsheet is finalized (unless the user is a superuser).
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
 #    logsheet_pk (int): The primary key of the logsheet containing the flight.
 #    flight_pk (int): The primary key of the flight to edit.
-# 
+#
 # Returns:
 #    HttpResponse: Renders the flight editing form for GET requests.
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful update of the flight.
+
 
 @active_member_required
 def edit_flight(request, logsheet_pk, flight_pk):
@@ -368,18 +388,19 @@ def edit_flight(request, logsheet_pk, flight_pk):
 # add_flight
 
 # This view handles the addition of a new flight to a specific logsheet.
-# 
+#
 # It allows active members to:
 # - Add a new flight to the logsheet if it is not finalized.
 # - Display a form for entering flight details.
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
 #    logsheet_pk (int): The primary key of the logsheet to which the flight will be added.
-# 
+#
 # Returns:
 #    HttpResponse: Renders the flight addition form for GET requests.
 #    HttpResponseRedirect: Redirects to the logsheet management page upon successful addition of the flight.
+
 
 @active_member_required
 def add_flight(request, logsheet_pk):
@@ -405,24 +426,25 @@ def add_flight(request, logsheet_pk):
 # delete_flight
 
 # This view handles the deletion of a flight from a specific logsheet.
-# 
+#
 # Decorators:
 # - @require_POST: Ensures that this view can only be accessed via a POST request, preventing accidental deletions through GET requests.
 # - @active_member_required: Restricts access to active members only, ensuring that only authorized users can perform this action.
-# 
+#
 # Functionality:
 # - Deletes a flight associated with a logsheet if the logsheet is not finalized.
 # - Prevents deletion of flights from finalized logsheets to maintain data integrity.
 # - Displays a success message upon successful deletion.
-# 
+#
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
 #    logsheet_pk (int): The primary key of the logsheet containing the flight.
 #    flight_pk (int): The primary key of the flight to delete.
-# 
+#
 # Returns:
 #    HttpResponseForbidden: If the logsheet is finalized, deletion is forbidden.
 #    HttpResponseRedirect: Redirects to the logsheet management page after successful deletion.
+
 
 @require_POST
 @active_member_required
@@ -500,7 +522,8 @@ def manage_logsheet_finances(request, pk):
     from .models import LogsheetPayment
 
     # Summary per pilot
-    pilot_summary = defaultdict(lambda: {"count": 0, "tow": 0, "rental": 0, "total": 0})
+    pilot_summary = defaultdict(
+        lambda: {"count": 0, "tow": 0, "rental": 0, "total": 0})
     for flight, costs in flight_data:
         pilot = flight.pilot
         if pilot:
@@ -511,7 +534,8 @@ def manage_logsheet_finances(request, pk):
             summary["total"] += costs["total"] or 0
 
     # Who pays what?
-    member_charges = defaultdict(lambda: {"tow": Decimal("0.00"), "rental": Decimal("0.00"), "total": Decimal("0.00")})
+    member_charges = defaultdict(lambda: {"tow": Decimal(
+        "0.00"), "rental": Decimal("0.00"), "total": Decimal("0.00")})
     for flight, costs in flight_data:
         pilot = flight.pilot
         partner = flight.split_with
@@ -546,7 +570,8 @@ def manage_logsheet_finances(request, pk):
     member_payment_data = []
     for member in member_charges:
         summary = member_charges[member]
-        payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
+        payment, _ = LogsheetPayment.objects.get_or_create(
+            logsheet=logsheet, member=member)
         member_payment_data.append({
             "member": member,
             "amount": summary["total"],
@@ -573,7 +598,8 @@ def manage_logsheet_finances(request, pk):
             missing = []
             for member in responsible_members:
                 try:
-                    payment = LogsheetPayment.objects.get(logsheet=logsheet, member=member)
+                    payment = LogsheetPayment.objects.get(
+                        logsheet=logsheet, member=member)
                     if not payment.payment_method:
                         missing.append(member.full_display_name)
                 except LogsheetPayment.DoesNotExist:
@@ -582,7 +608,8 @@ def manage_logsheet_finances(request, pk):
             if missing:
                 messages.error(
                     request,
-                    "Cannot finalize. Missing payment method for: " + ", ".join(missing)
+                    "Cannot finalize. Missing payment method for: " +
+                    ", ".join(missing)
                 )
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
@@ -596,14 +623,17 @@ def manage_logsheet_finances(request, pk):
 
             logsheet.finalized = True
             logsheet.save()
-            messages.success(request, "Logsheet has been finalized and all costs locked in.")
+            messages.success(
+                request, "Logsheet has been finalized and all costs locked in.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
         else:
             for entry in member_payment_data:
                 member = entry["member"]
-                payment, _ = LogsheetPayment.objects.get_or_create(logsheet=logsheet, member=member)
-                payment_method = request.POST.get(f"payment_method_{member.id}")
+                payment, _ = LogsheetPayment.objects.get_or_create(
+                    logsheet=logsheet, member=member)
+                payment_method = request.POST.get(
+                    f"payment_method_{member.id}")
                 note = request.POST.get(f"note_{member.id}", "").strip()
                 payment.payment_method = payment_method or None
                 payment.note = note
@@ -650,21 +680,25 @@ def manage_logsheet_finances(request, pk):
 # - HttpResponse: Renders the closeout editing form page or redirects after successful save.
 #################################################
 
+
 @active_member_required
 def edit_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     closeout, _ = LogsheetCloseout.objects.get_or_create(logsheet=logsheet)
-    maintenance_issues = MaintenanceIssue.objects.filter(logsheet=logsheet).select_related("reported_by", "glider", "towplane")
+    maintenance_issues = MaintenanceIssue.objects.filter(
+        logsheet=logsheet).select_related("reported_by", "glider", "towplane")
 
     if logsheet.finalized and not request.user.is_superuser:
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
     # Identify towplanes used in this logsheet
-    towplanes_used = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
+    towplanes_used = Towplane.objects.filter(
+        flight__logsheet=logsheet).distinct()
 
     # Make sure a TowplaneCloseout exists for each
     for towplane in towplanes_used:
-        TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
+        TowplaneCloseout.objects.get_or_create(
+            logsheet=logsheet, towplane=towplane)
 
     # Build formset for towplane closeouts
     queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
@@ -681,7 +715,8 @@ def edit_logsheet_closeout(request, pk):
             duty_form.save()
             formset.save()
 
-            messages.success(request, "Closeout, duty crew, and towplane info updated.")
+            messages.success(
+                request, "Closeout, duty crew, and towplane info updated.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
     else:
@@ -720,10 +755,12 @@ def edit_logsheet_closeout(request, pk):
 # - HttpResponse: Renders the closeout summary page.
 #################################################
 
+
 @active_member_required
 def view_logsheet_closeout(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    maintenance_issues = MaintenanceIssue.objects.filter(logsheet=logsheet).select_related("reported_by", "glider", "towplane")
+    maintenance_issues = MaintenanceIssue.objects.filter(
+        logsheet=logsheet).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
     towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
     return render(request, "logsheet/view_closeout.html", {
@@ -765,7 +802,8 @@ def add_maintenance_issue(request, logsheet_id):
     if form.is_valid():
         issue = form.save(commit=False)
         if not issue.glider and not issue.towplane:
-            messages.error(request, "Please select either a glider or a towplane.")
+            messages.error(
+                request, "Please select either a glider or a towplane.")
             return redirect("logsheet:edit_logsheet_closeout", pk=logsheet_id)
 
         issue.reported_by = request.user
@@ -795,10 +833,13 @@ def add_maintenance_issue(request, logsheet_id):
 # - HttpResponse: Renders the equipment list page.
 #################################################
 
+
 @active_member_required
 def equipment_list(request):
-    gliders = Glider.objects.filter(is_active=True, club_owned=True).order_by("n_number")
-    towplanes = Towplane.objects.filter(is_active=True, club_owned=True).order_by("n_number")
+    gliders = Glider.objects.filter(
+        is_active=True, club_owned=True).order_by("n_number")
+    towplanes = Towplane.objects.filter(
+        is_active=True, club_owned=True).order_by("n_number")
     return render(request, "logsheet/equipment_list.html", {
         "gliders": gliders,
         "towplanes": towplanes,
@@ -823,9 +864,11 @@ def equipment_list(request):
 # - HttpResponse: Renders the maintenance issues list page.
 #################################################
 
+
 @active_member_required
 def maintenance_issues(request):
-    open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related("glider", "towplane")
+    open_issues = MaintenanceIssue.objects.filter(
+        resolved=False).select_related("glider", "towplane")
     return render(request, "logsheet/maintenance_list.html", {
         "open_issues": open_issues,
     })
@@ -860,11 +903,13 @@ def mark_issue_resolved(request, issue_id):
     member = request.user
     if issue.glider:
         if not AircraftMeister.objects.filter(glider=issue.glider, meister=member).exists():
-            messages.error(request, "You are not authorized to resolve issues for this glider.")
+            messages.error(
+                request, "You are not authorized to resolve issues for this glider.")
             return redirect("logsheet:maintenance_issues")
     elif issue.towplane:
         if not AircraftMeister.objects.filter(towplane=issue.towplane, meister=member).exists():
-            messages.error(request, "You are not authorized to resolve issues for this towplane.")
+            messages.error(
+                request, "You are not authorized to resolve issues for this towplane.")
             return redirect("logsheet:maintenance_issues")
 
     issue.resolved = True
@@ -949,46 +994,6 @@ def resolve_maintenance_issue(request, issue_id):
     return JsonResponse({"reload": True})
 
 #################################################
-# maintenance_mark_resolved
-#
-# Purpose:
-# Processes a POST request to mark a maintenance issue as resolved.
-# Ensures that only authorized users (based on AircraftMeister rules) can resolve the issue.
-#
-# Behavior:
-# - Fetches the MaintenanceIssue by ID.
-# - Checks if the current user is authorized to resolve the issue using `can_be_resolved_by()`.
-# - If unauthorized, returns an HTTP 403 Forbidden response.
-# - If authorized, records the resolving user and the resolution date.
-# - Saves the resolution and returns a JSON response to trigger a reload.
-#
-# Args:
-# - request (HttpRequest): The incoming HTTP POST request.
-# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
-#
-# Returns:
-# - JsonResponse: {"reload": True} if successfully resolved.
-# - HttpResponseForbidden: If the user is not authorized to resolve the issue.
-#################################################
-
-
-@require_POST
-@active_member_required
-def maintenance_mark_resolved(request, issue_id):
-    issue = get_object_or_404(MaintenanceIssue, id=issue_id)
-
-    user = request.user
-    if not issue.can_be_resolved_by(user):
-        return HttpResponseForbidden("You're not authorized to resolve this issue.")
-
-    issue.resolved = True
-    issue.resolved_by = user
-    issue.resolved_date = now().date()
-    issue.save()
-
-    return JsonResponse({"reload": True})
-
-#################################################
 # maintenance_resolve_modal
 #
 # Purpose:
@@ -1034,7 +1039,7 @@ def maintenance_resolve_modal(request, issue_id):
 # - issue_id (int): Primary key of the MaintenanceIssue to resolve.
 #
 # Returns:
-# - JsonResponse: 
+# - JsonResponse:
 #     - {"reload": True} if successfully resolved.
 #     - {"error": "..."} with HTTP 400 if notes are missing.
 # - HttpResponseForbidden: If the user is not authorized to resolve the issue.
@@ -1094,8 +1099,8 @@ def maintenance_deadlines(request):
     sorted_deadlines = sorted(
         all_deadlines,
         key=lambda d: (
-            0 if d.due_date < today else 
-            1 if (d.due_date - today).days <= 30 else 
+            0 if d.due_date < today else
+            1 if (d.due_date - today).days <= 30 else
             2,
             d.due_date
         )
@@ -1106,3 +1111,110 @@ def maintenance_deadlines(request):
         "today": today,
         "today_plus_30": today_plus_30,
     })
+
+
+def _daily_flight_rollup(queryset, date_field="logsheet__log_date"):
+    # 1) DB does per-day + per-logsheet rollup
+    daily_qs = (
+        queryset
+        .values(day=F(date_field), logsheet_pk=F("logsheet_id"))
+        .annotate(
+            flights=Count("id"),
+            # your field is `duration`
+            day_time=Sum("duration", default=timedelta(0)),
+        )
+        .order_by("day", "logsheet_pk")
+    )
+
+    # 2) Python computes cumulative running total
+    rows = list(daily_qs)
+    running = timedelta(0)
+    for r in rows:
+        running += r["day_time"] or timedelta(0)
+        r["cum_time"] = running
+    return rows
+
+
+def _issues_by_day_for_glider(glider):
+    qs = (
+        MaintenanceIssue.objects
+        .filter(glider=glider)
+        .annotate(day=TruncDate("report_date"))
+        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
+        .order_by("day", "id")
+    )
+    bucket = {}
+    for it in qs:
+        bucket.setdefault(it["day"], []).append(it)
+    return bucket
+
+
+def _issues_by_day_for_towplane(towplane):
+    qs = (
+        MaintenanceIssue.objects
+        .filter(towplane=towplane)
+        .annotate(day=TruncDate("report_date"))
+        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
+        .order_by("day", "id")
+    )
+    bucket = {}
+    for it in qs:
+        bucket.setdefault(it["day"], []).append(it)
+    return bucket
+
+
+def _deadlines_by_day_for_glider(glider):
+    qs = (
+        MaintenanceDeadline.objects
+        .filter(glider=glider)
+        .annotate(day=TruncDate("due_date"))
+        .values("day", "id", "description", "due_date")
+        .order_by("day", "id")
+    )
+    bucket = {}
+    for dl in qs:
+        bucket.setdefault(dl["day"], []).append(dl)
+    return bucket
+
+
+def glider_logbook(request, pk: int):
+    glider = get_object_or_404(Glider, pk=pk)
+
+    flights = (
+        Flight.objects
+        .select_related("logsheet")
+        .filter(glider=glider)
+        .order_by("logsheet__log_date", "logsheet_id")
+    )
+    daily = _daily_flight_rollup(flights)
+
+    context = {
+        "object": glider,
+        "object_type": "glider",
+        "daily": daily,
+        "issues_by_day": _issues_by_day_for_glider(glider),
+        "deadlines_by_day": _deadlines_by_day_for_glider(glider),
+    }
+    return render(request, "logsheet/equipment_logbook.html", context)
+
+
+def towplane_logbook(request, pk: int):
+    towplane = get_object_or_404(Towplane, pk=pk)
+
+    flights = (
+        Flight.objects
+        .select_related("logsheet")
+        .filter(towplane=towplane)
+        .order_by("logsheet__log_date", "logsheet_id")
+    )
+    daily = _daily_flight_rollup(flights)
+
+    # If/when you track MaintenanceIssue/Deadline for towplanes, mirror the glider helpers.
+    context = {
+        "object": towplane,
+        "object_type": "towplane",
+        "daily": daily,
+        "issues_by_day": {},     # none for towplanes today
+        "deadlines_by_day": {},  # none for towplanes today
+    }
+    return render(request, "logsheet/equipment_logbook.html", context)
