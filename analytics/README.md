@@ -22,7 +22,6 @@ Export buttons (top-right of each card) download **PNG/SVG/CSV**.
 
 ## Screenshots
 
-> Put PNGs in `analytics/docs/img/`. You can generate them from the page using each chart’s **PNG** button.
 
 | Cumulative (Annual) | Flights by Year by Aircraft (Annual) |
 | :--: | :--: |
