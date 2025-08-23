@@ -9,9 +9,14 @@
         </h2>
     </div>
 
-    <p class="text-muted mt-1">
-        Daily flights with per‑day and running totals, plus maintenance & deadlines aligned to dates.
-    </p>
+    {% if year_nav %}
+    <div class="mt-2 mb-3 small text-muted">
+        Jump to year:
+        {% for y in year_nav %}
+        <a href="#{{ y.anchor }}" class="me-2">{{ y.year }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="table-responsive">
         <table class="table table-sm align-middle">
@@ -19,8 +24,8 @@
                 <tr>
                     <th style="white-space:nowrap;">Date</th>
                     <th class="text-end">Flights</th>
-                    <th class="text-end">Day Time</th>
-                    <th class="text-end">Cumulative</th>
+                    <th class="text-end">Day Hours</th>
+                    <th class="text-end">Cumulative Hours</th>
                     <th>Events</th>
                     <th>Logsheet</th>
                 </tr>
@@ -28,44 +33,50 @@
             <tbody>
                 {% for row in daily %}
                 {% with d=row.day %}
-                <tr>
+                <tr id="{% if row.year_anchor %}{{ row.year_anchor }}{% endif %}">
                     <td style="white-space:nowrap;">{{ d }}</td>
                     <td class="text-end">{{ row.flights }}</td>
-                    <td class="text-end">{{ row.day_time }}</td>
-                    <td class="text-end">{{ row.cum_time }}</td>
+
+                    {# Decimal hours #}
+                    <td class="text-end">{{ row.day_hours|floatformat:1 }}</td>
+                    <td class="text-end">{{ row.cum_hours|floatformat:1 }}</td>
+
                     <td>
-                        {% if issues_by_day.d %}
-                        <div class="mb-1 fw-semibold">Maintenance Items</div>
+                        {% if row.issues %}
+                        <div class="mb-1 fw-semibold">Maintenance</div>
                         <ul class="mb-1">
-                            {% for it in issues_by_day.d %}
+                            {% for it in row.issues %}
                             <li>
                                 #{{ it.id }} — {{ it.description }}
                                 {% if it.grounded %}<span class="badge bg-danger">Grounding</span>{% endif %}
-                                {% if it.resolved %}<span class="badge bg-success">Resolved{% if it.resolved_date %} {{
-                                    it.resolved_date }}{% endif %}</span>{% else %}
-                                <span class="badge bg-warning text-dark">Open</span>{% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
-                        {% endif %}
-                        {% if deadlines_by_day.d %}
-                        <div class="mb-1 fw-semibold">Deadlines</div>
-                        <ul class="mb-0">
-                            {% for dl in deadlines_by_day.d %}
-                            <li>
-                                {{ dl.description }} — due {{ dl.due_date }}
+                                {% if it.resolved %}
+                                <span class="badge bg-success">Resolved{% if it.resolved_date %} {{ it.resolved_date
+                                    }}{% endif %}</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Open</span>
+                                {% endif %}
                             </li>
                             {% endfor %}
                         </ul>
                         {% endif %}
 
-                        {% if not issues_by_day.d and not deadlines_by_day.d %}
+                        {% if row.deadlines %}
+                        <div class="mb-1 fw-semibold">Deadlines</div>
+                        <ul class="mb-0">
+                            {% for dl in row.deadlines %}
+                            <li>{{ dl.description }} — due {{ dl.due_date }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+
+                        {% if not row.issues and not row.deadlines %}
                         <span class="text-muted">—</span>
                         {% endif %}
                     </td>
+
                     <td>
-                        {% if row.logsheet_id %}
-                        <a class="btn btn-sm btn-outline-primary" href="{% url 'logsheet:manage' row.logsheet_id %}">
+                        {% if row.logsheet_pk %}
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'logsheet:manage' row.logsheet_pk %}">
                             View Logsheet
                         </a>
                         {% else %}

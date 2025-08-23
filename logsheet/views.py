@@ -10,9 +10,28 @@ from django.core.paginator import Paginator
 from datetime import datetime
 from django.shortcuts import get_object_or_404, render, redirect
 from members.decorators import active_member_required
-from .models import Glider, Logsheet, LogsheetCloseout, TowplaneCloseout, Towplane, LogsheetPayment, Flight, MaintenanceIssue, AircraftMeister, MaintenanceDeadline
-from .forms import LogsheetCloseoutForm, LogsheetDutyCrewForm, TowplaneCloseoutFormSet, CreateLogsheetForm, FlightForm, MaintenanceIssueForm
-from .models import RevisionLog
+from .models import (
+    Flight,
+    Logsheet,
+    Glider,
+    Towplane,
+    MaintenanceIssue,
+    MaintenanceDeadline,
+    RevisionLog,
+    AircraftMeister,
+    LogsheetCloseout,
+    LogsheetPayment,
+    TowplaneCloseout,
+)
+
+from .forms import (
+    LogsheetCloseoutForm,
+    LogsheetDutyCrewForm,
+    TowplaneCloseoutFormSet,
+    CreateLogsheetForm,
+    FlightForm,
+    MaintenanceIssueForm
+)
 from django.db.models import Count, Sum, F, Window, Value, OrderBy
 from django.db.models.functions import TruncDate
 
@@ -196,7 +215,6 @@ def manage_logsheet(request, pk):
 
         logsheet.finalized = True
         logsheet.save()
-        from .models import RevisionLog  # if not already imported
 
         RevisionLog.objects.create(
             logsheet=logsheet,
@@ -213,7 +231,6 @@ def manage_logsheet(request, pk):
     # If there is a "revise", then we'll remove the finalized status
     # and the logsheet can be returned to editing status.
     elif request.method == "POST":
-        from .models import RevisionLog
 
         if "revise" in request.POST:
             if request.user.is_superuser:
@@ -230,8 +247,6 @@ def manage_logsheet(request, pk):
                 return HttpResponseForbidden("Only superusers can revise a finalized logsheet.")
             return redirect("logsheet:manage", pk=logsheet.pk)
 
-    revisions = logsheet.revisions.select_related(
-        "revised_by").order_by("-revised_at")
     revisions = (
         RevisionLog.objects
         .select_related("revised_by")
@@ -1113,46 +1128,67 @@ def maintenance_deadlines(request):
     })
 
 
-def _daily_flight_rollup(queryset, date_field="logsheet__log_date"):
-    # 1) DB does per-day + per-logsheet rollup
+def _td_to_hours(td: timedelta | None) -> float:
+    if not td:
+        return 0.0
+    # keep 2dp; template can round to 1
+    return round(td.total_seconds() / 3600.0, 2)
+
+
+def _daily_flight_rollup(queryset, date_field="logsheet__log_date",
+                         issues_by_day=None, deadlines_by_day=None):
+    """
+    Return rows: day, logsheet_pk, flights, day_time, cum_time, plus
+    pre-attached issues/deadlines and decimal-hour fields for display.
+    """
+    issues_by_day = issues_by_day or {}
+    deadlines_by_day = deadlines_by_day or {}
+
     daily_qs = (
         queryset
         .values(day=F(date_field), logsheet_pk=F("logsheet_id"))
         .annotate(
             flights=Count("id"),
-            # your field is `duration`
             day_time=Sum("duration", default=timedelta(0)),
         )
         .order_by("day", "logsheet_pk")
     )
 
-    # 2) Python computes cumulative running total
     rows = list(daily_qs)
+
+    # Running total + attach events + decimal hours
     running = timedelta(0)
     for r in rows:
         running += r["day_time"] or timedelta(0)
         r["cum_time"] = running
-    return rows
+        r["issues"] = issues_by_day.get(r["day"], [])
+        r["deadlines"] = deadlines_by_day.get(r["day"], [])
+        r["day_hours"] = _td_to_hours(r["day_time"])
+        r["cum_hours"] = _td_to_hours(r["cum_time"])
+
+    # Mark year anchors and collect navigation list
+    year_seen: set[int] = set()
+    year_nav: list[dict] = []
+    for r in rows:
+        if isinstance(r["day"], date):
+            y = r["day"].year
+        else:
+            y = r["day"].year  # if already a date
+
+        if y not in year_seen:
+            year_seen.add(y)
+            r["year_anchor"] = f"y{y}"    # e.g., "y2025"
+            year_nav.append({"year": y, "anchor": r["year_anchor"]})
+        else:
+            r["year_anchor"] = None
+
+    return rows, sorted(year_nav, key=lambda x: x["year"], reverse=True)
 
 
 def _issues_by_day_for_glider(glider):
     qs = (
         MaintenanceIssue.objects
         .filter(glider=glider)
-        .annotate(day=TruncDate("report_date"))
-        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
-        .order_by("day", "id")
-    )
-    bucket = {}
-    for it in qs:
-        bucket.setdefault(it["day"], []).append(it)
-    return bucket
-
-
-def _issues_by_day_for_towplane(towplane):
-    qs = (
-        MaintenanceIssue.objects
-        .filter(towplane=towplane)
         .annotate(day=TruncDate("report_date"))
         .values("day", "id", "description", "resolved", "grounded", "resolved_date")
         .order_by("day", "id")
@@ -1186,16 +1222,38 @@ def glider_logbook(request, pk: int):
         .filter(glider=glider)
         .order_by("logsheet__log_date", "logsheet_id")
     )
-    daily = _daily_flight_rollup(flights)
+
+    issues_by_day = _issues_by_day_for_glider(glider)
+    deadlines_by_day = _deadlines_by_day_for_glider(glider)
+
+    daily, year_nav = _daily_flight_rollup(
+        flights,
+        date_field="logsheet__log_date",
+        issues_by_day=issues_by_day,
+        deadlines_by_day=deadlines_by_day,
+    )
 
     context = {
         "object": glider,
         "object_type": "glider",
         "daily": daily,
-        "issues_by_day": _issues_by_day_for_glider(glider),
-        "deadlines_by_day": _deadlines_by_day_for_glider(glider),
+        "year_nav": year_nav,  # for bookmarks
     }
     return render(request, "logsheet/equipment_logbook.html", context)
+
+
+def _issues_by_day_for_towplane(towplane):
+    qs = (
+        MaintenanceIssue.objects
+        .filter(towplane=towplane)
+        .annotate(day=TruncDate("report_date"))
+        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
+        .order_by("day", "id")
+    )
+    bucket = {}
+    for it in qs:
+        bucket.setdefault(it["day"], []).append(it)
+    return bucket
 
 
 def towplane_logbook(request, pk: int):
@@ -1207,14 +1265,20 @@ def towplane_logbook(request, pk: int):
         .filter(towplane=towplane)
         .order_by("logsheet__log_date", "logsheet_id")
     )
-    daily = _daily_flight_rollup(flights)
 
-    # If/when you track MaintenanceIssue/Deadline for towplanes, mirror the glider helpers.
+    issues_by_day = _issues_by_day_for_towplane(towplane)
+    # deadlines: keep empty unless you track towplane deadlines
+    daily, year_nav = _daily_flight_rollup(
+        flights,
+        date_field="logsheet__log_date",
+        issues_by_day=issues_by_day,
+        deadlines_by_day={},  # or a towplane deadline helper if you add one
+    )
+
     context = {
         "object": towplane,
         "object_type": "towplane",
         "daily": daily,
-        "issues_by_day": {},     # none for towplanes today
-        "deadlines_by_day": {},  # none for towplanes today
+        "year_nav": year_nav,
     }
     return render(request, "logsheet/equipment_logbook.html", context)
