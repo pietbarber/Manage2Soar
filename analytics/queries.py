@@ -1,11 +1,11 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from itertools import chain
 
 from django.db.models.functions import Extract, ExtractYear
 from logsheet.models import Flight
 from typing import Dict, Any, TypedDict, List, Tuple
-from django.db.models import Count, Q, F, Sum, Avg, DurationField
+from django.db.models import Count, Q, F, Sum, Avg, DurationField, Max
 from django.db.models.functions import ExtractYear, Coalesce
 from django.db.models.expressions import ExpressionWrapper
 from logsheet.models import Flight
@@ -629,3 +629,131 @@ def towpilot_flights_by_member(start_date, end_date, *, finalized_only=True, top
     tow_total = int(qs.count())
     return {"names": names, "labels": WEEKDAYS_LABELS, "matrix": matrix, "totals": totals,
             "tow_total": tow_total}
+
+
+def long_flights_by_pilot(
+    start_date,
+    end_date,
+    *,
+    threshold_hours: float = 3.0,
+    finalized_only: bool = True,
+    min_count: int = 1,
+    top_n: int = 30,
+) -> Dict[str, Any]:
+    """
+    Count flights with duration >= threshold_hours, grouped by pilot.
+    Returns names (full_display_name), counts, and the longest flight (minutes).
+    """
+    from logsheet.models import Flight
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    qs = qs.annotate(
+        ops_date=F("logsheet__log_date"),
+        dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
+        dur=Coalesce(F("duration"), F("dur_diff")),
+    ).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        pilot__isnull=False,
+        dur__gte=timedelta(hours=threshold_hours),
+    )
+
+    # Counts by pilot + longest overall
+    rows = list(
+        qs.values("pilot_id").annotate(n=Count("id"), longest=Max("dur")).order_by("-n", "pilot_id")
+    )
+    ids_ordered = [r["pilot_id"] for r in rows if r["n"] >= min_count][:top_n]
+    if not ids_ordered:
+        return {"names": [], "counts": [], "threshold_hours": threshold_hours, "longest_min": 0}
+
+    name_map = _display_name_map(ids_ordered)
+    names = [name_map.get(i, str(i)) for i in ids_ordered]
+    counts = [int(next((r["n"] for r in rows if r["pilot_id"] == i), 0)) for i in ids_ordered]
+
+    longest_any = qs.aggregate(m=Max("dur"))["m"]
+    longest_min = int(round(longest_any.total_seconds() / 60.0)) if longest_any else 0
+
+    return {
+        "names": names,
+        "counts": counts,
+        "threshold_hours": float(threshold_hours),
+        "longest_min": longest_min,
+    }
+
+
+def duty_days_by_member(
+    start_date,
+    end_date,
+    *,
+    finalized_only: bool = True,
+    min_total: int = 1,
+    top_n: int = 30,
+) -> Dict[str, Any]:
+    """
+    Distinct assignment days per member for DO and ADO within the date range.
+    Returns stacked data: labels ["DO","ADO"], matrix {label:[...]} aligned to names.
+    """
+    from logsheet.models import Logsheet
+
+    base = Logsheet.objects.all()
+    if finalized_only:
+        base = base.filter(finalized=True)
+
+    base = base.filter(log_date__gte=start_date, log_date__lte=end_date)
+
+    # Distinct days per role
+    do_rows = list(
+        base.filter(duty_officer__isnull=False)
+            .values("duty_officer_id")
+            .annotate(n=Count("log_date", distinct=True))
+    )
+    ado_rows = list(
+        base.filter(assistant_duty_officer__isnull=False)
+            .values("assistant_duty_officer_id")
+            .annotate(n=Count("log_date", distinct=True))
+    )
+
+    do_map = {r["duty_officer_id"]: int(r["n"]) for r in do_rows}
+    ado_map = {r["assistant_duty_officer_id"]: int(r["n"]) for r in ado_rows}
+
+    member_ids = set(do_map.keys()) | set(ado_map.keys())
+    if not member_ids:
+        return {
+            "names": [], "labels": ["DO", "ADO"], "matrix": {"DO": [], "ADO": []},
+            "totals": [], "do_total": 0, "ado_total": 0, "ops_days_total": int(base.values("log_date").distinct().count()),
+        }
+
+    # Sort by (DO+ADO) desc, then display name asc
+    name_map = _display_name_map(list(member_ids))
+    rows = []
+    for mid in member_ids:
+        nm = name_map.get(mid)
+        if not nm:
+            continue
+        total = do_map.get(mid, 0) + ado_map.get(mid, 0)
+        if total >= min_total:
+            rows.append((mid, nm, total))
+    rows.sort(key=lambda t: (-t[2], t[1].lower()))
+    rows = rows[:top_n]
+
+    ids_sorted = [mid for (mid, _, _) in rows]
+    names = [name_map[mid] for mid in ids_sorted]
+    do_list = [do_map.get(mid, 0) for mid in ids_sorted]
+    ado_list = [ado_map.get(mid, 0) for mid in ids_sorted]
+    totals = [d + a for d, a in zip(do_list, ado_list)]
+
+    do_total = sum(do_map.values())
+    ado_total = sum(ado_map.values())
+    ops_days_total = int(base.values("log_date").distinct().count())
+
+    return {
+        "names": names,
+        "labels": ["DO", "ADO"],
+        "matrix": {"DO": do_list, "ADO": ado_list},
+        "totals": totals,
+        "do_total": do_total,
+        "ado_total": ado_total,
+        "ops_days_total": ops_days_total,
+    }

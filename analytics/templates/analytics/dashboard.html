@@ -233,6 +233,47 @@
     </div>
   </div>
 </div>
+<div class="row">
+  <!-- Long Flights ≥ 3 hours -->
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="long3hChart" data-name="long-flights-3h">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 pe-5">
+          Long Flights (≥ 3 hours) by Pilot
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="long3hChart"></canvas></div>
+        <div class="small text-muted mt-2" id="long3hStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DO & ADO Assignment Days -->
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="dutyChart" data-name="do-ado-assignments">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 pe-5">
+          DO &amp; ADO Assignment Days
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="dutyChart"></canvas></div>
+        <div class="small text-muted mt-2" id="dutyStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 <style>

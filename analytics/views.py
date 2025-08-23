@@ -84,6 +84,8 @@ def dashboard(request):
     pgf   = queries.pilot_glider_flights(util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
     inst = queries.instructor_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
     tow  = queries.towpilot_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    long3h = queries.long_flights_by_pilot(util_start, util_end, finalized_only=finalized_only, threshold_hours=3.0, top_n=30) or {}
+    duty   = queries.duty_days_by_member(util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
 
     ctx = {
         "year": end,
@@ -143,6 +145,20 @@ def dashboard(request):
         "tow_matrix":  tow.get("matrix", {}),
         "tow_totals":  tow.get("totals", []),
         "tow_total":   tow.get("tow_total", 0),
+
+        "long3h_names": long3h.get("names", []),
+        "long3h_counts": long3h.get("counts", []),
+        "long3h_longest_min": long3h.get("longest_min", 0),
+        "long3h_thresh": long3h.get("threshold_hours", 3.0),
+    
+        "duty_names": duty.get("names", []),
+        "duty_labels": duty.get("labels", ["DO","ADO"]),
+        "duty_matrix": duty.get("matrix", {"DO": [], "ADO": []}),
+        "duty_totals": duty.get("totals", []),
+        "duty_do_total": duty.get("do_total", 0),
+        "duty_ado_total": duty.get("ado_total", 0),
+        "duty_ops_days_total": duty.get("ops_days_total", 0),
+
         }
 
     analytics_data = {
@@ -202,6 +218,23 @@ def dashboard(request):
             "totals": ctx.get("tow_totals", []),
             "tow_total": ctx.get("tow_total", 0),
         },
+
+        "long3h": {
+            "names": ctx.get("long3h_names", []),
+            "counts": ctx.get("long3h_counts", []),
+            "longest_min": ctx.get("long3h_longest_min", 0),
+            "threshold_hours": ctx.get("long3h_thresh", 3.0),
+        },
+        "duty": {
+            "names": ctx.get("duty_names", []),
+            "labels": ctx.get("duty_labels", ["DO","ADO"]),
+            "matrix": ctx.get("duty_matrix", {"DO": [], "ADO": []}),
+            "totals": ctx.get("duty_totals", []),
+            "do_total": ctx.get("duty_do_total", 0),
+            "ado_total": ctx.get("duty_ado_total", 0),
+            "ops_days_total": ctx.get("duty_ops_days_total", 0),
+        },
+
     }
 
     ctx["analytics_data"] = analytics_data
