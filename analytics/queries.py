@@ -11,6 +11,7 @@ from django.db.models.expressions import ExpressionWrapper
 from logsheet.models import Flight
 from django.db.models.functions import Coalesce
 from django.contrib.auth import get_user_model
+from django.db.models.functions import ExtractWeekDay
 
 
 FINALIZED_ONLY = Q(logsheet__finalized=True)
@@ -515,3 +516,116 @@ def pilot_glider_flights(start_date: date, end_date: date, *, finalized_only=Tru
     names = [name_map[i] for i in ids if i in name_map]
     counts = [int(r["n"]) for r in rows if r["pilot_id"] in name_map]
     return {"names": names, "counts": counts}
+
+WEEKDAYS_ORDER = [2, 3, 4, 5, 6, 7, 1]  # Mon..Sun (Django ExtractWeekDay: Sun=1..Sat=7)
+WEEKDAYS_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+def _stack_by_weekday(rows, id_order):
+    """
+    rows: iterable of dicts with keys ("member_id", "wday", "n")
+    id_order: list of member ids in desired display order
+    returns: matrix { "Mon":[...], "Tue":[...], ... } aligned to id_order
+    """
+    # build quick lookup: counts[(member_id, wday)] -> n
+    counts = {}
+    for r in rows:
+        counts[(r["member_id"], r["wday"])] = int(r["n"])
+
+    matrix: Dict[str, List[int]] = {lbl: [] for lbl in WEEKDAYS_LABELS}
+    for mid in id_order:
+        for w_idx, lbl in zip(WEEKDAYS_ORDER, WEEKDAYS_LABELS):
+            matrix[lbl].append(counts.get((mid, w_idx), 0))
+    return matrix
+
+def instructor_flights_by_member(start_date, end_date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
+    """
+    Horizontal stacked bars by instructor, broken down by weekday.
+    """
+    from logsheet.models import Flight
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        instructor__isnull=False
+    )
+
+    # totals per instructor
+    totals_qs = (qs.values("instructor_id")
+                   .annotate(n=Count("id"))
+                   .order_by("-n", "instructor_id"))
+    totals_rows = list(totals_qs)
+    ids_sorted = [r["instructor_id"] for r in totals_rows if r["n"] >= min_total][:top_n]
+    if not ids_sorted:
+        return {"names": [], "labels": WEEKDAYS_LABELS, "matrix": {}, "totals": [], "inst_total": 0, "all_total": 0}
+
+    # weekday breakdown for just those IDs
+    wday_rows = (qs.filter(instructor_id__in=ids_sorted)
+                   .annotate(wday=ExtractWeekDay(F("ops_date")))
+                   .values("instructor_id", "wday")
+                   .annotate(n=Count("id")))
+
+    # map ids -> display names
+    name_map = _display_name_map(ids_sorted)
+    names = [name_map.get(i, str(i)) for i in ids_sorted]
+
+    # matrix aligned to ids_sorted
+    matrix = _stack_by_weekday(
+        [{"member_id": r["instructor_id"], "wday": r["wday"], "n": r["n"]} for r in wday_rows],
+        ids_sorted
+    )
+    totals = [int(next((t["n"] for t in totals_rows if t["instructor_id"] == i), 0)) for i in ids_sorted]
+
+    # overall counts for caption
+    inst_total = int(qs.count())
+    all_total = int(Flight.objects.filter(LANDED_ONLY)
+                                  .filter(FINALIZED_ONLY if finalized_only else Q())
+                                  .annotate(ops_date=F("logsheet__log_date"))
+                                  .filter(ops_date__gte=start_date, ops_date__lte=end_date)
+                                  .count())
+
+    return {"names": names, "labels": WEEKDAYS_LABELS, "matrix": matrix, "totals": totals,
+            "inst_total": inst_total, "all_total": all_total}
+
+def towpilot_flights_by_member(start_date, end_date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
+    """
+    Horizontal stacked bars by tow pilot, broken down by weekday.
+    """
+    from logsheet.models import Flight
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        tow_pilot__isnull=False
+    )
+
+    totals_qs = (qs.values("tow_pilot_id")
+                   .annotate(n=Count("id"))
+                   .order_by("-n", "tow_pilot_id"))
+    totals_rows = list(totals_qs)
+    ids_sorted = [r["tow_pilot_id"] for r in totals_rows if r["n"] >= min_total][:top_n]
+    if not ids_sorted:
+        return {"names": [], "labels": WEEKDAYS_LABELS, "matrix": {}, "totals": [], "tow_total": 0}
+
+    wday_rows = (qs.filter(tow_pilot_id__in=ids_sorted)
+                   .annotate(wday=ExtractWeekDay(F("ops_date")))
+                   .values("tow_pilot_id", "wday")
+                   .annotate(n=Count("id")))
+
+    name_map = _display_name_map(ids_sorted)
+    names = [name_map.get(i, str(i)) for i in ids_sorted]
+
+    matrix = _stack_by_weekday(
+        [{"member_id": r["tow_pilot_id"], "wday": r["wday"], "n": r["n"]} for r in wday_rows],
+        ids_sorted
+    )
+    totals = [int(next((t["n"] for t in totals_rows if t["tow_pilot_id"] == i), 0)) for i in ids_sorted]
+
+    tow_total = int(qs.count())
+    return {"names": names, "labels": WEEKDAYS_LABELS, "matrix": matrix, "totals": totals,
+            "tow_total": tow_total}

@@ -82,6 +82,8 @@ def dashboard(request):
     fdays = queries.flying_days_by_member(util_start, util_end, finalized_only=finalized_only, min_days=2) or {}
     dur   = queries.flight_duration_distribution(util_start, util_end, finalized_only=finalized_only) or {}
     pgf   = queries.pilot_glider_flights(util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
+    inst = queries.instructor_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    tow  = queries.towpilot_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
 
     ctx = {
         "year": end,
@@ -129,7 +131,20 @@ def dashboard(request):
         "pgf_names": pgf.get("names", []),
         "pgf_counts": pgf.get("counts", []),
 
-    }
+        "inst_names":  inst.get("names", []),
+        "inst_labels": inst.get("labels", []),
+        "inst_matrix": inst.get("matrix", {}),
+        "inst_totals": inst.get("totals", []),
+        "inst_total":  inst.get("inst_total", 0),
+        "all_total":   inst.get("all_total", 0),
+    
+        "tow_names":   tow.get("names", []),
+        "tow_labels":  tow.get("labels", []),
+        "tow_matrix":  tow.get("matrix", {}),
+        "tow_totals":  tow.get("totals", []),
+        "tow_total":   tow.get("tow_total", 0),
+        }
+
     analytics_data = {
         "cumulative": {
             "labels": labels,
@@ -172,7 +187,21 @@ def dashboard(request):
             "median_min": ctx.get("dur_median_min", 0),
             "pct_gt": ctx.get("dur_pct_gt", {"1":0,"2":0,"3":0}),
         },
-
+        "instructors": {
+            "names": ctx.get("inst_names", []),
+            "labels": ctx.get("inst_labels", []),
+            "matrix": ctx.get("inst_matrix", {}),
+            "totals": ctx.get("inst_totals", []),
+            "inst_total": ctx.get("inst_total", 0),
+            "all_total": ctx.get("all_total", 0),
+        },
+        "tows": {
+            "names": ctx.get("tow_names", []),
+            "labels": ctx.get("tow_labels", []),
+            "matrix": ctx.get("tow_matrix", {}),
+            "totals": ctx.get("tow_totals", []),
+            "tow_total": ctx.get("tow_total", 0),
+        },
     }
 
     ctx["analytics_data"] = analytics_data

@@ -33,109 +33,223 @@
     </div>
   {% endif %}
 
-  <!-- Cumulative -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title mb-3">Cumulative Flights by Julian Day</h5>
-      <div class="chart-box"><canvas id="cumuChart"></canvas></div>
-      <div class="small text-muted mt-2">Current year is emphasized. Hover any day to see the running total for that year.</div>
+<!-- Cumulative (Annual) -->
+<div class="card mb-4">
+  <div class="card-body position-relative">
+    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+         role="group" data-canvas="cumuChart" data-name="cumulative-flights">
+      <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+    </div>
+    <h5 class="card-title mb-3 pe-5">
+      Cumulative Flights by Julian Day
+      <span class="badge bg-secondary ms-2">Annual</span>
+    </h5>
+    <div class="chart-box"><canvas id="cumuChart"></canvas></div>
+    <div class="small text-muted mt-2">Current year is emphasized. Hover any day to see the running total for that year.</div>
+  </div>
+</div>
+
+<!-- Flights by Year by Aircraft (Annual) -->
+<div class="card mb-4">
+  <div class="card-body position-relative">
+    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+         role="group" data-canvas="byAcftChart" data-name="flights-by-year-by-aircraft">
+      <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+    </div>
+    <h5 class="card-title mb-3 pe-5">
+      Flights by Year by Aircraft
+      <span class="badge bg-secondary ms-2">Annual</span>
+    </h5>
+    <div class="chart-box"><canvas id="byAcftChart"></canvas></div>
+    <div id="byAcftStatus" class="small text-muted mt-2">
+      Club ships shown individually; non-club ships bucketed as <em>Private</em>. Flights with no identified glider
+      appear as <em>Unknown</em>. Low-volume ships beyond the top N are grouped as <em>Other</em>.
     </div>
   </div>
+</div>
 
-  <!-- Flights by Year by Aircraft -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title mb-3">Flights by Year by Aircraft</h5>
-      <div class="chart-box"><canvas id="byAcftChart"></canvas></div>
-      <div id="byAcftStatus" class="small text-muted mt-2">
-        Club ships shown individually; non-club ships bucketed as <em>Private</em>. Flights with no identified glider appear as <em>Unknown</em>. Low-volume ships beyond the top N are grouped as <em>Other</em>.
-      </div>
+<!-- Date-range banner stays as-is -->
+
+<!-- Glider Utilization (Date range) -->
+<div class="card mb-4">
+  <div class="card-body position-relative">
+    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+         role="group" data-canvas="utilChart" data-name="glider-utilization">
+      <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
-  </div>
 
-  <!-- Utilization + Private Utilization -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-end">
-        <h5 class="card-title mb-3">Glider Utilization</h5>
-        <form class="row g-2 align-items-end" method="get">
-          <div class="col-auto">
-            <label class="form-label small mb-1">From</label>
-            <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
-          </div>
-          <div class="col-auto">
-            <label class="form-label small mb-1">To</label>
-            <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
-          </div>
-          <input type="hidden" name="start" value="{{ start }}">
-          <input type="hidden" name="end" value="{{ end }}">
-          {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
-          <div class="col-auto">
-            <button class="btn btn-outline-primary btn-sm">Update</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="chart-box" style="height:520px;"><canvas id="utilChart"></canvas></div>
-      <div id="utilStatus" class="small text-muted mt-2">Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.</div>
-    </div>
-  </div>
-
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title mb-3">Private Glider Utilization (excludes club ships)</h5>
-      <div class="chart-box" style="height:520px;"><canvas id="utilPrivChart"></canvas></div>
-      <div id="utilPrivStatus" class="small text-muted mt-2">Each private ship listed individually. Date range matches the selector above.</div>
-    </div>
-  </div>
-
-  <!-- Member activity -->
-  <div class="row">
-    <div class="col-lg-6">
-      <div class="card mb-4">
-        <div class="card-body">
-          <h5 class="card-title mb-3">Flying Days by Member</h5>
-          <div class="chart-box" style="height:560px;"><canvas id="fdChart"></canvas></div>
-          <div class="small text-muted mt-2" id="fdStatus"></div>
+    <div class="d-flex justify-content-between align-items-end pe-5">
+      <h5 class="card-title mb-3">
+        Glider Utilization
+        <span class="badge bg-info text-dark ms-2">Date range</span>
+      </h5>
+      {# existing date-range form unchanged #}
+      <form class="row g-2 align-items-end" method="get">
+        <div class="col-auto">
+          <label class="form-label small mb-1">From</label>
+          <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
         </div>
+        <div class="col-auto">
+          <label class="form-label small mb-1">To</label>
+          <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
+        </div>
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
+        <div class="col-auto">
+          <button class="btn btn-outline-primary btn-sm">Update</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="chart-box" style="height:520px;"><canvas id="utilChart"></canvas></div>
+    <div id="utilStatus" class="small text-muted mt-2">
+      Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.
+    </div>
+  </div>
+</div>
+
+<!-- Private Utilization -->
+<div class="card mb-4">
+  <div class="card-body position-relative">
+    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+         role="group" data-canvas="utilPrivChart" data-name="private-glider-utilization">
+      <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+    </div>
+    <h5 class="card-title mb-3 pe-5">
+      Private Glider Utilization (excludes club ships)
+      <span class="badge bg-info text-dark ms-2">Date range</span>
+    </h5>
+    <div class="chart-box" style="height:520px;"><canvas id="utilPrivChart"></canvas></div>
+    <div id="utilPrivStatus" class="small text-muted mt-2">Each private ship listed individually. Date range matches the selector above.</div>
+  </div>
+</div>
+
+<!-- Member activity row -->
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="fdChart" data-name="flying-days-by-member">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 pe-5">
+          Flying Days by Member
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="fdChart"></canvas></div>
+        <div class="small text-muted mt-2" id="fdStatus"></div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="card mb-4">
-        <div class="card-body">
-          <h5 class="card-title mb-3">Glider Flights by Pilot (non-instruction)</h5>
-          <div class="chart-box" style="height:560px;"><canvas id="pgfChart"></canvas></div>
-          <div class="small text-muted mt-2" id="pgfStatus"></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="pgfChart" data-name="glider-flights-by-pilot">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
+        <h5 class="card-title mb-3 pe-5">
+          Glider Flights by Pilot (non-instruction)
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="pgfChart"></canvas></div>
+        <div class="small text-muted mt-2" id="pgfStatus"></div>
       </div>
     </div>
-    <div class="col-12">
-      <div class="card mb-4">
-        <div class="card-body">
-          <h5 class="card-title mb-3">Flight Duration Distribution</h5>
-          <div class="chart-box" style="height:380px;"><canvas id="durChart"></canvas></div>
-          <div class="small text-muted mt-2" id="durStatus"></div>
+  </div>
+
+  <div class="col-12">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="durChart" data-name="flight-duration-distribution">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
+        <h5 class="card-title mb-3 pe-5">
+          Flight Duration Distribution
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:380px;"><canvas id="durChart"></canvas></div>
+        <div class="small text-muted mt-2" id="durStatus"></div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Instructors & Tow-pilots -->
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="instChart" data-name="instructor-flights">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 pe-5">
+          Instructor Flights (by weekday)
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="instChart"></canvas></div>
+        <div class="small text-muted mt-2" id="instStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-body position-relative">
+        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
+             role="group" data-canvas="towChart" data-name="tow-pilot-flights">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 pe-5">
+          Tow-pilot Flights (by weekday)
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box" style="height:560px;"><canvas id="towChart"></canvas></div>
+        <div class="small text-muted mt-2" id="towStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <style>
   .chart-box { height: 440px; position: relative; }
   #cumuChart { width: 100% !important; height: 100% !important; display: block; }
 </style>
 
-{# one single JSON blob with everything #}
 {{ analytics_data|json_script:"analytics-data" }}
 
-{# scripts: Chart.js + our single initializer, both deferred #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <script src="{% static 'analytics/charts.js' %}" defer></script>
 <script defer>
   window.addEventListener("DOMContentLoaded", () => {
     const ALL = JSON.parse(document.getElementById("analytics-data").textContent || "{}");
     window.AnalyticsCharts?.initAll(ALL);
+    // If charts.js exposes attachPngAuto, call it to bind all PNG buttons
+    if (window.attachPngAuto) window.attachPngAuto();
   });
 </script>
 {% endblock %}

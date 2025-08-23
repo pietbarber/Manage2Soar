@@ -195,6 +195,213 @@
       initFlyingDays(all.fdays || {});
       initPilotFlights(all.pgf || {});
       initDuration(all.duration || {});
+      initInstructorByWeekday(all.instructors || {});
+      initTowByWeekday(all.tows || {});
     }
   };
 })(window);
+
+
+function makeHStacked(canvasId, names, labels, matrix, colors) {
+  const ctx = document.getElementById(canvasId)?.getContext?.("2d");
+  if (!ctx) return null;
+
+  const datasets = labels.map((lbl, i) => ({
+    label: lbl,
+    data: (matrix[lbl] || []).map(v => Number(v) || 0),
+    backgroundColor: colors[i % colors.length],
+    borderColor: colors[i % colors.length],
+    borderWidth: 1,
+  }));
+
+  // total per row for x-axis sizing
+  const totals = names.map((_, r) => datasets.reduce((s, ds) => s + (Number(ds.data[r]) || 0), 0));
+  const xMax = Math.max(1, ...totals);
+  const pad = Math.ceil((xMax * 1.08) / 10) * 10;
+
+  return new Chart(ctx, {
+    type: "bar",
+    data: { labels: names, datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { position: "right" } },
+      scales: {
+        x: { stacked: true, beginAtZero: true, suggestedMax: pad, ticks: { precision: 0 } },
+        y: { stacked: true, ticks: { autoSkip: false } }
+      }
+    }
+  });
+}
+
+function initInstructorByWeekday(d) {
+  const names=d.names||[], labels=d.labels||[], matrix=d.matrix||{}, instTotal=d.inst_total||0, allTotal=d.all_total||0;
+  const blues = ["#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8"]; // 7 shades
+  if (!names.length) { const el=document.getElementById("instStatus"); if(el) el.textContent="No instructor flights in the selected period."; return; }
+  if (window.instChart?.destroy) window.instChart.destroy();
+  window.instChart = makeHStacked("instChart", names, labels, matrix, blues);
+  const el=document.getElementById("instStatus");
+  if (el) el.textContent = `${instTotal.toLocaleString()} instructional flights out of ${allTotal.toLocaleString()} total flights in range.`;
+}
+
+function initTowByWeekday(d) {
+  const names=d.names||[], labels=d.labels||[], matrix=d.matrix||{}, towTotal=d.tow_total||0;
+  const greens = ["#e3f9e5","#c1eac5","#a3d9a5","#7bc47f","#57ae5b","#3f9142","#2f8132"]; // 7 shades
+  if (!names.length) { const el=document.getElementById("towStatus"); if(el) el.textContent="No tow-pilot flights in the selected period."; return; }
+  if (window.towChart?.destroy) window.towChart.destroy();
+  window.towChart = makeHStacked("towChart", names, labels, matrix, greens);
+  const el=document.getElementById("towStatus");
+  if (el) el.textContent = `${towTotal.toLocaleString()} total tows in range.`;
+}
+
+function attachPngAuto() {
+  document.querySelectorAll(".chart-save").forEach((btn) => {
+    btn.onclick = () => {
+      const canvasId = btn.dataset.canvas;
+      const name     = btn.dataset.name || canvasId || "chart";
+      const canvas   = document.getElementById(canvasId);
+      const chart    = Chart.getChart ? Chart.getChart(canvasId) : null;
+
+      const url = chart && typeof chart.toBase64Image === "function"
+        ? chart.toBase64Image()
+        : (canvas && canvas.toDataURL ? canvas.toDataURL("image/png") : null);
+
+      if (!url) return;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}.png`;
+      a.click();
+    };
+  });
+}
+
+// call this after you’ve built all charts:
+attachPngAuto();
+
+function attachPng(buttonId, canvasId, filename) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.onclick = () => {
+    const canvas = document.getElementById(canvasId);
+    const chart  = Chart.getChart ? Chart.getChart(canvasId) : null;
+    const url = chart && typeof chart.toBase64Image === "function"
+      ? chart.toBase64Image()
+      : (canvas && canvas.toDataURL ? canvas.toDataURL("image/png") : null);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${filename}.png`;
+    a.click();
+  };
+}
+
+// after building window.instChart / window.towChart:
+attachPng("instSave", "instChart", "instructor-flights");
+attachPng("towSave",  "towChart",  "tow-pilot-flights");
+
+function blobDownload(filename, mime, content) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 200);
+}
+
+function exportPNG(canvasId, name) {
+  const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const url = chart && typeof chart.toBase64Image === "function"
+    ? chart.toBase64Image() // uses devicePixelRatio for crispness
+    : (canvas.toDataURL ? canvas.toDataURL("image/png") : null);
+  if (!url) return;
+  // Convert data URL to blob for download
+  fetch(url).then(r => r.blob()).then(b => blobDownload(`${name}.png`, "image/png", b));
+}
+
+function exportSVG(canvasId, name) {
+  // Wrap the PNG in an SVG container (vector-friendly wrapper)
+  const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const w = canvas.width, h = canvas.height;
+  const url = chart && typeof chart.toBase64Image === "function"
+    ? chart.toBase64Image()
+    : (canvas.toDataURL ? canvas.toDataURL("image/png") : null);
+  if (!url) return;
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <image href="${url}" x="0" y="0" width="${w}" height="${h}" />
+</svg>`.trim();
+
+  blobDownload(`${name}.svg`, "image/svg+xml", svg);
+}
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function chartToCSV(canvasId) {
+  const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
+  if (!chart) return "";
+  const cfg = chart.config || {};
+  const type = cfg.type || (cfg._config && cfg._config.type);
+  const data = chart.data || (cfg.data ?? {});
+  const labels = Array.isArray(data.labels) ? data.labels : [];
+  const datasets = Array.isArray(data.datasets) ? data.datasets : [];
+
+  // XY line (our duration survival chart)
+  if (type === "line" && datasets.length === 1 && datasets[0].data && typeof datasets[0].data[0] === "object") {
+    const pts = datasets[0].data;
+    const rows = [["x", "y"]].concat(pts.map(p => [p.x, p.y]));
+    return rows.map(r => r.map(csvEscape).join(",")).join("\n");
+  }
+
+  // Generic tables (bar/stacked)
+  const header = ["Label", ...datasets.map(ds => ds.label || "Series")];
+  const len = Math.max(labels.length, ...datasets.map(ds => (ds.data || []).length));
+  const rows = [header];
+  for (let i = 0; i < len; i++) {
+    const row = [labels[i] ?? i];
+    for (const ds of datasets) {
+      const v = (ds.data || [])[i];
+      row.push(typeof v === "object" && v !== null ? (v.y ?? "") : (v ?? ""));
+    }
+    rows.push(row);
+  }
+  return rows.map(r => r.map(csvEscape).join(",")).join("\n");
+}
+
+function exportCSV(canvasId, name) {
+  const csv = chartToCSV(canvasId);
+  if (!csv) return;
+  blobDownload(`${name}.csv`, "text/csv;charset=utf-8", csv);
+}
+
+// Bind all button groups once charts exist
+function attachChartDownloads() {
+  document.querySelectorAll(".chart-tools").forEach((group) => {
+    const canvasId = group.dataset.canvas;
+    const name = group.dataset.name || canvasId || "chart";
+    group.querySelectorAll(".chart-dl").forEach((btn) => {
+      const type = btn.dataset.type;
+      btn.onclick = () => {
+        if (type === "png") return exportPNG(canvasId, name);
+        if (type === "svg") return exportSVG(canvasId, name);
+        if (type === "csv") return exportCSV(canvasId, name);
+      };
+    });
+  });
+}
+
+// After your charts are created:
+window.AnalyticsCharts && (function(orig){
+  const wrapped = function(all) { orig(all); attachChartDownloads(); };
+  window.AnalyticsCharts.initAll = wrapped;
+})(window.AnalyticsCharts.initAll);
