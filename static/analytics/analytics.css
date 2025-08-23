@@ -1,0 +1,68 @@
+/* Analytics layout & theming */
+
+/* ========= Design tokens ========= */
+:root{
+  --chart-h-short: 380px;
+  --chart-h:       440px;
+  --chart-h-tall:  520px;
+  --chart-h-xl:    560px;
+
+  --chart-title-pr: 5rem;          /* padding-right so title doesn't sit under tool buttons */
+  --chart-text: #212529;           /* bootstrap body color */
+  --chart-grid: rgba(0,0,0,.1);    /* grid/axis default */
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --chart-text: #e9ecef;
+    --chart-grid: rgba(255,255,255,.16);
+  }
+}
+
+/* ========= Chart containers ========= */
+.chart-card{ position: relative; }
+
+.chart-box{
+  height: var(--chart-h);
+  position: relative;
+}
+.chart-box--short{ height: var(--chart-h-short); }
+.chart-box--tall { height: var(--chart-h-tall); }
+.chart-box--xl   { height: var(--chart-h-xl);   }
+
+/* Make canvas stretch to the box */
+.chart-box > canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ========= Title padding so it doesn’t overlap the tools ========= */
+.chart-title-pad{ padding-right: var(--chart-title-pr) !important; }
+
+/* ========= Tool buttons (PNG/SVG/CSV) ========= */
+.chart-tools{
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+  z-index: 3;
+}
+.chart-tools .btn{
+  padding: .2rem .5rem;
+  line-height: 1.1;
+}
+
+/* ========= Responsive tweaks ========= */
+@media (max-width: 576px){
+  .chart-box{ height: 320px; }
+  .chart-box--xl{ height: 420px; }
+}
+
+/* ========= Print: hide controls, compress heights ========= */
+@media print{
+  .chart-tools,
+  form,
+  .alert{ display: none !important; }
+  .card{ break-inside: avoid; }
+  .chart-box{ height: 320px; }
+}

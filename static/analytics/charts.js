@@ -1,4 +1,13 @@
 /* global Chart */
+(function(){
+  const cs = getComputedStyle(document.documentElement);
+  const text = cs.getPropertyValue('--chart-text').trim() || '#212529';
+  const grid = cs.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,.1)';
+  Chart.defaults.color = text;
+  Chart.defaults.scale.grid.color = grid;
+  Chart.defaults.scale.ticks.color = text;
+})();
+
 ;(function (w) {
   const $ = (id) => document.getElementById(id);
 

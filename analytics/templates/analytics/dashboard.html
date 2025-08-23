@@ -33,34 +33,35 @@
     </div>
   {% endif %}
 
-<!-- Cumulative (Annual) -->
+{# ===== Annual charts ===== #}
 <div class="card mb-4">
-  <div class="card-body position-relative">
-    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-         role="group" data-canvas="cumuChart" data-name="cumulative-flights">
+  <div class="card-body chart-card">
+    <div class="btn-group btn-group-sm chart-tools" role="group"
+         data-canvas="cumuChart" data-name="cumulative-flights">
       <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
-    <h5 class="card-title mb-3 pe-5">
+    <h5 class="card-title mb-3 chart-title-pad">
       Cumulative Flights by Julian Day
       <span class="badge bg-secondary ms-2">Annual</span>
     </h5>
     <div class="chart-box"><canvas id="cumuChart"></canvas></div>
-    <div class="small text-muted mt-2">Current year is emphasized. Hover any day to see the running total for that year.</div>
+    <div class="small text-muted mt-2">
+      Current year is emphasized. Hover any day to see the running total for that year.
+    </div>
   </div>
 </div>
 
-<!-- Flights by Year by Aircraft (Annual) -->
 <div class="card mb-4">
-  <div class="card-body position-relative">
-    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-         role="group" data-canvas="byAcftChart" data-name="flights-by-year-by-aircraft">
+  <div class="card-body chart-card">
+    <div class="btn-group btn-group-sm chart-tools" role="group"
+         data-canvas="byAcftChart" data-name="flights-by-year-by-aircraft">
       <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
-    <h5 class="card-title mb-3 pe-5">
+    <h5 class="card-title mb-3 chart-title-pad">
       Flights by Year by Aircraft
       <span class="badge bg-secondary ms-2">Annual</span>
     </h5>
@@ -72,24 +73,28 @@
   </div>
 </div>
 
-<!-- Date-range banner stays as-is -->
+{# ===== Date-range section banner ===== #}
+<div class="alert alert-info py-2 small">
+  The charts below use the selected date range:
+  <strong>{{ util_start|default:"(no start)" }}</strong> → <strong>{{ util_end|default:"(no end)" }}</strong>
+  • {% if finalized %}showing <em>finalized only</em>{% else %}<em>including unfinalized</em>{% endif %}.
+</div>
 
-<!-- Glider Utilization (Date range) -->
+{# ===== Utilization (Date range) ===== #}
 <div class="card mb-4">
-  <div class="card-body position-relative">
-    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-         role="group" data-canvas="utilChart" data-name="glider-utilization">
+  <div class="card-body chart-card">
+    <div class="btn-group btn-group-sm chart-tools" role="group"
+         data-canvas="utilChart" data-name="glider-utilization">
       <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
 
-    <div class="d-flex justify-content-between align-items-end pe-5">
+    <div class="d-flex justify-content-between align-items-end chart-title-pad">
       <h5 class="card-title mb-3">
         Glider Utilization
         <span class="badge bg-info text-dark ms-2">Date range</span>
       </h5>
-      {# existing date-range form unchanged #}
       <form class="row g-2 align-items-end" method="get">
         <div class="col-auto">
           <label class="form-label small mb-1">From</label>
@@ -108,47 +113,48 @@
       </form>
     </div>
 
-    <div class="chart-box" style="height:520px;"><canvas id="utilChart"></canvas></div>
+    <div class="chart-box chart-box--tall"><canvas id="utilChart"></canvas></div>
     <div id="utilStatus" class="small text-muted mt-2">
       Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.
     </div>
   </div>
 </div>
 
-<!-- Private Utilization -->
 <div class="card mb-4">
-  <div class="card-body position-relative">
-    <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-         role="group" data-canvas="utilPrivChart" data-name="private-glider-utilization">
+  <div class="card-body chart-card">
+    <div class="btn-group btn-group-sm chart-tools" role="group"
+         data-canvas="utilPrivChart" data-name="private-glider-utilization">
       <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
-    <h5 class="card-title mb-3 pe-5">
+    <h5 class="card-title mb-3 chart-title-pad">
       Private Glider Utilization (excludes club ships)
       <span class="badge bg-info text-dark ms-2">Date range</span>
     </h5>
-    <div class="chart-box" style="height:520px;"><canvas id="utilPrivChart"></canvas></div>
-    <div id="utilPrivStatus" class="small text-muted mt-2">Each private ship listed individually. Date range matches the selector above.</div>
+    <div class="chart-box chart-box--tall"><canvas id="utilPrivChart"></canvas></div>
+    <div id="utilPrivStatus" class="small text-muted mt-2">
+      Each private ship listed individually. Date range matches the selector above.
+    </div>
   </div>
 </div>
 
-<!-- Member activity row -->
+{# ===== Member activity (Date range) ===== #}
 <div class="row">
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="fdChart" data-name="flying-days-by-member">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="fdChart" data-name="flying-days-by-member">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Flying Days by Member
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="fdChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="fdChart"></canvas></div>
         <div class="small text-muted mt-2" id="fdStatus"></div>
       </div>
     </div>
@@ -156,18 +162,18 @@
 
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="pgfChart" data-name="glider-flights-by-pilot">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="pgfChart" data-name="glider-flights-by-pilot">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Glider Flights by Pilot (non-instruction)
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="pgfChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="pgfChart"></canvas></div>
         <div class="small text-muted mt-2" id="pgfStatus"></div>
       </div>
     </div>
@@ -175,40 +181,40 @@
 
   <div class="col-12">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="durChart" data-name="flight-duration-distribution">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="durChart" data-name="flight-duration-distribution">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Flight Duration Distribution
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:380px;"><canvas id="durChart"></canvas></div>
+        <div class="chart-box chart-box--short"><canvas id="durChart"></canvas></div>
         <div class="small text-muted mt-2" id="durStatus"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Instructors & Tow-pilots -->
+{# ===== Instructors & Tow-pilots (Date range) ===== #}
 <div class="row">
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="instChart" data-name="instructor-flights">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="instChart" data-name="instructor-flights">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Instructor Flights (by weekday)
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="instChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="instChart"></canvas></div>
         <div class="small text-muted mt-2" id="instStatus"></div>
       </div>
     </div>
@@ -216,64 +222,66 @@
 
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="towChart" data-name="tow-pilot-flights">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="towChart" data-name="tow-pilot-flights">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Tow-pilot Flights (by weekday)
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="towChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="towChart"></canvas></div>
         <div class="small text-muted mt-2" id="towStatus"></div>
       </div>
     </div>
   </div>
 </div>
+
+{# ===== Long flights & Duty assignments (Date range) ===== #}
 <div class="row">
-  <!-- Long Flights ≥ 3 hours -->
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="long3hChart" data-name="long-flights-3h">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="long3hChart" data-name="long-flights-3h">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           Long Flights (≥ 3 hours) by Pilot
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="long3hChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="long3hChart"></canvas></div>
         <div class="small text-muted mt-2" id="long3hStatus"></div>
       </div>
     </div>
   </div>
 
-  <!-- DO & ADO Assignment Days -->
   <div class="col-lg-6">
     <div class="card mb-4">
-      <div class="card-body position-relative">
-        <div class="btn-group btn-group-sm position-absolute top-0 end-0 m-2 z-3 chart-tools"
-             role="group" data-canvas="dutyChart" data-name="do-ado-assignments">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="dutyChart" data-name="do-ado-assignments">
           <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
           <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
         </div>
-        <h5 class="card-title mb-3 pe-5">
+        <h5 class="card-title mb-3 chart-title-pad">
           DO &amp; ADO Assignment Days
           <span class="badge bg-info text-dark ms-2">Date range</span>
         </h5>
-        <div class="chart-box" style="height:560px;"><canvas id="dutyChart"></canvas></div>
+        <div class="chart-box chart-box--xl"><canvas id="dutyChart"></canvas></div>
         <div class="small text-muted mt-2" id="dutyStatus"></div>
       </div>
     </div>
   </div>
 </div>
+
+
 
 
 <style>
