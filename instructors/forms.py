@@ -1,14 +1,32 @@
 from django import forms
-from datetime import date
-from tinymce.widgets import TinyMCE
-from datetime import timedelta
-from django.forms import formset_factory
+from members.models import Member
+# TestBuilderForm: Form for creating written test templates
+from django import forms
 from .models import (
-    MemberQualification, ClubQualificationType, InstructionReport, 
-    LessonScore, TrainingLesson, GroundInstruction, 
+    MemberQualification, ClubQualificationType, InstructionReport,
+    LessonScore, TrainingLesson, GroundInstruction,
     GroundLessonScore, TrainingLesson, SCORE_CHOICES,
     SyllabusDocument
 )
+from django.forms import formset_factory
+from datetime import timedelta
+from tinymce.widgets import TinyMCE
+from datetime import date
+
+
+class TestBuilderForm(forms.Form):
+    pass_percentage = forms.DecimalField(
+        max_digits=5, decimal_places=2,
+        initial=100,
+        help_text="Minimum % score required to pass"
+    )
+
+    student = forms.ModelChoiceField(
+        queryset=Member.objects.filter(is_active=True),
+        help_text="Who should take this test",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
 
 ####################################################
 # InstructionReportForm
@@ -18,6 +36,7 @@ from .models import (
 # - report_text: HTML summary of the session (TinyMCE widget).
 # - simulator: Boolean flag for simulator sessions.
 ####################################################
+
 
 class InstructionReportForm(forms.ModelForm):
     class Meta:
@@ -36,8 +55,10 @@ class InstructionReportForm(forms.ModelForm):
 # - score: Select field for SCORE_CHOICES with optional blank.
 ####################################################
 
+
 class LessonScoreSimpleForm(forms.Form):
-    lesson = forms.ModelChoiceField(queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput())
+    lesson = forms.ModelChoiceField(
+        queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput())
     score = forms.ChoiceField(
         choices=[("", "---------")] + SCORE_CHOICES,
         required=False,
@@ -49,6 +70,7 @@ class LessonScoreSimpleForm(forms.Form):
 #
 # A FormSet factory for LessonScoreSimpleForm with no extra forms.
 ####################################################
+
 
 LessonScoreSimpleFormSet = formset_factory(LessonScoreSimpleForm, extra=0)
 
@@ -89,7 +111,8 @@ class GroundInstructionForm(forms.ModelForm):
                     raise ValueError
                 return timedelta(hours=hours, minutes=minutes, seconds=seconds)
             except ValueError:
-                raise forms.ValidationError("Enter duration in HH:MM or HH:MM:SS format.")
+                raise forms.ValidationError(
+                    "Enter duration in HH:MM or HH:MM:SS format.")
         elif isinstance(val, timedelta):
             return val
         elif not val:
@@ -136,6 +159,7 @@ class SyllabusDocumentForm(forms.ModelForm):
 # A FormSet factory for GroundLessonScoreSimpleForm with no extra forms.
 ####################################################
 
+
 GroundLessonScoreFormSet = formset_factory(
     GroundLessonScoreSimpleForm,
     extra=0,
@@ -152,10 +176,12 @@ GroundLessonScoreFormSet = formset_factory(
 # Overrides save() to update_or_create qualification record.
 ####################################################
 
+
 class QualificationAssignForm(forms.ModelForm):
     class Meta:
         model = MemberQualification
-        fields = ['qualification', 'is_qualified', 'expiration_date', 'date_awarded', 'notes']
+        fields = ['qualification', 'is_qualified',
+                  'expiration_date', 'date_awarded', 'notes']
         widgets = {
             'expiration_date': forms.DateInput(attrs={'type': 'date'}),
             'date_awarded': forms.DateInput(attrs={'type': 'date'}),
@@ -173,7 +199,7 @@ class QualificationAssignForm(forms.ModelForm):
 
     def save(self, commit=True):
         date_awarded = self.cleaned_data.get('date_awarded') or date.today()
-    
+
         instance, _ = MemberQualification.objects.update_or_create(
             member=self.student,
             qualification=self.cleaned_data['qualification'],
@@ -187,4 +213,3 @@ class QualificationAssignForm(forms.ModelForm):
             }
         )
         return instance
-

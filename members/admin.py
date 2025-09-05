@@ -14,10 +14,12 @@ from .models import Member
 from .models import Member, Badge, MemberBadge
 from .models import Member, MemberBadge
 
+
 @admin.register(Biography)
 class BiographyAdmin(admin.ModelAdmin):
     list_display = ("member", "updated_at")
-    search_fields = ("member__first_name", "member__last_name", "member__email")
+    search_fields = ("member__first_name",
+                     "member__last_name", "member__email")
     ordering = ("-updated_at",)
 
 
@@ -50,11 +52,12 @@ class MemberBadgeAdmin(admin.ModelAdmin):
 
 # Fields typically include badge name, code, description, and any categorization fields.
 
+
 class BadgeAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.TextField: {'widget': TinyMCE(attrs={'cols': 80, 'rows': 10})},
     }
-    search_fields = ['name', 'description']  
+    search_fields = ['name', 'description']
 
 
 #########################
@@ -69,6 +72,8 @@ class BadgeAdmin(admin.ModelAdmin):
 # extra: Set to 0 to avoid displaying extra empty rows by default
 
 admin.site.register(Badge, BadgeAdmin)
+
+
 class MemberBadgeInline(admin.TabularInline):
     model = MemberBadge
     extra = 1  # Show one empty row to add a badge
@@ -86,7 +91,8 @@ class MemberBadgeInline(admin.TabularInline):
 class CustomMemberChangeForm(UserChangeForm):
     class Meta:
         model = Member
-        fields = ("username", "email", "first_name", "last_name", "membership_status", "instructor", "towpilot")
+        fields = ("username", "email", "first_name", "last_name",
+                  "membership_status", "instructor", "towpilot")
 
 #########################
 # CustomMemberCreationForm Class
@@ -96,6 +102,7 @@ class CustomMemberChangeForm(UserChangeForm):
 # or additional fields required by the Member model.
 
 # This form is referenced by MemberAdmin via the 'add_form' attribute.
+
 
 class CustomMemberCreationForm(UserCreationForm):
     class Meta:
@@ -112,15 +119,12 @@ class CustomMemberCreationForm(UserCreationForm):
 # model: MemberBadge — the related model that stores a member's earned badges
 # extra: Sets the number of blank inline forms to display by default (0 = none)
 
-class MemberBadgeInline(admin.TabularInline):
-    model = MemberBadge
-    extra = 0
 
 #########################
 # MemberAdmin Class
 
 # This class customizes the Django admin interface for the Member model.
-# It extends both VersionAdmin (from django-reversion) and UserAdmin to 
+# It extends both VersionAdmin (from django-reversion) and UserAdmin to
 # provide editable fields, filters, and auditing of all member-related changes.
 
 # add_form: Custom form used when creating a new member
@@ -142,18 +146,21 @@ class MemberBadgeInline(admin.TabularInline):
 # add_fieldsets: Defines fields used during initial member creation
 #   (uses "wide" layout for better visual spacing)
 
+
 @admin.register(Member)
 class MemberAdmin(VersionAdmin, UserAdmin):
-    readonly_fields = ("profile_photo_preview",) 
+    readonly_fields = ("profile_photo_preview",)
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
     model = Member
     inlines = [MemberBadgeInline]
 
-    list_display = ("last_name", "first_name", "email", "membership_status", "instructor", "towpilot", "rostermeister")
+    list_display = ("last_name", "first_name", "email",
+                    "membership_status", "instructor", "towpilot", "rostermeister")
     search_fields = ("first_name", "last_name", "email", "username")
-    list_filter = ("membership_status", "instructor", "towpilot", "director", "member_manager", "rostermeister")
+    list_filter = ("membership_status", "instructor", "towpilot",
+                   "director", "member_manager", "rostermeister")
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
@@ -194,8 +201,12 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         return ""
     profile_photo_preview.short_description = "Current Photo"
 
-
     def get_search_results(self, request, queryset, search_term):
         from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-        queryset = queryset.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        from django.db import models
+        # Always include superusers
+        queryset = queryset.filter(
+            models.Q(membership_status__in=DEFAULT_ACTIVE_STATUSES) | models.Q(
+                is_superuser=True)
+        )
         return super().get_search_results(request, queryset, search_term)

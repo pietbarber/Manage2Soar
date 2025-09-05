@@ -13,7 +13,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
     Question,
     WrittenTestAttempt,
-    WrittenTestAnswer, 
+    WrittenTestAnswer,
     QuestionCategory,
     WrittenTestAssignment
 )
@@ -23,28 +23,34 @@ from instructors.decorators import member_or_instructor_required, instructor_req
 from instructors.models import InstructionReport
 from members.decorators import active_member_required
 
-PRESETS = {
 
-    'ASK21': {
-        'ACRO': 0,  'AIM': 5,  'AMF': 0,  'ASK21': 19, 'DO': 0,
-        'Discus': 0,'FAR': 5,  'GF': 10, 'GFH': 10,   'GNDOPS':5,
-        'PW5': 0,  'SSC': 5,  'ST': 5,  'WX': 4,
-    },
-    'PW5': {
-        'ACRO': 0, 'AIM': 5, 'AMF': 5, 'ASK21': 0, 'DO': 0,
-        'Discus': 0,'FAR': 5, 'GF': 10, 'GFH': 10, 'GNDOPS':5,
-        'PW5':24,'SSC':5,'ST':5,'WX':4,
-    },
-    'DISCUS': {
-        'ACRO': 0, 'AIM': 0, 'AMF':0, 'ASK21': 0, 'DO': 0,
-        'Discus': 22, 'FAR': 5, 'GF': 10, 'GFH': 0, 'GNDOPS' :5,
-        'PW5': 0, 'SSC': 0, 'ST': 5, 'WX': 0, 
-    },
-    'ACRO': {
-        'ACRO': 30
-    },
-    'EMPTY': { code: 0 for code in Question.objects.values_list('category__code', flat=True) },
-}
+def _get_empty_preset():
+    # This function is called only when needed, preventing database queries at import time.
+    return {code: 0 for code in Question.objects.values_list('category__code', flat=True)}
+
+
+def get_presets():
+    return {
+        'ASK21': {
+            'ACRO': 0,  'AIM': 5,  'AMF': 0,  'ASK21': 19, 'DO': 0,
+            'Discus': 0, 'FAR': 5,  'GF': 10, 'GFH': 10,   'GNDOPS': 5,
+            'PW5': 0,  'SSC': 5,  'ST': 5,  'WX': 4,
+        },
+        'PW5': {
+            'ACRO': 0, 'AIM': 5, 'AMF': 5, 'ASK21': 0, 'DO': 0,
+            'Discus': 0, 'FAR': 5, 'GF': 10, 'GFH': 10, 'GNDOPS': 5,
+            'PW5': 24, 'SSC': 5, 'ST': 5, 'WX': 4,
+        },
+        'DISCUS': {
+            'ACRO': 0, 'AIM': 0, 'AMF': 0, 'ASK21': 0, 'DO': 0,
+            'Discus': 22, 'FAR': 5, 'GF': 10, 'GFH': 0, 'GNDOPS': 5,
+            'PW5': 0, 'SSC': 0, 'ST': 5, 'WX': 0,
+        },
+        'ACRO': {
+            'ACRO': 30
+        },
+        'EMPTY': _get_empty_preset(),
+    }
 
 
 class WrittenTestStartView(TemplateView):
@@ -54,15 +60,18 @@ class WrittenTestStartView(TemplateView):
         ctx = super().get_context_data(**kwargs)
         tmpl = get_object_or_404(WrittenTestTemplate, pk=kwargs['pk'])
         qs = tmpl.questions.all().values(
-            'qnum','question_text','option_a','option_b','option_c','option_d'
+            # from knowledgetest.views import get_presets
         )
-        ctx['questions']   = list(qs)             # <-- a Python list of dicts
-        ctx['submit_url']  = reverse('knowledgetest:quiz-submit', args=[tmpl.pk])
+        ctx['questions'] = list(qs)             # <-- a Python list of dicts
+        ctx['submit_url'] = reverse(
+            'knowledgetest:quiz-submit', args=[tmpl.pk])
         return ctx
 
 # ----------------------------------------------------------------
 # Helper mixin to enforce “only the assigned student or staff”
 # ----------------------------------------------------------------
+
+
 class AssignmentPermissionMixin:
     def dispatch(self, request, *args, **kwargs):
         # Must be logged in
@@ -88,17 +97,22 @@ class AssignmentPermissionMixin:
 @method_decorator(active_member_required, name='dispatch')
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
-    form_class    = TestBuilderForm
+    form_class = TestBuilderForm
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
         preset = self.request.GET.get('preset')
-        kw['preset'] = PRESETS.get(preset.upper())
+        if preset:
+            presets = get_presets()
+            kw['preset'] = presets.get(preset.upper())
+        else:
+            kw['preset'] = None  # Or a default preset if applicable
         return kw
 
     def get_context_data(self, **ctx):
         ctx = super().get_context_data(**ctx)
-        ctx['presets'] = PRESETS.keys()
+        presets = get_presets()
+        ctx['presets'] = presets.keys()
         return ctx
 
     def form_valid(self, form):
@@ -164,7 +178,6 @@ class CreateWrittenTestView(FormView):
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
 
 
-
 # ----------------------------------------------------------------
 # Secure the Submit View
 # ----------------------------------------------------------------
@@ -177,8 +190,8 @@ class WrittenTestSubmitView(View):
             return render(request, self.template_name, {
                 'template': tmpl,
                 'questions_json': json.dumps(list(tmpl.questions.all().values(
-                    'qnum','question_text','option_a',
-                    'option_b','option_c','option_d'
+                    'qnum', 'question_text', 'option_a',
+                    'option_b', 'option_c', 'option_d'
                 ))),
                 'submit_url': reverse('knowledgetest:quiz-submit', args=[tmpl.pk]),
                 'form': form,
@@ -223,7 +236,7 @@ class WrittenTestSubmitView(View):
             )
             asn.attempt = attempt
             asn.completed = True
-            asn.save(update_fields=['attempt','completed'])
+            asn.save(update_fields=['attempt', 'completed'])
         except WrittenTestAssignment.DoesNotExist:
             pass
 
@@ -253,6 +266,7 @@ class WrittenTestSubmitView(View):
                 )
             )
         return redirect('knowledgetest:quiz-result', attempt.pk)
+
 
 class WrittenTestResultView(DetailView):
     model = WrittenTestAttempt

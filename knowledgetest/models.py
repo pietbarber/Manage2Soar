@@ -1,9 +1,12 @@
 from django.db import models
 from django.conf import settings
 from tinymce.models import HTMLField
+from decimal import Decimal
 from members.models import Member
 
 # Categories (legacy qcodes)
+
+
 class QuestionCategory(models.Model):
     code = models.CharField(max_length=10, primary_key=True)
     description = models.CharField(max_length=255)
@@ -12,6 +15,8 @@ class QuestionCategory(models.Model):
         return self.code
 
 # Test bank questions (legacy test_contents)
+
+
 class Question(models.Model):
     qnum = models.IntegerField(primary_key=True)
     category = models.ForeignKey(
@@ -55,6 +60,8 @@ class Question(models.Model):
         return f"Q{self.qnum}: {text[:50]}..."
 
 # Templates or ad-hoc tests
+
+
 class WrittenTestTemplate(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
@@ -66,7 +73,7 @@ class WrittenTestTemplate(models.Model):
     pass_percentage = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=100,
+        default=Decimal('100.00'),
         help_text='Minimum score (in %) required to pass'
     )
     time_limit = models.DurationField(
@@ -85,6 +92,7 @@ class WrittenTestTemplate(models.Model):
     def __str__(self):
         return self.name
 
+
 class WrittenTestTemplateQuestion(models.Model):
     template = models.ForeignKey(
         WrittenTestTemplate,
@@ -101,6 +109,8 @@ class WrittenTestTemplateQuestion(models.Model):
         ordering = ['order']
 
 # Student test attempts and results
+
+
 class WrittenTestAttempt(models.Model):
     template = models.ForeignKey(
         WrittenTestTemplate,
@@ -137,6 +147,7 @@ class WrittenTestAttempt(models.Model):
         status = 'Passed' if self.passed else 'Failed'
         return f"{self.student} - {self.template.name} on {self.date_taken.date()} ({status})"
 
+
 class WrittenTestAnswer(models.Model):
     attempt = models.ForeignKey(
         WrittenTestAttempt,
@@ -147,7 +158,8 @@ class WrittenTestAnswer(models.Model):
         Question,
         on_delete=models.PROTECT
     )
-    selected_answer = models.CharField(max_length=1, choices=Question.CORRECT_CHOICES)
+    selected_answer = models.CharField(
+        max_length=1, choices=Question.CORRECT_CHOICES)
     is_correct = models.BooleanField()
 
     class Meta:
@@ -155,7 +167,8 @@ class WrittenTestAnswer(models.Model):
 
     def __str__(self):
         return f"{self.attempt.student} - Q{self.question.qnum}: {self.selected_answer}"
-    
+
+
 class WrittenTestAssignment(models.Model):
     template = models.ForeignKey(
         WrittenTestTemplate,
@@ -184,7 +197,7 @@ class WrittenTestAssignment(models.Model):
     )
 
     class Meta:
-        unique_together = ('template','student')
+        unique_together = ('template', 'student')
 
     def __str__(self):
         return f"{self.template.name} → {self.student}"

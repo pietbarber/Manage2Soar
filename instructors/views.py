@@ -4,7 +4,8 @@ import itertools
 import json
 from collections import namedtuple, OrderedDict
 import qrcode
-import random, re
+import random
+import re
 from io import BytesIO
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
@@ -13,7 +14,7 @@ from django.db import transaction
 
 from django import forms
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse 
+from django.http import HttpResponse
 from django.views.generic import FormView
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import user_passes_test
@@ -29,32 +30,28 @@ from django.utils.timezone import now
 
 from instructors.decorators import member_or_instructor_required, instructor_required
 from instructors.forms import (
-    InstructionReportForm, LessonScoreSimpleForm, 
-    LessonScoreSimpleFormSet, QualificationAssignForm, 
-    GroundInstructionForm, GroundLessonScoreFormSet, 
+    InstructionReportForm, LessonScoreSimpleForm,
+    LessonScoreSimpleFormSet, QualificationAssignForm,
+    GroundInstructionForm, GroundLessonScoreFormSet,
     SyllabusDocumentForm
 )
 from instructors.utils import get_flight_summary_for_member
 from instructors.models import (
-    InstructionReport, LessonScore, GroundInstruction, 
-    GroundLessonScore, TrainingLesson, SyllabusDocument, 
-    TrainingPhase, StudentProgressSnapshot 
+    InstructionReport, LessonScore, GroundInstruction,
+    GroundLessonScore, TrainingLesson, SyllabusDocument,
+    TrainingPhase, StudentProgressSnapshot
 )
 from logsheet.models import Flight, Logsheet
 from members.decorators import active_member_required
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 
-from knowledgetest.forms import TestBuilderForm
+from instructors.forms import TestBuilderForm
 from knowledgetest.models import (
-    QuestionCategory, Question, WrittenTestTemplate, 
+    QuestionCategory, Question, WrittenTestTemplate,
     WrittenTestTemplateQuestion, WrittenTestAssignment
 )
-from knowledgetest.views import PRESETS
-
-
-
-
+from knowledgetest.views import get_presets
 
 
 ####################################################
@@ -71,7 +68,7 @@ from knowledgetest.views import PRESETS
 ####################################################
 
 
-# Training Syllabus links available to the public, no instructor login required. 
+# Training Syllabus links available to the public, no instructor login required.
 
 def public_syllabus_overview(request):
     phases = TrainingPhase.objects.prefetch_related("lessons").all()
@@ -99,13 +96,13 @@ def public_syllabus_overview(request):
 # - public: True flag for template logic.
 ####################################################
 
+
 def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     return render(request, "instructors/syllabus_detail.html", {
         "lesson": lesson,
         "public": True,
     })
-
 
 
 ####################################################
@@ -126,6 +123,7 @@ def instructors_home(request):
 # For authenticated instructors.
 ####################################################
 
+
 @instructor_required
 def syllabus_overview(request):
     lessons = TrainingLesson.objects.all().order_by("code")
@@ -137,6 +135,7 @@ def syllabus_overview(request):
 # Grouped syllabus view by phase, includes header/materials.
 # For authenticated instructors.
 ####################################################
+
 
 @instructor_required
 def syllabus_overview_grouped(request):
@@ -157,6 +156,7 @@ def syllabus_overview_grouped(request):
 # Accessible to instructors only.
 ####################################################
 
+
 @instructor_required
 def syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
@@ -176,6 +176,7 @@ def syllabus_detail(request, code):
 # Template: instructors/fill_instruction_report.html
 ####################################################
 
+
 @instructor_required
 def fill_instruction_report(request, student_id, report_date):
     try:
@@ -185,7 +186,6 @@ def fill_instruction_report(request, student_id, report_date):
 
     student = get_object_or_404(Member, pk=student_id)
     instructor = request.user
-
 
     # 1) On GET: only retrieve, do NOT create a stub
     try:
@@ -210,7 +210,7 @@ def fill_instruction_report(request, student_id, report_date):
             )
 
         report_form = InstructionReportForm(request.POST, instance=report)
-        formset     = LessonScoreSimpleFormSet(request.POST)
+        formset = LessonScoreSimpleFormSet(request.POST)
 
         if report_form.is_valid() and formset.is_valid():
             # save the InstructionReport (new or existing)
@@ -220,27 +220,31 @@ def fill_instruction_report(request, student_id, report_date):
             LessonScore.objects.filter(report=report).delete()
             for form in formset.cleaned_data:
                 lesson = form.get("lesson")
-                score  = form.get("score")
+                score = form.get("score")
                 if lesson and score:
-                    LessonScore.objects.create(report=report, lesson=lesson, score=score)
+                    LessonScore.objects.create(
+                        report=report, lesson=lesson, score=score)
 
-            messages.success(request, "Instruction report submitted successfully.")
+            messages.success(
+                request, "Instruction report submitted successfully.")
             return redirect("instructors:member_instruction_record", member_id=student.id)
         else:
-            messages.error(request, "There were errors in the form. Please review and correct them.")
+            messages.error(
+                request, "There were errors in the form. Please review and correct them.")
     else:
         # GET: build empty form/formset (report may be None)
         report_form = InstructionReportForm(instance=report)
         initial_data = []
         for lesson in lessons:
             if report:
-                existing = LessonScore.objects.filter(report=report, lesson=lesson).first()
+                existing = LessonScore.objects.filter(
+                    report=report, lesson=lesson).first()
                 val = existing.score if existing else ""
             else:
                 val = ""
             initial_data.append({"lesson": lesson.id, "score": val})
 
-        formset   = LessonScoreSimpleFormSet(initial=initial_data)
+        formset = LessonScoreSimpleFormSet(initial=initial_data)
         form_rows = list(zip(formset.forms, lessons))
 
     return render(request, "instructors/fill_instruction_report.html", {
@@ -257,6 +261,7 @@ def fill_instruction_report(request, student_id, report_date):
 # Displays dates of recent flights (last 30 days) for selecting
 # an instruction report to fill. Requires active member status.
 ####################################################
+
 
 @active_member_required
 def select_instruction_date(request, student_id):
@@ -301,6 +306,8 @@ def select_instruction_date(request, student_id):
 # Returns:
 # - String of two uppercase letters or '??'
 ####################################################
+
+
 def get_instructor_initials(member):
     initials = (
         f"{member.first_name[0]}{member.last_name[0]}"
@@ -327,6 +334,8 @@ def get_instructor_initials(member):
 # - report_dates: Ordered list of dates for grid columns
 # - column_metadata: List of dicts with 'date', 'initials', 'days_ago'
 ####################################################
+
+
 @active_member_required
 def member_training_grid(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
@@ -362,10 +371,13 @@ def member_training_grid(request, member_id):
         if not f.instructor:
             continue
         d = f.logsheet.log_date
+        initials = "".join(
+            [n[0] for n in str(f.instructor.full_display_name or "").split()])
+        full_name = str(f.instructor.full_display_name or "")
         flights_by_date[d].append({
             "days_ago": (today - d).days,
-            "initials": "".join([n[0] for n in f.instructor.full_display_name.split()]),
-            "full_name": f.instructor.full_display_name,
+            "initials": initials,
+            "full_name": full_name,
         })
 
     # Compose grid rows per lesson
@@ -389,7 +401,8 @@ def member_training_grid(request, member_id):
                 tooltip = f"{info['full_name']} – {info['days_ago']} days ago"
             else:
                 label = tooltip = ""
-            row["scores"].append({"score": score, "label": label, "tooltip": tooltip})
+            row["scores"].append(
+                {"score": score, "label": label, "tooltip": tooltip})
         row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
@@ -425,6 +438,8 @@ def member_training_grid(request, member_id):
 # - form_rows: paired list of (form, lesson) tuples for rendering
 # - student: Member instance (or None)
 ####################################################
+
+
 @instructor_required
 def log_ground_instruction(request):
     student_id = request.GET.get("student")
@@ -450,8 +465,13 @@ def log_ground_instruction(request):
                     GroundLessonScore.objects.create(
                         session=session, lesson=lesson, score=sc
                     )
-            messages.success(request, "Ground instruction session logged successfully.")
-            return redirect("instructors:member_instruction_record", member_id=student.id)
+            messages.success(
+                request, "Ground instruction session logged successfully.")
+            if student is not None:
+                return redirect("instructors:member_instruction_record", member_id=student.id)
+            else:
+                messages.error(request, "No student selected.")
+                return redirect("instructors:log_ground_instruction")
         else:
             messages.error(request, "Please correct the errors below.")
     else:
@@ -466,7 +486,6 @@ def log_ground_instruction(request):
         "form_rows": form_rows,
         "student": student,
     })
-
 
 
 ####################################################
@@ -515,21 +534,19 @@ def assign_qualification(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
 
     if request.method == 'POST':
-        form = QualificationAssignForm(request.POST, instructor=request.user, student=student)
+        form = QualificationAssignForm(
+            request.POST, instructor=request.user, student=student)
         if form.is_valid():
             form.save()
             return redirect('members:member_view', member_id=member_id)
     else:
-        form = QualificationAssignForm(instructor=request.user, student=student)
+        form = QualificationAssignForm(
+            instructor=request.user, student=student)
 
     return render(request, 'instructors/assign_qualification.html', {
         'form': form,
         'student': student,
     })
-
-@instructor_required
-def instructors_home(request):
-     return render(request, "instructors/instructors_home.html")
 
 ####################################################
 # progress_dashboard
@@ -547,6 +564,7 @@ def instructors_home(request):
 # - students_data: List of dicts with per-student 'solo_pct', 'rating_pct', 'sessions', 'solo_url', 'checkride_url'
 # - rated_data: Same as students_data but for rated members
 ####################################################
+
 
 @instructor_required
 def progress_dashboard(request):
@@ -577,7 +595,7 @@ def progress_dashboard(request):
     # ————————————————————————————————
     # 2) Bulk‐fetch all snapshots for those members
     member_ids = list(students_qs.values_list('pk', flat=True)) + \
-                 list(rated_qs.values_list('pk', flat=True))
+        list(rated_qs.values_list('pk', flat=True))
     snapshots = StudentProgressSnapshot.objects \
         .filter(student_id__in=member_ids) \
         .select_related('student')
@@ -588,9 +606,9 @@ def progress_dashboard(request):
     students_data = []
     for m in students_qs:
         snap = snapshot_map.get(m.pk)
-        solo_pct   = int((snap.solo_progress   or 0.0) * 100) if snap else 0
+        solo_pct = int((snap.solo_progress or 0.0) * 100) if snap else 0
         rating_pct = int((snap.checkride_progress or 0.0) * 100) if snap else 0
-        sessions   = snap.sessions if snap else 0
+        sessions = snap.sessions if snap else 0
 
         students_data.append({
             'member':        m,
@@ -604,9 +622,9 @@ def progress_dashboard(request):
     rated_data = []
     for m in rated_qs:
         snap = snapshot_map.get(m.pk)
-        solo_pct   = int((snap.solo_progress   or 0.0) * 100) if snap else 0
+        solo_pct = int((snap.solo_progress or 0.0) * 100) if snap else 0
         rating_pct = int((snap.checkride_progress or 0.0) * 100) if snap else 0
-        sessions   = snap.sessions if snap else 0
+        sessions = snap.sessions if snap else 0
 
         rated_data.append({
             'member':       m,
@@ -614,7 +632,6 @@ def progress_dashboard(request):
             'rating_pct':   rating_pct,
             'sessions':     sessions,
         })
-
 
     # ————————————————————————————————
     # 4) Pending reports (unchanged)
@@ -666,6 +683,7 @@ def progress_dashboard(request):
 # - doc: SyllabusDocument instance
 ####################################################
 
+
 @instructor_required
 def edit_syllabus_document(request, slug):
     doc = get_object_or_404(SyllabusDocument, slug=slug)
@@ -705,22 +723,20 @@ def member_instruction_record(request, member_id):
     member = get_object_or_404(
         Member.objects
               .prefetch_related(
-                 'badges__badge', 
-                 'memberqualification_set__qualification'
+                  'badges__badge',
+                  'memberqualification_set__qualification'
               ),
         pk=member_id
     )
 
-
     # ── Flying summary by glider ──
     flights = (
         Flight.objects
-              .filter(pilot=member)
-              .select_related("logsheet", "aircraft")
+        .filter(pilot=member)
+        .select_related("logsheet", "aircraft")
     )
 
     flights_summary = get_flight_summary_for_member(member)
-
 
     instruction_reports = (
         InstructionReport.objects
@@ -740,15 +756,15 @@ def member_instruction_record(request, member_id):
     # 1) Grab all flight‐instruction reports and ground sessions
     flight_reports = list(
         InstructionReport.objects
-            .filter(student=member)
-            .order_by("report_date")
-            .values_list("report_date", flat=True)
+        .filter(student=member)
+        .order_by("report_date")
+        .values_list("report_date", flat=True)
     )
     ground_reports = list(
         GroundInstruction.objects
-            .filter(student=member)
-            .order_by("date")
-            .values_list("date", flat=True)
+        .filter(student=member)
+        .order_by("date")
+        .values_list("date", flat=True)
     )
     # 2) Merge into a single sorted list of dates with tags
     sessions = []
@@ -790,34 +806,34 @@ def member_instruction_record(request, member_id):
         # solo‐standard completed (score 3 or 4)
         flight_solo = set(
             LessonScore.objects
-                .filter(report__student=member,
-                        report__report_date__lte=d,
-                        score__in=["3","4"])
-                .values_list("lesson_id", flat=True)
+            .filter(report__student=member,
+                    report__report_date__lte=d,
+                    score__in=["3", "4"])
+            .values_list("lesson_id", flat=True)
         )
         ground_solo = set(
             GroundLessonScore.objects
-                .filter(session__student=member,
-                        session__date__lte=d,
-                        score__in=["3","4"])
-                .values_list("lesson_id", flat=True)
+            .filter(session__student=member,
+                    session__date__lte=d,
+                    score__in=["3", "4"])
+            .values_list("lesson_id", flat=True)
         )
         solo_done = flight_solo | ground_solo
 
         # rating‐standard completed (score 4 only)
         flight_rating = set(
             LessonScore.objects
-                .filter(report__student=member,
-                        report__report_date__lte=d,
-                        score="4")
-                .values_list("lesson_id", flat=True)
+            .filter(report__student=member,
+                    report__report_date__lte=d,
+                    score="4")
+            .values_list("lesson_id", flat=True)
         )
         ground_rating = set(
             GroundLessonScore.objects
-                .filter(session__student=member,
-                        session__date__lte=d,
-                        score="4")
-                .values_list("lesson_id", flat=True)
+            .filter(session__student=member,
+                    session__date__lte=d,
+                    score="4")
+            .values_list("lesson_id", flat=True)
         )
         rating_done = flight_rating | ground_rating
 
@@ -829,7 +845,6 @@ def member_instruction_record(request, member_id):
             int(len(rating_done & rating_ids) / total_rating * 100)
         )
 
-
     blocks = []
 
     # ── Flight‐instruction reports ──
@@ -840,18 +855,18 @@ def member_instruction_record(request, member_id):
             LessonScore.objects.filter(
                 report__student=member,
                 report__report_date__lte=d,
-                score__in=["3","4"]
+                score__in=["3", "4"]
             ).values_list("lesson_id", flat=True)
         )
         ground_solo = set(
             GroundLessonScore.objects.filter(
                 session__student=member,
                 session__date__lte=d,
-                score__in=["3","4"]
+                score__in=["3", "4"]
             ).values_list("lesson_id", flat=True)
         )
         solo_done = flight_solo | ground_solo
-    
+
         # cumulative “rating” (4 only) up to date d
         flight_rate = set(
             LessonScore.objects.filter(
@@ -868,23 +883,26 @@ def member_instruction_record(request, member_id):
             ).values_list("lesson_id", flat=True)
         )
         rating_done = flight_rate | ground_rate
-    
-        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100)
+
+        solo_pct = int(len(solo_done & solo_ids) / total_solo * 100)
         rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
-    
-        missing_solo   = TrainingLesson.objects.filter(id__in=solo_ids - solo_done).order_by("code")
-        missing_rating = TrainingLesson.objects.filter(id__in=rating_ids - rating_done).order_by("code")
-    
+
+        missing_solo = TrainingLesson.objects.filter(
+            id__in=solo_ids - solo_done).order_by("code")
+        missing_rating = TrainingLesson.objects.filter(
+            id__in=rating_ids - rating_done).order_by("code")
+
         blocks.append({
             "type":           "flight",
             "report":         report,
             "days_ago":       (timezone.now().date() - d).days,
             "flights":        Flight.objects.filter(
-                                  instructor=report.instructor,
-                                  pilot=report.student,
-                                  logsheet__log_date=d
-                              ),
-            "scores_by_code": { str(s.score): [] for s in report.lesson_scores.all() },  # your existing logic
+                instructor=report.instructor,
+                pilot=report.student,
+                logsheet__log_date=d
+            ),
+            # your existing logic
+            "scores_by_code": {str(s.score): [] for s in report.lesson_scores.all()},
             "solo_pct":       solo_pct,
             "rating_pct":     rating_pct,
             "missing_solo":   missing_solo,
@@ -898,18 +916,18 @@ def member_instruction_record(request, member_id):
             LessonScore.objects.filter(
                 report__student=member,
                 report__report_date__lte=d,
-                score__in=["3","4"]
+                score__in=["3", "4"]
             ).values_list("lesson_id", flat=True)
         )
         ground_solo = set(
             GroundLessonScore.objects.filter(
                 session__student=member,
                 session__date__lte=d,
-                score__in=["3","4"]
+                score__in=["3", "4"]
             ).values_list("lesson_id", flat=True)
         )
         solo_done = flight_solo | ground_solo
-    
+
         flight_rate = set(
             LessonScore.objects.filter(
                 report__student=member,
@@ -925,19 +943,21 @@ def member_instruction_record(request, member_id):
             ).values_list("lesson_id", flat=True)
         )
         rating_done = flight_rate | ground_rate
-    
-        solo_pct   = int(len(solo_done   & solo_ids)   / total_solo   * 100)
+
+        solo_pct = int(len(solo_done & solo_ids) / total_solo * 100)
         rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
-    
-        missing_solo   = TrainingLesson.objects.filter(id__in=solo_ids - solo_done).order_by("code")
-        missing_rating = TrainingLesson.objects.filter(id__in=rating_ids - rating_done).order_by("code")
-    
+
+        missing_solo = TrainingLesson.objects.filter(
+            id__in=solo_ids - solo_done).order_by("code")
+        missing_rating = TrainingLesson.objects.filter(
+            id__in=rating_ids - rating_done).order_by("code")
+
         blocks.append({
             "type":           "ground",
             "report":         session,
             "days_ago":       (timezone.now().date() - d).days,
             "flights":        None,
-            "scores_by_code": { str(s.score): [] for s in session.lesson_scores.all() },
+            "scores_by_code": {str(s.score): [] for s in session.lesson_scores.all()},
             "solo_pct":       solo_pct,
             "rating_pct":     rating_pct,
             "missing_solo":   missing_solo,
@@ -948,7 +968,6 @@ def member_instruction_record(request, member_id):
         key=lambda b: b["report"].report_date if b["type"] == "flight" else b["report"].date,
         reverse=True,
     )
-
 
     return render(request, "shared/member_instruction_record.html", {
         "member": member,
@@ -977,13 +996,14 @@ def member_instruction_record(request, member_id):
 # - code: TrainingLesson.code string
 ####################################################
 
+
 def public_syllabus_qr(request, code):
     url = request.build_absolute_uri(
         reverse('public_syllabus_detail', args=[code])
     )
     img = qrcode.make(url)
     buf = BytesIO()
-    img.save(buf, format='PNG')
+    img.save(buf, 'PNG')
     return HttpResponse(buf.getvalue(), content_type='image/png')
 
 ####################################################
@@ -996,14 +1016,15 @@ def public_syllabus_qr(request, code):
 # - request: HttpRequest
 ####################################################
 
+
 @require_GET
 def public_syllabus_full(request):
     # grab header/materials as before
-    phases    = TrainingPhase.objects.prefetch_related("lessons").all()
-    header    = SyllabusDocument.objects.filter(slug="header").first()
+    phases = TrainingPhase.objects.prefetch_related("lessons").all()
+    header = SyllabusDocument.objects.filter(slug="header").first()
     materials = SyllabusDocument.objects.filter(slug="materials").first()
     # all lessons in order
-    lessons   = TrainingLesson.objects.order_by("code").all()
+    lessons = TrainingLesson.objects.order_by("code").all()
 
     return render(request,
                   "instructors/syllabus_full.html",
@@ -1020,6 +1041,7 @@ def public_syllabus_full(request):
 # - request: HttpRequest
 ####################################################
 
+
 @active_member_required
 def member_logbook(request):
 
@@ -1034,7 +1056,7 @@ def member_logbook(request):
 
     # 1) Fetch all flights & ground sessions for this member
     flights = Flight.objects.filter(pilot=member).select_related(
-        'glider','instructor','airfield','logsheet','passenger'
+        'glider', 'instructor', 'airfield', 'logsheet', 'passenger'
     ).order_by('logsheet__log_date')
 
     # 2) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
@@ -1045,7 +1067,7 @@ def member_logbook(request):
             Q(instructor=member) |
             Q(passenger=member)
         )
-        .select_related('glider','instructor','passenger','airfield','logsheet')
+        .select_related('glider', 'instructor', 'passenger', 'airfield', 'logsheet')
         .order_by('logsheet__log_date')
     )
 
@@ -1053,9 +1075,9 @@ def member_logbook(request):
         'lesson_scores__lesson'
     ).order_by('date')
 
-
     # 3) Approximate rating_date = first time they carried a passenger
-    first_pax = flights.filter(passenger__isnull=False).order_by('logsheet__log_date').first()
+    first_pax = flights.filter(passenger__isnull=False).order_by(
+        'logsheet__log_date').first()
     rating_date = first_pax.logsheet.log_date if first_pax else None
 
     # 4) Flatten flights & grounds into a single timeline of events, capturing time
@@ -1078,7 +1100,6 @@ def member_logbook(request):
     # sort by date then time
     events.sort(key=lambda e: (e["date"], e["time"]))
 
-
     # 5) Build one row per event, formatting all times as H:MM
     rows = []
     flight_no = 0
@@ -1088,24 +1109,24 @@ def member_logbook(request):
             f = ev["obj"]
             flight_id = f.id
             date = ev["date"]
-    
+
             # Roles
-            is_pilot      = (f.pilot_id      == member.id)
+            is_pilot = (f.pilot_id == member.id)
             is_instructor = (f.instructor_id == member.id)
-            is_passenger  = (f.passenger_id  == member.id)
+            is_passenger = (f.passenger_id == member.id)
 
             # Always initialize report_id
             report_id = None
- 
+
             # 5a) Flight #: increment for pilot OR instructor
             if is_pilot or is_instructor:
                 flight_no += 1
-    
+
             # Raw minutes
-            dur_m   = int(f.duration.total_seconds()//60) if f.duration else 0
-            dual_m  = solo_m = pic_m = inst_m = 0
+            dur_m = int(f.duration.total_seconds()//60) if f.duration else 0
+            dual_m = solo_m = pic_m = inst_m = 0
             comments = ""
-    
+
             # 5b) Pilot logic: instruction received vs lesson codes
             if is_pilot:
                 if f.instructor:
@@ -1114,7 +1135,7 @@ def member_logbook(request):
                         pic_m += dur_m
                     else:
                         dual_m += dur_m
-    
+
                     # Look up the instructor report
                     rpt = InstructionReport.objects.filter(
                         student=member,
@@ -1123,21 +1144,22 @@ def member_logbook(request):
                     ).first()
 
                     if rpt:
-                        codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
-                        comments    = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
-                        report_id   = rpt.id
+                        codes = [
+                            ls.lesson.code for ls in rpt.lesson_scores.all()]
+                        comments = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
+                        report_id = rpt.id
                     else:
-                        comments  = "instruction received"
+                        comments = "instruction received"
                         report_id = None
                 else:
                     # Solo flight
                     solo_m += dur_m
-                    pic_m  += dur_m
+                    pic_m += dur_m
                     if f.passenger:
-                        comments = f"{f.passenger.full_display_name}" 
+                        comments = f"{f.passenger.full_display_name}"
                     elif f.passenger_name:
                         comments = f"{f.passenger_name}"
-    
+
             # 6) Passenger logic: show "Pilot (You)"
             elif is_passenger:
                 comments = f"{f.pilot.full_display_name} (<i>{member.full_display_name}</i>)"
@@ -1145,7 +1167,7 @@ def member_logbook(request):
             # 7) Instructor logic: inst_given + PIC
             elif is_instructor:
                 inst_m += dur_m
-                pic_m  += dur_m
+                pic_m += dur_m
                 student = f.pilot or f.passenger
                 if student:
                     comments = student.full_display_name
@@ -1155,12 +1177,12 @@ def member_logbook(request):
                 "flight_id":      flight_id,
                 "date":           date,
                 "flight_no":      flight_no if (is_pilot or is_instructor) else "",
-                "model":          f.glider.model    if f.glider else "",
+                "model":          f.glider.model if f.glider else "",
                 "n_number":       f.glider.n_number if f.glider else "Private",
                 "is_passenger":   is_passenger,
-                "A":              (1 if f.launch_method=="tow"   else 0) if not is_passenger else 0,
-                "G":              (1 if f.launch_method=="winch" else 0) if not is_passenger else 0,
-                "S":              (1 if f.launch_method=="self"  else 0) if not is_passenger else 0,
+                "A":              (1 if f.launch_method == "tow" else 0) if not is_passenger else 0,
+                "G":              (1 if f.launch_method == "winch" else 0) if not is_passenger else 0,
+                "S":              (1 if f.launch_method == "self" else 0) if not is_passenger else 0,
                 "release":        f.release_altitude or "",
                 "maxh":           "",  # always blank
                 "airfield":       f.airfield.identifier if f.airfield else "",
@@ -1172,7 +1194,7 @@ def member_logbook(request):
                 "total":          format_hhmm(timedelta(minutes=dur_m)),
                 # raw-minute keys for page/run totals
                 "ground_inst_m":  0,
-                "dual_received_m":dual_m if not is_passenger else 0,
+                "dual_received_m": dual_m if not is_passenger else 0,
                 "solo_m":         solo_m if not is_passenger else 0,
                 "pic_m":          pic_m if not is_passenger else 0,
                 "inst_given_m":   inst_m if not is_passenger else 0,
@@ -1186,7 +1208,7 @@ def member_logbook(request):
         else:  # ground instruction
             g = ev["obj"]
             gm = int(g.duration.total_seconds()//60) if g.duration else 0
-                # build the lesson list + instructor tag
+            # build the lesson list + instructor tag
             codes = [ls.lesson.code for ls in g.lesson_scores.all()]
             comments = ", ".join(codes)
             if g.instructor:
@@ -1225,32 +1247,32 @@ def member_logbook(request):
     # 8) Paginate into 10-row pages with per-page totals
     pages = []
     cumulative_m = {k: 0 for k in (
-        'ground_inst_m','dual_received_m','solo_m','pic_m','inst_given_m','total_m','A','G','S'
+        'ground_inst_m', 'dual_received_m', 'solo_m', 'pic_m', 'inst_given_m', 'total_m', 'A', 'G', 'S'
     )}
-    
+
     for idx in range(0, len(rows), 10):
         chunk = rows[idx:idx+10]
-    
+
         # filter out passenger‐only rows once
         non_passenger = [r for r in chunk if not r['is_passenger']]
-    
+
         # now sum across that filtered list
         sums_m = {
-            'ground_inst_m':   sum(r['ground_inst_m']   for r in non_passenger),
+            'ground_inst_m':   sum(r['ground_inst_m'] for r in non_passenger),
             'dual_received_m': sum(r['dual_received_m'] for r in non_passenger),
-            'solo_m':          sum(r['solo_m']          for r in non_passenger),
-            'pic_m':           sum(r['pic_m']           for r in non_passenger),
-            'inst_given_m':    sum(r['inst_given_m']    for r in non_passenger),
-            'total_m':         sum(r['total_m']         for r in non_passenger),
-            'A':               sum(r['A']               for r in non_passenger),
-            'G':               sum(r['G']               for r in non_passenger),
-            'S':               sum(r['S']               for r in non_passenger),
+            'solo_m':          sum(r['solo_m'] for r in non_passenger),
+            'pic_m':           sum(r['pic_m'] for r in non_passenger),
+            'inst_given_m':    sum(r['inst_given_m'] for r in non_passenger),
+            'total_m':         sum(r['total_m'] for r in non_passenger),
+            'A':               sum(r['A'] for r in non_passenger),
+            'G':               sum(r['G'] for r in non_passenger),
+            'S':               sum(r['S'] for r in non_passenger),
         }
-    
+
         # update running raw‐minute totals
         for k, v in sums_m.items():
             cumulative_m[k] += v
-    
+
         # format for display…
         sums = {
             'ground_inst':   format_hhmm(timedelta(minutes=sums_m['ground_inst_m'])),
@@ -1263,7 +1285,7 @@ def member_logbook(request):
             'G':             sums_m['G'],
             'S':             sums_m['S'],
         }
-    
+
         cumulative = {
             'ground_inst':   format_hhmm(timedelta(minutes=cumulative_m['ground_inst_m'])),
             'dual_received': format_hhmm(timedelta(minutes=cumulative_m['dual_received_m'])),
@@ -1294,7 +1316,7 @@ def member_logbook(request):
 # - threshold_scores: list of score strings to include
 # - requirement_check: callable(lesson) -> bool
 ####################################################
- 
+
 def _build_signoff_records(student, threshold_scores, requirement_check):
     records = []
 
@@ -1366,12 +1388,13 @@ def _build_signoff_records(student, threshold_scores, requirement_check):
 # - member_id: PK of the student Member
 ####################################################
 
+
 @active_member_required
 def needed_for_solo(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
 
     # Solo standard is score of 3 or 4
-    threshold = ['3','4']
+    threshold = ['3', '4']
     records = _build_signoff_records(
         student,
         threshold_scores=threshold,
@@ -1395,6 +1418,7 @@ def needed_for_solo(request, member_id):
 # - member_id: PK of the student Member
 ####################################################
 
+
 @active_member_required
 def needed_for_checkride(request, member_id):
     student = get_object_or_404(Member, pk=member_id)
@@ -1408,9 +1432,9 @@ def needed_for_checkride(request, member_id):
     )
 
     # 2) Compute the 2-calendar-month window
-    today          = date.today()
+    today = date.today()
     first_of_month = today.replace(day=1)
-    window_start   = first_of_month - relativedelta(months=2)
+    window_start = first_of_month - relativedelta(months=2)
 
     # 3) Fetch all this student's glider flights
     flights = Flight.objects.filter(pilot=student)
@@ -1426,9 +1450,9 @@ def needed_for_checkride(request, member_id):
     total_flights = flights.count()
 
     # 5) Solo flights/hours
-    solo_qs         = flights.filter(instructor__isnull=True)
-    solo_flights   = solo_qs.count()
-    solo_hours     = sum(
+    solo_qs = flights.filter(instructor__isnull=True)
+    solo_flights = solo_qs.count()
+    solo_hours = sum(
         ((datetime.combine(f.logsheet.log_date, f.landing_time)
           - datetime.combine(f.logsheet.log_date, f.launch_time))
          .total_seconds() / 3600.0)
@@ -1441,16 +1465,16 @@ def needed_for_checkride(request, member_id):
         instructor__isnull=False,
         logsheet__log_date__gte=window_start
     )
-    
-    instr_recent        = instr_qs.count()
+
+    instr_recent = instr_qs.count()
     # Grab the distinct dates, newest first
-    instr_recent_dates  = list(
+    instr_recent_dates = list(
         instr_qs
         .order_by('-logsheet__log_date')
         .values_list('logsheet__log_date', flat=True)
         .distinct()
     )
-    
+
     # 7) Decide which block applies
     Metrics = namedtuple('Metrics', [
         'block',          # 'A' for <40h, 'B' for ≥40h
@@ -1504,7 +1528,6 @@ def needed_for_checkride(request, member_id):
             required=required
         )
 
-
     return render(request, 'instructors/needed_for_checkride.html', {
         'student':        student,
         'records':        records,
@@ -1538,24 +1561,23 @@ def instruction_report_detail(request, report_id):
     })
 
 
-
 @method_decorator(instructor_required, name='dispatch')
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
-    form_class    = TestBuilderForm
+    form_class = TestBuilderForm
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
         preset_key = self.request.GET.get('preset')
         if preset_key:
-            kw['preset'] = PRESETS.get(preset_key.upper())
+            kw['preset'] = get_presets.get(preset_key.upper())
         else:
             kw['preset'] = None
         return kw
 
     def get_context_data(self, **ctx):
         ctx = super().get_context_data(**ctx)
-        ctx['presets'] = PRESETS.keys()
+        ctx['presets'] = get_presets.keys()
         return ctx
 
     def form_valid(self, form):
@@ -1619,16 +1641,3 @@ class CreateWrittenTestView(FormView):
 
         # 5. Redirect to the quiz start
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
-
-class TestBuilderForm(forms.Form):
-    pass_percentage = forms.DecimalField(
-        max_digits=5, decimal_places=2,
-        initial=100,
-        help_text="Minimum % score required to pass"
-    )
-
-    student = forms.ModelChoiceField(
-        queryset=Member.objects.filter(is_active=True),
-        help_text="Who should take this test",
-        widget=forms.Select(attrs={'class':'form-select'})
-    )

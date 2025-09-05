@@ -1,6 +1,6 @@
 from datetime import timedelta
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, User
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.timezone import now
@@ -15,10 +15,13 @@ from django.db import transaction
 def biography_upload_path(instance, filename):
     return f'biography/{instance.member.username}/{filename}'
 
+
 class Biography(models.Model):
-    member = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    member = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     content = HTMLField(blank=True, null=True)
-    uploaded_image = models.ImageField(upload_to=biography_upload_path, blank=True, null=True)
+    uploaded_image = models.ImageField(
+        upload_to=biography_upload_path, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -85,17 +88,18 @@ class Member(AbstractUser):
     )
 
     NAME_SUFFIX_CHOICES = [
-    ('', '—'),  # blank default
-    ('Jr.', 'Jr.'),
-    ('Sr.', 'Sr.'),
-    ('II', 'II'),
-    ('III', 'III'),
-    ('IV', 'IV'),
-    ('V', 'V'),
+        ('', '—'),  # blank default
+        ('Jr.', 'Jr.'),
+        ('Sr.', 'Sr.'),
+        ('II', 'II'),
+        ('III', 'III'),
+        ('IV', 'IV'),
+        ('V', 'V'),
     ]
 
     # Additional name-related fields
-
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='member_profile', null=True, blank=True)
     middle_initial = models.CharField(max_length=2, blank=True, null=True)
     nickname = models.CharField(max_length=50, blank=True, null=True)
     name_suffix = models.CharField(
@@ -106,12 +110,15 @@ class Member(AbstractUser):
     )
 
     # Additional contact information fields
- 
-    SSA_member_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
-    legacy_username = models.CharField(max_length=50, unique=True, blank=True, null=True)
+
+    SSA_member_number = models.CharField(
+        max_length=20, unique=True, blank=True, null=True)
+    legacy_username = models.CharField(
+        max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     mobile_phone = models.CharField(max_length=20, blank=True, null=True)
-    country = models.CharField(max_length=2, blank=True, null=True, default='US')
+    country = models.CharField(
+        max_length=2, blank=True, null=True, default='US')
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=50, blank=True, null=True)
     state_code = models.CharField(
@@ -122,7 +129,8 @@ class Member(AbstractUser):
     )
     state_freeform = models.CharField(max_length=50, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
-    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    profile_photo = models.ImageField(
+        upload_to='profile_photos/', blank=True, null=True)
     GLIDER_RATING_CHOICES = [
         ('none', 'None'),
         ('student', 'Student'),
@@ -151,8 +159,8 @@ class Member(AbstractUser):
     public_notes = HTMLField(blank=True, null=True)
     private_notes = HTMLField(blank=True, null=True)
 
-    last_updated_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)
-
+    last_updated_by = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True)
 
     @property
     def profile_image_url(self):
@@ -168,9 +176,9 @@ class Member(AbstractUser):
     ##################################
     # full_display_name
     #
-    # Return the member's display name for UI usage. 
-    # If a nickname exists, use it in place of the first name. 
-    # Example: 'Sam Gilbert' instead of 'Bret "Sam" Gilbert' 
+    # Return the member's display name for UI usage.
+    # If a nickname exists, use it in place of the first name.
+    # Example: 'Sam Gilbert' instead of 'Bret "Sam" Gilbert'
     #
     @property
     def full_display_name(self):
@@ -218,8 +226,12 @@ class Member(AbstractUser):
 
     def save(self, *args, **kwargs):
         # 1) pre-save flags
-        self.is_staff = self.instructor or self.member_manager
-    
+        # Always allow superusers to access admin
+        if self.is_superuser:
+            self.is_staff = True
+        else:
+            self.is_staff = self.instructor or self.member_manager
+
         # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
             filename = f"profile_{self.username}.png"
@@ -227,18 +239,18 @@ class Member(AbstractUser):
             if not os.path.exists(os.path.join('media', file_path)):
                 generate_identicon(self.username, file_path)
             self.profile_photo = file_path
-    
+
         # 3) persist first – get a PK
         super().save(*args, **kwargs)
-    
+
         # 4) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
 
-
     ##################################
-    #  def __str__ 
+    #  def __str__
     # Returns a readable name for the member, (the full display name)
-    # Used in admin dropdowns and member selectors. 
+    # Used in admin dropdowns and member selectors.
+
     def __str__(self):
         return self.full_display_name
 
@@ -256,14 +268,15 @@ class Member(AbstractUser):
 
 # Used in a many-to-many relationship with members through MemberBadge.
 
+
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='badge_images/', blank=True, null=True)
     description = HTMLField(blank=True)
-    order = models.PositiveIntegerField(default=0) 
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order'] 
+        ordering = ['order']
 
     def __str__(self):
         return self.name
@@ -279,8 +292,10 @@ class Badge(models.Model):
 # - date_awarded: optional date of award
 # - notes: optional comment for internal use
 
+
 class MemberBadge(models.Model):
-    member = models.ForeignKey('Member', on_delete=models.CASCADE, related_name='badges')
+    member = models.ForeignKey(
+        'Member', on_delete=models.CASCADE, related_name='badges')
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     date_awarded = models.DateField()
     notes = models.TextField(blank=True)
@@ -290,4 +305,3 @@ class MemberBadge(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
-    

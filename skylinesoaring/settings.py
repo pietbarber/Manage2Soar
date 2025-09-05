@@ -10,9 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+from django.conf.urls.static import static
+from django.conf import settings
+from django.shortcuts import redirect
+from django.contrib.messages import constants as messages
+from django.contrib.auth.decorators import login_required
+from dotenv import load_dotenv
+import os
 from pathlib import Path
 
-from django.shortcuts import redirect
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,19 +26,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static", 
+    BASE_DIR / "static",
 ]
-
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# That's why we put it in .env and .env is in .gitignore ! 
+# That's why we put it in .env and .env is in .gitignore !
 
-import os
-from dotenv import load_dotenv
 load_dotenv()
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
@@ -92,11 +95,11 @@ MIDDLEWARE = [
 
 ]
 
-from django.contrib.auth.decorators import login_required
 
 LOGIN_REQUIRED_MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 )
+
 
 def login_required_middleware(get_response):
     def middleware(request):
@@ -105,8 +108,9 @@ def login_required_middleware(get_response):
         return get_response(request)
     return middleware
 
+
 ROOT_URLCONF = "skylinesoaring.urls"
-DEFAULT_AIRFIELD_ID = 1 
+DEFAULT_AIRFIELD_ID = 1
 
 TEMPLATES = [
     {
@@ -153,25 +157,33 @@ DATABASES = {
 }
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_KEY")
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET")
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv(
+    "SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET")
 
 SOCIAL_AUTH_PIPELINE = (
     # Standard steps
-    'social_core.pipeline.social_auth.social_details',         # Get user details from provider
+    # Get user details from provider
+    'social_core.pipeline.social_auth.social_details',
     'social_core.pipeline.social_auth.social_uid',             # Get provider UID
-    'social_core.pipeline.social_auth.auth_allowed',           # Check if auth is allowed
-    'social_core.pipeline.social_auth.social_user',            # Try to find existing social user
+    # Check if auth is allowed
+    'social_core.pipeline.social_auth.auth_allowed',
+    # Try to find existing social user
+    'social_core.pipeline.social_auth.social_user',
 
     # 🔁 NEW: Associate by email if not linked yet (password-first → OAuth2)
     'social_core.pipeline.social_auth.associate_by_email',
 
     # 🛠️ Custom steps — insert after association
     'members.pipeline.debug_pipeline_data',                    # Log details
-    'members.pipeline.create_username',                        # Create proper username format
-    'social_core.pipeline.user.get_username',                  # Default username getter
-    'social_core.pipeline.user.create_user',                   # Create user if not found
+    # Create proper username format
+    'members.pipeline.create_username',
+    # Default username getter
+    'social_core.pipeline.user.get_username',
+    # Create user if not found
+    'social_core.pipeline.user.create_user',
     'members.pipeline.set_default_membership_status',          # Set membership status
-    'members.pipeline.fetch_google_profile_picture',           # Fetch profile picture from Google
+    # Fetch profile picture from Google
+    'members.pipeline.fetch_google_profile_picture',
 
     # Standard steps to finalize
     'social_core.pipeline.social_auth.associate_user',         # Link social to user
@@ -180,12 +192,9 @@ SOCIAL_AUTH_PIPELINE = (
 )
 
 
-from django.contrib.messages import constants as messages
-
 MESSAGE_TAGS = {
     messages.ERROR: "danger",  # maps Django "error" to Bootstrap "danger"
 }
-
 
 
 # Password validation
@@ -212,7 +221,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-#TIME_ZONE = "UTC"
+# TIME_ZONE = "UTC"
 TIME_ZONE = "America/New_York"
 USE_TZ = True
 
@@ -243,7 +252,7 @@ DEBUG = True
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     SITE_URL = "http://127.0.0.1:8000"
-else: 
+else:
     SITE_URL = "https://members.skylinesoaring.org"
 
 DEFAULT_FROM_EMAIL = "noreply@skylinesoaring.org"
@@ -253,9 +262,6 @@ EMAIL_SUBJECT_PREFIX = "[Skyline] "
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-
-from django.conf import settings
-from django.conf.urls.static import static
 
 LOGGING = {
     'version': 1,
@@ -300,4 +306,3 @@ TINYMCE_DEFAULT_CONFIG = {
         "tableinsertcolbefore tableinsertcolafter tabledeletecol"
     ),
 }
-
