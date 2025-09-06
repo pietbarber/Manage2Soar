@@ -1272,7 +1272,7 @@ def member_logbook(request):
     # 8) Extract year information for navigation
     years = []
     year_page_map = {}  # Maps year to page index where that year starts
-    
+
     if rows:
         current_year = None
         for idx, row in enumerate(rows):
@@ -1294,13 +1294,11 @@ def member_logbook(request):
         chunk = rows[idx:idx+10]
         page_number = idx // 10
 
-        # Check if this page starts a new year and mark it
+        # Always set year_start for every page
         year_start = None
         if chunk:
             first_row_year = chunk[0]['date'].year
-            # If this is the first page with this year, mark it
-            if year_page_map.get(first_row_year) == page_number:
-                year_start = first_row_year
+            year_start = first_row_year
 
         # filter out passenger‐only rows once
         non_passenger = [r for r in chunk if not r['is_passenger']]
@@ -1347,12 +1345,21 @@ def member_logbook(request):
             'S':             cumulative_m['S'],
         }
         pages.append({
-            'rows': chunk, 
-            'sums': sums, 
+            'rows': chunk,
+            'sums': sums,
             'cumulative': cumulative,
             'year_start': year_start,
             'page_number': page_number
         })
+
+    # Annotate first page for each year for template anchors
+    years_seen = set()
+    for page in pages:
+        if page.get('year_start') and page['year_start'] not in years_seen:
+            page['is_first_for_year'] = True
+            years_seen.add(page['year_start'])
+        else:
+            page['is_first_for_year'] = False
 
     return render(request, "instructors/logbook.html", {
         "member": member,

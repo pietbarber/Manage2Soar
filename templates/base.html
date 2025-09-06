@@ -5,6 +5,8 @@
 <html lang="en">
 
 <head>
+  <link href="{% static 'css/logbook.css' %}" rel="stylesheet">
+  {% block head_extra %}{% endblock %}
 
   <meta charset="UTF-8">
   <title>{% block title %}Skyline Soaring{% endblock %}</title>
