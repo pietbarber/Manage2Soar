@@ -1233,6 +1233,11 @@ def glider_logbook(request, pk: int):
         deadlines_by_day=deadlines_by_day,
     )
 
+    # Add initial_hours to every day's cumulative hours
+    if daily and hasattr(glider, 'initial_hours'):
+        for r in daily:
+            r["cum_hours"] = round(
+                float(r["cum_hours"]) + float(glider.initial_hours), 1)
     context = {
         "object": glider,
         "object_type": "glider",
@@ -1275,6 +1280,11 @@ def towplane_logbook(request, pk: int):
         deadlines_by_day={},  # or a towplane deadline helper if you add one
     )
 
+    # Add initial_hours to every day's cumulative hours
+    if daily and hasattr(towplane, 'initial_hours'):
+        for r in daily:
+            r["cum_hours"] = round(
+                float(r["cum_hours"]) + float(towplane.initial_hours), 1)
     context = {
         "object": towplane,
         "object_type": "towplane",
