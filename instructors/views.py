@@ -1269,7 +1269,22 @@ def member_logbook(request):
             }
             rows.append(row)
 
-    # 8) Paginate into 10-row pages with per-page totals
+    # 8) Extract year information for navigation
+    years = []
+    year_page_map = {}  # Maps year to page index where that year starts
+    
+    if rows:
+        current_year = None
+        for idx, row in enumerate(rows):
+            row_year = row['date'].year
+            if row_year != current_year:
+                current_year = row_year
+                years.append(row_year)
+                # Calculate which page this year starts on (0-indexed)
+                page_idx = idx // 10
+                year_page_map[row_year] = page_idx
+
+    # 9) Paginate into 10-row pages with per-page totals
     pages = []
     cumulative_m = {k: 0 for k in (
         'ground_inst_m', 'dual_received_m', 'solo_m', 'pic_m', 'inst_given_m', 'total_m', 'A', 'G', 'S'
@@ -1277,6 +1292,15 @@ def member_logbook(request):
 
     for idx in range(0, len(rows), 10):
         chunk = rows[idx:idx+10]
+        page_number = idx // 10
+
+        # Check if this page starts a new year and mark it
+        year_start = None
+        if chunk:
+            first_row_year = chunk[0]['date'].year
+            # If this is the first page with this year, mark it
+            if year_page_map.get(first_row_year) == page_number:
+                year_start = first_row_year
 
         # filter out passenger‐only rows once
         non_passenger = [r for r in chunk if not r['is_passenger']]
@@ -1322,11 +1346,19 @@ def member_logbook(request):
             'G':             cumulative_m['G'],
             'S':             cumulative_m['S'],
         }
-        pages.append({'rows': chunk, 'sums': sums, 'cumulative': cumulative})
+        pages.append({
+            'rows': chunk, 
+            'sums': sums, 
+            'cumulative': cumulative,
+            'year_start': year_start,
+            'page_number': page_number
+        })
 
     return render(request, "instructors/logbook.html", {
         "member": member,
         "pages": pages,
+        "years": years,
+        "year_page_map": year_page_map,
     })
 
 
