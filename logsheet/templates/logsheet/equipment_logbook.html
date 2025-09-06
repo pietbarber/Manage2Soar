@@ -2,6 +2,7 @@
 {% load humanize %}
 
 {% block content %}
+
 <div id="top"></div>
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -11,11 +12,16 @@
     </div>
 
     {% if year_nav %}
-    <div class="mt-2 mb-3 small text-muted">
-        Jump to year:
-        {% for y in year_nav %}
-        <a href="#{{ y.anchor }}" class="me-2">{{ y.year }}</a>
-        {% endfor %}
+    <div class="year-navigation">
+        <h5 class="mb-3">📅 Jump to Year:</h5>
+        <div class="year-links">
+            {% for y in year_nav %}
+            <a href="#{{ y.anchor }}" class="year-link">{{ y.year }}</a>
+            {% endfor %}
+        </div>
+        <small class="text-muted mt-2 d-block">
+            Click on any year to jump to that section. Years with no flights are not shown.
+        </small>
     </div>
     {% endif %}
 
