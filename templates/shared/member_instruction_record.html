@@ -141,110 +141,80 @@
   {% endif %}
   {% endwith %}
 
+  {% comment %}
+  Instruction records grouped by date, starting at line 148.
+  Requires: daily_blocks in context (see view patch).
+  {% endcomment %}
 
-
-
-  {% for block in report_blocks %}
-  <div id="flight-{{ block.report.report_date|date:" Y-m-d" }}" class="card mb-4">
-
+  {% for day in daily_blocks %}
+  <div class="card mb-4">
     <div class="card-header">
-      {% if block.type == "flight" %}
-      ✈️ Flight Instruction - {{ block.report.report_date }} ({{ block.days_ago }} days ago)
-      {% else %}
-      📝 Ground Instruction - {{ block.report.date }} ({{ block.days_ago }} days ago)
-      {% endif %}
+      <strong>{{ day.date|date:"l, F j, Y" }}</strong>
+      ({{ day.blocks.0.days_ago }} days ago)
     </div>
     <div class="card-body">
-
-
-      {# mini progress bars #}
+      {# Mini progress bars for the first block of the day #}
+      {% with block=day.blocks.0 %}
       {% if member.glider_rating != 'private' and member.glider_rating != 'commercial' %}
-      <td style="min-width:160px;">
+      <div style="min-width:160px;">
         <div class="progress mb-1" style="--pct: {{ block.solo_pct }}%; height:1em; max-width:300px;">
           <div class="progress-bar bg-success" style="width: var(--pct);"></div>
           <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
         </div>
-
         <div class="progress" style="--pct: {{ block.rating_pct }}%; height:1em; max-width:300px;">
           <div class="progress-bar bg-success" style="width: var(--pct);"></div>
           <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
         </div>
-      </td>
+      </div>
       {% endif %}
+      {% endwith %}
 
+      {# Flights table for all blocks that have flights #}
 
-
-
-      {% if block.flights %}
       <h5>🛫 Flights</h5>
-      <ul class="list-group mb-3">
-        {% for flight in block.flights %}
-        <li class="list-group-item">
-          <strong>Glider:</strong> {{ flight.glider.n_number }} –
-          <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
-          <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
-          <strong>Duration:</strong> {{ flight.duration|default:"?" }}
-        </li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-
-      {% if block.scores_by_code %}
-      <h5>🎯 Performance Results</h5>
-      {% for score, codes in block.scores_by_code.items %}
-      {% if codes %}
-      <p>
-        <strong>
-          {% if score == "1" %}Introduced:
-          {% elif score == "2" %}Practiced:
-          {% elif score == "3" %}Solo Proficient:
-          {% elif score == "4" %}Checkride Standard:
-          {% elif score == "!" %}Critical Issue:
-          {% else %}{{ score }}:
+      <table class="table table-sm table-bordered mb-3">
+        <thead class="table-primary">
+          <tr>
+            <th>Glider</th>
+            <th>Instructor</th>
+            <th>Release Altitude</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for block in day.blocks %}
+          {% if block.flights %}
+          {% for flight in block.flights %}
+          <tr>
+            <td>{{ flight.glider.n_number }}</td>
+            <td>{{ flight.instructor.full_display_name }}</td>
+            <td>{{ flight.release_altitude|default:"?" }} ft</td>
+            <td>{{ flight.duration|default:"?" }}</td>
+          </tr>
+          {% endfor %}
           {% endif %}
-        </strong>
-        {% for code in codes %}
-        <a href="{% url 'public_syllabus_detail' code %}" class="lesson-code-tooltip" data-bs-toggle="tooltip"
-          data-bs-placement="top" title="{{ lesson_titles|dict_get:code }}">{{ code }}</a>
-        {% if not forloop.last %}, {% endif %}
-        {% endfor %}
-      </p>
-      {% endif %}
-      {% endfor %}
-      {% elif block.type == "ground" %}
-      <p class="text-muted"><em>No performance scores recorded for this ground session.</em></p>
-      {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
 
+      {# Essays for all blocks that have them #}
+      {% for block in day.blocks %}
       {% if block.report.report_text %}
       <h5>📝 Instructor Essay</h5>
-      <div class="border p-3 bg-white card-body">
+      <div class="border p-3 bg-white card-body mb-2">
         {{ block.report.report_text|safe }}
       </div>
       {% elif block.report.notes %}
       <h5>📝 Notes</h5>
-      <div class="border p-3 bg-white card-body">
+      <div class="border p-3 bg-white card-body mb-2">
         {{ block.report.notes|safe }}
       </div>
-      {% elif block.type == "ground" %}
-      <p class="text-muted"><em>No notes provided for this ground session.</em></p>
       {% endif %}
-
-    </div>
-
-    <div class="card-footer text-muted small">
-      Submitted by {{ block.report.instructor.full_display_name }}.
-      {% if block.type == "flight" %}
-      Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
-      {% if block.report.updated_at %}
-      – Updated {{ block.report.updated_at|date:"Y-m-d H:i:s" }}
-      {% endif %}
-      {% else %}
-      {% if block.report.created_at %}
-      Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
-      {% endif %}
-      {% endif %}
+      {% endfor %}
     </div>
   </div>
+  {% endfor %}
+
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -254,5 +224,4 @@
       });
     });
   </script>
-  {% endfor %}
   {% endblock %}

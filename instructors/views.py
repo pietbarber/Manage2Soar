@@ -980,10 +980,24 @@ def member_instruction_record(request, member_id):
         reverse=True,
     )
 
+    # Group blocks by date for template
+    from collections import OrderedDict
+    daily_blocks = OrderedDict()
+    for block in blocks:
+        date_key = block["report"].report_date if block["type"] == "flight" else block["report"].date
+        if date_key not in daily_blocks:
+            daily_blocks[date_key] = []
+        daily_blocks[date_key].append(block)
+    daily_blocks = [
+        {"date": date, "blocks": blist}
+        for date, blist in daily_blocks.items()
+    ]
+
     return render(request, "shared/member_instruction_record.html", {
         "member": member,
         "flights_summary": flights_summary,
-        "report_blocks": blocks,
+        "report_blocks": blocks,  # for summary/progress alert logic
+        "daily_blocks": daily_blocks,  # for grouped display
         "chart_dates":     chart_dates,
         "chart_solo":      chart_solo,
         "chart_rating":    chart_rating,
