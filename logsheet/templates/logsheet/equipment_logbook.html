@@ -2,6 +2,7 @@
 {% load humanize %}
 
 {% block content %}
+<div id="top"></div>
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center">
         <h2 class="mb-0">
@@ -94,4 +95,10 @@
         </table>
     </div>
 </div>
+<!-- Back to Top Button -->
+<button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"
+    title="Back to Top">
+    ↑
+</button>
+
 {% endblock %}

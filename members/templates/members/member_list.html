@@ -4,88 +4,99 @@
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
+<div id="top"></div>
 <h2 class="mb-4 d-flex justify-content-between align-items-center">
-    Club Members
-    {% if user.is_staff %}
-        <a href="/admin/members/member/add/" class="btn btn-success btn-sm">➕ Add New Member</a>
-    {% endif %}
+  Club Members
+  {% if user.is_staff %}
+  <a href="/admin/members/member/add/" class="btn btn-success btn-sm">➕ Add New Member</a>
+  {% endif %}
 </h2>
 {% duty_emoji_legend %}
 <form method="get">
-    <label><input type="checkbox" name="status" value="active" checked> Active ✅</label>
-    <label><input type="checkbox" name="status" value="pending"> Pending ⏳</label>
-    <label><input type="checkbox" name="status" value="inactive"> Inactive 💤</label>
-    <label><input type="checkbox" name="status" value="nonmember"> Non-member 🚫</label>
-    <br> 
-    <label><input type="checkbox" name="role" value="towpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}> 🛩️ Tow Pilot</label>
-    <label><input type="checkbox" name="role" value="instructor" {% if 'instructor' in selected_roles %}checked{% endif %}> 🎓 Instructor</label>
-    <label><input type="checkbox" name="role" value="director" {% if 'director' in selected_roles %}checked{% endif %}> 🎩 Director</label>
-    <label><input type="checkbox" name="role" value="dutyofficer" {% if 'duty_officer' in selected_roles %}checked{% endif %}> 📋 Duty Officer</label>
+  <label><input type="checkbox" name="status" value="active" checked> Active ✅</label>
+  <label><input type="checkbox" name="status" value="pending"> Pending ⏳</label>
+  <label><input type="checkbox" name="status" value="inactive"> Inactive 💤</label>
+  <label><input type="checkbox" name="status" value="nonmember"> Non-member 🚫</label>
+  <br>
+  <label><input type="checkbox" name="role" value="towpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}>
+    🛩️ Tow Pilot</label>
+  <label><input type="checkbox" name="role" value="instructor" {% if 'instructor' in selected_roles %}checked{% endif
+      %}> 🎓 Instructor</label>
+  <label><input type="checkbox" name="role" value="director" {% if 'director' in selected_roles %}checked{% endif %}> 🎩
+    Director</label>
+  <label><input type="checkbox" name="role" value="dutyofficer" {% if 'duty_officer' in selected_roles %}checked{% endif
+      %}> 📋 Duty Officer</label>
 
-    <button type="submit">Filter</button>
-  </form>
+  <button type="submit">Filter</button>
+</form>
 <table class="table table-bordered table-hover table-striped">
-    <thead class="table-light">
-        <tr>
-            <th>Photo</th>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Duties</th>
-            <th>Email</th>
-            <th>View
-            </th>
-        </tr>
-        </tr>
-    </thead>
-    <tbody>
-        {% for member in members %}
-        <tr>
-            <td>
-                {% if member.profile_photo %}
-                  <img src="{{ member.profile_photo.url }}" alt="Profile photo" height="60" class="rounded-circle me-2">
-                {% else %}
-                  <img src="{% static 'images/default-avatar-100px.png' %}" height="60" class="rounded-circle me-2">
-                {% endif %}
-            </td>
-            </td>
-            <td>{{ member.full_display_name }}{% if member.biography %} 📔{% endif %}</td>
+  <thead class="table-light">
+    <tr>
+      <th>Photo</th>
+      <th>Name</th>
+      <th>Phone</th>
+      <th>Duties</th>
+      <th>Email</th>
+      <th>View
+      </th>
+    </tr>
+    </tr>
+  </thead>
+  <tbody>
+    {% for member in members %}
+    <tr>
+      <td>
+        {% if member.profile_photo %}
+        <img src="{{ member.profile_photo.url }}" alt="Profile photo" height="60" class="rounded-circle me-2">
+        {% else %}
+        <img src="{% static 'images/default-avatar-100px.png' %}" height="60" class="rounded-circle me-2">
+        {% endif %}
+      </td>
+      </td>
+      <td>{{ member.full_display_name }}{% if member.biography %} 📔{% endif %}</td>
 
-            <td>
-                {% if member.phone and member.phone == member.mobile_phone %}
-                  📞📱 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
-                {% else %}
-                  {% if member.phone %}📞 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>{% endif %}
-                  {% if member.mobile_phone %}
-                    <br>📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
-                  {% endif %}
-                {% endif %}
-            <td class="text-center">
-                {{ member|render_duties|safe }}
-            </td>
-            <td>
-                <a href="mailto:{{ member.email }}">{{ member.email }}</a>
-            </td>
-            <td>
-                <a href="{% url 'members:member_view' member.id %}" class="btn btn-outline-primary btn-sm">View</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
+      <td>
+        {% if member.phone and member.phone == member.mobile_phone %}
+        📞📱 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
+        {% else %}
+        {% if member.phone %}📞 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>{% endif %}
+        {% if member.mobile_phone %}
+        <br>📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
+        {% endif %}
+        {% endif %}
+      <td class="text-center">
+        {{ member|render_duties|safe }}
+      </td>
+      <td>
+        <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+      </td>
+      <td>
+        <a href="{% url 'members:member_view' member.id %}" class="btn btn-outline-primary btn-sm">View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 
 {% with request.GET.urlencode as query_string %}
-  <div class="pagination">
-    {% if page_obj.has_previous %}
-      <a href="?{{ query_string }}&page={{ page_obj.previous_page_number }}">« Prev</a>
-    {% endif %}
+<div class="pagination">
+  {% if page_obj.has_previous %}
+  <a href="?{{ query_string }}&page={{ page_obj.previous_page_number }}">« Prev</a>
+  {% endif %}
 
-    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
 
-    {% if page_obj.has_next %}
-      <a href="?{{ query_string }}&page={{ page_obj.next_page_number }}">Next »</a>
-    {% endif %}
-  </div>
+  {% if page_obj.has_next %}
+  <a href="?{{ query_string }}&page={{ page_obj.next_page_number }}">Next »</a>
+  {% endif %}
+</div>
 {% endwith %}
 
+
+<!-- Back to Top Button -->
+<button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"
+  title="Back to Top">
+  ↑
+</button>
 
 {% endblock %}

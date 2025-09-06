@@ -2,6 +2,7 @@
 {% load static %}
 {% load dict_extras %}
 {% block content %}
+<div id="top"></div>
 <h2>Instruction Record for {{ member.full_display_name }}</h2>
 <div id="charts-container" data-dates='{{ chart_dates_json|safe }}' data-solo='{{ chart_solo_json|safe }}'
   data-rating='{{ chart_rating_json|safe }}' data-anchors='{{ chart_anchors_json|safe }}'
@@ -224,4 +225,11 @@
       });
     });
   </script>
+
+  <!-- Back to Top Button -->
+  <button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"
+    title="Back to Top">
+    ↑
+  </button>
+
   {% endblock %}
