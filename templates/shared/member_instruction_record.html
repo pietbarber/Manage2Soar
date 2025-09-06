@@ -1,253 +1,258 @@
 {% extends "base.html" %}
 {% load static %}
+{% load dict_extras %}
 {% block content %}
 <h2>Instruction Record for {{ member.full_display_name }}</h2>
-<div id="charts-container"
-     data-dates='{{ chart_dates_json|safe }}'
-     data-solo='{{ chart_solo_json|safe }}'
-     data-rating='{{ chart_rating_json|safe }}'
-     data-anchors='{{ chart_anchors_json|safe }}'
-     data-firstsolo="{{ first_solo_str }}"
-     style="overflow-x:auto; margin-bottom:2rem;"
->
-<div style="width:100%; overflow-x:auto; margin-bottom:1rem;">
-  <div id="solo_chart"   style="height:150px; width:100%;"></div>
-</div>
-<div style="width:100%; overflow-x:auto; margin-bottom:2rem;">
-  <div id="rating_chart" style="height:150px; width:100%;"></div>
-</div>
+<div id="charts-container" data-dates='{{ chart_dates_json|safe }}' data-solo='{{ chart_solo_json|safe }}'
+  data-rating='{{ chart_rating_json|safe }}' data-anchors='{{ chart_anchors_json|safe }}'
+  data-firstsolo="{{ first_solo_str }}" style="overflow-x:auto; margin-bottom:2rem;">
+  <div style="width:100%; overflow-x:auto; margin-bottom:1rem;">
+    <div id="solo_chart" style="height:150px; width:100%;"></div>
+  </div>
+  <div style="width:100%; overflow-x:auto; margin-bottom:2rem;">
+    <div id="rating_chart" style="height:150px; width:100%;"></div>
+  </div>
 
 
 
-<script src="https://www.gstatic.com/charts/loader.js"></script>
-<script src="{% static 'js/instruction_charts.js' %}"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="{% static 'js/instruction_charts.js' %}"></script>
 
-<!-- Badges -->
-{# — Badges Earned — #}
-{% if member.badges.all %}
+  <!-- Badges -->
+  {# — Badges Earned — #}
+  {% if member.badges.all %}
   <h5>Badges:</h5>
   <div class="mb-3">
     {% for mb in member.badges.all %}
-      {% if mb.badge.image %}
-        <img src="{{ mb.badge.image.url }}"
-             alt="{{ mb.badge.name }}"
-             title="{{ mb.badge.name }}"
-             class="me-2"
-             style="height:2rem; width:auto;"
-             data-bs-toggle="tooltip"
-             data-bs-placement="top" />
-      {% else %}
-        <span class="badge bg-secondary me-1"
-              data-bs-toggle="tooltip"
-              data-bs-placement="top"
-              title="{{ mb.badge.name }}">
-          {{ mb.badge.name }}
-        </span>
-      {% endif %}
+    {% if mb.badge.image %}
+    <img src="{{ mb.badge.image.url }}" alt="{{ mb.badge.name }}" title="{{ mb.badge.name }}" class="me-2"
+      style="height:2rem; width:auto;" data-bs-toggle="tooltip" data-bs-placement="top" />
+    {% else %}
+    <span class="badge bg-secondary me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ mb.badge.name }}">
+      {{ mb.badge.name }}
+    </span>
+    {% endif %}
     {% endfor %}
   </div>
-{% endif %}
+  {% endif %}
 
-<!-- Qualifications Summary -->
-{% with qs=member.memberqualification_set.all %}
+  <!-- Qualifications Summary -->
+  {% with qs=member.memberqualification_set.all %}
   {% if qs %}
-    <h5>Qualifications:</h5>
-    <div class="mb-4">
-      {% for mq in qs %}
-        {% with q=mq.qualification %}
-          {% if q.icon %}
-            <img src="{{ q.icon.url }}"
-                 alt="{{ q.name }}"
-                 title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}"
-                 class="me-2"
-                 style="height:2rem; width:auto;"
-                 data-bs-toggle="tooltip"
-                 data-bs-placement="top" />
-          {% else %}
-            <span class="badge bg-info text-dark me-1"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}">
-              {{ q.code }}
-            </span>
-          {% endif %}
-        {% endwith %}
-      {% endfor %}
-    </div>
-  {% endif %}
-{% endwith %}
-
-<!-- Flying Summary -->
-<h3>Flying Summary:</h3>
-<table class="table table-sm table-bordered mb-4">
-  <thead class="table-dark">
-    <tr>
-      <th rowspan="2">Glider</th>
-      <th colspan="3">Solo Flights</th>
-      <th colspan="3">With Instructor</th>
-      <th colspan="3">Instruction Given</th>
-      <th colspan="3">Total Flights</th>
-    </tr>
-    <tr>
-      <th>#</th><th>Time</th><th>Last Flight</th>
-      <th>#</th><th>Time</th><th>Last Flight</th>
-      <th>#</th><th>Time</th><th>Last Flight</th>
-      <th>#</th><th>Time</th><th>Last Flight</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for s in flights_summary %}
-    <tr class="{% if forloop.last %}table-secondary fw-bold{% endif %}">
-      <td>{{ s.n_number }}</td>
-      <td class="text-end">{{ s.solo_count }}</td>
-      <td class="text-end">{{ s.solo_time }}</td>
-      <td class="text-end">{{ s.solo_last|default_if_none:"" }}</td>
-
-      <td class="text-end">{{ s.with_count }}</td>
-      <td class="text-end">{{ s.with_time }}</td>
-      <td class="text-end">{{ s.with_last|default_if_none:"" }}</td>
-
-      <td class="text-end">{{ s.given_count }}</td>
-      <td class="text-end">{{ s.given_time }}</td>
-      <td class="text-end">{{ s.given_last|default_if_none:"" }}</td>
-
-      <td class="text-end">{{ s.total_count }}</td>
-      <td class="text-end">{{ s.total_time }}</td>
-      <td class="text-end">{{ s.total_last|default_if_none:"" }}</td>
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="13" class="text-center">No flights on record</td>
-    </tr>
+  <h5>Qualifications:</h5>
+  <div class="mb-4">
+    {% for mq in qs %}
+    {% with q=mq.qualification %}
+    {% if q.icon %}
+    <img src="{{ q.icon.url }}" alt="{{ q.name }}"
+      title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}" class="me-2"
+      style="height:2rem; width:auto;" data-bs-toggle="tooltip" data-bs-placement="top" />
+    {% else %}
+    <span class="badge bg-info text-dark me-1" data-bs-toggle="tooltip" data-bs-placement="top"
+      title="{{ q.name }}{% if mq.expiration_date %} (exp. {{ mq.expiration_date }}){% endif %}">
+      {{ q.code }}
+    </span>
+    {% endif %}
+    {% endwith %}
     {% endfor %}
-  </tbody>
-</table>
-
-
-{% for block in report_blocks %}
-  {% if block.type == "flight" %}
-    <div id="flight-{{ block.report.report_date|date:"Y-m-d" }}" class="card mb-4">
-  {% else %}
-    <div id="ground-{{ block.report.date|date:"Y-m-d" }}" class="card mb-4">
+  </div>
   {% endif %}
+  {% endwith %}
 
-      <div class="card-header">
-        {% if block.type == "flight" %}
-          ✈️ Flight Instruction - {{ block.report.report_date }} ({{ block.days_ago }} days ago)
-        {% else %}
-          📝 Ground Instruction - {{ block.report.date }} ({{ block.days_ago }} days ago)
-        {% endif %}
-      </div>
+  <!-- Flying Summary -->
+  <h3>Flying Summary:</h3>
+  <table class="table table-sm table-bordered mb-4">
+    <thead class="table-dark">
+      <tr>
+        <th rowspan="2">Glider</th>
+        <th colspan="3">Solo Flights</th>
+        <th colspan="3">With Instructor</th>
+        <th colspan="3">Instruction Given</th>
+        <th colspan="3">Total Flights</th>
+      </tr>
+      <tr>
+        <th>#</th>
+        <th>Time</th>
+        <th>Last Flight</th>
+        <th>#</th>
+        <th>Time</th>
+        <th>Last Flight</th>
+        <th>#</th>
+        <th>Time</th>
+        <th>Last Flight</th>
+        <th>#</th>
+        <th>Time</th>
+        <th>Last Flight</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in flights_summary %}
+      <tr class="{% if forloop.last %}table-secondary fw-bold{% endif %}">
+        <td>{{ s.n_number }}</td>
+        <td class="text-end">{{ s.solo_count }}</td>
+        <td class="text-end">{{ s.solo_time }}</td>
+        <td class="text-end">{{ s.solo_last|default_if_none:"" }}</td>
+
+        <td class="text-end">{{ s.with_count }}</td>
+        <td class="text-end">{{ s.with_time }}</td>
+        <td class="text-end">{{ s.with_last|default_if_none:"" }}</td>
+
+        <td class="text-end">{{ s.given_count }}</td>
+        <td class="text-end">{{ s.given_time }}</td>
+        <td class="text-end">{{ s.given_last|default_if_none:"" }}</td>
+
+        <td class="text-end">{{ s.total_count }}</td>
+        <td class="text-end">{{ s.total_time }}</td>
+        <td class="text-end">{{ s.total_last|default_if_none:"" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="13" class="text-center">No flights on record</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {# --- Show 'still needs' for the most recent report block only --- #}
+  {% with latest_block=report_blocks.0 %}
+  {% if latest_block.missing_solo or latest_block.missing_rating %}
+  <div class="alert alert-warning mb-4">
+    {% if latest_block.missing_solo %}
+    <p class="mb-1">
+      Solo progress: still needs a (3) or (4) in
+      {% for lesson in latest_block.missing_solo %}
+      <a href="{% url 'public_syllabus_detail' lesson.code %}" class="lesson-code-tooltip" data-bs-toggle="tooltip"
+        data-bs-placement="top" title="{{ lesson_titles|dict_get:lesson.code }}">{{ lesson.code }}</a>
+      {% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+    {% endif %}
+    {% if latest_block.missing_rating %}
+    <p class="mb-0">
+      Rating progress: still needs a (4) in
+      {% for lesson in latest_block.missing_rating %}
+      <a href="{% url 'public_syllabus_detail' lesson.code %}" class="lesson-code-tooltip" data-bs-toggle="tooltip"
+        data-bs-placement="top" title="{{ lesson_titles|dict_get:lesson.code }}">{{ lesson.code }}</a>
+      {% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+
+
+
+  {% for block in report_blocks %}
+  <div id="flight-{{ block.report.report_date|date:" Y-m-d" }}" class="card mb-4">
+
+    <div class="card-header">
+      {% if block.type == "flight" %}
+      ✈️ Flight Instruction - {{ block.report.report_date }} ({{ block.days_ago }} days ago)
+      {% else %}
+      📝 Ground Instruction - {{ block.report.date }} ({{ block.days_ago }} days ago)
+      {% endif %}
+    </div>
     <div class="card-body">
 
 
       {# mini progress bars #}
       {% if member.glider_rating != 'private' and member.glider_rating != 'commercial' %}
-        <td style="min-width:160px;">
-          <div class="progress mb-1"
-               style="--pct: {{ block.solo_pct }}%; height:1em; max-width:300px;">
-            <div class="progress-bar bg-success" style="width: var(--pct);"></div>
-            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
-          </div>
-      
-          <div class="progress"
-               style="--pct: {{ block.rating_pct }}%; height:1em; max-width:300px;">
-            <div class="progress-bar bg-success" style="width: var(--pct);"></div>
-            <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
-          </div>
-        </td>
-      {% endif %}
-       
+      <td style="min-width:160px;">
+        <div class="progress mb-1" style="--pct: {{ block.solo_pct }}%; height:1em; max-width:300px;">
+          <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+          <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+        </div>
 
-      {# “still needs…” messages #}
-      {% if member.glider_rating != 'private' and member.glider_rating != 'commercial' %}
+        <div class="progress" style="--pct: {{ block.rating_pct }}%; height:1em; max-width:300px;">
+          <div class="progress-bar bg-success" style="width: var(--pct);"></div>
+          <div class="progress-bar bg-secondary" style="width: calc(100% - var(--pct));"></div>
+        </div>
+      </td>
+      {% endif %}
 
-      {% if block.missing_solo %}
-        <p class="mb-1">
-          Solo progress: still needs a (3) or (4) in
-          {% for lesson in block.missing_solo %}
-            <a href="{% url 'public_syllabus_detail' lesson.code %}">{{ lesson.code }}</a>{% if not forloop.last %},{% endif %}
-          {% endfor %}
-        </p>
-      {% endif %}
-      {% if block.missing_rating %}
-        <p class="mb-3">
-          Rating progress: still needs a (4) in
-          {% for lesson in block.missing_rating %}
-            <a href="{% url 'public_syllabus_detail' lesson.code %}">{{ lesson.code }}</a>{% if not forloop.last %},{% endif %}
-          {% endfor %}
-        </p>
-      {% endif %}
-      {% endif %}
-    
 
 
 
       {% if block.flights %}
-        <h5>🛫 Flights</h5>
-        <ul class="list-group mb-3">
-          {% for flight in block.flights %}
-            <li class="list-group-item">
-              <strong>Glider:</strong> {{ flight.glider.n_number }} –
-              <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
-              <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
-              <strong>Duration:</strong> {{ flight.duration|default:"?" }}
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    
-      {% if block.scores_by_code %}
-        <h5>🎯 Performance Results</h5>
-        {% for score, codes in block.scores_by_code.items %}
-          {% if codes %}
-            <p>
-              <strong>
-                {% if score == "1" %}Introduced:
-                {% elif score == "2" %}Practiced:
-                {% elif score == "3" %}Solo Proficient:
-                {% elif score == "4" %}Checkride Standard:
-                {% elif score == "!" %}Critical Issue:
-                {% else %}{{ score }}:
-                {% endif %}
-              </strong>
-              {{ codes|join:", " }}
-            </p>
-          {% endif %}
+      <h5>🛫 Flights</h5>
+      <ul class="list-group mb-3">
+        {% for flight in block.flights %}
+        <li class="list-group-item">
+          <strong>Glider:</strong> {{ flight.glider.n_number }} –
+          <strong>Instructor:</strong> {{ flight.instructor.full_display_name }} –
+          <strong>Release Altitude:</strong> {{ flight.release_altitude|default:"?" }} ft –
+          <strong>Duration:</strong> {{ flight.duration|default:"?" }}
+        </li>
         {% endfor %}
-      {% elif block.type == "ground" %}
-        <p class="text-muted"><em>No performance scores recorded for this ground session.</em></p>
+      </ul>
       {% endif %}
-    
+
+      {% if block.scores_by_code %}
+      <h5>🎯 Performance Results</h5>
+      {% for score, codes in block.scores_by_code.items %}
+      {% if codes %}
+      <p>
+        <strong>
+          {% if score == "1" %}Introduced:
+          {% elif score == "2" %}Practiced:
+          {% elif score == "3" %}Solo Proficient:
+          {% elif score == "4" %}Checkride Standard:
+          {% elif score == "!" %}Critical Issue:
+          {% else %}{{ score }}:
+          {% endif %}
+        </strong>
+        {% for code in codes %}
+        <a href="{% url 'public_syllabus_detail' code %}" class="lesson-code-tooltip" data-bs-toggle="tooltip"
+          data-bs-placement="top" title="{{ lesson_titles|dict_get:code }}">{{ code }}</a>
+        {% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </p>
+      {% endif %}
+      {% endfor %}
+      {% elif block.type == "ground" %}
+      <p class="text-muted"><em>No performance scores recorded for this ground session.</em></p>
+      {% endif %}
+
       {% if block.report.report_text %}
-        <h5>📝 Instructor Essay</h5>
-        <div class="border p-3 bg-white card-body">
-          {{ block.report.report_text|safe }}
-        </div>
+      <h5>📝 Instructor Essay</h5>
+      <div class="border p-3 bg-white card-body">
+        {{ block.report.report_text|safe }}
+      </div>
       {% elif block.report.notes %}
-        <h5>📝 Notes</h5>
-        <div class="border p-3 bg-white card-body">
-          {{ block.report.notes|safe }}
-        </div>
+      <h5>📝 Notes</h5>
+      <div class="border p-3 bg-white card-body">
+        {{ block.report.notes|safe }}
+      </div>
       {% elif block.type == "ground" %}
-        <p class="text-muted"><em>No notes provided for this ground session.</em></p>
+      <p class="text-muted"><em>No notes provided for this ground session.</em></p>
       {% endif %}
-    
+
     </div>
-    
+
     <div class="card-footer text-muted small">
       Submitted by {{ block.report.instructor.full_display_name }}.
       {% if block.type == "flight" %}
-        Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
-        {% if block.report.updated_at %}
-          – Updated {{ block.report.updated_at|date:"Y-m-d H:i:s" }}
-        {% endif %}
+      Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
+      {% if block.report.updated_at %}
+      – Updated {{ block.report.updated_at|date:"Y-m-d H:i:s" }}
+      {% endif %}
       {% else %}
-        {% if block.report.created_at %}
-          Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
-        {% endif %}
+      {% if block.report.created_at %}
+      Created on {{ block.report.created_at|date:"Y-m-d H:i:s" }}
+      {% endif %}
       {% endif %}
     </div>
   </div>
-{% endfor %}
-{% endblock %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('.lesson-code-tooltip'));
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    });
+  </script>
+  {% endfor %}
+  {% endblock %}

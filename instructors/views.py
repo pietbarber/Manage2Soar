@@ -28,6 +28,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 
+from collections import defaultdict
 from instructors.decorators import member_or_instructor_required, instructor_required
 from instructors.forms import (
     InstructionReportForm, LessonScoreSimpleForm,
@@ -720,6 +721,9 @@ def edit_syllabus_document(request, slug):
 ####################################################
 
 def member_instruction_record(request, member_id):
+    # Build a mapping of lesson code to lesson title for tooltips
+    lesson_titles = {
+        lesson.code: lesson.title for lesson in TrainingLesson.objects.all()}
     member = get_object_or_404(
         Member.objects
               .prefetch_related(
@@ -892,6 +896,10 @@ def member_instruction_record(request, member_id):
         missing_rating = TrainingLesson.objects.filter(
             id__in=rating_ids - rating_done).order_by("code")
 
+        # Group lesson codes by score for this report
+        scores_by_code = defaultdict(list)
+        for s in report.lesson_scores.all():
+            scores_by_code[str(s.score)].append(s.lesson.code)
         blocks.append({
             "type":           "flight",
             "report":         report,
@@ -901,8 +909,7 @@ def member_instruction_record(request, member_id):
                 pilot=report.student,
                 logsheet__log_date=d
             ),
-            # your existing logic
-            "scores_by_code": {str(s.score): [] for s in report.lesson_scores.all()},
+            "scores_by_code": dict(scores_by_code),
             "solo_pct":       solo_pct,
             "rating_pct":     rating_pct,
             "missing_solo":   missing_solo,
@@ -952,12 +959,16 @@ def member_instruction_record(request, member_id):
         missing_rating = TrainingLesson.objects.filter(
             id__in=rating_ids - rating_done).order_by("code")
 
+        # Group lesson codes by score for this ground session
+        scores_by_code = defaultdict(list)
+        for s in session.lesson_scores.all():
+            scores_by_code[str(s.score)].append(s.lesson.code)
         blocks.append({
             "type":           "ground",
             "report":         session,
             "days_ago":       (timezone.now().date() - d).days,
             "flights":        None,
-            "scores_by_code": {str(s.score): [] for s in session.lesson_scores.all()},
+            "scores_by_code": dict(scores_by_code),
             "solo_pct":       solo_pct,
             "rating_pct":     rating_pct,
             "missing_solo":   missing_solo,
@@ -982,7 +993,7 @@ def member_instruction_record(request, member_id):
         "chart_solo_json":    json.dumps(chart_solo),
         "chart_rating_json":  json.dumps(chart_rating),
         "chart_anchors_json": json.dumps(chart_anchors),
-
+        "lesson_titles": lesson_titles,
     })
 
 ####################################################
