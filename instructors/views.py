@@ -1177,8 +1177,9 @@ def member_logbook(request):
                         comments = "instruction received"
                         report_id = None
                 else:
-                    # Solo flight
-                    solo_m += dur_m
+                    # Solo flight (only if no passenger)
+                    if not f.passenger and not f.passenger_name:
+                        solo_m += dur_m
                     pic_m += dur_m
                     if f.passenger:
                         comments = f"{f.passenger.full_display_name}"
