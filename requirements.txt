@@ -12,3 +12,4 @@ pydenticon
 django-reversion
 pytest-django
 django-htmx
+pytz
