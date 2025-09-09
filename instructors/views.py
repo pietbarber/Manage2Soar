@@ -1,5 +1,6 @@
 
 
+from django.views import View as DjangoView
 import itertools
 import json
 from collections import namedtuple, OrderedDict
@@ -1696,11 +1697,13 @@ class CreateWrittenTestView(FormView):
                 created_by=self.request.user
             )
 
-        WrittenTestAssignment.objects.create(
-            template=tmpl,
-            student=data['student'],
-            instructor=self.request.user
-        )
+        # Only assign the test if the student is not the instructor
+        if data['student'] != self.request.user:
+            WrittenTestAssignment.objects.create(
+                template=tmpl,
+                student=data['student'],
+                instructor=self.request.user
+            )
 
         order = 1
         # 3. First, include forced questions
@@ -1729,5 +1732,23 @@ class CreateWrittenTestView(FormView):
                 )
                 order += 1
 
-        # 5. Redirect to the quiz start
-        return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
+        # 5. Redirect to the instructor review page
+        return redirect(reverse('knowledgetest:quiz-review', args=[tmpl.pk, data['student'].pk]))
+
+
+# Instructor test review page (not for taking the test)
+
+
+class WrittenTestReviewView(DjangoView):
+    template_name = "written_test/review.html"
+
+    def get(self, request, pk, student_pk):
+        from knowledgetest.models import WrittenTestTemplate, Question, Member
+        tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
+        student = get_object_or_404(Member, pk=student_pk)
+        questions = tmpl.questions.all()
+        return render(request, self.template_name, {
+            'template': tmpl,
+            'student': student,
+            'questions': questions,
+        })

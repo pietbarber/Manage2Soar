@@ -7,6 +7,7 @@
 {% endfor %}
 {% endif %}
 
+
 <div class="container py-4">
   <h2>Create a Written Test</h2>
   <p>Sample Test Question Selections:
@@ -14,6 +15,20 @@
     <a href="?preset={{ p }}" class="btn btn-sm btn-outline-secondary">{{ p }}</a>
     {% endfor %}
   </p>
+
+  {# Instructor-specific dialog at the top #}
+  {% if form.student.value and form.description.value %}
+  <div class="alert alert-info">
+    <strong>Here is the test you are generating for {{ form.student.field.queryset.get(pk=form.student.value)
+      }}.</strong><br>
+    <span class="text-muted">Description:</span> <em>{{ form.description.value }}</em><br>
+    Here are the questions for you to review.
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    Fill out the form below to generate a test for a student. You'll see a preview here before assigning.
+  </div>
+  {% endif %}
 
   <form method="post">
     {% csrf_token %}
@@ -78,7 +93,9 @@
       <tfoot>
         <tr>
           <td colspan="3">
-            <button type="submit" class="btn btn-primary">Create Test</button>
+            <button type="submit" class="btn btn-primary">
+              Create Test
+            </button>
           </td>
         </tr>
       </tfoot>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title">Test Review: {{ template.name }}</h2>
+            {% if template.description %}
+            <p class="lead">{{ template.description }}</p>
+            {% endif %}
+            <p class="text-muted">Created for {{ student }} by {{ template.created_by }}
+                on {{ template.created_at|date:"M j, Y" }}</p>
+            <hr>
+            <h5>Questions:</h5>
+            <ol>
+                {% for q in questions %}
+                <li>
+                    <div><strong>{{ q.question_text|safe }}</strong></div>
+                    <ul>
+                        <li>A. {{ q.option_a|safe }}</li>
+                        <li>B. {{ q.option_b|safe }}</li>
+                        <li>C. {{ q.option_c|safe }}</li>
+                        <li>D. {{ q.option_d|safe }}</li>
+                    </ul>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}
