@@ -1691,10 +1691,10 @@ class CreateWrittenTestView(FormView):
         with transaction.atomic():
             tmpl = WrittenTestTemplate.objects.create(
                 name=f"Test by {self.request.user} on {timezone.now().date()}",
+                description=data.get('description', ''),
                 pass_percentage=data['pass_percentage'],
                 created_by=self.request.user
             )
-        print("📝 Debug: creating assignment for student:", data.get('student'))
 
         WrittenTestAssignment.objects.create(
             template=tmpl,

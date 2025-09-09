@@ -2,16 +2,16 @@
 {% block content %}
 
 {% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-  {% endfor %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}">{{ message }}</div>
+{% endfor %}
 {% endif %}
 
 <div class="container py-4">
   <h2>Create a Written Test</h2>
   <p>Sample Test Question Selections:
     {% for p in presets %}
-      <a href="?preset={{ p }}" class="btn btn-sm btn-outline-secondary">{{ p }}</a>
+    <a href="?preset={{ p }}" class="btn btn-sm btn-outline-secondary">{{ p }}</a>
     {% endfor %}
   </p>
 
@@ -19,27 +19,36 @@
     {% csrf_token %}
 
     <div class="mb-4">
-      {{ form.student.label_tag }}  
+      {{ form.student.label_tag }}
       {{ form.student }}
       {% for error in form.student.errors %}
       <div class="invalid-feedback d-block">{{ error }}</div>
       {% endfor %}
-
       {% if form.student.help_text %}
-        <small class="form-text text-muted">{{ form.student.help_text }}</small>
+      <small class="form-text text-muted">{{ form.student.help_text }}</small>
       {% endif %}
     </div>
     <div class="mb-4">
       {{ form.pass_percentage.label_tag }}
       {{ form.pass_percentage }}
       {% for err in form.pass_percentage.errors %}
-        <div class="invalid-feedback d-block">{{ err }}</div>
+      <div class="invalid-feedback d-block">{{ err }}</div>
       {% endfor %}
       {% if form.pass_percentage.help_text %}
-        <small class="form-text text-muted">{{ form.pass_percentage.help_text }}</small>
+      <small class="form-text text-muted">{{ form.pass_percentage.help_text }}</small>
       {% endif %}
     </div>
-    
+    <div class="mb-4">
+      {{ form.description.label_tag }}
+      {{ form.description }}
+      {% for err in form.description.errors %}
+      <div class="invalid-feedback d-block">{{ err }}</div>
+      {% endfor %}
+      {% if form.description.help_text %}
+      <small class="form-text text-muted">{{ form.description.help_text }}</small>
+      {% endif %}
+    </div>
+
 
     <table class="table table-bordered">
       <thead>
@@ -53,15 +62,15 @@
 
         {% for field in form %}
         {% if field.name|slice:":7" == "weight_" %}
-          <tr>
-            <td>{{ field.label }}</td>
-            <td>{{ field.field.max_value }}</td>
-            <td>{{ field }}</td>
-          </tr>
+        <tr>
+          <td>{{ field.label }}</td>
+          <td>{{ field.field.max_value }}</td>
+          <td>{{ field }}</td>
+        </tr>
         {% endif %}
         {% endfor %}
-      
-       <tr>
+
+        <tr>
           <td colspan="2">Optional: Must include Q-numbers</td>
           <td>{{ form.must_include }}</td>
         </tr>
@@ -76,7 +85,7 @@
     </table>
 
     {% if form.non_field_errors %}
-      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
     {% endif %}
   </form>
 </div>

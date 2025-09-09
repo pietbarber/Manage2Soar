@@ -115,6 +115,9 @@ class CreateWrittenTestView(FormView):
         ctx['presets'] = presets.keys()
         return ctx
 
+    def form_invalid(self, form):
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         data = form.cleaned_data
         # 1. Pull weights & must_include
@@ -161,10 +164,10 @@ class CreateWrittenTestView(FormView):
         with transaction.atomic():
             tmpl = WrittenTestTemplate.objects.create(
                 name=f"Test by {self.request.user} on {timezone.now().date()}",
+                description=data.get('description', ''),
                 pass_percentage=data['pass_percentage'],
                 created_by=self.request.user
             )
-        print("📝 Debug: creating assignment for student:", data.get('student'))
 
         WrittenTestAssignment.objects.create(
             template=tmpl,

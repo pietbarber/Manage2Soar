@@ -1,14 +1,33 @@
-{% for asn in assignments %}
-  <div class="card mb-3">
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Pending Written Tests</h2>
+  {% if assignments %}
+  <div class="alert alert-info mb-4">
+    <strong>You have written test(s) assigned to you.</strong> Please review the details and click <b>Start Test</b>
+    when you are ready. You must complete each test in one sitting.
+  </div>
+  {% for asn in assignments %}
+  <div class="card mb-4 shadow-sm">
     <div class="card-body">
-      <strong>{{ asn.template.name }}</strong>
-      assigned on {{ asn.assigned_at|date:"M j, Y" }} by {{ asn.instructor }}
-      <a href="{% url 'knowledgetest:quiz-start' asn.template.pk %}"
-         class="btn btn-sm btn-primary float-end">
-        Start Test
+      <h4 class="card-title mb-1">{{ asn.template.name }}</h4>
+      {% if asn.template.description %}
+      <div class="mb-2">
+        <span class="badge bg-info text-dark">Test Title</span>
+        <span class="fw-semibold ms-2">{{ asn.template.description }}</span>
+      </div>
+      {% endif %}
+      <div class="mb-2 text-muted small">
+        Assigned on {{ asn.assigned_at|date:"M j, Y" }} by {{ asn.instructor }}
+      </div>
+      <a href="{% url 'knowledgetest:quiz-start' asn.template.pk %}" class="btn btn-primary">
+        Start Test{% if asn.template.description %}: {{ asn.template.description|truncatechars:40 }}{% endif %}
       </a>
     </div>
   </div>
-{% empty %}
-  <p>No tests pending. 🎉</p>
-{% endfor %}
+  {% endfor %}
+  {% else %}
+  <div class="alert alert-success">No tests pending. 🎉</div>
+  {% endif %}
+</div>
+{% endblock %}

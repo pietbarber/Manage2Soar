@@ -2,27 +2,37 @@
 {% load static %}
 
 {% block content %}
+
 <div class="container py-4">
-  <h2>{{ template.name }}</h2>
-  <p>{{ template.description }}</p>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="card-title">{{ template.name }}</h2>
+      {% if template.description %}
+      <p class="lead">{{ template.description }}</p>
+      {% endif %}
+      <p class="text-muted">Assigned by {{ template.created_by }} on {{ template.created_at|date:"M j, Y" }}</p>
+      <hr>
+      <p>When you are ready, click <strong>Start Test</strong> below. You must complete the test in one sitting.</p>
+    </div>
+  </div>
 
   {% if form and form.non_field_errors %}
-    <div class="alert alert-danger">
-      {{ form.non_field_errors }}
-    </div>
+  <div class="alert alert-danger">
+    {{ form.non_field_errors }}
+  </div>
   {% endif %}
 
   <form id="quiz-form" action="{{ submit_url }}" method="post">
     {% csrf_token %}
     {% if form %}{{ form.answers }}{% endif %}
     <input type="hidden" id="answers-input" name="answers" />
-  
+
     {# Now we embed a pure JSON array, not a quoted string #}
     {{ questions|json_script:"questions-data" }}
     <div id="quiz-root"></div>
     <button type="submit" class="btn btn-primary">Submit Test</button>
   </form>
-   
+
 </div>
 
 <!-- React bundle for quiz.js -->

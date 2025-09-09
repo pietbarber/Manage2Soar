@@ -26,6 +26,13 @@ class TestSubmissionForm(forms.Form):
 
 
 class TestBuilderForm(forms.Form):
+    description = forms.CharField(
+        label="Test Description",
+        widget=forms.Textarea(attrs={'rows': 2, 'class': 'form-control mb-3',
+                              'placeholder': 'e.g. ASK-21 test, Pre-solo written, Duty Officer Responsibilities, etc.'}),
+        required=False,
+        help_text="A short description or title for this test."
+    )
     student = forms.ModelChoiceField(
         queryset=Member.objects.filter(is_active=True)
                                .order_by('last_name', 'first_name'),
@@ -72,7 +79,7 @@ class TestBuilderForm(forms.Form):
         from collections import OrderedDict
         ordered_fields = OrderedDict()
         # static order first
-        for name in ['student', 'pass_percentage', 'must_include']:
+        for name in ['student', 'pass_percentage', 'description', 'must_include']:
             ordered_fields[name] = self.fields.pop(name)
         # then all weight_ fields in sorted order
         weight_keys = sorted(k for k in self.fields if k.startswith('weight_'))
