@@ -127,10 +127,35 @@ class CreateWrittenTestView(FormView):
             for code in QuestionCategory.objects.values_list('code', flat=True)
             if data[f'weight_{code}'] > 0
         }
+
         total = sum(weights.values())
-        if total > 50:
-            form.add_error(None, "Cannot select more than 50 questions total.")
-            return self.form_invalid(form)
+        MAX_QUESTIONS = 50
+        import random
+        # If too many, randomly select down to 50 (must-includes always included)
+        if total + len(must) > MAX_QUESTIONS:
+            # Remove duplicates in must
+            must = list(dict.fromkeys(must))
+            if len(must) >= MAX_QUESTIONS:
+                must = must[:MAX_QUESTIONS]
+                weights = {}
+            else:
+                # Build a pool of all possible (non-must) questions
+                pool = []
+                for code, cnt in weights.items():
+                    pool.extend(list(
+                        Question.objects.filter(
+                            category__code=code).exclude(qnum__in=must)
+                    ) * cnt)
+                # Remove duplicates and already-included
+                pool = list({q.qnum: q for q in pool}.values())
+                needed = MAX_QUESTIONS - len(must)
+                chosen = random.sample(pool, min(needed, len(pool)))
+                # Overwrite weights to only include chosen
+                weights = {}
+                for q in chosen:
+                    weights.setdefault(q.category.code, 0)
+                    weights[q.category.code] += 1
+                # Now must is capped, and weights is capped
 
         # 2. Build a template
         with transaction.atomic():
