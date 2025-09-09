@@ -68,8 +68,8 @@
         </li>
         {% endif %}
         <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br>
-          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }} {% endif
-          %} {{ member.zip_code }}<br>
+          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
+          {% endif %} {{ member.zip_code }}<br>
           {{ member.country }}
         </li>
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li>
@@ -77,8 +77,10 @@
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
         {% if request.user == member %}
-        <li class="list-group-item"><strong>User Name:</strong> {{ member.username }}</li>
-        <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3">Set Password</a>
+        <li class="list-group-item">
+          <strong>User Name:</strong> {{ member.username }}
+          <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3 ms-3">Set Password</a>
+        </li>
         {% endif %}
         <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}
         </li>
