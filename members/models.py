@@ -113,6 +113,8 @@ class Member(AbstractUser):
 
     SSA_member_number = models.CharField(
         max_length=20, unique=True, blank=True, null=True)
+    ssa_url = models.URLField(
+        max_length=300, blank=True, null=True, help_text="Direct link to this member's SSA page for badges and achievements.")
     legacy_username = models.CharField(
         max_length=50, unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)

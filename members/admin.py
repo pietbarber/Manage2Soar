@@ -177,7 +177,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         )}),
         ("Other Info", {"fields": (
             "address", "city", "state_code", "state_freeform", "zip_code", "country",
-            "SSA_member_number", "glider_rating", "private_notes", "public_notes"
+            "SSA_member_number", "ssa_url", "glider_rating", "private_notes", "public_notes"
         )}),
         ("Permissions", {"fields": (
             "is_active", "is_staff", "is_superuser", "groups", "user_permissions"

@@ -7,24 +7,21 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
     {% if request.user.rostermeister or request.user.is_staff %}
-      <a 
-        href="{% url 'admin:members_member_change' member.id %}" 
-        class="btn btn-success btn-sm"
-      >
-        Edit this member
-      </a>
+    <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-success btn-sm">
+      Edit this member
+    </a>
     {% endif %}
   </div>
 
   <div class="row">
     <div class="col-md-4">
       {% if member.profile_photo %}
-        <img src="{{ member.profile_photo.url }}" class="img-thumbnail" alt="Profile Photo">
+      <img src="{{ member.profile_photo.url }}" class="img-thumbnail" alt="Profile Photo">
       {% else %}
-        <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
+      <img src="{% static 'images/default-avatar-large.png' %}" class="img-thumbnail" alt="Default Avatar">
       {% endif %}
       {% if is_self %}
       <h5>Update Profile Photo</h5>
@@ -36,36 +33,46 @@
       {% endif %}
       <br><br>
       <h5>Contact Card QR Code</h5>
-      <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width: 200px;">
+      <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail"
+        style="max-width: 200px;">
     </div>
-  
+
     <div class="col-md-8">
       <ul class="list-group">
-       <li class="list-group-item">
-            <strong>Email:</strong>
-            {% if member.email and "@" in member.email %}
-              <a href="mailto:{{ member.email }}">{{ member.email }}</a>
-            {% else %}
-              {{ member.email }}
-            {% endif %}
+        {% if member.ssa_url %}
+        <li class="list-group-item">
+          <strong>SSA Badges at SSA.org:</strong>
+          <a href="{{ member.ssa_url }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm ms-2">
+            View at SSA &rarr;
+          </a>
+        </li>
+        {% endif %}
+        <li class="list-group-item">
+          <strong>Email:</strong>
+          {% if member.email and "@" in member.email %}
+          <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+          {% else %}
+          {{ member.email }}
+          {% endif %}
         </li>
         {% if member.phone %}
         <li class="list-group-item">
-            <strong>Phone:</strong>
-              📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
+          <strong>Phone:</strong>
+          📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
         </li>
         {% endif %}
         {% if member.mobile_phone %}
         <li class="list-group-item">
-            <strong>Mobile:</strong>
-              📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
+          <strong>Mobile:</strong>
+          📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
         </li>
         {% endif %}
-        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br> 
-          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }} {% endif %} {{ member.zip_code }}<br>
+        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br>
+          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }} {% endif
+          %} {{ member.zip_code }}<br>
           {{ member.country }}
         </li>
-        <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li> 
+        <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li>
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
@@ -73,159 +80,168 @@
         <li class="list-group-item"><strong>User Name:</strong> {{ member.username }}</li>
         <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3">Set Password</a>
         {% endif %}
-        <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}</li>
+        <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}
+        </li>
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
 
       {% if request.user == member or request.user.instructor %}
-        {% if show_need_buttons %}
-          {% if not member.solo_date %}
-            <a class="btn btn-warning" href="{% url 'instructors:needed_for_solo' member.id %}">
-              What's still needed to solo?
-            </a>
-          {% endif %}
-        {% if not member.checkride_date %}
-          <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
-            What's still needed for checkride?
-          </a>
-        {% endif %}
+      {% if show_need_buttons %}
+      {% if not member.solo_date %}
+      <a class="btn btn-warning" href="{% url 'instructors:needed_for_solo' member.id %}">
+        What's still needed to solo?
+      </a>
+      {% endif %}
+      {% if not member.checkride_date %}
+      <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
+        What's still needed for checkride?
+      </a>
+      {% endif %}
       {% endif %}
 
       <div class="mt-3">
-      <a href="{% if request.user.instructor %}
+        <a href="{% if request.user.instructor %}
                   {% url 'instructors:member_training_grid' member.id %}
                {% else %}
                   {% url 'members:training_progress' %}
-               {% endif %}"
-         class="btn btn-outline-primary btn-sm my-2">
-        📊 View Training Grid
-      </a>
-      <a href="{% url 'instructors:member_instruction_record' member.id %}" class="btn btn-outline-primary btn-sm my-1">
-        📘 View Instruction Record
-      </a>
+               {% endif %}" class="btn btn-outline-primary btn-sm my-2">
+          📊 View Training Grid
+        </a>
+        <a href="{% url 'instructors:member_instruction_record' member.id %}"
+          class="btn btn-outline-primary btn-sm my-1">
+          📘 View Instruction Record
+        </a>
       </div>
       {% endif %}
       {% if request.user.instructor %}
       <div class="mt-3">
         <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}"
           class="btn btn-outline-primary btn-sm">
-        ✍️ Log Ground Instruction
-      </a>
-      <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-sm btn-outline-primary">
-         Create Instruction Report
-      </a>
-      <a href="{% url 'instructors:assign_qualification' member.id %}" class="btn btn-sm btn-outline-primary">
-        ➕ Assign Qualification
-      </a>
+          ✍️ Log Ground Instruction
+        </a>
+        <a href="{% url 'instructors:select_instruction_date' member.id %}" class="btn btn-sm btn-outline-primary">
+          Create Instruction Report
+        </a>
+        <a href="{% url 'instructors:assign_qualification' member.id %}" class="btn btn-sm btn-outline-primary">
+          ➕ Assign Qualification
+        </a>
       </div>
       {% endif %}
 
-<!-- QUALIFICATIONS HERE -->
+      <!-- QUALIFICATIONS HERE -->
       <div class="accordion mb-4" id="qualificationAccordion">
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingQuals">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseQuals" aria-expanded="false" aria-controls="collapseQuals">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapseQuals" aria-expanded="false" aria-controls="collapseQuals">
               Qualifications
               <span class="ms-3">
                 {% for q in qualifications %}
-                  {% if q.qualification.icon %}
-                    <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" title="{{ q.qualification.name }}" width="24" height="24" class="ms-1">
-                  {% endif %}
+                {% if q.qualification.icon %}
+                <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}"
+                  title="{{ q.qualification.name }}" width="24" height="24" class="ms-1">
+                {% endif %}
                 {% endfor %}
               </span>
             </button>
           </h2>
-          <div id="collapseQuals" class="accordion-collapse collapse" aria-labelledby="headingQuals" data-bs-parent="#qualificationAccordion">
+          <div id="collapseQuals" class="accordion-collapse collapse" aria-labelledby="headingQuals"
+            data-bs-parent="#qualificationAccordion">
             <div class="accordion-body">
               {% if qualifications %}
-                <ul class="list-group">
-                  {% for q in qualifications %}
+              <ul class="list-group">
+                {% for q in qualifications %}
 
 
-                  <li class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                      <div class="d-flex align-items-start">
-                        {% if q.qualification.icon %}
-                          <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" width="48" height="48" class="me-2 mt-1">
-                        {% endif %}
-                        <div>
-                          <strong>{{ q.qualification.name }}</strong><br>
-                          <small class="text-muted">
-                            {% if q.date_awarded %}
-                              Awarded {{ q.date_awarded|date:"Y-m-d" }}
-                            {% endif %}
-                            {% if q.instructor %}
-                              by {{ q.instructor.full_display_name }}
-                            {% endif %}
-                          </small>
-                          {% if q.notes %}
-                            <div class="text-muted small">{{ q.notes }}</div>
-                          {% endif %}
-                        </div>
-                      </div>
+                <li class="list-group-item">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-start">
+                      {% if q.qualification.icon %}
+                      <img src="{{ q.qualification.icon.url }}" alt="{{ q.qualification.code }}" width="48" height="48"
+                        class="me-2 mt-1">
+                      {% endif %}
                       <div>
-                        {% if q.expiration_date %}
-                          {% if q.expiration_date < today %}
-                            <span class="badge bg-danger">Expired {{ q.expiration_date|date:"Y-m-d" }}</span>
-                          {% else %}
-                            <span class="badge bg-warning">Expires {{ q.expiration_date|date:"Y-m-d" }}</span>
+                        <strong>{{ q.qualification.name }}</strong><br>
+                        <small class="text-muted">
+                          {% if q.date_awarded %}
+                          Awarded {{ q.date_awarded|date:"Y-m-d" }}
                           {% endif %}
-                        {% else %}
-                          <span class="badge bg-success">Permanent</span>
+                          {% if q.instructor %}
+                          by {{ q.instructor.full_display_name }}
+                          {% endif %}
+                        </small>
+                        {% if q.notes %}
+                        <div class="text-muted small">{{ q.notes }}</div>
                         {% endif %}
                       </div>
                     </div>
-                  </li>
-                  
+                    <div>
+                      {% if q.expiration_date %}
+                      {% if q.expiration_date < today %} <span class="badge bg-danger">Expired {{
+                        q.expiration_date|date:"Y-m-d" }}</span>
+                        {% else %}
+                        <span class="badge bg-warning">Expires {{ q.expiration_date|date:"Y-m-d" }}</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="badge bg-success">Permanent</span>
+                        {% endif %}
+                    </div>
+                  </div>
+                </li>
 
 
 
-                  {% endfor %}
-                </ul>
+
+                {% endfor %}
+              </ul>
               {% else %}
-                <p class="text-muted"><em>No qualifications recorded.</em></p>
+              <p class="text-muted"><em>No qualifications recorded.</em></p>
               {% endif %}
             </div>
           </div>
         </div>
       </div>
-<!-- BADGES HERE -->
+      <!-- BADGES HERE -->
       <div class="accordion mb-4" id="ssaBadgeAccordion">
         <div class="accordion-item">
           <h2 class="accordion-header" id="headingBadges">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
               🏅 SSA Badges
               <span class="ms-3">
                 {% for badge in member.badges.all %}
-                  {% if badge.badge.image %}
-                  <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" width="24" height="24" class="ms-1" title="{{ badge.badge.name }}">
-                  {% endif %}
+                {% if badge.badge.image %}
+                <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" width="24" height="24" class="ms-1"
+                  title="{{ badge.badge.name }}">
+                {% endif %}
                 {% endfor %}
               </span>
             </button>
           </h2>
-          <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges" data-bs-parent="#ssaBadgeAccordion">
+          <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges"
+            data-bs-parent="#ssaBadgeAccordion">
             <div class="accordion-body">
               {% if member.badges.exists %}
-                <div class="row row-cols-auto g-3 justify-content-start">
-                  {% for badge in member.badges.all %}
-                    <div class="col text-center">
-                      {% if badge.badge.image %}
-                      <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail mb-1" style="max-width: 100px;">
-                      {% endif %}
-                      <div class="small">{{ badge.badge.name }}</div>
-                      <div class="text-muted small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
-                    </div>
-                  {% endfor %}
+              <div class="row row-cols-auto g-3 justify-content-start">
+                {% for badge in member.badges.all %}
+                <div class="col text-center">
+                  {% if badge.badge.image %}
+                  <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-thumbnail mb-1"
+                    style="max-width: 100px;">
+                  {% endif %}
+                  <div class="small">{{ badge.badge.name }}</div>
+                  <div class="text-muted small">{{ badge.date_awarded|date:"Y-m-d" }}</div>
                 </div>
+                {% endfor %}
+              </div>
               {% else %}
-                <p class="text-muted">No badges awarded yet.</p>
+              <p class="text-muted">No badges awarded yet.</p>
               {% endif %}
             </div>
           </div>
         </div>
       </div>
-      
+
 
 
 
@@ -234,18 +250,20 @@
   <hr>
   <h4>🧾 Biography</h4>
   {% if member.biography %}
-    <div class="prose max-w-none">
-      {{ member.biography.content|safe }}
-    </div>
-    {% if can_edit %}
-      <a href="{% url 'members:biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Edit Biography</a>
-    {% endif %}
-  {% else %}
-    <p>{{ member.first_name }} {{ member.last_name }} hasn’t uploaded a biography yet.</p>
-    {% if can_edit %}
-      <a href="{% url 'members:biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Write Biography</a>
-    {% endif %}
+  <div class="prose max-w-none">
+    {{ member.biography.content|safe }}
+  </div>
+  {% if can_edit %}
+  <a href="{% url 'members:biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Edit
+    Biography</a>
   {% endif %}
-  
+  {% else %}
+  <p>{{ member.first_name }} {{ member.last_name }} hasn’t uploaded a biography yet.</p>
+  {% if can_edit %}
+  <a href="{% url 'members:biography_view' member.id %}" class="btn btn-sm btn-outline-secondary mt-2">Write
+    Biography</a>
+  {% endif %}
+  {% endif %}
+
 </div>
 {% endblock %}
