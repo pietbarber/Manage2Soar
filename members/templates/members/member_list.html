@@ -18,14 +18,22 @@
   <label><input type="checkbox" name="status" value="inactive"> Inactive 💤</label>
   <label><input type="checkbox" name="status" value="nonmember"> Non-member 🚫</label>
   <br>
-  <label><input type="checkbox" name="role" value="towpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}>
-    🛩️ Tow Pilot</label>
-  <label><input type="checkbox" name="role" value="instructor" {% if 'instructor' in selected_roles %}checked{% endif
-      %}> 🎓 Instructor</label>
-  <label><input type="checkbox" name="role" value="director" {% if 'director' in selected_roles %}checked{% endif %}> 🎩
-    Director</label>
-  <label><input type="checkbox" name="role" value="dutyofficer" {% if 'duty_officer' in selected_roles %}checked{% endif
-      %}> 📋 Duty Officer</label>
+  <label>
+    <input type="checkbox" name="role" value="towpilot" {% if 'towpilot' in selected_roles %}checked{% endif %}>
+    🛩️ Tow Pilot
+  </label>
+  <label>
+    <input type="checkbox" name="role" value="instructor" {% if 'instructor' in selected_roles %}checked {% endif %}>
+    🎓 Instructor
+  </label>
+  <label>
+    <input type="checkbox" name="role" value="director" {% if 'director' in selected_roles %}checked {% endif %}>
+    🎩 Director
+  </label>
+  <label>
+    <input type="checkbox" name="role" value="dutyofficer" {% if 'duty_officer' in selected_roles %}checked {% endif %}>
+    📋 Duty Officer
+  </label>
 
   <button type="submit">Filter</button>
 </form>
