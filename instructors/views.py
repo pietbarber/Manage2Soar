@@ -47,7 +47,7 @@ from members.decorators import active_member_required
 from members.models import Member
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 
-from instructors.forms import TestBuilderForm
+from knowledgetest.forms import TestBuilderForm
 from knowledgetest.models import (
     QuestionCategory, Question, WrittenTestTemplate,
     WrittenTestTemplateQuestion, WrittenTestAssignment
@@ -1635,14 +1635,14 @@ class CreateWrittenTestView(FormView):
         kw = super().get_form_kwargs()
         preset_key = self.request.GET.get('preset')
         if preset_key:
-            kw['preset'] = get_presets.get(preset_key.upper())
+            kw['preset'] = get_presets().get(preset_key.upper())
         else:
             kw['preset'] = None
         return kw
 
     def get_context_data(self, **ctx):
         ctx = super().get_context_data(**ctx)
-        ctx['presets'] = get_presets.keys()
+        ctx['presets'] = get_presets().keys()
         return ctx
 
     def form_valid(self, form):
