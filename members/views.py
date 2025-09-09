@@ -28,6 +28,7 @@ from instructors.models import MemberQualification
 
 # Can be used to browse, link to member profiles, or assign operational roles.
 
+
 @active_member_required
 def member_list(request):
     selected_statuses = request.GET.getlist("status")
@@ -119,7 +120,8 @@ def member_view(request, member_id):
     )
 
     if is_self and request.method == "POST":
-        form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
+        form = MemberProfilePhotoForm(
+            request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile photo updated.")
@@ -138,10 +140,9 @@ def member_view(request, member_id):
         "today": date.today(),
         # new flag for template
         "show_need_buttons": show_need_buttons,
+        "private_glider_checkride_date": member.private_glider_checkride_date,
     }
     return render(request, "members/member_view.html", context)
-
-
 
 
 #########################
@@ -194,6 +195,7 @@ def biography_view(request, member_id):
 # Future enhancements may include turning this into a full dashboard,
 # displaying pending tests, recent instruction reports, and other user-specific data.
 
+
 def home(request):
     pending_count = 0
     if request.user.is_authenticated:
@@ -208,7 +210,7 @@ def home(request):
 # set_password() View
 
 # Allows a logged-in user to set or change their password. This is typically
-# used when a member is transitioning from OAuth or legacy authentication 
+# used when a member is transitioning from OAuth or legacy authentication
 # to a Django-managed password.
 
 # Methods:
@@ -220,6 +222,7 @@ def home(request):
 # - messages.success: displays a confirmation if the password is successfully changed
 
 # Redirects to home page on success.
+
 
 @active_member_required
 def set_password(request):
@@ -253,6 +256,7 @@ def set_password(request):
 # Returns a JSON response containing the file URL for use in the editor.
 # Only accessible to logged-in users.
 
+
 @active_member_required
 @csrf_exempt
 def tinymce_image_upload(request):
@@ -278,9 +282,11 @@ def tinymce_image_upload(request):
 # Variables:
 # - members: queryset of all members, prefetching badge relationships
 
+
 @active_member_required
 def badge_board(request):
-    active_members = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+    active_members = Member.objects.filter(
+        membership_status__in=DEFAULT_ACTIVE_STATUSES)
 
     badges = Badge.objects.prefetch_related(
         Prefetch(

@@ -76,6 +76,11 @@
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
+        {% if member.private_glider_checkride_date %}
+        <li class="list-group-item"><strong>Rated Glider Pilot Since: </strong>
+          {{ member.private_glider_checkride_date }}
+        </li>
+        {% endif %}
         {% if request.user == member %}
         <li class="list-group-item">
           <strong>User Name:</strong> {{ member.username }}

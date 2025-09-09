@@ -164,25 +164,37 @@ class MemberAdmin(VersionAdmin, UserAdmin):
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        ("Personal Info", {"fields": (
-            "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
-            "profile_photo", "profile_photo_preview",
-            "email", "phone", "mobile_phone", "emergency_contact"
-        )}),
-        ("Membership", {"fields": (
-            "membership_status", "date_joined",
-            "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
-            "director", "member_manager", "rostermeister",
-            "webmaster", "secretary", "treasurer"
-        )}),
-        ("Other Info", {"fields": (
-            "address", "city", "state_code", "state_freeform", "zip_code", "country",
-            "SSA_member_number", "ssa_url", "glider_rating", "private_notes", "public_notes"
-        )}),
-        ("Permissions", {"fields": (
-            "is_active", "is_staff", "is_superuser", "groups", "user_permissions"
-        )}),
-        ("Important Dates", {"fields": ("last_login",)}),
+        ("Personal Info", {
+            "fields": (
+                "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
+                "profile_photo", "profile_photo_preview",
+                "email", "phone", "mobile_phone", "emergency_contact"
+            )
+        }),
+        ("Membership", {
+            "fields": (
+                "membership_status", "date_joined",
+                "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
+                "director", "member_manager", "rostermeister",
+                "webmaster", "secretary", "treasurer"
+            )
+        }),
+        ("Other Info", {
+            "fields": (
+                "address", "city", "state_code", "state_freeform", "zip_code", "country",
+                "SSA_member_number", "ssa_url", "glider_rating", "private_notes", "public_notes"
+            )
+        }),
+        ("Permissions", {
+            "fields": (
+                "is_active", "is_staff", "is_superuser", "groups", "user_permissions"
+            )
+        }),
+        ("Important Dates", {
+            "fields": (
+                "private_glider_checkride_date", "last_login",
+            )
+        }),
     )
 
     add_fieldsets = (

@@ -63,6 +63,9 @@ class Biography(models.Model):
 # - is_active_member(): Returns True if the member has a qualifying active membership status
 
 class Member(AbstractUser):
+    private_glider_checkride_date = models.DateField(
+        blank=True, null=True,
+        help_text="Date member passed practical checkride for Private Pilot Glider.")
     # Here are the legacy codes from the old database,
     # Legacy status codes:
     # M = Full Member

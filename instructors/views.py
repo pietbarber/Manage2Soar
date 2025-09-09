@@ -1101,10 +1101,8 @@ def member_logbook(request):
         'lesson_scores__lesson'
     ).order_by('date')
 
-    # 3) Approximate rating_date = first time they carried a passenger
-    first_pax = flights.filter(passenger__isnull=False).order_by(
-        'logsheet__log_date').first()
-    rating_date = first_pax.logsheet.log_date if first_pax else None
+    # 3) Use actual private_glider_checkride_date if available
+    rating_date = getattr(member, 'private_glider_checkride_date', None)
 
     # 4) Flatten flights & grounds into a single timeline of events, capturing time
     events = []
