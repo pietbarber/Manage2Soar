@@ -5,7 +5,7 @@ from datetime import date
 from django.urls import reverse
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Func, F
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -56,7 +56,9 @@ def member_list(request):
     if 'dutyofficer' in selected_roles:
         members = members.filter(duty_officer=True)
 
-    members = members.order_by("last_name", "first_name")
+    members = members.annotate(
+        last_name_lower=Func(F('last_name'), function='LOWER')
+    ).order_by('last_name_lower', 'first_name')
 
     paginator = Paginator(members, 150)
     page_number = request.GET.get("page")
