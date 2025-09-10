@@ -40,10 +40,10 @@
       <th>A</th>
       <th>G</th>
       <th>S</th>
-      <th>Release</th>
+      <th>Rel</th>
       <th>Max</th>
-      <th>Location</th>
-      <th class="text-end">Gnd Inst</th>
+      <th>Loc</th>
+      <th class="text-end">Gnd</th>
       <th class="text-end">Dual</th>
       <th class="text-end">Solo</th>
       <th class="text-end">PIC</th>
@@ -84,8 +84,9 @@
         {{ r.total }}
         {% endif %}
       </td>
-      <td class="text-start">
 
+      <td class="text-start logbook-comments"
+        style="max-width:320px;white-space:normal !important;word-break:break-all;overflow-wrap:break-word;">
         {{ r.signature_html|safe }}
 
         {% if r.report_id %}
