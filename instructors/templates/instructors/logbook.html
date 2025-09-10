@@ -5,6 +5,9 @@
 <div id="top"></div>
 <h2>Logbook for {{ member.full_display_name }}</h2>
 
+<a href="{% url 'instructors:member_logbook_export_csv' %}" class="btn btn-success mb-3">Export as CSV (Excel/Google
+  Sheets)</a>
+
 {% if years %}
 <div class="year-navigation">
   <h5 class="mb-3">📅 Jump to Year:</h5>
@@ -30,6 +33,7 @@
 </div>
 {% endif %}
 
+<div class="table-responsive">
 <table class="table table-bordered table-sm mb-1">
   <thead class="table-dark">
     <tr>
@@ -85,8 +89,7 @@
         {% endif %}
       </td>
 
-      <td class="text-start logbook-comments"
-        style="max-width:320px;white-space:normal !important;word-break:break-all;overflow-wrap:break-word;">
+  <td class="text-start logbook-comments">
         {{ r.signature_html|safe }}
 
         {% if r.report_id %}
@@ -136,6 +139,7 @@
 
   </tbody>
 </table>
+</div>
 
 {% if not forloop.last %}
 <div class="page-break"></div>

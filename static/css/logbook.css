@@ -19,13 +19,6 @@
 }
 
 
-/* Logbook table: force fixed layout for proper column wrapping */
-table.table {
-    width: 100%;
-    font-size: 0.85rem;
-    table-layout: fixed;
-}
-
 
 th,
 td {

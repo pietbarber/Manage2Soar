@@ -1,5 +1,3 @@
-
-
 from django.views import View as DjangoView
 import itertools
 import json
@@ -12,6 +10,7 @@ from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta, time
 from django.db import transaction
+import csv
 
 from django import forms
 from django.core.exceptions import PermissionDenied
@@ -1781,3 +1780,153 @@ class WrittenTestReviewView(DjangoView):
             'student': student,
             'questions': questions,
         })
+
+
+@active_member_required
+def export_member_logbook_csv(request):
+    """Export the member's logbook as CSV for Excel/Google Sheets."""
+    member = request.user
+
+    # Use the same logic as member_logbook to build rows
+    def format_hhmm(duration):
+        if not duration:
+            return ""
+        total_minutes = int(duration.total_seconds() // 60)
+        h, m = divmod(total_minutes, 60)
+        return f"{h}:{m:02d}"
+
+    flights = (
+        Flight.objects
+        .filter(
+            Q(pilot=member) |
+            Q(instructor=member) |
+            Q(passenger=member)
+        )
+        .select_related('glider', 'instructor', 'passenger', 'airfield', 'logsheet')
+        .order_by('logsheet__log_date')
+    )
+    grounds = GroundInstruction.objects.filter(student=member).prefetch_related(
+        'lesson_scores__lesson'
+    ).order_by('date')
+
+    rating_date = getattr(member, 'private_glider_checkride_date', None)
+    events = []
+    for f in flights:
+        events.append({
+            "type": "flight",
+            "obj":   f,
+            "date":  f.logsheet.log_date,
+            "time":  f.launch_time or time(0, 0)
+        })
+    for g in grounds:
+        events.append({
+            "type": "ground",
+            "obj":   g,
+            "date":  g.date,
+            "time":  time(0, 0)
+        })
+    events.sort(key=lambda e: (e["date"], e["time"]))
+
+    # Build rows (flattened)
+    rows = []
+    flight_no = 0
+    for ev in events:
+        if ev["type"] == "flight":
+            f = ev["obj"]
+            date = ev["date"]
+            is_pilot = (f.pilot_id == member.id)
+            is_instructor = (f.instructor_id == member.id)
+            is_passenger = (f.passenger_id == member.id)
+            if is_pilot or is_instructor:
+                flight_no += 1
+            dur_m = int(f.duration.total_seconds()//60) if f.duration else 0
+            dual_m = solo_m = pic_m = inst_m = 0
+            comments = ""
+            if is_pilot:
+                if f.instructor:
+                    if rating_date and date >= rating_date:
+                        pic_m += dur_m
+                    else:
+                        dual_m += dur_m
+                    rpt = InstructionReport.objects.filter(
+                        student=member,
+                        instructor=f.instructor,
+                        report_date=date
+                    ).first()
+                    if rpt:
+                        codes = [
+                            ls.lesson.code for ls in rpt.lesson_scores.all()]
+                        comments = f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
+                    else:
+                        comments = "instruction received"
+                else:
+                    if not f.passenger and not f.passenger_name:
+                        solo_m += dur_m
+                    pic_m += dur_m
+                    if f.passenger:
+                        comments = f"{f.passenger.full_display_name}"
+                    elif f.passenger_name:
+                        comments = f"{f.passenger_name}"
+            elif is_passenger:
+                comments = f"{f.pilot.full_display_name} (You)"
+            elif is_instructor:
+                inst_m += dur_m
+                pic_m += dur_m
+                student = f.pilot or f.passenger
+                if student:
+                    comments = student.full_display_name
+            row = {
+                "Date": date,
+                "Flight #": flight_no if (is_pilot or is_instructor) else "",
+                "Model": f.glider.model if f.glider else "",
+                "N-Number": f.glider.n_number if f.glider else "Private",
+                "A": (1 if f.launch_method == "tow" else 0) if not is_passenger else 0,
+                "G": (1 if f.launch_method == "winch" else 0) if not is_passenger else 0,
+                "S": (1 if f.launch_method == "self" else 0) if not is_passenger else 0,
+                "Release": f.release_altitude or "",
+                "Location": f.airfield.identifier if f.airfield else "",
+                "Ground Inst": "",
+                "Dual": format_hhmm(timedelta(minutes=dual_m)),
+                "Solo": format_hhmm(timedelta(minutes=solo_m)),
+                "PIC": format_hhmm(timedelta(minutes=pic_m)),
+                "Inst": format_hhmm(timedelta(minutes=inst_m)),
+                "Total": format_hhmm(timedelta(minutes=dur_m)),
+                "Comments": comments,
+            }
+            rows.append(row)
+        else:
+            g = ev["obj"]
+            gm = int(g.duration.total_seconds()//60) if g.duration else 0
+            # build the lesson list + instructor tag
+            codes = [ls.lesson.code for ls in g.lesson_scores.all()]
+            comments = ", ".join(codes)
+            if g.instructor:
+                comments += f" /s/ {g.instructor.full_display_name}"
+            row = {
+                "Date": g.date,
+                "Flight #": "",
+                "Model": "",
+                "N-Number": "",
+                "A": 0, "G": 0, "S": 0,
+                "Release": "",
+                "Location": g.location or "",
+                "Ground Inst": format_hhmm(timedelta(minutes=gm)),
+                "Dual": "",
+                "Solo": "",
+                "PIC": "",
+                "Inst": "",
+                "Total": "",
+                "Comments": comments,
+            }
+            rows.append(row)
+
+    # CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="logbook_{member.username}.csv"'
+    writer = csv.DictWriter(response, fieldnames=[
+        "Date", "Flight #", "Model", "N-Number", "A", "G", "S", "Release", "Location", "Ground Inst", "Dual", "Solo", "PIC", "Inst", "Total", "Comments"
+    ])
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    return response
