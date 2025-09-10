@@ -19,6 +19,7 @@ from .models import Member, Biography
 from .utils.vcard_tools import generate_vcard_qr
 from .decorators import active_member_required
 from instructors.models import MemberQualification
+from cms.models import HomePageContent
 
 #########################
 # member_list() View
@@ -203,8 +204,11 @@ def home(request):
         pending_count = request.user.assigned_written_tests.filter(
             completed=False
         ).count()
+    # Fetch homepage content (latest)
+    homepage_content = HomePageContent.objects.order_by('-updated_at').first()
     return render(request, "home.html", {
         "pending_tests_count": pending_count,
+        "homepage_content": homepage_content,
     })
 
 #########################
