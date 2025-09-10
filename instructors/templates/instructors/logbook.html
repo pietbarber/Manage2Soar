@@ -85,7 +85,8 @@
         {% endif %}
       </td>
       <td class="text-start">
-        {{ r.comments|safe }}
+
+        {{ r.signature_html|safe }}
 
         {% if r.report_id %}
         <button class="btn btn-sm btn-outline-secondary ms-1" data-bs-toggle="modal" data-bs-target="#trainingModal"

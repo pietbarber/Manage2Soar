@@ -140,6 +140,7 @@ def member_view(request, member_id):
         "today": date.today(),
         # new flag for template
         "show_need_buttons": show_need_buttons,
+        "pilot_certificate_number": member.pilot_certificate_number,
         "private_glider_checkride_date": member.private_glider_checkride_date,
     }
     return render(request, "members/member_view.html", context)

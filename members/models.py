@@ -63,6 +63,9 @@ class Biography(models.Model):
 # - is_active_member(): Returns True if the member has a qualifying active membership status
 
 class Member(AbstractUser):
+    pilot_certificate_number = models.CharField(
+        max_length=32, blank=True, null=True,
+        help_text="FAA pilot certificate number (optional, but required for instructors giving instruction)")
     private_glider_checkride_date = models.DateField(
         blank=True, null=True,
         help_text="Date member passed practical checkride for Private Pilot Glider.")

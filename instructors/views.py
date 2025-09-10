@@ -1198,6 +1198,31 @@ def member_logbook(request):
                     comments = student.full_display_name
 
             # Build the row
+            instructor_cert = ""
+            if f.instructor and hasattr(f.instructor, "pilot_certificate_number"):
+                instructor_cert = f.instructor.pilot_certificate_number or ""
+            # Build signature_html for template
+            signature_html = ""
+            if "/s/" in comments:
+                pre, post = comments.split("/s/", 1)
+                # Only the instructor name and cert get cursive, not the /s/
+                post = post.strip()
+                # Split post into name and (optional) cert
+                if ',' in post:
+                    name, rest = post.split(',', 1)
+                    name = name.strip()
+                    rest = rest.strip()
+                else:
+                    name = post
+                    rest = ""
+                cert_part = f", {instructor_cert}CFI" if instructor_cert else ""
+                signature_html = (
+                    f"{pre.strip()} "
+                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{name}</span>"
+                    f"{cert_part}"
+                )
+            else:
+                signature_html = comments
             row = {
                 "flight_id":      flight_id,
                 "date":           date,
@@ -1227,6 +1252,8 @@ def member_logbook(request):
                 "report_id":      report_id,
 
                 "comments":       comments,
+                "instructor_certificate_number": instructor_cert,
+                "signature_html": signature_html,
             }
             rows.append(row)
 
@@ -1236,6 +1263,9 @@ def member_logbook(request):
             # build the lesson list + instructor tag
             codes = [ls.lesson.code for ls in g.lesson_scores.all()]
             comments = ", ".join(codes)
+            instructor_cert = ""
+            if g.instructor and hasattr(g.instructor, "pilot_certificate_number"):
+                instructor_cert = g.instructor.pilot_certificate_number or ""
             if g.instructor:
                 comments += f" /s/ {g.instructor.full_display_name}"
 
@@ -1266,6 +1296,7 @@ def member_logbook(request):
                 "pic_m":            0,
                 "inst_given_m":     0,
                 "total_m":          0,
+                "instructor_certificate_number": instructor_cert,
             }
             rows.append(row)
 

@@ -173,7 +173,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         }),
         ("Membership", {
             "fields": (
-                "membership_status", "date_joined",
+                "membership_status", "date_joined", "private_glider_checkride_date",
                 "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
                 "director", "member_manager", "rostermeister",
                 "webmaster", "secretary", "treasurer"
@@ -182,6 +182,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         ("Other Info", {
             "fields": (
                 "address", "city", "state_code", "state_freeform", "zip_code", "country",
+                "pilot_certificate_number",
                 "SSA_member_number", "ssa_url", "glider_rating", "private_notes", "public_notes"
             )
         }),
@@ -192,7 +193,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
         }),
         ("Important Dates", {
             "fields": (
-                "private_glider_checkride_date", "last_login",
+                "last_login",
             )
         }),
     )

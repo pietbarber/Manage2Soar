@@ -74,6 +74,10 @@
         </li>
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li>
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
+        {% if pilot_certificate_number %}
+        <li class="list-group-item"><strong>Certificate Number: </strong>
+          {{ member.pilot_certificate_number }}</li>
+        {% endif %}
         <li class="list-group-item"><strong>Membership Status:</strong> {{ member.membership_status }}</li>
         <li class="list-group-item"><strong>Joined Club:</strong> {{ member.joined_club }}</li>
         {% if member.private_glider_checkride_date %}
