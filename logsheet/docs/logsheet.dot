@@ -1,7 +1,7 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-05-12 23:41
-  // Cli Options: logsheet --arrow-shape normal --group-models --output /home/pbarber/Projects/skylinesoaring/logsheet/docs/logsheet.dot
+  // Created: 2025-09-10 23:27
+  // Cli Options: logsheet --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/logsheet/docs/logsheet.dot
 
   fontname = "Roboto"
   fontsize = 8
@@ -351,6 +351,14 @@ digraph model_graph {
     
     
       <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT FACE="Roboto">initial_hours</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT FACE="Roboto">DecimalField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
       <FONT FACE="Roboto">is_active</FONT>
       </TD><TD ALIGN="LEFT">
       <FONT FACE="Roboto">BooleanField</FONT>
@@ -428,6 +436,14 @@ digraph model_graph {
       <FONT COLOR="#7B7B7B" FACE="Roboto">competition_number</FONT>
       </TD><TD ALIGN="LEFT">
       <FONT COLOR="#7B7B7B" FACE="Roboto">CharField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT FACE="Roboto">initial_hours</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT FACE="Roboto">DecimalField</FONT>
       </TD></TR>
     
     

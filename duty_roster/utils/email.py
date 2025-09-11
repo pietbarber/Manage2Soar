@@ -10,7 +10,7 @@ def notify_ops_status(assignment):
         return  # Ignore scheduled days
 
     ops_date = assignment.date.strftime("%A, %B %d, %Y")
-    subject_prefix = "[Skyline Soaring]"
+    subject_prefix = "[Manage2Soar]"
 
     # 1. Ad-hoc day created (no crew yet)
     if not assignment.tow_pilot and not assignment.duty_officer:

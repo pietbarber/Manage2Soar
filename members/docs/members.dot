@@ -1,7 +1,7 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-05-12 23:41
-  // Cli Options: members --arrow-shape normal --group-models --output /home/pbarber/Projects/skylinesoaring/members/docs/members.dot
+  // Created: 2025-09-10 23:26
+  // Cli Options: members --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/members/docs/members.dot
 
   fontname = "Roboto"
   fontsize = 8
@@ -194,6 +194,14 @@ digraph model_graph {
       <FONT COLOR="#7B7B7B" FACE="Roboto"><B>last_updated_by</B></FONT>
       </TD><TD ALIGN="LEFT">
       <FONT COLOR="#7B7B7B" FACE="Roboto"><B>ForeignKey (id)</B></FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT COLOR="#7B7B7B" FACE="Roboto"><B>user</B></FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT COLOR="#7B7B7B" FACE="Roboto"><B>OneToOneField (id)</B></FONT>
       </TD></TR>
     
     
@@ -423,6 +431,22 @@ digraph model_graph {
     
     
       <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">pilot_certificate_number</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">CharField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">private_glider_checkride_date</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">DateField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
       <FONT COLOR="#7B7B7B" FACE="Roboto">private_notes</FONT>
       </TD><TD ALIGN="LEFT">
       <FONT COLOR="#7B7B7B" FACE="Roboto">HTMLField</FONT>
@@ -458,6 +482,14 @@ digraph model_graph {
       <FONT FACE="Roboto">secretary</FONT>
       </TD><TD ALIGN="LEFT">
       <FONT FACE="Roboto">BooleanField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">ssa_url</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT COLOR="#7B7B7B" FACE="Roboto">URLField</FONT>
       </TD></TR>
     
     
@@ -645,6 +677,9 @@ digraph model_graph {
 
   members_models_Biography -> members_models_Member
   [label=" member (biography)"] [arrowhead=none, arrowtail=none, dir=both];
+
+  members_models_Member -> members_models_Member
+  [label=" user (member_profile)"] [arrowhead=none, arrowtail=none, dir=both];
 
   members_models_Member -> members_models_Member
   [label=" last_updated_by (member)"] [arrowhead=none, arrowtail=normal, dir=both];

@@ -613,7 +613,7 @@ def calendar_cancel_ops_day(request, year, month, day):
 
     # Send to members@default.manage2soar.com
     send_mail(
-        subject=f"[Skyline Soaring] Operations Canceled – {ops_date.strftime('%B %d')}",
+        subject=f"[Manage2Soar] Operations Canceled - {ops_date.strftime('%B %d')}",
         message=body,
         from_email="noreply@default.manage2soar.com",
         recipient_list=["members@default.manage2soar.com"],

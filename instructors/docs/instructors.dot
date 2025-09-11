@@ -1,7 +1,7 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-05-12 23:41
-  // Cli Options: instructors --arrow-shape normal --group-models --output /home/pbarber/Projects/skylinesoaring/instructors/docs/instructors.dot
+  // Created: 2025-09-10 23:26
+  // Cli Options: instructors --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/instructors/docs/instructors.dot
 
   fontname = "Roboto"
   fontsize = 8

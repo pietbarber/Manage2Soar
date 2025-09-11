@@ -16,12 +16,39 @@ This is a Django-based web application for managing the members, gliders, badges
 
 ## Tech Stack
 
-- Python 3.12 / Django 5.1
-- PostgreSQL
-- Bootstrap 5
-- TinyMCE rich text editor
-- Pillow (for image resizing)
-- qrcode and vobject (for QR/vCard support)
+### Backend
+- **Python 3.12**
+- **Django 5.1**
+- **PostgreSQL** (with `psycopg2-binary`)
+
+### Frontend
+- **Bootstrap 5** (via CDN)
+- **django-crispy-forms**
+- **crispy-bootstrap4**
+- **django-tinymce** (WYSIWYG editor)
+
+### Core Python/Django Packages
+- **Pillow** (image processing)
+- **qrcode** (QR code generation)
+- **vobject** (vCard/iCalendar support)
+- **python-dotenv** (environment variable management)
+- **django-reversion** (object versioning)
+- **django-htmx** (progressive enhancement)
+- **pydenticon** (avatar generation)
+- **requests** (HTTP requests)
+- **pytz** (timezone support)
+- **social-auth-app-django** (social authentication)
+
+### Testing & Dev Tools
+- **pytest-django**
+- **pytest**
+
+### System Requirements
+- **graphviz** (required for ERD generation via `generate_erds.py`)
+
+### Notes
+- All Python dependencies are listed in `requirements.txt`.
+- System package `graphviz` must be installed separately (e.g., `sudo apt install graphviz`).
 
 # Manage2Soar – Duty Roster & Operations Management
 
@@ -77,7 +104,19 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
  -- duty officers can sign up to be the operations officer. 
  -- if those two conditions are met, email is sent to members indicating operations are a go. 
 
-## 🛠️ Installation & Setup
+## Charts and Analytics
+ - Several varieties of charts and graphs can be displayed for your club's statistics
+ -- Flights to date this year 
+ -- Compare this year to previous years
+ -- Show usage of each glider in the club 
+ -- Show how many flights each user is getting
+
+## Knowledge Tests
+ - Maintain a test bank of your written test questions
+ -- Useful for pre-solo written test 
+ -- also useful for training wing runners or duty officers 
+
+# 🛠️ Installation & Setup
 
 1. **Clone the Repository**:
    ```bash
