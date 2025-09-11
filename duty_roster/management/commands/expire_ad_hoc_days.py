@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 
+
 class Command(BaseCommand):
     help = "Cancel unconfirmed ad-hoc ops days that are scheduled for tomorrow"
 
@@ -25,9 +26,10 @@ class Command(BaseCommand):
                 message=f"""Ad-hoc ops on {ops_date} could not get sufficient interest to meet the minimum 
 duty crew of tow pilot and duty officer. The deadline has passed and the ops 
 have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/""",
-                from_email="noreply@skylinesoaring.org",
-                recipient_list=["members@skylinesoaring.org"],
+                from_email="noreply@default.manage2soar.com",
+                recipient_list=["members@default.manage2soar.com"],
             )
 
-            self.stdout.write(self.style.WARNING(f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"))
+            self.stdout.write(self.style.WARNING(
+                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"))
             assignment.delete()

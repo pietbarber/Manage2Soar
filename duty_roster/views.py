@@ -25,9 +25,9 @@ from .roster_generator import generate_roster
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 
 
-
 def roster_home(request):
     return HttpResponse("Duty Roster Home")
+
 
 @active_member_required
 def blackout_manage(request):
@@ -42,16 +42,19 @@ def blackout_manage(request):
     existing_dates = set(b.date for b in existing)
 
     today = now().date()
+
     def generate_calendar(year, month):
         cal = calendar.Calendar()
         month_days = cal.itermonthdates(year, month)
         weeks, week = [], []
         for day in month_days:
             if len(week) == 7:
-                weeks.append(week); week = []
+                weeks.append(week)
+                week = []
             week.append(day if day.month == month else None)
         if week:
-            while len(week) < 7: week.append(None)
+            while len(week) < 7:
+                week.append(None)
             weeks.append(week)
         return weeks
 
@@ -63,23 +66,28 @@ def blackout_manage(request):
             'calendar': generate_calendar(m1.year, m1.month),
         })
 
-    percent_options = [0,25,33,50,66,75,100]
+    percent_options = [0, 25, 33, 50, 66, 75, 100]
     role_choices = []
-    if member.instructor: role_choices.append(('instructor','Flight Instructor'))
-    if member.duty_officer: role_choices.append(('duty_officer','Duty Officer'))
-    if member.assistant_duty_officer: role_choices.append(('ado','Assistant Duty Officer'))
-    if member.towpilot: role_choices.append(('towpilot','Tow Pilot'))
+    if member.instructor:
+        role_choices.append(('instructor', 'Flight Instructor'))
+    if member.duty_officer:
+        role_choices.append(('duty_officer', 'Duty Officer'))
+    if member.assistant_duty_officer:
+        role_choices.append(('ado', 'Assistant Duty Officer'))
+    if member.towpilot:
+        role_choices.append(('towpilot', 'Tow Pilot'))
 
     pair_with = Member.objects.filter(pairing_target__member=member)
     avoid_with = Member.objects.filter(avoid_target__member=member)
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
-
     if request.method == 'POST':
-        blackout_dates = set(date.fromisoformat(d) for d in request.POST.getlist('blackout_dates'))
-        note = request.POST.get('default_note','').strip()
+        blackout_dates = set(date.fromisoformat(d)
+                             for d in request.POST.getlist('blackout_dates'))
+        note = request.POST.get('default_note', '').strip()
         for d in blackout_dates - existing_dates:
-            MemberBlackout.objects.get_or_create(member=member, date=d, defaults={'note': note})
+            MemberBlackout.objects.get_or_create(
+                member=member, date=d, defaults={'note': note})
         for d in existing_dates - blackout_dates:
             MemberBlackout.objects.filter(member=member, date=d).delete()
 
@@ -105,8 +113,10 @@ def blackout_manage(request):
             )
             DutyPairing.objects.filter(member=member).delete()
             DutyAvoidance.objects.filter(member=member).delete()
-            for m in data.get('pair_with', []): DutyPairing.objects.create(member=member, pair_with=m)
-            for m in data.get('avoid_with', []): DutyAvoidance.objects.create(member=member, avoid_with=m)
+            for m in data.get('pair_with', []):
+                DutyPairing.objects.create(member=member, pair_with=m)
+            for m in data.get('avoid_with', []):
+                DutyAvoidance.objects.create(member=member, avoid_with=m)
 
             messages.success(request, 'Preferences saved successfully.')
             return redirect('duty_roster:blackout_manage')
@@ -145,7 +155,6 @@ def blackout_manage(request):
     })
 
 
-
 def get_adjacent_months(year, month):
     # Previous month
     prev_month = month - 1 if month > 1 else 12
@@ -157,6 +166,7 @@ def get_adjacent_months(year, month):
 
     return prev_year, prev_month, next_year, next_month
 
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
     year = int(year) if year else today.year
@@ -166,19 +176,21 @@ def duty_calendar_view(request, year=None, month=None):
     weeks = cal.monthdatescalendar(year, month)
     first_visible_day = weeks[0][0]
     last_visible_day = weeks[-1][-1]
-    assignments = DutyAssignment.objects.filter(date__range=(first_visible_day, last_visible_day))
+    assignments = DutyAssignment.objects.filter(
+        date__range=(first_visible_day, last_visible_day))
 
     assignments_by_date = {a.date: a for a in assignments}
 
-    prev_year, prev_month, next_year, next_month = get_adjacent_months(year, month)
+    prev_year, prev_month, next_year, next_month = get_adjacent_months(
+        year, month)
 
     # After building `weeks` for the calendar
     visible_dates = [day for week in weeks for day in week]
-    
+
     # Then safely run these:
     instruction_count = defaultdict(int)
     tow_count = defaultdict(int)
-    
+
     intents = OpsIntent.objects.filter(date__in=visible_dates)
 
     for intent in intents:
@@ -187,7 +199,6 @@ def duty_calendar_view(request, year=None, month=None):
             instruction_count[intent.date] += 1
         if "private" in roles or "club" in roles:
             tow_count[intent.date] += 1
-
 
     surge_needed_by_date = {}
 
@@ -215,6 +226,7 @@ def duty_calendar_view(request, year=None, month=None):
         return render(request, "duty_roster/_calendar_body.html", context)
     return render(request, "duty_roster/calendar.html", context)
 
+
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
     assignment = DutyAssignment.objects.filter(date=day_date).first()
@@ -223,14 +235,18 @@ def calendar_day_detail(request, year, month, day):
     intent_exists = False
     can_submit_intent = request.user.is_authenticated and day_date >= date.today()
     if request.user.is_authenticated:
-        intent_exists = OpsIntent.objects.filter(member=request.user, date=day_date).exists()
+        intent_exists = OpsIntent.objects.filter(
+            member=request.user, date=day_date).exists()
 
     # Pull all intents for the day
-    intents = OpsIntent.objects.filter(date=day_date).select_related("member").order_by("member__last_name")
+    intents = OpsIntent.objects.filter(date=day_date).select_related(
+        "member").order_by("member__last_name")
 
     # Check for instruction-specific intent
-    instruction_intent_count = sum(1 for i in intents if "instruction" in i.available_as)
-    tow_count = sum(1 for i in intents if "club" in i.available_as or "private" in i.available_as)
+    instruction_intent_count = sum(
+        1 for i in intents if "instruction" in i.available_as)
+    tow_count = sum(
+        1 for i in intents if "club" in i.available_as or "private" in i.available_as)
 
     show_surge_alert = instruction_intent_count > 3
     show_tow_surge_alert = tow_count >= 6
@@ -262,7 +278,8 @@ def ops_intent_toggle(request, year, month, day):
     day_date = date(year, month, day)
 
     # remember prior intent so we only email on true cancellations
-    old_intent = OpsIntent.objects.filter(member=request.user, date=day_date).first()
+    old_intent = OpsIntent.objects.filter(
+        member=request.user, date=day_date).first()
     old_available = old_intent.available_as if old_intent else []
 
     available_as = request.POST.getlist("available_as") or []
@@ -271,7 +288,7 @@ def ops_intent_toggle(request, year, month, day):
     if "instruction" in available_as:
         days_until = (day_date - timezone.now().date()).days
         if days_until > 14:
-            response  = '<p class="text-red-700">⏰ You can only request instruction within 14 days of your duty date.</p>'
+            response = '<p class="text-red-700">⏰ You can only request instruction within 14 days of your duty date.</p>'
             response += (
                 f'<form hx-get="{request.path}form/" '
                 'hx-post="{request.path}"'
@@ -291,7 +308,8 @@ def ops_intent_toggle(request, year, month, day):
 
         # who’s signed up now?
         intents = OpsIntent.objects.filter(date=day_date)
-        students = [i.member.full_display_name for i in intents if "instruction" in i.available_as]
+        students = [
+            i.member.full_display_name for i in intents if "instruction" in i.available_as]
 
         assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
         duty_inst = assignment.instructor
@@ -318,9 +336,10 @@ def ops_intent_toggle(request, year, month, day):
             recipients.append(surge_inst.email)
 
         if recipients:
-            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True)
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL,
+                      recipients, fail_silently=True)
 
-        response  = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
         response += (
             f'<button hx-post="{request.path}" '
             'hx-target="#ops-intent-response" '
@@ -341,10 +360,11 @@ def ops_intent_toggle(request, year, month, day):
                     f"Student {request.user.full_display_name} cancelled their instruction signup "
                     f"for {day_date:%B %d, %Y}."
                 )
-                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [duty_inst.email], fail_silently=True)
+                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL,
+                          [duty_inst.email], fail_silently=True)
 
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
-        response  = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
+        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
         response += (
             f'<form hx-get="{request.path}form/" '
             'hx-target="#ops-intent-response" hx-swap="innerHTML">'
@@ -359,8 +379,6 @@ def ops_intent_toggle(request, year, month, day):
     return HttpResponse(response)
 
 
-
-
 def ops_intent_form(request, year, month, day):
     if not request.user.is_authenticated:
         return HttpResponse("Unauthorized", status=403)
@@ -370,24 +388,27 @@ def ops_intent_form(request, year, month, day):
         "day": day_date,
     })
 
+
 def maybe_notify_surge_instructor(day_date):
     assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
     if assignment.surge_notified:
         return
 
     intents = OpsIntent.objects.filter(date=day_date)
-    instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
+    instruction_count = sum(
+        1 for i in intents if "instruction" in i.available_as)
 
     if instruction_count > 3:
         send_mail(
             subject=f"Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
             message=f"There are currently {instruction_count} pilots requesting instruction for {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge instructor.",
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=["instructors@skylinesoaring.org"],
+            recipient_list=["instructors@default.manage2soar.com"],
             fail_silently=True,
         )
         assignment.surge_notified = True
         assignment.save()
+
 
 def maybe_notify_surge_towpilot(day_date):
     assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
@@ -395,18 +416,20 @@ def maybe_notify_surge_towpilot(day_date):
         return
 
     intents = OpsIntent.objects.filter(date=day_date)
-    tow_count = sum(1 for i in intents if "club" in i.available_as or "private" in i.available_as)
+    tow_count = sum(
+        1 for i in intents if "club" in i.available_as or "private" in i.available_as)
 
     if tow_count >= 6:
         send_mail(
             subject=f"Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
             message=f"There are currently {tow_count} pilots planning flights requiring tows on {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge tow pilot.",
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=["towpilots@skylinesoaring.org"],
+            recipient_list=["towpilots@default.manage2soar.com"],
             fail_silently=True,
         )
         assignment.tow_surge_notified = True
         assignment.save()
+
 
 def assignment_edit_form(request, year, month, day):
     if not request.user.is_authenticated or not request.user.rostermeister:
@@ -421,6 +444,7 @@ def assignment_edit_form(request, year, month, day):
         "form": form,
         "day": day_date,
     })
+
 
 @require_POST
 def assignment_save_form(request, year, month, day):
@@ -460,11 +484,12 @@ def calendar_ad_hoc_start(request, year, month, day):
         return HttpResponse(status=400)
 
     html = render_to_string(
-        "duty_roster/calendar_ad_hoc_start.html", 
+        "duty_roster/calendar_ad_hoc_start.html",
         {"date": day_obj},
         request=request,
     )
     return HttpResponse(html)
+
 
 @require_POST
 def calendar_ad_hoc_confirm(request, year, month, day):
@@ -484,7 +509,7 @@ def calendar_ad_hoc_confirm(request, year, month, day):
         }
     )
     notify_ops_status(assignment)
-    return JsonResponse({"reload": True })
+    return JsonResponse({"reload": True})
 
 
 @require_POST
@@ -507,6 +532,7 @@ def calendar_tow_signup(request, year, month, day):
 
     return JsonResponse({"reload": True})
 
+
 @require_POST
 @active_member_required
 def calendar_dutyofficer_signup(request, year, month, day):
@@ -525,6 +551,7 @@ def calendar_dutyofficer_signup(request, year, month, day):
 
     return JsonResponse({"reload": True})
 
+
 @require_POST
 @active_member_required
 def calendar_instructor_signup(request, year, month, day):
@@ -540,6 +567,7 @@ def calendar_instructor_signup(request, year, month, day):
         assignment.save()
 
     return HttpResponse(status=204)
+
 
 @require_POST
 @active_member_required
@@ -562,7 +590,7 @@ def calendar_ado_signup(request, year, month, day):
 @active_member_required
 def calendar_cancel_ops_day(request, year, month, day):
     from datetime import date
-    
+
     ops_date = date(int(year), int(month), int(day))
     assignment = get_object_or_404(DutyAssignment, date=ops_date)
 
@@ -583,18 +611,19 @@ def calendar_cancel_ops_day(request, year, month, day):
         f"Stay safe and we'll see you next time!"
     )
 
-    # Send to members@skylinesoaring.org
+    # Send to members@default.manage2soar.com
     send_mail(
         subject=f"[Skyline Soaring] Operations Canceled – {ops_date.strftime('%B %d')}",
         message=body,
-        from_email="noreply@skylinesoaring.org",
-        recipient_list=["members@skylinesoaring.org"],
+        from_email="noreply@default.manage2soar.com",
+        recipient_list=["members@default.manage2soar.com"],
     )
 
     # Delete the DutyAssignment entry
     assignment.delete()
 
     return JsonResponse({"reload": True})
+
 
 @active_member_required
 def calendar_cancel_ops_modal(request, year, month, day):
@@ -605,8 +634,10 @@ def calendar_cancel_ops_modal(request, year, month, day):
 
     return render(request, "duty_roster/calendar_cancel_modal.html", {"assignment": assignment})
 
+
 def is_rostermeister(user):
     return user.is_authenticated and user.rostermeister
+
 
 @active_member_required
 @user_passes_test(is_rostermeister)
@@ -630,18 +661,21 @@ def propose_roster(request):
                     d for d in cal.itermonthdates(year, month)
                     if d.month == month and d.weekday() in (5, 6)
                 ]
-                raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}} for d in weekend]
+                raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}}
+                       for d in weekend]
                 incomplete = True
-            draft = [{'date': e['date'].isoformat(), 'slots': e['slots']} for e in raw]
+            draft = [{'date': e['date'].isoformat(), 'slots': e['slots']}
+                     for e in raw]
             request.session['proposed_roster'] = draft
 
         elif action == 'publish':
             from .models import DutyAssignment
-            default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
+            default_field = Airfield.objects.get(
+                pk=settings.DEFAULT_AIRFIELD_ID)
             DutyAssignment.objects.filter(
                 date__year=year, date__month=month
             ).delete()
-        
+
             for e in request.session.get('proposed_roster', []):
                 edt = dt_date.fromisoformat(e['date'])
                 assignment_data = {
@@ -651,12 +685,14 @@ def propose_roster(request):
                 for role, mem in e['slots'].items():
                     field_name = ROLE_FIELD_MAP.get(role)
                     if field_name and mem:
-                        assignment_data[field_name] = Member.objects.get(pk=mem)
-        
+                        assignment_data[field_name] = Member.objects.get(
+                            pk=mem)
+
                 DutyAssignment.objects.create(**assignment_data)
-        
+
             request.session.pop('proposed_roster', None)
-            messages.success(request, f"Duty roster published for {month}/{year}.")
+            messages.success(
+                request, f"Duty roster published for {month}/{year}.")
             return redirect(
                 'duty_roster:duty_calendar_month', year=year, month=month
             )
@@ -672,11 +708,14 @@ def propose_roster(request):
                 d for d in cal.itermonthdates(year, month)
                 if d.month == month and d.weekday() in (5, 6)
             ]
-            raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}} for d in weekend]
+            raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}}
+                   for d in weekend]
             incomplete = True
-        draft = [{'date': e['date'].isoformat(), 'slots': e['slots']} for e in raw]
+        draft = [{'date': e['date'].isoformat(), 'slots': e['slots']}
+                 for e in raw]
         request.session['proposed_roster'] = draft
-    display = [{'date': dt_date.fromisoformat(e['date']), 'slots': e['slots']} for e in request.session.get('proposed_roster', [])]
+    display = [{'date': dt_date.fromisoformat(
+        e['date']), 'slots': e['slots']} for e in request.session.get('proposed_roster', [])]
     return render(request, 'duty_roster/propose_roster.html', {
         'draft': display,
         'year': year,
@@ -684,6 +723,7 @@ def propose_roster(request):
         'incomplete': incomplete,
         'DEFAULT_ROLES': DEFAULT_ROLES
     })
+
 
 @active_member_required
 def calendar_view(request, year=None, month=None):
@@ -705,7 +745,8 @@ def calendar_view(request, year=None, month=None):
                     slots[a.role] = a.member.full_display_name
                 days.append({'date': d, 'slots': slots})
         grid.append(days)
-    context = {'weeks': grid, 'year': year, 'month': month, 'DEFAULT_ROLES': DEFAULT_ROLES}
+    context = {'weeks': grid, 'year': year,
+               'month': month, 'DEFAULT_ROLES': DEFAULT_ROLES}
     if request.headers.get('HX-Request') == 'true':
         return render(request, 'duty_roster/partials/calendar_grid.html', context)
     return render(request, 'duty_roster/calendar.html', context)

@@ -4,30 +4,36 @@ from logsheet.models import MaintenanceIssue, AircraftMeister
 from django.utils.timezone import now
 from django.conf import settings
 
+
 class Command(BaseCommand):
     help = "Send weekly maintenance summary to aircraft meisters"
 
     def handle(self, *args, **options):
         today = now().date()
-        open_issues = MaintenanceIssue.objects.filter(resolved=False).order_by("report_date")
+        open_issues = MaintenanceIssue.objects.filter(
+            resolved=False).order_by("report_date")
 
         if not open_issues.exists():
-            self.stdout.write("✅ No unresolved maintenance issues. Skipping email.")
+            self.stdout.write(
+                "✅ No unresolved maintenance issues. Skipping email.")
             return
 
-        lines = [f"🔧 Maintenance Summary for {today.strftime('%A, %B %d, %Y')}", ""]
+        lines = [
+            f"🔧 Maintenance Summary for {today.strftime('%A, %B %d, %Y')}", ""]
         recipients = set()
 
         for issue in open_issues:
             aircraft = issue.glider or issue.towplane or "Unassigned"
             grounded_status = "GROUNDED" if issue.grounded else "Operational"
-            lines.append(f"- {aircraft}: {issue.description} (Reported: {issue.report_date.strftime('%Y-%m-%d')}) [{grounded_status}]")
+            lines.append(
+                f"- {aircraft}: {issue.description} (Reported: {issue.report_date.strftime('%Y-%m-%d')}) [{grounded_status}]")
 
             # Get assigned meisters
             if issue.glider:
                 meisters = AircraftMeister.objects.filter(glider=issue.glider)
             elif issue.towplane:
-                meisters = AircraftMeister.objects.filter(towplane=issue.towplane)
+                meisters = AircraftMeister.objects.filter(
+                    towplane=issue.towplane)
             else:
                 meisters = []
 
@@ -36,7 +42,8 @@ class Command(BaseCommand):
                     recipients.add(meister.member.email)
 
         lines.append("\nTotal Open Issues: " + str(open_issues.count()))
-        lines.append("\nMaintenance Dashboard: {}/maintenance/".format(settings.SITE_URL))
+        lines.append(
+            "\nMaintenance Dashboard: {}/maintenance/".format(settings.SITE_URL))
 
         body = "\n".join(lines)
 
@@ -44,9 +51,11 @@ class Command(BaseCommand):
             send_mail(
                 subject=f"[Skyline Soaring] Maintenance Summary - {today.strftime('%B %d')}",
                 message=body,
-                from_email="noreply@skylinesoaring.org",
+                from_email="noreply@default.manage2soar.com",
                 recipient_list=list(recipients),
             )
-            self.stdout.write(self.style.SUCCESS(f"✅ Sent maintenance summary to: {', '.join(recipients)}"))
+            self.stdout.write(self.style.SUCCESS(
+                f"✅ Sent maintenance summary to: {', '.join(recipients)}"))
         else:
-            self.stdout.write(self.style.WARNING("⚠️ No aircraft meisters with email found."))
+            self.stdout.write(self.style.WARNING(
+                "⚠️ No aircraft meisters with email found."))
