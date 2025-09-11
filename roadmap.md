@@ -1,6 +1,6 @@
-# Skyline Soaring Club Member Portal – Roadmap
+# Manage2Soar – Roadmap
 
-This roadmap outlines current and future development goals for the Skyline Soaring Club Member Portal. Items marked as ✅ are complete.
+This roadmap outlines current and future development goals for the Manage2Soar Portal. Items marked as ✅ are complete.
 
 ## Completed Tasks ✅
 - Move Django SECRET_KEY to `.env` file and rotate it.

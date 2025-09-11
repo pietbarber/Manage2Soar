@@ -1,6 +1,6 @@
-# Skyline Soaring Club Member Portal
+# Manage2Soar Soaring Club Member Portal
 
-This is a Django-based web application for managing the members, gliders, badges, and operations of the Skyline Soaring Club.
+This is a Django-based web application for managing the members, gliders, badges, and operations of any soaring club.
 
 ## Features
 
@@ -23,9 +23,9 @@ This is a Django-based web application for managing the members, gliders, badges
 - Pillow (for image resizing)
 - qrcode and vobject (for QR/vCard support)
 
-# Skyline Soaring Club – Duty Roster & Operations Management
+# Manage2Soar – Duty Roster & Operations Management
 
-Welcome to the Skyline Soaring Club's duty roster and operations management system. This Django-based application streamlines the scheduling and coordination of club operations, including both scheduled and ad-hoc flying days.
+Welcome to the Manage2Soar duty roster and operations management system. This Django-based application streamlines the scheduling and coordination of club operations, including both scheduled and ad-hoc flying days.
 
 ## Source-of-truth Membership Management
  - All membership types, contact information
@@ -81,8 +81,8 @@ Welcome to the Skyline Soaring Club's duty roster and operations management syst
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/pietbarber/skylinesoaring.git
-   cd skylinesoaring
+   git clone https://github.com/pietbarber/manage2soar.git
+   cd manage2soar
    ```
 
 2. **Create a Virtual Environment**:
@@ -113,8 +113,7 @@ Welcome to the Skyline Soaring Club's duty roster and operations management syst
 
 ## 📄 Documentation
 
-- **Operations Manual**: [Skyline Soaring Club Documents](https://www.skylinesoaring.org/documents)
-- **Training Syllabus**: [Instructor Resources](https://www.skylinesoaring.org/documents)
+(coming soon!)
 
 ## 🤝 Contributing
 
