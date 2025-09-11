@@ -1,5 +1,5 @@
 """
-WSGI config for skylinesoaring project.
+WSGI config for Manage2Soar project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

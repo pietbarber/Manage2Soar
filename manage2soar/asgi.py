@@ -1,5 +1,5 @@
 """
-ASGI config for skylinesoaring project.
+ASGI config for Manage2Soar project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
