@@ -4,17 +4,42 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-    <h2>Please log in</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Login</button>
-    </form>
-    <a href="{% url 'password_reset' %}">Forgot your password?</a>
-
-    <h2>Login with Google</h2>
-    <a href="{% url 'social:begin' 'google-oauth2' %}?next={{ request.GET.next|urlencode }}">
-    <img src="https://developers.google.com/identity/images/btn_google_signin_dark_normal_web.png" alt="Sign in with Google">
-    </a>
-
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow-lg p-4" style="max-width: 400px; width: 100%;">
+        <div class="text-center mb-4">
+            <img src="/static/images/logo.png" alt="Logo" style="max-height: 60px;" onerror="this.style.display='none'">
+            <h2 class="mt-2 mb-3">Sign in to your account</h2>
+        </div>
+        <form method="post" autocomplete="username">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="mb-3">
+                {{ field.label_tag }}
+                {{ field }}
+                {% if field.errors %}
+                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary w-100">Login</button>
+        </form>
+        <div class="mt-2 text-end">
+            <a href="{% url 'password_reset' %}">Forgot your password?</a>
+        </div>
+        <hr class="my-4">
+        <div class="text-center mb-2">
+            <span class="fw-semibold">Or sign in with</span>
+        </div>
+        <a href="{% url 'social:begin' 'google-oauth2' %}?next={{ request.GET.next|urlencode }}"
+            class="btn btn-outline-light border w-100 d-flex align-items-center justify-content-center"
+            style="background: #fff;">
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google"
+                style="height: 20px; margin-right: 8px;">
+            <span class="text-dark">Sign in with Google</span>
+        </a>
+        <div class="mt-3 text-center text-muted small">
+            {{ now|date:'Y' }}
+        </div>
+    </div>
+</div>
 {% endblock %}
