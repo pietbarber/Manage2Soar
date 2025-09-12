@@ -211,10 +211,13 @@ class CreateWrittenTestView(FormView):
 # ----------------------------------------------------------------
 @method_decorator(active_member_required, name='dispatch')
 class WrittenTestSubmitView(View):
+    template_name = "written_test/start.html"
+
     def post(self, request, pk):
         tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
         form = TestSubmissionForm(request.POST)
         if not form.is_valid():
+            form.add_error(None, "Invalid answer payload")
             return render(request, self.template_name, {
                 'template': tmpl,
                 'questions_json': json.dumps(list(tmpl.questions.all().values(
