@@ -1,4 +1,5 @@
 from .models import Logsheet, Airfield
+from typing import Optional
 from django.core.exceptions import ValidationError
 from django import forms
 from .models import Logsheet, Flight, Towplane, LogsheetCloseout, TowplaneCloseout
@@ -11,11 +12,12 @@ from django.db.models import Case, When, Value, IntegerField
 from logsheet.models import MaintenanceIssue, Glider, Towplane
 
 
-def get_active_members_with_role(role_flag: str = None):
+def get_active_members_with_role(role_flag: Optional[str] = None):
     qs = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
     if role_flag:
         qs = qs.filter(**{role_flag: True})
     return qs.order_by("last_name", "first_name")
+
 
 def get_active_members():
     return Member.objects.filter(
@@ -74,8 +76,25 @@ class FlightForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Filter instructors only
         self.fields["pilot"].queryset = get_active_members()
-        self.fields["instructor"].queryset = get_active_members_with_role("instructor")
-        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
+        self.fields["instructor"].queryset = get_active_members_with_role(
+            "instructor")
+        # Ensure the logsheet's scheduled tow pilot is included and selected by default
+        tow_pilot_initial = self.initial.get("tow_pilot")
+        tow_pilot_qs = get_active_members_with_role("towpilot")
+        if tow_pilot_initial:
+            # Make sure the scheduled tow pilot is in the queryset
+            tow_pilot_qs = tow_pilot_qs | Member.objects.filter(
+                pk=tow_pilot_initial)
+            # Move the scheduled tow pilot to the top for better UX
+            tow_pilot_qs = tow_pilot_qs.distinct().order_by(
+                Case(
+                    When(pk=tow_pilot_initial, then=0),
+                    default=1,
+                    output_field=IntegerField()
+                ),
+                "last_name", "first_name"
+            )
+        self.fields["tow_pilot"].queryset = tow_pilot_qs
         self.fields["split_with"].queryset = get_active_members()
 
         active_towplanes = Towplane.objects.filter(is_active=True)
@@ -92,7 +111,8 @@ class FlightForm(forms.ModelForm):
         ALL_ALTITUDES = list(range(0, 7100, 100))
 
         # Remove common ones from the base list to avoid duplicates
-        remaining = [alt for alt in ALL_ALTITUDES if alt not in COMMON_ALTITUDES]
+        remaining = [
+            alt for alt in ALL_ALTITUDES if alt not in COMMON_ALTITUDES]
 
         self.fields["release_altitude"].choices = (
             [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES] +
@@ -108,7 +128,7 @@ class FlightForm(forms.ModelForm):
                 owner_ids = glider_obj.owners.values_list("pk", flat=True)
             except Glider.DoesNotExist:
                 owner_ids = []
-    
+
             self.fields["pilot"].queryset = Member.objects.filter(
                 membership_status__in=DEFAULT_ACTIVE_STATUSES
             ).annotate(
@@ -124,11 +144,13 @@ class FlightForm(forms.ModelForm):
 
         if not self.initial.get("pilot") and not self.data.get("pilot"):
             if glider_obj and glider_obj.owners.count() == 1:
-                self.initial["pilot"] = glider_obj.owners.first().pk
-
+                owner = glider_obj.owners.first()
+                if owner is not None:
+                    self.initial["pilot"] = owner.pk
 
         if not self.instance.pk:
-            self.fields["launch_time"].initial = localtime(now()).strftime("%H:%M")
+            self.fields["launch_time"].initial = localtime(
+                now()).strftime("%H:%M")
 
 
 # CreateLogsheetForm
@@ -141,7 +163,7 @@ class FlightForm(forms.ModelForm):
 
 # Methods:
 #    - `clean`: Validates that a logsheet does not already exist for the selected date and airfield. Raises a ValidationError if a duplicate is found.
-#    - `__init__`: 
+#    - `__init__`:
 #        - Initializes the form with filtered querysets for dropdown fields:
 #        - Filters active airfields for "airfield".
 #        - Filters members based on their roles for duty crew fields (e.g., duty officer, instructor, tow pilot).
@@ -170,7 +192,8 @@ class CreateLogsheetForm(forms.ModelForm):
 
         if log_date and airfield:
             if Logsheet.objects.filter(log_date=log_date, airfield=airfield).exists():
-                raise ValidationError("A logsheet for this date and airfield already exists.")
+                raise ValidationError(
+                    "A logsheet for this date and airfield already exists.")
 
         return cleaned_data
 
@@ -178,7 +201,8 @@ class CreateLogsheetForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["log_date"].widget.attrs.update({"class": "form-control"})
-        self.fields["airfield"].queryset = Airfield.objects.filter(is_active=True).order_by("name")
+        self.fields["airfield"].queryset = Airfield.objects.filter(
+            is_active=True).order_by("name")
         self.fields["airfield"].widget.attrs.update({"class": "form-select"})
 
         default_airfield = Airfield.objects.filter(identifier="KFRR").first()
@@ -186,13 +210,20 @@ class CreateLogsheetForm(forms.ModelForm):
             self.fields["airfield"].initial = default_airfield
 
         # Setup filtered querysets for each duty crew role
-        self.fields["duty_officer"].queryset = get_active_members_with_role("duty_officer")
-        self.fields["assistant_duty_officer"].queryset = get_active_members_with_role("assistant_duty_officer")
-        self.fields["duty_instructor"].queryset = get_active_members_with_role("instructor")
-        self.fields["surge_instructor"].queryset = get_active_members_with_role("instructor")
-        self.fields["tow_pilot"].queryset = get_active_members_with_role("towpilot")
-        self.fields["surge_tow_pilot"].queryset = get_active_members_with_role("towpilot")
-        self.fields["default_towplane"].queryset = Towplane.objects.filter(is_active=True).order_by("name", "n_number") 
+        self.fields["duty_officer"].queryset = get_active_members_with_role(
+            "duty_officer")
+        self.fields["assistant_duty_officer"].queryset = get_active_members_with_role(
+            "assistant_duty_officer")
+        self.fields["duty_instructor"].queryset = get_active_members_with_role(
+            "instructor")
+        self.fields["surge_instructor"].queryset = get_active_members_with_role(
+            "instructor")
+        self.fields["tow_pilot"].queryset = get_active_members_with_role(
+            "towpilot")
+        self.fields["surge_tow_pilot"].queryset = get_active_members_with_role(
+            "towpilot")
+        self.fields["default_towplane"].queryset = Towplane.objects.filter(
+            is_active=True).order_by("name", "n_number")
 
         # Optional: set widget styles for dropdowns
         for name in [
@@ -208,7 +239,7 @@ class CreateLogsheetForm(forms.ModelForm):
 # LogsheetCloseoutForm
 #
 # Handles the editing of logsheet closeout reports.
-# Allows the duty officer to enter safety issues, equipment issues, 
+# Allows the duty officer to enter safety issues, equipment issues,
 # and a summary of operations for the day's flights.
 #
 # Fields:
@@ -219,6 +250,7 @@ class CreateLogsheetForm(forms.ModelForm):
 # Widgets:
 # - TinyMCE editor is used for all fields for better formatting.
 #
+
 
 class LogsheetCloseoutForm(forms.ModelForm):
     class Meta:
@@ -247,6 +279,7 @@ class LogsheetCloseoutForm(forms.ModelForm):
 #
 # Standard form with default select dropdowns.
 #
+
 
 class LogsheetDutyCrewForm(forms.ModelForm):
     class Meta:
@@ -309,6 +342,7 @@ TowplaneCloseoutFormSet = modelformset_factory(
 # - clean: Ensures either a glider or a towplane is selected.
 #
 
+
 class MaintenanceIssueForm(forms.ModelForm):
     class Meta:
         model = MaintenanceIssue
@@ -319,19 +353,22 @@ class MaintenanceIssueForm(forms.ModelForm):
             "glider": forms.Select(attrs={"class": "form-select"}),
             "towplane": forms.Select(attrs={"class": "form-select"}),
         }
+
     def clean(self):
         cleaned_data = super().clean()
         glider = cleaned_data.get("glider")
         towplane = cleaned_data.get("towplane")
 
         if not glider and not towplane:
-            raise forms.ValidationError("You must select either a glider or a towplane.")
+            raise forms.ValidationError(
+                "You must select either a glider or a towplane.")
 
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Only show club-owned and active gliders and towplanes
-        self.fields["glider"].queryset = Glider.objects.filter(club_owned=True, is_active=True)
-        self.fields["towplane"].queryset = Towplane.objects.filter(is_active=True)
-
+        self.fields["glider"].queryset = Glider.objects.filter(
+            club_owned=True, is_active=True)
+        self.fields["towplane"].queryset = Towplane.objects.filter(
+            is_active=True)

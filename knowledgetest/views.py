@@ -67,9 +67,9 @@ class WrittenTestStartView(TemplateView):
             'knowledgetest:quiz-submit', args=[tmpl.pk])
         return ctx
 
-# ----------------------------------------------------------------
+# ################################################################
 # Helper mixin to enforce “only the assigned student or staff”
-# ----------------------------------------------------------------
+# ################################################################
 
 
 class AssignmentPermissionMixin:
@@ -91,9 +91,9 @@ class AssignmentPermissionMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
-# ----------------------------------------------------------------
+# ################################################################
 # Secure the Start View
-# ----------------------------------------------------------------
+# ################################################################
 @method_decorator(active_member_required, name='dispatch')
 class CreateWrittenTestView(FormView):
     template_name = "written_test/create.html"
@@ -206,9 +206,9 @@ class CreateWrittenTestView(FormView):
         return redirect(reverse('knowledgetest:quiz-start', args=[tmpl.pk]))
 
 
-# ----------------------------------------------------------------
+# ################################################################
 # Secure the Submit View
-# ----------------------------------------------------------------
+# ################################################################
 @method_decorator(active_member_required, name='dispatch')
 class WrittenTestSubmitView(View):
     template_name = "written_test/start.html"

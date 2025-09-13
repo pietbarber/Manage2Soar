@@ -429,7 +429,12 @@ def add_flight(request, logsheet_pk):
             flight.save()
             return redirect("logsheet:manage", pk=logsheet.pk)
     else:
-        form = FlightForm()
+        initial = {}
+        if logsheet.tow_pilot_id:
+            initial["tow_pilot"] = logsheet.tow_pilot_id
+        if logsheet.default_towplane_id:
+            initial["towplane"] = logsheet.default_towplane_id
+        form = FlightForm(initial=initial)
 
     return render(request, "logsheet/edit_flight_form.html", {
         "form": form,

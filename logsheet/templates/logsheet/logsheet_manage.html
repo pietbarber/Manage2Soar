@@ -320,13 +320,15 @@
         const modalTrigger = document.querySelector("[data-bs-target='#flightModal']");
         const pilotIdsRaw = modalTrigger?.getAttribute("data-tow-pilot-ids") || "";
         const towPilotIds = pilotIdsRaw.split(",").filter(Boolean);
-      
+
         if (towPilotIds.length === 0) return;
-      
+
+        const originalValue = towPilotField.value; // Save the current selection
+
         const options = Array.from(towPilotField.options);
         const promoted = [];
         const others = [];
-      
+
         for (let option of options) {
           if (towPilotIds.includes(option.value)) {
             promoted.push(option);
@@ -334,25 +336,27 @@
             others.push(option);
           }
         }
-      
+
         towPilotField.innerHTML = "";
         promoted.concat(others).forEach(opt => towPilotField.appendChild(opt));
+
+        // Restore the original selection
+        towPilotField.value = originalValue;
       }
 
-
-     function promoteGliderOwners() {
+      function promoteGliderOwners() {
         const gliderField = document.getElementById("id_glider");
         const pilotField = document.getElementById("id_pilot");
-      
+
         const selectedOption = gliderField.options[gliderField.selectedIndex];
         const ownerIds = (selectedOption.dataset.ownerIds || "").split(",").filter(Boolean);
-      
+
         if (ownerIds.length === 0) return;
-      
+
         const options = Array.from(pilotField.options);
         const owners = [];
         const nonOwners = [];
-      
+
         for (let option of options) {
           if (ownerIds.includes(option.value)) {
             owners.push(option);
@@ -360,7 +364,7 @@
             nonOwners.push(option);
           }
         }
-      
+
         // Clear and reinsert with owners first
         pilotField.innerHTML = "";
         owners.concat(nonOwners).forEach(opt => pilotField.appendChild(opt));
@@ -377,6 +381,30 @@
 
       const towPilotField = document.getElementById("id_tow_pilot");
       towPilotField && promoteTowPilots();
+
+      // Attach NOW button logic after modal content is loaded
+      const launchBtn = document.getElementById('now-launch-btn');
+      const landingBtn = document.getElementById('now-landing-btn');
+      const launchInput = document.getElementById('id_launch_time');
+      const landingInput = document.getElementById('id_landing_time');
+      function getNowTime24() {
+        const now = new Date();
+        const h = now.getHours();
+        const m = now.getMinutes();
+        return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+      }
+      if (launchBtn && launchInput) {
+        launchBtn.addEventListener('click', function() {
+          launchInput.value = getNowTime24();
+          launchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
+      if (landingBtn && landingInput) {
+        landingBtn.addEventListener('click', function() {
+          landingInput.value = getNowTime24();
+          landingInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
     });
   });
 
@@ -430,6 +458,11 @@
   new Tablesort(flightsTable);
 </script>
 
-
+<script>
+  document.getElementById('flightModal').addEventListener('hidden.bs.modal', function (event) {
+    // Clear modal content to force reload next time
+    document.getElementById('flightModalContent').innerHTML = '';
+  });
+</script>
 
 {% endblock %}
