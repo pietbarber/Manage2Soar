@@ -18,7 +18,7 @@ This is a Django-based web application for managing the members, gliders, badges
 
 ### Backend
 - **Python 3.12**
-- **Django 5.1**
+- **Django 5.2**
 - **PostgreSQL** (with `psycopg2-binary`)
 
 ### Frontend
