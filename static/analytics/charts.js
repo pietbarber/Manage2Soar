@@ -219,6 +219,7 @@
     if (w.initTowByWeekday)       w.initTowByWeekday(all.tows || {});
     if (w.initLongFlights3h)      w.initLongFlights3h(all.long3h || {});
     if (w.initDutyDays)           w.initDutyDays(all.duty || {});
+    initTimeOps(all.time_ops || {});
   };
 
 })(window);
@@ -324,6 +325,140 @@ function initDutyDays(d) {
 
   if (status) status.textContent =
     `Total assignment days: ${doTotal + adoTotal} (DO ${doTotal}, ADO ${adoTotal}) • Ops days in range: ${opsDays}`;
+}
+
+function initTimeOps(d) {
+  const takeoffPoints = d.takeoff_points || [];
+  const landingPoints = d.landing_points || [];
+  const meanTakeoffTimes = d.mean_takeoff_times || [];
+  const meanLandingTimes = d.mean_landing_times || [];
+  const totalFlightDays = d.total_flight_days || 0;
+  const status = document.getElementById("timeOpsStatus");
+
+  if (!takeoffPoints.length && !landingPoints.length) {
+    if (status) status.textContent = "No flight time data for the selected period.";
+    return;
+  }
+
+  const ctx = document.getElementById("timeOpsChart")?.getContext?.("2d");
+  if (!ctx) return;
+
+  if (window.timeOpsChart?.destroy) window.timeOpsChart.destroy();
+
+  // Helper function to format time decimal back to time string for tooltips
+  const formatTime = (decimalHours) => {
+    const hours = Math.floor(decimalHours);
+    const minutes = Math.round((decimalHours - hours) * 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  window.timeOpsChart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Earliest Takeoffs",
+          data: takeoffPoints,
+          backgroundColor: "#3498db", // Blue
+          borderColor: "#3498db",
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: "Latest Landings", 
+          data: landingPoints,
+          backgroundColor: "#27ae60", // Green
+          borderColor: "#27ae60",
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: "Mean Takeoff Times",
+          data: meanTakeoffTimes,
+          backgroundColor: "rgba(52, 152, 219, 0.3)", // Light blue
+          borderColor: "#3498db",
+          borderWidth: 2,
+          pointRadius: 0,
+          type: "line",
+          fill: false,
+          tension: 0.1,
+        },
+        {
+          label: "Mean Landing Times",
+          data: meanLandingTimes,
+          backgroundColor: "rgba(39, 174, 96, 0.3)", // Light green
+          borderColor: "#27ae60",
+          borderWidth: 2,
+          pointRadius: 0,
+          type: "line",
+          fill: false,
+          tension: 0.1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", intersect: false },
+      plugins: {
+        legend: { position: "right", labels: { boxWidth: 18 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              if (!items.length) return "";
+              const day = items[0].parsed.x;
+              // Convert Julian day to approximate date for context
+              const date = new Date(2024, 0, day); // Using 2024 as reference year
+              const month = date.toLocaleDateString(undefined, { month: "short" });
+              const dayOfMonth = date.getDate();
+              return `Day ${day} (≈${month} ${dayOfMonth})`;
+            },
+            label: (item) => {
+              const time = formatTime(item.parsed.y);
+              return ` ${item.dataset.label}: ${time}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: "linear",
+          position: "bottom",
+          title: { display: true, text: "Julian Day" },
+          min: 1,
+          max: 365,
+          ticks: {
+            stepSize: 30,
+            callback: function(value) {
+              // Show month labels at key points
+              if ([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335].includes(value)) {
+                const date = new Date(2024, 0, value);
+                return date.toLocaleDateString(undefined, { month: "short" });
+              }
+              return value;
+            }
+          }
+        },
+        y: {
+          type: "linear",
+          title: { display: true, text: "Time of Day" },
+          min: 6,  // 6 AM
+          max: 21, // 9 PM
+          ticks: {
+            stepSize: 2,
+            callback: function(value) {
+              return formatTime(value);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (status) {
+    status.textContent = `Flight data from ${totalFlightDays} operational days • Blue: earliest takeoffs • Green: latest landings • Lines: mean times`;
+  }
 }
 
 // ---------- Download buttons (PNG/SVG/CSV) ----------
