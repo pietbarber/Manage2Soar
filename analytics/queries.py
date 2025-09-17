@@ -18,6 +18,7 @@ FINALIZED_ONLY = Q(logsheet__finalized=True)
 LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
 __all__ = ["cumulative_flights_by_year"]
 
+
 def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, finalized_only=True):
     today = date.today()
     if end_year is None:
@@ -35,7 +36,7 @@ def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, fin
     qs = qs.annotate(ops_date=F("logsheet__log_date"))
     qs = qs.annotate(ops_year=ExtractYear("ops_date"))
     qs = qs.filter(ops_year__gte=start_year, ops_year__lte=end_year)
-    
+
     # Per (year, day-of-year) counts using SQLite-compatible approach
     # Group by date and year, then calculate day of year in Python
     per_day_raw = (
@@ -43,16 +44,15 @@ def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, fin
           .annotate(n=Count("id"))
           .order_by("ops_year", "ops_date")
     )
-    
+
     # Convert to the format expected by the rest of the function
     per_day = []
     for row in per_day_raw:
         year = row["ops_year"]
         date_obj = row["ops_date"]
-        day_of_year = date_obj.timetuple().tm_yday  # Python built-in day of year calculation
+        # Python built-in day of year calculation
+        day_of_year = date_obj.timetuple().tm_yday
         per_day.append({"y": year, "d": day_of_year, "n": row["n"]})
-
-
 
     # Totals per year
     totals_qs = qs.values("ops_year").annotate(n=Count("id"))
@@ -90,7 +90,8 @@ def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, fin
             running += daymap.get(d, 0)
             arr[d - 1] = running
 
-    years = [y for y in range(start_year, end_year + 1) if totals.get(y, 0) > 0]
+    years = [y for y in range(start_year, end_year + 1)
+             if totals.get(y, 0) > 0]
     return {
         "labels": labels,
         "years": years,
@@ -168,7 +169,8 @@ def flights_by_year_by_aircraft(start_year: int, end_year: int, *, finalized_onl
 
     # Top-N categories by total (excluding "Private" which we append explicitly if present)
     have_private = "Private" in cat_counts
-    sorted_cats = sorted([c for c in cat_counts if c != "Private"], key=lambda c: (-cat_counts[c], c))
+    sorted_cats = sorted([c for c in cat_counts if c !=
+                         "Private"], key=lambda c: (-cat_counts[c], c))
     head = sorted_cats[:top_n]
     others = sorted_cats[top_n:]
 
@@ -187,12 +189,14 @@ def flights_by_year_by_aircraft(start_year: int, end_year: int, *, finalized_onl
         if have_private:
             matrix["Private"][i] = int(year_row.get("Private", 0))
         if others:
-            other_sum = sum(int(v) for k, v in year_row.items() if k not in set(head) | {"Private"})
+            other_sum = sum(int(v) for k, v in year_row.items()
+                            if k not in set(head) | {"Private"})
             matrix["Other"][i] = other_sum
 
     totals_by_cat = {c: sum(vals) for c, vals in matrix.items()}
     return {"years": years, "categories": categories, "matrix": matrix, "totals_by_cat": totals_by_cat}
- 
+
+
 class GliderUtilization(TypedDict):
     names: List[str]          # labels in display order
     flights: List[int]        # flights per name
@@ -201,6 +205,7 @@ class GliderUtilization(TypedDict):
     start: str
     end: str
 
+
 def glider_utilization(
     start_date: date,
     end_date: date,
@@ -208,7 +213,8 @@ def glider_utilization(
     finalized_only: bool = True,
     top_n: int = 12,
     fleet: str = "all",               # "all" | "club" | "private"
-    bucket_private: bool = True,      # True → non-club into "Private"; False → list individually
+    # True → non-club into "Private"; False → list individually
+    bucket_private: bool = True,
     include_unknown: bool = True,     # include flights with null glider as "Unknown"
 ) -> GliderUtilization:
     # Flights / total hours / avg minutes per glider in a date range.
@@ -227,7 +233,8 @@ def glider_utilization(
     # Date filtering + duration choice
     qs = qs.annotate(
         ops_date=F("logsheet__log_date"),
-        dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
+        dur_diff=ExpressionWrapper(
+            F("landing_time") - F("launch_time"), output_field=DurationField()),
     ).annotate(
         dur=Coalesce(F("duration"), F("dur_diff")),
     ).filter(
@@ -318,7 +325,8 @@ def glider_utilization(
             d = agg.get(name, {"flights": 0, "seconds": 0.0})
             flights = int(d["flights"])
             hours = d["seconds"] / 3600.0
-            avg_min = int(round((d["seconds"] / 60.0 / flights), 0)) if flights else 0
+            avg_min = int(
+                round((d["seconds"] / 60.0 / flights), 0)) if flights else 0
             return {"flights": flights, "hours": hours, "avg_min": avg_min}
         # "Other" sums the tail
         flights = sum(int(agg[k]["flights"]) for k in tail)
@@ -344,6 +352,7 @@ def glider_utilization(
         "start": start_date.isoformat(),
         "end": end_date.isoformat(),
     }
+
 
 def _display_name_map(ids: List[int]) -> Dict[int, str]:
     """
@@ -391,9 +400,12 @@ def flying_days_by_member(
     )
 
     # Pull distinct (member_id, ops_date) pairs per role
-    pilot_pairs = qs.filter(pilot__isnull=False).values_list("pilot_id", "ops_date").distinct()
-    instr_pairs = qs.filter(instructor__isnull=False).values_list("instructor_id", "ops_date").distinct()
-    tow_pairs   = qs.filter(tow_pilot__isnull=False).values_list("tow_pilot_id", "ops_date").distinct()
+    pilot_pairs = qs.filter(pilot__isnull=False).values_list(
+        "pilot_id", "ops_date").distinct()
+    instr_pairs = qs.filter(instructor__isnull=False).values_list(
+        "instructor_id", "ops_date").distinct()
+    tow_pairs = qs.filter(tow_pilot__isnull=False).values_list(
+        "tow_pilot_id", "ops_date").distinct()
 
     # Union in Python and count distinct days per member
     days_by_member: Dict[int, set] = defaultdict(set)
@@ -408,7 +420,8 @@ def flying_days_by_member(
 
     # Map IDs -> usernames once
     User = get_user_model()
-    name_map = _display_name_map(ids)  # uses full_display_name → full_name → username
+    # uses full_display_name → full_name → username
+    name_map = _display_name_map(ids)
 
     rows: List[tuple] = []
     for m in ids:
@@ -420,11 +433,10 @@ def flying_days_by_member(
     rows.sort(key=lambda t: (-t[1], t[0]))
 
     names = [t[0] for t in rows]
-    days  = [int(t[1]) for t in rows]
+    days = [int(t[1]) for t in rows]
 
     ops_days_total = int(qs.values("ops_date").distinct().count())
     return {"names": names, "days": days, "ops_days_total": ops_days_total}
-
 
 
 # 2) Flight duration distribution (CDF) for glider flights
@@ -450,7 +462,8 @@ def flight_duration_distribution(start_date: date, end_date: date, *, finalized_
 
     qs = qs.annotate(
         ops_date=F("logsheet__log_date"),
-        dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
+        dur_diff=ExpressionWrapper(
+            F("landing_time") - F("launch_time"), output_field=DurationField()),
     ).annotate(
         dur=Coalesce(F("duration"), F("dur_diff"))
     ).filter(
@@ -480,13 +493,16 @@ def flight_duration_distribution(start_date: date, end_date: date, *, finalized_
 
     # Ensure last point reaches ~0% at the maximum duration
     if points[-1]["x"] < secs[-1] / 3600.0:
-        points.append({"x": round(secs[-1] / 3600.0, 3), "y": round(1.0 / n * 100.0, 2)})
+        points.append(
+            {"x": round(secs[-1] / 3600.0, 3), "y": round(1.0 / n * 100.0, 2)})
 
     # Median (same as before)
-    mid = secs[n // 2] if n % 2 == 1 else 0.5 * (secs[n // 2 - 1] + secs[n // 2])
+    mid = secs[n // 2] if n % 2 == 1 else 0.5 * \
+        (secs[n // 2 - 1] + secs[n // 2])
     median_min = int(round(mid / 60.0))
 
     import bisect
+
     def pct_over(hours: float) -> float:
         threshold = hours * 3600.0
         k = bisect.bisect_right(secs, threshold)
@@ -499,8 +515,6 @@ def flight_duration_distribution(start_date: date, end_date: date, *, finalized_
     cdf_pct = [round(100.0 - p["y"], 2) for p in points]
 
     return {"points": points, "x_hours": x_hours, "cdf_pct": cdf_pct, "median_min": median_min, "pct_gt": pct_gt}
-
-
 
 
 # 3) Non-instruction glider flights by pilot
@@ -526,8 +540,11 @@ def pilot_glider_flights(start_date: date, end_date: date, *, finalized_only=Tru
     counts = [int(r["n"]) for r in rows if r["pilot_id"] in name_map]
     return {"names": names, "counts": counts}
 
-WEEKDAYS_ORDER = [2, 3, 4, 5, 6, 7, 1]  # Mon..Sun (Django ExtractWeekDay: Sun=1..Sat=7)
+
+# Mon..Sun (Django ExtractWeekDay: Sun=1..Sat=7)
+WEEKDAYS_ORDER = [2, 3, 4, 5, 6, 7, 1]
 WEEKDAYS_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
 
 def _stack_by_weekday(rows, id_order):
     """
@@ -545,6 +562,7 @@ def _stack_by_weekday(rows, id_order):
         for w_idx, lbl in zip(WEEKDAYS_ORDER, WEEKDAYS_LABELS):
             matrix[lbl].append(counts.get((mid, w_idx), 0))
     return matrix
+
 
 def instructor_flights_by_member(start_date, end_date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
     """
@@ -566,7 +584,8 @@ def instructor_flights_by_member(start_date, end_date, *, finalized_only=True, t
                    .annotate(n=Count("id"))
                    .order_by("-n", "instructor_id"))
     totals_rows = list(totals_qs)
-    ids_sorted = [r["instructor_id"] for r in totals_rows if r["n"] >= min_total][:top_n]
+    ids_sorted = [r["instructor_id"]
+                  for r in totals_rows if r["n"] >= min_total][:top_n]
     if not ids_sorted:
         return {"names": [], "labels": WEEKDAYS_LABELS, "matrix": {}, "totals": [], "inst_total": 0, "all_total": 0}
 
@@ -582,10 +601,12 @@ def instructor_flights_by_member(start_date, end_date, *, finalized_only=True, t
 
     # matrix aligned to ids_sorted
     matrix = _stack_by_weekday(
-        [{"member_id": r["instructor_id"], "wday": r["wday"], "n": r["n"]} for r in wday_rows],
+        [{"member_id": r["instructor_id"], "wday": r["wday"], "n": r["n"]}
+            for r in wday_rows],
         ids_sorted
     )
-    totals = [int(next((t["n"] for t in totals_rows if t["instructor_id"] == i), 0)) for i in ids_sorted]
+    totals = [int(next((t["n"] for t in totals_rows if t["instructor_id"] == i), 0))
+              for i in ids_sorted]
 
     # overall counts for caption
     inst_total = int(qs.count())
@@ -597,6 +618,7 @@ def instructor_flights_by_member(start_date, end_date, *, finalized_only=True, t
 
     return {"names": names, "labels": WEEKDAYS_LABELS, "matrix": matrix, "totals": totals,
             "inst_total": inst_total, "all_total": all_total}
+
 
 def towpilot_flights_by_member(start_date, end_date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
     """
@@ -617,7 +639,8 @@ def towpilot_flights_by_member(start_date, end_date, *, finalized_only=True, top
                    .annotate(n=Count("id"))
                    .order_by("-n", "tow_pilot_id"))
     totals_rows = list(totals_qs)
-    ids_sorted = [r["tow_pilot_id"] for r in totals_rows if r["n"] >= min_total][:top_n]
+    ids_sorted = [r["tow_pilot_id"]
+                  for r in totals_rows if r["n"] >= min_total][:top_n]
     if not ids_sorted:
         return {"names": [], "labels": WEEKDAYS_LABELS, "matrix": {}, "totals": [], "tow_total": 0}
 
@@ -630,10 +653,12 @@ def towpilot_flights_by_member(start_date, end_date, *, finalized_only=True, top
     names = [name_map.get(i, str(i)) for i in ids_sorted]
 
     matrix = _stack_by_weekday(
-        [{"member_id": r["tow_pilot_id"], "wday": r["wday"], "n": r["n"]} for r in wday_rows],
+        [{"member_id": r["tow_pilot_id"], "wday": r["wday"], "n": r["n"]}
+            for r in wday_rows],
         ids_sorted
     )
-    totals = [int(next((t["n"] for t in totals_rows if t["tow_pilot_id"] == i), 0)) for i in ids_sorted]
+    totals = [int(next((t["n"] for t in totals_rows if t["tow_pilot_id"] == i), 0))
+              for i in ids_sorted]
 
     tow_total = int(qs.count())
     return {"names": names, "labels": WEEKDAYS_LABELS, "matrix": matrix, "totals": totals,
@@ -661,7 +686,8 @@ def long_flights_by_pilot(
 
     qs = qs.annotate(
         ops_date=F("logsheet__log_date"),
-        dur_diff=ExpressionWrapper(F("landing_time") - F("launch_time"), output_field=DurationField()),
+        dur_diff=ExpressionWrapper(
+            F("landing_time") - F("launch_time"), output_field=DurationField()),
         dur=Coalesce(F("duration"), F("dur_diff")),
     ).filter(
         ops_date__gte=start_date, ops_date__lte=end_date,
@@ -671,7 +697,8 @@ def long_flights_by_pilot(
 
     # Counts by pilot + longest overall
     rows = list(
-        qs.values("pilot_id").annotate(n=Count("id"), longest=Max("dur")).order_by("-n", "pilot_id")
+        qs.values("pilot_id").annotate(n=Count("id"),
+                                       longest=Max("dur")).order_by("-n", "pilot_id")
     )
     ids_ordered = [r["pilot_id"] for r in rows if r["n"] >= min_count][:top_n]
     if not ids_ordered:
@@ -679,10 +706,12 @@ def long_flights_by_pilot(
 
     name_map = _display_name_map(ids_ordered)
     names = [name_map.get(i, str(i)) for i in ids_ordered]
-    counts = [int(next((r["n"] for r in rows if r["pilot_id"] == i), 0)) for i in ids_ordered]
+    counts = [int(next((r["n"] for r in rows if r["pilot_id"] == i), 0))
+              for i in ids_ordered]
 
     longest_any = qs.aggregate(m=Max("dur"))["m"]
-    longest_min = int(round(longest_any.total_seconds() / 60.0)) if longest_any else 0
+    longest_min = int(round(longest_any.total_seconds() / 60.0)
+                      ) if longest_any else 0
 
     return {
         "names": names,
@@ -715,8 +744,8 @@ def duty_days_by_member(
     # Distinct days per role
     do_rows = list(
         base.filter(duty_officer__isnull=False)
-            .values("duty_officer_id")
-            .annotate(n=Count("log_date", distinct=True))
+        .values("duty_officer_id")
+        .annotate(n=Count("log_date", distinct=True))
     )
     ado_rows = list(
         base.filter(assistant_duty_officer__isnull=False)
@@ -776,13 +805,13 @@ def time_of_day_operations(
 ) -> Dict[str, Any]:
     """
     Returns earliest takeoff and latest landing times by Julian day of year.
-    
+
     Returns a scatter plot data structure with:
     - takeoff_points: [{"x": julian_day, "y": time_decimal}] for earliest takeoffs
     - landing_points: [{"x": julian_day, "y": time_decimal}] for latest landings 
     - mean_takeoff_times: [{"x": julian_day, "y": mean_time_decimal}] for averaging line
     - mean_landing_times: [{"x": julian_day, "y": mean_time_decimal}] for averaging line
-    
+
     Where time_decimal represents time as decimal hours (e.g., 14.5 = 2:30 PM)
     """
     from logsheet.models import Flight
@@ -811,46 +840,60 @@ def time_of_day_operations(
 
     # Get all flights with their dates and times
     flights_data = list(qs.values("ops_date", "launch_time", "landing_time"))
-    
+
     # Group flights by Julian day and find min/max times
     daily_data = defaultdict(lambda: {"takeoffs": [], "landings": []})
-    
+
     for flight in flights_data:
         date_obj = flight["ops_date"]
         julian_day = date_obj.timetuple().tm_yday
-        
+
         if flight["launch_time"]:
-            daily_data[julian_day]["takeoffs"].append(time_to_decimal(flight["launch_time"]))
+            daily_data[julian_day]["takeoffs"].append(
+                time_to_decimal(flight["launch_time"]))
         if flight["landing_time"]:
-            daily_data[julian_day]["landings"].append(time_to_decimal(flight["landing_time"]))
+            daily_data[julian_day]["landings"].append(
+                time_to_decimal(flight["landing_time"]))
 
     # Calculate extreme points and means
     takeoff_points = []
     landing_points = []
-    mean_takeoff_times = []
-    mean_landing_times = []
-    
+    earliest_takeoff_by_day = []
+    latest_landing_by_day = []
+
     for julian_day in range(1, 366):  # 1-365
         day_data = daily_data[julian_day]
-        
         if day_data["takeoffs"]:
             earliest_takeoff = min(day_data["takeoffs"])
-            mean_takeoff = sum(day_data["takeoffs"]) / len(day_data["takeoffs"])
-            
-            takeoff_points.append({"x": julian_day, "y": round(earliest_takeoff, 2)})
-            mean_takeoff_times.append({"x": julian_day, "y": round(mean_takeoff, 2)})
-        
+            takeoff_points.append(
+                {"x": julian_day, "y": round(earliest_takeoff, 2)})
+            earliest_takeoff_by_day.append((julian_day, earliest_takeoff))
         if day_data["landings"]:
             latest_landing = max(day_data["landings"])
-            mean_landing = sum(day_data["landings"]) / len(day_data["landings"])
-            
-            landing_points.append({"x": julian_day, "y": round(latest_landing, 2)})
-            mean_landing_times.append({"x": julian_day, "y": round(mean_landing, 2)})
+            landing_points.append(
+                {"x": julian_day, "y": round(latest_landing, 2)})
+            latest_landing_by_day.append((julian_day, latest_landing))
+
+    # Compute moving average for smoothing (window=7 days)
+    def moving_average(points, window=7):
+        if not points:
+            return []
+        result = []
+        n = len(points)
+        for i in range(n):
+            start = max(0, i - window // 2)
+            end = min(n, i + window // 2 + 1)
+            avg = sum(val for _, val in points[start:end]) / (end - start)
+            result.append({"x": points[i][0], "y": round(avg, 2)})
+        return result
+
+    mean_earliest_takeoff = moving_average(earliest_takeoff_by_day)
+    mean_latest_landing = moving_average(latest_landing_by_day)
 
     return {
         "takeoff_points": takeoff_points,
         "landing_points": landing_points,
-        "mean_takeoff_times": mean_takeoff_times,
-        "mean_landing_times": mean_landing_times,
+        "mean_earliest_takeoff": mean_earliest_takeoff,
+        "mean_latest_landing": mean_latest_landing,
         "total_flight_days": len([day for day in daily_data.values() if day["takeoffs"] or day["landings"]]),
     }

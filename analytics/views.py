@@ -6,12 +6,14 @@ from django.contrib.auth.decorators import user_passes_test
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from . import queries
 
+
 def _is_active_member(user):
     if not user.is_authenticated:
         return False
     if getattr(user, "is_superuser", False):
         return True
     return getattr(user, "membership_status", None) in DEFAULT_ACTIVE_STATUSES
+
 
 @user_passes_test(_is_active_member, login_url="login")
 def dashboard(request):
@@ -51,6 +53,7 @@ def dashboard(request):
         ) or {}
     )
     # --- Glider utilization date range (defaults to YTD) ---
+
     def _parse_dt(s: str | None) -> date | None:
         if not s:
             return None
@@ -58,15 +61,16 @@ def dashboard(request):
             return datetime.fromisoformat(s).date()
         except Exception:
             return None
-    
+
     util_start = _parse_dt(request.GET.get("util_start"))
-    util_end   = _parse_dt(request.GET.get("util_end"))
-    
+    util_end = _parse_dt(request.GET.get("util_end"))
+
     today = date.today()
     default_start = date(today.year, 1, 1)
     util_start = util_start or default_start
-    util_end   = util_end or today
-    util = queries.glider_utilization(util_start, util_end, finalized_only=finalized_only, top_n=12)
+    util_end = util_end or today
+    util = queries.glider_utilization(
+        util_start, util_end, finalized_only=finalized_only, top_n=12)
     util_private = queries.glider_utilization(
         util_start, util_end,
         finalized_only=finalized_only,
@@ -75,20 +79,28 @@ def dashboard(request):
         bucket_private=False,     # list each private ship individually
         include_unknown=False,    # omit null-glider flights
     )
-   
+
     fy_years = cast(list[int], by_acft_raw.get("years") or [])
     fy_categories = cast(list[str], by_acft_raw.get("categories") or [])
     fy_matrix = cast(Dict[str, list[int]], by_acft_raw.get("matrix") or {})
-    fdays = queries.flying_days_by_member(util_start, util_end, finalized_only=finalized_only, min_days=2) or {}
-    dur   = queries.flight_duration_distribution(util_start, util_end, finalized_only=finalized_only) or {}
-    pgf   = queries.pilot_glider_flights(util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
-    inst = queries.instructor_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
-    tow  = queries.towpilot_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
-    long3h = queries.long_flights_by_pilot(util_start, util_end, finalized_only=finalized_only, threshold_hours=3.0, top_n=30) or {}
-    duty   = queries.duty_days_by_member(util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
-    
+    fdays = queries.flying_days_by_member(
+        util_start, util_end, finalized_only=finalized_only, min_days=2) or {}
+    dur = queries.flight_duration_distribution(
+        util_start, util_end, finalized_only=finalized_only) or {}
+    pgf = queries.pilot_glider_flights(
+        util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
+    inst = queries.instructor_flights_by_member(
+        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    tow = queries.towpilot_flights_by_member(
+        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    long3h = queries.long_flights_by_pilot(
+        util_start, util_end, finalized_only=finalized_only, threshold_hours=3.0, top_n=30) or {}
+    duty = queries.duty_days_by_member(
+        util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
+
     # Time of day operations for yearly view (using start/end years)
-    time_ops = queries.time_of_day_operations(start, end, finalized_only=finalized_only) or {}
+    time_ops = queries.time_of_day_operations(
+        start, end, finalized_only=finalized_only) or {}
 
     ctx = {
         "year": end,
@@ -129,9 +141,9 @@ def dashboard(request):
         "dur_x_hours": dur.get("x_hours", []),
         "dur_cdf_pct": dur.get("cdf_pct", []),
         "dur_median_min": dur.get("median_min", 0),
-        "dur_pct_gt": dur.get("pct_gt", {1:0.0,2:0.0,3:0.0}),
+        "dur_pct_gt": dur.get("pct_gt", {1: 0.0, 2: 0.0, 3: 0.0}),
         "dur_points": dur.get("points", []),
- 
+
         # pilot flights (non-instruction)
         "pgf_names": pgf.get("names", []),
         "pgf_counts": pgf.get("counts", []),
@@ -142,7 +154,7 @@ def dashboard(request):
         "inst_totals": inst.get("totals", []),
         "inst_total":  inst.get("inst_total", 0),
         "all_total":   inst.get("all_total", 0),
-    
+
         "tow_names":   tow.get("names", []),
         "tow_labels":  tow.get("labels", []),
         "tow_matrix":  tow.get("matrix", {}),
@@ -153,23 +165,23 @@ def dashboard(request):
         "long3h_counts": long3h.get("counts", []),
         "long3h_longest_min": long3h.get("longest_min", 0),
         "long3h_thresh": long3h.get("threshold_hours", 3.0),
-    
+
         "duty_names": duty.get("names", []),
-        "duty_labels": duty.get("labels", ["DO","ADO"]),
+        "duty_labels": duty.get("labels", ["DO", "ADO"]),
         "duty_matrix": duty.get("matrix", {"DO": [], "ADO": []}),
         "duty_totals": duty.get("totals", []),
         "duty_do_total": duty.get("do_total", 0),
         "duty_ado_total": duty.get("ado_total", 0),
         "duty_ops_days_total": duty.get("ops_days_total", 0),
-        
+
         # Time of day operations
         "timeops_takeoff_points": time_ops.get("takeoff_points", []),
         "timeops_landing_points": time_ops.get("landing_points", []),
-        "timeops_mean_takeoff_times": time_ops.get("mean_takeoff_times", []),
-        "timeops_mean_landing_times": time_ops.get("mean_landing_times", []),
+        "timeops_mean_earliest_takeoff": time_ops.get("mean_earliest_takeoff", []),
+        "timeops_mean_latest_landing": time_ops.get("mean_latest_landing", []),
         "timeops_total_flight_days": time_ops.get("total_flight_days", 0),
 
-        }
+    }
 
     analytics_data = {
         "cumulative": {
@@ -211,7 +223,7 @@ def dashboard(request):
             "x_hours": ctx.get("dur_x_hours", []),
             "cdf_pct": ctx.get("dur_cdf_pct", []),
             "median_min": ctx.get("dur_median_min", 0),
-            "pct_gt": ctx.get("dur_pct_gt", {"1":0,"2":0,"3":0}),
+            "pct_gt": ctx.get("dur_pct_gt", {"1": 0, "2": 0, "3": 0}),
         },
         "instructors": {
             "names": ctx.get("inst_names", []),
@@ -237,24 +249,24 @@ def dashboard(request):
         },
         "duty": {
             "names": ctx.get("duty_names", []),
-            "labels": ctx.get("duty_labels", ["DO","ADO"]),
+            "labels": ctx.get("duty_labels", ["DO", "ADO"]),
             "matrix": ctx.get("duty_matrix", {"DO": [], "ADO": []}),
             "totals": ctx.get("duty_totals", []),
             "do_total": ctx.get("duty_do_total", 0),
             "ado_total": ctx.get("duty_ado_total", 0),
             "ops_days_total": ctx.get("duty_ops_days_total", 0),
         },
-        
+
         "time_ops": {
             "takeoff_points": ctx.get("timeops_takeoff_points", []),
             "landing_points": ctx.get("timeops_landing_points", []),
-            "mean_takeoff_times": ctx.get("timeops_mean_takeoff_times", []),
-            "mean_landing_times": ctx.get("timeops_mean_landing_times", []),
+            "mean_earliest_takeoff": ctx.get("timeops_mean_earliest_takeoff", []),
+            "mean_latest_landing": ctx.get("timeops_mean_latest_landing", []),
             "total_flight_days": ctx.get("timeops_total_flight_days", 0),
         },
 
     }
 
     ctx["analytics_data"] = analytics_data
- 
+
     return render(request, "analytics/dashboard.html", ctx)

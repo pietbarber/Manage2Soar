@@ -1,5 +1,5 @@
 /* global Chart */
-(function(){
+(function () {
   const cs = getComputedStyle(document.documentElement);
   const text = cs.getPropertyValue('--chart-text').trim() || '#212529';
   const grid = cs.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,.1)';
@@ -8,11 +8,11 @@
   Chart.defaults.scale.ticks.color = text;
 })();
 
-;(function (w) {
+; (function (w) {
   const $ = (id) => document.getElementById(id);
 
   // ---------- Reusable helpers ----------
-  function makeHBar(canvasId, labels, values, { color="#1f77b4", xTitle="", legendLabel="" } = {}) {
+  function makeHBar(canvasId, labels, values, { color = "#1f77b4", xTitle = "", legendLabel = "" } = {}) {
     const ctx = $(canvasId)?.getContext?.("2d"); if (!ctx) return null;
     const maxVal = Math.max(1, ...values.map(v => Number(v) || 0));
     const padMax = Math.ceil((maxVal * 1.05) / 5) * 5;
@@ -33,7 +33,7 @@
     });
   }
 
-  function makeCDF(canvasId, points, { color="#5dade2", xTitle="Duration (hours)" } = {}) {
+  function makeCDF(canvasId, points, { color = "#5dade2", xTitle = "Duration (hours)" } = {}) {
     const ctx = $(canvasId)?.getContext?.("2d"); if (!ctx) return null;
 
     // Fill from the top (0% at top thanks to y.reverse)
@@ -75,150 +75,168 @@
     const totals = d.totals || {}, instr = d.instr || {};
     const currentYear = d.current_year;
 
-    const anchors = {1:"Jan",32:"Feb",60:"Mar",91:"Apr",121:"May",152:"Jun",182:"Jul",213:"Aug",244:"Sep",274:"Oct",305:"Nov",335:"Dec"};
-    const colorForYear = (y) => { const base=(y*9301+49297)%233280; const hue=(base/233280)*360; return `hsl(${hue},60%,45%)`; };
-    const doyToday = () => { const t=new Date(); return Math.floor((t - new Date(t.getFullYear(),0,0))/86400000); };
+    const anchors = { 1: "Jan", 32: "Feb", 60: "Mar", 91: "Apr", 121: "May", 152: "Jun", 182: "Jul", 213: "Aug", 244: "Sep", 274: "Oct", 305: "Nov", 335: "Dec" };
+    const colorForYear = (y) => { const base = (y * 9301 + 49297) % 233280; const hue = (base / 233280) * 360; return `hsl(${hue},60%,45%)`; };
+    const doyToday = () => { const t = new Date(); return Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 86400000); };
     const todayYear = new Date().getFullYear(), todayDoy = doyToday();
 
     const datasets = years.map((y) => {
-      const c=colorForYear(y), isCurrent=y===currentYear, arr=(dataByYear[String(y)]||[]).slice();
-      if (isCurrent && y===todayYear) { for (let i=todayDoy;i<arr.length;i++) arr[i]=null; }
+      const c = colorForYear(y), isCurrent = y === currentYear, arr = (dataByYear[String(y)] || []).slice();
+      if (isCurrent && y === todayYear) { for (let i = todayDoy; i < arr.length; i++) arr[i] = null; }
       return {
-        label:String(y), data:arr, borderColor:c, backgroundColor:c, tension:0.2,
-        borderWidth:isCurrent?3:1.5, borderDash:isCurrent?undefined:[5,4],
-        pointRadius:isCurrent?3:0, pointHoverRadius:isCurrent?5:3,
-        pointBackgroundColor:isCurrent?"#fff":undefined, pointBorderColor:isCurrent?c:undefined, pointBorderWidth:isCurrent?2:0, spanGaps:false
+        label: String(y), data: arr, borderColor: c, backgroundColor: c, tension: 0.2,
+        borderWidth: isCurrent ? 3 : 1.5, borderDash: isCurrent ? undefined : [5, 4],
+        pointRadius: isCurrent ? 3 : 0, pointHoverRadius: isCurrent ? 5 : 3,
+        pointBackgroundColor: isCurrent ? "#fff" : undefined, pointBorderColor: isCurrent ? c : undefined, pointBorderWidth: isCurrent ? 2 : 0, spanGaps: false
       };
     });
 
-    const flatMax = datasets.reduce((m,ds)=>Math.max(m, Math.max(0,...(ds.data||[]).filter(v=>v!=null))), 0);
+    const flatMax = datasets.reduce((m, ds) => Math.max(m, Math.max(0, ...(ds.data || []).filter(v => v != null))), 0);
     const yMax = Math.max(10, Math.ceil((flatMax * 1.05) / 50) * 50);
 
     if (w.cumuChart?.destroy) w.cumuChart.destroy();
     const ctx = $("cumuChart")?.getContext?.("2d"); if (!ctx) return;
     w.cumuChart = new Chart(ctx, {
-      type:"line",
-      data:{ labels:L, datasets },
-      options:{
-        responsive:true, maintainAspectRatio:false, animation:false, interaction:{mode:"nearest",intersect:false},
-        plugins:{ legend:{position:"left",labels:{boxWidth:18}}, tooltip:{ callbacks:{
-          title:(items)=>{ if(!items.length) return ""; const i=items[0]; const y=Number(i.dataset.label); const doy=L[i.dataIndex]; const dte=new Date(y,0,doy); const month=dte.toLocaleString(undefined,{month:"short"}); const day=dte.getDate(); return `${y} • Day ${doy} (${month} ${day})`; },
-          label:(item)=>{ const y=String(item.dataset.label); const val=item.parsed.y; const tot=totals[y]??val; const ins=instr[y]??0; const pct=tot?Math.round((ins/tot)*100):0; return ` ${val} flights (total ${tot}, ${ins} instruction • ${pct}%)`; }
-        }}},
-        scales:{
-          x:{ title:{display:true,text:"Julian Day (1–365)"}, ticks:{ callback:(_,idx)=>anchors[L[idx]]||"", maxRotation:0, autoSkip:false },
-              grid:{ color:(c)=> anchors[L[c.index]] ? undefined : "rgba(0,0,0,0)" } },
-          y:{ beginAtZero:true, max:yMax, ticks:{precision:0}, title:{display:true,text:"Cumulative Flights"} }
+      type: "line",
+      data: { labels: L, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: "nearest", intersect: false },
+        plugins: {
+          legend: { position: "left", labels: { boxWidth: 18 } }, tooltip: {
+            callbacks: {
+              title: (items) => { if (!items.length) return ""; const i = items[0]; const y = Number(i.dataset.label); const doy = L[i.dataIndex]; const dte = new Date(y, 0, doy); const month = dte.toLocaleString(undefined, { month: "short" }); const day = dte.getDate(); return `${y} • Day ${doy} (${month} ${day})`; },
+              label: (item) => { const y = String(item.dataset.label); const val = item.parsed.y; const tot = totals[y] ?? val; const ins = instr[y] ?? 0; const pct = tot ? Math.round((ins / tot) * 100) : 0; return ` ${val} flights (total ${tot}, ${ins} instruction • ${pct}%)`; }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: "Julian Day (1–365)" }, ticks: { callback: (_, idx) => anchors[L[idx]] || "", maxRotation: 0, autoSkip: false },
+            grid: { color: (c) => anchors[L[c.index]] ? undefined : "rgba(0,0,0,0)" }
+          },
+          y: { beginAtZero: true, max: yMax, ticks: { precision: 0 }, title: { display: true, text: "Cumulative Flights" } }
         }
       }
     });
   }
 
   function initByAircraft(d) {
-    const years = d.years||[], cats=d.cats||[], matrix=d.matrix||{};
+    const years = d.years || [], cats = d.cats || [], matrix = d.matrix || {};
     const colorForCategory = (cat, i) =>
-      cat==="Private" ? "#BDBDBD" :
-      cat==="Other"   ? "#9E9E9E" :
-      cat==="Unknown" ? "#8E44AD" :
-      `hsl(${(i*137.508)%360},65%,48%)`;
+      cat === "Private" ? "#BDBDBD" :
+        cat === "Other" ? "#9E9E9E" :
+          cat === "Unknown" ? "#8E44AD" :
+            `hsl(${(i * 137.508) % 360},65%,48%)`;
 
-    const datasets = cats.map((cat,i)=>({
-      label:cat, data:(matrix[cat]||[]).map(v=>Number(v)||0),
-      backgroundColor:colorForCategory(cat,i), borderColor:colorForCategory(cat,i), borderWidth:1
+    const datasets = cats.map((cat, i) => ({
+      label: cat, data: (matrix[cat] || []).map(v => Number(v) || 0),
+      backgroundColor: colorForCategory(cat, i), borderColor: colorForCategory(cat, i), borderWidth: 1
     }));
-    const totals = years.map((_,i)=>datasets.reduce((s,ds)=>s+(Number(ds.data[i])||0),0));
-    const yMax = Math.max(10, Math.ceil((Math.max(0,...totals)*1.10)/50)*50);
+    const totals = years.map((_, i) => datasets.reduce((s, ds) => s + (Number(ds.data[i]) || 0), 0));
+    const yMax = Math.max(10, Math.ceil((Math.max(0, ...totals) * 1.10) / 50) * 50);
 
     if (w.byAcftChart?.destroy) w.byAcftChart.destroy();
     const ctx = $("byAcftChart")?.getContext?.("2d"); if (!ctx) return;
     w.byAcftChart = new Chart(ctx, {
-      type:"bar",
-      data:{ labels: years.map(String), datasets },
-      options:{
-        responsive:true, maintainAspectRatio:false, animation:false,
-        plugins:{ legend:{position:"left"}, tooltip:{ callbacks:{
-          title:(items)=> items[0]?.label ?? "", label:(it)=>` ${it.dataset.label}: ${it.formattedValue}`,
-          footer:(items)=>{ const i=items[0]?.dataIndex??0; return `Total: ${totals[i]||0}`; }
-        }}},
-        scales:{ x:{stacked:true,title:{display:true,text:"Year"}}, y:{stacked:true,beginAtZero:true,suggestedMax:yMax,title:{display:true,text:"Flights"},ticks:{precision:0}} }
+      type: "bar",
+      data: { labels: years.map(String), datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: {
+          legend: { position: "left" }, tooltip: {
+            callbacks: {
+              title: (items) => items[0]?.label ?? "", label: (it) => ` ${it.dataset.label}: ${it.formattedValue}`,
+              footer: (items) => { const i = items[0]?.dataIndex ?? 0; return `Total: ${totals[i] || 0}`; }
+            }
+          }
+        },
+        scales: { x: { stacked: true, title: { display: true, text: "Year" } }, y: { stacked: true, beginAtZero: true, suggestedMax: yMax, title: { display: true, text: "Flights" }, ticks: { precision: 0 } } }
       }
     });
   }
 
-  function initUtilization(d, {canvasId, statusId}) {
-    const names=d.names||[], flights=d.flights||[], hours=d.hours||[], avgm=d.avgm||[];
-    const C_FLIGHTS="#e74c3c", C_HOURS="#3498db", C_AVG="#8bc34a";
+  function initUtilization(d, { canvasId, statusId }) {
+    const names = d.names || [], flights = d.flights || [], hours = d.hours || [], avgm = d.avgm || [];
+    const C_FLIGHTS = "#e74c3c", C_HOURS = "#3498db", C_AVG = "#8bc34a";
     const xMax = Math.max(1, ...flights.map(Number), ...hours.map(Number), ...avgm.map(Number));
-    const padMax = Math.ceil((xMax*1.05)/20)*20;
+    const padMax = Math.ceil((xMax * 1.05) / 20) * 20;
 
-    if (!names.length) { $(statusId)&&($(statusId).textContent="No utilization data for the selected period."); return; }
+    if (!names.length) { $(statusId) && ($(statusId).textContent = "No utilization data for the selected period."); return; }
     if (w[canvasId]?.destroy) w[canvasId].destroy();
-    const ctx = $(canvasId)?.getContext?.("2d"); if(!ctx) return;
+    const ctx = $(canvasId)?.getContext?.("2d"); if (!ctx) return;
 
     w[canvasId] = new Chart(ctx, {
-      type:"bar",
-      data:{ labels:names, datasets:[
-        { label:"Total Flights", data:flights, backgroundColor:C_FLIGHTS, borderColor:C_FLIGHTS, borderWidth:1 },
-        { label:"Total Hours",   data:hours,   backgroundColor:C_HOURS,   borderColor:C_HOURS,   borderWidth:1 },
-        { label:"Avg Flight (min)", data:avgm, backgroundColor:C_AVG, borderColor:C_AVG, borderWidth:1 },
-      ]},
-      options:{
-        indexAxis:"y", responsive:true, maintainAspectRatio:false, animation:false,
-        plugins:{ legend:{position:"right"}, tooltip:{ callbacks:{
-          label:(it)=>{ const ds=it.dataset.label; const v=Number(it.formattedValue);
-            if(ds==="Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
-            if(ds==="Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
-            return ` ${ds}: ${v}`; }
-        }}},
-        scales:{ x:{beginAtZero:true,suggestedMax:padMax,title:{display:true,text:"Flights / Hours / Minutes (scaled)"},ticks:{precision:0}}, y:{ticks:{autoSkip:false}} }
+      type: "bar",
+      data: {
+        labels: names, datasets: [
+          { label: "Total Flights", data: flights, backgroundColor: C_FLIGHTS, borderColor: C_FLIGHTS, borderWidth: 1 },
+          { label: "Total Hours", data: hours, backgroundColor: C_HOURS, borderColor: C_HOURS, borderWidth: 1 },
+          { label: "Avg Flight (min)", data: avgm, backgroundColor: C_AVG, borderColor: C_AVG, borderWidth: 1 },
+        ]
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: {
+          legend: { position: "right" }, tooltip: {
+            callbacks: {
+              label: (it) => {
+                const ds = it.dataset.label; const v = Number(it.formattedValue);
+                if (ds === "Total Hours") return ` ${ds}: ${v.toFixed(1)} h`;
+                if (ds === "Avg Flight (min)") return ` ${ds}: ${Math.round(v)} min`;
+                return ` ${ds}: ${v}`;
+              }
+            }
+          }
+        },
+        scales: { x: { beginAtZero: true, suggestedMax: padMax, title: { display: true, text: "Flights / Hours / Minutes (scaled)" }, ticks: { precision: 0 } }, y: { ticks: { autoSkip: false } } }
       }
     });
-    $(statusId)&&($(statusId).textContent="");
+    $(statusId) && ($(statusId).textContent = "");
   }
 
   function initFlyingDays(d) {
-    const names=d.names||[], days=d.days||[], ops=d.ops_total||0;
-    if (!names.length) { $("fdStatus") && ( $("fdStatus").textContent = "No flying-day data for the selected period." ); return; }
-    makeHBar("fdChart", names, days, { color:"#1f3a93", xTitle:"Days with flying activity", legendLabel:"Days" });
-    $("fdStatus") && ( $("fdStatus").textContent = `Members with ≥2 days. Ops days this period: ${ops}.` );
+    const names = d.names || [], days = d.days || [], ops = d.ops_total || 0;
+    if (!names.length) { $("fdStatus") && ($("fdStatus").textContent = "No flying-day data for the selected period."); return; }
+    makeHBar("fdChart", names, days, { color: "#1f3a93", xTitle: "Days with flying activity", legendLabel: "Days" });
+    $("fdStatus") && ($("fdStatus").textContent = `Members with ≥2 days. Ops days this period: ${ops}.`);
   }
 
   function initPilotFlights(d) {
-    const names=d.names||[], counts=d.counts||[];
-    if (!names.length) { $("pgfStatus") && ( $("pgfStatus").textContent = "No pilot-flight data for the selected period." ); return; }
-    makeHBar("pgfChart", names, counts, { color:"#e74c3c", xTitle:"Flights", legendLabel:"Flights" });
-    $("pgfStatus") && ( $("pgfStatus").textContent = "Members with ≥2 non-instruction glider flights." );
+    const names = d.names || [], counts = d.counts || [];
+    if (!names.length) { $("pgfStatus") && ($("pgfStatus").textContent = "No pilot-flight data for the selected period."); return; }
+    makeHBar("pgfChart", names, counts, { color: "#e74c3c", xTitle: "Flights", legendLabel: "Flights" });
+    $("pgfStatus") && ($("pgfStatus").textContent = "Members with ≥2 non-instruction glider flights.");
   }
 
   function initDuration(d) {
     const pts = Array.isArray(d.points) && d.points.length
       ? d.points
-      : (Array.isArray(d.x_hours) ? d.x_hours.map((x,i)=>({x, y:(d.cdf_pct||[])[i]||0})) : []);
-    if (!pts.length) { const el=$("durStatus"); if(el) el.textContent="No duration data for the selected period."; return; }
+      : (Array.isArray(d.x_hours) ? d.x_hours.map((x, i) => ({ x, y: (d.cdf_pct || [])[i] || 0 })) : []);
+    if (!pts.length) { const el = $("durStatus"); if (el) el.textContent = "No duration data for the selected period."; return; }
 
     if (w.durChart?.destroy) w.durChart.destroy();
-    w.durChart = makeCDF("durChart", pts, { color:"#5dade2" });
+    w.durChart = makeCDF("durChart", pts, { color: "#5dade2" });
 
-    const med = d.median_min || 0, p = d.pct_gt || {"1":0,"2":0,"3":0};
+    const med = d.median_min || 0, p = d.pct_gt || { "1": 0, "2": 0, "3": 0 };
     const s = $("durStatus");
     if (s) s.textContent = `Median = ${med} min • Over 1h: ${p["1"]}% • Over 2h: ${p["2"]}% • Over 3h: ${p["3"]}%`;
   }
 
   // Public entry: DO NOT overwrite the object (keeps .helpers intact)
-  w.AnalyticsCharts.initAll = function(all) {
+  w.AnalyticsCharts.initAll = function (all) {
     if (!all || typeof all !== "object") return;
     initCumulative(all.cumulative || {});
     initByAircraft(all.by_acft || {});
-    initUtilization(all.util || {},      {canvasId:"utilChart",    statusId:"utilStatus"});
-    initUtilization(all.util_priv || {}, {canvasId:"utilPrivChart", statusId:"utilPrivStatus"});
+    initUtilization(all.util || {}, { canvasId: "utilChart", statusId: "utilStatus" });
+    initUtilization(all.util_priv || {}, { canvasId: "utilPrivChart", statusId: "utilPrivStatus" });
     initFlyingDays(all.fdays || {});
     initPilotFlights(all.pgf || {});
     initDuration(all.duration || {});
     // These two are defined OUTSIDE (Option B); call if available
     if (w.initInstructorByWeekday) w.initInstructorByWeekday(all.instructors || {});
-    if (w.initTowByWeekday)       w.initTowByWeekday(all.tows || {});
-    if (w.initLongFlights3h)      w.initLongFlights3h(all.long3h || {});
-    if (w.initDutyDays)           w.initDutyDays(all.duty || {});
+    if (w.initTowByWeekday) w.initTowByWeekday(all.tows || {});
+    if (w.initLongFlights3h) w.initLongFlights3h(all.long3h || {});
+    if (w.initDutyDays) w.initDutyDays(all.duty || {});
     initTimeOps(all.time_ops || {});
   };
 
@@ -257,20 +275,20 @@ function makeHStacked(canvasId, names, labels, matrix, colors) {
 
 // ---------- External initializers (Option B) ----------
 function initInstructorByWeekday(d) {
-  const names=d.names||[], labels=d.labels||[], matrix=d.matrix||{}, instTotal=d.inst_total||0, allTotal=d.all_total||0;
-  const blues = ["#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8"];
+  const names = d.names || [], labels = d.labels || [], matrix = d.matrix || {}, instTotal = d.inst_total || 0, allTotal = d.all_total || 0;
+  const blues = ["#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"];
   const el = document.getElementById("instStatus");
-  if (!names.length) { if(el) el.textContent="No instructor flights in the selected period."; return; }
+  if (!names.length) { if (el) el.textContent = "No instructor flights in the selected period."; return; }
   if (window.instChart?.destroy) window.instChart.destroy();
   window.instChart = makeHStacked("instChart", names, labels, matrix, blues);
   if (el) el.textContent = `${instTotal.toLocaleString()} instructional flights out of ${allTotal.toLocaleString()} total flights in range.`;
 }
 
 function initTowByWeekday(d) {
-  const names=d.names||[], labels=d.labels||[], matrix=d.matrix||{}, towTotal=d.tow_total||0;
-  const greens = ["#e3f9e5","#c1eac5","#a3d9a5","#7bc47f","#57ae5b","#3f9142","#2f8132"];
+  const names = d.names || [], labels = d.labels || [], matrix = d.matrix || {}, towTotal = d.tow_total || 0;
+  const greens = ["#e3f9e5", "#c1eac5", "#a3d9a5", "#7bc47f", "#57ae5b", "#3f9142", "#2f8132"];
   const el = document.getElementById("towStatus");
-  if (!names.length) { if(el) el.textContent="No tow-pilot flights in the selected period."; return; }
+  if (!names.length) { if (el) el.textContent = "No tow-pilot flights in the selected period."; return; }
   if (window.towChart?.destroy) window.towChart.destroy();
   window.towChart = makeHStacked("towChart", names, labels, matrix, greens);
   if (el) el.textContent = `${towTotal.toLocaleString()} total tows in range.`;
@@ -307,12 +325,12 @@ function initLongFlights3h(d) {
 }
 
 function initDutyDays(d) {
-  const names  = d.names || [];
+  const names = d.names || [];
   const labels = d.labels || ["DO", "ADO"];
-  const matrix = d.matrix || {"DO":[], "ADO":[]};
-  const doTotal  = d.do_total  || 0;
+  const matrix = d.matrix || { "DO": [], "ADO": [] };
+  const doTotal = d.do_total || 0;
   const adoTotal = d.ado_total || 0;
-  const opsDays  = d.ops_days_total || 0;
+  const opsDays = d.ops_days_total || 0;
   const status = document.getElementById("dutyStatus");
 
   if (!names.length) { if (status) status.textContent = "No DO/ADO assignments in the selected date range."; return; }
@@ -330,8 +348,8 @@ function initDutyDays(d) {
 function initTimeOps(d) {
   const takeoffPoints = d.takeoff_points || [];
   const landingPoints = d.landing_points || [];
-  const meanTakeoffTimes = d.mean_takeoff_times || [];
-  const meanLandingTimes = d.mean_landing_times || [];
+  const meanEarliestTakeoff = d.mean_earliest_takeoff || [];
+  const meanLatestLanding = d.mean_latest_landing || [];
   const totalFlightDays = d.total_flight_days || 0;
   const status = document.getElementById("timeOpsStatus");
 
@@ -355,6 +373,7 @@ function initTimeOps(d) {
   window.timeOpsChart = new Chart(ctx, {
     type: "scatter",
     data: {
+      labels: [], // Defensive: Chart.js expects this sometimes
       datasets: [
         {
           label: "Earliest Takeoffs",
@@ -365,7 +384,7 @@ function initTimeOps(d) {
           pointHoverRadius: 5,
         },
         {
-          label: "Latest Landings", 
+          label: "Latest Landings",
           data: landingPoints,
           backgroundColor: "#27ae60", // Green
           borderColor: "#27ae60",
@@ -373,26 +392,26 @@ function initTimeOps(d) {
           pointHoverRadius: 5,
         },
         {
-          label: "Mean Takeoff Times",
-          data: meanTakeoffTimes,
+          label: "Mean Earliest Takeoff",
+          data: meanEarliestTakeoff,
           backgroundColor: "rgba(52, 152, 219, 0.3)", // Light blue
           borderColor: "#3498db",
           borderWidth: 2,
           pointRadius: 0,
           type: "line",
           fill: false,
-          tension: 0.1,
+          tension: 0.4, // More smoothing
         },
         {
-          label: "Mean Landing Times",
-          data: meanLandingTimes,
+          label: "Mean Latest Landing",
+          data: meanLatestLanding,
           backgroundColor: "rgba(39, 174, 96, 0.3)", // Light green
           borderColor: "#27ae60",
           borderWidth: 2,
           pointRadius: 0,
           type: "line",
           fill: false,
-          tension: 0.1,
+          tension: 0.4, // More smoothing
         }
       ]
     },
@@ -430,7 +449,7 @@ function initTimeOps(d) {
           max: 365,
           ticks: {
             stepSize: 30,
-            callback: function(value) {
+            callback: function (value) {
               // Show month labels at key points
               if ([1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335].includes(value)) {
                 const date = new Date(2024, 0, value);
@@ -447,7 +466,7 @@ function initTimeOps(d) {
           max: 21, // 9 PM
           ticks: {
             stepSize: 2,
-            callback: function(value) {
+            callback: function (value) {
               return formatTime(value);
             }
           }
@@ -492,7 +511,7 @@ function exportSVG(canvasId, name) {
     : (canvas.toDataURL ? canvas.toDataURL("image/png") : null);
   if (!url) return;
   const svg =
-`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <image href="${url}" x="0" y="0" width="${w}" height="${h}" />
 </svg>`;
   blobDownload(`${name}.svg`, "image/svg+xml", svg);
@@ -513,9 +532,21 @@ function chartToCSV(canvasId) {
   const datasets = Array.isArray(data.datasets) ? data.datasets : [];
 
   // XY line (duration)
-  if (type === "line" && datasets.length === 1 && datasets[0].data && typeof datasets[0].data[0] === "object") {
-    const pts = datasets[0].data;
-    const rows = [["x", "y"]].concat(pts.map(p => [p.x, p.y]));
+  if ((type === "line" || type === "scatter") && datasets.length >= 1 && datasets[0].data && typeof datasets[0].data[0] === "object") {
+    // For scatter/line charts with multiple datasets of {x, y}
+    const allX = new Set();
+    datasets.forEach(ds => (ds.data || []).forEach(p => allX.add(p.x)));
+    const sortedX = Array.from(allX).sort((a, b) => a - b);
+    const header = ["x", ...datasets.map(ds => ds.label || "Series")];
+    const rows = [header];
+    for (const x of sortedX) {
+      const row = [x];
+      for (const ds of datasets) {
+        const pt = (ds.data || []).find(p => p.x === x);
+        row.push(pt ? pt.y : "");
+      }
+      rows.push(row);
+    }
     return rows.map(r => r.map(csvEscape).join(",")).join("\n");
   }
 
@@ -557,8 +588,8 @@ function attachChartDownloads() {
 
 // After charts render, bind downloads
 if (window.AnalyticsCharts && window.AnalyticsCharts.initAll) {
-  (function(orig) {
-    window.AnalyticsCharts.initAll = function(all) {
+  (function (orig) {
+    window.AnalyticsCharts.initAll = function (all) {
       orig(all);
       attachChartDownloads();
     };
