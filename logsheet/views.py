@@ -388,8 +388,17 @@ def edit_flight(request, logsheet_pk, flight_pk):
         form = FlightForm(request.POST, instance=flight)
         if form.is_valid():
             form.save()
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": True})
             messages.success(request, "Flight updated.")
             return redirect("logsheet:manage", pk=logsheet.pk)
+        # AJAX: return form HTML with errors for modal
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(request, "logsheet/edit_flight_form.html", {
+                "form": form,
+                "flight": flight,
+                "logsheet": logsheet
+            }, status=400)
     else:
         form = FlightForm(instance=flight)
 
@@ -427,7 +436,16 @@ def add_flight(request, logsheet_pk):
             flight = form.save(commit=False)
             flight.logsheet = logsheet
             flight.save()
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": True})
             return redirect("logsheet:manage", pk=logsheet.pk)
+        # AJAX: return form HTML with errors for modal
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(request, "logsheet/edit_flight_form.html", {
+                "form": form,
+                "logsheet": logsheet,
+                "mode": "add",
+            }, status=400)
     else:
         initial = {}
         if logsheet.tow_pilot_id:

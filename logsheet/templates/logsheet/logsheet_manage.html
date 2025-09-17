@@ -280,6 +280,48 @@
     .then(html => {
       document.getElementById("flightModalContent").innerHTML = html;
 
+      // Attach robust form submit handler for modal
+      function attachFlightFormHandler() {
+        const form = document.getElementById("edit-flight-form");
+        if (!form) return;
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const url = form.action || window.location.href;
+          const data = new FormData(form);
+          fetch(url, {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            body: data
+          })
+          .then(async response => {
+            const contentType = response.headers.get("content-type") || "";
+            if (response.ok) {
+              // Success: expect JSON
+              const data = await response.json();
+              if (data.success) {
+                location.reload();
+              }
+            } else if (contentType.includes("text/html")) {
+              // Validation error: got HTML form, replace modal content and re-attach handler
+              const html = await response.text();
+              const modalContent = document.getElementById("flightModalContent");
+              if (modalContent) {
+                modalContent.innerHTML = html;
+                attachFlightFormHandler();
+              } else {
+                document.body.innerHTML = html;
+              }
+            } else {
+              alert("Could not save the flight. Please try again.");
+            }
+          })
+          .catch(error => {
+            alert("Could not save the flight. Please try again.");
+          });
+        });
+      }
+      attachFlightFormHandler();
+
       // 🚨 DOM inside modal is now ready, attach glider/instructor logic here
       const gliderField = flightModal.querySelector("#id_glider");
       const instructorField = flightModal.querySelector("#id_instructor");
