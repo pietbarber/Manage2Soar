@@ -100,8 +100,10 @@
         </tr>
         <tr>
           <th scope="row" class="text-end">Release Altitude</th>
-          <td>
+          <td class="d-flex align-items-center gap-2">
             {{ form.release_altitude }}
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="alt-2k-btn">2K</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-1" id="alt-3k-btn">3K</button>
             {{ form.release_altitude.errors }}
             <div class="form-text" class="text-end">Release altitude in feet (0–7000 in 100ft steps)</div>
           </td>
@@ -169,24 +171,7 @@
     return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-    const launchBtn = document.getElementById('now-launch-btn');
-    const landingBtn = document.getElementById('now-landing-btn');
-    const launchInput = document.getElementById('id_launch_time');
-    const landingInput = document.getElementById('id_landing_time');
-    if (launchBtn && launchInput) {
-      launchBtn.addEventListener('click', function() {
-        launchInput.value = getNowTime24();
-        launchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-    }
-    if (landingBtn && landingInput) {
-      landingBtn.addEventListener('click', function() {
-        landingInput.value = getNowTime24();
-        landingInput.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-    }
-  });
+  // Button event listeners are now attached in logsheet_manage.html after modal content loads
 </script>
 
 

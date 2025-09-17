@@ -382,7 +382,7 @@
       const towPilotField = document.getElementById("id_tow_pilot");
       towPilotField && promoteTowPilots();
 
-      // Attach NOW button logic after modal content is loaded
+      // Attach NOW and 2K/3K button logic after modal content is loaded
       const launchBtn = document.getElementById('now-launch-btn');
       const landingBtn = document.getElementById('now-landing-btn');
       const launchInput = document.getElementById('id_launch_time');
@@ -403,6 +403,23 @@
         landingBtn.addEventListener('click', function() {
           landingInput.value = getNowTime24();
           landingInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
+
+      // 2K/3K buttons for release altitude
+      const alt2kBtn = document.getElementById('alt-2k-btn');
+      const alt3kBtn = document.getElementById('alt-3k-btn');
+      const altSelect = document.getElementById('id_release_altitude');
+      if (alt2kBtn && altSelect) {
+        alt2kBtn.addEventListener('click', function() {
+          altSelect.value = '2000';
+          altSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
+      if (alt3kBtn && altSelect) {
+        alt3kBtn.addEventListener('click', function() {
+          altSelect.value = '3000';
+          altSelect.dispatchEvent(new Event('change', { bubbles: true }));
         });
       }
     });

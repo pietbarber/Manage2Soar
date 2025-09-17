@@ -39,6 +39,56 @@ def get_active_members():
 # - Filters active members for "split_with", ordered by last name.
 # Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        glider = cleaned_data.get("glider")
+        launch_time = cleaned_data.get("launch_time")
+        landing_time = cleaned_data.get("landing_time")
+        logsheet = cleaned_data.get("logsheet") if "logsheet" in cleaned_data else getattr(
+            self.instance, "logsheet", None)
+
+        # Only check if a glider and launch_time are provided
+        if glider and launch_time:
+            # Defensive: ensure logsheet and log_date are present
+            if not logsheet or not hasattr(logsheet, 'log_date') or logsheet.log_date is None:
+                # If missing, skip overlap check (or optionally raise a ValidationError)
+                return cleaned_data
+            from django.db.models import Q
+            flights_qs = Flight.objects.filter(
+                glider=glider, logsheet__log_date=logsheet.log_date)
+            if self.instance.pk:
+                flights_qs = flights_qs.exclude(pk=self.instance.pk)
+
+            # Overlap logic: (A starts before B ends) and (A ends after B starts)
+            for other in flights_qs:
+                other_launch = other.launch_time
+                other_landing = other.landing_time
+                # If either flight has no landing time, treat as 'still airborne'
+                if not other_launch:
+                    continue
+                # If both have landing times, check for overlap
+                if landing_time and other_landing:
+                    if (launch_time < other_landing and landing_time > other_launch):
+                        raise forms.ValidationError(
+                            f"This glider is already scheduled for another flight (ID {other.pk}) from {other_launch} to {other_landing}.")
+                # If this flight has no landing, check if launch is during another flight
+                elif not landing_time and other_landing:
+                    if launch_time < other_landing and launch_time >= other_launch:
+                        raise forms.ValidationError(
+                            f"This glider is already airborne in another flight (ID {other.pk}) from {other_launch} to {other_landing}.")
+                # If other flight has no landing, check for overlap
+                elif landing_time and not other_landing:
+                    if landing_time > other_launch and launch_time <= other_launch:
+                        raise forms.ValidationError(
+                            f"This glider is already airborne in another flight (ID {other.pk}) starting at {other_launch}.")
+                # If neither has landing time, both are open-ended
+                elif not landing_time and not other_landing:
+                    if launch_time == other_launch:
+                        raise forms.ValidationError(
+                            f"This glider is already airborne in another open-ended flight (ID {other.pk}) at {other_launch}.")
+
+        return cleaned_data
+
     class Meta:
         model = Flight
         fields = [
@@ -75,10 +125,15 @@ class FlightForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Filter instructors only
-        self.fields["pilot"].queryset = get_active_members()
+        self.fields["pilot"].queryset = get_active_members().order_by(
+            "first_name", "last_name")
         self.fields["instructor"].queryset = get_active_members_with_role(
             "instructor")
         # Ensure the logsheet's scheduled tow pilot is included and selected by default
+        # Sort passenger dropdown by last name, first name
+        if "passenger" in self.fields:
+            self.fields["passenger"].queryset = self.fields["passenger"].queryset.order_by(
+                "first_name", "last_name")
         tow_pilot_initial = self.initial.get("tow_pilot")
         tow_pilot_qs = get_active_members_with_role("towpilot")
         if tow_pilot_initial:
@@ -92,10 +147,11 @@ class FlightForm(forms.ModelForm):
                     default=1,
                     output_field=IntegerField()
                 ),
-                "last_name", "first_name"
+                "first_name", "last_name"
             )
         self.fields["tow_pilot"].queryset = tow_pilot_qs
-        self.fields["split_with"].queryset = get_active_members()
+        self.fields["split_with"].queryset = get_active_members().order_by(
+            "first_name", "last_name")
 
         active_towplanes = Towplane.objects.filter(is_active=True)
         self.fields["towplane"].queryset = active_towplanes.exclude(
@@ -137,10 +193,11 @@ class FlightForm(forms.ModelForm):
                     default=Value(1),
                     output_field=IntegerField()
                 )
-            ).order_by("owner_rank", "last_name", "first_name")
+            ).order_by("owner_rank", "first_name", "last_name")
 
         else:
-            self.fields["pilot"].queryset = get_active_members()
+            self.fields["pilot"].queryset = get_active_members().order_by(
+                "first_name", "last_name")
 
         if not self.initial.get("pilot") and not self.data.get("pilot"):
             if glider_obj and glider_obj.owners.count() == 1:
