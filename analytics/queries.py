@@ -36,12 +36,21 @@ def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, fin
     qs = qs.annotate(ops_year=ExtractYear("ops_date"))
     qs = qs.filter(ops_year__gte=start_year, ops_year__lte=end_year)
     
-    # Per (year, day-of-year) counts
-    per_day = (
-        qs.annotate(y=F("ops_year"), d=Extract("ops_date", "doy"))
-          .values("y", "d")
+    # Per (year, day-of-year) counts using SQLite-compatible approach
+    # Group by date and year, then calculate day of year in Python
+    per_day_raw = (
+        qs.values("ops_year", "ops_date")
           .annotate(n=Count("id"))
+          .order_by("ops_year", "ops_date")
     )
+    
+    # Convert to the format expected by the rest of the function
+    per_day = []
+    for row in per_day_raw:
+        year = row["ops_year"]
+        date_obj = row["ops_date"]
+        day_of_year = date_obj.timetuple().tm_yday  # Python built-in day of year calculation
+        per_day.append({"y": year, "d": day_of_year, "n": row["n"]})
 
 
 
@@ -756,4 +765,92 @@ def duty_days_by_member(
         "do_total": do_total,
         "ado_total": ado_total,
         "ops_days_total": ops_days_total,
+    }
+
+
+def time_of_day_operations(
+    start_year: int,
+    end_year: int,
+    *,
+    finalized_only: bool = True,
+) -> Dict[str, Any]:
+    """
+    Returns earliest takeoff and latest landing times by Julian day of year.
+    
+    Returns a scatter plot data structure with:
+    - takeoff_points: [{"x": julian_day, "y": time_decimal}] for earliest takeoffs
+    - landing_points: [{"x": julian_day, "y": time_decimal}] for latest landings 
+    - mean_takeoff_times: [{"x": julian_day, "y": mean_time_decimal}] for averaging line
+    - mean_landing_times: [{"x": julian_day, "y": mean_time_decimal}] for averaging line
+    
+    Where time_decimal represents time as decimal hours (e.g., 14.5 = 2:30 PM)
+    """
+    from logsheet.models import Flight
+    from django.db.models import Min, Max
+    from collections import defaultdict
+    import datetime
+
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+
+    # Filter by year range - using SQLite-compatible date functions
+    qs = qs.annotate(
+        ops_date=F("logsheet__log_date"),
+        ops_year=ExtractYear("ops_date")
+    ).filter(
+        ops_year__gte=start_year,
+        ops_year__lte=end_year
+    )
+
+    def time_to_decimal(time_obj):
+        """Convert time object to decimal hours"""
+        if time_obj is None:
+            return None
+        return time_obj.hour + time_obj.minute / 60.0 + time_obj.second / 3600.0
+
+    # Get all flights with their dates and times
+    flights_data = list(qs.values("ops_date", "launch_time", "landing_time"))
+    
+    # Group flights by Julian day and find min/max times
+    daily_data = defaultdict(lambda: {"takeoffs": [], "landings": []})
+    
+    for flight in flights_data:
+        date_obj = flight["ops_date"]
+        julian_day = date_obj.timetuple().tm_yday
+        
+        if flight["launch_time"]:
+            daily_data[julian_day]["takeoffs"].append(time_to_decimal(flight["launch_time"]))
+        if flight["landing_time"]:
+            daily_data[julian_day]["landings"].append(time_to_decimal(flight["landing_time"]))
+
+    # Calculate extreme points and means
+    takeoff_points = []
+    landing_points = []
+    mean_takeoff_times = []
+    mean_landing_times = []
+    
+    for julian_day in range(1, 366):  # 1-365
+        day_data = daily_data[julian_day]
+        
+        if day_data["takeoffs"]:
+            earliest_takeoff = min(day_data["takeoffs"])
+            mean_takeoff = sum(day_data["takeoffs"]) / len(day_data["takeoffs"])
+            
+            takeoff_points.append({"x": julian_day, "y": round(earliest_takeoff, 2)})
+            mean_takeoff_times.append({"x": julian_day, "y": round(mean_takeoff, 2)})
+        
+        if day_data["landings"]:
+            latest_landing = max(day_data["landings"])
+            mean_landing = sum(day_data["landings"]) / len(day_data["landings"])
+            
+            landing_points.append({"x": julian_day, "y": round(latest_landing, 2)})
+            mean_landing_times.append({"x": julian_day, "y": round(mean_landing, 2)})
+
+    return {
+        "takeoff_points": takeoff_points,
+        "landing_points": landing_points,
+        "mean_takeoff_times": mean_takeoff_times,
+        "mean_landing_times": mean_landing_times,
+        "total_flight_days": len([day for day in daily_data.values() if day["takeoffs"] or day["landings"]]),
     }

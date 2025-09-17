@@ -86,6 +86,9 @@ def dashboard(request):
     tow  = queries.towpilot_flights_by_member(util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
     long3h = queries.long_flights_by_pilot(util_start, util_end, finalized_only=finalized_only, threshold_hours=3.0, top_n=30) or {}
     duty   = queries.duty_days_by_member(util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
+    
+    # Time of day operations for yearly view (using start/end years)
+    time_ops = queries.time_of_day_operations(start, end, finalized_only=finalized_only) or {}
 
     ctx = {
         "year": end,
@@ -158,6 +161,13 @@ def dashboard(request):
         "duty_do_total": duty.get("do_total", 0),
         "duty_ado_total": duty.get("ado_total", 0),
         "duty_ops_days_total": duty.get("ops_days_total", 0),
+        
+        # Time of day operations
+        "timeops_takeoff_points": time_ops.get("takeoff_points", []),
+        "timeops_landing_points": time_ops.get("landing_points", []),
+        "timeops_mean_takeoff_times": time_ops.get("mean_takeoff_times", []),
+        "timeops_mean_landing_times": time_ops.get("mean_landing_times", []),
+        "timeops_total_flight_days": time_ops.get("total_flight_days", 0),
 
         }
 
@@ -233,6 +243,14 @@ def dashboard(request):
             "do_total": ctx.get("duty_do_total", 0),
             "ado_total": ctx.get("duty_ado_total", 0),
             "ops_days_total": ctx.get("duty_ops_days_total", 0),
+        },
+        
+        "time_ops": {
+            "takeoff_points": ctx.get("timeops_takeoff_points", []),
+            "landing_points": ctx.get("timeops_landing_points", []),
+            "mean_takeoff_times": ctx.get("timeops_mean_takeoff_times", []),
+            "mean_landing_times": ctx.get("timeops_mean_landing_times", []),
+            "total_flight_days": ctx.get("timeops_total_flight_days", 0),
         },
 
     }
