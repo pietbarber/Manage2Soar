@@ -18,6 +18,11 @@
             {% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}
             {% endif %}">
   <div class="modal-body">
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger" role="alert">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
     {% csrf_token %}
     <table class="table table-borderless align-middle">
       <tbody>
@@ -137,42 +142,7 @@
 
 
 
-<script>
-  document.getElementById("edit-flight-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    const form = e.target;
-    const url = form.action || window.location.href;
-    const data = new FormData(form);
-
-    fetch(url, {
-      method: "POST",
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-      body: data
-    })
-    .then(response => {
-      if (!response.ok) throw new Error("Failed to save");
-      return response.json();
-    })
-    .then(data => {
-      if (data.success) {
-        location.reload();
-      }
-    })
-    .catch(error => {
-      alert("Could not save the flight. Please try again.");
-    })
-  });
-
-  // Add NOW button logic for launch and landing time
-  function getNowTime24() {
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-  }
-
-  // Button event listeners are now attached in logsheet_manage.html after modal content loads
-</script>
+<!-- Form submit JS is now managed in logsheet_manage.html for robust modal handling. -->
 
 
   <footer style="font-size: 0.8em; color: gray;">
