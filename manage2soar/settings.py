@@ -137,13 +137,25 @@ WSGI_APPLICATION = "manage2soar.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'test_db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+    },
+    'legacy': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('LEGACY_DB_NAME'),
+        'USER': os.getenv('LEGACY_DB_USER'),
+        'PASSWORD': os.getenv('LEGACY_DB_PASSWORD'),
+        'HOST': os.getenv('LEGACY_DB_HOST', 'localhost'),
+        'PORT': os.getenv('LEGACY_DB_PORT', '5555'),
     }
 }
+
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_KEY")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv(
