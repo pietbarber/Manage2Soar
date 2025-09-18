@@ -1,0 +1,8 @@
+/* Styles for the equipment logbook (maintenance/events column) */
+.logbook-events-col {
+    max-width: 320px;
+    word-break: break-word;
+    white-space: normal;
+    text-align: left;
+    vertical-align: top;
+}

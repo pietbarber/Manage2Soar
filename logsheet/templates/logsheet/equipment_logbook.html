@@ -25,15 +25,17 @@
     </div>
     {% endif %}
 
+    <link rel="stylesheet" href="/static/css/equipment_logbook.css">
+    <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
     <div class="table-responsive">
-        <table class="table table-sm align-middle">
+        <table class="table table-sm align-middle sort" id="equipmentLogbookTable">
             <thead class="table-light">
                 <tr>
-                    <th style="white-space:nowrap;">Date</th>
+                    <th style="white-space:nowrap; cursor:pointer;" data-sort-method="date">Date</th>
                     <th class="text-end">Flights</th>
                     <th class="text-end">Day Hours</th>
                     <th class="text-end">Cumulative Hours</th>
-                    <th>Events</th>
+                    <th class="logbook-events-col">Events</th>
                     <th>Logsheet</th>
                 </tr>
             </thead>
@@ -41,30 +43,32 @@
                 {% for row in daily %}
                 {% with d=row.day %}
                 <tr id="{% if row.year_anchor %}{{ row.year_anchor }}{% endif %}">
-                    <td style="white-space:nowrap;">{{ d }}</td>
+                    <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">{{ d|date:'M. j, Y' }}</td>
                     <td class="text-end">{{ row.flights }}</td>
 
                     {# Decimal hours #}
                     <td class="text-end">{{ row.day_hours|floatformat:1 }}</td>
                     <td class="text-end">{{ row.cum_hours|floatformat:1 }}</td>
 
-                    <td>
+                    <td class="logbook-events-col">
                         {% if row.issues %}
                         <div class="mb-1 fw-semibold">Maintenance</div>
-                        <ul class="mb-1">
-                            {% for it in row.issues %}
-                            <li>
+                        {% for it in row.issues %}
+                            <div class="mb-1">
                                 #{{ it.id }} — {{ it.description }}
                                 {% if it.grounded %}<span class="badge bg-danger">Grounding</span>{% endif %}
-                                {% if it.resolved %}
-                                <span class="badge bg-success">Resolved{% if it.resolved_date %} {{ it.resolved_date
-                                    }}{% endif %}</span>
+                                {% if it.event_type == "resolved" %}
+                                    <span class="badge bg-success">Resolved{% if it.resolved_date %} {{ it.resolved_date }}{% endif %}</span>
+                                {% elif it.resolved %}
+                                    <span class="badge bg-success">Resolved{% if it.resolved_date %} {{ it.resolved_date }}{% endif %}</span>
                                 {% else %}
-                                <span class="badge bg-warning text-dark">Open</span>
+                                    <span class="badge bg-warning text-dark">Open</span>
                                 {% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
+                                {% if it.event_type == "resolved" and it.report_date and it.resolved_date and it.report_date != it.resolved_date %}
+                                    <br><small class="text-muted">(Resolved, originally reported {{ it.report_date }})</small>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
                         {% endif %}
 
                         {% if row.deadlines %}
@@ -99,7 +103,15 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                var table = document.getElementById('equipmentLogbookTable');
+                if (table) {
+                    new Tablesort(table);
+                }
+            });
+        </script>
 </div>
 <!-- Back to Top Button -->
 <button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"

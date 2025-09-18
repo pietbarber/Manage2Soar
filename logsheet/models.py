@@ -577,13 +577,21 @@ class TowplaneCloseout(models.Model):
 
 
 class MaintenanceIssue(models.Model):
+    def save(self, *args, **kwargs):
+        from django.utils import timezone
+        # Set report_date to logsheet.log_date if available, else today
+        if self.logsheet and self.logsheet.log_date:
+            self.report_date = self.logsheet.log_date
+        elif not self.report_date:
+            self.report_date = timezone.now().date()
+        super().save(*args, **kwargs)
     glider = models.ForeignKey(
         "logsheet.Glider", null=True, blank=True, on_delete=models.CASCADE)
     towplane = models.ForeignKey(
         "logsheet.Towplane", null=True, blank=True, on_delete=models.CASCADE)
     reported_by = models.ForeignKey(
         Member, on_delete=models.SET_NULL, null=True)
-    report_date = models.DateField(auto_now_add=True)
+    report_date = models.DateField()
     logsheet = models.ForeignKey("Logsheet", on_delete=models.SET_NULL,
                                  null=True, blank=True, related_name="maintenance_issues")
 

@@ -1179,6 +1179,25 @@ def _daily_flight_rollup(queryset, date_field="logsheet__log_date",
 
     rows = list(daily_qs)
 
+    # Collect all days with issues or deadlines, even if no flights
+    extra_days = set(issues_by_day.keys()) | set(deadlines_by_day.keys())
+    days_in_rows = set(r["day"] for r in rows)
+    for day in extra_days - days_in_rows:
+        rows.append({
+            "day": day,
+            "logsheet_pk": None,
+            "flights": 0,
+            "day_time": timedelta(0),
+            "cum_time": timedelta(0),
+            "issues": issues_by_day.get(day, []),
+            "deadlines": deadlines_by_day.get(day, []),
+            "day_hours": 0.0,
+            "cum_hours": 0.0,
+        })
+
+    # Sort rows by day (and logsheet_pk for stability)
+    rows.sort(key=lambda r: (r["day"], r["logsheet_pk"] or 0))
+
     # Running total + attach events + decimal hours
     running = timedelta(0)
     for r in rows:
@@ -1209,16 +1228,32 @@ def _daily_flight_rollup(queryset, date_field="logsheet__log_date",
 
 
 def _issues_by_day_for_glider(glider):
-    qs = (
+    # Issues by report_date
+    qs_report = (
         MaintenanceIssue.objects
         .filter(glider=glider)
-        .annotate(day=TruncDate("report_date"))
-        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
-        .order_by("day", "id")
+        .values("report_date", "id", "description", "resolved", "grounded", "resolved_date", "report_date")
+        .order_by("report_date", "id")
+    )
+    # Issues by resolved_date (for issues resolved on non-flight days)
+    qs_resolved = (
+        MaintenanceIssue.objects
+        .filter(glider=glider, resolved=True)
+        .exclude(resolved_date__isnull=True)
+        .values("resolved_date", "id", "description", "resolved", "grounded", "resolved_date", "report_date")
+        .order_by("resolved_date", "id")
     )
     bucket = {}
-    for it in qs:
-        bucket.setdefault(it["day"], []).append(it)
+    for it in qs_report:
+        it = dict(it)
+        it["event_type"] = "reported"
+        bucket.setdefault(it["report_date"], []).append(it)
+    for it in qs_resolved:
+        it = dict(it)
+        it["event_type"] = "resolved"
+        # Only add if not already present for this day (avoid double-listing if resolved same day as reported)
+        if it["resolved_date"] != it["report_date"]:
+            bucket.setdefault(it["resolved_date"], []).append(it)
     return bucket
 
 
