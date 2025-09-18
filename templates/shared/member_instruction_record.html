@@ -205,7 +205,11 @@
       <div class="border p-3 bg-white card-body mb-2">
         {{ block.report.report_text|safe }}
         <div class="mt-2 small text-muted">
-          Written by: {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
+          Written by:
+          {% if block.report.instructor.profile_photo %}
+            <img src="{{ block.report.instructor.profile_photo.url }}" alt="{{ block.report.instructor.full_display_name }}" class="rounded-circle me-1" style="height:2.4em; width:2.4em; object-fit:cover; vertical-align:middle; border:1px solid #ccc;" />
+          {% endif %}
+          {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
         </div>
       </div>
       {% elif block.report.notes %}
