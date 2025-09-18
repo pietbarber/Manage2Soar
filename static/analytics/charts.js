@@ -33,6 +33,27 @@
     });
   }
 
+  //////////////////////////////////// 
+  // 
+  // function makeCDF 
+  // 
+  // Renders a cumulative distribution function (CDF) line chart using Chart.js. 
+  // The chart displays the percentage of flights with duration greater than or equal to x, 
+  // with the y-axis reversed so 0% is at the top. 
+  // 
+  // Arguments: 
+  //   canvasId (string): The ID of the canvas element to render the chart in. 
+  //   points (Array<{x: number, y: number}>): Array of data points for the CDF curve. 
+  //  
+  // options (object, optional): 
+  // - color (string): Line and fill color for the CDF (default: "#5dade2"). 
+  // - xTitle (string): Label for the x-axis (default: "Duration (hours)"). 
+  // 
+  // Returns: 
+  // Chart instance if rendering succeeds, or null if the canvas is not found. 
+  // 
+  ////////////////////////////////////
+
   function makeCDF(canvasId, points, { color = "#5dade2", xTitle = "Duration (hours)" } = {}) {
     const ctx = $(canvasId)?.getContext?.("2d"); if (!ctx) return null;
 
@@ -120,6 +141,23 @@
     });
   }
 
+  ////////////////////////////////////
+  //
+  // function initByAircraft
+  //
+  // Renders a stacked bar chart showing the number of flights by aircraft category for each year using Chart.js.
+  // Each category is assigned a distinct color, with special colors for "Private", "Other", and "Unknown" categories.
+  //
+  // Arguments:
+  //   d (object): Data object containing:
+  //     - years (Array<number|string>): List of years for the x-axis.
+  //     - cats (Array<string>): List of aircraft categories.
+  //     - matrix (object): Mapping of category to array of flight counts per year.
+  //
+  // Returns:
+  //   None. The chart is rendered in the canvas with ID "byAcftChart".
+  //
+  ////////////////////////////////////
   function initByAircraft(d) {
     const years = d.years || [], cats = d.cats || [], matrix = d.matrix || {};
     const colorForCategory = (cat, i) =>
@@ -155,6 +193,27 @@
     });
   }
 
+  ////////////////////////////////////
+  //
+  // function initUtilization
+  //
+  // Renders a horizontal bar chart showing total flights, total hours, and average flight duration (in minutes)
+  // for each entity (e.g., aircraft or pilot) using Chart.js. Each metric is displayed as a separate bar series.
+  //
+  // Arguments:
+  //   d (object): Data object containing:
+  //     - names (Array<string>): Labels for each entity (y-axis).
+  //     - flights (Array<number>): Total flights per entity.
+  //     - hours (Array<number>): Total hours per entity.
+  //     - avgm (Array<number>): Average flight duration in minutes per entity.
+  //   options (object):
+  //     - canvasId (string): ID of the canvas element to render the chart in.
+  //     - statusId (string): ID of the status element to update with summary text.
+  //
+  // Returns:
+  //   None. The chart is rendered in the specified canvas, and the status element is updated.
+  //
+  ////////////////////////////////////
   function initUtilization(d, { canvasId, statusId }) {
     const names = d.names || [], flights = d.flights || [], hours = d.hours || [], avgm = d.avgm || [];
     const C_FLIGHTS = "#e74c3c", C_HOURS = "#3498db", C_AVG = "#8bc34a";
@@ -194,6 +253,24 @@
     $(statusId) && ($(statusId).textContent = "");
   }
 
+
+  ////////////////////////////////////
+  //
+  // function initFlyingDays
+  //
+  // Renders a horizontal bar chart showing the number of days with flying activity for each member using Chart.js.
+  // Updates a status element with a summary of members and operational days.
+  //
+  // Arguments:
+  //   d (object): Data object containing:
+  //     - names (Array<string>): Member names (y-axis labels).
+  //     - days (Array<number>): Number of flying days per member.
+  //     - ops (number): Total operational days in the period.
+  //
+  // Returns:
+  //   None. The chart is rendered in the canvas with ID "fdChart", and the status element "fdStatus" is updated.
+  //
+  ////////////////////////////////////
   function initFlyingDays(d) {
     const names = d.names || [], days = d.days || [], ops = d.ops_total || 0;
     if (!names.length) { $("fdStatus") && ($("fdStatus").textContent = "No flying-day data for the selected period."); return; }
@@ -201,6 +278,22 @@
     $("fdStatus") && ($("fdStatus").textContent = `Members with ≥2 days. Ops days this period: ${ops}.`);
   }
 
+  ////////////////////////////////////
+  //
+  // function initPilotFlights
+  //
+  // Renders a horizontal bar chart showing the number of non-instruction glider flights for each member using Chart.js.
+  // Updates a status element with a summary of qualifying members.
+  //
+  // Arguments:
+  //   d (object): Data object containing:
+  //     - names (Array<string>): Member names (y-axis labels).
+  //     - counts (Array<number>): Number of qualifying flights per member.
+  //
+  // Returns:
+  //   None. The chart is rendered in the canvas with ID "pgfChart", and the status element "pgfStatus" is updated.
+  //
+  ////////////////////////////////////
   function initPilotFlights(d) {
     const names = d.names || [], counts = d.counts || [];
     if (!names.length) { $("pgfStatus") && ($("pgfStatus").textContent = "No pilot-flight data for the selected period."); return; }
@@ -208,6 +301,25 @@
     $("pgfStatus") && ($("pgfStatus").textContent = "Members with ≥2 non-instruction glider flights.");
   }
 
+  ////////////////////////////////////
+  //
+  // function initDuration
+  //
+  // Renders a cumulative distribution function (CDF) line chart of flight durations using Chart.js.
+  // Also updates a status element with median and percentage statistics for long flights.
+  //
+  // Arguments:
+  //   d (object): Data object containing:
+  //     - points (Array<{x: number, y: number}>): Data points for the CDF curve (optional, can be built from x_hours/cdf_pct).
+  //     - x_hours (Array<number>): X values (hours) for the CDF (optional).
+  //     - cdf_pct (Array<number>): Y values (percentages) for the CDF (optional).
+  //     - median_min (number): Median flight duration in minutes.
+  //     - pct_gt (object): Percentages of flights over 1h, 2h, 3h (keys: "1", "2", "3").
+  //
+  // Returns:
+  //   None. The chart is rendered in the canvas with ID "durChart", and the status element "durStatus" is updated.
+  //
+  ////////////////////////////////////
   function initDuration(d) {
     const pts = Array.isArray(d.points) && d.points.length
       ? d.points
@@ -284,6 +396,24 @@ function initInstructorByWeekday(d) {
   if (el) el.textContent = `${instTotal.toLocaleString()} instructional flights out of ${allTotal.toLocaleString()} total flights in range.`;
 }
 
+////////////////////////////////////
+//
+// function initTowByWeekday
+//
+// Renders a horizontal stacked bar chart showing tow-pilot flights by weekday using Chart.js.
+// Updates a status element with the total number of tows in the selected period.
+//
+// Arguments:
+//   d (object): Data object containing:
+//     - names (Array<string>): Tow-pilot names (y-axis labels).
+//     - labels (Array<string>): Weekday labels.
+//     - matrix (object): Mapping of weekday to array of tow counts per pilot.
+//     - tow_total (number): Total number of tows in the period.
+//
+// Returns:
+//   None. The chart is rendered in the canvas with ID "towChart", and the status element "towStatus" is updated.
+//
+////////////////////////////////////
 function initTowByWeekday(d) {
   const names = d.names || [], labels = d.labels || [], matrix = d.matrix || {}, towTotal = d.tow_total || 0;
   const greens = ["#e3f9e5", "#c1eac5", "#a3d9a5", "#7bc47f", "#57ae5b", "#3f9142", "#2f8132"];
@@ -294,6 +424,19 @@ function initTowByWeekday(d) {
   if (el) el.textContent = `${towTotal.toLocaleString()} total tows in range.`;
 }
 
+////////////////////////////////////
+//
+// function minutesToHMM
+//
+// Converts a number of minutes to a string in "h:mm" format.
+//
+// Arguments:
+//   mins (number): Number of minutes.
+//
+// Returns:
+//   (string): Time formatted as "h:mm".
+//
+////////////////////////////////////
 function minutesToHMM(mins) {
   const m = Math.max(0, Math.round(mins || 0));
   const h = Math.floor(m / 60);
@@ -301,6 +444,24 @@ function minutesToHMM(mins) {
   return `${h}:${mm}`;
 }
 
+////////////////////////////////////
+//
+// function initLongFlights3h
+//
+// Renders a horizontal bar chart showing the number of flights ≥ threshold hours for each pilot using Chart.js.
+// Updates a status element with the total number of long flights and the longest flight duration.
+//
+// Arguments:
+//   d (object): Data object containing:
+//     - names (Array<string>): Pilot names (y-axis labels).
+//     - counts (Array<number>): Number of long flights per pilot.
+//     - longest_min (number): Duration in minutes of the longest flight.
+//     - threshold_hours (number): Threshold in hours for a flight to be considered "long".
+//
+// Returns:
+//   None. The chart is rendered in the canvas with ID "long3hChart", and the status element "long3hStatus" is updated.
+//
+////////////////////////////////////
 function initLongFlights3h(d) {
   const H = window.AnalyticsCharts?.helpers; if (!H) return;
   const names = d.names || [];
@@ -324,6 +485,26 @@ function initLongFlights3h(d) {
   }
 }
 
+////////////////////////////////////
+//
+// function initDutyDays
+//
+// Renders a horizontal stacked bar chart showing DO/ADO assignments for each member using Chart.js.
+// Updates a status element with totals for DO, ADO, and operational days.
+//
+// Arguments:
+//   d (object): Data object containing:
+//     - names (Array<string>): Member names (y-axis labels).
+//     - labels (Array<string>): Assignment types (e.g., ["DO", "ADO"]).
+//     - matrix (object): Mapping of assignment type to array of counts per member.
+//     - do_total (number): Total DO assignments.
+//     - ado_total (number): Total ADO assignments.
+//     - ops_days_total (number): Total operational days in the period.
+//
+// Returns:
+//   None. The chart is rendered in the canvas with ID "dutyChart", and the status element "dutyStatus" is updated.
+//
+////////////////////////////////////
 function initDutyDays(d) {
   const names = d.names || [];
   const labels = d.labels || ["DO", "ADO"];
@@ -345,6 +526,26 @@ function initDutyDays(d) {
     `Total assignment days: ${doTotal + adoTotal} (DO ${doTotal}, ADO ${adoTotal}) • Ops days in range: ${opsDays}`;
 }
 
+////////////////////////////////////
+//
+// function initTimeOps
+//
+// Renders a scatter/line chart showing earliest takeoff and latest landing times by Julian day using Chart.js.
+// Also displays mean earliest takeoff and mean latest landing as smoothed lines.
+// Updates a status element with a summary of flight day data.
+//
+// Arguments:
+//   d (object): Data object containing:
+//     - takeoff_points (Array<{x: number, y: number}>): Earliest takeoff points.
+//     - landing_points (Array<{x: number, y: number}>): Latest landing points.
+//     - mean_earliest_takeoff (Array<{x: number, y: number}>): Mean earliest takeoff line.
+//     - mean_latest_landing (Array<{x: number, y: number}>): Mean latest landing line.
+//     - total_flight_days (number): Total number of operational days.
+//
+// Returns:
+//   None. The chart is rendered in the canvas with ID "timeOpsChart", and the status element "timeOpsStatus" is updated.
+//
+////////////////////////////////////
 function initTimeOps(d) {
   const takeoffPoints = d.takeoff_points || [];
   const landingPoints = d.landing_points || [];
@@ -481,6 +682,21 @@ function initTimeOps(d) {
 }
 
 // ---------- Download buttons (PNG/SVG/CSV) ----------
+////////////////////////////////////
+//
+// function blobDownload
+//
+// Triggers a download of the given content as a file with the specified filename and MIME type.
+//
+// Arguments:
+//   filename (string): Name of the file to download.
+//   mime (string): MIME type of the file.
+//   content (string|Blob): File content as a string or Blob.
+//
+// Returns:
+//   None. Initiates a browser download.
+//
+////////////////////////////////////
 function blobDownload(filename, mime, content) {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
   const a = document.createElement("a");
@@ -490,6 +706,20 @@ function blobDownload(filename, mime, content) {
   setTimeout(() => URL.revokeObjectURL(a.href), 200);
 }
 
+////////////////////////////////////
+//
+// function exportPNG
+//
+// Exports a Chart.js chart as a PNG image and triggers a download with the given name.
+//
+// Arguments:
+//   canvasId (string): ID of the canvas element containing the chart.
+//   name (string): Base name for the downloaded PNG file.
+//
+// Returns:
+//   None. Initiates a browser download of the PNG image.
+//
+////////////////////////////////////
 function exportPNG(canvasId, name) {
   const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
   const canvas = document.getElementById(canvasId);
@@ -501,6 +731,20 @@ function exportPNG(canvasId, name) {
   fetch(url).then(r => r.blob()).then(b => blobDownload(`${name}.png`, "image/png", b));
 }
 
+////////////////////////////////////
+//
+// function exportSVG
+//
+// Exports a Chart.js chart as an SVG image and triggers a download with the given name.
+//
+// Arguments:
+//   canvasId (string): ID of the canvas element containing the chart.
+//   name (string): Base name for the downloaded SVG file.
+//
+// Returns:
+//   None. Initiates a browser download of the SVG image.
+//
+////////////////////////////////////
 function exportSVG(canvasId, name) {
   const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
   const canvas = document.getElementById(canvasId);
@@ -522,6 +766,20 @@ function csvEscape(v) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+////////////////////////////////////
+//
+// function chartToCSV
+//
+// Converts the data from a Chart.js chart into CSV format for download or export.
+// Handles both XY (line/scatter) and bar/stacked chart types.
+//
+// Arguments:
+//   canvasId (string): ID of the canvas element containing the chart.
+//
+// Returns:
+//   (string): CSV-formatted string representing the chart data.
+//
+////////////////////////////////////
 function chartToCSV(canvasId) {
   const chart = Chart.getChart ? Chart.getChart(canvasId) : null;
   if (!chart) return "";
@@ -565,12 +823,39 @@ function chartToCSV(canvasId) {
   return rows.map(r => r.map(csvEscape).join(",")).join("\n");
 }
 
+////////////////////////////////////
+//
+// function exportCSV
+//
+// Exports the data from a Chart.js chart as a CSV file and triggers a download with the given name.
+//
+// Arguments:
+//   canvasId (string): ID of the canvas element containing the chart.
+//   name (string): Base name for the downloaded CSV file.
+//
+// Returns:
+//   None. Initiates a browser download of the CSV file.
+//
+////////////////////////////////////
 function exportCSV(canvasId, name) {
   const csv = chartToCSV(canvasId);
   if (!csv) return;
   blobDownload(`${name}.csv`, "text/csv;charset=utf-8", csv);
 }
 
+////////////////////////////////////
+//
+// function attachChartDownloads
+//
+// Attaches download button event handlers for PNG, SVG, and CSV export to all chart toolbars on the page.
+//
+// Arguments:
+//   None. Operates on elements with class "chart-tools" and their child buttons.
+//
+// Returns:
+//   None. Sets up event handlers for download buttons.
+//
+////////////////////////////////////
 function attachChartDownloads() {
   document.querySelectorAll(".chart-tools").forEach((group) => {
     const canvasId = group.dataset.canvas;
