@@ -100,9 +100,17 @@ def public_syllabus_overview(request):
 
 def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
+    # Get all lessons in code order
+    lessons = list(TrainingLesson.objects.order_by("code"))
+    idx = next((i for i, l in enumerate(lessons) if l.code == code), None)
+    prev_lesson = lessons[idx - 1] if idx is not None and idx > 0 else None
+    next_lesson = lessons[idx +
+                          1] if idx is not None and idx < len(lessons) - 1 else None
     return render(request, "instructors/syllabus_detail.html", {
         "lesson": lesson,
         "public": True,
+        "prev_lesson": prev_lesson,
+        "next_lesson": next_lesson,
     })
 
 

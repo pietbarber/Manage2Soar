@@ -3,15 +3,23 @@
 /* 1) Truly zero out the page margins */
 @page {
   size: auto;
-  margin: 0;
+  margin: 0.5in;
 }
 
 @media print {
+
   /* 2) Kill any body padding/margin and force full width */
-  html, body {
+  html,
+  body {
     margin: 0;
     padding: 0;
-    width: 100%;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .border.p-3.bg-light {
+    border: none !important;
+    /* Use !important if necessary to ensure override */
   }
 
   /* 3) Override Bootstrap’s container caps so it really stretches edge-to-edge */
@@ -26,5 +34,7 @@
   }
 
   /* (Optional) hide any navbars, buttons, etc */
-  .no-print { display: none !important; }
+  .no-print {
+    display: none !important;
+  }
 }

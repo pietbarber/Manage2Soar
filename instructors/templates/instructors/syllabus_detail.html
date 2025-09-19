@@ -27,8 +27,19 @@
     {{ lesson.description|safe }}
   </div>
 
-  <p class="mt-3">
-    <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-primary">Back to Syllabus</a>
-    <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-outline-secondary">Edit This Lesson</a>
-  </p>
+  <div class="mt-3 d-flex flex-wrap gap-2 no-print-nav">
+    {% if prev_lesson %}
+      <a href="{% url 'public_syllabus_detail' prev_lesson.code %}" class="btn btn-outline-primary">&larr; View previous lesson ({{ prev_lesson.title }})</a>
+    {% endif %}
+    <a href="{% url 'public_syllabus_overview' %}" class="btn btn-outline-secondary">Return to Syllabus</a>
+    {% if next_lesson %}
+      <a href="{% url 'public_syllabus_detail' next_lesson.code %}" class="btn btn-outline-primary">View next lesson ({{ next_lesson.title }}) &rarr;</a>
+    {% endif %}
+    {% if not public and user.is_authenticated %}
+      <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-primary">Back to Syllabus</a>
+      {% if user.instructor %}
+        <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-outline-secondary">Edit This Lesson</a>
+      {% endif %}
+    {% endif %}
+  </div>
 {% endblock %}
