@@ -8,6 +8,7 @@ from duty_roster.models import DutyPreference, DutyAvoidance, DutyPairing, Membe
 from members.models import Member
 from members.constants.membership import DEFAULT_ROLES
 
+
 def generate_roster(year=None, month=None):
     from django.utils.timezone import now
     today = now().date()
@@ -19,16 +20,22 @@ def generate_roster(year=None, month=None):
         if d.month == month and d.weekday() in (5, 6)
     ]
     members = list(Member.objects.filter(is_active=True))
-    prefs = {p.member_id: p for p in DutyPreference.objects.select_related('member').all()}
-    avoidances = {(a.member_id, a.avoid_with_id) for a in DutyAvoidance.objects.all()}
+    prefs = {p.member_id: p for p in DutyPreference.objects.select_related(
+        'member').all()}
+    avoidances = {(a.member_id, a.avoid_with_id)
+                  for a in DutyAvoidance.objects.all()}
     pairings = defaultdict(set)
     for p in DutyPairing.objects.all():
         pairings[p.member_id].add(p.pair_with_id)
-    blackouts = {(b.member_id, b.date) for b in MemberBlackout.objects.filter(date__year=year, date__month=month)}
+    blackouts = {(b.member_id, b.date) for b in MemberBlackout.objects.filter(
+        date__year=year, date__month=month)}
     assignments = defaultdict(int)
+
     def last_key(m):
         p = prefs.get(m.id)
-        return getattr(p, 'last_duty_date', date(1900, 1, 1))
+        d = getattr(p, 'last_duty_date', None)
+        return d or date(1900, 1, 1)
+
     def eligible(role, m, day, assigned):
         p = prefs.get(m.id)
         if not p or p.dont_schedule or p.scheduling_suspended:
@@ -51,6 +58,7 @@ def generate_roster(year=None, month=None):
         if assignments[m.id] >= getattr(p, 'max_assignments_per_month', 0):
             return False
         return True
+
     def choose(cands, role, assigned):
         weights = []
         for m in cands:
