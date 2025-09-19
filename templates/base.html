@@ -148,6 +148,11 @@
           <span class="navbar-text ms-2">
             Welcome, {{ user.full_display_name }}
           </span>
+          {% if user.is_staff or user.webmaster or user.rostermeister or user.member_meister or user.instructor or user.admin %}
+            <a href="/admin/" class="ms-3" title="Admin interface" data-bs-toggle="tooltip" data-bs-placement="bottom">
+              <span style="font-size:1.5em; vertical-align:middle; cursor:pointer;">🛠️</span>
+            </a>
+          {% endif %}
         </div>
         <form action="{% url 'logout' %}" method="post" class="d-flex">
           {% csrf_token %}
