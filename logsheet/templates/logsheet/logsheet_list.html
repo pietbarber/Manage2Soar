@@ -26,8 +26,6 @@
     <tr>
       <th>Date</th>
       <th>Location</th>
-      <th>Created By</th>
-      <th>Created At</th>
       <th>Flights</th>
       <th>Status</th>
       <th></th>
@@ -38,8 +36,6 @@
     <tr>
       <td>{{ log.log_date }}</td>
       <td>{{ log.airfield }}</td>
-      <td>{{ log.created_by }}</td>
-      <td>{{ log.created_at|date:"Y-m-d H:i" }}</td>
       <td>{{ log.flights.count }}</td>
       <td>
         {% if log.finalized %}
