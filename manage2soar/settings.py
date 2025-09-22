@@ -277,6 +277,10 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'DEBUG',
         },
+        'duty_roster.generator': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+        },
     },
 }
 
