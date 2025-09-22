@@ -13,3 +13,5 @@ django-reversion
 pytest-django
 django-htmx
 pytz
+django-extensions
+python-dateutil
