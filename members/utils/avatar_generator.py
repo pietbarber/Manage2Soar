@@ -2,6 +2,7 @@ import os
 import pydenticon
 from django.conf import settings
 
+
 def generate_identicon(username, relative_path):
     """Generate a unique identicon and save as a PNG image."""
     generator = pydenticon.Generator(
@@ -13,5 +14,8 @@ def generate_identicon(username, relative_path):
     full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
+    data = generator.generate(username, 250, 250, output_format="png")
+    if isinstance(data, str):
+        data = data.encode('utf-8')
     with open(full_path, "wb") as f:
-        f.write(generator.generate(username, 250, 250, output_format="png"))
+        f.write(data)
