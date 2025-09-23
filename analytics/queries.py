@@ -17,6 +17,68 @@ from django.db.models.functions import ExtractWeekDay
 from duty_roster.models import DutyAssignment
 
 
+def instructor_schedule_vs_actual(start_date: date, end_date: date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
+    """
+    For each instructor:
+      - blue: unique days scheduled as duty instructor (from submitted Logsheets)
+      - burnt orange: unique days with at least one instructional flight (Flight.instructor) when NOT scheduled as duty instructor
+    Returns sorted Y axis (most total days at top), and two lists per instructor: scheduled_days, unscheduled_days
+    """
+    from logsheet.models import Logsheet
+    # 1. Get all scheduled instructor days (from submitted logsheets)
+    logsheet_qs = Logsheet.objects.filter(
+        log_date__gte=start_date, log_date__lte=end_date
+    )
+    if finalized_only:
+        logsheet_qs = logsheet_qs.filter(finalized=True)
+    scheduled_days = defaultdict(set)
+    for ls in logsheet_qs:
+        if ls.duty_instructor_id:
+            scheduled_days[ls.duty_instructor_id].add(ls.log_date)
+        if ls.surge_instructor_id:
+            scheduled_days[ls.surge_instructor_id].add(ls.log_date)
+
+    # 2. Get all actual instructor days (from flights)
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        instructor__isnull=False
+    )
+    # Map: instructor_id -> set of days they instructed
+    actual_days = defaultdict(set)
+    for row in qs.values("instructor_id", "ops_date").distinct():
+        if row["instructor_id"]:
+            actual_days[row["instructor_id"]].add(row["ops_date"])
+
+    # 3. For each instructor, count scheduled and unscheduled days
+    all_ids = set(scheduled_days.keys()) | set(actual_days.keys())
+    data = []
+    for pid in all_ids:
+        sched = scheduled_days.get(pid, set())
+        actual = actual_days.get(pid, set())
+        unsched = actual - sched
+        data.append((pid, len(sched), len(unsched)))
+
+    # Sort by total (scheduled+unscheduled) desc, then name
+    name_map = _display_name_map(list(all_ids))
+    data = [(pid, name_map.get(pid, str(pid)), s, u) for pid, s, u in data]
+    data.sort(key=lambda t: (-(t[2]+t[3]), t[1].lower()))
+    data = data[:top_n]
+
+    names = [t[1] for t in data]
+    scheduled = [t[2] for t in data]
+    unscheduled = [t[3] for t in data]
+
+    return {
+        "names": names,
+        "scheduled": scheduled,  # blue
+        "unscheduled": unscheduled,  # burnt orange
+        "labels": ["Scheduled", "Unscheduled"]
+    }
+
+
 def tow_pilot_schedule_vs_actual(start_date: date, end_date: date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
     """
     For each tow pilot:

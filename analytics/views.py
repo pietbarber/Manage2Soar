@@ -102,6 +102,10 @@ def dashboard(request):
     tow_sched = queries.tow_pilot_schedule_vs_actual(
         util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
 
+    # Instructor scheduled vs unscheduled chart data
+    instructor_sched = queries.instructor_schedule_vs_actual(
+        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+
     # Time of day operations for yearly view (using start/end years)
     time_ops = queries.time_of_day_operations(
         start, end, finalized_only=finalized_only) or {}
@@ -176,13 +180,19 @@ def dashboard(request):
         "duty_totals": duty.get("totals", []),
         "duty_do_total": duty.get("do_total", 0),
         "duty_ado_total": duty.get("ado_total", 0),
-    "duty_ops_days_total": duty.get("ops_days_total", 0),
+        "duty_ops_days_total": duty.get("ops_days_total", 0),
 
-    # Tow pilot scheduled vs unscheduled
-    "tow_sched_names": tow_sched.get("names", []),
-    "tow_sched_scheduled": tow_sched.get("scheduled", []),
-    "tow_sched_unscheduled": tow_sched.get("unscheduled", []),
-    "tow_sched_labels": tow_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
+        # Tow pilot scheduled vs unscheduled
+        "tow_sched_names": tow_sched.get("names", []),
+        "tow_sched_scheduled": tow_sched.get("scheduled", []),
+        "tow_sched_unscheduled": tow_sched.get("unscheduled", []),
+        "tow_sched_labels": tow_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
+
+        # Instructor scheduled vs unscheduled
+        "instructor_sched_names": instructor_sched.get("names", []),
+        "instructor_sched_scheduled": instructor_sched.get("scheduled", []),
+        "instructor_sched_unscheduled": instructor_sched.get("unscheduled", []),
+        "instructor_sched_labels": instructor_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
 
         # Time of day operations
         "timeops_takeoff_points": time_ops.get("takeoff_points", []),
@@ -257,7 +267,7 @@ def dashboard(request):
             "longest_min": ctx.get("long3h_longest_min", 0),
             "threshold_hours": ctx.get("long3h_thresh", 3.0),
         },
-    "duty": {
+        "duty": {
             "names": ctx.get("duty_names", []),
             "labels": ctx.get("duty_labels", ["DO", "ADO"]),
             "matrix": ctx.get("duty_matrix", {"DO": [], "ADO": []}),
@@ -266,11 +276,19 @@ def dashboard(request):
             "ado_total": ctx.get("duty_ado_total", 0),
             "ops_days_total": ctx.get("duty_ops_days_total", 0),
         },
+
         "tow_sched": {
             "names": ctx.get("tow_sched_names", []),
             "scheduled": ctx.get("tow_sched_scheduled", []),
             "unscheduled": ctx.get("tow_sched_unscheduled", []),
             "labels": ctx.get("tow_sched_labels", []),
+        },
+
+        "instructor_sched": {
+            "names": ctx.get("instructor_sched_names", []),
+            "scheduled": ctx.get("instructor_sched_scheduled", []),
+            "unscheduled": ctx.get("instructor_sched_unscheduled", []),
+            "labels": ctx.get("instructor_sched_labels", []),
         },
 
         "time_ops": {

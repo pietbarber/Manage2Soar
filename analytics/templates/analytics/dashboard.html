@@ -299,6 +299,7 @@
     </div>
   </div>
 
+
 <div class="row">
   <div class="col-lg-12">
     <div class="card mb-4">
@@ -316,6 +317,29 @@
         <div class="chart-box chart-box--xl"><canvas id="towSchedChart"></canvas></div>
         <div class="small text-muted mt-2" id="towSchedStatus">
           Blue: Scheduled as duty tow pilot • Burnt orange: Towed on unscheduled day
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="card mb-4">
+      <div class="card-body chart-card">
+        <div class="btn-group btn-group-sm chart-tools" role="group"
+             data-canvas="instSchedChart" data-name="instructor-schedule-vs-actual">
+          <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+          <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+        </div>
+        <h5 class="card-title mb-3 chart-title-pad">
+          Instructor Scheduling: Scheduled vs Unscheduled Days
+          <span class="badge bg-info text-dark ms-2">Date range</span>
+        </h5>
+        <div class="chart-box chart-box--xl"><canvas id="instSchedChart"></canvas></div>
+        <div class="small text-muted mt-2" id="instSchedStatus">
+          Blue: Scheduled as duty instructor • Burnt orange: Instructed on unscheduled day
         </div>
       </div>
     </div>
