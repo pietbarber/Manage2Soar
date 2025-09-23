@@ -1,3 +1,5 @@
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 import base64
 import os
 from datetime import date
@@ -269,12 +271,10 @@ def set_password(request):
 def tinymce_image_upload(request):
     if request.method == 'POST' and request.FILES.get('file'):
         f = request.FILES['file']
-        path = os.path.join(settings.MEDIA_ROOT, 'tinymce', f.name)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'wb+') as destination:
-            for chunk in f.chunks():
-                destination.write(chunk)
-        url = os.path.join(settings.MEDIA_URL, 'tinymce', f.name)
+        # Save to 'tinymce/<filename>' in the default storage (GCS or local)
+        save_path = os.path.join('tinymce', f.name)
+        saved_name = default_storage.save(save_path, ContentFile(f.read()))
+        url = default_storage.url(saved_name)
         return JsonResponse({'location': url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
