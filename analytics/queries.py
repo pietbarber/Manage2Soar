@@ -1,10 +1,12 @@
+# --- IMPORTS ---
 from collections import defaultdict
 from datetime import date, timedelta
 from itertools import chain
-
 from django.db.models.functions import Extract, ExtractYear
 from logsheet.models import Flight
 from typing import Dict, Any, TypedDict, List, Tuple
+from typing import Dict, Any, List
+from datetime import date
 from django.db.models import Count, Q, F, Sum, Avg, DurationField, Max
 from django.db.models.functions import ExtractYear, Coalesce
 from django.db.models.expressions import ExpressionWrapper
@@ -12,6 +14,69 @@ from logsheet.models import Flight
 from django.db.models.functions import Coalesce
 from django.contrib.auth import get_user_model
 from django.db.models.functions import ExtractWeekDay
+from duty_roster.models import DutyAssignment
+
+
+def tow_pilot_schedule_vs_actual(start_date: date, end_date: date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
+    """
+    For each tow pilot:
+      - blue: unique days scheduled as duty tow pilot (from submitted Logsheets, not DutyAssignment)
+      - burnt orange: unique days with at least one tow (Flight) when NOT scheduled as duty tow pilot
+    Returns sorted Y axis (most total days at top), and two lists per pilot: scheduled_days, unscheduled_days
+    """
+    # 1. Get all scheduled tow pilot days (from submitted logsheets)
+    from logsheet.models import Logsheet
+    logsheet_qs = Logsheet.objects.filter(
+        log_date__gte=start_date, log_date__lte=end_date
+    )
+    if finalized_only:
+        logsheet_qs = logsheet_qs.filter(finalized=True)
+    scheduled_days = defaultdict(set)
+    for ls in logsheet_qs:
+        if ls.tow_pilot_id:
+            scheduled_days[ls.tow_pilot_id].add(ls.log_date)
+        if ls.surge_tow_pilot_id:
+            scheduled_days[ls.surge_tow_pilot_id].add(ls.log_date)
+
+    # 2. Get all actual tow pilot days (from flights)
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        tow_pilot__isnull=False
+    )
+    # Map: tow_pilot_id -> set of days they towed
+    actual_days = defaultdict(set)
+    for row in qs.values("tow_pilot_id", "ops_date").distinct():
+        if row["tow_pilot_id"]:
+            actual_days[row["tow_pilot_id"]].add(row["ops_date"])
+
+    # 3. For each tow pilot, count scheduled and unscheduled days
+    all_ids = set(scheduled_days.keys()) | set(actual_days.keys())
+    data = []
+    for pid in all_ids:
+        sched = scheduled_days.get(pid, set())
+        actual = actual_days.get(pid, set())
+        unsched = actual - sched
+        data.append((pid, len(sched), len(unsched)))
+
+    # Sort by total (scheduled+unscheduled) desc, then name
+    name_map = _display_name_map(list(all_ids))
+    data = [(pid, name_map.get(pid, str(pid)), s, u) for pid, s, u in data]
+    data.sort(key=lambda t: (-(t[2]+t[3]), t[1].lower()))
+    data = data[:top_n]
+
+    names = [t[1] for t in data]
+    scheduled = [t[2] for t in data]
+    unscheduled = [t[3] for t in data]
+
+    return {
+        "names": names,
+        "scheduled": scheduled,  # blue
+        "unscheduled": unscheduled,  # burnt orange
+        "labels": ["Scheduled", "Unscheduled"]
+    }
 
 
 FINALIZED_ONLY = Q(logsheet__finalized=True)

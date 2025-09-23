@@ -1,3 +1,46 @@
+// Tow Pilot Scheduled vs Unscheduled Days (custom stacked bar)
+function initTowSched(d) {
+  const names = d.names || [], scheduled = d.scheduled || [], unscheduled = d.unscheduled || [];
+  if (!names.length) {
+    const el = document.getElementById("towSchedStatus");
+    if (el) el.textContent = "No tow pilot scheduling data for the selected period.";
+    return;
+  }
+  const datasets = [
+    {
+      label: d.labels?.[0] || "Scheduled (Blue)",
+      data: scheduled,
+      backgroundColor: "#1f77b4",
+      borderColor: "#1f77b4",
+      borderWidth: 1
+    },
+    {
+      label: d.labels?.[1] || "Unscheduled (Burnt Orange)",
+      data: unscheduled,
+      backgroundColor: "#e07b39",
+      borderColor: "#e07b39",
+      borderWidth: 1
+    }
+  ];
+  if (window.towSchedChart?.destroy) window.towSchedChart.destroy();
+  const ctx = document.getElementById("towSchedChart")?.getContext?.("2d");
+  if (!ctx) return;
+  window.towSchedChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: names, datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { position: "right" } },
+      scales: {
+        x: { stacked: true, beginAtZero: true, title: { display: true, text: "Unique Days" }, ticks: { precision: 0 } },
+        y: { stacked: true, ticks: { autoSkip: false } }
+      }
+    }
+  });
+}
 /* global Chart */
 (function () {
   const cs = getComputedStyle(document.documentElement);
@@ -349,6 +392,7 @@
     if (w.initTowByWeekday) w.initTowByWeekday(all.tows || {});
     if (w.initLongFlights3h) w.initLongFlights3h(all.long3h || {});
     if (w.initDutyDays) w.initDutyDays(all.duty || {});
+    if (w.initTowSched) w.initTowSched(all.tow_sched || {});
     initTimeOps(all.time_ops || {});
   };
 
