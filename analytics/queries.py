@@ -52,30 +52,46 @@ def instructor_schedule_vs_actual(start_date: date, end_date: date, *, finalized
         if row["instructor_id"]:
             actual_days[row["instructor_id"]].add(row["ops_date"])
 
+    # Find instructors who also towed during the period
+    tow_qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        tow_qs = tow_qs.filter(FINALIZED_ONLY)
+    tow_qs = tow_qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        tow_pilot__isnull=False
+    )
+    tow_counts = defaultdict(int)
+    for row in tow_qs.values("tow_pilot_id").annotate(n=Count("id")):
+        if row["tow_pilot_id"]:
+            tow_counts[row["tow_pilot_id"]] += row["n"]
+
     # 3. For each instructor, count scheduled and unscheduled days
     all_ids = set(scheduled_days.keys()) | set(actual_days.keys())
     data = []
+    italicize = []
+    name_map = _display_name_map(list(all_ids))
     for pid in all_ids:
         sched = scheduled_days.get(pid, set())
         actual = actual_days.get(pid, set())
         unsched = actual - sched
-        data.append((pid, len(sched), len(unsched)))
+        name = name_map.get(pid, str(pid))
+        data.append((pid, name, len(sched), len(unsched)))
+        italicize.append(tow_counts.get(pid, 0) > 0)
 
     # Sort by total (scheduled+unscheduled) desc, then name
-    name_map = _display_name_map(list(all_ids))
-    data = [(pid, name_map.get(pid, str(pid)), s, u) for pid, s, u in data]
-    data.sort(key=lambda t: (-(t[2]+t[3]), t[1].lower()))
-    data = data[:top_n]
-
-    names = [t[1] for t in data]
-    scheduled = [t[2] for t in data]
-    unscheduled = [t[3] for t in data]
+    data = sorted(zip(data, italicize),
+                  key=lambda t: (-(t[0][2]+t[0][3]), t[0][1].lower()))[:top_n]
+    names = [t[0][1] for t in data]
+    scheduled = [t[0][2] for t in data]
+    unscheduled = [t[0][3] for t in data]
+    italicize = [t[1] for t in data]
 
     return {
         "names": names,
         "scheduled": scheduled,  # blue
         "unscheduled": unscheduled,  # burnt orange
-        "labels": ["Scheduled", "Unscheduled"]
+        "labels": ["Scheduled", "Unscheduled"],
+        "italicize": italicize,
     }
 
 
@@ -114,30 +130,46 @@ def tow_pilot_schedule_vs_actual(start_date: date, end_date: date, *, finalized_
         if row["tow_pilot_id"]:
             actual_days[row["tow_pilot_id"]].add(row["ops_date"])
 
+    # Find tow pilots who also instructed during the period
+    inst_qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        inst_qs = inst_qs.filter(FINALIZED_ONLY)
+    inst_qs = inst_qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date,
+        instructor__isnull=False
+    )
+    inst_counts = defaultdict(int)
+    for row in inst_qs.values("instructor_id").annotate(n=Count("id")):
+        if row["instructor_id"]:
+            inst_counts[row["instructor_id"]] += row["n"]
+
     # 3. For each tow pilot, count scheduled and unscheduled days
     all_ids = set(scheduled_days.keys()) | set(actual_days.keys())
     data = []
+    italicize = []
+    name_map = _display_name_map(list(all_ids))
     for pid in all_ids:
         sched = scheduled_days.get(pid, set())
         actual = actual_days.get(pid, set())
         unsched = actual - sched
-        data.append((pid, len(sched), len(unsched)))
+        name = name_map.get(pid, str(pid))
+        data.append((pid, name, len(sched), len(unsched)))
+        italicize.append(inst_counts.get(pid, 0) > 0)
 
     # Sort by total (scheduled+unscheduled) desc, then name
-    name_map = _display_name_map(list(all_ids))
-    data = [(pid, name_map.get(pid, str(pid)), s, u) for pid, s, u in data]
-    data.sort(key=lambda t: (-(t[2]+t[3]), t[1].lower()))
-    data = data[:top_n]
-
-    names = [t[1] for t in data]
-    scheduled = [t[2] for t in data]
-    unscheduled = [t[3] for t in data]
+    data = sorted(zip(data, italicize),
+                  key=lambda t: (-(t[0][2]+t[0][3]), t[0][1].lower()))[:top_n]
+    names = [t[0][1] for t in data]
+    scheduled = [t[0][2] for t in data]
+    unscheduled = [t[0][3] for t in data]
+    italicize = [t[1] for t in data]
 
     return {
         "names": names,
         "scheduled": scheduled,  # blue
         "unscheduled": unscheduled,  # burnt orange
-        "labels": ["Scheduled", "Unscheduled"]
+        "labels": ["Scheduled", "Unscheduled"],
+        "italicize": italicize,
     }
 
 

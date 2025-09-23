@@ -277,11 +277,13 @@ def dashboard(request):
             "ops_days_total": ctx.get("duty_ops_days_total", 0),
         },
 
+
         "tow_sched": {
             "names": ctx.get("tow_sched_names", []),
             "scheduled": ctx.get("tow_sched_scheduled", []),
             "unscheduled": ctx.get("tow_sched_unscheduled", []),
             "labels": ctx.get("tow_sched_labels", []),
+            "italicize": tow_sched.get("italicize", []),
         },
 
         "instructor_sched": {
@@ -289,6 +291,7 @@ def dashboard(request):
             "scheduled": ctx.get("instructor_sched_scheduled", []),
             "unscheduled": ctx.get("instructor_sched_unscheduled", []),
             "labels": ctx.get("instructor_sched_labels", []),
+            "italicize": instructor_sched.get("italicize", []),
         },
 
         "time_ops": {

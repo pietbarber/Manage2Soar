@@ -25,6 +25,7 @@ function initInstSched(d) {
   if (window.instSchedChart?.destroy) window.instSchedChart.destroy();
   const ctx = document.getElementById("instSchedChart")?.getContext?.("2d");
   if (!ctx) return;
+  const italicize = d.italicize || [];
   window.instSchedChart = new Chart(ctx, {
     type: "bar",
     data: { labels: names, datasets },
@@ -36,7 +37,26 @@ function initInstSched(d) {
       plugins: { legend: { position: "right" } },
       scales: {
         x: { stacked: true, beginAtZero: true, title: { display: true, text: "Unique Days" }, ticks: { precision: 0 } },
-        y: { stacked: true, ticks: { autoSkip: false } }
+        y: {
+          stacked: true,
+          ticks: {
+            autoSkip: false,
+            callback: function (value, idx) {
+              const label = names[idx] || value;
+              if (italicize[idx]) {
+                // Underline using Unicode combining underline (U+0332)
+                const underline = '\u0332';
+                // Apply underline to each character
+                const underlined = label.split('').map(ch => ch + underline).join('');
+                return underlined;
+              }
+              return label;
+            },
+            font: {
+              style: (ctx) => italicize[ctx.index] ? 'italic' : 'normal'
+            }
+          }
+        }
       }
     }
   });
@@ -68,6 +88,7 @@ function initTowSched(d) {
   if (window.towSchedChart?.destroy) window.towSchedChart.destroy();
   const ctx = document.getElementById("towSchedChart")?.getContext?.("2d");
   if (!ctx) return;
+  const italicize = d.italicize || [];
   window.towSchedChart = new Chart(ctx, {
     type: "bar",
     data: { labels: names, datasets },
@@ -79,7 +100,26 @@ function initTowSched(d) {
       plugins: { legend: { position: "right" } },
       scales: {
         x: { stacked: true, beginAtZero: true, title: { display: true, text: "Unique Days" }, ticks: { precision: 0 } },
-        y: { stacked: true, ticks: { autoSkip: false } }
+        y: {
+          stacked: true,
+          ticks: {
+            autoSkip: false,
+            callback: function (value, idx) {
+              const label = names[idx] || value;
+              if (italicize[idx]) {
+                // Underline using Unicode combining underline (U+0332)
+                const underline = '\u0332';
+                // Apply underline to each character
+                const underlined = label.split('').map(ch => ch + underline).join('');
+                return underlined;
+              }
+              return label;
+            },
+            font: {
+              style: (ctx) => italicize[ctx.index] ? 'italic' : 'normal'
+            }
+          }
+        }
       }
     }
   });
