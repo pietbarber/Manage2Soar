@@ -1,0 +1,94 @@
+# Kubernetes deployment and service for Django + Gunicorn
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: django-app
+  template:
+    metadata:
+      labels:
+        app: django-app
+    spec:
+      containers:
+      - name: django
+        image: your-django-image:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          value: manage2soar.settings
+        volumeMounts:
+        - name: static-files
+          mountPath: /app/static
+        - name: media-files
+          mountPath: /app/media
+      volumes:
+      - name: static-files
+        emptyDir: {}
+      - name: media-files
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django
+spec:
+  selector:
+    app: django-app
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+# Kubernetes deployment and service for Nginx
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: your-nginx-image:latest
+        ports:
+        - containerPort: 443
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/nginx/ssl
+        - name: static-files
+          mountPath: /app/static
+        - name: media-files
+          mountPath: /app/media
+      volumes:
+      - name: ssl-certs
+        secret:
+          secretName: nginx-ssl
+      - name: static-files
+        emptyDir: {}
+      - name: media-files
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-proxy
+  ports:
+  - protocol: TCP
+    port: 443
+    targetPort: 443
