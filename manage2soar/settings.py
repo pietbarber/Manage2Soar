@@ -135,6 +135,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
+        "sslmode": "require"
     },
     'legacy': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -232,13 +233,14 @@ STORAGES = {
     },
 }
 
+GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
 MEDIA_URL = os.getenv(
     "MEDIA_URL",
     f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
 )
 
+# These static directories are not on Google Storage Platform.
 STATIC_URL = '/static/'
-
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]

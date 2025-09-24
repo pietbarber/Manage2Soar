@@ -274,7 +274,9 @@ def tinymce_image_upload(request):
         # Save to 'tinymce/<filename>' in the default storage (GCS or local)
         save_path = os.path.join('tinymce', f.name)
         saved_name = default_storage.save(save_path, ContentFile(f.read()))
-        url = default_storage.url(saved_name)
+        # Always return the public GCS URL
+        from django.conf import settings
+        url = settings.MEDIA_URL + saved_name
         return JsonResponse({'location': url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
