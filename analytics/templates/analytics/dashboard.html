@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
 {% load json_script %}
-
 {% block content %}
 <div class="container mt-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
@@ -347,6 +346,28 @@
 </div>
 
 
+<div class="card mb-4">
+  <div class="card-body chart-card">
+    <div class="btn-group btn-group-sm chart-tools" role="group"
+         data-canvas="combinedDutyChart" data-name="combined-duty-days">
+      <button class="btn btn-outline-secondary chart-dl" data-type="png">PNG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
+      <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
+    </div>
+    <h5 class="card-title mb-3 chart-title-pad">
+      Combined Duty Days: Tow Pilots &amp; Instructors
+      <span class="badge bg-info text-dark ms-2">Date range</span>
+    </h5>
+    <div class="chart-box chart-box--xl"><canvas id="combinedDutyChart"></canvas></div>
+    <div class="small text-muted mt-2" id="combinedDutyStatus">
+      <span style="color:#1f77b4">Blue</span>: Tow pilot days<br>
+      <span style="color:#e07b39">Burnt orange</span>: Instructor days<br>
+      <span style="color:#a259e6">Purple</span>: Days served as both tow pilot and instructor<br>
+      <span class="fst-italic">Italicized names</span> indicate dual-role members (served as both tow pilot and instructor).
+    </div>
+  </div>
+</div>
+
 </div>
 
 
@@ -364,7 +385,10 @@
 <script defer>
   window.addEventListener("DOMContentLoaded", () => {
     const ALL = JSON.parse(document.getElementById("analytics-data").textContent || "{}");
-    window.AnalyticsCharts?.initAll(ALL);
+    window.AnalyticsCharts?.initAll?.(ALL);
+    if (typeof initCombinedDuty === "function" && ALL.combined_duty) {
+      initCombinedDuty(ALL.combined_duty);
+    }
     // If charts.js exposes attachPngAuto, call it to bind all PNG buttons
     if (window.attachPngAuto) window.attachPngAuto();
   });

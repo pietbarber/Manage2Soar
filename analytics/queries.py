@@ -178,6 +178,100 @@ LANDED_ONLY = Q(landing_time__isnull=False) & Q(launch_time__isnull=False)
 __all__ = ["cumulative_flights_by_year"]
 
 
+def combined_duty_days_vs_actual(start_date: date, end_date: date, *, finalized_only=True, top_n=20, min_total=1) -> Dict[str, Any]:
+    """
+    For each member:
+      - Count unique days they did any duty (tow or instruct), not double-counting days when both.
+      - Flag dual-role members (did both at least once in period).
+    Returns sorted Y axis (most total days at top), and list per member: total duty days.
+    """
+    from logsheet.models import Logsheet
+    # 1. Get all scheduled tow pilot and instructor days (from submitted logsheets)
+    logsheet_qs = Logsheet.objects.filter(
+        log_date__gte=start_date, log_date__lte=end_date
+    )
+    if finalized_only:
+        logsheet_qs = logsheet_qs.filter(finalized=True)
+    scheduled_by_member = defaultdict(set)
+    for ls in logsheet_qs:
+        for pid in [ls.tow_pilot_id, ls.surge_tow_pilot_id, ls.duty_instructor_id, ls.surge_instructor_id]:
+            if pid:
+                scheduled_by_member[pid].add(ls.log_date)
+
+    # 2. Get all actual tow pilot and instructor days (from flights)
+    qs = Flight.objects.filter(LANDED_ONLY)
+    if finalized_only:
+        qs = qs.filter(FINALIZED_ONLY)
+    qs = qs.annotate(ops_date=F("logsheet__log_date")).filter(
+        ops_date__gte=start_date, ops_date__lte=end_date
+    )
+    actual_by_member = defaultdict(set)
+    for row in qs.values("tow_pilot_id", "instructor_id", "ops_date").distinct():
+        for pid in [row["tow_pilot_id"], row["instructor_id"]]:
+            if pid:
+                actual_by_member[pid].add(row["ops_date"])
+
+    # 3. For each member, count tow pilot and instructor days (no double-counting per day)
+    all_ids = set(scheduled_by_member.keys()) | set(actual_by_member.keys())
+    tow_days = defaultdict(set)
+    inst_days = defaultdict(set)
+    for row in qs.values("tow_pilot_id", "instructor_id", "ops_date").distinct():
+        if row["tow_pilot_id"]:
+            tow_days[row["tow_pilot_id"]].add(row["ops_date"])
+        if row["instructor_id"]:
+            inst_days[row["instructor_id"]].add(row["ops_date"])
+
+    # Also include scheduled days from logsheets
+    for ls in logsheet_qs:
+        if ls.tow_pilot_id:
+            tow_days[ls.tow_pilot_id].add(ls.log_date)
+        if ls.surge_tow_pilot_id:
+            tow_days[ls.surge_tow_pilot_id].add(ls.log_date)
+        if ls.duty_instructor_id:
+            inst_days[ls.duty_instructor_id].add(ls.log_date)
+        if ls.surge_instructor_id:
+            inst_days[ls.surge_instructor_id].add(ls.log_date)
+
+    # For each member, count unique tow and instructor days
+    name_map = _display_name_map(list(all_ids))
+    data = []
+    dual_role_flags = []
+    for pid in all_ids:
+        name = name_map.get(pid, str(pid))
+        tow = tow_days.get(pid, set())
+        inst = inst_days.get(pid, set())
+        # Days where member did both roles
+        both = tow & inst
+        tow_only = tow - both
+        inst_only = inst - both
+        tow_count = len(tow_only)
+        inst_count = len(inst_only)
+        both_count = len(both)
+        total = tow_count + inst_count + both_count
+        # Only include members who have both tow and instructor days
+        if (tow_count > 0 and inst_count > 0) or both_count > 0:
+            if total >= min_total:
+                data.append((pid, name, tow_count, inst_count, both_count))
+                dual_role_flags.append(True)
+
+    # Sort by total duty days desc, then name
+    data = sorted(zip(data, dual_role_flags), key=lambda t: (-(t[0][2]+t[0][3]+t[0][4]), t[0][1].lower()))[:top_n]
+    names = [t[0][1] for t in data]
+    tow_days_list = [t[0][2] for t in data]
+    inst_days_list = [t[0][3] for t in data]
+    both_days_list = [t[0][4] for t in data]
+    dual_role = [t[1] for t in data]
+
+    return {
+        "names": names,
+        "tow_days": tow_days_list,      # blue
+        "inst_days": inst_days_list,    # burnt orange
+        "both_days": both_days_list,    # days did both roles
+        "labels": ["Tow Pilot Days", "Instructor Days", "Both Roles"],
+        "dual_role": dual_role,
+    }
+
+
 def cumulative_flights_by_year(start_year=None, end_year=None, max_years=15, finalized_only=True):
     today = date.today()
     if end_year is None:

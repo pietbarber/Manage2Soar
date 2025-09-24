@@ -1,3 +1,71 @@
+// Combined Duty Days (custom bar)
+function initCombinedDuty(d) {
+  const names = d.names || [], tow_days = d.tow_days || [], inst_days = d.inst_days || [], both_days = d.both_days || [];
+  if (!names.length) {
+    const el = document.getElementById("combinedDutyStatus");
+    if (el) el.textContent = "No combined duty data for the selected period.";
+    return;
+  }
+  const datasets = [
+    {
+      label: d.labels?.[0] || "Tow Pilot Days",
+      data: tow_days,
+      backgroundColor: "#1f77b4", // blue
+      borderColor: "#1f77b4",
+      borderWidth: 1
+    },
+    {
+      label: d.labels?.[1] || "Instructor Days",
+      data: inst_days,
+      backgroundColor: "#e07b39", // burnt orange
+      borderColor: "#e07b39",
+      borderWidth: 1
+    },
+    {
+      label: d.labels?.[2] || "Both Roles",
+      data: both_days,
+      backgroundColor: "#a259e6", // purple
+      borderColor: "#a259e6",
+      borderWidth: 1
+    }
+  ];
+  if (window.combinedDutyChart?.destroy) window.combinedDutyChart.destroy();
+  const ctx = document.getElementById("combinedDutyChart")?.getContext?.("2d");
+  if (!ctx) return;
+  const dual_role = d.dual_role || [];
+  window.combinedDutyChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: names, datasets },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { position: "right" } },
+      scales: {
+        x: { beginAtZero: true, title: { display: true, text: "Unique Duty Days" }, ticks: { precision: 0 } },
+        y: {
+          ticks: {
+            autoSkip: false,
+            callback: function (value, idx) {
+              const label = names[idx] || value;
+              if (dual_role[idx]) {
+                // Underline using Unicode combining underline (U+0332)
+                const underline = '\u0332';
+                const underlined = label.split('').map(ch => ch + underline).join('');
+                return underlined;
+              }
+              return label;
+            },
+            font: {
+              style: (ctx) => dual_role[ctx.index] ? 'italic' : 'normal'
+            }
+          }
+        }
+      }
+    }
+  });
+}
 // Instructor Scheduled vs Unscheduled Days (custom stacked bar)
 function initInstSched(d) {
   const names = d.names || [], scheduled = d.scheduled || [], unscheduled = d.unscheduled || [];
