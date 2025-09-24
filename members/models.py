@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.timezone import now
 from tinymce.models import HTMLField
 from .utils.avatar_generator import generate_identicon
+from utils.upload_entropy import upload_with_entropy
 import os
 from django.contrib.auth.models import Group
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
@@ -21,7 +22,7 @@ class Biography(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     content = HTMLField(blank=True, null=True)
     uploaded_image = models.ImageField(
-        upload_to=biography_upload_path, blank=True, null=True)
+        upload_to=upload_with_entropy('biography'), blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -138,7 +139,7 @@ class Member(AbstractUser):
     state_freeform = models.CharField(max_length=50, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
     profile_photo = models.ImageField(
-        upload_to='profile_photos/', blank=True, null=True)
+        upload_to=upload_with_entropy('profile_photos'), blank=True, null=True)
     GLIDER_RATING_CHOICES = [
         ('none', 'None'),
         ('student', 'Student'),
@@ -279,7 +280,8 @@ class Member(AbstractUser):
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    image = models.ImageField(upload_to='badge_images/', blank=True, null=True)
+    image = models.ImageField(upload_to=upload_with_entropy(
+        'badge_images'), blank=True, null=True)
     description = HTMLField(blank=True)
     order = models.PositiveIntegerField(default=0)
 

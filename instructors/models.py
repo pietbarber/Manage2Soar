@@ -1,4 +1,5 @@
 from django.db import models
+from utils.upload_entropy import upload_with_entropy
 from tinymce.models import HTMLField
 from members.models import Member
 
@@ -266,7 +267,7 @@ class GroundLessonScore(models.Model):
 class ClubQualificationType(models.Model):
     code = models.CharField(max_length=30, unique=True)  # e.g. 'CFI', 'ASK-Back'
     name = models.CharField(max_length=100)              # Human-friendly name
-    icon = models.ImageField(upload_to='quals/icons/', null=True, blank=True)
+    icon = models.ImageField(upload_to=upload_with_entropy('quals/icons'), null=True, blank=True)
     applies_to = models.CharField(
         max_length=10,
         choices=[('student', 'Student'), ('rated', 'Rated'), ('both', 'Both')],
