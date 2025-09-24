@@ -255,7 +255,8 @@ def combined_duty_days_vs_actual(start_date: date, end_date: date, *, finalized_
                 dual_role_flags.append(True)
 
     # Sort by total duty days desc, then name
-    data = sorted(zip(data, dual_role_flags), key=lambda t: (-(t[0][2]+t[0][3]+t[0][4]), t[0][1].lower()))[:top_n]
+    data = sorted(zip(data, dual_role_flags),
+                  key=lambda t: (-(t[0][2]+t[0][3]+t[0][4]), t[0][1].lower()))[:top_n]
     names = [t[0][1] for t in data]
     tow_days_list = [t[0][2] for t in data]
     inst_days_list = [t[0][3] for t in data]

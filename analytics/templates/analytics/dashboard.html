@@ -92,13 +92,29 @@
 </div>
 
 {# ===== Date-range section banner ===== #}
+
 <div class="alert alert-info py-2 small">
-  The charts below use the selected date range:
-  <strong>{{ util_start|default:"(no start)" }}</strong> → <strong>{{ util_end|default:"(no end)" }}</strong>
-  • {% if finalized %}showing <em>finalized only</em>{% else %}<em>including unfinalized</em>{% endif %}.
+  The charts below show data for the selected date range:<br>
+  <form class="row g-2 align-items-end d-inline-flex" method="get" style="margin-bottom:0;">
+    <div class="col-auto">
+      <label class="form-label small mb-1">From</label>
+      <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label small mb-1">To</label>
+      <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
+    </div>
+    <input type="hidden" name="start" value="{{ start }}">
+    <input type="hidden" name="end" value="{{ end }}">
+    {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
+    <div class="col-auto">
+      <button class="btn btn-outline-primary btn-sm">Update</button>
+    </div>
+  </form>
 </div>
 
 {# ===== Utilization (Date range) ===== #}
+
 <div class="card mb-4">
   <div class="card-body chart-card">
     <div class="btn-group btn-group-sm chart-tools" role="group"
@@ -107,30 +123,10 @@
       <button class="btn btn-outline-secondary chart-dl" data-type="svg">SVG</button>
       <button class="btn btn-outline-secondary chart-dl" data-type="csv">CSV</button>
     </div>
-
-    <div class="d-flex justify-content-between align-items-end chart-title-pad">
-      <h5 class="card-title mb-3">
-        Glider Utilization
-        <span class="badge bg-info text-dark ms-2">Date range</span>
-      </h5>
-      <form class="row g-2 align-items-end" method="get">
-        <div class="col-auto">
-          <label class="form-label small mb-1">From</label>
-          <input class="form-control form-control-sm" type="date" name="util_start" value="{{ util_start }}">
-        </div>
-        <div class="col-auto">
-          <label class="form-label small mb-1">To</label>
-          <input class="form-control form-control-sm" type="date" name="util_end" value="{{ util_end }}">
-        </div>
-        <input type="hidden" name="start" value="{{ start }}">
-        <input type="hidden" name="end" value="{{ end }}">
-        {% if not finalized %}<input type="hidden" name="all" value="1">{% endif %}
-        <div class="col-auto">
-          <button class="btn btn-outline-primary btn-sm">Update</button>
-        </div>
-      </form>
-    </div>
-
+    <h5 class="card-title mb-3">
+      Glider Utilization
+      <span class="badge bg-info text-dark ms-2">Date range</span>
+    </h5>
     <div class="chart-box chart-box--tall"><canvas id="utilChart"></canvas></div>
     <div id="utilStatus" class="small text-muted mt-2">
       Top 12 ships shown individually. Non-club ships bucketed as <em>Private</em>, null gliders as <em>Unknown</em>, remainder as <em>Other</em>.

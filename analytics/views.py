@@ -98,7 +98,6 @@ def dashboard(request):
     duty = queries.duty_days_by_member(
         util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
 
-
     # Tow pilot scheduled vs unscheduled chart data
     tow_sched = queries.tow_pilot_schedule_vs_actual(
         util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
@@ -188,25 +187,25 @@ def dashboard(request):
         "duty_ops_days_total": duty.get("ops_days_total", 0),
 
 
-    # Tow pilot scheduled vs unscheduled
-    "tow_sched_names": tow_sched.get("names", []),
-    "tow_sched_scheduled": tow_sched.get("scheduled", []),
-    "tow_sched_unscheduled": tow_sched.get("unscheduled", []),
-    "tow_sched_labels": tow_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
+        # Tow pilot scheduled vs unscheduled
+        "tow_sched_names": tow_sched.get("names", []),
+        "tow_sched_scheduled": tow_sched.get("scheduled", []),
+        "tow_sched_unscheduled": tow_sched.get("unscheduled", []),
+        "tow_sched_labels": tow_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
 
-    # Instructor scheduled vs unscheduled
-    "instructor_sched_names": instructor_sched.get("names", []),
-    "instructor_sched_scheduled": instructor_sched.get("scheduled", []),
-    "instructor_sched_unscheduled": instructor_sched.get("unscheduled", []),
-    "instructor_sched_labels": instructor_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
+        # Instructor scheduled vs unscheduled
+        "instructor_sched_names": instructor_sched.get("names", []),
+        "instructor_sched_scheduled": instructor_sched.get("scheduled", []),
+        "instructor_sched_unscheduled": instructor_sched.get("unscheduled", []),
+        "instructor_sched_labels": instructor_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
 
-    # Combined duty days chart
-    "combined_duty_names": combined_duty.get("names", []),
-    "combined_duty_tow_days": combined_duty.get("tow_days", []),
-    "combined_duty_inst_days": combined_duty.get("inst_days", []),
-    "combined_duty_both_days": combined_duty.get("both_days", []),
-    "combined_duty_labels": combined_duty.get("labels", ["Tow Pilot Days", "Instructor Days", "Both Roles"]),
-    "combined_duty_dual_role": combined_duty.get("dual_role", []),
+        # Combined duty days chart
+        "combined_duty_names": combined_duty.get("names", []),
+        "combined_duty_tow_days": combined_duty.get("tow_days", []),
+        "combined_duty_inst_days": combined_duty.get("inst_days", []),
+        "combined_duty_both_days": combined_duty.get("both_days", []),
+        "combined_duty_labels": combined_duty.get("labels", ["Tow Pilot Days", "Instructor Days", "Both Roles"]),
+        "combined_duty_dual_role": combined_duty.get("dual_role", []),
 
         # Time of day operations
         "timeops_takeoff_points": time_ops.get("takeoff_points", []),
