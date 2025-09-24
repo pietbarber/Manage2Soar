@@ -1,5 +1,5 @@
 from django.db import models
-from utils.upload_entropy import upload_with_entropy
+from utils.upload_entropy import upload_quals_icon
 from tinymce.models import HTMLField
 from members.models import Member
 
@@ -56,14 +56,18 @@ class TrainingPhase(models.Model):
 # - is_required_for_private: True if pts_reference is non-empty.
 # - __str__: Returns code and title.
 ####################################################
+
+
 class TrainingLesson(models.Model):
     code = models.CharField(max_length=5, unique=True)  # e.g., "2l"
     title = models.CharField(max_length=100)  # e.g., "Normal Landing"
     description = HTMLField(blank=True)  # full lesson content from .shtml
 
     # FAA compliance tracking (from legacy fields)
-    far_requirement = models.CharField(max_length=20, blank=True)       # e.g., "61.87(i)(16)"
-    pts_reference = models.CharField(max_length=30, blank=True)         # e.g., "61.107(b)(6)(iv)"
+    far_requirement = models.CharField(
+        max_length=20, blank=True)       # e.g., "61.87(i)(16)"
+    pts_reference = models.CharField(
+        max_length=30, blank=True)         # e.g., "61.107(b)(6)(iv)"
     phase = models.ForeignKey(
         TrainingPhase,
         on_delete=models.SET_NULL,
@@ -101,6 +105,8 @@ class TrainingLesson(models.Model):
 # Methods:
 # - __str__: Returns the document title.
 ####################################################
+
+
 class SyllabusDocument(models.Model):
     slug = models.SlugField(unique=True)  # e.g. 'header', 'materials'
     title = models.CharField(max_length=200)
@@ -126,6 +132,8 @@ class SyllabusDocument(models.Model):
 # Methods:
 # - __str__: Returns a summary string of student, date, and instructor.
 ####################################################
+
+
 class InstructionReport(models.Model):
     student = models.ForeignKey(
         Member,
@@ -149,7 +157,7 @@ class InstructionReport(models.Model):
 
     def __str__(self):
         return (
-            f"{self.student.full_display_name} – {self.report_date}"  
+            f"{self.student.full_display_name} – {self.report_date}"
             f" by {self.instructor.full_display_name}"
         )
 
@@ -164,6 +172,8 @@ class InstructionReport(models.Model):
 # - lesson: Reference to the TrainingLesson.
 # - score: Choice field from SCORE_CHOICES.
 ####################################################
+
+
 class LessonScore(models.Model):
     report = models.ForeignKey(
         InstructionReport,
@@ -195,6 +205,8 @@ class LessonScore(models.Model):
 # Methods:
 # - __str__: Summary with date, student, and instructor.
 ####################################################
+
+
 class GroundInstruction(models.Model):
     student = models.ForeignKey(
         Member,
@@ -233,6 +245,8 @@ class GroundInstruction(models.Model):
 # Methods:
 # - __str__: Returns lesson code and score display.
 ####################################################
+
+
 class GroundLessonScore(models.Model):
     session = models.ForeignKey(
         "GroundInstruction",
@@ -264,10 +278,14 @@ class GroundLessonScore(models.Model):
 # - tooltip: Text description for UI hints.
 
 ####################################################
+
+
 class ClubQualificationType(models.Model):
-    code = models.CharField(max_length=30, unique=True)  # e.g. 'CFI', 'ASK-Back'
+    # e.g. 'CFI', 'ASK-Back'
+    code = models.CharField(max_length=30, unique=True)
     name = models.CharField(max_length=100)              # Human-friendly name
-    icon = models.ImageField(upload_to=upload_with_entropy('quals/icons'), null=True, blank=True)
+    icon = models.ImageField(
+        upload_to=upload_quals_icon, null=True, blank=True)
     applies_to = models.CharField(
         max_length=10,
         choices=[('student', 'Student'), ('rated', 'Rated'), ('both', 'Both')],
@@ -294,9 +312,12 @@ class ClubQualificationType(models.Model):
 # - notes: Optional text.
 # - imported: Flag for legacy import.
 ####################################################
+
+
 class MemberQualification(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
-    qualification = models.ForeignKey(ClubQualificationType, on_delete=models.CASCADE)
+    qualification = models.ForeignKey(
+        ClubQualificationType, on_delete=models.CASCADE)
     is_qualified = models.BooleanField(default=True)
     instructor = models.ForeignKey(
         Member,
@@ -308,7 +329,8 @@ class MemberQualification(models.Model):
     date_awarded = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
-    imported = models.BooleanField(default=False)  # track legacy-imported quals
+    # track legacy-imported quals
+    imported = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('member', 'qualification')
@@ -330,11 +352,14 @@ class MemberQualification(models.Model):
 # - sessions: Integer total of ground + flight instruction sessions.
 # - last_updated: Timestamp auto-updated on save.
 ####################################################
+
+
 class StudentProgressSnapshot(models.Model):
     student = models.OneToOneField(Member, on_delete=models.CASCADE)
     solo_progress = models.FloatField(default=0.0)       # 0.0 to 1.0
     checkride_progress = models.FloatField(default=0.0)  # 0.0 to 1.0
-    sessions = models.IntegerField(default=0)            # total instructor sessions
+    # total instructor sessions
+    sessions = models.IntegerField(default=0)
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):

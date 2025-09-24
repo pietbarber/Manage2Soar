@@ -1,7 +1,7 @@
 # from .models import Towplane, Airfield  # Adjust import paths as needed
 from django.db import models
 from decimal import Decimal, ROUND_HALF_UP
-from utils.upload_entropy import upload_with_entropy
+from utils.upload_entropy import upload_towplane_photo, upload_glider_photo, upload_airfield_photo
 from datetime import datetime, timedelta, date
 from tinymce.models import HTMLField
 from django.conf import settings
@@ -286,7 +286,7 @@ class Towplane(models.Model):
     model = models.CharField(max_length=100, blank=True, null=True)
     n_number = models.CharField(max_length=50)  # e.g., N-number
     photo = models.ImageField(
-        upload_to=upload_with_entropy('towplane_photos'), blank=True, null=True)
+        upload_to=upload_towplane_photo, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     club_owned = models.BooleanField(default=False)
     initial_hours = models.DecimalField(
@@ -333,7 +333,7 @@ class Glider(models.Model):
     competition_number = models.CharField(max_length=10, blank=True)
     seats = models.PositiveIntegerField(default=2)
     photo = models.ImageField(
-        upload_to=upload_with_entropy('glider_photos'), blank=True, null=True)
+        upload_to=upload_glider_photo, blank=True, null=True)
     rental_rate = models.DecimalField(
         max_digits=6, decimal_places=2, blank=True, null=True)
     max_rental_rate = models.DecimalField(
@@ -393,7 +393,7 @@ class Airfield(models.Model):
     # e.g., Front Royal Warren County Airport
     name = models.CharField(max_length=100)
     photo = models.ImageField(
-        upload_to=upload_with_entropy('airfield_photos'), blank=True, null=True)
+        upload_to=upload_airfield_photo, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

@@ -1,5 +1,5 @@
 from django.db import models
-from utils.upload_entropy import upload_with_entropy
+from utils.upload_entropy import upload_written_test_media
 from django.conf import settings
 from tinymce.models import HTMLField
 from decimal import Decimal
@@ -50,7 +50,7 @@ class Question(models.Model):
         help_text='Member who last updated this question'
     )
     media = models.FileField(
-        upload_to=upload_with_entropy('written_test_media'),
+        upload_to=upload_written_test_media,
         null=True,
         blank=True,
         help_text='Optional image or file attachment for the question'

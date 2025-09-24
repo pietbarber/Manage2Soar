@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "django_extensions",
     "instructors.apps.InstructorsConfig",
     "knowledgetest",
+    "siteconfig",
     "storages"
 ]
 
