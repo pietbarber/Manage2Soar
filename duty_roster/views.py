@@ -640,7 +640,6 @@ def is_rostermeister(user):
     return user.is_authenticated and user.rostermeister
 
 
-
 @active_member_required
 @user_passes_test(is_rostermeister)
 def propose_roster(request):
