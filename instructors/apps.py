@@ -3,6 +3,7 @@
 from django.apps import AppConfig
 import sys
 
+
 class InstructorsConfig(AppConfig):
     name = 'instructors'
 
