@@ -1,3 +1,5 @@
+
+{% load siteconfig_tags %}
 <div class="modal-header">
 <h2>Flight Details</h2>
 {% if is_modal %}
@@ -5,6 +7,7 @@
 {% endif %} 
 </div>
 <div class="modal-body">
+{% get_siteconfig as config %}
 <h4>📅 General Info</h4>
 <ul>
   <li><strong>Flight ID:</strong> {{ flight.id }}</li>
@@ -13,7 +16,7 @@
   <li><strong>Glider:</strong> {{ flight.glider }}</li>
 </ul>
 
-<h4>👨‍✈️ Pilot & Instructor</h4>
+<h4>👨‍✈️ Pilot&nbsp;&&nbsp;{{ config.instructor_title|default:'Instructor' }}</h4>
 <ul>
   <li><strong>Pilot:</strong> 
     {% if flight.pilot %}
@@ -23,7 +26,7 @@
     {% endif %}
   </li>
 
-  <li><strong>Instructor:</strong>
+  <li><strong>{{ config.instructor_title|default:'Instructor' }}:</strong>
     {% if flight.instructor %}
       {{ flight.instructor.full_display_name }}
     {% else %}
@@ -53,11 +56,11 @@
       Winch
     {% else %}
       Tow
-<h4>Tow Info</h4>
+<h4>{{ config.towpilot_title|default:'Tow Pilot' }} Info</h4>
 <ul>
   <li><strong>Towplane:</strong> {{ flight.towplane }}</li>
 
-  <li><strong>Tow Pilot:</strong>
+  <li><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong>
     {% if flight.tow_pilot %}
       {{ flight.tow_pilot.full_display_name }}
     {% else %}

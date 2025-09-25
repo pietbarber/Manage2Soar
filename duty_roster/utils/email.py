@@ -12,11 +12,14 @@ def notify_ops_status(assignment):
     ops_date = assignment.date.strftime("%A, %B %d, %Y")
     subject_prefix = "[Manage2Soar]"
 
+    from siteconfig.utils import get_role_title
     # 1. Ad-hoc day created (no crew yet)
     if not assignment.tow_pilot and not assignment.duty_officer:
+        tow_title = get_role_title('towpilot') or 'Tow Pilot'
+        do_title = get_role_title('duty_officer') or 'Duty Officer'
         send_mail(
             subject=f"{subject_prefix} Ad-Hoc Operations Proposed for {ops_date}",
-            message=f"An ad-hoc ops day has been proposed for {ops_date}.\n\nTow pilots and duty officers needed!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
+            message=f"An ad-hoc ops day has been proposed for {ops_date}.\n\n{tow_title}s and {do_title.lower()}s needed!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
             from_email="noreply@default.manage2soar.com",
             recipient_list=["instructors@default.manage2soar.com",
                             "towpilots@default.manage2soar.com"],
@@ -30,9 +33,11 @@ def notify_ops_status(assignment):
             assignment.is_confirmed = True
             assignment.save()
 
+            tow_title = get_role_title('towpilot') or 'Tow Pilot'
+            do_title = get_role_title('duty_officer') or 'Duty Officer'
             send_mail(
                 subject=f"{subject_prefix} Ad-Hoc Ops Confirmed for {ops_date}",
-                message=f"We now have a tow pilot and duty officer for {ops_date} — operations are a go!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
+                message=f"We now have a {tow_title.lower()} and {do_title.lower()} for {ops_date} — operations are a go!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=["members@default.manage2soar.com"],
             )

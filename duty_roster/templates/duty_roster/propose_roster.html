@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load roster_extras %}
+{% load siteconfig_tags %}
 {% block content %}
 
 {% if incomplete %}
@@ -19,12 +20,26 @@
   <input type="hidden" name="year"  value="{{ year }}">
   <input type="hidden" name="month" value="{{ month }}">
 
+  {% get_siteconfig as siteconfig %}
   <table class="table">
     <thead>
       <tr>
         <th>Date</th>
         {% for role in enabled_roles %}
-          <th>{{ role|title }}</th>
+          <th>
+            {% if siteconfig %}
+              {% if role == 'duty_officer' %}{{ siteconfig.duty_officer_title }}
+              {% elif role == 'assistant_duty_officer' %}{{ siteconfig.assistant_duty_officer_title }}
+              {% elif role == 'towpilot' %}{{ siteconfig.towpilot_title }}
+              {% elif role == 'instructor' %}{{ siteconfig.instructor_title }}
+              {% elif role == 'surge_towpilot' %}{{ siteconfig.surge_towpilot_title|default:'Surge Tow Pilot' }}
+              {% elif role == 'surge_instructor' %}{{ siteconfig.surge_instructor_title|default:'Surge Instructor' }}
+              {% else %}{{ role|title }}
+              {% endif %}
+            {% else %}
+              {{ role|title }}
+            {% endif %}
+          </th>
         {% endfor %}
       </tr>
     </thead>

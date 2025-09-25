@@ -23,6 +23,7 @@ from logsheet.models import Airfield
 from duty_roster.utils.email import notify_ops_status
 from .roster_generator import generate_roster
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
+from siteconfig.utils import get_role_title
 from siteconfig.models import SiteConfiguration
 
 
@@ -72,9 +73,11 @@ def blackout_manage(request):
     if member.instructor:
         role_choices.append(('instructor', 'Flight Instructor'))
     if member.duty_officer:
-        role_choices.append(('duty_officer', 'Duty Officer'))
+        role_choices.append(
+            ('duty_officer', get_role_title('duty_officer') or 'Duty Officer'))
     if member.assistant_duty_officer:
-        role_choices.append(('ado', 'Assistant Duty Officer'))
+        role_choices.append(('ado', get_role_title(
+            'assistant_duty_officer') or 'Assistant Duty Officer'))
     if member.towpilot:
         role_choices.append(('towpilot', 'Tow Pilot'))
 
@@ -542,7 +545,8 @@ def calendar_dutyofficer_signup(request, year, month, day):
 
     member = request.user
     if not member.duty_officer:
-        return HttpResponseForbidden("You are not a duty officer.")
+        title = get_role_title('duty_officer') or 'Duty Officer'
+        return HttpResponseForbidden(f"You are not a {title.lower()}.")
 
     if not assignment.duty_officer:
         assignment.duty_officer = member
@@ -578,7 +582,9 @@ def calendar_ado_signup(request, year, month, day):
 
     member = request.user
     if not member.assistant_duty_officer:
-        return HttpResponseForbidden("You are not an assistant duty officer.")
+        title = get_role_title(
+            'assistant_duty_officer') or 'Assistant Duty Officer'
+        return HttpResponseForbidden(f"You are not an {title.lower()}.")
 
     if not assignment.assistant_duty_officer:
         assignment.assistant_duty_officer = member

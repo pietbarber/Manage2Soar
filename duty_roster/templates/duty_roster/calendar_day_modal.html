@@ -1,3 +1,5 @@
+
+{% load siteconfig_tags %}
 <h5>{{ day|date:"l, F j, Y" }}</h5>
 
 {% if user.is_authenticated %}
@@ -17,12 +19,13 @@
 {% endif %}
  
 {% if assignment %}
-  <p><strong>Instructor:</strong> {{ assignment.instructor|default:"—" }}</p>
-  <p><strong>Surge Instructor:</strong> {{ assignment.surge_instructor|default:"—" }}</p>
-  <p><strong>Tow Pilot:</strong> {{ assignment.tow_pilot|default:"—" }}</p>
-  <p><strong>Surge Tow Pilot:</strong> {{ assignment.surge_tow_pilot|default:"—" }}</p>
-  <p><strong>Duty Officer:</strong> {{ assignment.duty_officer|default:"—" }}</p>
-  <p><strong>ADO:</strong> {{ assignment.assistant_duty_officer|default:"—" }}</p>
+  {% get_siteconfig as config %}
+  <p><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ assignment.instructor|default:"—" }}</p>
+  <p><strong>{{ config.surge_instructor_title|default:'Surge Instructor' }}:</strong> {{ assignment.surge_instructor|default:"—" }}</p>
+  <p><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong> {{ assignment.tow_pilot|default:"—" }}</p>
+  <p><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ assignment.surge_tow_pilot|default:"—" }}</p>
+  <p><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ assignment.duty_officer|default:"—" }}</p>
+  <p><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ assignment.assistant_duty_officer|default:"—" }}</p>
 {% else %}
   <p>No duty crew assigned for this date.</p>
 {% endif %}

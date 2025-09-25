@@ -292,6 +292,20 @@ class CreateLogsheetForm(forms.ModelForm):
             self.fields[name].required = False
             self.fields[name].widget.attrs.update({"class": "form-select"})
 
+        # Set dynamic labels for duty crew fields using siteconfig
+        try:
+            from siteconfig.models import SiteConfiguration
+            config = SiteConfiguration.objects.first()
+        except Exception:
+            config = None
+        if config:
+            self.fields["duty_officer"].label = config.duty_officer_title or "Duty Officer"
+            self.fields["assistant_duty_officer"].label = config.assistant_duty_officer_title or "Assistant Duty Officer"
+            self.fields["duty_instructor"].label = config.instructor_title or "Instructor"
+            self.fields["surge_instructor"].label = config.surge_instructor_title or "Surge Instructor"
+            self.fields["tow_pilot"].label = config.towpilot_title or "Tow Pilot"
+            self.fields["surge_tow_pilot"].label = config.surge_towpilot_title or "Surge Tow Pilot"
+
 ######################################################
 # LogsheetCloseoutForm
 #
@@ -339,6 +353,21 @@ class LogsheetCloseoutForm(forms.ModelForm):
 
 
 class LogsheetDutyCrewForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            from siteconfig.models import SiteConfiguration
+            config = SiteConfiguration.objects.first()
+        except Exception:
+            config = None
+        if config:
+            self.fields["duty_officer"].label = config.duty_officer_title or "Duty Officer"
+            self.fields["assistant_duty_officer"].label = config.assistant_duty_officer_title or "Assistant Duty Officer"
+            self.fields["duty_instructor"].label = config.instructor_title or "Instructor"
+            self.fields["surge_instructor"].label = config.surge_instructor_title or "Surge Instructor"
+            self.fields["tow_pilot"].label = config.towpilot_title or "Tow Pilot"
+            self.fields["surge_tow_pilot"].label = config.surge_towpilot_title or "Surge Tow Pilot"
+
     class Meta:
         model = Logsheet
         fields = [

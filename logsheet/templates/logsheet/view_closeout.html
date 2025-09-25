@@ -1,5 +1,7 @@
+
 {% extends "base.html" %}
 {% load humanize %}
+{% load siteconfig_tags %}
 
 {% block content %}
 <h2>📝 Closeout Summary – {{ logsheet.log_date }}</h2>
@@ -19,25 +21,26 @@
 <div class="alert alert-info">No closeout report was submitted for this day.</div>
 {% endif %}
 
+{% get_siteconfig as config %}
 <h3>Duty Crew</h3>
 <ul class="list-unstyled">
   {% if logsheet.duty_officer %}
-    <li><strong>Duty Officer:</strong> {{ logsheet.duty_officer.full_display_name }}</li>
+    <li><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ logsheet.duty_officer.full_display_name }}</li>
   {% endif %}
   {% if logsheet.assistant_duty_officer %}
-    <li><strong>Assistant Duty Officer:</strong> {{ logsheet.assistant_duty_officer.full_display_name }}</li>
+    <li><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ logsheet.assistant_duty_officer.full_display_name }}</li>
   {% endif %}
   {% if logsheet.duty_instructor %}
-    <li><strong>Duty Instructor:</strong> {{ logsheet.duty_instructor.full_display_name }}</li>
+    <li><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ logsheet.duty_instructor.full_display_name }}</li>
   {% endif %}
   {% if logsheet.surge_instructor %}
-    <li><strong>Surge Instructor:</strong> {{ logsheet.surge_instructor.full_display_name }}</li>
+    <li><strong>{{ config.surge_instructor_title|default:'Surge Instructor' }}:</strong> {{ logsheet.surge_instructor.full_display_name }}</li>
   {% endif %}
   {% if logsheet.tow_pilot %}
-    <li><strong>Tow Pilot:</strong> {{ logsheet.tow_pilot.full_display_name }}</li>
+    <li><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong> {{ logsheet.tow_pilot.full_display_name }}</li>
   {% endif %}
   {% if logsheet.surge_tow_pilot %}
-    <li><strong>Surge Tow Pilot:</strong> {{ logsheet.surge_tow_pilot.full_display_name }}</li>
+    <li><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ logsheet.surge_tow_pilot.full_display_name }}</li>
   {% endif %}
 </ul>
 

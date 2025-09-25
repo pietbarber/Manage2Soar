@@ -1,6 +1,7 @@
 
 {% load duty_extras %}
 {% load static %}
+{% load siteconfig_tags %}
 {% if user.rostermeister %}
   <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" class="btn btn-primary mb-3">Propose Duty Roster</a>
 {% endif %}
@@ -48,8 +49,9 @@
                 {% if not a.confirmed and not a.is_confirmed %}
                   <div class="text-warning font-weight-bold mb-1 small">
                     🚧 Not Confirmed<br>
-                    {% if not a.tow_pilot %}🛩️ Tow Pilot Missing<br>{% endif %}
-                    {% if not a.duty_officer %}📋 Duty Officer Missing<br>{% endif %}
+                    {% get_siteconfig as config %}
+                    {% if not a.tow_pilot %}🛩️ {{ config.towpilot_title|default:'Tow Pilot' }} Missing<br>{% endif %}
+                    {% if not a.duty_officer %}📋 {{ config.duty_officer_title|default:'Duty Officer' }} Missing<br>{% endif %}
                   </div>
                 {% endif %}
                 <div class="small">
