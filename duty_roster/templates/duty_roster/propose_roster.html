@@ -9,16 +9,21 @@
   </div>
 {% endif %}
 <h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
+{% if no_scheduling %}
+  <div class="alert alert-info">
+    This club does not schedule operations. If you want to change this, please configure the site to schedule volunteers.
+  </div>
+{% else %}
 <form method="post">
   {% csrf_token %}
-<input type="hidden" name="year"  value="{{ year }}">
-<input type="hidden" name="month" value="{{ month }}">
+  <input type="hidden" name="year"  value="{{ year }}">
+  <input type="hidden" name="month" value="{{ month }}">
 
   <table class="table">
     <thead>
       <tr>
         <th>Date</th>
-        {% for role in DEFAULT_ROLES %}
+        {% for role in enabled_roles %}
           <th>{{ role|title }}</th>
         {% endfor %}
       </tr>
@@ -27,7 +32,7 @@
       {% for entry in draft %}
         <tr>
           <td>{{ entry.date }}</td>
-          {% for role in DEFAULT_ROLES %}
+          {% for role in enabled_roles %}
             <td>
               {% if entry.slots|dict_get:role %}
                 {{ entry.slots|dict_get:role|get_member_name }}
@@ -44,4 +49,5 @@
   <button name="action" value="roll"    class="btn btn-secondary">🔄 Roll Again</button>
   <button name="action" value="cancel"  class="btn btn-danger">❌ Cancel</button>
 </form>
+{% endif %}
 {% endblock %}

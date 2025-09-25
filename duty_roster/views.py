@@ -23,6 +23,7 @@ from logsheet.models import Airfield
 from duty_roster.utils.email import notify_ops_status
 from .roster_generator import generate_roster
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
+from siteconfig.models import SiteConfiguration
 
 
 def roster_home(request):
@@ -639,6 +640,7 @@ def is_rostermeister(user):
     return user.is_authenticated and user.rostermeister
 
 
+
 @active_member_required
 @user_passes_test(is_rostermeister)
 def propose_roster(request):
@@ -650,6 +652,33 @@ def propose_roster(request):
         today = timezone.now().date()
         year, month = today.year, today.month
     incomplete = False
+
+    # Get site config and determine which roles to schedule
+    siteconfig = SiteConfiguration.objects.first()
+    enabled_roles = []
+    if siteconfig:
+        if getattr(siteconfig, 'schedule_instructors', False):
+            enabled_roles.append('instructor')
+        if getattr(siteconfig, 'schedule_duty_officers', False):
+            enabled_roles.append('duty_officer')
+        if getattr(siteconfig, 'schedule_assistant_duty_officers', False):
+            enabled_roles.append('assistant_duty_officer')
+        if getattr(siteconfig, 'schedule_tow_pilots', False):
+            enabled_roles.append('towpilot')
+    else:
+        enabled_roles = DEFAULT_ROLES.copy()
+
+    if not enabled_roles:
+        # No scheduling for this club
+        return render(request, 'duty_roster/propose_roster.html', {
+            'draft': [],
+            'year': year,
+            'month': month,
+            'incomplete': False,
+            'enabled_roles': [],
+            'no_scheduling': True,
+        })
+
     if request.method == 'POST':
         action = request.POST.get('action')
         draft = request.session.get('proposed_roster', [])
@@ -661,10 +690,10 @@ def propose_roster(request):
                     d for d in cal.itermonthdates(year, month)
                     if d.month == month and d.weekday() in (5, 6)
                 ]
-                raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}}
+                raw = [{'date': d, 'slots': {r: None for r in enabled_roles}}
                        for d in weekend]
                 incomplete = True
-            draft = [{'date': e['date'].isoformat(), 'slots': e['slots']}
+            draft = [{'date': e['date'].isoformat(), 'slots': {r: e['slots'].get(r) for r in enabled_roles}}
                      for e in raw]
             request.session['proposed_roster'] = draft
 
@@ -708,10 +737,10 @@ def propose_roster(request):
                 d for d in cal.itermonthdates(year, month)
                 if d.month == month and d.weekday() in (5, 6)
             ]
-            raw = [{'date': d, 'slots': {r: None for r in DEFAULT_ROLES}}
+            raw = [{'date': d, 'slots': {r: None for r in enabled_roles}}
                    for d in weekend]
             incomplete = True
-        draft = [{'date': e['date'].isoformat(), 'slots': e['slots']}
+        draft = [{'date': e['date'].isoformat(), 'slots': {r: e['slots'].get(r) for r in enabled_roles}}
                  for e in raw]
         request.session['proposed_roster'] = draft
     display = [{'date': dt_date.fromisoformat(
@@ -721,7 +750,8 @@ def propose_roster(request):
         'year': year,
         'month': month,
         'incomplete': incomplete,
-        'DEFAULT_ROLES': DEFAULT_ROLES
+        'enabled_roles': enabled_roles,
+        'no_scheduling': False,
     })
 
 
