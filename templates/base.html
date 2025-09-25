@@ -10,7 +10,10 @@
   {% block head_extra %}{% endblock %}
 
   <meta charset="UTF-8">
-  <title>{% block title %}Manage2Soar{% endblock %}</title>
+  {% get_siteconfig as siteconfig %}
+  <title>
+    {% block title %}{% endblock %}{% if block.title %}{% if siteconfig and siteconfig.club_name %} - {{ siteconfig.club_name }}{% else %} - Manage2Soar{% endif %}{% else %}{% if siteconfig and siteconfig.club_name %}{{ siteconfig.club_name }}{% else %}Manage2Soar{% endif %}{% endif %}
+  </title>
   <!-- Flatpickr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="{% static 'css/calendar.css' %}">
