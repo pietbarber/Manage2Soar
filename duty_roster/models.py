@@ -11,16 +11,14 @@ class DutyDay(models.Model):
 
 
 class DutySlot(models.Model):
-    from siteconfig.utils import get_role_title
+    # Static role keys; display titles are resolved at runtime
     ROLE_CHOICES = [
-        ('duty_officer', get_role_title('duty_officer') or 'Duty Officer'),
-        ('assistant_duty_officer', get_role_title(
-            'assistant_duty_officer') or 'Assistant Duty Officer'),
-        ('instructor', get_role_title('instructor') or 'Instructor'),
-        ('surge_instructor', get_role_title(
-            'surge_instructor') or 'Surge Instructor'),
-        ('tow_pilot', get_role_title('towpilot') or 'Tow Pilot'),
-        ('surge_tow_pilot', get_role_title('surge_towpilot') or 'Surge Tow Pilot'),
+        ('duty_officer', 'Duty Officer'),
+        ('assistant_duty_officer', 'Assistant Duty Officer'),
+        ('instructor', 'Instructor'),
+        ('surge_instructor', 'Surge Instructor'),
+        ('tow_pilot', 'Tow Pilot'),
+        ('surge_tow_pilot', 'Surge Tow Pilot'),
     ]
 
     duty_day = models.ForeignKey(
@@ -160,12 +158,12 @@ class InstructionSlot(models.Model):
 
 
 class DutySwapRequest(models.Model):
-    from siteconfig.utils import get_role_title
+    # Static role keys; display titles are resolved at runtime
     ROLE_CHOICES = [
-        ("DO", get_role_title('duty_officer') or 'Duty Officer'),
-        ("ADO", get_role_title('assistant_duty_officer') or 'Assistant Duty Officer'),
-        ("INSTRUCTOR", get_role_title('instructor') or 'Instructor'),
-        ("TOW", get_role_title('towpilot') or 'Tow Pilot'),
+        ("DO", "Duty Officer"),
+        ("ADO", "Assistant Duty Officer"),
+        ("INSTRUCTOR", "Instructor"),
+        ("TOW", "Tow Pilot"),
     ]
 
     requester = models.ForeignKey(

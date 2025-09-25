@@ -19,3 +19,4 @@ django-storages
 google-cloud-storage
 google-auth 
 google-api-python-client 
+gunicorn
