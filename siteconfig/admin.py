@@ -22,9 +22,11 @@ class SiteConfigurationAdmin(admin.ModelAdmin):
             'fields': (
                 'club_name', 'domain_name', 'club_abbreviation', 'club_logo', 'club_nickname',
                 'schedule_instructors', 'schedule_tow_pilots', 'schedule_duty_officers', 'schedule_assistant_duty_officers',
-                'duty_officer_title', 'assistant_duty_officer_title', 'membership_manager_title', 'equipment_manager_title',
+                'duty_officer_title', 'assistant_duty_officer_title',
+                'towpilot_title', 'surge_towpilot_title',
+                'instructor_title', 'surge_instructor_title',
+                'membership_manager_title', 'equipment_manager_title',
                 'allow_glider_reservations', 'allow_two_seater_reservations',
-                'extra_config',
             )
         }),
     )

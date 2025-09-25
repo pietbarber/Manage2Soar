@@ -24,11 +24,19 @@ class SiteConfiguration(models.Model):
     schedule_assistant_duty_officers = models.BooleanField(
         default=False, help_text="We schedule Assistant Duty Officers ahead of time")
 
-    # Terminology
+    # Terminology (customizable titles for all roles)
     duty_officer_title = models.CharField(
         max_length=40, default="Duty Officer", help_text="We refer to the position of Duty Officer as ...")
     assistant_duty_officer_title = models.CharField(
         max_length=40, default="Assistant Duty Officer", help_text="We refer to the position of Assistant Duty Officer as ...")
+    towpilot_title = models.CharField(
+        max_length=40, default="Tow Pilot", help_text="We refer to the position of Tow Pilot as ...")
+    surge_towpilot_title = models.CharField(
+        max_length=40, default="Surge Tow Pilot", blank=True, help_text="We refer to the position of Surge Tow Pilot as ... (optional)")
+    instructor_title = models.CharField(
+        max_length=40, default="Instructor", help_text="We refer to the position of Instructor as ...")
+    surge_instructor_title = models.CharField(
+        max_length=40, default="Surge Instructor", blank=True, help_text="We refer to the position of Surge Instructor as ... (optional)")
     membership_manager_title = models.CharField(
         max_length=40, default="Membership Manager", help_text="We refer to the person who manages the membership as ...")
     equipment_manager_title = models.CharField(
@@ -39,9 +47,6 @@ class SiteConfiguration(models.Model):
         default=False, help_text="We allow members to reserve club gliders ahead of time.")
     allow_two_seater_reservations = models.BooleanField(
         default=False, help_text="We allow members to reserve club two seaters ahead of time.")
-
-    extra_config = models.JSONField(
-        blank=True, null=True, help_text="Other club-specific settings (dict)")
 
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
