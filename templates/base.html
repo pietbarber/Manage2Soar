@@ -1,5 +1,6 @@
 {% load static %}
 {% load crispy_forms_tags %}
+{% load siteconfig_tags %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -42,10 +43,14 @@
 
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
+      {% get_siteconfig as siteconfig %}
       <a class="navbar-brand" href="{% url 'home' %}">
-        <img src="{% static 'images/Manage2Soar-square-Logo-black.png' %}" alt="Manage2Soar Logo" height="30"
-          class="d-inline-block align-text-top">
-        Manage2Soar
+        {% if siteconfig and siteconfig.club_logo %}
+          <img src="{{ siteconfig.club_logo.url }}" alt="{{ siteconfig.club_name }} Logo" height="30" class="d-inline-block align-text-top me-2">
+        {% else %}
+          <img src="{% static 'images/Manage2Soar-square-Logo-black.png' %}" alt="Manage2Soar Logo" height="30" class="d-inline-block align-text-top me-2">
+        {% endif %}
+        {{ siteconfig.club_name|default:'Manage2Soar' }}
       </a>
 
       <!-- Hamburger toggle button -->
