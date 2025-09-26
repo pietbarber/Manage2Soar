@@ -18,9 +18,9 @@ spec:
           image: your-django-image:latest
           ports:
             - containerPort: 8000
-          env:
-            - name: DJANGO_SETTINGS_MODULE
-              value: manage2soar.settings
+          envFrom:
+            - secretRef:
+                name: manage2soar-env
           volumeMounts:
             - name: static-files
               mountPath: /app/static
