@@ -26,6 +26,13 @@ spec:
               mountPath: /app/static
             - name: media-files
               mountPath: /app/media
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       volumes:
         - name: static-files
           emptyDir: {}
@@ -43,52 +50,3 @@ spec:
     - protocol: TCP
       port: 8000
       targetPort: 8000
----
-# Kubernetes deployment and service for Nginx
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-proxy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx-proxy
-  template:
-    metadata:
-      labels:
-        app: nginx-proxy
-    spec:
-      containers:
-        - name: nginx
-          image: your-nginx-image:latest
-          ports:
-            - containerPort: 443
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /etc/nginx/ssl
-            - name: static-files
-              mountPath: /app/static
-            - name: media-files
-              mountPath: /app/media
-      volumes:
-        - name: ssl-certs
-          secret:
-            secretName: nginx-ssl
-        - name: static-files
-          emptyDir: {}
-        - name: media-files
-          emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nginx
-spec:
-  type: LoadBalancer
-  selector:
-    app: nginx-proxy
-  ports:
-    - protocol: TCP
-      port: 443
-      targetPort: 443
