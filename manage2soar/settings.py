@@ -277,7 +277,11 @@ AUTHENTICATION_BACKENDS = (
 # Or your real domain in production
 # ALLOWED_HOSTS = ['10.76.0.0', '127.0.0.1',
 # 'localhost', 'm2s.skylinesoaring.org', '.skylinesoaring.org']
+
 ALLOWED_HOSTS = ['*']
+
+# Trust X-Forwarded-Proto header for HTTPS detection (required for OAuth2 redirect URI to use https)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 DEBUG = True
