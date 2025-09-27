@@ -14,16 +14,27 @@
         </div>
         <form method="post" autocomplete="username">
             {% csrf_token %}
-            {% for field in form %}
-            <div class="mb-3">
-                {{ field.label_tag }}
-                {{ field }}
-                {% if field.errors %}
-                <div class="text-danger small">{{ field.errors|striptags }}</div>
-                {% endif %}
+            <div class="mx-auto login-width" style="max-width: 320px; width: 100%;">
+                {% for field in form %}
+                <div class="mb-3">
+                    {{ field.label_tag }}
+                    {% if field.field.widget.input_type == "password" %}
+                    <div class="input-group password-group login-width" style="display: flex; width: 100%;">
+                        <input type="password" name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-control" style="flex: 1 1 auto; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0;" {% if field.field.required %}required{% endif %}>
+                        <button type="button" class="btn btn-outline-secondary" id="togglePassword" tabindex="-1" data-bs-toggle="tooltip" data-bs-placement="right" title="Show/Hide password" style="width: 40px; border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                            <span class="fa fa-eye" id="togglePasswordIcon"></span>
+                        </button>
+                    </div>
+                    {% else %}
+                    <input type="text" name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-control" style="width: 100%;" {% if field.field.required %}required{% endif %} {% if field.field.widget.attrs.autofocus %}autofocus{% endif %}>
+                    {% endif %}
+                    {% if field.errors %}
+                    <div class="text-danger small">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary login-width" style="width: 100%;">Login</button>
             </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary w-100">Login</button>
         </form>
         <div class="mt-2 text-end">
             <a href="{% url 'password_reset' %}">Forgot your password?</a>
@@ -42,6 +53,64 @@
         <div class="mt-3 text-center text-muted small">
             {{ now|date:'Y' }}
         </div>
+    </div>
+</div>
+<style>
+    .login-width {
+        max-width: 320px;
+        width: 100%;
+        min-width: 220px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .input-group {
+        width: 100%;
+    }
+    .input-group .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .password-group {
+        width: 100%;
+        display: flex;
+    }
+    .password-group .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .password-group .btn {
+        width: 40px;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        padding-left: 0;
+        padding-right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var toggleBtn = document.getElementById('togglePassword');
+    var toggleIcon = document.getElementById('togglePasswordIcon');
+    var passwordField = document.querySelector('input[type="password"]');
+    if (toggleBtn && toggleIcon && passwordField) {
+        // Enable Bootstrap tooltip
+        if (window.bootstrap) {
+            new bootstrap.Tooltip(toggleBtn);
+        }
+        toggleBtn.addEventListener('click', function () {
+            var isPassword = passwordField.getAttribute('type') === 'password';
+            passwordField.setAttribute('type', isPassword ? 'text' : 'password');
+            toggleIcon.classList.toggle('fa-eye');
+            toggleIcon.classList.toggle('fa-eye-slash');
+            toggleBtn.setAttribute('title', isPassword ? 'Hide password' : 'Show password');
+        });
+    }
+});
+</script>
     </div>
 </div>
 {% endblock %}

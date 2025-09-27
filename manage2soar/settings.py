@@ -73,7 +73,6 @@ LOGIN_URL = '/members/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 AUTH_USER_MODEL = 'members.Member'
-CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -147,6 +146,11 @@ DATABASES = {
     }
 }
 
+
+# These are to allow us to have users log in with Google OAuth2
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_KEY")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv(
@@ -279,9 +283,9 @@ ALLOWED_HOSTS = ['*']
 DEBUG = True
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    SITE_URL = "http://127.0.0.1:8000"
-else:
-    SITE_URL = "https://default.manage2soar.org"
+
+CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
+SITE_URL = "https://m2s.skylinesoaring.org"
 
 DEFAULT_FROM_EMAIL = "noreply@default.manage2soar.org"
 EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
