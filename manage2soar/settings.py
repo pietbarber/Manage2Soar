@@ -37,7 +37,6 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-ALLOWED_HOSTS = []
 STATIC_ROOT = "/app/staticfiles"
 
 # Application definition
@@ -74,7 +73,7 @@ LOGIN_URL = '/members/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 AUTH_USER_MODEL = 'members.Member'
-
+CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -270,7 +269,11 @@ AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
 )
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']  # Or your real domain in production
+
+# Or your real domain in production
+# ALLOWED_HOSTS = ['10.76.0.0', '127.0.0.1',
+# 'localhost', 'm2s.skylinesoaring.org', '.skylinesoaring.org']
+ALLOWED_HOSTS = ['*']
 
 
 DEBUG = True

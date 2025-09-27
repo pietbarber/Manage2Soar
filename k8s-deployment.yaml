@@ -15,9 +15,12 @@ spec:
     spec:
       containers:
         - name: django
-          image: your-django-image:latest
+          image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
           ports:
             - containerPort: 8000
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /app/skyline-soaring-storage.json
           envFrom:
             - secretRef:
                 name: manage2soar-env
@@ -26,18 +29,25 @@ spec:
               mountPath: /app/static
             - name: media-files
               mountPath: /app/media
+            - name: gcp-sa-key
+              mountPath: /app/skyline-soaring-storage.json
+              subPath: skyline-soaring-storage.json
+              readOnly: true
           resources:
             requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
               memory: "256Mi"
               cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
       volumes:
         - name: static-files
           emptyDir: {}
         - name: media-files
           emptyDir: {}
+        - name: gcp-sa-key
+          secret:
+            secretName: gcp-sa-key
 ---
 apiVersion: v1
 kind: Service

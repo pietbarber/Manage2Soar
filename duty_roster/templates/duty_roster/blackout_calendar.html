@@ -1,11 +1,3 @@
-    {% comment %} Warning if all eligible role percents are zero {% endcomment %}
-    {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
-      {% if total_percent == 0 %}
-        <div class="alert alert-warning mt-3">
-          <strong>Warning:</strong> You have not set any duty role preferences. You will not be scheduled for any duty slots until you set at least one role percentage above 0%.
-        </div>
-      {% endif %}
-    {% endwith %}
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
@@ -18,7 +10,14 @@
       <div class="alert alert-success">{{ message }}</div>
     {% endfor %}
   {% endif %}
-
+    {% comment %} Warning if all eligible role percents are zero {% endcomment %}
+    {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
+      {% if total_percent == 0 %}
+        <div class="alert alert-warning mt-3">
+          <strong>Warning:</strong> You have not set any duty role preferences. You will not be scheduled for any duty slots until you set at least one role percentage above 0%.
+        </div>
+      {% endif %}
+    {% endwith %}
   {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
