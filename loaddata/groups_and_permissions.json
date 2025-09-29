@@ -5,34 +5,6 @@
   "fields": {
     "name": "Instructor Admins",
     "permissions": [
-      189,
-      190,
-      191,
-      192,
-      181,
-      182,
-      183,
-      184,
-      185,
-      186,
-      187,
-      188,
-      173,
-      174,
-      175,
-      176,
-      177,
-      178,
-      179,
-      180,
-      193,
-      194,
-      195,
-      196,
-      197,
-      198,
-      199,
-      200,
       169,
       170,
       171,
@@ -57,18 +29,6 @@
       222,
       223,
       224,
-      225,
-      226,
-      227,
-      228,
-      217,
-      218,
-      219,
-      220,
-      209,
-      210,
-      211,
-      212,
       213,
       214,
       215,
@@ -2204,6 +2164,114 @@
     "name": "Can view written test assignment",
     "content_type": 57,
     "codename": "view_writtentestassignment"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 229,
+  "fields": {
+    "name": "Can add Homepage Content",
+    "content_type": 58,
+    "codename": "add_homepagecontent"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 230,
+  "fields": {
+    "name": "Can change Homepage Content",
+    "content_type": 58,
+    "codename": "change_homepagecontent"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 231,
+  "fields": {
+    "name": "Can delete Homepage Content",
+    "content_type": 58,
+    "codename": "delete_homepagecontent"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 232,
+  "fields": {
+    "name": "Can view Homepage Content",
+    "content_type": 58,
+    "codename": "view_homepagecontent"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 233,
+  "fields": {
+    "name": "Can add Homepage Image",
+    "content_type": 59,
+    "codename": "add_homepageimage"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 234,
+  "fields": {
+    "name": "Can change Homepage Image",
+    "content_type": 59,
+    "codename": "change_homepageimage"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 235,
+  "fields": {
+    "name": "Can delete Homepage Image",
+    "content_type": 59,
+    "codename": "delete_homepageimage"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 236,
+  "fields": {
+    "name": "Can view Homepage Image",
+    "content_type": 59,
+    "codename": "view_homepageimage"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 237,
+  "fields": {
+    "name": "Can add site configuration",
+    "content_type": 60,
+    "codename": "add_siteconfiguration"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 238,
+  "fields": {
+    "name": "Can change site configuration",
+    "content_type": 60,
+    "codename": "change_siteconfiguration"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 239,
+  "fields": {
+    "name": "Can delete site configuration",
+    "content_type": 60,
+    "codename": "delete_siteconfiguration"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 240,
+  "fields": {
+    "name": "Can view site configuration",
+    "content_type": 60,
+    "codename": "view_siteconfiguration"
   }
 }
 ]
