@@ -105,12 +105,19 @@
         </table>
         </div>
         <script>
-            document.addEventListener("DOMContentLoaded", function() {
-                var table = document.getElementById('equipmentLogbookTable');
-                if (table) {
-                    new Tablesort(table);
-                }
-            });
+                document.addEventListener("DOMContentLoaded", function() {
+                    var table = document.getElementById('equipmentLogbookTable');
+                    if (table) {
+                        var ts = new Tablesort(table);
+                        // Force initial sort descending on Date column (first column)
+                        var dateHeader = table.querySelector('th[data-sort-method="date"]');
+                        if (dateHeader) {
+                            // Simulate two clicks to sort descending
+                            dateHeader.click();
+                            dateHeader.click();
+                        }
+                    }
+                });
         </script>
 </div>
 <!-- Back to Top Button -->

@@ -1278,7 +1278,7 @@ def glider_logbook(request, pk: int):
         Flight.objects
         .select_related("logsheet")
         .filter(glider=glider)
-        .order_by("logsheet__log_date", "logsheet_id")
+        .order_by("-logsheet__log_date", "-logsheet_id")
     )
 
     issues_by_day = _issues_by_day_for_glider(glider)
@@ -1326,7 +1326,7 @@ def towplane_logbook(request, pk: int):
         Flight.objects
         .select_related("logsheet")
         .filter(towplane=towplane)
-        .order_by("logsheet__log_date", "logsheet_id")
+        .order_by("-logsheet__log_date", "-logsheet_id")
     )
 
     issues_by_day = _issues_by_day_for_towplane(towplane)
