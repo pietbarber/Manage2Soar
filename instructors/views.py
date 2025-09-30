@@ -339,7 +339,8 @@ def get_instructor_initials(member):
 #
 # Context:
 # - member: Member instance whose grid is shown
-# - lesson_data: List of dicts with 'label', 'phase', 'scores', 'max_score', 'lesson_id'
+# - lesson_data: List of dicts with 'label', 'phase', 'scores',
+#   'max_score', 'lesson_id', 'num_flights'
 # - report_dates: Ordered list of dates for grid columns
 # - column_metadata: List of dicts with 'date', 'initials', 'days_ago'
 ####################################################
@@ -420,12 +421,35 @@ def member_training_grid(request, member_id):
     # Build column metadata for template headers
     column_metadata = []
     for d in report_dates:
+        flights_on_day = flights.filter(logsheet__log_date=d)
+        num_flights = flights_on_day.count()
+        # Build tooltip string
+        tooltip_lines = [
+            f"{num_flights} flight{'s' if num_flights != 1 else ''}"]
+        for f in flights_on_day:
+            tow = f.release_altitude if hasattr(
+                f, 'release_altitude') and f.release_altitude else None
+            duration = f.duration if hasattr(
+                f, 'duration') and f.duration else None
+            tow_str = f"{tow:,}" if tow else "?"
+            # Format duration as H:MM
+            if duration:
+                total_seconds = int(duration.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                duration_str = f"{hours}:{minutes:02d}"
+            else:
+                duration_str = "?"
+            tooltip_lines.append(f"{tow_str} feet, {duration_str}")
+        flights_tooltip = "\n".join(tooltip_lines)
         meta = flights_by_date.get(d, [{}])[0]
         column_metadata.append({
             "date": d,
             "initials": meta.get("initials", ""),
             "days_ago": meta.get("days_ago", ""),
             "instructor_name": meta.get("full_name", ""),
+            "num_flights": num_flights,
+            "flights_tooltip": flights_tooltip,
         })
 
     return render(request, "shared/training_grid.html", {

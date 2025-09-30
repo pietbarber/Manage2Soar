@@ -3,7 +3,10 @@
 {% load dict_extras %}
 {% block content %}
 <div id="top"></div>
-<h2>Instruction Record for {{ member.full_display_name }}</h2>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
+  <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm ms-3">📊 View Training Grid</a>
+</div>
 <div id="charts-container" data-dates='{{ chart_dates_json|safe }}' data-solo='{{ chart_solo_json|safe }}'
   data-rating='{{ chart_rating_json|safe }}' data-anchors='{{ chart_anchors_json|safe }}'
   data-firstsolo="{{ first_solo_str }}" style="overflow-x:auto; margin-bottom:2rem;">
