@@ -318,10 +318,19 @@ def select_instruction_date(request, student_id):
 
 
 def get_instructor_initials(member):
-    initials = (
-        f"{member.first_name[0]}{member.last_name[0]}"
-        if member.first_name and member.last_name else "??"
-    )
+    # Remove suffixes from last name (e.g., Jr, Sr, III)
+    suffixes = {"jr", "sr", "ii", "iii", "iv", "v"}
+    first = member.first_name.split()[0] if member.first_name else ""
+    last_parts = member.last_name.split() if member.last_name else []
+    last = ""
+    for part in last_parts:
+        if part.lower().strip(".,") not in suffixes:
+            last = part
+            break
+    if first and last:
+        initials = f"{first[0]}{last[0]}"
+    else:
+        initials = "??"
     return initials.upper()
 
 ####################################################
@@ -375,7 +384,13 @@ def member_training_grid(request, member_id):
         .filter(pilot=member, logsheet__log_date__in=report_dates)
         .select_related("logsheet", "instructor")
     )
+    ground_sessions = (
+        GroundInstruction.objects
+        .filter(student=member, date__in=report_dates)
+        .select_related("instructor")
+    )
     flights_by_date = defaultdict(list)
+    ground_by_date = {g.date: g for g in ground_sessions}
     today = now().date()
     for f in flights:
         if not f.instructor:
@@ -389,6 +404,27 @@ def member_training_grid(request, member_id):
             "initials": initials,
             "full_name": full_name,
         })
+
+    # Compose instructor initials/name for each date (flight or ground)
+        def get_instructor_meta_for_date(d):
+            # Prefer flight instructor if present
+            metas = flights_by_date.get(d, [])
+            if metas:
+                initials = metas[0]["initials"]
+                full_name = metas[0]["full_name"]
+            elif d in ground_by_date:
+                ground_instr = ground_by_date[d].instructor
+                initials = get_instructor_initials(ground_instr)
+                full_name = str(ground_instr.full_display_name or "")
+            else:
+                report = reports.filter(report_date=d).first()
+                if report and report.instructor:
+                    initials = get_instructor_initials(report.instructor)
+                    full_name = report.instructor.full_display_name
+                else:
+                    initials = ""
+                    full_name = ""
+            return {"initials": initials, "full_name": full_name, "days_ago": (today - d).days}
 
     # Compose grid rows per lesson
     lesson_data = []
@@ -418,7 +454,7 @@ def member_training_grid(request, member_id):
         row["max_score"] = str(max(max_scores)) if max_scores else ""
         lesson_data.append(row)
 
-    # Build column metadata for template headers
+    # Build column metadata for template headers using get_instructor_meta_for_date
     column_metadata = []
     for d in report_dates:
         flights_on_day = flights.filter(logsheet__log_date=d)
@@ -442,7 +478,7 @@ def member_training_grid(request, member_id):
                 duration_str = "?"
             tooltip_lines.append(f"{tow_str} feet, {duration_str}")
         flights_tooltip = "\n".join(tooltip_lines)
-        meta = flights_by_date.get(d, [{}])[0]
+        meta = get_instructor_meta_for_date(d)
         column_metadata.append({
             "date": d,
             "initials": meta.get("initials", ""),

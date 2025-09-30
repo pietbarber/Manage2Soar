@@ -28,16 +28,22 @@
     <tr>
         {% for meta in column_metadata %}
           <th class="small text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}">
-            {{ meta.initials }}<br>
+            {% if meta.initials %}
+              {{ meta.initials }}<br>
+            {% else %}
+              &mdash;<br>
+            {% endif %}
             {{ meta.days_ago }}<br>
-            {{ meta.altitudes }}
+            {% if meta.altitudes %}{{ meta.altitudes }}{% endif %}
           </th>
         {% endfor %}
     </tr>
     <tr>
         {% for meta in column_metadata %}
           <th>
-            <span class="badge bg-secondary text-light fs-6" style="min-width:2em;" title="{{ meta.flights_tooltip }}">{{ meta.num_flights }}</span>
+            {% if meta.num_flights > 0 %}
+              <span class="badge bg-secondary text-light fs-6" style="min-width:2em;" title="{{ meta.flights_tooltip }}">{{ meta.num_flights }}</span>
+            {% endif %}
           </th>
         {% endfor %}
         <th></th>
