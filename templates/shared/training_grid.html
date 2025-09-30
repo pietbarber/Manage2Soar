@@ -20,13 +20,13 @@
       <th rowspan="2" class="max_score">⭐ Max</th>
     </tr>
     <tr>
-      {% for meta in column_metadata %}
-        <th class="small text-muted">
-          {{ meta.initials }}<br>
-          {{ meta.days_ago }}<br>
-          {{ meta.altitudes }}
-        </th>
-      {% endfor %}
+        {% for meta in column_metadata %}
+          <th class="small text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}">
+            {{ meta.initials }}<br>
+            {{ meta.days_ago }}<br>
+            {{ meta.altitudes }}
+          </th>
+        {% endfor %}
     </tr>
   </thead>
   
@@ -73,4 +73,14 @@
     {% endfor %}
   </tbody>
 </table>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.bootstrap) {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+});
+</script>
 {% endblock %}

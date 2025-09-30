@@ -423,6 +423,7 @@ def member_training_grid(request, member_id):
             "date": d,
             "initials": meta.get("initials", ""),
             "days_ago": meta.get("days_ago", ""),
+            "instructor_name": meta.get("full_name", ""),
         })
 
     return render(request, "shared/training_grid.html", {
