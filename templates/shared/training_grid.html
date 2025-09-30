@@ -40,7 +40,13 @@
   
         {% for row in group.list %}
           <tr>
-            <td class="text-end pe-2">{{ row.label }}</td>
+            <td class="text-end pe-2">
+              {% if row.code %}
+                <a href="/TRAINING/Syllabus/{{ row.code }}/" target="_blank">{{ row.label }}</a>
+              {% else %}
+                {{ row.label }}
+              {% endif %}
+            </td>
             {% for cell in row.scores %}
             <td class="text-center
                 {% if cell.score == '1' %}score-1

@@ -339,7 +339,7 @@ def get_instructor_initials(member):
 #
 # Context:
 # - member: Member instance whose grid is shown
-# - lesson_data: List of dicts with 'label', 'phase', 'scores', 'max_score'
+# - lesson_data: List of dicts with 'label', 'phase', 'scores', 'max_score', 'lesson_id'
 # - report_dates: Ordered list of dates for grid columns
 # - column_metadata: List of dicts with 'date', 'initials', 'days_ago'
 ####################################################
@@ -396,7 +396,9 @@ def member_training_grid(request, member_id):
             "label": f"{lesson.code} – {lesson.title}",
             "phase": lesson.phase.name if lesson.phase else "Other",
             "scores": [],
-            "max_score": ""
+            "max_score": "",
+            "lesson_id": lesson.id,
+            "code": lesson.code,
         }
         max_scores = []
         for d in report_dates:
