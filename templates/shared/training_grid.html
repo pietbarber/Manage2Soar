@@ -15,7 +15,7 @@
     <tr>
       <th rowspan="2">Lesson</th>
       {% for meta in column_metadata %}
-        <th>{{ meta.date|date:"M d" }}</th>
+        <th>{{ meta.date|date:"M d" }}<br><span class="text-muted small">{{ meta.date|date:"Y" }}</span></th>
       {% endfor %}
       <th rowspan="2" class="max_score">⭐ Max</th>
     </tr>
