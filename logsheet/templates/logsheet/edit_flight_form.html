@@ -41,7 +41,7 @@ input[type="time"], input.timeinput {
           <td>
             <select name="{{ form.glider.name }}" id="{{ form.glider.id_for_label }}" class="form-select">
               <option value="">---------</option>
-              {% for glider in form.glider.field.queryset %}
+              {% for glider in gliders_sorted %}
                 <option value="{{ glider.pk }}"
                         data-seats="{{ glider.seats }}"
                         data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"

@@ -384,6 +384,20 @@ def edit_flight(request, logsheet_pk, flight_pk):
     if logsheet.finalized and not request.user.is_superuser:
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
+    # Build sorted glider list for template
+    from logsheet.models import Glider
+    gliders = Glider.objects.all()
+    gliders_sorted = sorted(
+        [g for g in gliders if not g.is_grounded],
+        key=lambda g: (
+            0 if g.club_owned and g.is_active and g.seats == 2 else
+            1 if g.club_owned and g.is_active and g.seats == 1 else
+            2 if not g.club_owned and g.is_active else
+            3,
+            g.n_number or g.competition_number or g.model or ""
+        )
+    )
+
     if request.method == "POST":
         form = FlightForm(request.POST, instance=flight)
         if form.is_valid():
@@ -397,7 +411,8 @@ def edit_flight(request, logsheet_pk, flight_pk):
             return render(request, "logsheet/edit_flight_form.html", {
                 "form": form,
                 "flight": flight,
-                "logsheet": logsheet
+                "logsheet": logsheet,
+                "gliders_sorted": gliders_sorted,
             }, status=400)
     else:
         form = FlightForm(instance=flight)
@@ -405,7 +420,8 @@ def edit_flight(request, logsheet_pk, flight_pk):
     return render(request, "logsheet/edit_flight_form.html", {
         "form": form,
         "flight": flight,
-        "logsheet": logsheet
+        "logsheet": logsheet,
+        "gliders_sorted": gliders_sorted,
     })
 
 #################################################
@@ -430,6 +446,19 @@ def edit_flight(request, logsheet_pk, flight_pk):
 def add_flight(request, logsheet_pk):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
 
+    from logsheet.models import Glider
+    gliders = Glider.objects.all()
+    gliders_sorted = sorted(
+        [g for g in gliders if not g.is_grounded],
+        key=lambda g: (
+            0 if g.club_owned and g.is_active and g.seats == 2 else
+            1 if g.club_owned and g.is_active and g.seats == 1 else
+            2 if not g.club_owned and g.is_active else
+            3,
+            g.n_number or g.competition_number or g.model or ""
+        )
+    )
+
     if request.method == "POST":
         form = FlightForm(request.POST)
         if form.is_valid():
@@ -445,6 +474,7 @@ def add_flight(request, logsheet_pk):
                 "form": form,
                 "logsheet": logsheet,
                 "mode": "add",
+                "gliders_sorted": gliders_sorted,
             }, status=400)
     else:
         initial = {}
@@ -458,6 +488,7 @@ def add_flight(request, logsheet_pk):
         "form": form,
         "logsheet": logsheet,
         "mode": "add",
+        "gliders_sorted": gliders_sorted,
     })
 
 #################################################

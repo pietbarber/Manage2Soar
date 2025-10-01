@@ -153,15 +153,30 @@ class FlightForm(forms.ModelForm):
         self.fields["split_with"].queryset = get_active_members().order_by(
             "first_name", "last_name")
 
-        active_towplanes = Towplane.objects.filter(is_active=True)
-        self.fields["towplane"].queryset = active_towplanes.exclude(
-            id__in=[tp.id for tp in active_towplanes if tp.is_grounded]
-        ).order_by("name", "n_number")
+        # Custom towplane sort: club-owned active first, then others by n_number
+        towplanes = Towplane.objects.all()
+        towplanes_sorted = sorted(
+            [tp for tp in towplanes if tp.is_active and not tp.is_grounded],
+            key=lambda t: (
+                0 if t.club_owned and t.is_active else 1, t.n_number or "")
+        )
+        self.fields["towplane"].queryset = Towplane.objects.filter(
+            pk__in=[tp.pk for tp in towplanes_sorted])
 
-        active_gliders = Glider.objects.filter(is_active=True)
-        self.fields["glider"].queryset = active_gliders.exclude(
-            id__in=[g.id for g in active_gliders if g.is_grounded]
-        ).order_by("n_number")
+        # Custom glider sort: club two-seaters, club one-seaters, private active, inactive
+        gliders = Glider.objects.all()
+
+        def glider_sort_key(g):
+            # 0 for club-owned, active, two-seater; 1 for all others
+            return 0 if g.club_owned and g.is_active and g.seats == 2 else 1
+
+        gliders_sorted = sorted(
+            [g for g in gliders if not g.is_grounded],
+            key=glider_sort_key
+        )
+        self.fields["glider"].choices = [
+            (g.pk, str(g)) for g in gliders_sorted
+        ]
 
         COMMON_ALTITUDES = [3000, 1500, 2000, 2500, 4000]
         ALL_ALTITUDES = list(range(0, 7100, 100))
