@@ -67,7 +67,7 @@
           📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
         </li>
         {% endif %}
-        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }},<br>
+        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }}<br>
           {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
           {% endif %} {{ member.zip_code }}<br>
           {{ member.country }}
