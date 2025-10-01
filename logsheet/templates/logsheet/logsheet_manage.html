@@ -482,16 +482,24 @@
     function updateLiveDurations() {
       const now = new Date();
       document.querySelectorAll(".live-duration").forEach(el => {
-        const launch = new Date(el.dataset.launch);
+        const launchStr = el.dataset.launch;
+        if (!launchStr || launchStr.endsWith('T')) {
+          // No launch time, show placeholder
+          el.textContent = '🕒 —';
+          return;
+        }
+        const launch = new Date(launchStr);
+        if (isNaN(launch.getTime())) {
+          el.textContent = '🕒 —';
+          return;
+        }
         const diffMs = now - launch;
         const totalSeconds = Math.floor(diffMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const emoji = clockEmojis[emojiIndex % clockEmojis.length];
-  
         el.textContent = `${emoji} ${hours}:${pad(minutes)}`;
       });
-  
       emojiIndex++;
     }
 
