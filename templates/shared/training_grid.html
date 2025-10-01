@@ -1,5 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+/* Scrollable grid container and sticky columns */
+.training-grid-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  width: 100%;
+  max-height: 80vh;
+  min-height: 400px;
+  position: relative;
+  background: #fff;
+}
+table.training-grid {
+  min-width: 1200px;
+  width: max-content;
+}
+th.sticky-col, td.sticky-col {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+}
+th.sticky-max, td.sticky-max {
+  position: sticky;
+  right: 0;
+  background: #fff;
+  z-index: 2;
+}
+</style>
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h2 class="mb-0">Training Progress for {{ member.full_display_name }}</h2>
   <a href="{% url 'instructors:member_instruction_record' member.id %}" class="btn btn-outline-primary btn-sm ms-3">📘 View Instruction Record</a>
@@ -13,17 +41,18 @@
   {% endfor %}
 {% endif %}
 
-<table class="table table-bordered table-sm border-dark-subtle">
+<div class="training-grid-scroll" id="training-grid-scroll">
+<table class="table table-bordered table-sm border-dark-subtle training-grid">
   <thead>
     <tr>
-      <th rowspan="3">Lesson</th>
+  <th rowspan="3" class="sticky-col">Lesson</th>
       {% for meta in column_metadata %}
         <th>
           {{ meta.date|date:"M d" }}<br>
           <span class="text-muted small">{{ meta.date|date:"Y" }}</span>
         </th>
       {% endfor %}
-      <th rowspan="2" class="max_score">⭐ Max</th>
+  <th rowspan="3" class="max_score sticky-max">⭐ Max</th>
     </tr>
     <tr>
         {% for meta in column_metadata %}
@@ -55,12 +84,14 @@
   
     {% for group in phase_groups %}
       <tr class="table-secondary">
-        <th class="text-start" colspan="{{ report_dates|length|add:'2' }}">{{ group.grouper }}</th>
+  <th class="text-start sticky-col" colspan="1">{{ group.grouper }}</th>
+  {% for _ in report_dates %}<td></td>{% endfor %}
+  <th class="sticky-max"></th>
       </tr>
   
         {% for row in group.list %}
           <tr>
-            <td class="text-end pe-2">
+            <td class="text-end pe-2 sticky-col">
               {% if row.code %}
                 <a href="/TRAINING/Syllabus/{{ row.code }}/" target="_blank">{{ row.label }}</a>
               {% else %}
@@ -87,7 +118,7 @@
           {% endfor %}
            
        
-          <td class="text-center border border-2 border-primary fw-bold max_score">
+          <td class="text-center border border-2 border-primary fw-bold max_score sticky-max">
               {% if row.max_score == "1" %} <img src="/static/images/blob1.png">
               {% elif row.max_score == "2" %} <img src="/static/images/blob2.png">
               {% elif row.max_score == "3" %} <img src="/static/images/blob3.png">
@@ -99,6 +130,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   if (window.bootstrap) {
@@ -106,6 +138,11 @@ document.addEventListener('DOMContentLoaded', function () {
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
       new bootstrap.Tooltip(tooltipTriggerEl);
     });
+  }
+  // Auto-scroll to right on load
+  var gridScroll = document.getElementById('training-grid-scroll');
+  if (gridScroll) {
+    gridScroll.scrollLeft = gridScroll.scrollWidth;
   }
 });
 </script>
