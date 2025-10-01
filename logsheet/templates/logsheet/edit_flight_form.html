@@ -1,4 +1,14 @@
 {% block content %}
+<style>
+input[type="time"], input.timeinput {
+  max-width: 6em;
+  min-width: 4em;
+  display: inline-block;
+}
+.now-btn {
+  margin-left: 0.5em !important;
+}
+</style>
 
 {% load static %}
 {% load crispy_forms_tags %}
@@ -89,9 +99,16 @@
         </tr>
         <tr>
           <th scope="row" class="text-end">Launch Time</th>
-          <td class="d-flex align-items-center gap-2">
-            {{ form.launch_time }}
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="now-launch-btn">NOW</button>
+          <td class="d-flex align-items-center">
+            {# Render launch_time field with no initial value and narrow width #}
+            {% with field=form.launch_time %}
+              {% if field.field.widget.input_type == "time" %}
+                <input type="time" name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-control timeinput" value="">
+              {% else %}
+                {{ field }}
+              {% endif %}
+            {% endwith %}
+            <button type="button" class="btn btn-outline-secondary btn-sm now-btn" id="now-launch-btn">NOW</button>
             {{ form.launch_time.errors }}
           </td>
         </tr>

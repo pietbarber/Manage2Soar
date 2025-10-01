@@ -429,6 +429,10 @@
       const landingBtn = document.getElementById('now-landing-btn');
       const launchInput = document.getElementById('id_launch_time');
       const landingInput = document.getElementById('id_landing_time');
+      // Always clear launch time field when modal loads
+      if (launchInput) {
+        launchInput.value = '';
+      }
       function getNowTime24() {
         const now = new Date();
         const h = now.getHours();
