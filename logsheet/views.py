@@ -387,15 +387,23 @@ def edit_flight(request, logsheet_pk, flight_pk):
     # Build sorted glider list for template
     from logsheet.models import Glider
     gliders = Glider.objects.all()
-    gliders_sorted = sorted(
-        [g for g in gliders if not g.is_grounded],
-        key=lambda g: (
+
+    def glider_sort_key(g):
+        group = (
             0 if g.club_owned and g.is_active and g.seats == 2 else
             1 if g.club_owned and g.is_active and g.seats == 1 else
             2 if not g.club_owned and g.is_active else
-            3,
-            g.n_number or g.competition_number or g.model or ""
+            3
         )
+        if group == 2:
+            # Private active: sort by contest number
+            secondary = g.competition_number or ""
+        else:
+            secondary = g.n_number or g.competition_number or g.model or ""
+        return (group, secondary)
+    gliders_sorted = sorted(
+        [g for g in gliders if not g.is_grounded],
+        key=glider_sort_key
     )
 
     if request.method == "POST":
@@ -448,15 +456,22 @@ def add_flight(request, logsheet_pk):
 
     from logsheet.models import Glider
     gliders = Glider.objects.all()
-    gliders_sorted = sorted(
-        [g for g in gliders if not g.is_grounded],
-        key=lambda g: (
+
+    def glider_sort_key(g):
+        group = (
             0 if g.club_owned and g.is_active and g.seats == 2 else
             1 if g.club_owned and g.is_active and g.seats == 1 else
             2 if not g.club_owned and g.is_active else
-            3,
-            g.n_number or g.competition_number or g.model or ""
+            3
         )
+        if group == 2:
+            secondary = g.competition_number or ""
+        else:
+            secondary = g.n_number or g.competition_number or g.model or ""
+        return (group, secondary)
+    gliders_sorted = sorted(
+        [g for g in gliders if not g.is_grounded],
+        key=glider_sort_key
     )
 
     if request.method == "POST":
