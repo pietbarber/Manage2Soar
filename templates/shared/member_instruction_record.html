@@ -157,7 +157,7 @@
   {% endcomment %}
 
   {% for day in daily_blocks %}
-  <div class="card mb-4">
+  <div class="card mb-4" id="day-{{ day.date|date:'Y-m-d' }}">
     <div class="card-header">
       <strong>{{ day.date|date:"l, F j, Y" }}</strong>
       ({{ day.blocks.0.days_ago }} days ago)
@@ -195,7 +195,7 @@
           {% for block in day.blocks %}
           {% if block.flights %}
           {% for flight in block.flights %}
-          <tr>
+          <tr id="flight-{{ flight.logsheet.log_date|date:'Y-m-d' }}">
             <td>{{ flight.glider.n_number }}</td>
             <td>{{ flight.instructor.full_display_name }}</td>
             <td>{{ flight.release_altitude|default:"?" }} ft</td>
@@ -211,7 +211,7 @@
       {% for block in day.blocks %}
       {% if block.report.report_text %}
       <h5>📝 Instructor Essay</h5>
-      <div class="border p-3 bg-white card-body mb-2">
+      <div class="border p-3 bg-white card-body mb-2" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.report_text|safe }}
         <div class="mt-2 small text-muted">
           Written by:
@@ -223,7 +223,7 @@
       </div>
       {% elif block.report.notes %}
       <h5>📝 Notes</h5>
-      <div class="border p-3 bg-white card-body mb-2">
+      <div class="border p-3 bg-white card-body mb-2" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.notes|safe }}
         <div class="mt-2 small text-muted">
           Written by: {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
