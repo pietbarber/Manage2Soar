@@ -405,6 +405,11 @@ def edit_flight(request, logsheet_pk, flight_pk):
         [g for g in gliders if not g.is_grounded],
         key=glider_sort_key
     )
+    # Split into optgroup categories
+    club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
+    club_private = [
+        g for g in gliders_sorted if not g.club_owned and g.is_active]
+    inactive_gliders = [g for g in gliders_sorted if not g.is_active]
 
     if request.method == "POST":
         form = FlightForm(request.POST, instance=flight)
@@ -429,7 +434,9 @@ def edit_flight(request, logsheet_pk, flight_pk):
         "form": form,
         "flight": flight,
         "logsheet": logsheet,
-        "gliders_sorted": gliders_sorted,
+        "club_gliders": club_gliders,
+        "club_private": club_private,
+        "inactive_gliders": inactive_gliders,
     })
 
 #################################################
@@ -473,6 +480,10 @@ def add_flight(request, logsheet_pk):
         [g for g in gliders if not g.is_grounded],
         key=glider_sort_key
     )
+    club_gliders = [g for g in gliders_sorted if g.club_owned and g.is_active]
+    club_private = [
+        g for g in gliders_sorted if not g.club_owned and g.is_active]
+    inactive_gliders = [g for g in gliders_sorted if not g.is_active]
 
     if request.method == "POST":
         form = FlightForm(request.POST)
@@ -503,7 +514,9 @@ def add_flight(request, logsheet_pk):
         "form": form,
         "logsheet": logsheet,
         "mode": "add",
-        "gliders_sorted": gliders_sorted,
+        "club_gliders": club_gliders,
+        "club_private": club_private,
+        "inactive_gliders": inactive_gliders,
     })
 
 #################################################
