@@ -36,6 +36,13 @@ from django.core.validators import MinValueValidator
 # - __str__: Returns a string representation of the flight, including the pilot, glider, and launch time.
 
 class Flight(models.Model):
+    class Meta:
+        indexes = [
+            models.Index(fields=['pilot']),
+            models.Index(fields=['instructor']),
+            models.Index(fields=['passenger']),
+            models.Index(fields=['logsheet']),
+        ]
     logsheet = models.ForeignKey(
         "Logsheet", on_delete=models.CASCADE, related_name="flights")
     launch_time = models.TimeField(blank=True, null=True)

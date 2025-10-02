@@ -154,6 +154,12 @@ class InstructionReport(models.Model):
     class Meta:
         unique_together = ('student', 'instructor', 'report_date')
         ordering = ['-report_date']
+        indexes = [
+            models.Index(fields=['student']),
+            models.Index(fields=['instructor']),
+            models.Index(fields=['report_date']),
+            models.Index(fields=['student', 'instructor', 'report_date']),
+        ]
 
     def __str__(self):
         return (
@@ -227,6 +233,11 @@ class GroundInstruction(models.Model):
 
     class Meta:
         ordering = ["-date"]
+        indexes = [
+            models.Index(fields=['student']),
+            models.Index(fields=['instructor']),
+            models.Index(fields=['date']),
+        ]
 
     def __str__(self):
         return f"{self.date} – {self.student} w/ {self.instructor}"
