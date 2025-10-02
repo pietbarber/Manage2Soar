@@ -1149,24 +1149,54 @@ def member_logbook(request):
         return f"{h}:{m:02d}"
 
     member = request.user
+    # Determine which years to show
 
-    # 1) Fetch all flights & ground sessions for this member
-    flights = Flight.objects.filter(pilot=member).select_related(
-        'glider', 'instructor', 'airfield', 'logsheet', 'passenger'
-    ).order_by('logsheet__log_date')
+    import datetime
+    today = datetime.date.today()
+    # Find all years with any flights or ground instruction for this member
+    flight_years_qs = Flight.objects.filter(
+        Q(pilot=member) | Q(instructor=member) | Q(passenger=member)
+    ).values_list('logsheet__log_date', flat=True)
+    ground_years_qs = GroundInstruction.objects.filter(
+        student=member).values_list('date', flat=True)
+    all_years = set()
+    for dt in flight_years_qs:
+        if dt:
+            all_years.add(dt.year)
+    for dt in ground_years_qs:
+        if dt:
+            all_years.add(dt.year)
+    all_years = sorted(all_years, reverse=True)
 
-    # 2) Fetch all flights (as pilot, instructor, or passenger) & ground sessions
+    # Years requested to load
+    show_years = request.GET.getlist('year')
+    if show_years:
+        years_to_load = [int(y) for y in show_years if y.isdigit()]
+    else:
+        # Default: last 12 months
+        years_to_load = [today.year, today.year - 1]
+
     flights = (
         Flight.objects
         .filter(
-            Q(pilot=member) |
-            Q(instructor=member) |
-            Q(passenger=member)
+            (Q(pilot=member) | Q(instructor=member) | Q(passenger=member)) &
+            Q(logsheet__log_date__year__in=years_to_load)
         )
         .select_related('glider', 'instructor', 'passenger', 'airfield', 'logsheet')
         .order_by('logsheet__log_date')
     )
-    grounds = GroundInstruction.objects.filter(student=member).prefetch_related(
+
+    # Compute cumulative flight offset for numbering
+    earliest_loaded_date = None
+    if flights:
+        earliest_loaded_date = flights[0].logsheet.log_date
+    flight_offset = 0
+    if earliest_loaded_date:
+        flight_offset = Flight.objects.filter(
+            (Q(pilot=member) | Q(instructor=member)),
+            logsheet__log_date__lt=earliest_loaded_date
+        ).count()
+    grounds = GroundInstruction.objects.filter(student=member, date__year__in=years_to_load).prefetch_related(
         'lesson_scores__lesson'
     ).order_by('date')
 
@@ -1214,6 +1244,9 @@ def member_logbook(request):
             # 5a) Flight #: increment for pilot OR instructor
             if is_pilot or is_instructor:
                 flight_no += 1
+                display_flight_no = flight_no + flight_offset
+            else:
+                display_flight_no = ""
 
             # Raw minutes
             dur_m = int(f.duration.total_seconds()//60) if f.duration else 0
@@ -1295,7 +1328,7 @@ def member_logbook(request):
             row = {
                 "flight_id":      flight_id,
                 "date":           date,
-                "flight_no":      flight_no if (is_pilot or is_instructor) else "",
+                "flight_no":      display_flight_no,
                 "model":          f.glider.model if f.glider else "",
                 "n_number":       f.glider.n_number if f.glider else "Private",
                 "is_passenger":   is_passenger,
@@ -1376,7 +1409,8 @@ def member_logbook(request):
     if rows:
         current_year = None
         for idx, row in enumerate(rows):
-            row_year = row['date'].year
+            row_date = row['date']
+            row_year = row_date.year
             if row_year != current_year:
                 current_year = row_year
                 years.append(row_year)
@@ -1466,6 +1500,7 @@ def member_logbook(request):
         "pages": pages,
         "years": years,
         "year_page_map": year_page_map,
+        "all_years": all_years,
     })
 
 

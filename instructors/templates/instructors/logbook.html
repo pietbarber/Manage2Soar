@@ -12,9 +12,25 @@
 <div class="year-navigation">
   <h5 class="mb-3">📅 Jump to Year:</h5>
   <div class="year-links">
-    {% for year in years %}
-    <a href="#year-{{ year }}" class="year-link">{{ year }}</a>
+    {% for year in all_years %}
+      {% if year in years %}
+        <a href="#year-{{ year }}" class="btn btn-primary year-link">{{ year }}</a>
+      {% else %}
+        <form method="get" style="display:inline">
+          {% for y in years %}
+            <input type="hidden" name="year" value="{{ y }}">
+          {% endfor %}
+          <input type="hidden" name="year" value="{{ year }}">
+          <button type="submit" class="btn btn-outline-secondary year-link">{{ year }}</button>
+        </form>
+      {% endif %}
     {% endfor %}
+<div id="logbook-spinner" style="display:none; text-align:center; margin:2em;">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <div>Loading logbook...</div>
+</div>
   </div>
   <small class="text-muted mt-2 d-block">
     Click on any year to jump to that section. Years with no flights are not shown.
@@ -169,3 +185,12 @@
 
 
 {% endblock %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var spinner = document.getElementById('logbook-spinner');
+  spinner.style.display = 'block';
+  window.addEventListener('load', function() {
+    spinner.style.display = 'none';
+  });
+});
+</script>
