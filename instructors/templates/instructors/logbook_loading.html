@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="modal-dialog modal-dialog-centered" style="max-width:400px;margin:auto;">
+  <div class="modal-content text-center p-4">
+    <div style="font-size:2em;">⏳</div>
+    <div class="mt-2">Loading logbook... This may take a while.</div>
+  </div>
+</div>
+<script>
+  // Redirect after a short delay (or instantly)
+  setTimeout(function() {
+    window.location.href = "{{ target_url }}";
+  }, 500); // 0.5s delay for user feedback
+</script>
+{% endblock %}

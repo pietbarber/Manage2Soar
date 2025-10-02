@@ -2,35 +2,35 @@
 {% block head_extra %}{% endblock %}
 
 {% block content %}
+
 <div id="top"></div>
 <h2>Logbook for {{ member.full_display_name }}</h2>
 
-<a href="{% url 'instructors:member_logbook_export_csv' %}" class="btn btn-success mb-3">Export as CSV (Excel/Google
-  Sheets)</a>
+<a href="{% url 'instructors:member_logbook_export_csv' %}" class="btn btn-success mb-3">Export as CSV (Excel/Google Sheets)</a>
 
+<!-- Show All Years Button -->
+<form method="post" action="{% url 'instructors:logbook_loading' %}" id="show-all-years-form" style="margin-bottom: 1em;">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-warning">
+    <span style="font-size:1.2em;">⏳</span> Show All Years
+  </button>
+</form>
+
+<!-- Year Navigation -->
 {% if years %}
 <div class="year-navigation">
   <h5 class="mb-3">📅 Jump to Year:</h5>
   <div class="year-links">
     {% for year in all_years %}
       {% if year in years %}
-        <a href="#year-{{ year }}" class="btn btn-primary year-link">{{ year }}</a>
+        <a href="#year-{{ year }}" class="btn btn-primary year-link" style="margin-bottom:0.25em;">{{ year }}</a>
       {% else %}
         <form method="get" style="display:inline">
-          {% for y in years %}
-            <input type="hidden" name="year" value="{{ y }}">
-          {% endfor %}
           <input type="hidden" name="year" value="{{ year }}">
-          <button type="submit" class="btn btn-outline-secondary year-link">{{ year }}</button>
+          <button type="submit" class="btn btn-outline-secondary year-link" style="margin-bottom:0.25em;">{{ year }}</button>
         </form>
       {% endif %}
     {% endfor %}
-<div id="logbook-spinner" style="display:none; text-align:center; margin:2em;">
-  <div class="spinner-border text-primary" role="status">
-    <span class="visually-hidden">Loading...</span>
-  </div>
-  <div>Loading logbook...</div>
-</div>
   </div>
   <small class="text-muted mt-2 d-block">
     Click on any year to jump to that section. Years with no flights are not shown.
@@ -163,10 +163,21 @@
 {% endfor %}
 
 <!-- Back to Top Button -->
-<button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"
-  title="Back to Top">
+
+<!-- Back to Top Button -->
+<button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})" title="Back to Top">
   ↑
 </button>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-4">
+      <div style="font-size:2em;">⏳</div>
+      <div class="mt-2">Loading logbook... This may take a while.</div>
+    </div>
+  </div>
+</div>
 
 <div class="modal fade" id="flightModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -185,12 +196,25 @@
 
 
 {% endblock %}
-<script>
 document.addEventListener('DOMContentLoaded', function() {
-  var spinner = document.getElementById('logbook-spinner');
-  spinner.style.display = 'block';
+
+<script>
+// Show loading modal on "Show All Years" form submit
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.getElementById('show-all-years-form');
+  var modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+  if (form) {
+    form.addEventListener('submit', function() {
+      setTimeout(function() { modal.show(); }, 10);
+    });
+  }
+  // Hide modal when page is loaded
   window.addEventListener('load', function() {
-    spinner.style.display = 'none';
+    var modalEl = document.getElementById('loadingModal');
+    if (modalEl.classList.contains('show')) {
+      var modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+    }
   });
 });
 </script>

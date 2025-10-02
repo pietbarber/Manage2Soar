@@ -1,58 +1,65 @@
 from django.views import View as DjangoView
-import itertools
-import json
-from collections import namedtuple, OrderedDict
-import qrcode
-import random
-import re
-from io import BytesIO
-from collections import defaultdict
-from dateutil.relativedelta import relativedelta
-from datetime import date, datetime, timedelta, time
-from django.db import transaction
-import csv
-
-from django import forms
-from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
-from django.views.generic import FormView
-from django.views.decorators.http import require_POST, require_GET
-from django.contrib.auth.decorators import user_passes_test
-from django.contrib import messages
-from django.db.models import Count, Max, Sum, F, Q, Value
-from django.forms import formset_factory
-from django.http import HttpResponseBadRequest
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.utils.timezone import now
-
-from collections import defaultdict
-from instructors.decorators import member_or_instructor_required, instructor_required
+from knowledgetest.views import get_presets
+from knowledgetest.models import (
+    QuestionCategory, Question, WrittenTestTemplate,
+    WrittenTestTemplateQuestion, WrittenTestAssignment
+)
+from knowledgetest.forms import TestBuilderForm
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from members.models import Member
+from members.decorators import active_member_required
+from logsheet.models import Flight, Logsheet
+from instructors.models import (
+    InstructionReport, LessonScore, GroundInstruction,
+    GroundLessonScore, TrainingLesson, SyllabusDocument,
+    TrainingPhase, StudentProgressSnapshot
+)
+from instructors.utils import get_flight_summary_for_member
 from instructors.forms import (
     InstructionReportForm, LessonScoreSimpleForm,
     LessonScoreSimpleFormSet, QualificationAssignForm,
     GroundInstructionForm, GroundLessonScoreFormSet,
     SyllabusDocumentForm
 )
-from instructors.utils import get_flight_summary_for_member
-from instructors.models import (
-    InstructionReport, LessonScore, GroundInstruction,
-    GroundLessonScore, TrainingLesson, SyllabusDocument,
-    TrainingPhase, StudentProgressSnapshot
-)
-from logsheet.models import Flight, Logsheet
-from members.decorators import active_member_required
-from members.models import Member
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from instructors.decorators import member_or_instructor_required, instructor_required
+from django.utils.timezone import now
+from django.utils.decorators import method_decorator
+from django.utils import timezone
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseBadRequest
+from django.forms import formset_factory
+from django.db.models import Count, Max, Sum, F, Q, Value
+from django.contrib import messages
+from django.contrib.auth.decorators import user_passes_test
+from django.views.decorators.http import require_POST, require_GET
+from django.views.generic import FormView
+from django.http import HttpResponse
+from django.core.exceptions import PermissionDenied
+from django import forms
+import csv
+from django.db import transaction
+from datetime import date, datetime, timedelta, time
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+from io import BytesIO
+import re
+import random
+import qrcode
+from collections import namedtuple, OrderedDict
+import json
+import itertools
+from django.views.decorators.csrf import csrf_exempt
+# Intermediate loading page for logbook
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
-from knowledgetest.forms import TestBuilderForm
-from knowledgetest.models import (
-    QuestionCategory, Question, WrittenTestTemplate,
-    WrittenTestTemplateQuestion, WrittenTestAssignment
-)
-from knowledgetest.views import get_presets
+
+@require_POST
+@csrf_exempt
+def logbook_loading(request):
+    # Redirect to logbook with show_all_years=1
+    target_url = reverse('instructors:member_logbook') + '?show_all_years=1'
+    return render(request, 'instructors/logbook_loading.html', {'target_url': target_url})
 
 
 ####################################################
@@ -1169,8 +1176,11 @@ def member_logbook(request):
     all_years = sorted(all_years, reverse=True)
 
     # Years requested to load
+    show_all_years = request.GET.get('show_all_years')
     show_years = request.GET.getlist('year')
-    if show_years:
+    if show_all_years:
+        years_to_load = all_years
+    elif show_years:
         years_to_load = [int(y) for y in show_years if y.isdigit()]
     else:
         # Default: last 12 months

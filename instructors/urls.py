@@ -27,6 +27,7 @@ urlpatterns = [
     path("assign-qualification/<int:member_id>/",
          views.assign_qualification,     name="assign_qualification"),
     path("logbook/", views.member_logbook, name="member_logbook"),
+    path("logbook/loading/", views.logbook_loading, name="logbook_loading"),
     path("logbook/export/csv/", views.export_member_logbook_csv,
          name="member_logbook_export_csv"),
     path('students/<int:member_id>/needed-for-solo/',
