@@ -239,7 +239,8 @@ class Member(AbstractUser):
         if self.is_superuser:
             self.is_staff = True
         else:
-            self.is_staff = self.instructor or self.member_manager
+            # Grant staff status to instructors, member managers, or rostermeisters
+            self.is_staff = self.instructor or self.member_manager or self.rostermeister
 
         # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
