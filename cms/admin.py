@@ -17,7 +17,7 @@ class HomePageContentAdmin(admin.ModelAdmin):
 
 @admin.register(HomePageImage)
 class HomePageImageAdmin(admin.ModelAdmin):
-    list_display = ("homepage_content", "caption", "order")
-    list_filter = ("homepage_content",)
+    list_display = ("page", "caption", "order")
+    list_filter = ("page",)
 
 # Register your models here.

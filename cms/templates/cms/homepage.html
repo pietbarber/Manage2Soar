@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="homepage-content">
+    <h1>{{ page.title }}</h1>
+    <div class="cms-content">
+      {{ page.content|safe }}
+    </div>
+    {% if page.images.all %}
+      <div class="homepage-gallery">
+        {% for img in page.images.all %}
+          <div class="gallery-image">
+            <img src="{{ img.image.url }}" alt="{{ img.caption }}">
+            {% if img.caption %}
+              <div class="caption">{{ img.caption }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
