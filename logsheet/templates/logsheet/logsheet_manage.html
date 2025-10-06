@@ -393,12 +393,19 @@
         const selectedOption = gliderField.options[gliderField.selectedIndex];
         const ownerIds = (selectedOption.dataset.ownerIds || "").split(",").filter(Boolean);
 
-        if (ownerIds.length === 0) return;
+        if (pilotField.options.length === 0) return;
 
+        // Sort all pilot options by last name (case-insensitive)
         const options = Array.from(pilotField.options);
+        options.sort((a, b) => {
+          const aLast = (a.text.split(" ").slice(-1)[0] || "").toLowerCase();
+          const bLast = (b.text.split(" ").slice(-1)[0] || "").toLowerCase();
+          return aLast.localeCompare(bLast);
+        });
+
+        // Separate owners and non-owners
         const owners = [];
         const nonOwners = [];
-
         for (let option of options) {
           if (ownerIds.includes(option.value)) {
             owners.push(option);
@@ -407,9 +414,14 @@
           }
         }
 
-        // Clear and reinsert with owners first
+        // Clear and reinsert with owners first, then non-owners
         pilotField.innerHTML = "";
         owners.concat(nonOwners).forEach(opt => pilotField.appendChild(opt));
+
+        // Auto-select the first owner if any
+        if (owners.length > 0) {
+          pilotField.value = owners[0].value;
+        }
       }
       if (gliderField && instructorField) {
         gliderField.addEventListener("change", updateFlightFormFields);
