@@ -254,12 +254,22 @@ def manage_logsheet(request, pk):
         .order_by("-revised_at")
     )
 
+    flight_total = flights.count()
+    flight_landed = flights.filter(
+        launch_time__isnull=False, landing_time__isnull=False).count()
+    flight_flying = flights.filter(
+        launch_time__isnull=False, landing_time__isnull=True).count()
+    flight_pending = flights.filter(launch_time__isnull=True).count()
+
     context = {
         "logsheet": logsheet,
         "flights": flights,
         "can_edit": not logsheet.finalized or request.user.is_superuser,
         "revisions": revisions,
-
+        "flight_total": flight_total,
+        "flight_landed": flight_landed,
+        "flight_flying": flight_flying,
+        "flight_pending": flight_pending,
     }
     # Find previous logsheet
     previous_logsheet = Logsheet.objects.filter(

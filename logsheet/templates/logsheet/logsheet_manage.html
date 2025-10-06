@@ -216,8 +216,18 @@
       <td colspan="9" class="text-center">No flights found.</td>
     </tr>
     {% endfor %}
+
   </tbody>
 </table>
+
+{% if logsheet.flights.exists %}
+  <div class="mt-2 mb-4">
+    <strong>{{ flight_total }} flights total</strong>,
+    <span class="text-success">{{ flight_landed }} landed</span>,
+    <span class="text-primary">{{ flight_flying }} flying</span>,
+    <span class="text-warning">{{ flight_pending }} pending</span>
+  </div>
+{% endif %}
 
 {% else %}
   <p>No flights recorded yet for this logsheet.</p>
