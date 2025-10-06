@@ -370,6 +370,20 @@ class LogsheetCloseoutForm(forms.ModelForm):
 class LogsheetDutyCrewForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Restrict all duty crew dropdowns to active members, alphabetized by last and first name
+        self.fields["duty_officer"].queryset = get_active_members_with_role(
+            "duty_officer")
+        self.fields["assistant_duty_officer"].queryset = get_active_members_with_role(
+            "assistant_duty_officer")
+        self.fields["duty_instructor"].queryset = get_active_members_with_role(
+            "instructor")
+        self.fields["surge_instructor"].queryset = get_active_members_with_role(
+            "instructor")
+        self.fields["tow_pilot"].queryset = get_active_members_with_role(
+            "towpilot")
+        self.fields["surge_tow_pilot"].queryset = get_active_members_with_role(
+            "towpilot")
+
         try:
             from siteconfig.models import SiteConfiguration
             config = SiteConfiguration.objects.first()
