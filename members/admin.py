@@ -215,11 +215,5 @@ class MemberAdmin(VersionAdmin, UserAdmin):
     profile_photo_preview.short_description = "Current Photo"
 
     def get_search_results(self, request, queryset, search_term):
-        from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-        from django.db import models
-        # Always include superusers
-        queryset = queryset.filter(
-            models.Q(membership_status__in=DEFAULT_ACTIVE_STATUSES) | models.Q(
-                is_superuser=True)
-        )
+        # Show all members (active and inactive) in admin
         return super().get_search_results(request, queryset, search_term)
