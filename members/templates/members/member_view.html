@@ -91,7 +91,21 @@
           <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3 ms-3">Set Password</a>
         </li>
         {% endif %}
-        <li class="list-group-item"><strong>Emergency Contact:</strong><br>{{ member.emergency_contact|linebreaksbr }}
+        <li class="list-group-item p-0">
+          <div class="accordion" id="emergencyContactAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingEmergencyContact">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEmergencyContact" aria-expanded="false" aria-controls="collapseEmergencyContact">
+                  Emergency Contact
+                </button>
+              </h2>
+              <div id="collapseEmergencyContact" class="accordion-collapse collapse" aria-labelledby="headingEmergencyContact" data-bs-parent="#emergencyContactAccordion">
+                <div class="accordion-body">
+                  {{ member.emergency_contact|linebreaksbr }}
+                </div>
+              </div>
+            </div>
+          </div>
         </li>
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
