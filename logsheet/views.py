@@ -1391,31 +1391,67 @@ def _issues_by_day_for_towplane(towplane):
 def towplane_logbook(request, pk: int):
     towplane = get_object_or_404(Towplane, pk=pk)
 
-    flights = (
-        Flight.objects
-        .select_related("logsheet")
+    # Get TowplaneCloseout records for this towplane, grouped by day
+    from collections import defaultdict
+    closeouts = (
+        TowplaneCloseout.objects
         .filter(towplane=towplane)
-        .order_by("-logsheet__log_date", "-logsheet_id")
+        .select_related("logsheet")
+        .order_by("logsheet__log_date", "logsheet_id")
     )
 
-    issues_by_day = _issues_by_day_for_towplane(towplane)
-    # deadlines: keep empty unless you track towplane deadlines
-    daily, year_nav = _daily_flight_rollup(
-        flights,
-        date_field="logsheet__log_date",
-        issues_by_day=issues_by_day,
-        deadlines_by_day={},  # or a towplane deadline helper if you add one
-    )
+    # Group by day
+    # Use explicit dict construction to avoid defaultdict type confusion
+    daily_data = {}
 
-    # Add initial_hours to every day's cumulative hours
-    if daily and hasattr(towplane, 'initial_hours'):
-        for r in daily:
-            r["cum_hours"] = round(
-                float(r["cum_hours"]) + float(towplane.initial_hours), 1)
+    # Ensure all keys are initialized with correct types
+    # (float for day_hours/cum_hours, None for day/logsheet_pk, list for issues/deadlines)
+    from logsheet.models import Flight
+    for c in closeouts:
+        day = c.logsheet.log_date
+        # Count glider tows for this towplane and day
+        tow_count = Flight.objects.filter(
+            towplane=towplane, logsheet__log_date=day).count()
+        if day not in daily_data:
+            daily_data[day] = {
+                "day": day,
+                "logsheet_pk": c.logsheet.pk,
+                "day_hours": float(c.tach_time or 0),
+                "cum_hours": float(c.end_tach or 0),
+                "glider_tows": tow_count,
+                "issues": [],
+                "deadlines": []
+            }
+        else:
+            daily_data[day]["day_hours"] += float(c.tach_time or 0)
+            daily_data[day]["cum_hours"] = float(c.end_tach or 0)
+            daily_data[day]["glider_tows"] = tow_count
+
+    # Sort days
+    days_sorted = sorted(daily_data.keys())
+    daily = []
+    for day in days_sorted:
+        row = daily_data[day]
+        # Attach issues for the day
+        row["issues"] = _issues_by_day_for_towplane(towplane).get(day, [])
+        daily.append(row)
+
+    # Year navigation anchors
+    year_seen = set()
+    year_nav = []
+    for row in daily:
+        y = row["day"].year
+        if y not in year_seen:
+            year_seen.add(y)
+            row["year_anchor"] = f"y{y}"
+            year_nav.append({"year": y, "anchor": row["year_anchor"]})
+        else:
+            row["year_anchor"] = None
+
     context = {
         "object": towplane,
         "object_type": "towplane",
         "daily": daily,
-        "year_nav": year_nav,
+        "year_nav": sorted(year_nav, key=lambda x: x["year"], reverse=True),
     }
     return render(request, "logsheet/equipment_logbook.html", context)

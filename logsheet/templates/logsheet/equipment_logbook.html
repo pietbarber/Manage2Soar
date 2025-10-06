@@ -32,9 +32,14 @@
             <thead class="table-light">
                 <tr>
                     <th style="white-space:nowrap; cursor:pointer;" data-sort-method="date">Date</th>
-                    <th class="text-end">Flights</th>
-                    <th class="text-end">Day Hours</th>
-                    <th class="text-end">Cumulative Hours</th>
+                    <th class="text-end">Glider Tows</th>
+                    {% if object_type == "towplane" %}
+                        <th class="text-end">Elapsed Tach Time</th>
+                        <th class="text-end">Ending Tach Time</th>
+                    {% else %}
+                        <th class="text-end">Day Hours</th>
+                        <th class="text-end">Cumulative Hours</th>
+                    {% endif %}
                     <th class="logbook-events-col">Events</th>
                     <th>Logsheet</th>
                 </tr>
@@ -44,7 +49,7 @@
                 {% with d=row.day %}
                 <tr id="{% if row.year_anchor %}{{ row.year_anchor }}{% endif %}">
                     <td style="white-space:nowrap;" data-sort="{{ d|date:'Y-m-d' }}">{{ d|date:'M. j, Y' }}</td>
-                    <td class="text-end">{{ row.flights }}</td>
+                    <td class="text-end">{{ row.glider_tows }}</td>
 
                     {# Decimal hours #}
                     <td class="text-end">{{ row.day_hours|floatformat:1 }}</td>
