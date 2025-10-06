@@ -1,0 +1,31 @@
+# Exclude docs folders
+**/docs/
+# Exclude markdown files
+*.md
+# Exclude loaddata directory
+loaddata/
+# Exclude requirements.txt after install
+requirements.txt
+# Exclude test cache, venv, and other dev files
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.vscode/
+*.log
+*.sqlite3
+*.db
+# Exclude git history
+.git/
+# Exclude node_modules
+node_modules/
+# Exclude built TinyMCE assets
+static/tinymce/
+# Exclude other unnecessary files
+roadmap.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+k8s-deployment.yaml
+ingress.yaml
+membership.json

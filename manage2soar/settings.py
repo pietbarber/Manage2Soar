@@ -37,7 +37,7 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-STATIC_ROOT = "/app/staticfiles"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Application definition
 
@@ -317,6 +317,9 @@ LOGGING = {
 
 handler403 = 'members.views.custom_permission_denied_view'
 
+# Use locally hosted TinyMCE JS
+TINYMCE_JS_URL = '/static/tinymce/tinymce.min.js'
+
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,         # turn off relative URLs
     "remove_script_host": False,    # strip protocol+host
@@ -341,4 +344,5 @@ TINYMCE_DEFAULT_CONFIG = {
         "tableinsertrowbefore tableinsertrowafter tabledeleterow | "
         "tableinsertcolbefore tableinsertcolafter tabledeletecol"
     ),
+    "promotion": False,  # Disable TinyMCE 'Upgrade' button
 }

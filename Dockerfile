@@ -1,12 +1,17 @@
 # Dockerfile for Django + Gunicorn
-FROM python:3.13-slim
+FROM python:3.13-slim-bullseye
 
 WORKDIR /app
 
+
+# Copy only requirements.txt for install, then remove it
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
 COPY . .
+
+# Fetch TinyMCE release and place in static/tinymce
+RUN bash loaddata/fetch_tinymce.sh
 
 ENV DJANGO_SETTINGS_MODULE=manage2soar.settings
 ENV PYTHONUNBUFFERED=1

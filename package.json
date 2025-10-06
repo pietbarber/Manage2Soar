@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "tinymce": "^8.1.2"
+  }
+}
