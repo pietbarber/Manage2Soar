@@ -4,8 +4,6 @@
 *.md
 # Exclude loaddata directory
 loaddata/
-# Exclude requirements.txt after install
-requirements.txt
 # Exclude test cache, venv, and other dev files
 __pycache__/
 *.pyc

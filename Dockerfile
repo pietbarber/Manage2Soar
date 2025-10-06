@@ -10,9 +10,6 @@ RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
 COPY . .
 
-# Fetch TinyMCE release and place in static/tinymce
-RUN bash loaddata/fetch_tinymce.sh
-
 ENV DJANGO_SETTINGS_MODULE=manage2soar.settings
 ENV PYTHONUNBUFFERED=1
 
