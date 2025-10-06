@@ -4,6 +4,7 @@
 # with name suffixes, and middle initials, and nicknames? 😂
 
 
+from siteconfig.models import SiteConfiguration
 from django import template
 import re
 from django.utils.safestring import mark_safe
@@ -49,19 +50,25 @@ def format_us_phone(value):
 @register.filter
 def render_duties(member):
     duties = []
-    from django.template.loader import render_to_string
+    from siteconfig.models import SiteConfiguration
+    config = SiteConfiguration.objects.first()
+    instructor = getattr(config, 'instructor_title',
+                         'Instructor') if config else 'Instructor'
+    towpilot = getattr(config, 'towpilot_title',
+                       'Tow Pilot') if config else 'Tow Pilot'
+    duty_officer = getattr(config, 'duty_officer_title',
+                           'Duty Officer') if config else 'Duty Officer'
+    assistant_duty_officer = getattr(config, 'assistant_duty_officer_title',
+                                     'Assistant Duty Officer') if config else 'Assistant Duty Officer'
     if member.instructor:
-        duties.append(
-            f'<span title="{{% get_siteconfig as config %}}{{{{ config.instructor_title|default:"Instructor" }}}}" class="emoji">🎓</span>')
+        duties.append(f'<span title="{instructor}" class="emoji">🎓</span>')
     if member.towpilot:
-        duties.append(
-            f'<span title="{{% get_siteconfig as config %}}{{{{ config.towpilot_title|default:"Tow Pilot" }}}}" class="emoji">🛩️</span>')
+        duties.append(f'<span title="{towpilot}" class="emoji">🛩️</span>')
     if member.duty_officer:
-        duties.append(
-            f'<span title="{{% get_siteconfig as config %}}{{{{ config.duty_officer_title|default:"Duty Officer" }}}}" class="emoji">📋</span>')
+        duties.append(f'<span title="{duty_officer}" class="emoji">📋</span>')
     if member.assistant_duty_officer:
         duties.append(
-            f'<span title="{{% get_siteconfig as config %}}{{{{ config.assistant_duty_officer_title|default:"Assistant Duty Officer" }}}}" class="emoji">💪</span>')
+            f'<span title="{assistant_duty_officer}" class="emoji">💪</span>')
     if member.secretary:
         duties.append('<span title="Secretary" class="emoji">✍️</span>')
     if member.treasurer:
@@ -84,26 +91,36 @@ def pluck_ids(members):
 
 @register.simple_tag
 def duty_emoji_legend():
-    return mark_safe("""
-        <div class="accordion mb-4" id="emojiLegendAccordion">
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="headingLegend">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLegend" aria-expanded="false" aria-controls="collapseLegend">
-                        📖 Expand to show Legend 
+    # Get the first SiteConfiguration object, or use defaults if not found
+    config = SiteConfiguration.objects.first()
+    instructor = getattr(config, 'instructor_title',
+                         'Instructor') if config else 'Instructor'
+    towpilot = getattr(config, 'towpilot_title',
+                       'Tow Pilot') if config else 'Tow Pilot'
+    duty_officer = getattr(config, 'duty_officer_title',
+                           'Duty Officer') if config else 'Duty Officer'
+    assistant_duty_officer = getattr(config, 'assistant_duty_officer_title',
+                                     'Assistant Duty Officer') if config else 'Assistant Duty Officer'
+    return mark_safe(f"""
+        <div class='accordion mb-4' id='emojiLegendAccordion'>
+            <div class='accordion-item'>
+                <h2 class='accordion-header' id='headingLegend'>
+                    <button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseLegend' aria-expanded='false' aria-controls='collapseLegend'>
+                        📖 Expand to show Legend
                     </button>
                 </h2>
-                <div id="collapseLegend" class="accordion-collapse collapse" aria-labelledby="headingLegend" data-bs-parent="#emojiLegendAccordion">
-                    <div class="accordion-body">
-                        <ul class="list-unstyled mb-0">
-                            <li><span class="emoji">🎓</span> – {{% get_siteconfig as config %}}{{ config.instructor_title|default:"Instructor" }}</li>
-                            <li><span class="emoji">🛩️</span> – {{% get_siteconfig as config %}}{{ config.towpilot_title|default:"Tow Pilot" }}</li>
-                            <li><span class="emoji">📋</span> – {{% get_siteconfig as config %}}{{ config.duty_officer_title|default:"Duty Officer" }}</li>
-                            <li><span class="emoji">💪</span> – {{% get_siteconfig as config %}}{{ config.assistant_duty_officer_title|default:"Assistant Duty Officer" }}</li>
-                            <li><span class="emoji">✍️</span> – Secretary</li>
-                            <li><span class="emoji">💰</span> – Treasurer</li>
-                            <li><span class="emoji">🌐</span> – Webmaster</li>
-                            <li><span class="emoji">🎩</span> – Director</li>
-                            <li><span class="emoji">📇</span> – Membership Manager</li>
+                <div id='collapseLegend' class='accordion-collapse collapse' aria-labelledby='headingLegend' data-bs-parent='#emojiLegendAccordion'>
+                    <div class='accordion-body'>
+                        <ul class='list-unstyled mb-0'>
+                            <li><span class='emoji'>🎓</span> – {instructor}</li>
+                            <li><span class='emoji'>🛩️</span> – {towpilot}</li>
+                            <li><span class='emoji'>📋</span> – {duty_officer}</li>
+                            <li><span class='emoji'>💪</span> – {assistant_duty_officer}</li>
+                            <li><span class='emoji'>✍️</span> – Secretary</li>
+                            <li><span class='emoji'>💰</span> – Treasurer</li>
+                            <li><span class='emoji'>🌐</span> – Webmaster</li>
+                            <li><span class='emoji'>🎩</span> – Director</li>
+                            <li><span class='emoji'>📇</span> – Membership Manager</li>
                         </ul>
                     </div>
                 </div>
