@@ -47,6 +47,12 @@ class FlightForm(forms.ModelForm):
         logsheet = cleaned_data.get("logsheet") if "logsheet" in cleaned_data else getattr(
             self.instance, "logsheet", None)
 
+        # Prevent landing time earlier than launch time
+        if launch_time and landing_time:
+            if landing_time < launch_time:
+                raise forms.ValidationError(
+                    "Landing time cannot be earlier than launch time.")
+
         # Only check if a glider and launch_time are provided
         if glider and launch_time:
             # Defensive: ensure logsheet and log_date are present
