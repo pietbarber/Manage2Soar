@@ -153,15 +153,26 @@ class FlightForm(forms.ModelForm):
         self.fields["split_with"].queryset = get_active_members().order_by(
             "first_name", "last_name")
 
-        # Custom towplane sort: club-owned active first, then others by n_number
-        towplanes = Towplane.objects.all()
-        towplanes_sorted = sorted(
-            [tp for tp in towplanes if tp.is_active and not tp.is_grounded],
-            key=lambda t: (
-                0 if t.club_owned and t.is_active else 1, t.n_number or "")
-        )
-        self.fields["towplane"].queryset = Towplane.objects.filter(
-            pk__in=[tp.pk for tp in towplanes_sorted])
+        # Custom towplane sort: club-owned active first, then others, with optgroup labels
+        towplanes = [tp for tp in Towplane.objects.all(
+        ) if tp.is_active and not tp.is_grounded]
+        club_towplanes = sorted(
+            [tp for tp in towplanes if tp.club_owned], key=lambda t: t.name)
+        other_towplanes = sorted(
+            [tp for tp in towplanes if not tp.club_owned], key=lambda t: t.name)
+
+        # Build grouped choices for the select widget
+        towplane_choices = []
+        if club_towplanes:
+            towplane_choices.append(
+                ("Club towplanes", [(tp.pk, str(tp)) for tp in club_towplanes]))
+        if other_towplanes:
+            towplane_choices.append(
+                ("Other", [(tp.pk, str(tp)) for tp in other_towplanes]))
+
+        self.fields["towplane"].choices = towplane_choices
+        # Optionally, add a visual divider for winch/self-launch if needed
+        # (Assumes these are represented as special Towplane objects or handled elsewhere)
 
         # Custom glider sort: club two-seaters, club one-seaters, private active, inactive
         gliders = Glider.objects.all()
@@ -427,35 +438,38 @@ class LogsheetDutyCrewForm(forms.ModelForm):
 #
 
 
+# TowplaneCloseoutForm with optgroup logic for towplane field
+class TowplaneCloseoutForm(forms.ModelForm):
+    class Meta:
+        model = TowplaneCloseout
+        fields = ["towplane", "start_tach", "end_tach", "fuel_added", "notes"]
+        widgets = {
+            "notes": TinyMCE(mce_attrs={"height": 300}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        towplanes = [tp for tp in Towplane.objects.filter(
+            is_active=True) if not tp.is_grounded]
+        club_towplanes = sorted(
+            [tp for tp in towplanes if tp.club_owned], key=lambda t: t.name)
+        other_towplanes = sorted(
+            [tp for tp in towplanes if not tp.club_owned], key=lambda t: t.name)
+        towplane_choices = []
+        if club_towplanes:
+            towplane_choices.append(
+                ("Club towplanes", [(tp.pk, str(tp)) for tp in club_towplanes]))
+        if other_towplanes:
+            towplane_choices.append(
+                ("Other", [(tp.pk, str(tp)) for tp in other_towplanes]))
+        self.fields["towplane"].choices = towplane_choices
+
+
 TowplaneCloseoutFormSet = modelformset_factory(
     TowplaneCloseout,
-    fields=["towplane", "start_tach", "end_tach", "fuel_added", "notes"],
+    form=TowplaneCloseoutForm,
     extra=0,
-    widgets={
-        "notes": TinyMCE(mce_attrs={"height": 300}),
-    }
 )
-
-######################################################
-# MaintenanceIssueForm
-#
-# Handles the reporting of new maintenance issues for gliders or towplanes.
-# Validates that at least one aircraft is selected when reporting an issue.
-#
-# Fields:
-# - glider
-# - towplane
-# - description
-# - grounded
-#
-# Widgets:
-# - Textarea for description.
-# - Checkbox for grounded status.
-# - Select dropdowns for aircraft.
-#
-# Methods:
-# - clean: Ensures either a glider or a towplane is selected.
-#
 
 
 class MaintenanceIssueForm(forms.ModelForm):
@@ -482,8 +496,22 @@ class MaintenanceIssueForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only show club-owned and active gliders and towplanes
+        # Only show club-owned and active gliders
         self.fields["glider"].queryset = Glider.objects.filter(
             club_owned=True, is_active=True)
-        self.fields["towplane"].queryset = Towplane.objects.filter(
-            is_active=True)
+
+        # Custom towplane sort: club-owned first, then others, with optgroup labels (include inactive and grounded)
+        towplanes = Towplane.objects.all()
+        club_towplanes = sorted(
+            [tp for tp in towplanes if tp.club_owned], key=lambda t: t.name)
+        other_towplanes = sorted(
+            [tp for tp in towplanes if not tp.club_owned], key=lambda t: t.name)
+
+        towplane_choices = []
+        if club_towplanes:
+            towplane_choices.append(
+                ("Club towplanes", [(tp.pk, str(tp)) for tp in club_towplanes]))
+        if other_towplanes:
+            towplane_choices.append(
+                ("Other", [(tp.pk, str(tp)) for tp in other_towplanes]))
+        self.fields["towplane"].choices = towplane_choices
