@@ -249,30 +249,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-<script>
-  document.getElementById("flightModal").addEventListener("shown.bs.modal", function () {
-
-    flatpickr("#id_launch_time", {
-      enableTime: true,
-      noCalendar: true,
-      dateFormat: "H:i",
-      time_24hr: true,
-      allowInput: true,
-      minuteIncrement: 1,
-    });
-
-    flatpickr("#id_landing_time", {
-      enableTime: true,
-      noCalendar: true,
-      dateFormat: "H:i",
-      time_24hr: true,
-      allowInput: true,
-      minuteIncrement: 1,
-    });
-  });
-</script>
 
 <script>
   const flightModal = document.getElementById("flightModal");
@@ -452,9 +429,6 @@
       const launchInput = document.getElementById('id_launch_time');
       const landingInput = document.getElementById('id_landing_time');
       // Always clear launch time field when modal loads
-      if (launchInput) {
-        launchInput.value = '';
-      }
       function getNowTime24() {
         const now = new Date();
         const h = now.getHours();
@@ -555,6 +529,31 @@
   document.getElementById('flightModal').addEventListener('hidden.bs.modal', function (event) {
     // Clear modal content to force reload next time
     document.getElementById('flightModalContent').innerHTML = '';
+  });
+</script>
+<script>
+  document.addEventListener("shown.bs.modal", function () {
+    setTimeout(function() {
+      const launchInput = document.getElementById("id_launch_time");
+      if (launchInput) {
+        console.log("[DIAG] Launch time value after modal shown:", launchInput.value);
+      }
+    }, 500);
+  });
+</script>
+
+<script>
+  document.addEventListener("shown.bs.modal", function () {
+    setTimeout(function() {
+      const launchInput = document.getElementById("id_launch_time");
+      if (launchInput && launchInput.value) {
+        // Force re-setting the value to trigger browser display
+        const val = launchInput.value;
+        launchInput.value = "";
+        launchInput.value = val;
+        console.log("[FORCE-SET] Launch time value set to:", val);
+      }
+    }, 300);
   });
 </script>
 

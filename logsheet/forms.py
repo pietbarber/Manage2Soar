@@ -130,6 +130,17 @@ class FlightForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Ensure launch_time and landing_time are always formatted as HH:MM (no seconds)
+        for field_name in ["launch_time", "landing_time"]:
+            value = self.initial.get(field_name) or getattr(
+                self.instance, field_name, None)
+            if value:
+                # value may be a datetime.time or string
+                if hasattr(value, 'strftime'):
+                    self.initial[field_name] = value.strftime('%H:%M')
+                elif isinstance(value, str) and len(value) >= 5:
+                    self.initial[field_name] = value[:5]
+
         # Filter instructors only
         self.fields["pilot"].queryset = get_active_members().order_by(
             "first_name", "last_name")
@@ -236,10 +247,6 @@ class FlightForm(forms.ModelForm):
                 owner = glider_obj.owners.first()
                 if owner is not None:
                     self.initial["pilot"] = owner.pk
-
-        if not self.instance.pk:
-            self.fields["launch_time"].initial = localtime(
-                now()).strftime("%H:%M")
 
 
 # CreateLogsheetForm
