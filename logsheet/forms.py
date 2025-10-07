@@ -112,8 +112,8 @@ class FlightForm(forms.ModelForm):
             "split_type"
         ]
         widgets = {
-            "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
-            "landing_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control timeinput"}),
+            "landing_time": forms.TimeInput(attrs={"type": "time", "class": "form-control timeinput"}),
             "pilot": forms.Select(attrs={"class": "form-select"}),
             "instructor": forms.Select(attrs={"class": "form-select"}),
             "glider": forms.Select(attrs={"class": "form-select"}),

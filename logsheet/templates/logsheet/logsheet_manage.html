@@ -531,30 +531,5 @@
     document.getElementById('flightModalContent').innerHTML = '';
   });
 </script>
-<script>
-  document.addEventListener("shown.bs.modal", function () {
-    setTimeout(function() {
-      const launchInput = document.getElementById("id_launch_time");
-      if (launchInput) {
-        console.log("[DIAG] Launch time value after modal shown:", launchInput.value);
-      }
-    }, 500);
-  });
-</script>
-
-<script>
-  document.addEventListener("shown.bs.modal", function () {
-    setTimeout(function() {
-      const launchInput = document.getElementById("id_launch_time");
-      if (launchInput && launchInput.value) {
-        // Force re-setting the value to trigger browser display
-        const val = launchInput.value;
-        launchInput.value = "";
-        launchInput.value = val;
-        console.log("[FORCE-SET] Launch time value set to:", val);
-      }
-    }, 300);
-  });
-</script>
 
 {% endblock %}
