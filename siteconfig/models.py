@@ -1,6 +1,10 @@
+
 from django.db import models
 from django.core.exceptions import ValidationError
 from utils.upload_entropy import upload_site_logo
+from utils.favicon import generate_favicon_from_logo
+from django.core.files.storage import default_storage
+import os
 
 
 class SiteConfiguration(models.Model):
@@ -55,7 +59,29 @@ class SiteConfiguration(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        is_new_logo = False
+        if self.pk:
+            old = SiteConfiguration.objects.get(pk=self.pk)
+            if old.club_logo != self.club_logo:
+                is_new_logo = True
+        else:
+            is_new_logo = bool(self.club_logo)
         super().save(*args, **kwargs)
+        # Generate favicon if logo was uploaded/changed
+        if self.club_logo and is_new_logo:
+            # Save favicon.ico at MEDIA_ROOT/favicon.ico using storage backend
+            try:
+                with self.club_logo.open('rb') as logo_file:
+                    # Generate favicon in memory
+                    from io import BytesIO
+                    outbuf = BytesIO()
+                    generate_favicon_from_logo(logo_file, outbuf)
+                    outbuf.seek(0)
+                    # Save to storage as 'favicon.ico' at root of MEDIA
+                    default_storage.save('favicon.ico', outbuf)
+            except Exception as e:
+                # Log or handle error as needed
+                pass
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
