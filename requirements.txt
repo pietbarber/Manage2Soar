@@ -20,3 +20,4 @@ google-cloud-storage
 google-auth 
 google-api-python-client 
 gunicorn
+django-import-export
