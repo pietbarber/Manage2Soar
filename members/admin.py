@@ -7,7 +7,9 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib import admin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib import admin
+
 from reversion.admin import VersionAdmin
+from import_export.admin import ImportExportModelAdmin
 from tinymce.widgets import TinyMCE
 
 from .models import Badge
@@ -151,7 +153,7 @@ class CustomMemberCreationForm(UserCreationForm):
 
 
 @admin.register(Member)
-class MemberAdmin(VersionAdmin, UserAdmin):
+class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     actions = ["export_members_csv"]
 
     def export_members_csv(self, request, queryset):
@@ -179,7 +181,6 @@ class MemberAdmin(VersionAdmin, UserAdmin):
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
-    model = Member
     inlines = [MemberBadgeInline]
 
     list_display = ("last_name", "first_name", "email",
