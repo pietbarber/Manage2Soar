@@ -3,6 +3,8 @@
 {% load static %}
 {% load member_extras %}
 
+{% block title %}View Member: {{ member.full_display_name }}{% endblock %}
+
 {% block content %}
 {% duty_emoji_legend %}
 
