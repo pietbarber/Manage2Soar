@@ -9,6 +9,7 @@ from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from django.db.models import Case, When, Value, IntegerField
+from django.db import models
 from logsheet.models import MaintenanceIssue, Glider, Towplane
 
 
@@ -141,16 +142,44 @@ class FlightForm(forms.ModelForm):
                 elif isinstance(value, str) and len(value) >= 5:
                     self.initial[field_name] = value[:5]
 
-        # Filter instructors only
-        self.fields["pilot"].queryset = get_active_members().order_by(
-            "first_name", "last_name")
+        # Pilot dropdown: active members first (by last name), then inactive (by last name)
+        active_qs = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        inactive_qs = Member.objects.filter(membership_status="Inactive")
+        pilot_qs = list(active_qs.order_by("last_name", "first_name")) + \
+            list(inactive_qs.order_by("last_name", "first_name"))
+        # Use a union queryset with correct ordering
+        self.fields["pilot"].queryset = Member.objects.filter(pk__in=[m.pk for m in pilot_qs]).order_by(
+            models.Case(
+                models.When(
+                    membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)),
+                models.When(membership_status="Inactive",
+                            then=models.Value(1)),
+                default=models.Value(2),
+                output_field=IntegerField(),
+            ),
+            "last_name", "first_name"
+        )
+
+        # Instructors unchanged
         self.fields["instructor"].queryset = get_active_members_with_role(
             "instructor")
-        # Ensure the logsheet's scheduled tow pilot is included and selected by default
-        # Sort passenger dropdown by last name, first name
+
+        # Passenger dropdown: active first, then inactive, exclude deceased
         if "passenger" in self.fields:
-            self.fields["passenger"].queryset = self.fields["passenger"].queryset.order_by(
-                "first_name", "last_name")
+            deceased_status = ["Deceased"]
+            active_pass = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES).exclude(
+                membership_status__in=deceased_status).order_by("last_name", "first_name")
+            inactive_pass = Member.objects.filter(
+                membership_status="Inactive").order_by("last_name", "first_name")
+            optgroups = []
+            if active_pass.exists():
+                optgroups.append(
+                    ("Active Members", [(m.pk, str(m)) for m in active_pass]))
+            if inactive_pass.exists():
+                optgroups.append(
+                    ("Not Active Members", [(m.pk, str(m)) for m in inactive_pass]))
+            self.fields["passenger"].choices = [("", "-------")] + optgroups
         tow_pilot_initial = self.initial.get("tow_pilot")
         tow_pilot_qs = get_active_members_with_role("towpilot")
         if tow_pilot_initial:
@@ -167,8 +196,10 @@ class FlightForm(forms.ModelForm):
                 "first_name", "last_name"
             )
         self.fields["tow_pilot"].queryset = tow_pilot_qs
-        self.fields["split_with"].queryset = get_active_members().order_by(
-            "first_name", "last_name")
+
+        # Split with: only active members, order by last name, first name
+        self.fields["split_with"].queryset = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES).order_by("last_name", "first_name")
 
         # Custom towplane sort: club-owned active first, then others, with optgroup labels
         towplanes = [tp for tp in Towplane.objects.all(
@@ -219,34 +250,25 @@ class FlightForm(forms.ModelForm):
             [(alt, f"{alt} ft") for alt in remaining]
         )
 
-        glider_obj = None
-        if "glider" in self.initial or "glider" in self.data:
-            glider_id = self.initial.get("glider") or self.data.get("glider")
-            try:
-                glider_obj = Glider.objects.get(pk=glider_id)
-                owner_ids = glider_obj.owners.values_list("pk", flat=True)
-            except Glider.DoesNotExist:
-                owner_ids = []
+        # Always use: active by last name, then inactive by last name
+        active_qs = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        inactive_qs = Member.objects.filter(membership_status="Inactive")
+        pilot_qs = list(active_qs.order_by("last_name", "first_name")) + \
+            list(inactive_qs.order_by("last_name", "first_name"))
+        self.fields["pilot"].queryset = Member.objects.filter(pk__in=[m.pk for m in pilot_qs]).order_by(
+            models.Case(
+                models.When(
+                    membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)),
+                models.When(membership_status="Inactive",
+                            then=models.Value(1)),
+                default=models.Value(2),
+                output_field=IntegerField(),
+            ),
+            "last_name", "first_name"
+        )
 
-            self.fields["pilot"].queryset = Member.objects.filter(
-                membership_status__in=DEFAULT_ACTIVE_STATUSES
-            ).annotate(
-                owner_rank=Case(
-                    When(pk__in=owner_ids, then=Value(0)),
-                    default=Value(1),
-                    output_field=IntegerField()
-                )
-            ).order_by("owner_rank", "first_name", "last_name")
-
-        else:
-            self.fields["pilot"].queryset = get_active_members().order_by(
-                "first_name", "last_name")
-
-        if not self.initial.get("pilot") and not self.data.get("pilot"):
-            if glider_obj and glider_obj.owners.count() == 1:
-                owner = glider_obj.owners.first()
-                if owner is not None:
-                    self.initial["pilot"] = owner.pk
+        # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
 
 
 # CreateLogsheetForm
