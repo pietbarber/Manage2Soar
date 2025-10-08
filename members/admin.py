@@ -1,7 +1,10 @@
 from django.db import models
 from django.utils.html import format_html
 
+import csv
+from django.http import HttpResponse
 from django.contrib.auth.admin import UserAdmin
+from django.contrib import admin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib import admin
 from reversion.admin import VersionAdmin
@@ -149,6 +152,29 @@ class CustomMemberCreationForm(UserCreationForm):
 
 @admin.register(Member)
 class MemberAdmin(VersionAdmin, UserAdmin):
+    actions = ["export_members_csv"]
+
+    def export_members_csv(self, request, queryset):
+        # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
+        fields = [
+            "username", "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
+            "email", "phone", "mobile_phone", "emergency_contact",
+            "membership_status", "date_joined", "private_glider_checkride_date",
+            "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
+            "director", "member_manager", "rostermeister", "webmaster", "secretary", "treasurer",
+            "address", "city", "state_code", "state_freeform", "zip_code", "country",
+            "pilot_certificate_number", "SSA_member_number", "ssa_url", "glider_rating",
+            "public_notes", "private_notes", "is_active", "is_staff", "is_superuser"
+        ]
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename=members_export.csv'
+        writer = csv.writer(response)
+        writer.writerow(fields)
+        for member in queryset:
+            row = [getattr(member, f, "") for f in fields]
+            writer.writerow(row)
+        return response
+    export_members_csv.short_description = "Export selected members to CSV"
     readonly_fields = ("profile_photo_preview",)
 
     add_form = CustomMemberCreationForm
@@ -157,7 +183,7 @@ class MemberAdmin(VersionAdmin, UserAdmin):
     inlines = [MemberBadgeInline]
 
     list_display = ("last_name", "first_name", "email",
-                    "membership_status", "instructor", "towpilot", "rostermeister")
+                    "membership_status")
     search_fields = ("first_name", "last_name", "email", "username")
     list_filter = ("membership_status", "instructor", "towpilot",
                    "director", "member_manager", "rostermeister")
