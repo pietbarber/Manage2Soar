@@ -30,8 +30,10 @@ class TowplaneAdmin(admin.ModelAdmin):
 class GliderAdmin(admin.ModelAdmin):
     list_display = (
         "competition_number", "n_number",
-        "model", "make", "seats", "club_owned")
+        "model", "make", "seats", "club_owned", "is_active")
+    list_filter = ("is_active",)
     search_fields = ("n_number", "competition_number", "make", "model")
+    ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
