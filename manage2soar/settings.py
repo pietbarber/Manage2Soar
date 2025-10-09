@@ -122,7 +122,7 @@ DEFAULT_AIRFIELD_ID = 1
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        'DIRS': [BASE_DIR / "templates"],  # <- this line is key
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         "OPTIONS": {
             "context_processors": [
@@ -260,6 +260,7 @@ MEDIA_URL = os.getenv(
     "MEDIA_URL",
     f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
 )
+# print(f"[DEBUG] MEDIA_URL at settings load: {MEDIA_URL}")
 
 # These static directories are not on Google Storage Platform.
 STATIC_URL = '/static/'
