@@ -1,23 +1,39 @@
 from django.db import models
-from django.utils.html import format_html
-
-import csv
-from django.http import HttpResponse
-from django.contrib.auth.admin import UserAdmin
-from django.contrib import admin
+from .models import Member, MemberBadge
+from .models import Member, Badge, MemberBadge
+from .models import Member
+from .models import Biography
+from .models import Badge, MemberBadge
+from .models import Badge
+from tinymce.widgets import TinyMCE
+from import_export.admin import ImportExportModelAdmin
+from reversion.admin import VersionAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.http import HttpResponse
+import csv
+from django.utils.html import format_html
+from django.contrib.admin import SimpleListFilter
+# Custom filter for Active/Not active status
 
-from reversion.admin import VersionAdmin
-from import_export.admin import ImportExportModelAdmin
-from tinymce.widgets import TinyMCE
 
-from .models import Badge
-from .models import Badge, MemberBadge
-from .models import Biography
-from .models import Member
-from .models import Member, Badge, MemberBadge
-from .models import Member, MemberBadge
+class ActiveStatusFilter(SimpleListFilter):
+    title = 'Active status'
+    parameter_name = 'active'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('active', 'Active'),
+            ('not_active', 'Not active'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'active':
+            return queryset.filter(is_active=True)
+        if self.value() == 'not_active':
+            return queryset.filter(is_active=False)
+        return queryset
 
 
 @admin.register(Biography)
@@ -187,7 +203,7 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
                     "membership_status")
     search_fields = ("first_name", "last_name", "email", "username")
     list_filter = ("membership_status", "instructor", "towpilot",
-                   "director", "member_manager", "rostermeister")
+                   "director", "member_manager", "rostermeister", ActiveStatusFilter)
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
