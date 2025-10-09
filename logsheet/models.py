@@ -190,6 +190,12 @@ class Flight(models.Model):
         rate = Decimal(str(self.glider.rental_rate))
         cost = rate * hours
 
+        # Cap at max_rental_rate if set
+        max_rate = self.glider.max_rental_rate
+        if max_rate is not None:
+            max_rate = Decimal(str(max_rate))
+            cost = min(cost, max_rate)
+
         return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
