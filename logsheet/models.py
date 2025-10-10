@@ -307,6 +307,22 @@ class Towplane(models.Model):
         validators=[MinValueValidator(0)],
         help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
     )
+    oil_change_interval = models.DecimalField(
+        max_digits=5, decimal_places=1, default=Decimal("50.0"),
+        help_text="Hours between oil changes (default 50, but configurable per aircraft)."
+    )
+    next_oil_change_due = models.DecimalField(
+        max_digits=8, decimal_places=1, blank=True, null=True,
+        help_text="Tach time at which next oil change is due."
+    )
+    requires_100hr_inspection = models.BooleanField(
+        default=False,
+        help_text="Check if this towplane requires 100-hour inspections."
+    )
+    next_100hr_due = models.DecimalField(
+        max_digits=8, decimal_places=1, blank=True, null=True,
+        help_text="Tach time at which next 100-hour inspection is due."
+    )
 
     class Meta:
         ordering = ["name"]
@@ -360,6 +376,14 @@ class Glider(models.Model):
         max_digits=8, decimal_places=1, default=Decimal("0.0"),
         validators=[MinValueValidator(0)],
         help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
+    )
+    requires_100hr_inspection = models.BooleanField(
+        default=False,
+        help_text="Check if this glider requires 100-hour inspections."
+    )
+    next_100hr_due = models.DecimalField(
+        max_digits=8, decimal_places=1, blank=True, null=True,
+        help_text="Cumulative hours at which next 100-hour inspection is due."
     )
 
     owners = models.ManyToManyField(
@@ -451,6 +475,103 @@ class Logsheet(models.Model):
 
     def __str__(self):
         return f"{self.log_date} @ {self.airfield}"
+
+    def save(self, *args, **kwargs):
+        from logsheet.models import MaintenanceIssue
+        from decimal import Decimal
+        is_new = self.pk is None
+        # Fetch previous finalized state if updating
+        if not is_new:
+            old = Logsheet.objects.get(pk=self.pk)
+            was_finalized = old.finalized
+        else:
+            was_finalized = False
+        super().save(*args, **kwargs)
+        # Only run automation if just finalized
+        if not was_finalized and self.finalized:
+            # --- Towplane oil change and 100hr checks ---
+            for closeout in self.towplane_closeouts.all():
+                towplane = closeout.towplane
+                stop_tach = closeout.end_tach
+                # Oil change logic
+                if towplane.next_oil_change_due:
+                    due = towplane.next_oil_change_due
+                    interval = towplane.oil_change_interval or Decimal("50.0")
+                    if stop_tach is not None:
+                        hours_to_due = due - stop_tach
+                        if hours_to_due <= 10 and hours_to_due > 0:
+                            MaintenanceIssue.objects.get_or_create(
+                                towplane=towplane,
+                                logsheet=self,
+                                description=f"Towplane oil change due in {hours_to_due:.1f} hours (at {due}).",
+                                grounded=False,
+                                resolved=False,
+                            )
+                        elif hours_to_due <= 0:
+                            MaintenanceIssue.objects.get_or_create(
+                                towplane=towplane,
+                                logsheet=self,
+                                description=f"Towplane oil change OVERDUE (due at {due}, now {stop_tach}).",
+                                grounded=True,
+                                resolved=False,
+                            )
+                # 100hr logic
+                if towplane.requires_100hr_inspection and towplane.next_100hr_due:
+                    due = towplane.next_100hr_due
+                    if stop_tach is not None:
+                        hours_to_due = due - stop_tach
+                        if hours_to_due <= 10 and hours_to_due > 0:
+                            MaintenanceIssue.objects.get_or_create(
+                                towplane=towplane,
+                                logsheet=self,
+                                description=f"Towplane 100-hour inspection due in {hours_to_due:.1f} hours (at {due}).",
+                                grounded=False,
+                                resolved=False,
+                            )
+                        elif hours_to_due <= 0:
+                            MaintenanceIssue.objects.get_or_create(
+                                towplane=towplane,
+                                logsheet=self,
+                                description=f"Towplane 100-hour inspection OVERDUE (due at {due}, now {stop_tach}).",
+                                grounded=True,
+                                resolved=False,
+                            )
+            # --- Glider 100hr checks ---
+            for glider in self.flights.values_list('glider', flat=True).distinct():
+                if not glider:
+                    continue
+                g = Glider.objects.filter(pk=glider).first()
+                if not g or not g.requires_100hr_inspection or not g.next_100hr_due:
+                    continue
+                # Calculate cumulative hours for this glider up to this logsheet
+                # (Assume initial_hours + sum of all durations for this glider)
+                from django.db.models import Sum, F, ExpressionWrapper, DurationField
+                flights = g.flights_as_pilot.all().filter(
+                    logsheet__log_date__lte=self.log_date)
+                total_seconds = flights.aggregate(
+                    s=Sum(ExpressionWrapper(F('duration'),
+                          output_field=DurationField()))
+                )['s'].total_seconds() if flights.exists() else 0
+                cum_hours = (g.initial_hours or Decimal("0.0")) + \
+                    Decimal(total_seconds or 0) / Decimal(3600)
+                due = g.next_100hr_due
+                hours_to_due = due - cum_hours
+                if hours_to_due <= 10 and hours_to_due > 0:
+                    MaintenanceIssue.objects.get_or_create(
+                        glider=g,
+                        logsheet=self,
+                        description=f"Glider 100-hour inspection due in {hours_to_due:.1f} hours (at {due}).",
+                        grounded=False,
+                        resolved=False,
+                    )
+                elif hours_to_due <= 0:
+                    MaintenanceIssue.objects.get_or_create(
+                        glider=g,
+                        logsheet=self,
+                        description=f"Glider 100-hour inspection OVERDUE (due at {due}, now {cum_hours:.1f}).",
+                        grounded=True,
+                        resolved=False,
+                    )
 
 
 ####################################################

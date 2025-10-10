@@ -11,9 +11,21 @@ from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeist
 # with the admin interface here.
 @admin.register(Towplane)
 class TowplaneAdmin(admin.ModelAdmin):
-    list_display = ("name", "n_number", "is_active")
-    list_filter = ("is_active",)
+
+    list_display = (
+        "name", "n_number", "is_active",
+        "oil_change_interval", "next_oil_change_due",
+        "requires_100hr_inspection", "next_100hr_due"
+    )
+    list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("name", "n_number")
+    fieldsets = (
+        (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
+        ("Oil Change", {
+         "fields": ("oil_change_interval", "next_oil_change_due")}),
+        ("100hr Inspection", {
+         "fields": ("requires_100hr_inspection", "next_100hr_due")}),
+    )
 
     def get_search_results(self, request, queryset, search_term):
         queryset = queryset.filter(is_active=True)
@@ -30,10 +42,18 @@ class TowplaneAdmin(admin.ModelAdmin):
 class GliderAdmin(admin.ModelAdmin):
     list_display = (
         "competition_number", "n_number",
-        "model", "make", "seats", "club_owned", "is_active")
-    list_filter = ("is_active",)
+        "model", "make", "seats", "club_owned", "is_active",
+        "requires_100hr_inspection", "next_100hr_due"
+    )
+    list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("n_number", "competition_number", "make", "model")
     ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
+    fieldsets = (
+        (None, {"fields": ("competition_number", "n_number",
+         "model", "make", "seats", "club_owned", "is_active")}),
+        ("100hr Inspection", {
+         "fields": ("requires_100hr_inspection", "next_100hr_due")}),
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
