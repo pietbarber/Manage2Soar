@@ -604,13 +604,13 @@ def manage_logsheet_finances(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     flights = logsheet.flights.all()
 
-    # Use locked-in values if finalized, else use calculated
+    # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
         return {
             "tow": f.tow_cost_actual if logsheet.finalized else f.tow_cost_calculated,
-            "rental": f.rental_cost_actual if logsheet.finalized else f.rental_cost_calculated,
+            "rental": f.rental_cost_actual if logsheet.finalized else f.rental_cost,
             "total": f.total_cost if logsheet.finalized else (
-                (f.tow_cost_calculated or 0) + (f.rental_cost_calculated or 0)
+                (f.tow_cost_calculated or 0) + (f.rental_cost or 0)
             )
         }
 
