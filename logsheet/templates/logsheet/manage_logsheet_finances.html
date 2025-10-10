@@ -23,7 +23,7 @@
 <table class="table table-striped table-sm sort">
   <thead>
     <tr>
-      <th>Pilot</th>
+      <th data-sort-method="last-name">Pilot</th>
       <th># Flights</th>
       <th class="text-end">Tow Total</th>
       <th class="text-end">Rental Total</th>
@@ -31,9 +31,9 @@
     </tr>
   </thead>
   <tbody>
-    {% for pilot, summary in pilot_summary.items|dictsort:"0.last_name" %}
+    {% for pilot, summary in pilot_summary_sorted %}
     <tr>
-      <td>{{ pilot|full_display_name }}</td>
+      <td data-sort-value="{{ pilot.last_name|default:'' }}">{{ pilot|full_display_name }}</td>
       <td>{{ summary.count }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
@@ -48,16 +48,16 @@
 <table class="table table-sm table-striped sort">
   <thead>
     <tr>
-      <th>Member</th>
+      <th data-sort-method="last-name">Member</th>
       <th class="text-end">Tow</th>
       <th class="text-end">Rental</th>
       <th class="text-end">Total</th>
     </tr>
   </thead>
   <tbody>
-    {% for member, summary in member_charges.items|dictsort:"0.last_name" %}
+    {% for member, summary in member_charges_sorted %}
     <tr>
-      <td>{{ member|full_display_name }}</td>
+      <td data-sort-value="{{ member.last_name|default:'' }}">{{ member|full_display_name }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
@@ -73,16 +73,16 @@
   <table class="table table-sm table-bordered sort">
     <thead>
       <tr>
-        <th>Member</th>
+        <th data-sort-method="last-name">Member</th>
         <th>Amount</th>
         <th>Payment Method</th>
         <th>Note</th>
       </tr>
     </thead>
     <tbody>
-      {% for row in member_payment_data|dictsort:"member.last_name" %}
+      {% for row in member_payment_data_sorted %}
       <tr>
-        <td>{{ row.member|full_display_name }}</td>
+        <td data-sort-value="{{ row.member.last_name|default:'' }}">{{ row.member|full_display_name }}</td>
         <td>${{ row.amount|floatformat:2 }}</td>
         <td>
           <select name="payment_method_{{ row.member.id }}" 
@@ -116,7 +116,7 @@
 <table class="table table-bordered table-sm align-middle sort">
   <thead>
     <tr>
-      <th>Pilot</th>
+      <th data-sort-method="last-name">Pilot</th>
       <th>Glider</th>
       <th>Duration</th>
       <th class="text-end">Tow Cost</th>
@@ -125,9 +125,11 @@
     </tr>
   </thead>
   <tbody>
-    {% for flight, costs in flight_data|dictsort:"0.pilot.last_name" %}
+    {% for flight, costs in flight_data_sorted %}
       <tr>
-        <td>{{ flight.pilot|full_display_name }}</td>
+        <td 
+          {% if flight.pilot %}data-sort-value="{{ flight.pilot.last_name|default:'' }}"{% else %}data-sort-value=""{% endif %}
+        >{{ flight.pilot|full_display_name }}</td>
         <td>{{ flight.glider }}</td>
         <td>{{ flight.duration }}</td>
         <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
@@ -151,8 +153,30 @@
 <!-- Table Sorting -->
 <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
 <script>
+
+  // Custom parser: sort by data-sort-value if present, else fallback to text
+  Tablesort.extend('last-name',
+    function(th) {
+      // Always apply to columns with data-sort-method="last-name"
+      return true;
+    },
+    function(a, b) {
+      // a and b are already extracted values (strings)
+      return a.localeCompare(b);
+    },
+    function(td) {
+      // Extract data-sort-value from the cell, or fallback to text
+      return td.getAttribute && td.getAttribute('data-sort-value') ? td.getAttribute('data-sort-value') : td.textContent.trim();
+    }
+  );
+
   document.addEventListener("DOMContentLoaded", function() {
     document.querySelectorAll("table.sort").forEach(function(table) {
+      // For each table, set the first column (Pilot/Member) to use the custom parser
+      var ths = table.querySelectorAll('th');
+      if (ths.length > 0) {
+        ths[0].setAttribute('data-sort-method', 'last-name');
+      }
       new Tablesort(table);
     });
   });

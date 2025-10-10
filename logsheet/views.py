@@ -749,15 +749,38 @@ def manage_logsheet_finances(request, pk):
             messages.success(request, "Payment methods updated.")
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
+    # Sort pilot_summary by pilot last name
+    pilot_summary_sorted = sorted(
+        pilot_summary.items(),
+        key=lambda item: (item[0].last_name or "", item[0].first_name or "")
+    )
+    # Sort member_charges by member last name
+    member_charges_sorted = sorted(
+        member_charges.items(),
+        key=lambda item: (item[0].last_name or "", item[0].first_name or "")
+    )
+    # Sort member_payment_data by member last name
+    member_payment_data_sorted = sorted(
+        member_payment_data,
+        key=lambda row: (getattr(row["member"], "last_name", ""), getattr(
+            row["member"], "first_name", ""))
+    )
+    # Sort flight_data by pilot last name (handle None pilot)
+    flight_data_sorted = sorted(
+        flight_data,
+        key=lambda fc: ((fc[0].pilot.last_name if fc[0].pilot else ""),
+                        (fc[0].pilot.first_name if fc[0].pilot else ""))
+    )
+
     context = {
         "logsheet": logsheet,
-        "flight_data": flight_data,
+        "flight_data_sorted": flight_data_sorted,
         "total_tow": total_tow,
         "total_rental": total_rental,
         "total_sum": total_sum,
-        "pilot_summary": dict(pilot_summary),
-        "member_charges": dict(member_charges),
-        "member_payment_data": member_payment_data
+        "pilot_summary_sorted": pilot_summary_sorted,
+        "member_charges_sorted": member_charges_sorted,
+        "member_payment_data_sorted": member_payment_data_sorted
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
