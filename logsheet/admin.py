@@ -50,7 +50,7 @@ class GliderAdmin(admin.ModelAdmin):
     ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
     fieldsets = (
         (None, {"fields": ("competition_number", "n_number",
-         "model", "make", "seats", "club_owned", "is_active")}),
+         "model", "make", "seats", "club_owned", "is_active", "rental_rate", "max_rental_rate")}),
         ("100hr Inspection", {
          "fields": ("requires_100hr_inspection", "next_100hr_due")}),
     )
