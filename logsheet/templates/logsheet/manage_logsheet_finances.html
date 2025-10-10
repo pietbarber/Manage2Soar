@@ -31,7 +31,7 @@
     </tr>
   </thead>
   <tbody>
-    {% for pilot, summary in pilot_summary.items %}
+    {% for pilot, summary in pilot_summary.items|dictsort:"0.last_name" %}
     <tr>
       <td>{{ pilot|full_display_name }}</td>
       <td>{{ summary.count }}</td>
@@ -55,7 +55,7 @@
     </tr>
   </thead>
   <tbody>
-    {% for member, summary in member_charges.items %}
+    {% for member, summary in member_charges.items|dictsort:"0.last_name" %}
     <tr>
       <td>{{ member|full_display_name }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
@@ -80,7 +80,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for row in member_payment_data %}
+      {% for row in member_payment_data|dictsort:"member.last_name" %}
       <tr>
         <td>{{ row.member|full_display_name }}</td>
         <td>${{ row.amount|floatformat:2 }}</td>
@@ -125,7 +125,7 @@
     </tr>
   </thead>
   <tbody>
-    {% for flight, costs in flight_data %}
+    {% for flight, costs in flight_data|dictsort:"0.pilot.last_name" %}
       <tr>
         <td>{{ flight.pilot|full_display_name }}</td>
         <td>{{ flight.glider }}</td>
