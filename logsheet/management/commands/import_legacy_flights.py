@@ -23,14 +23,16 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 
-
-
 GLIDER_ALIASES = [
 
-    {"legacy_name": "XZ", "start": "2000-01-02", "end": "2019-07-01", "n_number": "N27SN"},
-    {"legacy_name": "XZ", "start": "2019-07-07", "end": "2099-12-31", "n_number": "N727AM"},
-    {"legacy_name": "Russia", "start": "2000-01-02", "end": "2020-02-28", "n_number": "N912ES"},
-    {"legacy_name": "Russia", "start": "2020-03-01", "end": "2099-12-31", "n_number": "N1051R"},
+    {"legacy_name": "XZ", "start": "2000-01-02",
+        "end": "2019-07-01", "n_number": "N27SN"},
+    {"legacy_name": "XZ", "start": "2019-07-07",
+        "end": "2099-12-31", "n_number": "N727AM"},
+    {"legacy_name": "Russia", "start": "2000-01-02",
+        "end": "2020-02-28", "n_number": "N912ES"},
+    {"legacy_name": "Russia", "start": "2020-03-01",
+        "end": "2099-12-31", "n_number": "N1051R"},
 
     {"legacy_name": "GROB 103", "n_number": "N4794E"},
     {"legacy_name": "SGS 1-36", "n_number": "N3617B"},
@@ -42,18 +44,24 @@ GLIDER_ALIASES = [
     {"legacy_name": "CAPSTAN", "n_number": "N7475"},
     {"legacy_name": "Private", "n_number": "Unknown"},
 
-    {"legacy_name": "Bergfalke", "n_number": "N9255X"}, # Asked Bill Burner for its current whereabouts
-    {"legacy_name": "1FW", "n_number": "Unknown"}, # This is Fred Winters old LS4 that he crashed, and no record of its N number
-    {"legacy_name": "BG", "n_number": "Unknown"},  # Mike Peterson, contacted to get N number. 
-    {"legacy_name": "PM", "n_number": "N8RX"}, # This may be the same glider as SF
+    # Asked Bill Burner for its current whereabouts
+    {"legacy_name": "Bergfalke", "n_number": "N9255X"},
+    # This is Fred Winters old LS4 that he crashed, and no record of its N number
+    {"legacy_name": "1FW", "n_number": "Unknown"},
+    # Mike Peterson, contacted to get N number.
+    {"legacy_name": "BG", "n_number": "Unknown"},
+    # This may be the same glider as SF
+    {"legacy_name": "PM", "n_number": "N8RX"},
 
 
-    {"legacy_name": "9X", "n_number": "N270AS"}, # Asked george Hazelrigg for its N number
+    # Asked george Hazelrigg for its N number
+    {"legacy_name": "9X", "n_number": "N270AS"},
     {"legacy_name": "Cirrus", "n_number": "N888AN"},
     {"legacy_name": "PW5", "n_number": "N505CC"},
     {"legacy_name": "H3", "n_number": "N16AL"},
     {"legacy_name": "9Y", "n_number": "N520RJ"},
-    {"legacy_name": "CI", "n_number": "N184W"}, # Kevin Fleet's Libelle; Got it from Ginny Pawlak, she found his logbook
+    # Kevin Fleet's Libelle; Got it from Ginny Pawlak, she found his logbook
+    {"legacy_name": "CI", "n_number": "N184W"},
     {"legacy_name": "JS", "n_number": "N370JS"},
     {"legacy_name": "TO", "n_number": "N606RM"},
     {"legacy_name": "QQ", "n_number": "N483KS"},
@@ -89,6 +97,7 @@ GLIDER_ALIASES = [
     {"legacy_name": "UU", "n_number": "N11UU"},
 ]
 
+
 def resolve_glider(legacy_name, flight_date):
     """Resolves glider by legacy name and optional date range."""
     if not legacy_name:
@@ -110,15 +119,15 @@ def resolve_glider(legacy_name, flight_date):
     if match:
         return Glider.objects.filter(n_number=match["n_number"]).first()
 
-    print(f"⚠️  Glider not resolved for legacy name '{legacy_name}' on {flight_date}")
+    print(
+        f"⚠️  Glider not resolved for legacy name '{legacy_name}' on {flight_date}")
     return None
-
 
 
 #########################################
 #  find_member_by_name
-# 
-# Tries to match a name to legacy_username first, then falls back to first_name + last name. 
+#
+# Tries to match a name to legacy_username first, then falls back to first_name + last name.
 
 def find_member_by_name(name):
     if not name:
@@ -143,10 +152,15 @@ def find_member_by_name(name):
     return Member.objects.filter(first_name__iexact=first, last_name__iexact=last).first()
 
 
-from members.models import Member
-
 class Command(BaseCommand):
     help = "Import legacy flights from PostgreSQL flight_info table"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--date',
+            type=str,
+            help='Only import flights on or after this date (YYYY-MM-DD)'
+        )
 
     def handle(self, *args, **options):
 
@@ -167,12 +181,14 @@ class Command(BaseCommand):
         if created:
             self.stdout.write(self.style.SUCCESS("✅ Created import_bot user."))
         else:
-            self.stdout.write(self.style.NOTICE("✔️ import_bot already exists."))
+            self.stdout.write(self.style.NOTICE(
+                "✔️ import_bot already exists."))
 
         import_user = Member.objects.filter(username="import_bot").first()
         print(import_user)
 
-        self.stdout.write(self.style.NOTICE("Connecting to legacy database via settings.DATABASES['legacy']..."))
+        self.stdout.write(self.style.NOTICE(
+            "Connecting to legacy database via settings.DATABASES['legacy']..."))
 
         legacy = settings.DATABASES['legacy']
         conn = psycopg2.connect(
@@ -183,27 +199,41 @@ class Command(BaseCommand):
             port=legacy.get('PORT', ''),
         )
 
+        # Handle --date argument
+        date_arg = options.get('date')
         with conn.cursor() as cursor:
-            #cursor.execute("SELECT * FROM flight_info2 WHERE flight_date >= '2024-01-01' ORDER BY flight_date ASC")
-            cursor.execute("SELECT * FROM flight_info2 ORDER BY flight_date ASC")
-            columns = [col[0] for col in cursor.description]
-            rows = cursor.fetchall()
+            if date_arg:
+                self.stdout.write(self.style.NOTICE(
+                    f"Importing flights on or after {date_arg}"))
+                cursor.execute(
+                    "SELECT * FROM flight_info2 WHERE flight_date >= %s ORDER BY flight_date ASC", [date_arg])
+            else:
+                cursor.execute(
+                    "SELECT * FROM flight_info2 ORDER BY flight_date ASC")
+            if cursor.description:
+                columns = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+            else:
+                columns = []
+                rows = []
 
         count = 0
         for row in rows:
             data = dict(zip(columns, row))
             towplane_name = data.get("towplane") or ""
             towplane_obj = None
-            
+
             if towplane_name:
-                towplane_obj = resolve_towplane(data.get("towplane"), data.get("flight_date"), comment="")
+                towplane_obj = resolve_towplane(
+                    data.get("towplane"), data.get("flight_date"), comment="")
                 if not towplane_obj:
-                    print(f"⚠️ No towplane matched for '{towplane_name}' on flight {data['flight_tracking_id']}")
+                    print(
+                        f"⚠️ No towplane matched for '{towplane_name}' on flight {data['flight_tracking_id']}")
 
             count += 1
-            #print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
-            print (".", end="", flush=True)
-            print (f" {data['flight_date']} ") if count % 100 == 0 else None
+            # print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
+            print(".", end="", flush=True)
+            print(f" {data['flight_date']} ") if count % 100 == 0 else None
 
             # --- Resolve related objects ---
             pilot = find_member_by_name(data["pilot"])
@@ -213,30 +243,31 @@ class Command(BaseCommand):
 
             # Glider by registration/N-number
             glider = resolve_glider(data["glider"], data["flight_date"])
- 
+
             airfield = None
             unknown_airfields = set()
 
-
             field_raw = data.get("field")
             if not field_raw or not isinstance(field_raw, str):
-                print(f"⚠️ Missing or invalid field value: {field_raw!r} — defaulting to KFRR")
+                print(
+                    f"⚠️ Missing or invalid field value: {field_raw!r} — defaulting to KFRR")
                 airfield = Airfield.objects.get(identifier="KFRR")
             else:
                 field_code = field_raw.strip().upper()
                 try:
                     airfield = Airfield.objects.get(identifier=field_code)
                 except Airfield.DoesNotExist:
-                    print(f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') — defaulting to KFRR")
+                    print(
+                        f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') — defaulting to KFRR")
                     airfield = Airfield.objects.get(identifier="KFRR")
                     unknown_airfields.add(field_code)
 
             # Parse times
             def parse_time(t): return t if isinstance(t, time) else None
             logsheet, _ = Logsheet.objects.get_or_create(
-                log_date = data["flight_date"],
-                airfield  = airfield,
-                defaults  = {
+                log_date=data["flight_date"],
+                airfield=airfield,
+                defaults={
                     "created_by": import_user,
                     "finalized":  True,
                 },
@@ -248,16 +279,16 @@ class Command(BaseCommand):
                 "airfield":               airfield,
                 "glider":                 resolve_glider(data["glider"], data["flight_date"]),
                 "duration":               None,
-                "guest_pilot_name":       data["pilot"]      if not pilot      else "",
-                "legacy_pilot_name":      data["pilot"]      or "",
+                "guest_pilot_name":       data["pilot"] if not pilot else "",
+                "legacy_pilot_name":      data["pilot"] or "",
                 "guest_instructor_name":  data["instructor"] if not instructor else "",
                 "legacy_instructor_name": data["instructor"] or "",
                 "passenger":             passenger,
                 "passenger_name":        data["passenger"] or "",
                 "legacy_passenger_name": data["passenger"] or "",
                 "tow_pilot":              towpilot,
-                "guest_towpilot_name":    data["towpilot"]   if not towpilot   else "",
-                "legacy_towpilot_name":   data["towpilot"]   or "",
+                "guest_towpilot_name":    data["towpilot"] if not towpilot else "",
+                "legacy_towpilot_name":   data["towpilot"] or "",
                 "towplane":               towplane_obj,
                 "release_altitude":       data["release_altitude"] or None,
                 "tow_cost_actual":        parse_money(data["tow_cost"]),
@@ -270,22 +301,23 @@ class Command(BaseCommand):
                 logsheet=logsheet,
                 pilot=pilot,
                 instructor=instructor,
-                glider       = glider,
-                towplane     = towplane_obj,
+                glider=glider,
+                towplane=towplane_obj,
                 launch_time=parse_time(data["takeoff_time"]),
                 landing_time=parse_time(data["landing_time"]),
                 passenger=passenger,
                 defaults=defaults
             )
             if created:
-                logger.info("➕ Created flight id=%s on %s", flight.id, data['flight_date'])
+                logger.info("➕ Created flight id=%s on %s",
+                            flight.id, data['flight_date'])
             else:
-                logger.info("♻️ Updated flight id=%s on %s", flight.id, data['flight_date'])
-
+                logger.info("♻️ Updated flight id=%s on %s",
+                            flight.id, data['flight_date'])
 
         print(f"\n✅ Imported {count} flights.")
-        print("⚠️ Unknown airfield codes encountered:", sorted(unknown_airfields))
-
+        print("⚠️ Unknown airfield codes encountered:",
+              sorted(unknown_airfields))
 
 
 def parse_money(val):

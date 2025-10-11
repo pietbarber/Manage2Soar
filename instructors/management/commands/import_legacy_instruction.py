@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Import legacy instructor reports and ground instruction sessions"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--date',
+            type=str,
+            help='Only import instruction records on or after this date (YYYY-MM-DD)'
+        )
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE(
             "Connecting to legacy database via settings.DATABASES['legacy']..."))
@@ -37,9 +44,11 @@ class Command(BaseCommand):
 
         cursor = conn.cursor()
 
+        date_arg = options.get('date')
+
         try:
-            self.import_flight_instruction_reports(cursor)
-            self.import_ground_instruction(cursor)
+            self.import_flight_instruction_reports(cursor, date_arg)
+            self.import_ground_instruction(cursor, date_arg)
         finally:
             cursor.close()
             conn.close()
@@ -52,20 +61,32 @@ class Command(BaseCommand):
                 f"❌ Member with legacy handle '{handle}' not found"))
             raise SystemExit(1)
 
-    def import_flight_instruction_reports(self, cursor):
+    def import_flight_instruction_reports(self, cursor, date_arg=None):
         self.stdout.write(self.style.NOTICE(
             "Importing flight-based instruction reports..."))
 
         # Query legacy student_syllabus3 and instructor_reports2
-        cursor.execute("""
-            SELECT s.handle, s.number, s.mode, s.instructor, s.signoff_date,
-                   r.report, r.lastupdated
-            FROM student_syllabus3 s
-            LEFT JOIN instructor_reports2 r
-              ON s.handle = r.handle
-             AND s.instructor = r.instructor
-             AND s.signoff_date = r.report_date
-        """)
+        if date_arg:
+            cursor.execute("""
+                SELECT s.handle, s.number, s.mode, s.instructor, s.signoff_date,
+                       r.report, r.lastupdated
+                FROM student_syllabus3 s
+                LEFT JOIN instructor_reports2 r
+                  ON s.handle = r.handle
+                 AND s.instructor = r.instructor
+                 AND s.signoff_date = r.report_date
+                WHERE s.signoff_date >= %s
+            """, [date_arg])
+        else:
+            cursor.execute("""
+                SELECT s.handle, s.number, s.mode, s.instructor, s.signoff_date,
+                       r.report, r.lastupdated
+                FROM student_syllabus3 s
+                LEFT JOIN instructor_reports2 r
+                  ON s.handle = r.handle
+                 AND s.instructor = r.instructor
+                 AND s.signoff_date = r.report_date
+            """)
 
         report_groups = {}
         for row in cursor.fetchall():
@@ -137,17 +158,24 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"{status}: {student} / {instructor_member} / {date} (legacy essay time: {aware_legacy_dt})")
 
-    def import_ground_instruction(self, cursor):
+    def import_ground_instruction(self, cursor, date_arg=None):
         # local import to avoid circularity
         from instructors.models import GroundLessonScore
 
         self.stdout.write(self.style.NOTICE(
             "Importing ground instruction sessions..."))
 
-        cursor.execute("""
-            SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
-            FROM ground_inst
-        """)
+        if date_arg:
+            cursor.execute("""
+                SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
+                FROM ground_inst
+                WHERE inst_date >= %s
+            """, [date_arg])
+        else:
+            cursor.execute("""
+                SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
+                FROM ground_inst
+            """)
         sessions = cursor.fetchall()
 
         for pilot, instructor, date, duration, location, tracking_id in sessions:
