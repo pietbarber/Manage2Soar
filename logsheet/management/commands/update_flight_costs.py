@@ -5,40 +5,50 @@ from django.db import transaction
 
 
 class Command(BaseCommand):
-    help = "Update flight costs for a logsheet on a given date, only if costs are missing or zero."
+    help = "Update flight costs for all logsheets after a given date, only if costs are missing or zero."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "date", type=str, help="Date of the logsheet (YYYY-MM-DD)")
+            "--after",
+            type=str,
+            required=True,
+            help="Update all logsheets with log_date > this date (YYYY-MM-DD)"
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
-        date_str = options["date"]
-        log_date = parse_date(date_str)
-        if not log_date:
+        after_str = options["after"]
+        after_date = parse_date(after_str)
+        if not after_date:
             raise CommandError(
-                f"Invalid date format: {date_str}. Use YYYY-MM-DD.")
+                f"Invalid date format: {after_str}. Use YYYY-MM-DD.")
 
-        try:
-            logsheet = Logsheet.objects.get(log_date=log_date)
-        except Logsheet.DoesNotExist:
-            raise CommandError(f"No logsheet found for date {date_str}.")
+        logsheets = Logsheet.objects.filter(
+            log_date__gt=after_date).order_by("log_date")
+        if not logsheets.exists():
+            raise CommandError(f"No logsheets found after {after_str}.")
 
-        flights = Flight.objects.filter(logsheet=logsheet)
-        updated = 0
-        for flight in flights:
-            tow_actual = getattr(flight, 'tow_cost_actual', None)
-            rental_actual = getattr(flight, 'rental_cost_actual', None)
-            # Only update if both are missing or zero
-            if (tow_actual is None or tow_actual == 0) and (rental_actual is None or rental_actual == 0):
-                # Use model properties to calculate
-                tow = flight.tow_cost or 0
-                rental = flight.rental_cost or 0
-                flight.tow_cost_actual = tow
-                flight.rental_cost_actual = rental
-                flight.save()
-                updated += 1
-                self.stdout.write(
-                    f"Updated flight ID {flight.pk} (tow: {tow}, rental: {rental})")
+        total_updated = 0
+        for logsheet in logsheets:
+            flights = Flight.objects.filter(logsheet=logsheet)
+            updated = 0
+            for flight in flights:
+                tow_actual = getattr(flight, 'tow_cost_actual', None)
+                rental_actual = getattr(flight, 'rental_cost_actual', None)
+                # Only update if both are missing or zero
+                if (tow_actual is None or tow_actual == 0) and (rental_actual is None or rental_actual == 0):
+                    # Use model properties to calculate
+                    tow = flight.tow_cost or 0
+                    rental = flight.rental_cost or 0
+                    flight.tow_cost_actual = tow
+                    flight.rental_cost_actual = rental
+                    flight.save()
+                    updated += 1
+                    self.stdout.write(
+                        f"Updated flight ID {flight.pk} (tow: {tow}, rental: {rental})")
+            if updated:
+                self.stdout.write(self.style.SUCCESS(
+                    f"Updated {updated} flights for logsheet {logsheet} on {logsheet.log_date}"))
+            total_updated += updated
         self.stdout.write(self.style.SUCCESS(
-            f"Updated {updated} flights for logsheet {logsheet} on {log_date}"))
+            f"Total updated flights after {after_str}: {total_updated}"))
