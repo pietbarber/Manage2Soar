@@ -1,0 +1,24 @@
+# Unit Tests in the Members App
+
+This document describes the unit tests for the `members` app.
+
+## Overview
+- Tests cover member creation, authentication, profile editing, badge assignment, and group logic.
+- Tests are located in `members/tests.py`.
+
+## Test Coverage
+- Member creation and profile logic
+- Authentication (including Google OAuth2 pipeline)
+- Badge assignment and display
+- Biography editing and upload
+- Group/role assignment and permissions
+- Decorator logic (e.g., `active_member_required`)
+
+## Also See
+- [README.md](README.md)
+- [models.md](models.md)
+- [decorators.md](decorators.md)
+- [pipeline.md](pipeline.md)
+- [views.md](views.md)
+- [management.md](management.md)
+- [forms.md](forms.md)
