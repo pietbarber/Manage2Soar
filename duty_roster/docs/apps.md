@@ -26,5 +26,8 @@ class DutyRosterConfig(AppConfig):
 
 ---
 
+
 ## See Also
-- [Django AppConfig documentation](https://docs.djangoproject.com/en/5.2/ref/applications/)
+- [README (App Overview)](README.md)
+- [Management Commands](management.md)
+- [Views](views.md)

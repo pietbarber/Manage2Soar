@@ -1,4 +1,4 @@
-
+# Duty Roster App
 
 [→ Duty Roster AppConfig (apps.py)](apps.md) | [→ Management Commands](management.md) | [→ Views](views.md)
 
@@ -59,31 +59,7 @@ The **Duty Roster** app manages scheduling and assignments for Duty Officers (DO
 
 ---
 
-## Styling
-
-- Uses Bootstrap 5 for layout and forms
-- Custom styles in `static/css/baseline.css` and `static/css/calendar.css`
-- Calendar uses color coding for roles and assignments
-
----
-
-## Troubleshooting
-
-- **Assignment not showing:** check member status and blackout dates
-- **Permission denied:** only rostermeisters can edit/generate
-- **Calendar not updating:** ensure browser cache is cleared after changes
-
----
-
-## Development Tips
-
-- To add a new assignment: use admin or `/duty_roster/propose/`
-- To update blackout dates: use `/duty_roster/blackout/`
-- To regenerate a roster: use `/duty_roster/propose/` (rostermeister only)
-- Roster logic is in `roster_generator.py` for customization
-
----
-
-## Changelog
-
-- **2025-10** Initial Duty Roster documentation.
+## See Also
+- [AppConfig](apps.md)
+- [Management Commands](management.md)
+- [Views](views.md)

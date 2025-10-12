@@ -38,6 +38,6 @@ This document describes the main view functions in `duty_roster/views.py` and th
 ---
 
 ## See Also
-- [Duty Roster App Index](index.md)
+- [README (App Overview)](README.md)
 - [Management Commands](management.md)
 - [AppConfig](apps.md)
