@@ -7,6 +7,8 @@ from django.utils import timezone
 from django.views.generic import ListView
 from django.db import transaction
 from django.http import HttpResponseForbidden
+import logging
+import sys
 
 from knowledgetest.models import (
     WrittenTestTemplate,
@@ -22,6 +24,9 @@ from django.utils.decorators import method_decorator
 from instructors.decorators import member_or_instructor_required, instructor_required
 from instructors.models import InstructionReport
 from members.decorators import active_member_required
+from notifications.models import Notification
+
+logger = logging.getLogger(__name__)
 
 
 def _get_empty_preset():
@@ -174,6 +179,19 @@ class CreateWrittenTestView(FormView):
             student=data['student'],
             instructor=self.request.user
         )
+        # Create notification for the student
+        print(
+            f"Attempting to create notification for student: {data['student']} (pk={getattr(data['student'], 'pk', None)}) for test {tmpl.name}", file=sys.stderr)
+        try:
+            notif = Notification.objects.create(
+                user=data['student'],
+                message=f"You have been assigned a new written test: {tmpl.name}",
+                url=reverse('knowledgetest:quiz-pending')
+            )
+            print(
+                f"Notification created successfully: {notif}", file=sys.stderr)
+        except Exception as e:
+            print(f"Failed to create notification: {e}", file=sys.stderr)
 
         order = 1
         # 3. First, include forced questions

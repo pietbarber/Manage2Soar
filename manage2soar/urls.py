@@ -58,7 +58,6 @@ urlpatterns = [
     path("analytics/", include("analytics.urls")),
     path("", include('knowledgetest.urls'))
 
-
 ]
 
 # Serve media files in development only
@@ -67,3 +66,7 @@ if settings.DEBUG:
                           document_root=settings.MEDIA_ROOT)
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+urlpatterns += [
+    path('notifications/', include('notifications.urls')),
+]

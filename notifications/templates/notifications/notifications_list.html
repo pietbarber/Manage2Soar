@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<h2>Notifications</h2>
+<ul>
+  {% for n in notifications %}
+    <li>
+      {% if n.url %}<a href="{{ n.url }}">{% endif %}{{ n.message }}{% if n.url %}</a>{% endif %}
+      <form method="post" action="{% url 'dismiss_notification' n.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit">Dismiss</button>
+      </form>
+    </li>
+  {% empty %}
+    <li>No notifications.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

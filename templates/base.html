@@ -184,7 +184,9 @@
 
 
   <div class="container">
-
+    {% if user.is_authenticated %}
+      {% include "notifications/notifications_dropdown.html" %}
+    {% endif %}
     {% block content %}
     <!-- page-specific content here -->
     {% endblock %}

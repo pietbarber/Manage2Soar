@@ -1,0 +1,15 @@
+{% if notifications %}
+<div class="notifications-dropdown">
+  <ul>
+    {% for n in notifications %}
+      <li>
+        {% if n.url %}<a href="{{ n.url }}">{% endif %}{{ n.message }}{% if n.url %}</a>{% endif %}
+        <form method="post" action="{% url 'dismiss_notification' n.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-link btn-sm">Dismiss</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

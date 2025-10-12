@@ -81,7 +81,8 @@ INSTALLED_APPS = [
     "instructors.apps.InstructorsConfig",
     "knowledgetest",
     "siteconfig",
-    "storages"
+    "storages",
+    "notifications",
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
@@ -365,3 +366,6 @@ TINYMCE_DEFAULT_CONFIG = {
     ),
     "promotion": False,  # Disable TinyMCE 'Upgrade' button
 }
+
+TEMPLATES[0]["OPTIONS"]["context_processors"].append(
+    "notifications.context_processors.notifications")
