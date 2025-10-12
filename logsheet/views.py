@@ -1431,21 +1431,25 @@ def towplane_logbook(request, pk: int):
     # Ensure all keys are initialized with correct types
     # (float for day_hours/cum_hours, None for day/logsheet_pk, list for issues/deadlines)
     from logsheet.models import Flight
+    # Collect all unique tow_pilot IDs for mapping
+    all_towpilot_ids = set()
+    daily_towpilot_refs = {}
     for c in closeouts:
         day = c.logsheet.log_date
-        # Get all flights for this towplane and day
         flights = Flight.objects.filter(
-            towplane=towplane, logsheet__log_date=day)
+            towplane=towplane, logsheet__log_date=day
+        ).values('tow_pilot', 'guest_towpilot_name', 'legacy_towpilot_name')
         tow_count = flights.count()
-        # Gather unique towpilots for the day
         towpilots = set()
         for f in flights:
-            if f.tow_pilot:
-                towpilots.add(f.tow_pilot)
-            elif f.guest_towpilot_name:
-                towpilots.add(f.guest_towpilot_name)
-            elif f.legacy_towpilot_name:
-                towpilots.add(f.legacy_towpilot_name)
+            if f['tow_pilot']:
+                towpilots.add(f['tow_pilot'])
+                all_towpilot_ids.add(f['tow_pilot'])
+            elif f['guest_towpilot_name']:
+                towpilots.add(f['guest_towpilot_name'])
+            elif f['legacy_towpilot_name']:
+                towpilots.add(f['legacy_towpilot_name'])
+        daily_towpilot_refs[day] = towpilots
         if day not in daily_data:
             daily_data[day] = {
                 "day": day,
@@ -1453,7 +1457,7 @@ def towplane_logbook(request, pk: int):
                 "day_hours": float(c.tach_time or 0),
                 "cum_hours": float(c.end_tach or 0),
                 "glider_tows": tow_count,
-                "towpilots": list(towpilots),
+                "towpilots": None,  # will fill in below
                 "issues": [],
                 "deadlines": []
             }
@@ -1461,8 +1465,21 @@ def towplane_logbook(request, pk: int):
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
             daily_data[day]["cum_hours"] = float(c.end_tach or 0)
             daily_data[day]["glider_tows"] = tow_count
-            daily_data[day]["towpilots"].extend(
-                [p for p in towpilots if p not in daily_data[day]["towpilots"]])
+    # Map tow_pilot IDs to names
+    from members.models import Member
+    id_to_name = {}
+    if all_towpilot_ids:
+        for m in Member.objects.filter(id__in=all_towpilot_ids):
+            id_to_name[m.id] = m.get_full_name() or m.username
+    # Fill in towpilots as names for each day
+    for day, refs in daily_towpilot_refs.items():
+        names = []
+        for ref in refs:
+            if isinstance(ref, int) and ref in id_to_name:
+                names.append(id_to_name[ref])
+            else:
+                names.append(ref)
+        daily_data[day]["towpilots"] = names
 
     # Sort days
     days_sorted = sorted(daily_data.keys())
