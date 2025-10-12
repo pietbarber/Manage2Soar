@@ -4,7 +4,7 @@ This document describes all models in `knowledgetest/models.py` and includes the
 
 ---
 
-![KnowledgeTest ERD](../knowledgetest.png)
+![KnowledgeTest ERD](knowledgetest.png)
 
 ## QuestionCategory
 - **Purpose:** Groups questions by category code and description.
