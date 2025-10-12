@@ -1436,6 +1436,7 @@ def towplane_logbook(request, pk: int):
     daily_towpilot_refs = {}
     for c in closeouts:
         day = c.logsheet.log_date
+        # Only include flights for this towplane and this day
         flights = Flight.objects.filter(
             towplane=towplane, logsheet__log_date=day
         ).values('tow_pilot', 'guest_towpilot_name', 'legacy_towpilot_name')
@@ -1449,6 +1450,7 @@ def towplane_logbook(request, pk: int):
                 towpilots.add(f['guest_towpilot_name'])
             elif f['legacy_towpilot_name']:
                 towpilots.add(f['legacy_towpilot_name'])
+        # Only towpilots for this towplane/day are included
         daily_towpilot_refs[day] = towpilots
         if day not in daily_data:
             daily_data[day] = {
