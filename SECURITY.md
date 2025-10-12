@@ -1,21 +1,18 @@
+
 # Security Policy
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Currently, Manage2Soar does not have formal version numbers or tags. All deployments are based on the latest code from the `main` branch. There are no official releases yet.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+**Security updates are applied to the latest code only.**
+
+If/when versioning and releases are introduced, this policy will be updated to reflect supported versions.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+If you discover a security vulnerability, please report it by opening a private issue or contacting the project maintainer directly via GitHub ([@pietbarber](https://github.com/pietbarber)).
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Please include as much detail as possible so we can quickly reproduce and address the issue.
+
+You will receive a response within 7 days. If the vulnerability is confirmed, we will coordinate a fix and notify you when it is resolved.

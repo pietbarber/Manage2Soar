@@ -1,18 +1,40 @@
-# Manage2Soar Soaring Club Member Portal
 
-This is a Django-based web application for managing the members, gliders, badges, and operations of any soaring club.
+# Manage2Soar – Soaring Club Management Platform
 
-## Features
+Manage2Soar is a modern Django 5.2 web application for comprehensive soaring club management. It supports members, gliders, badges, operations, analytics, instruction, notifications, and site configuration—all in one integrated platform.
 
-- Secure Google OAuth2 login system (with support for traditional login)
-- Role-based access for administrators, instructors, duty officers, etc.
-- Member profiles with bios, contact info, and profile photos
-- SSA Badge management with badge board display
-- Rich HTML biographies with image upload support
-- Glider fleet database (with pictures and rental info)
-- QR-coded contact cards (vCard)
-- Custom error pages and responsive UI with Bootstrap
-- Clean roadmap and continuous development
+## Major Apps
+- `members`: Membership management, profiles, roles, and permissions
+- `logsheet`: Flight logging, glider operations, and analytics data source
+- `duty_roster`: Scheduling for duty officers, instructors, and tow pilots
+- `instructors`: Training, lesson tracking, and instructor tools
+- `analytics`: Read-only charts and club statistics
+- `cms`: Dynamic homepage and content management (public/member views)
+- `knowledgetest`: Knowledge test and quiz system
+- `notifications`: Automated and ad-hoc email notifications
+- `siteconfig`: Club/site configuration (admin-only)
+
+## Key Features
+- Secure Google OAuth2 login (with Django fallback)
+- Role-based access for all club roles (admin, instructor, member, etc.)
+- Member profiles with bios, photos, badges, and qualifications
+- SSA badge management and badge board
+- Glider fleet and rental management
+- QR-coded vCard contact cards
+- Rich HTML content and image uploads (tinymce)
+- Flight log integration with analytics and duty roster
+- Automated and manual notifications
+- Custom error pages and responsive UI (Bootstrap 5)
+- Per-app documentation and extensible architecture
+
+## Project Conventions
+- All apps have `models.py`, `views.py`, `admin.py`, `urls.py`, and `tests.py`
+- Tests use `pytest` and `pytest-django` with coverage reporting
+- Homepage (`/`) serves public or member content based on user status (no redirect)
+- Use slugs like `"home"` (public) and `"member-home"` (member) in CMS
+- Site configuration is admin-only (via Django admin)
+- Data flows between apps via Django ORM and signals
+- See per-app `docs/` and main `README.md` for details
 
 ## Tech Stack
 
@@ -45,6 +67,11 @@ This is a Django-based web application for managing the members, gliders, badges
 
 ### System Requirements
 - **graphviz** (required for ERD generation via `generate_erds.py`)
+
+
+### Deployment & Cloud
+- **Kubernetes-ready:** This project includes manifests and configuration for Kubernetes deployment.
+- **GCP Support:** Out-of-the-box configuration for Google Cloud Platform (GCP) is provided; see `k8s-deployment.yaml` and related files for details.
 
 ### Notes
 - All Python dependencies are listed in `requirements.txt`.
@@ -126,8 +153,8 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 
 2. **Create a Virtual Environment**:
    ```bash
-   python3 -m venv env
-   source env/bin/activate
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 
 3. **Install Dependencies**:
@@ -152,7 +179,7 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 
 ## 📄 Documentation
 
-(coming soon!)
+Extensive documentation is available in each app's `docs/` folder (e.g., `members/docs/README.md`, `logsheet/docs/README.md`, etc.) and in this main `README.md`. For details on models, workflows, and integration, see the per-app docs and the project root documentation.
 
 ## 🤝 Contributing
 
