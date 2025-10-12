@@ -23,17 +23,29 @@ def test_homepagecontent_slug_unique():
 
 
 @pytest.mark.django_db
-def test_homepagecontent_view(client):
-    page = HomePageContent.objects.create(
-        title="Test", slug="test", content="<p>Hi</p>")
-    url = reverse("cms:page", args=[page.slug])
-    response = client.get(url)
+@pytest.mark.django_db
+def test_homepagecontent_view_visitor(client):
+    HomePageContent.objects.create(
+        title="Test", slug="test", content="<p>Hi Visitor</p>")
+    response = client.get("/")
     assert response.status_code == 200
-    assert b"Hi" in response.content
+    assert b"Hi Visitor" in response.content
+
+
+@pytest.mark.django_db
+def test_homepagecontent_view_logged_in(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="user", password="pass")
+    client.login(username="user", password="pass")
+    HomePageContent.objects.create(
+        title="Test", slug="test", content="<p>Hi User</p>")
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"Hi User" in response.content
 
 
 @pytest.mark.django_db
 def test_homepagecontent_404(client):
-    url = reverse("cms:page", args=["does-not-exist"])
-    response = client.get(url)
+    # Since there is no detail view, just check a non-existent path returns 404
+    response = client.get("/nonexistent-path/")
     assert response.status_code == 404
