@@ -1,6 +1,6 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-09-10 23:26
+  // Created: 2025-10-12 01:15
   // Cli Options: members --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/members/docs/members.dot
 
   fontname = "Roboto"

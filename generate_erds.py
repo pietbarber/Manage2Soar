@@ -14,7 +14,8 @@ import sys
 
 # Update this list if you add/remove apps
 APPS = ["instructors", "members", "logsheet",
-        "duty_roster", "knowledgetest", "analytics", "cms"]
+        "duty_roster", "knowledgetest", "analytics",
+        "cms", "notifications", "siteconfig"]
 
 
 def main():
