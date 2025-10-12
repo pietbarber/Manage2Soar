@@ -2,7 +2,32 @@
 
 ## Project Overview
 - **Manage2Soar** is a Django 5.2 web application for soaring club management: members, gliders, badges, operations, analytics, and instruction.
-- Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`.
+- Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`.
+## Testing & Coverage
+- All Django apps must have comprehensive test coverage using pytest and pytest-django.
+- Use `pytest --cov` or the VS Code "Run test with coverage" feature to ensure all code paths are tested.
+- Tests for views must accurately reflect authentication and permission logic. For example, use the `active_member_required` decorator for member-only views, and ensure test users have a valid `membership_status`.
+- Do not write tests for public endpoints that do not exist (e.g., `/siteconfig/edit/`); admin-only models should be tested via model logic or Django admin, not via public URLs.
+- When updating models or URLs, always update or remove affected tests to prevent false failures.
+
+## URL & View Patterns
+- The homepage (`/`) dynamically serves either public or member content based on user status. Do not use redirects for this; render the correct content in-place.
+- Use slugs like `"home"` for public content and `"member-home"` for member content in the CMS.
+- Only include URLs in `urls.py` that are actually implemented; avoid stubs or placeholders.
+
+## Decorators & Permissions
+- Use `active_member_required` for views that require a valid, active member. This decorator checks both authentication and membership status.
+- In tests, create users with a valid `membership_status` (e.g., `"Full Member"`) to pass this decorator.
+
+## Troubleshooting
+- If you see `NoReverseMatch`, check that the URL name exists in your `urls.py`.
+- If you see 404s in tests, verify that the URL is actually implemented and included.
+- If content assertions fail, ensure the test data matches the view's query logic (e.g., correct slug and audience).
+
+## Maintenance
+- Scaffold new tests for any new models, views, or permission logic.
+- Remove or update tests if endpoints or model fields are removed or renamed.
+- Use coverage reports to identify and fill gaps in test coverage.
 - Data flows between apps via Django ORM models and signals. Analytics is read-only, built on `logsheet` and `members` data.
 
 ## Key Workflows
