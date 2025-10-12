@@ -775,6 +775,7 @@ def manage_logsheet_finances(request, pk):
     context = {
         "logsheet": logsheet,
         "flight_data_sorted": flight_data_sorted,
+        "flight_data": flight_data,  # Added for test compatibility
         "total_tow": total_tow,
         "total_rental": total_rental,
         "total_sum": total_sum,
