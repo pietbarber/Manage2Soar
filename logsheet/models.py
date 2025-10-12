@@ -42,6 +42,8 @@ class Flight(models.Model):
             models.Index(fields=['instructor']),
             models.Index(fields=['passenger']),
             models.Index(fields=['logsheet']),
+            models.Index(fields=['towplane', 'logsheet']),
+            models.Index(fields=['tow_pilot', 'logsheet']),
         ]
     logsheet = models.ForeignKey(
         "Logsheet", on_delete=models.CASCADE, related_name="flights")
@@ -684,6 +686,9 @@ class TowplaneCloseout(models.Model):
 
     class Meta:
         unique_together = ("logsheet", "towplane")
+        indexes = [
+            models.Index(fields=["towplane", "logsheet"]),
+        ]
 
     def __str__(self):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"
