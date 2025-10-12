@@ -135,7 +135,6 @@ class CreateWrittenTestView(FormView):
             for code in QuestionCategory.objects.values_list('code', flat=True)
             if data[f'weight_{code}'] > 0
         }
-
         total = sum(weights.values())
         MAX_QUESTIONS = 50
         import random
@@ -173,26 +172,20 @@ class CreateWrittenTestView(FormView):
                 pass_percentage=data['pass_percentage'],
                 created_by=self.request.user
             )
-
-        WrittenTestAssignment.objects.create(
-            template=tmpl,
-            student=data['student'],
-            instructor=self.request.user
-        )
+            WrittenTestAssignment.objects.create(
+                template=tmpl,
+                student=data['student'],
+                instructor=self.request.user
+            )
         # Create notification for the student
-        print(
-            f"Attempting to create notification for student: {data['student']} (pk={getattr(data['student'], 'pk', None)}) for test {tmpl.name}", file=sys.stderr)
         try:
-            notif = Notification.objects.create(
+            Notification.objects.create(
                 user=data['student'],
                 message=f"You have been assigned a new written test: {tmpl.name}",
                 url=reverse('knowledgetest:quiz-pending')
             )
-            print(
-                f"Notification created successfully: {notif}", file=sys.stderr)
-        except Exception as e:
-            print(f"Failed to create notification: {e}", file=sys.stderr)
-
+        except Exception:
+            pass
         order = 1
         # 3. First, include forced questions
         for qnum in must:

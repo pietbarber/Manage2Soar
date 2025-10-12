@@ -52,6 +52,7 @@ from django.views.decorators.csrf import csrf_exempt
 # Intermediate loading page for logbook
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from notifications.models import Notification
 
 
 @require_POST
@@ -1801,37 +1802,27 @@ class CreateWrittenTestView(FormView):
             for code in QuestionCategory.objects.values_list('code', flat=True)
             if data[f'weight_{code}'] > 0
         }
-
-        total = sum(weights.values())
         MAX_QUESTIONS = 50
         import random
-        # If too many, randomly select down to 50 (must-includes always included)
-        if total + len(must) > MAX_QUESTIONS:
-            # Remove duplicates in must
+        if sum(weights.values()) + len(must) > MAX_QUESTIONS:
             must = list(dict.fromkeys(must))
             if len(must) >= MAX_QUESTIONS:
                 must = must[:MAX_QUESTIONS]
                 weights = {}
             else:
-                # Build a pool of all possible (non-must) questions
                 pool = []
                 for code, cnt in weights.items():
                     pool.extend(list(
                         Question.objects.filter(
                             category__code=code).exclude(qnum__in=must)
                     ) * cnt)
-                # Remove duplicates and already-included
                 pool = list({q.qnum: q for q in pool}.values())
                 needed = MAX_QUESTIONS - len(must)
                 chosen = random.sample(pool, min(needed, len(pool)))
-                # Overwrite weights to only include chosen
                 weights = {}
                 for q in chosen:
                     weights.setdefault(q.category.code, 0)
                     weights[q.category.code] += 1
-                # Now must is capped, and weights is capped
-
-        # 2. Build a template
         with transaction.atomic():
             tmpl = WrittenTestTemplate.objects.create(
                 name=f"Test by {self.request.user} on {timezone.now().date()}",
@@ -1839,15 +1830,22 @@ class CreateWrittenTestView(FormView):
                 pass_percentage=data['pass_percentage'],
                 created_by=self.request.user
             )
-
         # Only assign the test if the student is not the instructor
         if data['student'] != self.request.user:
-            WrittenTestAssignment.objects.create(
+            assignment = WrittenTestAssignment.objects.create(
                 template=tmpl,
                 student=data['student'],
                 instructor=self.request.user
             )
-
+            # Create notification for the student
+            try:
+                notif = Notification.objects.create(
+                    user=data['student'],
+                    message=f"You have been assigned a new written test: {tmpl.name}",
+                    url=reverse('knowledgetest:quiz-pending')
+                )
+            except Exception as e:
+                print(f"Failed to create notification: {e}")
         order = 1
         # 3. First, include forced questions
         for qnum in must:
