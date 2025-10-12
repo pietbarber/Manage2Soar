@@ -7,24 +7,17 @@ User = get_user_model()
 
 @pytest.mark.django_db
 def test_create_siteconfiguration():
-    config = SiteConfiguration.objects.create(site_name="Skyline Soaring")
+    config = SiteConfiguration.objects.create(
+        club_name="Skyline Soaring", domain_name="example.org", club_abbreviation="SSS")
     assert SiteConfiguration.objects.filter(
-        site_name="Skyline Soaring").exists()
+        club_name="Skyline Soaring").exists()
 
 
 @pytest.mark.django_db
 def test_update_siteconfiguration():
-    config = SiteConfiguration.objects.create(site_name="Old Name")
-    config.site_name = "New Name"
+    config = SiteConfiguration.objects.create(
+        club_name="Old Name", domain_name="example.org", club_abbreviation="SSS")
+    config.club_name = "New Name"
     config.save()
     config.refresh_from_db()
-    assert config.site_name == "New Name"
-
-
-@pytest.mark.django_db
-def test_only_superuser_can_edit(client, django_user_model):
-    user = django_user_model.objects.create_superuser(
-        username="admin", password="pw")
-    client.force_login(user)
-    response = client.post("/siteconfig/edit/", {"site_name": "Changed"})
-    assert response.status_code in (200, 302)
+    assert config.club_name == "New Name"

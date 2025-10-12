@@ -23,10 +23,9 @@ def test_homepagecontent_slug_unique():
 
 
 @pytest.mark.django_db
-@pytest.mark.django_db
 def test_homepagecontent_view_visitor(client):
     HomePageContent.objects.create(
-        title="Test", slug="test", content="<p>Hi Visitor</p>")
+        title="Test", slug="home", content="<p>Hi Visitor</p>")
     response = client.get("/")
     assert response.status_code == 200
     assert b"Hi Visitor" in response.content
@@ -35,10 +34,10 @@ def test_homepagecontent_view_visitor(client):
 @pytest.mark.django_db
 def test_homepagecontent_view_logged_in(client, django_user_model):
     user = django_user_model.objects.create_user(
-        username="user", password="pass")
+        username="user", password="pass", membership_status="Full Member")
     client.login(username="user", password="pass")
     HomePageContent.objects.create(
-        title="Test", slug="test", content="<p>Hi User</p>")
+        title="Test", slug="member-home", audience="member", content="<p>Hi User</p>")
     response = client.get("/")
     assert response.status_code == 200
     assert b"Hi User" in response.content
