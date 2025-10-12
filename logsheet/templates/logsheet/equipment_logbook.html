@@ -36,6 +36,7 @@
                     {% if object_type == "towplane" %}
                         <th class="text-end">Elapsed Tach Time</th>
                         <th class="text-end">Ending Tach Time</th>
+                        <th class="text-end">Towpilot(s)</th>
                     {% else %}
                         <th class="text-end">Day Hours</th>
                         <th class="text-end">Cumulative Hours</th>
@@ -52,8 +53,24 @@
                     <td class="text-end">{{ row.glider_tows }}</td>
 
                     {# Decimal hours #}
+
                     <td class="text-end">{{ row.day_hours|floatformat:1 }}</td>
                     <td class="text-end">{{ row.cum_hours|floatformat:1 }}</td>
+                    {% if object_type == "towplane" %}
+                        <td class="text-end">
+                            {% if row.towpilots %}
+                                {% for tp in row.towpilots %}
+                                    {% if tp.get_full_name %}
+                                        {{ tp.get_full_name }}{% if not forloop.last %}, {% endif %}
+                                    {% else %}
+                                        {{ tp }}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    {% endif %}
 
                     <td class="logbook-events-col">
                         {% if row.issues %}
