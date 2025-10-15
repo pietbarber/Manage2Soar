@@ -41,4 +41,8 @@ urlpatterns = [
          name="api_duty_assignment"),
     path("delete/<int:pk>/", views.delete_logsheet, name="delete"),
 
+    # AJAX endpoint for instant launch
+    path("flight/<int:flight_id>/launch_now/",
+         views.launch_flight_now, name="launch_flight_now"),
+
 ]

@@ -1,14 +1,15 @@
+# --- LAUNCH NOW AJAX ENDPOINT ---
 from django.http import HttpResponseForbidden, JsonResponse
-from django.db.models.functions import TruncDate
-from django.db.models import Count, Sum, F, Window, Value, OrderBy
-from .forms import (
-    LogsheetCloseoutForm,
-    LogsheetDutyCrewForm,
-    TowplaneCloseoutFormSet,
-    CreateLogsheetForm,
-    FlightForm,
-    MaintenanceIssueForm
-)
+from django.views.decorators.http import require_POST, require_GET
+from django.utils import timezone
+from datetime import timedelta, date
+from django.utils.timezone import now
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Q
+from django.core.paginator import Paginator
+from datetime import datetime
+from django.shortcuts import get_object_or_404, render, redirect
 from .models import (
     Flight,
     Logsheet,
@@ -22,18 +23,43 @@ from .models import (
     LogsheetPayment,
     TowplaneCloseout,
 )
-from django.shortcuts import get_object_or_404, render, redirect
-from datetime import datetime
-from django.core.paginator import Paginator
-from django.db.models import Q
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
+from .forms import (
+    LogsheetCloseoutForm,
+    LogsheetDutyCrewForm,
+    TowplaneCloseoutFormSet,
+    CreateLogsheetForm,
+    FlightForm,
+    MaintenanceIssueForm
+)
+from django.db.models import Count, Sum, F, Window, Value, OrderBy
+from django.db.models.functions import TruncDate
+from django.utils.dateparse import parse_time
 from django.views.decorators.http import require_POST
-from django.utils.timezone import now
-from datetime import timedelta, date
-from django.utils import timezone
 from members.decorators import active_member_required
-from django.views.decorators.http import require_POST, require_GET
+
+
+@require_POST
+@active_member_required
+def launch_flight_now(request, flight_id):
+    import json
+    try:
+        flight = get_object_or_404(Flight, pk=flight_id)
+        if flight.launch_time:
+            return JsonResponse({"success": False, "error": "Flight already launched."}, status=400)
+        data = json.loads(request.body.decode())
+        launch_time_str = data.get("launch_time")
+        if not launch_time_str:
+            return JsonResponse({"success": False, "error": "No launch time provided."}, status=400)
+        launch_time = parse_time(launch_time_str)
+        if not launch_time:
+            return JsonResponse({"success": False, "error": "Invalid time format."}, status=400)
+        flight.launch_time = launch_time
+        flight.save(update_fields=["launch_time"])
+        return JsonResponse({"success": True})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
 # Delete logsheet if empty (no flights, no closeout, no payments)
 
 
