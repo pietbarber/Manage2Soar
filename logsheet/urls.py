@@ -1,3 +1,4 @@
+
 from django.urls import path
 from . import views
 
@@ -34,5 +35,10 @@ urlpatterns = [
          views.glider_logbook, name="glider_logbook"),
     path("equipment/towplane/<int:pk>/logbook/",
          views.towplane_logbook, name="towplane_logbook"),
+
+    # AJAX API endpoint for duty assignment lookup
+    path("api/duty-assignment/", views.api_duty_assignment,
+         name="api_duty_assignment"),
+    path("delete/<int:pk>/", views.delete_logsheet, name="delete"),
 
 ]

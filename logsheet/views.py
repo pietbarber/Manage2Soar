@@ -1,15 +1,14 @@
 from django.http import HttpResponseForbidden, JsonResponse
-from django.utils import timezone
-from datetime import timedelta, date
-from django.utils.timezone import now
-from django.views.decorators.http import require_POST
-from django.contrib import messages
-from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q
-from django.core.paginator import Paginator
-from datetime import datetime
-from django.shortcuts import get_object_or_404, render, redirect
-from members.decorators import active_member_required
+from django.db.models.functions import TruncDate
+from django.db.models import Count, Sum, F, Window, Value, OrderBy
+from .forms import (
+    LogsheetCloseoutForm,
+    LogsheetDutyCrewForm,
+    TowplaneCloseoutFormSet,
+    CreateLogsheetForm,
+    FlightForm,
+    MaintenanceIssueForm
+)
 from .models import (
     Flight,
     Logsheet,
@@ -23,17 +22,69 @@ from .models import (
     LogsheetPayment,
     TowplaneCloseout,
 )
+from django.shortcuts import get_object_or_404, render, redirect
+from datetime import datetime
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.utils.timezone import now
+from datetime import timedelta, date
+from django.utils import timezone
+from members.decorators import active_member_required
+from django.views.decorators.http import require_POST, require_GET
+# Delete logsheet if empty (no flights, no closeout, no payments)
 
-from .forms import (
-    LogsheetCloseoutForm,
-    LogsheetDutyCrewForm,
-    TowplaneCloseoutFormSet,
-    CreateLogsheetForm,
-    FlightForm,
-    MaintenanceIssueForm
-)
-from django.db.models import Count, Sum, F, Window, Value, OrderBy
-from django.db.models.functions import TruncDate
+
+@require_POST
+@active_member_required
+def delete_logsheet(request, pk):
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+    has_towplane_closeout = logsheet.towplane_closeouts.exists(
+    ) if hasattr(logsheet, 'towplane_closeouts') else False
+    if (
+        logsheet.flights.count() == 0
+        and not hasattr(logsheet, 'closeout')
+        and logsheet.payments.count() == 0
+        and not logsheet.finalized
+        and not has_towplane_closeout
+    ):
+        logsheet.delete()
+        messages.success(request, "Logsheet deleted.")
+        return redirect('logsheet:index')
+    else:
+        return HttpResponseForbidden("Logsheet cannot be deleted: it has flights, closeout, payments, towplane summary, or is finalized.")
+# AJAX API endpoint for duty assignment lookup
+
+
+@require_GET
+@active_member_required
+def api_duty_assignment(request):
+    from duty_roster.models import DutyAssignment
+    date_str = request.GET.get('date')
+    result = {
+        'duty_officer': None,
+        'assistant_duty_officer': None,
+        'duty_instructor': None,
+        'surge_instructor': None,
+        'tow_pilot': None,
+        'surge_tow_pilot': None,
+    }
+    if date_str:
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+            assignment = DutyAssignment.objects.filter(date=dt).first()
+            if assignment:
+                result['duty_officer'] = assignment.duty_officer_id
+                result['assistant_duty_officer'] = assignment.assistant_duty_officer_id
+                result['duty_instructor'] = assignment.instructor_id
+                result['surge_instructor'] = assignment.surge_instructor_id
+                result['tow_pilot'] = assignment.tow_pilot_id
+                result['surge_tow_pilot'] = assignment.surge_tow_pilot_id
+        except Exception:
+            pass
+    return JsonResponse(result)
 
 
 #################################################
@@ -325,6 +376,7 @@ def view_flight(request, pk):
 def list_logsheets(request):
     query = request.GET.get("q", "")
     # Default to current year
+    from datetime import datetime
     year = request.GET.get("year", str(datetime.now().year))
     logsheets = Logsheet.objects.all()
 
@@ -357,6 +409,19 @@ def list_logsheets(request):
         .order_by("-year")
     )
 
+    from .forms import CreateLogsheetForm
+    # If a log_date is provided in GET, use it to prepopulate from duty roster
+    log_date = request.GET.get("log_date")
+    form = None
+    if log_date:
+        try:
+            from datetime import datetime
+            parsed_date = datetime.strptime(log_date, "%Y-%m-%d").date()
+            form = CreateLogsheetForm(duty_assignment_date=parsed_date)
+        except Exception:
+            form = CreateLogsheetForm()
+    else:
+        form = CreateLogsheetForm()
     return render(request, "logsheet/logsheet_list.html", {
         "logsheets": page_obj.object_list,
         "query": query,
@@ -364,6 +429,7 @@ def list_logsheets(request):
         "page_obj": page_obj,
         "paginator": paginator,
         "available_years": available_years,
+        "form": form,
     })
 
 #################################################

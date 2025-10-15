@@ -1,6 +1,89 @@
+
 {% extends "base.html" %}
 {% block content %}
 <h1>All Logsheets</h1>
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="d-flex justify-content-end mb-3">
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
+    ➕ Create New Logsheet
+  </button>
+</div>
+<!-- Modal HTML structure for creating a new logsheet -->
+<div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{% url 'logsheet:create' %}">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createLogsheetModalLabel">Create New Logsheet</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            {{ form.log_date.label_tag }}
+            {{ form.log_date }}
+            {{ form.log_date.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.airfield.label_tag }}
+            {{ form.airfield }}
+            {{ form.airfield.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.duty_officer.label_tag }}
+            {{ form.duty_officer }}
+            {{ form.duty_officer.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.assistant_duty_officer.label_tag }}
+            {{ form.assistant_duty_officer }}
+            {{ form.assistant_duty_officer.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.duty_instructor.label_tag }}
+            {{ form.duty_instructor }}
+            {{ form.duty_instructor.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.surge_instructor.label_tag }}
+            {{ form.surge_instructor }}
+            {{ form.surge_instructor.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.tow_pilot.label_tag }}
+            {{ form.tow_pilot }}
+            {{ form.tow_pilot.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.surge_tow_pilot.label_tag }}
+            {{ form.surge_tow_pilot }}
+            {{ form.surge_tow_pilot.errors }}
+          </div>
+          <div class="mb-3">
+            {{ form.default_towplane.label_tag }}
+            {{ form.default_towplane }}
+            {{ form.default_towplane.errors }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Start Logsheet</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <form method="get" class="row mb-3">
     <div class="col-md-4">
       <input type="text" name="q" class="form-control" placeholder="Search by date, location, or user" value="{{ query }}">
@@ -48,6 +131,14 @@
         <a href="{% url 'logsheet:manage' pk=log.pk %}" class="btn btn-sm {% if log.finalized %}btn-secondary{% else %}btn-primary{% endif %}">
           {% if log.finalized %}View{% else %}Manage{% endif %}
         </a>
+        {% if log.flights.count == 0 and not log.closeout and log.payments.count == 0 and not log.finalized and log.towplane_closeouts.count == 0 %}
+        <form method="post" action="{% url 'logsheet:delete' pk=log.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this empty logsheet? This cannot be undone.');">
+            Delete
+          </button>
+        </form>
+        {% endif %}
       </td>
     </tr>
     {% empty %}
@@ -81,7 +172,49 @@
   </ul>
 </nav>
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var dateInput = document.getElementById('id_log_date');
+  if (dateInput) {
+    dateInput.addEventListener('change', function() {
+      var dateVal = this.value;
+      if (!dateVal) return;
+      fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateVal), {
+        credentials: 'same-origin'
+      })
+      .then(response => response.json())
+      .then(data => {
+        var fields = [
+          'duty_officer', 'assistant_duty_officer', 'duty_instructor',
+          'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
+        ];
+        fields.forEach(function(field) {
+          var select = document.getElementById('id_' + field);
+          if (select && data[field]) {
+            select.value = data[field];
+          }
+        });
+      });
+    });
+  }
 
+  // Validate default towplane before submitting the modal form
+  var createForm = document.querySelector('#createLogsheetModal form');
+  if (createForm) {
+    createForm.addEventListener('submit', function(e) {
+      var towplane = document.getElementById('id_default_towplane');
+      if (towplane && (!towplane.value || towplane.value === '')) {
+        e.preventDefault();
+        alert('Please select a default towplane before creating the logsheet.');
+        towplane.focus();
+      }
+    });
+  }
+});
+</script>
+
+{% endblock %}
 
 
 <footer style="font-size: 0.8em; color: gray;">

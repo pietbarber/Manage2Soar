@@ -316,8 +316,14 @@ class CreateLogsheetForm(forms.ModelForm):
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
+        # Accept a special kwarg for duty_assignment_date
+        duty_assignment_date = kwargs.pop('duty_assignment_date', None)
+        from datetime import date
         super().__init__(*args, **kwargs)
 
+        # Set initial log_date to today if not already set
+        if not self.fields["log_date"].initial:
+            self.fields["log_date"].initial = date.today()
         self.fields["log_date"].widget.attrs.update({"class": "form-control"})
         self.fields["airfield"].queryset = Airfield.objects.filter(
             is_active=True).order_by("name")
@@ -342,6 +348,22 @@ class CreateLogsheetForm(forms.ModelForm):
             "towpilot")
         self.fields["default_towplane"].queryset = Towplane.objects.filter(
             is_active=True).order_by("name", "n_number")
+
+        # If a duty assignment exists for this date, prepopulate fields
+        if duty_assignment_date:
+            try:
+                from duty_roster.models import DutyAssignment
+                assignment = DutyAssignment.objects.filter(
+                    date=duty_assignment_date).first()
+                if assignment:
+                    self.fields["duty_officer"].initial = assignment.duty_officer_id
+                    self.fields["assistant_duty_officer"].initial = assignment.assistant_duty_officer_id
+                    self.fields["duty_instructor"].initial = assignment.instructor_id
+                    self.fields["surge_instructor"].initial = assignment.surge_instructor_id
+                    self.fields["tow_pilot"].initial = assignment.tow_pilot_id
+                    self.fields["surge_tow_pilot"].initial = assignment.surge_tow_pilot_id
+            except Exception:
+                pass
 
         # Optional: set widget styles for dropdowns
         for name in [
