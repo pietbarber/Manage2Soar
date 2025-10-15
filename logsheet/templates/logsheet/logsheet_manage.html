@@ -216,9 +216,8 @@
     {% if not flight.launch_time and not flight.landing_time %}
     <tr>
       <td colspan="9" class="text-center">
-        {% comment %} Compose the launch label with full names, fallback to 'them' if none {% endcomment %}
         <button class="btn btn-success btn-lg rounded-pill launch-now-btn" data-flight-id="{{ flight.pk }}">
-          🚀 Launch
+          🛫 Launch
           {% if flight.pilot or flight.instructor or flight.passenger %}
             {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
             {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
@@ -227,6 +226,24 @@
             them
           {% endif %}
           now
+        </button>
+      </td>
+    </tr>
+    {% endif %}
+
+    {# Insert Landing now row for flying flights #}
+    {% if flight.launch_time and not flight.landing_time %}
+    <tr>
+      <td colspan="9" class="text-center">
+        <button class="btn btn-success btn-lg rounded-pill landing-now-btn" data-flight-id="{{ flight.pk }}">
+          🛬 Record Landing for  
+          {% if flight.pilot or flight.instructor or flight.passenger %}
+            {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
+            {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
+            {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
+          {% else %}
+            them 
+          {% endif %}
         </button>
       </td>
     </tr>
@@ -242,7 +259,7 @@
 </table>
 
   <script>
-  // Handle "Launch them now" button click
+  // Handle "Launch them now" and "Landing now" button clicks
   document.addEventListener("click", function(e) {
     if (e.target && e.target.classList.contains("launch-now-btn")) {
       e.preventDefault();
@@ -272,6 +289,35 @@
         }
       })
       .catch(() => alert("Could not launch flight. Please try again."));
+    }
+    if (e.target && e.target.classList.contains("landing-now-btn")) {
+      e.preventDefault();
+      const btn = e.target;
+      const flightId = btn.getAttribute("data-flight-id");
+      // Get user's local time in HH:MM (24h)
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2, '0');
+      const mm = now.getMinutes().toString().padStart(2, '0');
+      const landingTime = `${hh}:${mm}`;
+      // POST to a new endpoint to set landing_time
+      fetch(`/logsheet/flight/${flightId}/landing_now/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ landing_time: landingTime })
+      })
+      .then(resp => resp.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || "Could not mark landing.");
+        }
+      })
+      .catch(() => alert("Could not mark landing. Please try again."));
     }
   });
   </script>

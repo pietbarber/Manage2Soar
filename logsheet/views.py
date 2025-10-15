@@ -1,15 +1,18 @@
-# --- LAUNCH NOW AJAX ENDPOINT ---
+# --- LANDING NOW AJAX ENDPOINT ---
 from django.http import HttpResponseForbidden, JsonResponse
-from django.views.decorators.http import require_POST, require_GET
-from django.utils import timezone
-from datetime import timedelta, date
-from django.utils.timezone import now
-from django.contrib import messages
-from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q
-from django.core.paginator import Paginator
-from datetime import datetime
-from django.shortcuts import get_object_or_404, render, redirect
+from members.decorators import active_member_required
+from django.views.decorators.http import require_POST
+from django.utils.dateparse import parse_time
+from django.db.models.functions import TruncDate
+from django.db.models import Count, Sum, F, Window, Value, OrderBy
+from .forms import (
+    LogsheetCloseoutForm,
+    LogsheetDutyCrewForm,
+    TowplaneCloseoutFormSet,
+    CreateLogsheetForm,
+    FlightForm,
+    MaintenanceIssueForm
+)
 from .models import (
     Flight,
     Logsheet,
@@ -23,19 +26,40 @@ from .models import (
     LogsheetPayment,
     TowplaneCloseout,
 )
-from .forms import (
-    LogsheetCloseoutForm,
-    LogsheetDutyCrewForm,
-    TowplaneCloseoutFormSet,
-    CreateLogsheetForm,
-    FlightForm,
-    MaintenanceIssueForm
-)
-from django.db.models import Count, Sum, F, Window, Value, OrderBy
-from django.db.models.functions import TruncDate
-from django.utils.dateparse import parse_time
-from django.views.decorators.http import require_POST
-from members.decorators import active_member_required
+from django.shortcuts import get_object_or_404, render, redirect
+from datetime import datetime
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.utils.timezone import now
+from datetime import timedelta, date
+from django.utils import timezone
+from django.views.decorators.http import require_POST, require_GET
+
+
+@require_POST
+@active_member_required
+def land_flight_now(request, flight_id):
+    import json
+    try:
+        flight = get_object_or_404(Flight, pk=flight_id)
+        if not flight.launch_time:
+            return JsonResponse({"success": False, "error": "Flight has not launched yet."}, status=400)
+        if flight.landing_time:
+            return JsonResponse({"success": False, "error": "Flight already landed."}, status=400)
+        data = json.loads(request.body.decode())
+        landing_time_str = data.get("landing_time")
+        if not landing_time_str:
+            return JsonResponse({"success": False, "error": "No landing time provided."}, status=400)
+        landing_time = parse_time(landing_time_str)
+        if not landing_time:
+            return JsonResponse({"success": False, "error": "Invalid time format."}, status=400)
+        flight.landing_time = landing_time
+        flight.save(update_fields=["landing_time"])
+        return JsonResponse({"success": True})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
 
 
 @require_POST
