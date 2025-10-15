@@ -81,7 +81,7 @@ def render_duties(member):
         duties.append(
             '<span title="Membership Manager" class="emoji">📇</span>')
 
-    return ' '.join(duties) if duties else "-"
+    return ' '.join(duties) if duties else '<span class="text-muted fst-italic">None assigned</span>'
 
 
 @register.filter
