@@ -179,7 +179,7 @@
 </form>
 
 <!-- Add Maintenance Issue Modal -->
-<div class="modal fade" id="addIssueModal" tabindex="-1" aria-labelledby="addIssueModalLabel" aria-hidden="true">
+<div class="modal fade" id="addIssueModal" tabindex="-1" aria-labelledby="addIssueModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form method="post" action="{% url 'logsheet:add_maintenance_issue' logsheet.id %}">
@@ -219,6 +219,7 @@
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-danger">Submit Issue</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
       </form>
     </div>
