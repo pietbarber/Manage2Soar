@@ -406,9 +406,11 @@
         pilotField.innerHTML = "";
         owners.concat(nonOwners).forEach(opt => pilotField.appendChild(opt));
 
-        // Auto-select the first owner if any
+        // Auto-select the first owner if any, otherwise clear selection
         if (owners.length > 0) {
           pilotField.value = owners[0].value;
+        } else {
+          pilotField.value = "";
         }
       }
       if (gliderField && instructorField) {
