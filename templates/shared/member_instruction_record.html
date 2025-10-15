@@ -4,8 +4,16 @@
 {% block content %}
 <div id="top"></div>
 <div class="d-flex justify-content-between align-items-center mb-2">
-  <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
-  <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm ms-3">📊 View Training Grid</a>
+  <div class="d-flex align-items-center">
+    {% if member.profile_photo %}
+      <img src="{{ member.profile_image_url }}" alt="{{ member.full_display_name }}" class="rounded-circle me-3" style="height:3.5em; width:3.5em; object-fit:cover; border:1px solid #ccc;" />
+    {% endif %}
+    <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
+  </div>
+  <div class="d-flex align-items-center">
+  <a href="{% url 'instructors:log_ground_instruction' %}?student_id={{ member.id }}" class="btn btn-outline-primary btn-sm me-2">✍️ Log Ground Instruction</a>
+    <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm">📊 View Training Grid</a>
+  </div>
 </div>
 <div id="charts-container" data-dates='{{ chart_dates_json|safe }}' data-solo='{{ chart_solo_json|safe }}'
   data-rating='{{ chart_rating_json|safe }}' data-anchors='{{ chart_anchors_json|safe }}'
