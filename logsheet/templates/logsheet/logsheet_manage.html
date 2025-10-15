@@ -355,20 +355,38 @@
 
         const originalValue = towPilotField.value; // Save the current selection
 
-        const options = Array.from(towPilotField.options);
-        const promoted = [];
-        const others = [];
-
-        for (let option of options) {
-          if (towPilotIds.includes(option.value)) {
-            promoted.push(option);
-          } else {
-            others.push(option);
+        // If there are optgroups, preserve them and promote within each group
+        const optgroups = towPilotField.querySelectorAll('optgroup');
+        if (optgroups.length > 0) {
+          for (const group of optgroups) {
+            const options = Array.from(group.children);
+            const promoted = [];
+            const others = [];
+            for (let option of options) {
+              if (towPilotIds.includes(option.value)) {
+                promoted.push(option);
+              } else {
+                others.push(option);
+              }
+            }
+            group.innerHTML = '';
+            promoted.concat(others).forEach(opt => group.appendChild(opt));
           }
+        } else {
+          // No optgroups, fallback to flat promotion
+          const options = Array.from(towPilotField.options);
+          const promoted = [];
+          const others = [];
+          for (let option of options) {
+            if (towPilotIds.includes(option.value)) {
+              promoted.push(option);
+            } else {
+              others.push(option);
+            }
+          }
+          towPilotField.innerHTML = "";
+          promoted.concat(others).forEach(opt => towPilotField.appendChild(opt));
         }
-
-        towPilotField.innerHTML = "";
-        promoted.concat(others).forEach(opt => towPilotField.appendChild(opt));
 
         // Restore the original selection
         towPilotField.value = originalValue;
@@ -383,34 +401,35 @@
 
         if (pilotField.options.length === 0) return;
 
-        // Sort all pilot options by last name (case-insensitive)
-        const options = Array.from(pilotField.options);
-        options.sort((a, b) => {
-          const aLast = (a.text.split(" ").slice(-1)[0] || "").toLowerCase();
-          const bLast = (b.text.split(" ").slice(-1)[0] || "").toLowerCase();
-          return aLast.localeCompare(bLast);
-        });
+        // Find the first owner option in the existing optgroups
+        let foundOwner = false;
+        let ownerValue = "";
+        const optgroups = pilotField.querySelectorAll('optgroup');
+        for (const group of optgroups) {
+          for (const option of group.children) {
+            if (ownerIds.includes(option.value)) {
+              ownerValue = option.value;
+              foundOwner = true;
+              break;
+            }
+          }
+          if (foundOwner) break;
+        }
 
-        // Separate owners and non-owners
-        const owners = [];
-        const nonOwners = [];
-        for (let option of options) {
-          if (ownerIds.includes(option.value)) {
-            owners.push(option);
-          } else {
-            nonOwners.push(option);
+        // If not found in optgroups, check direct children (if any)
+        if (!foundOwner) {
+          for (const option of pilotField.children) {
+            if (option.tagName === 'OPTION' && ownerIds.includes(option.value)) {
+              ownerValue = option.value;
+              foundOwner = true;
+              break;
+            }
           }
         }
 
-        // Clear and reinsert with owners first, then non-owners
-        pilotField.innerHTML = "";
-        owners.concat(nonOwners).forEach(opt => pilotField.appendChild(opt));
-
-        // Auto-select the first owner if any, otherwise clear selection
-        if (owners.length > 0) {
-          pilotField.value = owners[0].value;
-        } else {
-          pilotField.value = "";
+        // Only set the value if an owner is found, otherwise leave as is
+        if (foundOwner) {
+          pilotField.value = ownerValue;
         }
       }
       if (gliderField && instructorField) {

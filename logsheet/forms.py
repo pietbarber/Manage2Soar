@@ -142,28 +142,49 @@ class FlightForm(forms.ModelForm):
                 elif isinstance(value, str) and len(value) >= 5:
                     self.initial[field_name] = value[:5]
 
-        # Pilot dropdown: active members first (by last name), then inactive (by last name)
-        active_qs = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES)
-        inactive_qs = Member.objects.filter(membership_status="Inactive")
-        pilot_qs = list(active_qs.order_by("last_name", "first_name")) + \
-            list(inactive_qs.order_by("last_name", "first_name"))
-        # Use a union queryset with correct ordering
-        self.fields["pilot"].queryset = Member.objects.filter(pk__in=[m.pk for m in pilot_qs]).order_by(
-            models.Case(
-                models.When(
-                    membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)),
-                models.When(membership_status="Inactive",
-                            then=models.Value(1)),
-                default=models.Value(2),
-                output_field=IntegerField(),
-            ),
-            "last_name", "first_name"
-        )
+        # Pilot dropdown: optgroups for Active and Inactive
+        pilot_active = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES).order_by("last_name", "first_name")
+        pilot_inactive = Member.objects.filter(
+            membership_status="Inactive").order_by("last_name", "first_name")
+        pilot_optgroups = []
+        if pilot_active.exists():
+            pilot_optgroups.append(
+                ("Active Members", [(m.pk, str(m)) for m in pilot_active]))
+        if pilot_inactive.exists():
+            pilot_optgroups.append(
+                ("Inactive Members", [(m.pk, str(m)) for m in pilot_inactive]))
+        self.fields["pilot"].choices = [("", "-------")] + pilot_optgroups
 
-        # Instructors unchanged
-        self.fields["instructor"].queryset = get_active_members_with_role(
-            "instructor")
+        # Instructor dropdown: optgroups for Active and Inactive instructors
+        instructor_active = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES, instructor=True).order_by("last_name", "first_name")
+        instructor_inactive = Member.objects.filter(
+            membership_status="Inactive", instructor=True).order_by("last_name", "first_name")
+        instructor_optgroups = []
+        if instructor_active.exists():
+            instructor_optgroups.append(
+                ("Active Instructors", [(m.pk, str(m)) for m in instructor_active]))
+        if instructor_inactive.exists():
+            instructor_optgroups.append(
+                ("Inactive Instructors", [(m.pk, str(m)) for m in instructor_inactive]))
+        self.fields["instructor"].choices = [
+            ("", "-------")] + instructor_optgroups
+
+        # Tow pilot dropdown: optgroups for Active and Inactive tow pilots
+        tow_pilot_active = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES, towpilot=True).order_by("last_name", "first_name")
+        tow_pilot_inactive = Member.objects.filter(
+            membership_status="Inactive", towpilot=True).order_by("last_name", "first_name")
+        tow_pilot_optgroups = []
+        if tow_pilot_active.exists():
+            tow_pilot_optgroups.append(
+                ("Active Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_active]))
+        if tow_pilot_inactive.exists():
+            tow_pilot_optgroups.append(
+                ("Inactive Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_inactive]))
+        self.fields["tow_pilot"].choices = [
+            ("", "-------")] + tow_pilot_optgroups
 
         # Passenger dropdown: active first, then inactive, exclude deceased
         if "passenger" in self.fields:
