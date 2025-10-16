@@ -1,5 +1,6 @@
 # Dockerfile for Django + Gunicorn
-FROM python:3.13-slim-bullseye
+FROM python:3.13-slim-alpine
+#FROM python:3.13-slim-bullseye
 
 WORKDIR /app
 
