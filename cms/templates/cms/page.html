@@ -9,7 +9,18 @@
         <li>
           <a href="{{ doc.file.url }}">{{ doc.title|default:doc.file.name }}</a>
           {% if doc.is_pdf %}
-            (PDF)
+            <br>
+            <a href="{{ doc.file.url }}" target="_blank" rel="noopener" title="Open PDF in new tab" style="display:inline-block;vertical-align:middle;margin-bottom:4px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;">
+                <path d="M14 3H17V6" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 10L17 3" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M17 10V17H3V3H10" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span style="font-size:0.9em;">Open PDF in new tab</span>
+            </a>
+            <br>
+            <embed src="{{ doc.file.url }}" type="application/pdf" width="100%" height="600px">
+            <p>Your browser does not support PDF viewing. <a href="{{ doc.file.url }}">Download PDF</a></p>
           {% endif %}
         </li>
       {% endfor %}
