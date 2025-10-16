@@ -156,21 +156,7 @@ input[type="time"], input.timeinput {
             <div class="form-text" class="text-end">Release altitude in feet (0–7000 in 100ft steps)</div>
           </td>
         </tr>
-        <tr>
-          <th scope="row" class="text-end">Split With</th>
-          <td>
-            {{ form.split_with }}
-            {{ form.split_with.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Split Type</th>
-          <td>
-            {{ form.split_type }}
-            {{ form.split_type.errors }}
-            <div class="form-text">Choose how to split the cost</div>
-          </td>
-        </tr>
+        <!-- Split With and Split Type fields removed for issue #165. -->
       </tbody>
     </table>
   </div>

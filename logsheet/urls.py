@@ -1,4 +1,5 @@
 
+
 from django.urls import path
 from . import views
 
@@ -41,10 +42,18 @@ urlpatterns = [
          name="api_duty_assignment"),
     path("delete/<int:pk>/", views.delete_logsheet, name="delete"),
 
+
     # AJAX endpoint for instant launch/landing
     path("flight/<int:flight_id>/launch_now/",
          views.launch_flight_now, name="launch_flight_now"),
     path("flight/<int:flight_id>/landing_now/",
          views.land_flight_now, name="land_flight_now"),
+
+    # AJAX endpoint for updating split fields
+    path("flight/<int:flight_id>/update_split/",
+         views.update_flight_split, name="update_flight_split"),
+    # AJAX endpoint for updating split fields
+    path("flight/<int:flight_id>/update_split/",
+         views.update_flight_split, name="update_flight_split"),
 
 ]

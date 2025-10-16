@@ -1,18 +1,14 @@
-# --- LANDING NOW AJAX ENDPOINT ---
-from django.http import HttpResponseForbidden, JsonResponse
-from members.decorators import active_member_required
-from django.views.decorators.http import require_POST
-from django.utils.dateparse import parse_time
-from django.db.models.functions import TruncDate
-from django.db.models import Count, Sum, F, Window, Value, OrderBy
-from .forms import (
-    LogsheetCloseoutForm,
-    LogsheetDutyCrewForm,
-    TowplaneCloseoutFormSet,
-    CreateLogsheetForm,
-    FlightForm,
-    MaintenanceIssueForm
-)
+# AJAX endpoint to update split fields for a flight
+from django.views.decorators.http import require_POST, require_GET
+from django.utils import timezone
+from datetime import timedelta, date
+from django.utils.timezone import now
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Q
+from django.core.paginator import Paginator
+from datetime import datetime
+from django.shortcuts import get_object_or_404, render, redirect
 from .models import (
     Flight,
     Logsheet,
@@ -26,16 +22,52 @@ from .models import (
     LogsheetPayment,
     TowplaneCloseout,
 )
-from django.shortcuts import get_object_or_404, render, redirect
-from datetime import datetime
-from django.core.paginator import Paginator
-from django.db.models import Q
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.utils.timezone import now
-from datetime import timedelta, date
-from django.utils import timezone
-from django.views.decorators.http import require_POST, require_GET
+from .forms import (
+    LogsheetCloseoutForm,
+    LogsheetDutyCrewForm,
+    TowplaneCloseoutFormSet,
+    CreateLogsheetForm,
+    FlightForm,
+    MaintenanceIssueForm
+)
+from django.db.models import Count, Sum, F, Window, Value, OrderBy
+from django.db.models.functions import TruncDate
+from django.utils.dateparse import parse_time
+from django.http import HttpResponseForbidden, JsonResponse
+from members.models import Member
+from django.views.decorators.http import require_POST
+from members.decorators import active_member_required
+from django.http import JsonResponse
+
+
+@require_POST
+@active_member_required
+def update_flight_split(request, flight_id):
+    flight = get_object_or_404(Flight, id=flight_id)
+    logsheet = flight.logsheet
+    if logsheet.finalized:
+        return JsonResponse({"success": False, "error": "Logsheet is finalized."}, status=403)
+
+    split_with_id = request.POST.get("split_with")
+    split_type = request.POST.get("split_type")
+
+    # Validate split_with and split_type: both must be present to save a split
+    valid_types = ["even", "tow", "rental", "full"]
+    if not split_with_id or not split_type:
+        return JsonResponse({"success": False, "error": "Both member and split type are required."}, status=400)
+    if split_type not in valid_types:
+        return JsonResponse({"success": False, "error": "Invalid split type."}, status=400)
+    try:
+        split_with = Member.objects.get(id=split_with_id)
+    except Member.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Invalid member selected."}, status=400)
+
+    flight.split_with = split_with
+    flight.split_type = split_type
+    flight.save(update_fields=["split_with", "split_type"])
+    return JsonResponse({"success": True})
+
+# --- LANDING NOW AJAX ENDPOINT ---
 
 
 @require_POST
@@ -717,6 +749,16 @@ def delete_flight(request, logsheet_pk, flight_pk):
 
 @active_member_required
 def manage_logsheet_finances(request, pk):
+    # For split modal: all members, grouped by active/non-active
+    from members.models import Member
+    all_members = Member.objects.all().order_by('last_name', 'first_name')
+    active_members = []
+    inactive_members = []
+    for m in all_members:
+        if m.is_active_member():
+            active_members.append(m)
+        else:
+            inactive_members.append(m)
     logsheet = get_object_or_404(Logsheet, pk=pk)
     flights = logsheet.flights.all()
 
@@ -897,7 +939,9 @@ def manage_logsheet_finances(request, pk):
         "total_sum": total_sum,
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
-        "member_payment_data_sorted": member_payment_data_sorted
+        "member_payment_data_sorted": member_payment_data_sorted,
+        "active_members": active_members,
+        "inactive_members": inactive_members,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

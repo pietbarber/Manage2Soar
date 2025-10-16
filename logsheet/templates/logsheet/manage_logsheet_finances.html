@@ -122,20 +122,84 @@
       <th class="text-end">Tow Cost</th>
       <th class="text-end">Rental Cost</th>
       <th class="text-end">Total</th>
+      <th class="text-end">Split</th>
+  {# Only show the Splits column for Payment Method Tracker, not Member Charges #}
     </tr>
   </thead>
   <tbody>
     {% for flight, costs in flight_data_sorted %}
-      <tr>
-        <td 
-          {% if flight.pilot %}data-sort-value="{{ flight.pilot.last_name|default:'' }}"{% else %}data-sort-value=""{% endif %}
-        >{{ flight.pilot|full_display_name }}</td>
-        <td>{{ flight.glider }}</td>
-        <td>{{ flight.duration }}</td>
-        <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
-        <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
-        <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
-      </tr>
+        <tr>
+          <td>{{ flight.pilot|full_display_name }}</td>
+          <td>{{ flight.glider }}</td>
+          <td>{{ flight.duration }}</td>
+          <td class="text-end">${{ costs.tow|floatformat:2 }}</td>
+          <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
+          <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
+          <td>
+            <button type="button" class="btn btn-outline-secondary btn-sm edit-split-btn" data-flight-id="{{ flight.id }}"
+              data-split-with="{{ flight.split_with.id|default:'' }}"
+              data-split-type="{{ flight.split_type|default:'' }}"
+              data-pilot-name="{{ flight.pilot|full_display_name }}"
+              data-glider="{{ flight.glider }}"
+              >Edit Split</button>
+          </td>
+        </tr>
+<!-- Edit Split Modal -->
+<div class="modal fade" id="editSplitModal" tabindex="-1" aria-labelledby="editSplitModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editSplitModalLabel">Edit Cost Split</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-split-form">
+          <input type="hidden" name="flight_id" id="split-flight-id">
+          <div class="mb-3">
+            <label for="split-with" class="form-label">Split With</label>
+            <select class="form-select" id="split-with" name="split_with">
+              <option value="">— None —</option>
+              {% with pilot_id=flight.pilot.id %}
+                {% if active_members %}
+                  <optgroup label="Active Members">
+                  {% for member in active_members %}
+                    {% if member.id != pilot_id %}
+                      <option value="{{ member.id }}">{{ member|full_display_name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                  </optgroup>
+                {% endif %}
+                {% if inactive_members %}
+                  <optgroup label="Non-Active Members">
+                  {% for member in inactive_members %}
+                    {% if member.id != pilot_id %}
+                      <option value="{{ member.id }}">{{ member|full_display_name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                  </optgroup>
+                {% endif %}
+              {% endwith %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="split-type" class="form-label">Split Type</label>
+            <select class="form-select" id="split-type" name="split_type">
+              <option value="">— None —</option>
+              <option value="even">50/50</option>
+              <option value="tow">Tow Only</option>
+              <option value="rental">Rental Only</option>
+              <option value="full">Full Cost</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-split-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
     {% endfor %}
   </tbody>
   <tfoot>
@@ -181,4 +245,53 @@
     });
   });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  var editModal = new bootstrap.Modal(document.getElementById('editSplitModal'));
+  document.querySelectorAll('.edit-split-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var flightId = btn.getAttribute('data-flight-id');
+      var splitWith = btn.getAttribute('data-split-with');
+      var splitType = btn.getAttribute('data-split-type');
+      document.getElementById('split-flight-id').value = flightId;
+      document.getElementById('split-with').value = splitWith || '';
+      document.getElementById('split-type').value = splitType || '';
+      editModal.show();
+    });
+  });
+  document.getElementById('save-split-btn').addEventListener('click', function() {
+    var form = document.getElementById('edit-split-form');
+    var data = new FormData(form);
+    var flightId = document.getElementById('split-flight-id').value;
+    var url = '/logsheet/flight/' + flightId + '/update_split/';
+    var saveBtn = this;
+    saveBtn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: data
+    })
+    .then(response => response.json())
+    .then(result => {
+      saveBtn.disabled = false;
+      if (result.success) {
+        var editModal = bootstrap.Modal.getInstance(document.getElementById('editSplitModal'));
+        if (editModal) editModal.hide();
+        location.reload();
+      } else {
+        alert(result.error || 'Failed to update split.');
+      }
+    })
+    .catch(error => {
+      saveBtn.disabled = false;
+      alert('AJAX error: ' + error);
+    });
+  });
+});
+</script>
+
+
+
 {% endblock %}

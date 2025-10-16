@@ -108,9 +108,7 @@ class FlightForm(forms.ModelForm):
             "tow_pilot",
             "release_altitude",
             "passenger",
-            "passenger_name",
-            "split_with",
-            "split_type"
+            "passenger_name"
         ]
         widgets = {
             "launch_time": forms.TimeInput(attrs={"type": "time", "class": "form-control timeinput"}),
@@ -125,8 +123,6 @@ class FlightForm(forms.ModelForm):
             "landing_time": forms.TextInput(attrs={"type": "text", "class": "form-control"}),
             "passenger": forms.Select(attrs={"class": "form-select"}),
             "passenger_name": forms.TextInput(attrs={"placeholder": "If not a member", "class": "form-control"}),
-            "split_type": forms.Select(attrs={"class": "form-select"}),
-
         }
 
     def __init__(self, *args, **kwargs):
@@ -218,9 +214,7 @@ class FlightForm(forms.ModelForm):
             )
         self.fields["tow_pilot"].queryset = tow_pilot_qs
 
-        # Split with: only active members, order by last name, first name
-        self.fields["split_with"].queryset = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES).order_by("last_name", "first_name")
+        # Split with field removed for issue #165
 
         # Custom towplane sort: club-owned active first, then others, with optgroup labels
         towplanes = [tp for tp in Towplane.objects.all(
