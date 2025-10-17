@@ -38,6 +38,10 @@ def homepage(request):
         "Founding Member", "Honorary Member", "Emeritus Member",
         "SSEF Member", "Temporary Member", "Introductory Member"
     ]
+    # First, try to render legacy HomePageContent if it exists for the
+    # appropriate audience. If not found, fall back to a navigable index
+    # of top-level CMS Pages (directories).
+    page = None
     if user.is_authenticated and (
         user.is_superuser or getattr(
             user, "membership_status", None) in allowed_statuses
@@ -47,6 +51,20 @@ def homepage(request):
     else:
         page = HomePageContent.objects.filter(
             audience='public', slug='home').first()
-    return render(request, 'cms/homepage.html', {'page': page})
+
+    if page:
+        return render(request, 'cms/homepage.html', {'page': page})
+
+    # Fallback: show CMS index of top-level pages
+    from .models import Page
+    top_pages = Page.objects.filter(parent__isnull=True).order_by('title')
+    pages = []
+    for p in top_pages:
+        pages.append({
+            'page': p,
+            'doc_count': p.documents.count(),
+            'is_public': p.is_public,
+        })
+    return render(request, 'cms/index.html', {'pages': pages})
 
 # Create your views here.

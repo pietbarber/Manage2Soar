@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>CMS Index</h1>
+  <p>Browse top-level CMS directories and documents.</p>
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr><th>Directory</th><th>Documents</th><th>Visibility</th></tr>
+    </thead>
+    <tbody>
+      {% for item in pages %}
+      <tr>
+        <td><a href="{{ item.page.get_absolute_url }}">{{ item.page.title }}</a></td>
+        <td>{{ item.doc_count }}</td>
+        <td>{{ item.is_public|yesno:"Public,Restricted" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
