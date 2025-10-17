@@ -1,9 +1,11 @@
 # Generic CMS Page view for arbitrary pages and directories
 from django.shortcuts import render
 from django.shortcuts import redirect
+from django.conf import settings
 from cms.models import HomePageContent
 from django.shortcuts import get_object_or_404
 from .models import Page
+from members.constants import ALLOWED_MEMBERSHIP_STATUSES
 
 
 def cms_page(request, **kwargs):
@@ -28,10 +30,36 @@ def cms_page(request, **kwargs):
         parent = page
     logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
+    # Access control: if the page is not public, require the same membership
+    # checks we use for the homepage logic. If the user is not authorized,
+    # redirect them to the login page.
+    assert page is not None
+    if not page.is_public:
+        user = request.user
+        if not (user.is_authenticated and (user.is_superuser or getattr(user, 'membership_status', None) in ALLOWED_MEMBERSHIP_STATUSES)):
+            # Use LOGIN_URL and preserve next
+            login_url = settings.LOGIN_URL
+            return redirect(f"{login_url}?next={request.path}")
     return render(request, 'cms/page.html', {'page': page})
 
 
 def homepage(request):
+    # If this request came in under the /cms/ path, show the CMS index
+    # of top-level pages rather than any legacy HomePageContent. This
+    # keeps the site root (/) behavior unchanged while making
+    # /cms/ act as a navigable directory index.
+    if request.path.startswith('/cms'):
+        from .models import Page
+        top_pages = Page.objects.filter(parent__isnull=True).order_by('title')
+        pages = []
+        for p in top_pages:
+            pages.append({
+                'page': p,
+                'doc_count': p.documents.count(),
+                'is_public': p.is_public,
+            })
+        return render(request, 'cms/index.html', {'pages': pages})
+
     user = request.user
     allowed_statuses = [
         "Full Member", "Student Member", "Family Member", "Service Member",

@@ -1,4 +1,6 @@
 # members/constants/membership.py
+# Canonical membership-related constants for the project. Import these from
+# `members.constants` (this module) rather than duplicating the lists elsewhere.
 
 ALLOWED_MEMBERSHIP_STATUSES = [
     "Charter Member",
@@ -52,17 +54,23 @@ MEMBERSHIP_STATUS_CHOICES = [
 
 US_STATE_CHOICES = [
     ('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'),
-    ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'),
+    ('CA', 'California'), ('CO', 'Colorado'), ('CT',
+                                               'Connecticut'), ('DE', 'Delaware'),
     ('FL', 'Florida'), ('GA', 'Georgia'), ('HI', 'Hawaii'), ('ID', 'Idaho'),
     ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'),
     ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MD', 'Maryland'),
-    ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'),
+    ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN',
+                                                  'Minnesota'), ('MS', 'Mississippi'),
     ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'),
-    ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'),
-    ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'),
-    ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'),
+    ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM',
+                                                    'New Mexico'), ('NY', 'New York'),
+    ('NC', 'North Carolina'), ('ND',
+                               'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'),
+    ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI',
+                                               'Rhode Island'), ('SC', 'South Carolina'),
     ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'),
-    ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'),
+    ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA',
+                                            'Washington'), ('WV', 'West Virginia'),
     ('WI', 'Wisconsin'), ('WY', 'Wyoming')
 ]
 

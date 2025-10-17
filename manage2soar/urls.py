@@ -36,7 +36,6 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('oauth/', include('social_django.urls', namespace='social')),
     path("cms/", include("cms.urls")),
-    path("", include("cms.urls")),
     path("password-reset/", auth_views.PasswordResetView.as_view(),
          name="password_reset"),
     path("password-reset/done/", auth_views.PasswordResetDoneView.as_view(),
@@ -57,7 +56,10 @@ urlpatterns = [
     path("TRAINING/Syllabus/<str:code>/qr.png",
          instr_views.public_syllabus_qr, name="public_syllabus_qr"),
     path("analytics/", include("analytics.urls")),
-    path("", include('knowledgetest.urls'))
+    path("", include('knowledgetest.urls')),
+
+    # CMS root include is last so other app URL patterns are matched first.
+    path("", include("cms.urls")),
 
 ]
 

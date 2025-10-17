@@ -1,5 +1,7 @@
 from functools import wraps
 from django.shortcuts import redirect, render
+from .constants import ALLOWED_MEMBERSHIP_STATUSES
+
 
 def active_member_required(view_func):
     @wraps(view_func)
@@ -13,13 +15,7 @@ def active_member_required(view_func):
         if user.is_superuser:
             return view_func(request, *args, **kwargs)
 
-        allowed_statuses = [
-            "Full Member", "Student Member", "Family Member", "Service Member",
-            "Founding Member", "Honorary Member", "Emeritus Member",
-            "SSEF Member", "Temporary Member", "Introductory Member"
-        ]
-
-        if getattr(user, "membership_status", None) not in allowed_statuses:
+        if getattr(user, "membership_status", None) not in ALLOWED_MEMBERSHIP_STATUSES:
             return render(request, "403.html", status=403)
 
         return view_func(request, *args, **kwargs)

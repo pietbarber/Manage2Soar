@@ -67,6 +67,7 @@ def airfield(db):
     return Airfield.objects.create(identifier="KFRR", name="Front Royal Airport")
 
 
+@pytest.fixture
 def logsheet(db, airfield, active_member):
     return Logsheet.objects.create(
         log_date=date.today(),
