@@ -136,12 +136,21 @@
           <td class="text-end">${{ costs.rental|floatformat:2 }}</td>
           <td class="text-end fw-bold">${{ costs.total|floatformat:2 }}</td>
           <td>
+            {% if flight.split_with and flight.split_type %}
+            <button type="button" class="btn btn-primary btn-sm edit-split-btn" data-flight-id="{{ flight.id }}"
+              data-split-with="{{ flight.split_with.id|default:'' }}"
+              data-split-type="{{ flight.split_type|default:'' }}"
+              data-pilot-name="{{ flight.pilot|full_display_name }}"
+              data-glider="{{ flight.glider }}"
+              >Edit Split</button>
+            {% else %}
             <button type="button" class="btn btn-outline-secondary btn-sm edit-split-btn" data-flight-id="{{ flight.id }}"
               data-split-with="{{ flight.split_with.id|default:'' }}"
               data-split-type="{{ flight.split_type|default:'' }}"
               data-pilot-name="{{ flight.pilot|full_display_name }}"
               data-glider="{{ flight.glider }}"
               >Edit Split</button>
+            {% endif %}
           </td>
         </tr>
 <!-- Edit Split Modal -->
