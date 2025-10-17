@@ -6,8 +6,22 @@ from .models import HomePageContent, HomePageImage, Page, Document
 class DocumentInline(admin.TabularInline):
     model = Document
     extra = 1
-    fields = ("file", "title", "uploaded_by", "uploaded_at")
+    fields = ("file", "title", "uploaded_at")
     readonly_fields = ("uploaded_at",)
+
+    def save_new_instance(self, form, commit=True):
+        obj = super().save_new_instance(form, commit=False)
+        request = form.request if hasattr(form, 'request') else None
+        if request and not obj.uploaded_by:
+            obj.uploaded_by = request.user
+        if commit:
+            obj.save()
+        return obj
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.request = request
+        return formset
 
 
 @admin.register(Page)
@@ -37,11 +51,17 @@ class DocumentAdmin(admin.ModelAdmin):
     list_display = ("title", "file", "page", "uploaded_by", "uploaded_at")
     search_fields = ("title", "file")
     list_filter = ("page",)
+    exclude = ("uploaded_by",)
 
     admin_helper_message = (
         "<b>CMS Documents:</b> These are files (PDFs, images, etc.) attached to CMS Pages. "
         "To add a document to a page, use the inline form on the CMS Page itself."
     )
+
+    def save_model(self, request, obj, form, change):
+        if not obj.uploaded_by:
+            obj.uploaded_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 class HomePageImageInline(admin.TabularInline):

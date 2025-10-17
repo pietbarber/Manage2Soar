@@ -2,28 +2,108 @@
 {% block content %}
   <h1>{{ page.title }}</h1>
   <div>{{ page.content|safe }}</div>
+  {% if page.children.exists %}
+    <h3>Subpages</h3>
+    <table class="table table-sm table-bordered" style="max-width:600px;">
+      <thead><tr><th>Title</th><th>URL</th></tr></thead>
+      <tbody>
+        {% for child in page.children.all %}
+          <tr>
+            <td><a href="{{ child.get_absolute_url }}">{{ child.title }}</a></td>
+            <td><code>{{ child.get_absolute_url }}</code></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if page.parent %}
+    <nav class="upstream-nav" style="margin-bottom:1em;">
+      <a href="{{ page.parent.get_absolute_url }}" class="btn btn-outline-secondary">&larr; Up to {{ page.parent.title }}</a>
+    </nav>
+  {% endif %}
   {% if page.documents.exists %}
     <h2>Documents</h2>
-    <ul>
-      {% for doc in page.documents.all %}
-        <li>
-          <a href="{{ doc.file.url }}">{{ doc.title|default:doc.file.name }}</a>
+    <nav class="doc-nav">
+      <ul>
+        {% for doc in page.documents.all %}
           {% if doc.is_pdf %}
-            <br>
-            <a href="{{ doc.file.url }}" target="_blank" rel="noopener" title="Open PDF in new tab" style="display:inline-block;vertical-align:middle;margin-bottom:4px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;">
-                <path d="M14 3H17V6" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M10 10L17 3" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M17 10V17H3V3H10" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span style="font-size:0.9em;">Open PDF in new tab</span>
-            </a>
-            <br>
-            <embed src="{{ doc.file.url }}" type="application/pdf" width="100%" height="600px">
-            <p>Your browser does not support PDF viewing. <a href="{{ doc.file.url }}">Download PDF</a></p>
+            <li><a href="#heading{{ forloop.counter }}">{{ doc.title|default:doc.file.name }}</a></li>
           {% endif %}
-        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <div class="accordion" id="pdfAccordion">
+      {% for doc in page.documents.all %}
+        {% if doc.is_pdf %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+              <div style="display:flex;flex-direction:column;align-items:flex-start;width:100%;">
+                <span><strong>{{ doc.title|default:"Untitled PDF" }}</strong></span>
+                <span style="font-size:0.95em;color:#555;">
+                  {% if doc.uploaded_by %}Uploaded by {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}{% endif %}
+                  {% if doc.uploaded_at %} on {{ doc.uploaded_at|date:"Y-m-d H:i" }}{% endif %}
+                  {% if doc.file.size %} &bull; {{ doc.file.size|filesizeformat }}{% endif %}
+                </span>
+              </div>
+            </button>
+          </h2>
+          <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#pdfAccordion">
+            <div class="accordion-body">
+              <a href="{{ doc.file.url }}" target="_blank" rel="noopener" title="Open PDF in new tab" style="display:inline-block;vertical-align:middle;margin-bottom:4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;">
+                  <path d="M14 3H17V6" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M10 10L17 3" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M17 10V17H3V3H10" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span style="font-size:0.9em;">Open PDF in new tab</span>
+              </a>
+              <div id="pdfContainer{{ forloop.counter }}"></div>
+              <div id="pdfFallback_{{ forloop.counter }}" style="display:none;">
+                <p>PDF viewer is not working. <a href="{{ doc.file.url }}">Download PDF</a> or <a href="https://support.google.com/chrome/answer/6213030?hl=en">see instructions to enable PDF viewing</a>.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
       {% endfor %}
-    </ul>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var accordions = document.querySelectorAll('.accordion-button');
+        accordions.forEach(function(btn, idx) {
+          btn.addEventListener('click', function() {
+            var num = idx + 1;
+            var container = document.getElementById('pdfContainer' + num);
+            if (!container.dataset.loaded) {
+              var embed = document.createElement('embed');
+              embed.id = 'pdfEmbed_' + num;
+              embed.src = btn.closest('.accordion-item').querySelector('a[target="_blank"]').href;
+              embed.type = 'application/pdf';
+              embed.width = '100%';
+              embed.height = '600px';
+              container.appendChild(embed);
+              setTimeout(function() {
+                if (embed.offsetHeight < 100) {
+                  document.getElementById('pdfFallback_' + num).style.display = 'block';
+                }
+              }, 1000);
+              container.dataset.loaded = 'true';
+            }
+          });
+        });
+      });
+    </script>
+    <style>
+      .doc-nav { margin-bottom: 1.5em; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 0.5em 1em; }
+      .doc-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 1em; }
+      .doc-nav li { margin: 0; }
+      .doc-nav a { text-decoration: none; color: #007bff; font-weight: 500; }
+      .doc-nav a:hover { text-decoration: underline; }
+      .accordion-button { cursor: pointer; }
+      .accordion-item { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; }
+      .accordion-header { background: #f7f7f7; padding: 0; }
+      .accordion-body { background: #fff; padding: 1em; }
+    </style>
   {% endif %}
 {% endblock %}

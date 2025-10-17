@@ -1,3 +1,4 @@
+from utils.upload_document_obfuscated import upload_document_obfuscated
 from django.conf import settings
 from django.utils.text import slugify
 # --- CMS Arbitrary Page and Document Models ---
@@ -42,8 +43,11 @@ class Page(models.Model):
 
 
 def upload_document_to(instance, filename):
-    # Store files under cms/<page-slug>/<filename>
+    # Store files under cms/<page-slug>/<filename> for public, obfuscated for private
     page_slug = instance.page.slug if instance.page else 'uncategorized'
+    if instance.page and not instance.page.is_public:
+        # Use obfuscated filename for restricted/private documents
+        return upload_document_obfuscated(instance, filename)
     return f"cms/{page_slug}/{filename}"
 
 
