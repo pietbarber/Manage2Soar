@@ -51,19 +51,22 @@ def update_flight_split(request, flight_id):
     split_with_id = request.POST.get("split_with")
     split_type = request.POST.get("split_type")
 
-    # Validate split_with and split_type: both must be present to save a split
+    # Allow clearing the split by accepting empty values. If provided, validate.
+    split_with = None
+    if split_with_id:
+        try:
+            split_with = Member.objects.get(id=split_with_id)
+        except Member.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Invalid member selected."}, status=400)
+
+    # Validate split_type only if provided (non-empty). Empty => clear.
     valid_types = ["even", "tow", "rental", "full"]
-    if not split_with_id or not split_type:
-        return JsonResponse({"success": False, "error": "Both member and split type are required."}, status=400)
-    if split_type not in valid_types:
+    split_type_value = split_type or None
+    if split_type_value and split_type_value not in valid_types:
         return JsonResponse({"success": False, "error": "Invalid split type."}, status=400)
-    try:
-        split_with = Member.objects.get(id=split_with_id)
-    except Member.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Invalid member selected."}, status=400)
 
     flight.split_with = split_with
-    flight.split_type = split_type
+    flight.split_type = split_type_value
     flight.save(update_fields=["split_with", "split_type"])
     return JsonResponse({"success": True})
 

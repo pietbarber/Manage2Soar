@@ -62,9 +62,27 @@ def test_update_flight_split_ajax_invalid(client, active_member, logsheet_with_f
     assert flight is not None, "Test setup failed: no Flight created."
     url = reverse('logsheet:update_flight_split', args=[flight.pk])
     client.force_login(active_member)
-    # Missing split_with and split_type
-    data = {'flight_id': flight.pk}
+    # Invalid split_type should be rejected
+    data = {'flight_id': flight.pk, 'split_with': '',
+            'split_type': 'invalid_type'}
     response = client.post(url, data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
     assert response.status_code == 400
     assert not response.json().get('success')
     assert 'error' in response.json()
+
+
+@pytest.mark.django_db
+def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
+    """Clearing the split via AJAX should succeed and remove split_with and split_type."""
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    assert flight is not None, "Test setup failed: no Flight created."
+    url = reverse('logsheet:update_flight_split', args=[flight.pk])
+    client.force_login(active_member)
+    # Send empty values to clear
+    data = {'flight_id': flight.pk, 'split_with': '', 'split_type': ''}
+    response = client.post(url, data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+    assert response.status_code == 200
+    assert response.json().get('success')
+    flight.refresh_from_db()
+    assert flight.split_with is None
+    assert flight.split_type is None
