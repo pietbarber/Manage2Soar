@@ -1,19 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>CMS Index</h1>
-  <p>Browse top-level CMS directories and documents.</p>
+  <h1>Resources</h1>
+  <p>Browse top-level resource directories and files available to members.</p>
   <table class="table table-sm table-striped">
     <thead>
-      <tr><th>Directory</th><th>Documents</th><th>Visibility</th></tr>
+      <tr><th>Directory</th><th>Resources</th><th>Visibility</th></tr>
     </thead>
     <tbody>
-      {% for item in pages %}
-      <tr>
-        <td><a href="{{ item.page.get_absolute_url }}">{{ item.page.title }}</a></td>
-        <td>{{ item.doc_count }}</td>
-        <td>{{ item.is_public|yesno:"Public,Restricted" }}</td>
-      </tr>
-      {% endfor %}
+      {% if pages %}
+        {% for item in pages %}
+        <tr>
+          <td><a href="{{ item.page.get_absolute_url }}">{{ item.page.title }}</a></td>
+          <td>{{ item.doc_count }}</td>
+          <td>{{ item.is_public|yesno:"Public,Restricted" }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="3">
+            <div class="alert alert-info mb-0">No resources or folders to display yet. Check back later or visit the <a href="/admin/">admin</a> to add content.</div>
+          </td>
+        </tr>
+      {% endif %}
     </tbody>
   </table>
 {% endblock %}

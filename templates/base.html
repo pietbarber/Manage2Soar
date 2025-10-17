@@ -78,6 +78,8 @@
               <li><a class="dropdown-item" href="{% url 'members:member_list' %}">Member List</a></li>
               <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">Badge Board</a></li>
               <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'home' %}">Resources</a></li>
 
             </ul>
           </li>
@@ -109,6 +111,8 @@
               {% endif %}
             </ul>
           </li>
+
+          <!-- Resources (CMS) - moved into Members dropdown -->
 
           {% if user.is_authenticated and user.instructor %}
           <li class="nav-item dropdown">
