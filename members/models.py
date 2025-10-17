@@ -220,6 +220,8 @@ class Member(AbstractUser):
             names.append("Instructor Admins")
         if self.member_manager:
             names.append("Member Managers")
+        if self.webmaster:
+            names.append("Webmasters")
         return names
 
     def _sync_groups(self):
@@ -239,8 +241,8 @@ class Member(AbstractUser):
         if self.is_superuser:
             self.is_staff = True
         else:
-            # Grant staff status to instructors, member managers, or rostermeisters
-            self.is_staff = self.instructor or self.member_manager or self.rostermeister
+            # Grant staff status to instructors, member managers, rostermeisters, or webmasters
+            self.is_staff = self.instructor or self.member_manager or self.rostermeister or self.webmaster
 
         # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
