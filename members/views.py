@@ -137,7 +137,9 @@ def member_view(request, member_id):
         "pilot_certificate_number": member.pilot_certificate_number,
         "private_glider_checkride_date": member.private_glider_checkride_date,
     }
-    return render(request, "members/member_view.html", context)
+
+    template = "members/member_view.html"
+    return render(request, template, context)
 
 
 #########################
@@ -173,7 +175,12 @@ def biography_view(request, member_id):
     return render(
         request,
         "members/biography.html",
-        {"form": form, "biography": biography, "member": member, "can_edit": can_edit},
+        {
+            "form": form,
+            "biography": biography,
+            "member": member,
+            "can_edit": can_edit,
+        },
     )
 
 
@@ -275,6 +282,8 @@ def tinymce_image_upload(request):
 
     url = urljoin(settings.MEDIA_URL, saved_name)
     return JsonResponse({"location": url})
+
+    # Fallback error response (should be unreachable because of the early return)
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 

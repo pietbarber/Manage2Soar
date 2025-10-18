@@ -67,7 +67,9 @@ class Member(AbstractUser):
     private_glider_checkride_date = models.DateField(
         blank=True,
         null=True,
-        help_text="Date member passed practical checkride for Private Pilot Glider.",
+        help_text=(
+            "Date member passed practical checkride for Private Pilot Glider."
+        ),
     )
     # Here are the legacy codes from the old database,
     # Legacy status codes:
@@ -129,7 +131,9 @@ class Member(AbstractUser):
         max_length=300,
         blank=True,
         null=True,
-        help_text="Direct link to this member's SSA page for badges and achievements.",
+        help_text=(
+            "Direct link to this member's SSA page for badges and achievements."
+        ),
     )
     legacy_username = models.CharField(
         max_length=50, unique=True, blank=True, null=True
