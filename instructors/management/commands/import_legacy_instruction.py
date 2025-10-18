@@ -1,15 +1,21 @@
 # instructors/management/commands/import_legacy_instruction.py
 
-import psycopg2
-from django.core.management.base import BaseCommand
-from django.conf import settings
-from instructors.models import InstructionReport, LessonScore, GroundInstruction
-from members.models import Member
-from instructors.models import TrainingLesson
-from django.utils.timezone import make_aware
-from datetime import datetime
-from tinymce.models import HTMLField  # in case it's needed
 import logging
+from datetime import datetime
+
+import psycopg2
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.utils.timezone import make_aware
+from tinymce.models import HTMLField  # in case it's needed
+
+from instructors.models import (
+    GroundInstruction,
+    InstructionReport,
+    LessonScore,
+    TrainingLesson,
+)
+from members.models import Member
 
 HTML_CUTOFF_EPOCH = 1171287324  # Reports before this should be <pre> wrapped
 
@@ -21,30 +27,33 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--date',
+            "--date",
             type=str,
-            help='Only import instruction records on or after this date (YYYY-MM-DD)'
+            help="Only import instruction records on or after this date (YYYY-MM-DD)",
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE(
-            "Connecting to legacy database via settings.DATABASES['legacy']..."))
+        self.stdout.write(
+            self.style.NOTICE(
+                "Connecting to legacy database via settings.DATABASES['legacy']..."
+            )
+        )
 
-        legacy = settings.DATABASES['legacy']
+        legacy = settings.DATABASES["legacy"]
         conn = psycopg2.connect(
-            dbname=legacy['NAME'],
-            user=legacy['USER'],
-            password=legacy['PASSWORD'],
-            host=legacy.get('HOST', ''),
-            port=legacy.get('PORT', ''),
+            dbname=legacy["NAME"],
+            user=legacy["USER"],
+            password=legacy["PASSWORD"],
+            host=legacy.get("HOST", ""),
+            port=legacy.get("PORT", ""),
         )
 
         # <--- this is an official psycopg2 method
-        conn.set_client_encoding('WIN1252')
+        conn.set_client_encoding("WIN1252")
 
         cursor = conn.cursor()
 
-        date_arg = options.get('date')
+        date_arg = options.get("date")
 
         try:
             self.import_flight_instruction_reports(cursor, date_arg)
@@ -57,17 +66,20 @@ class Command(BaseCommand):
         try:
             return Member.objects.get(legacy_username__iexact=handle)
         except Member.DoesNotExist:
-            self.stderr.write(self.style.ERROR(
-                f"❌ Member with legacy handle '{handle}' not found"))
+            self.stderr.write(
+                self.style.ERROR(f"❌ Member with legacy handle '{handle}' not found")
+            )
             raise SystemExit(1)
 
     def import_flight_instruction_reports(self, cursor, date_arg=None):
-        self.stdout.write(self.style.NOTICE(
-            "Importing flight-based instruction reports..."))
+        self.stdout.write(
+            self.style.NOTICE("Importing flight-based instruction reports...")
+        )
 
         # Query legacy student_syllabus3 and instructor_reports2
         if date_arg:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT s.handle, s.number, s.mode, s.instructor, s.signoff_date,
                        r.report, r.lastupdated
                 FROM student_syllabus3 s
@@ -76,9 +88,12 @@ class Command(BaseCommand):
                  AND s.instructor = r.instructor
                  AND s.signoff_date = r.report_date
                 WHERE s.signoff_date >= %s
-            """, [date_arg])
+            """,
+                [date_arg],
+            )
         else:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT s.handle, s.number, s.mode, s.instructor, s.signoff_date,
                        r.report, r.lastupdated
                 FROM student_syllabus3 s
@@ -86,19 +101,25 @@ class Command(BaseCommand):
                   ON s.handle = r.handle
                  AND s.instructor = r.instructor
                  AND s.signoff_date = r.report_date
-            """)
+            """
+            )
 
         report_groups = {}
         for row in cursor.fetchall():
             handle, number, mode, instructor, date, report, lastupdated = row
             key = (handle, instructor, date)
             report_groups.setdefault(key, []).append(
-                (number, mode, report, lastupdated))
+                (number, mode, report, lastupdated)
+            )
 
-        from django.utils.timezone import make_aware
         import pytz
-        tz = pytz.timezone(settings.TIME_ZONE) if hasattr(
-            settings, 'TIME_ZONE') else None
+        from django.utils.timezone import make_aware
+
+        tz = (
+            pytz.timezone(settings.TIME_ZONE)
+            if hasattr(settings, "TIME_ZONE")
+            else None
+        )
 
         for (handle, instructor, date), items in report_groups.items():
             student = self.resolve_member(handle)
@@ -115,8 +136,7 @@ class Command(BaseCommand):
             # Convert legacy_lastupdated (epoch) to aware datetime
             aware_legacy_dt = None
             if legacy_lastupdated:
-                aware_legacy_dt = make_aware(
-                    datetime.fromtimestamp(legacy_lastupdated))
+                aware_legacy_dt = make_aware(datetime.fromtimestamp(legacy_lastupdated))
                 if tz:
                     aware_legacy_dt = aware_legacy_dt.astimezone(tz)
 
@@ -125,15 +145,13 @@ class Command(BaseCommand):
                 student=student,
                 instructor=instructor_member,
                 report_date=date,
-                defaults={'report_text': ''}
+                defaults={"report_text": ""},
             )
 
             for number, mode, report_html, updated in items:
                 lesson = TrainingLesson.objects.get(code=number)
                 LessonScore.objects.update_or_create(
-                    report=report_obj,
-                    lesson=lesson,
-                    defaults={'score': mode}
+                    report=report_obj, lesson=lesson, defaults={"score": mode}
                 )
 
                 # If this row carries the actual narrative...
@@ -150,32 +168,38 @@ class Command(BaseCommand):
             # Patch created_at/updated_at if legacy timestamp is available
             if aware_legacy_dt:
                 InstructionReport.objects.filter(pk=report_obj.pk).update(
-                    created_at=aware_legacy_dt, updated_at=aware_legacy_dt)
+                    created_at=aware_legacy_dt, updated_at=aware_legacy_dt
+                )
                 report_obj.created_at = aware_legacy_dt
                 report_obj.updated_at = aware_legacy_dt
 
             status = "✅ Created" if created else "↺ Updated"
             self.stdout.write(
-                f"{status}: {student} / {instructor_member} / {date} (legacy essay time: {aware_legacy_dt})")
+                f"{status}: {student} / {instructor_member} / {date} (legacy essay time: {aware_legacy_dt})"
+            )
 
     def import_ground_instruction(self, cursor, date_arg=None):
         # local import to avoid circularity
         from instructors.models import GroundLessonScore
 
-        self.stdout.write(self.style.NOTICE(
-            "Importing ground instruction sessions..."))
+        self.stdout.write(self.style.NOTICE("Importing ground instruction sessions..."))
 
         if date_arg:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
                 FROM ground_inst
                 WHERE inst_date >= %s
-            """, [date_arg])
+            """,
+                [date_arg],
+            )
         else:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
                 FROM ground_inst
-            """)
+            """
+            )
         sessions = cursor.fetchall()
 
         for pilot, instructor, date, duration, location, tracking_id in sessions:
@@ -186,19 +210,18 @@ class Command(BaseCommand):
                 student=student,
                 instructor=instructor_member,
                 date=date,
-                defaults={
-                    'location': location,
-                    'duration': duration,
-                    'notes': ''
-                }
+                defaults={"location": location, "duration": duration, "notes": ""},
             )
 
             # Attach notes from instructor_reports2 — only if not used in InstructionReport
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT report
                 FROM instructor_reports2
                 WHERE handle = %s AND instructor = %s AND report_date = %s
-            """, (pilot, instructor, date))
+            """,
+                (pilot, instructor, date),
+            )
             row = cursor.fetchone()
 
             if row and row[0]:
@@ -209,14 +232,13 @@ class Command(BaseCommand):
                     student=student,
                     instructor=instructor_member,
                     report_date=date,
-                    report_text__iexact=legacy_report_text
+                    report_text__iexact=legacy_report_text,
                 ).exists()
 
-                if not exists and (gi.notes or '').strip() != legacy_report_text:
+                if not exists and (gi.notes or "").strip() != legacy_report_text:
                     gi.notes = legacy_report_text
                     gi.save()
                     print("📝 Ground essay attached", end="", flush=True)
 
             status = "✅ Created" if created else "↺ Skipped (exists)"
-            self.stdout.write(
-                f"{status}: {student} / {instructor_member} / {date}")
+            self.stdout.write(f"{status}: {student} / {instructor_member} / {date}")

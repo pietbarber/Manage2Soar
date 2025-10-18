@@ -2,22 +2,23 @@
 
 
 import sys
+
 from django.apps import apps
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from .models import StudentProgressSnapshot, GroundInstruction, InstructionReport
+from .models import GroundInstruction, InstructionReport, StudentProgressSnapshot
 from .utils import update_student_progress_snapshot
 
 # Utility to check if it's safe to run signal DB code
 
 
 def is_safe_to_run_signals():
-    return (
-        apps.ready and
-        not any(cmd in sys.argv for cmd in [
-            'makemigrations', 'migrate', 'collectstatic', 'loaddata', 'test'])
+    return apps.ready and not any(
+        cmd in sys.argv
+        for cmd in ["makemigrations", "migrate", "collectstatic", "loaddata", "test"]
     )
+
 
 ####################################################
 # Signal handlers for updating StudentProgressSnapshot

@@ -1,4 +1,5 @@
 from django import template
+
 from siteconfig.models import SiteConfiguration
 
 register = template.Library()

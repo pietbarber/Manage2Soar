@@ -1,7 +1,9 @@
 from django.test import TestCase
 from django.urls import reverse
-from members.models import Member, Biography
+
 from members.forms import SetPasswordForm
+from members.models import Biography, Member
+
 
 class MemberModelTests(TestCase):
     def test_full_display_name_prefers_nickname(self):
@@ -20,28 +22,29 @@ class MemberModelTests(TestCase):
         m = Member(membership_status="Student Member")
         self.assertTrue(m.is_active_member())
 
+
 class SetPasswordFormTests(TestCase):
     def test_passwords_must_match(self):
-        form = SetPasswordForm(data={
-            "new_password1": "abc123",
-            "new_password2": "xyz123"
-        })
+        form = SetPasswordForm(
+            data={"new_password1": "abc123", "new_password2": "xyz123"}
+        )
         self.assertFalse(form.is_valid())
 
     def test_valid_passwords_are_accepted(self):
-        form = SetPasswordForm(data={
-            "new_password1": "securepass123",
-            "new_password2": "securepass123"
-        })
+        form = SetPasswordForm(
+            data={"new_password1": "securepass123", "new_password2": "securepass123"}
+        )
         self.assertTrue(form.is_valid())
+
 
 class BiographyModelTests(TestCase):
     def test_biography_str_repr(self):
-        member = Member.objects.create(username="jdoe", first_name="John", last_name="Doe")
+        member = Member.objects.create(
+            username="jdoe", first_name="John", last_name="Doe"
+        )
         bio = Biography(member=member)
         bio.content = "<p>Hello!</p>"  # ✅ use 'content' instead of 'body'
         self.assertEqual(str(bio), "Biography of John Doe")
-
 
 
 class MemberViewsTests(TestCase):

@@ -1,19 +1,23 @@
 # instructors/utils.py
 
 from datetime import timedelta
-from django.utils import timezone
-from django.db.models import Count, Sum, Max, F, Value
-from django.db.models.functions import Coalesce
+
+from django.db.models import Count, F, Max, Sum, Value
 from django.db.models.fields import DurationField
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+
 from logsheet.models import Flight
+
 from .models import (
-    StudentProgressSnapshot,
     GroundInstruction,
     GroundLessonScore,
-    TrainingLesson,
     InstructionReport,
     LessonScore,
+    StudentProgressSnapshot,
+    TrainingLesson,
 )
+
 
 ####################################################
 # get_flight_summary_for_member
@@ -55,43 +59,38 @@ def get_flight_summary_for_member(member):
         """
         if extra_filter:
             qs = qs.filter(**extra_filter)
-        return (
-            qs
-            .values(n_number=F('glider__n_number'))
-            .annotate(
-                **{
-                    f"{prefix}_count": Count('id'),
-                    f"{prefix}_time": Coalesce(
-                        Sum('duration'),
-                        Value(timedelta(0), output_field=DurationField()),
-                        output_field=DurationField()
-                    ),
-                    f"{prefix}_last": Max('logsheet__log_date'),
-                }
-            )
+        return qs.values(n_number=F("glider__n_number")).annotate(
+            **{
+                f"{prefix}_count": Count("id"),
+                f"{prefix}_time": Coalesce(
+                    Sum("duration"),
+                    Value(timedelta(0), output_field=DurationField()),
+                    output_field=DurationField(),
+                ),
+                f"{prefix}_last": Max("logsheet__log_date"),
+            }
         )
 
-    solo   = summarize(pilot_qs, 'solo', {'instructor__isnull': True})
-    with_i = summarize(pilot_qs, 'with', {'instructor__isnull': False})
-    given  = summarize(
-        Flight.objects.filter(instructor=member, glider__isnull=False),
-        'given'
+    solo = summarize(pilot_qs, "solo", {"instructor__isnull": True})
+    with_i = summarize(pilot_qs, "with", {"instructor__isnull": False})
+    given = summarize(
+        Flight.objects.filter(instructor=member, glider__isnull=False), "given"
     )
-    total  = summarize(pilot_qs, 'total')
+    total = summarize(pilot_qs, "total")
 
     # Merge all prefixes into a dict keyed by n_number
     data = {}
     for qs in (solo, with_i, given, total):
         for row in qs:
-            data.setdefault(row['n_number'], {}).update(row)
+            data.setdefault(row["n_number"], {}).update(row)
 
     # Prepare totals accumulator
     flights_summary = []
-    totals = {'n_number': 'Totals'}
-    for field in ('solo', 'with', 'given', 'total'):
-        totals[f'{field}_count'] = 0
-        totals[f'{field}_time']  = timedelta(0)
-        totals[f'{field}_last']  = None
+    totals = {"n_number": "Totals"}
+    for field in ("solo", "with", "given", "total"):
+        totals[f"{field}_count"] = 0
+        totals[f"{field}_time"] = timedelta(0)
+        totals[f"{field}_last"] = None
 
     for n in sorted(data):
         row = data[n]
@@ -100,27 +99,30 @@ def get_flight_summary_for_member(member):
             row.setdefault(k, v)
         flights_summary.append(row)
         # Accumulate into totals
-        for field in ('solo', 'with', 'given', 'total'):
-            totals[f'{field}_count'] += row[f'{field}_count']
-            totals[f'{field}_time']  += row[f'{field}_time']
-            last = row[f'{field}_last']
-            if last and (totals[f'{field}_last'] is None or last > totals[f'{field}_last']):
-                totals[f'{field}_last'] = last
+        for field in ("solo", "with", "given", "total"):
+            totals[f"{field}_count"] += row[f"{field}_count"]
+            totals[f"{field}_time"] += row[f"{field}_time"]
+            last = row[f"{field}_last"]
+            if last and (
+                totals[f"{field}_last"] is None or last > totals[f"{field}_last"]
+            ):
+                totals[f"{field}_last"] = last
 
     flights_summary.append(totals)
 
     # Format durations as "H:MM"
     for row in flights_summary:
-        for prefix in ('solo', 'with', 'given', 'total'):
-            dur = row.get(f'{prefix}_time')
+        for prefix in ("solo", "with", "given", "total"):
+            dur = row.get(f"{prefix}_time")
             if isinstance(dur, timedelta):
                 total_minutes = int(dur.total_seconds() // 60)
                 h, m = divmod(total_minutes, 60)
-                row[f'{prefix}_time'] = f"{h}:{m:02d}"
+                row[f"{prefix}_time"] = f"{h}:{m:02d}"
             else:
-                row[f'{prefix}_time'] = ""
+                row[f"{prefix}_time"] = ""
 
     return flights_summary
+
 
 ####################################################
 # update_student_progress_snapshot
@@ -141,42 +143,44 @@ def update_student_progress_snapshot(student):
     snapshot.sessions = report_sessions + ground_sessions
 
     # 2. Identify required lesson IDs
-    lessons    = list(TrainingLesson.objects.all())
-    solo_ids   = [l.id for l in lessons if l.far_requirement]
+    lessons = list(TrainingLesson.objects.all())
+    solo_ids = [l.id for l in lessons if l.far_requirement]
     rating_ids = [l.id for l in lessons if l.is_required_for_private()]
 
-    solo_total   = len(solo_ids)
+    solo_total = len(solo_ids)
     rating_total = len(rating_ids)
 
     # 3. Collect completed lesson IDs from both scoring tables
     ls_solo = set(
-        LessonScore.objects
-        .filter(report__student=student, lesson_id__in=solo_ids, score__gte='3')
-        .values_list('lesson_id', flat=True)
+        LessonScore.objects.filter(
+            report__student=student, lesson_id__in=solo_ids, score__gte="3"
+        ).values_list("lesson_id", flat=True)
     )
     gs_solo = set(
-        GroundLessonScore.objects
-        .filter(session__student=student, lesson_id__in=solo_ids, score__gte='3')
-        .values_list('lesson_id', flat=True)
+        GroundLessonScore.objects.filter(
+            session__student=student, lesson_id__in=solo_ids, score__gte="3"
+        ).values_list("lesson_id", flat=True)
     )
 
     ls_rating = set(
-        LessonScore.objects
-        .filter(report__student=student, lesson_id__in=rating_ids, score='4')
-        .values_list('lesson_id', flat=True)
+        LessonScore.objects.filter(
+            report__student=student, lesson_id__in=rating_ids, score="4"
+        ).values_list("lesson_id", flat=True)
     )
     gs_rating = set(
-        GroundLessonScore.objects
-        .filter(session__student=student, lesson_id__in=rating_ids, score='4')
-        .values_list('lesson_id', flat=True)
+        GroundLessonScore.objects.filter(
+            session__student=student, lesson_id__in=rating_ids, score="4"
+        ).values_list("lesson_id", flat=True)
     )
 
     # 4. Compute progress ratios
-    solo_done   = ls_solo.union(gs_solo)
+    solo_done = ls_solo.union(gs_solo)
     rating_done = ls_rating.union(gs_rating)
 
-    snapshot.solo_progress      = (len(solo_done) / solo_total) if solo_total else 0.0
-    snapshot.checkride_progress = (len(rating_done) / rating_total) if rating_total else 0.0
+    snapshot.solo_progress = (len(solo_done) / solo_total) if solo_total else 0.0
+    snapshot.checkride_progress = (
+        (len(rating_done) / rating_total) if rating_total else 0.0
+    )
 
     # 5. Save and timestamp
     snapshot.last_updated = timezone.now()

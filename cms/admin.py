@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import HomePageContent, HomePageImage, Page, Document
+
+from .models import Document, HomePageContent, HomePageImage, Page
+
 # --- CMS Arbitrary Page and Document Admin ---
 
 
@@ -11,7 +13,7 @@ class DocumentInline(admin.TabularInline):
 
     def save_new_instance(self, form, commit=True):
         obj = super().save_new_instance(form, commit=False)
-        request = form.request if hasattr(form, 'request') else None
+        request = form.request if hasattr(form, "request") else None
         if request and not obj.uploaded_by:
             obj.uploaded_by = request.user
         if commit:
@@ -28,8 +30,9 @@ class DocumentInline(admin.TabularInline):
 class PageAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['admin_helper_message'] = self.admin_helper_message
+        extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
     list_display = ("title", "slug", "parent", "is_public", "updated_at")
     search_fields = ("title", "slug")
     list_filter = ("is_public", "parent")
@@ -46,8 +49,9 @@ class PageAdmin(admin.ModelAdmin):
 class DocumentAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['admin_helper_message'] = self.admin_helper_message
+        extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
     list_display = ("title", "file", "page", "uploaded_by", "uploaded_at")
     search_fields = ("title", "file")
     list_filter = ("page",)
@@ -74,8 +78,9 @@ class HomePageImageInline(admin.TabularInline):
 class HomePageContentAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['admin_helper_message'] = self.admin_helper_message
+        extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
     list_display = ("title", "updated_at")
     search_fields = ("title",)
     inlines = [HomePageImageInline]
@@ -95,9 +100,11 @@ class HomePageImageAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['admin_helper_message'] = self.admin_helper_message
+        extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
     list_display = ("page", "caption", "order")
     list_filter = ("page",)
+
 
 # Register your models here.

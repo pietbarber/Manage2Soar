@@ -4,11 +4,12 @@
 # with name suffixes, and middle initials, and nicknames? 😂
 
 
-from siteconfig.models import SiteConfiguration
-from django import template
 import re
+
+from django import template
 from django.utils.safestring import mark_safe
 
+from siteconfig.models import SiteConfiguration
 
 register = template.Library()
 
@@ -27,7 +28,7 @@ def full_display_name(member):
         parts.append(member.middle_initial)
 
     if member.nickname:
-        parts.append(f'“{member.nickname}”')
+        parts.append(f"“{member.nickname}”")
 
     if member.last_name:
         parts.append(member.last_name)
@@ -41,7 +42,7 @@ def full_display_name(member):
 @register.filter
 def format_us_phone(value):
     """Format a 10-digit US phone number into +1-AAA-BBB-CCCC"""
-    digits = re.sub(r'\D', '', str(value))
+    digits = re.sub(r"\D", "", str(value))
     if len(digits) == 10:
         return f"+1 {digits[0:3]}-{digits[3:6]}-{digits[6:]}"
     return value  # Fallback: return original
@@ -51,15 +52,22 @@ def format_us_phone(value):
 def render_duties(member):
     duties = []
     from siteconfig.models import SiteConfiguration
+
     config = SiteConfiguration.objects.first()
-    instructor = getattr(config, 'instructor_title',
-                         'Instructor') if config else 'Instructor'
-    towpilot = getattr(config, 'towpilot_title',
-                       'Tow Pilot') if config else 'Tow Pilot'
-    duty_officer = getattr(config, 'duty_officer_title',
-                           'Duty Officer') if config else 'Duty Officer'
-    assistant_duty_officer = getattr(config, 'assistant_duty_officer_title',
-                                     'Assistant Duty Officer') if config else 'Assistant Duty Officer'
+    instructor = (
+        getattr(config, "instructor_title", "Instructor") if config else "Instructor"
+    )
+    towpilot = getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
+    duty_officer = (
+        getattr(config, "duty_officer_title", "Duty Officer")
+        if config
+        else "Duty Officer"
+    )
+    assistant_duty_officer = (
+        getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
+        if config
+        else "Assistant Duty Officer"
+    )
     if member.instructor:
         duties.append(f'<span title="{instructor}" class="emoji">🎓</span>')
     if member.towpilot:
@@ -67,8 +75,7 @@ def render_duties(member):
     if member.duty_officer:
         duties.append(f'<span title="{duty_officer}" class="emoji">📋</span>')
     if member.assistant_duty_officer:
-        duties.append(
-            f'<span title="{assistant_duty_officer}" class="emoji">💪</span>')
+        duties.append(f'<span title="{assistant_duty_officer}" class="emoji">💪</span>')
     if member.secretary:
         duties.append('<span title="Secretary" class="emoji">✍️</span>')
     if member.treasurer:
@@ -78,10 +85,13 @@ def render_duties(member):
     if member.director:
         duties.append('<span title="Director" class="emoji"️>🎩</span>')
     if member.member_manager:
-        duties.append(
-            '<span title="Membership Manager" class="emoji">📇</span>')
+        duties.append('<span title="Membership Manager" class="emoji">📇</span>')
 
-    return ' '.join(duties) if duties else '<span class="text-muted fst-italic">None assigned</span>'
+    return (
+        " ".join(duties)
+        if duties
+        else '<span class="text-muted fst-italic">None assigned</span>'
+    )
 
 
 @register.filter
@@ -93,15 +103,22 @@ def pluck_ids(members):
 def duty_emoji_legend():
     # Get the first SiteConfiguration object, or use defaults if not found
     config = SiteConfiguration.objects.first()
-    instructor = getattr(config, 'instructor_title',
-                         'Instructor') if config else 'Instructor'
-    towpilot = getattr(config, 'towpilot_title',
-                       'Tow Pilot') if config else 'Tow Pilot'
-    duty_officer = getattr(config, 'duty_officer_title',
-                           'Duty Officer') if config else 'Duty Officer'
-    assistant_duty_officer = getattr(config, 'assistant_duty_officer_title',
-                                     'Assistant Duty Officer') if config else 'Assistant Duty Officer'
-    return mark_safe(f"""
+    instructor = (
+        getattr(config, "instructor_title", "Instructor") if config else "Instructor"
+    )
+    towpilot = getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
+    duty_officer = (
+        getattr(config, "duty_officer_title", "Duty Officer")
+        if config
+        else "Duty Officer"
+    )
+    assistant_duty_officer = (
+        getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
+        if config
+        else "Assistant Duty Officer"
+    )
+    return mark_safe(
+        f"""
         <div class='accordion mb-4' id='emojiLegendAccordion'>
             <div class='accordion-item'>
                 <h2 class='accordion-header' id='headingLegend'>
@@ -126,4 +143,5 @@ def duty_emoji_legend():
                 </div>
             </div>
         </div>
-        """)
+        """
+    )

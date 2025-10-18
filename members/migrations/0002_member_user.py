@@ -8,13 +8,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0001_initial'),
+        ("members", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='user',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='member_profile', to=settings.AUTH_USER_MODEL),
+            model_name="member",
+            name="user",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="member_profile",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

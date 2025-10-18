@@ -1,8 +1,21 @@
 from django.contrib import admin
-from .models import Glider, Towplane, Logsheet, Flight, RevisionLog, TowRate, Airfield, LogsheetCloseout, TowplaneCloseout, LogsheetPayment
 from django.utils.html import format_html
+
+from logsheet.models import AircraftMeister, MaintenanceDeadline, MaintenanceIssue
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeister
+
+from .models import (
+    Airfield,
+    Flight,
+    Glider,
+    Logsheet,
+    LogsheetCloseout,
+    LogsheetPayment,
+    RevisionLog,
+    Towplane,
+    TowplaneCloseout,
+    TowRate,
+)
 
 
 # Admin configuration for managing Towplane objects
@@ -13,18 +26,23 @@ from logsheet.models import MaintenanceIssue, MaintenanceDeadline, AircraftMeist
 class TowplaneAdmin(admin.ModelAdmin):
 
     list_display = (
-        "name", "n_number", "is_active",
-        "oil_change_interval", "next_oil_change_due",
-        "requires_100hr_inspection", "next_100hr_due"
+        "name",
+        "n_number",
+        "is_active",
+        "oil_change_interval",
+        "next_oil_change_due",
+        "requires_100hr_inspection",
+        "next_100hr_due",
     )
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("name", "n_number")
     fieldsets = (
         (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
-        ("Oil Change", {
-         "fields": ("oil_change_interval", "next_oil_change_due")}),
-        ("100hr Inspection", {
-         "fields": ("requires_100hr_inspection", "next_100hr_due")}),
+        ("Oil Change", {"fields": ("oil_change_interval", "next_oil_change_due")}),
+        (
+            "100hr Inspection",
+            {"fields": ("requires_100hr_inspection", "next_100hr_due")},
+        ),
     )
 
     def get_search_results(self, request, queryset, search_term):
@@ -38,21 +56,44 @@ class TowplaneAdmin(admin.ModelAdmin):
 # If a member gets a new glider, it also needs to be added here.
 # If the rental rate for any of our gliders change, those updates need to go here.
 
+
 @admin.register(Glider)
 class GliderAdmin(admin.ModelAdmin):
     list_display = (
-        "competition_number", "n_number",
-        "model", "make", "seats", "club_owned", "is_active",
-        "requires_100hr_inspection", "next_100hr_due"
+        "competition_number",
+        "n_number",
+        "model",
+        "make",
+        "seats",
+        "club_owned",
+        "is_active",
+        "requires_100hr_inspection",
+        "next_100hr_due",
     )
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("n_number", "competition_number", "make", "model")
     ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
     fieldsets = (
-        (None, {"fields": ("competition_number", "n_number",
-         "model", "make", "seats", "club_owned", "is_active", "rental_rate", "max_rental_rate")}),
-        ("100hr Inspection", {
-         "fields": ("requires_100hr_inspection", "next_100hr_due")}),
+        (
+            None,
+            {
+                "fields": (
+                    "competition_number",
+                    "n_number",
+                    "model",
+                    "make",
+                    "seats",
+                    "club_owned",
+                    "is_active",
+                    "rental_rate",
+                    "max_rental_rate",
+                )
+            },
+        ),
+        (
+            "100hr Inspection",
+            {"fields": ("requires_100hr_inspection", "next_100hr_due")},
+        ),
     )
 
     def get_queryset(self, request):
@@ -71,11 +112,25 @@ class GliderAdmin(admin.ModelAdmin):
 # they're all going to be listed here. I don't have any better solutions.
 @admin.register(Flight)
 class FlightAdmin(admin.ModelAdmin):
-    list_display = ("logsheet", "launch_time", "landing_time", "pilot", "instructor",
-                    "glider", "towplane", "tow_pilot", "tow_cost_actual", "rental_cost_actual")
+    list_display = (
+        "logsheet",
+        "launch_time",
+        "landing_time",
+        "pilot",
+        "instructor",
+        "glider",
+        "towplane",
+        "tow_pilot",
+        "tow_cost_actual",
+        "rental_cost_actual",
+    )
     list_filter = ("logsheet", "glider", "towplane", "instructor")
-    search_fields = ("pilot__first_name", "pilot__last_name",
-                     "instructor__first_name", "instructor__last_name")
+    search_fields = (
+        "pilot__first_name",
+        "pilot__last_name",
+        "instructor__first_name",
+        "instructor__last_name",
+    )
     readonly_fields = ("tow_cost", "rental_cost", "total_cost_display")
 
     def tow_cost(self, obj):
@@ -86,6 +141,7 @@ class FlightAdmin(admin.ModelAdmin):
 
     def total_cost_display(self, obj):
         return obj.total_cost_display
+
 
 # Each time a member locks a flight log because it's finalized, no more changes can be done
 # to that flight log.  Of course, mistakes happen, and the log sheet needs to be revised.
@@ -100,6 +156,7 @@ class RevisionLogAdmin(admin.ModelAdmin):
     list_display = ("logsheet", "revised_by", "revised_at")
     list_filter = ("revised_by", "revised_at")
 
+
 # Each time the club operates at a new field for the first time, it needs to be added here.
 # When we start a logsheet for the day, we need to indicate the airfield where the operations take place.
 # If we as a club are starting an op at a new airfield, we need to add it here first. This is the only place
@@ -108,16 +165,20 @@ class RevisionLogAdmin(admin.ModelAdmin):
 
 @admin.register(Airfield)
 class AirfieldAdmin(admin.ModelAdmin):
-    list_display = ['identifier', 'name', 'is_active']
-    search_fields = ['identifier', 'name']
-    list_filter = ['is_active']
-    readonly_fields = ['airfield_image_preview']
+    list_display = ["identifier", "name", "is_active"]
+    search_fields = ["identifier", "name"]
+    list_filter = ["is_active"]
+    readonly_fields = ["airfield_image_preview"]
 
     def airfield_image_preview(self, obj):
         if obj.photo:
-            return format_html('<img src="{}" style="max-height: 150px;" />', obj.photo.url)
+            return format_html(
+                '<img src="{}" style="max-height: 150px;" />', obj.photo.url
+            )
         return "(No photo uploaded)"
+
     airfield_image_preview.short_description = "Current Photo"
+
 
 # The particulars of what day a logsheet happened, the airfield, who is on the duty roster for that day
 # are all kept in teh Logsheet model. If a logsheet is finalized is kept in this entry too.
@@ -127,8 +188,7 @@ class AirfieldAdmin(admin.ModelAdmin):
 
 @admin.register(Logsheet)
 class LogsheetAdmin(admin.ModelAdmin):
-    list_display = ("log_date", "airfield", "created_by",
-                    "finalized", "created_at")
+    list_display = ("log_date", "airfield", "created_by", "finalized", "created_at")
     list_filter = ("airfield", "finalized")
     search_fields = ("airfield__name", "created_by__username")
 
@@ -141,11 +201,13 @@ class LogsheetAdmin(admin.ModelAdmin):
 # There is a script in the logsheet/management that allows you to paste the output into
 # a `./manage.py shell` command
 
+
 @admin.register(TowRate)
 class TowRateAdmin(admin.ModelAdmin):
     list_display = ("altitude", "price")
     list_editable = ("price",)
     ordering = ("altitude",)
+
 
 # Admin configuration for LogsheetCloseout objects
 # Allows viewing and managing closeout reports for each logsheet,
@@ -157,6 +219,7 @@ class TowRateAdmin(admin.ModelAdmin):
 class LogsheetCloseoutAdmin(admin.ModelAdmin):
     list_display = ("logsheet",)
 
+
 # Admin configuration for TowplaneCloseout objects
 # Used to manage end-of-day tachometer readings, fuel logs,
 # and operational notes for each towplane per logsheet.
@@ -167,6 +230,7 @@ class LogsheetCloseoutAdmin(admin.ModelAdmin):
 class TowplaneCloseoutAdmin(admin.ModelAdmin):
     list_display = ("logsheet", "towplane")
 
+
 # Admin configuration for LogsheetPayment objects
 # Displays and manages payment methods associated with each member's flight charges.
 # Useful for tracking which members paid by account, check, Zelle, or cash.
@@ -175,14 +239,15 @@ class TowplaneCloseoutAdmin(admin.ModelAdmin):
 @admin.register(LogsheetPayment)
 class LogsheetPaymentAdmin(admin.ModelAdmin):
     list_display = (
-        'member',
-        'logsheet',
-        'payment_method',
-        'note',
+        "member",
+        "logsheet",
+        "payment_method",
+        "note",
     )
-    list_filter = ('payment_method', 'logsheet')
-    search_fields = ('member__first_name', 'member__last_name', 'note')
-    autocomplete_fields = ('member', 'logsheet')
+    list_filter = ("payment_method", "logsheet")
+    search_fields = ("member__first_name", "member__last_name", "note")
+    autocomplete_fields = ("member", "logsheet")
+
 
 # Admin configuration for MaintenanceIssue objects
 # Manages maintenance issues reported against gliders and towplanes.
@@ -193,31 +258,40 @@ class LogsheetPaymentAdmin(admin.ModelAdmin):
 
 @admin.register(MaintenanceIssue)
 class MaintenanceIssueAdmin(admin.ModelAdmin):
-    list_display = ('aircraft_display', 'is_glider', 'grounded',
-                    'resolved', 'report_date', 'description_short')
-    search_fields = ('glider__n_number', 'towplane__n_number', 'description')
-    list_filter = ('grounded', 'resolved')
-    autocomplete_fields = ('glider', 'towplane', 'reported_by', 'resolved_by')
-    readonly_fields = ('report_date',)
+    list_display = (
+        "aircraft_display",
+        "is_glider",
+        "grounded",
+        "resolved",
+        "report_date",
+        "description_short",
+    )
+    search_fields = ("glider__n_number", "towplane__n_number", "description")
+    list_filter = ("grounded", "resolved")
+    autocomplete_fields = ("glider", "towplane", "reported_by", "resolved_by")
+    readonly_fields = ("report_date",)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "glider":
             from logsheet.models import Glider
-            kwargs["queryset"] = Glider.objects.filter(
-                is_active=True, club_owned=True)
+
+            kwargs["queryset"] = Glider.objects.filter(is_active=True, club_owned=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def aircraft_display(self, obj):
         return obj.glider or obj.towplane
+
     aircraft_display.short_description = "Aircraft"
 
     def is_glider(self, obj):
         return bool(obj.glider)
+
     is_glider.boolean = True
     is_glider.short_description = "Glider?"
 
     def description_short(self, obj):
-        return obj.description[:50] + ('...' if len(obj.description) > 50 else '')
+        return obj.description[:50] + ("..." if len(obj.description) > 50 else "")
+
 
 # Admin configuration for MaintenanceDeadline objects
 # Displays upcoming maintenance deadlines for gliders and towplanes.
@@ -227,8 +301,7 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
 
 @admin.register(MaintenanceDeadline)
 class MaintenanceDeadlineAdmin(admin.ModelAdmin):
-    list_display = ("aircraft_n_number", "aircraft_type",
-                    "description", "due_date")
+    list_display = ("aircraft_n_number", "aircraft_type", "description", "due_date")
     list_filter = ("description", "due_date")
     search_fields = ("glider__n_number", "towplane__n_number")
 
@@ -236,10 +309,12 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
 
     def aircraft_n_number(self, obj):
         return obj.glider.n_number if obj.glider else obj.towplane.n_number
+
     aircraft_n_number.short_description = "N-Number"
 
     def aircraft_type(self, obj):
         return "Glider" if obj.glider else "Towplane"
+
     aircraft_type.short_description = "Type"
 
 
@@ -248,13 +323,14 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
 # Meisters are authorized to resolve maintenance issues for their assigned aircraft.
 # Allows quick lookup by aircraft or member.
 
+
 @admin.register(AircraftMeister)
 class AircraftMeisterAdmin(admin.ModelAdmin):
-    list_display = ('aircraft_display', 'member')
-    search_fields = ('glider__n_number',
-                     'towplane__n_number', 'member__username')
-    autocomplete_fields = ('glider', 'towplane', 'member')
+    list_display = ("aircraft_display", "member")
+    search_fields = ("glider__n_number", "towplane__n_number", "member__username")
+    autocomplete_fields = ("glider", "towplane", "member")
 
     def aircraft_display(self, obj):
         return obj.glider or obj.towplane
+
     aircraft_display.short_description = "Aircraft"

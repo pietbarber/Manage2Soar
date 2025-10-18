@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0003_member_ssa_url'),
+        ("members", "0003_member_ssa_url"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='private_glider_checkride_date',
-            field=models.DateField(blank=True, help_text='Date member passed practical checkride for Private Pilot Glider.', null=True),
+            model_name="member",
+            name="private_glider_checkride_date",
+            field=models.DateField(
+                blank=True,
+                help_text="Date member passed practical checkride for Private Pilot Glider.",
+                null=True,
+            ),
         ),
     ]

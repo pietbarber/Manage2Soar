@@ -1,6 +1,8 @@
-import qrcode
 from io import BytesIO
+
+import qrcode
 from django.core.files.base import ContentFile
+
 
 def generate_vcard_qr(member):
     vcard = f"""BEGIN:VCARD
@@ -19,5 +21,5 @@ EMAIL;TYPE=INTERNET,HOME:{member.email}
 END:VCARD"""
     qr = qrcode.make(vcard)
     buffer = BytesIO()
-    qr.save(buffer, format='PNG')
+    qr.save(buffer, format="PNG")
     return buffer.getvalue()

@@ -10,148 +10,501 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('logsheet', '__first__'),
+        ("logsheet", "__first__"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='DutyDay',
+            name="DutyDay",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField(unique=True)),
-                ('notes', models.TextField(blank=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField(unique=True)),
+                ("notes", models.TextField(blank=True)),
             ],
         ),
         migrations.CreateModel(
-            name='DutyAssignment',
+            name="DutyAssignment",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField(unique=True)),
-                ('surge_notified', models.BooleanField(default=False)),
-                ('tow_surge_notified', models.BooleanField(default=False)),
-                ('is_scheduled', models.BooleanField(default=True)),
-                ('is_confirmed', models.BooleanField(default=True)),
-                ('notes', models.TextField(blank=True)),
-                ('assistant_duty_officer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_ado', to=settings.AUTH_USER_MODEL)),
-                ('duty_officer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_duty_officer', to=settings.AUTH_USER_MODEL)),
-                ('instructor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_instructor', to=settings.AUTH_USER_MODEL)),
-                ('location', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='logsheet.airfield')),
-                ('surge_instructor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_surge_instructor', to=settings.AUTH_USER_MODEL)),
-                ('surge_tow_pilot', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_surge_tow_pilot', to=settings.AUTH_USER_MODEL)),
-                ('tow_pilot', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='as_tow_pilot', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField(unique=True)),
+                ("surge_notified", models.BooleanField(default=False)),
+                ("tow_surge_notified", models.BooleanField(default=False)),
+                ("is_scheduled", models.BooleanField(default=True)),
+                ("is_confirmed", models.BooleanField(default=True)),
+                ("notes", models.TextField(blank=True)),
+                (
+                    "assistant_duty_officer",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_ado",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "duty_officer",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_duty_officer",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_instructor",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "location",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="logsheet.airfield",
+                    ),
+                ),
+                (
+                    "surge_instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_surge_instructor",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "surge_tow_pilot",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_surge_tow_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "tow_pilot",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="as_tow_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutyAvoidance',
+            name="DutyAvoidance",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('avoid_with', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='avoid_target', to=settings.AUTH_USER_MODEL)),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='avoid_source', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "avoid_with",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="avoid_target",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="avoid_source",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutyPairing',
+            name="DutyPairing",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='pairing_source', to=settings.AUTH_USER_MODEL)),
-                ('pair_with', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='pairing_target', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="pairing_source",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "pair_with",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="pairing_target",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutyPreference',
+            name="DutyPreference",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('preferred_day', models.CharField(blank=True, choices=[('sat', 'Saturday'), ('sun', 'Sunday')], max_length=10, null=True)),
-                ('comment', models.TextField(blank=True, null=True)),
-                ('dont_schedule', models.BooleanField(default=False)),
-                ('scheduling_suspended', models.BooleanField(default=False)),
-                ('suspended_reason', models.CharField(blank=True, max_length=255, null=True)),
-                ('last_duty_date', models.DateField(blank=True, null=True)),
-                ('instructor_percent', models.PositiveIntegerField(default=0)),
-                ('duty_officer_percent', models.PositiveIntegerField(default=0)),
-                ('ado_percent', models.PositiveIntegerField(default=0)),
-                ('towpilot_percent', models.PositiveIntegerField(default=0)),
-                ('max_assignments_per_month', models.PositiveIntegerField(choices=[(0, '0'), (1, '1'), (2, '2'), (3, '3'), (4, '4'), (5, '5'), (6, '6'), (7, '7'), (8, '8'), (9, '9'), (10, '10'), (11, '11'), (12, '12')], default=2, help_text='How many times per month you’d like to be scheduled')),
-                ('allow_weekend_double', models.BooleanField(default=False, help_text="I'm fine being scheduled both Saturday and Sunday on the same weekend")),
-                ('member', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "preferred_day",
+                    models.CharField(
+                        blank=True,
+                        choices=[("sat", "Saturday"), ("sun", "Sunday")],
+                        max_length=10,
+                        null=True,
+                    ),
+                ),
+                ("comment", models.TextField(blank=True, null=True)),
+                ("dont_schedule", models.BooleanField(default=False)),
+                ("scheduling_suspended", models.BooleanField(default=False)),
+                (
+                    "suspended_reason",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("last_duty_date", models.DateField(blank=True, null=True)),
+                ("instructor_percent", models.PositiveIntegerField(default=0)),
+                ("duty_officer_percent", models.PositiveIntegerField(default=0)),
+                ("ado_percent", models.PositiveIntegerField(default=0)),
+                ("towpilot_percent", models.PositiveIntegerField(default=0)),
+                (
+                    "max_assignments_per_month",
+                    models.PositiveIntegerField(
+                        choices=[
+                            (0, "0"),
+                            (1, "1"),
+                            (2, "2"),
+                            (3, "3"),
+                            (4, "4"),
+                            (5, "5"),
+                            (6, "6"),
+                            (7, "7"),
+                            (8, "8"),
+                            (9, "9"),
+                            (10, "10"),
+                            (11, "11"),
+                            (12, "12"),
+                        ],
+                        default=2,
+                        help_text="How many times per month you’d like to be scheduled",
+                    ),
+                ),
+                (
+                    "allow_weekend_double",
+                    models.BooleanField(
+                        default=False,
+                        help_text="I'm fine being scheduled both Saturday and Sunday on the same weekend",
+                    ),
+                ),
+                (
+                    "member",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutySwapRequest',
+            name="DutySwapRequest",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('role', models.CharField(choices=[('DO', 'Duty Officer'), ('ADO', 'Assistant Duty Officer'), ('INSTRUCTOR', 'Instructor'), ('TOW', 'Tow Pilot')], max_length=20)),
-                ('original_date', models.DateField()),
-                ('is_emergency', models.BooleanField(default=False)),
-                ('is_fulfilled', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('requester', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='swap_requests', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[
+                            ("DO", "Duty Officer"),
+                            ("ADO", "Assistant Duty Officer"),
+                            ("INSTRUCTOR", "Instructor"),
+                            ("TOW", "Tow Pilot"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("original_date", models.DateField()),
+                ("is_emergency", models.BooleanField(default=False)),
+                ("is_fulfilled", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "requester",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="swap_requests",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutySwapOffer',
+            name="DutySwapOffer",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('offer_type', models.CharField(choices=[('cover', "Cover (I'll take your shift)"), ('swap', "Swap (I'll take yours if you take mine)")], max_length=10)),
-                ('proposed_swap_date', models.DateField(blank=True, null=True)),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined')], default='pending', max_length=10)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('responded_at', models.DateTimeField(blank=True, null=True)),
-                ('offered_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('swap_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='offers', to='duty_roster.dutyswaprequest')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "offer_type",
+                    models.CharField(
+                        choices=[
+                            ("cover", "Cover (I'll take your shift)"),
+                            ("swap", "Swap (I'll take yours if you take mine)"),
+                        ],
+                        max_length=10,
+                    ),
+                ),
+                ("proposed_swap_date", models.DateField(blank=True, null=True)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("accepted", "Accepted"),
+                            ("declined", "Declined"),
+                        ],
+                        default="pending",
+                        max_length=10,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("responded_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "offered_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "swap_request",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="offers",
+                        to="duty_roster.dutyswaprequest",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='InstructionSlot',
+            name="InstructionSlot",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('status', models.CharField(choices=[('scheduled', 'Scheduled'), ('waitlist', 'Waitlist'), ('cancelled', 'Cancelled')], default='waitlist', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('assignment', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='instruction_slots', to='duty_roster.dutyassignment')),
-                ('instructor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='assigned_students', to=settings.AUTH_USER_MODEL)),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='instruction_requests', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("scheduled", "Scheduled"),
+                            ("waitlist", "Waitlist"),
+                            ("cancelled", "Cancelled"),
+                        ],
+                        default="waitlist",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "assignment",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="instruction_slots",
+                        to="duty_roster.dutyassignment",
+                    ),
+                ),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="assigned_students",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="instruction_requests",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='DutySlot',
+            name="DutySlot",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('role', models.CharField(choices=[('duty_officer', 'Duty Officer'), ('assistant_duty_officer', 'Assistant Duty Officer'), ('instructor', 'Instructor'), ('surge_instructor', 'Surge Instructor'), ('tow_pilot', 'Tow Pilot'), ('surge_tow_pilot', 'Surge Tow Pilot')], max_length=32)),
-                ('duty_day', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='slots', to='duty_roster.dutyday')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[
+                            ("duty_officer", "Duty Officer"),
+                            ("assistant_duty_officer", "Assistant Duty Officer"),
+                            ("instructor", "Instructor"),
+                            ("surge_instructor", "Surge Instructor"),
+                            ("tow_pilot", "Tow Pilot"),
+                            ("surge_tow_pilot", "Surge Tow Pilot"),
+                        ],
+                        max_length=32,
+                    ),
+                ),
+                (
+                    "duty_day",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="slots",
+                        to="duty_roster.dutyday",
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['duty_day', 'role'],
-                'unique_together': {('duty_day', 'role')},
+                "ordering": ["duty_day", "role"],
+                "unique_together": {("duty_day", "role")},
             },
         ),
         migrations.CreateModel(
-            name='MemberBlackout',
+            name="MemberBlackout",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField()),
-                ('note', models.CharField(blank=True, max_length=200)),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField()),
+                ("note", models.CharField(blank=True, max_length=200)),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['date'],
-                'unique_together': {('member', 'date')},
+                "ordering": ["date"],
+                "unique_together": {("member", "date")},
             },
         ),
         migrations.CreateModel(
-            name='OpsIntent',
+            name="OpsIntent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField()),
-                ('available_as', models.JSONField(default=list)),
-                ('notes', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('glider', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='logsheet.glider')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField()),
+                ("available_as", models.JSONField(default=list)),
+                ("notes", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "glider",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="logsheet.glider",
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('member', 'date')},
+                "unique_together": {("member", "date")},
             },
         ),
     ]

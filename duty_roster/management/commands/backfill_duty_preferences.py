@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
+
 from duty_roster.models import DutyPreference
 from members.models import Member
+
 
 class Command(BaseCommand):
     help = "Backfill DutyPreference records for active members based on role flags"
@@ -26,4 +28,6 @@ class Command(BaseCommand):
                 DutyPreference.objects.create(member=m, **defaults)
                 created += 1
 
-        self.stdout.write(self.style.SUCCESS(f"✅ Backfilled {created} duty preferences."))
+        self.stdout.write(
+            self.style.SUCCESS(f"✅ Backfilled {created} duty preferences.")
+        )

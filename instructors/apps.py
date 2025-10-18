@@ -1,13 +1,23 @@
 # instructors/apps.py
 
-from django.apps import AppConfig
 import sys
+
+from django.apps import AppConfig
 
 
 class InstructorsConfig(AppConfig):
-    name = 'instructors'
+    name = "instructors"
 
     def ready(self):
         # Only connect signals if not running migrations, collectstatic, etc.
-        if not any(cmd in sys.argv for cmd in ['makemigrations', 'migrate', 'collectstatic', 'loaddata', 'test']):
+        if not any(
+            cmd in sys.argv
+            for cmd in [
+                "makemigrations",
+                "migrate",
+                "collectstatic",
+                "loaddata",
+                "test",
+            ]
+        ):
             import instructors.signals  # noqa

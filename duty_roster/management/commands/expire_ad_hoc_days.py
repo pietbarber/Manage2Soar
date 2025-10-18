@@ -1,9 +1,11 @@
-from django.core.management.base import BaseCommand
-from duty_roster.models import DutyAssignment
-from django.utils.timezone import now
 from datetime import timedelta
-from django.core.mail import send_mail
+
 from django.conf import settings
+from django.core.mail import send_mail
+from django.core.management.base import BaseCommand
+from django.utils.timezone import now
+
+from duty_roster.models import DutyAssignment
 
 
 class Command(BaseCommand):
@@ -13,9 +15,7 @@ class Command(BaseCommand):
         tomorrow = now().date() + timedelta(days=1)
 
         assignments = DutyAssignment.objects.filter(
-            is_scheduled=False,
-            is_confirmed=False,
-            date=tomorrow
+            is_scheduled=False, is_confirmed=False, date=tomorrow
         )
 
         for assignment in assignments:
@@ -30,6 +30,9 @@ have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/c
                 recipient_list=["members@default.manage2soar.com"],
             )
 
-            self.stdout.write(self.style.WARNING(
-                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"))
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"
+                )
+            )
             assignment.delete()

@@ -16,200 +16,821 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Airfield',
+            name="Airfield",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('identifier', models.CharField(max_length=10, unique=True)),
-                ('name', models.CharField(max_length=100)),
-                ('photo', models.ImageField(blank=True, null=True, upload_to='airfield_photos/')),
-                ('is_active', models.BooleanField(default=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("identifier", models.CharField(max_length=10, unique=True)),
+                ("name", models.CharField(max_length=100)),
+                (
+                    "photo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="airfield_photos/"
+                    ),
+                ),
+                ("is_active", models.BooleanField(default=True)),
             ],
         ),
         migrations.CreateModel(
-            name='Towplane',
+            name="Towplane",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100)),
-                ('make', models.CharField(blank=True, max_length=100, null=True)),
-                ('model', models.CharField(blank=True, max_length=100, null=True)),
-                ('n_number', models.CharField(max_length=50)),
-                ('photo', models.ImageField(blank=True, null=True, upload_to='towplane_photos/')),
-                ('is_active', models.BooleanField(default=True)),
-                ('club_owned', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("make", models.CharField(blank=True, max_length=100, null=True)),
+                ("model", models.CharField(blank=True, max_length=100, null=True)),
+                ("n_number", models.CharField(max_length=50)),
+                (
+                    "photo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="towplane_photos/"
+                    ),
+                ),
+                ("is_active", models.BooleanField(default=True)),
+                ("club_owned", models.BooleanField(default=False)),
             ],
             options={
-                'ordering': ['name'],
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='TowRate',
+            name="TowRate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('altitude', models.PositiveIntegerField(help_text='Release altitude in feet (e.g. 2000)')),
-                ('price', models.DecimalField(decimal_places=2, help_text='Price in USD', max_digits=6)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "altitude",
+                    models.PositiveIntegerField(
+                        help_text="Release altitude in feet (e.g. 2000)"
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        decimal_places=2, help_text="Price in USD", max_digits=6
+                    ),
+                ),
             ],
             options={
-                'ordering': ['altitude'],
+                "ordering": ["altitude"],
             },
         ),
         migrations.CreateModel(
-            name='Glider',
+            name="Glider",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('make', models.CharField(max_length=100)),
-                ('model', models.CharField(max_length=100)),
-                ('n_number', models.CharField(max_length=20, unique=True)),
-                ('competition_number', models.CharField(blank=True, max_length=10)),
-                ('seats', models.PositiveIntegerField(default=2)),
-                ('photo', models.ImageField(blank=True, null=True, upload_to='glider_photos/')),
-                ('rental_rate', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('max_rental_rate', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('is_active', models.BooleanField(default=True, help_text='Uncheck to hide this glider from flight entry dropdowns')),
-                ('club_owned', models.BooleanField(default=True)),
-                ('owners', models.ManyToManyField(blank=True, help_text='Members who own this glider', related_name='gliders_owned', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("make", models.CharField(max_length=100)),
+                ("model", models.CharField(max_length=100)),
+                ("n_number", models.CharField(max_length=20, unique=True)),
+                ("competition_number", models.CharField(blank=True, max_length=10)),
+                ("seats", models.PositiveIntegerField(default=2)),
+                (
+                    "photo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="glider_photos/"
+                    ),
+                ),
+                (
+                    "rental_rate",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "max_rental_rate",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Uncheck to hide this glider from flight entry dropdowns",
+                    ),
+                ),
+                ("club_owned", models.BooleanField(default=True)),
+                (
+                    "owners",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Members who own this glider",
+                        related_name="gliders_owned",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Logsheet',
+            name="Logsheet",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('log_date', models.DateField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('finalized', models.BooleanField(default=False)),
-                ('airfield', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='logsheet.airfield')),
-                ('assistant_duty_officer', models.ForeignKey(blank=True, limit_choices_to={'assistant_duty_officer': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_assistant_duty_officer', to=settings.AUTH_USER_MODEL)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('duty_instructor', models.ForeignKey(blank=True, limit_choices_to={'instructor': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_duty_instructor', to=settings.AUTH_USER_MODEL)),
-                ('duty_officer', models.ForeignKey(blank=True, limit_choices_to={'duty_officer': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_duty_officer', to=settings.AUTH_USER_MODEL)),
-                ('surge_instructor', models.ForeignKey(blank=True, limit_choices_to={'instructor': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_surge_instructor', to=settings.AUTH_USER_MODEL)),
-                ('surge_tow_pilot', models.ForeignKey(blank=True, limit_choices_to={'towpilot': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_surge_tow_pilot', to=settings.AUTH_USER_MODEL)),
-                ('tow_pilot', models.ForeignKey(blank=True, limit_choices_to={'towpilot': True}, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='log_tow_pilot', to=settings.AUTH_USER_MODEL)),
-                ('default_towplane', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("log_date", models.DateField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("finalized", models.BooleanField(default=False)),
+                (
+                    "airfield",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="logsheet.airfield",
+                    ),
+                ),
+                (
+                    "assistant_duty_officer",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"assistant_duty_officer": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_assistant_duty_officer",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "duty_instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"instructor": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_duty_instructor",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "duty_officer",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"duty_officer": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_duty_officer",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "surge_instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"instructor": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_surge_instructor",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "surge_tow_pilot",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"towpilot": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_surge_tow_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "tow_pilot",
+                    models.ForeignKey(
+                        blank=True,
+                        limit_choices_to={"towpilot": True},
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="log_tow_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "default_towplane",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('log_date', 'airfield')},
+                "unique_together": {("log_date", "airfield")},
             },
         ),
         migrations.CreateModel(
-            name='LogsheetCloseout',
+            name="LogsheetCloseout",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('safety_issues', tinymce.models.HTMLField(blank=True)),
-                ('equipment_issues', tinymce.models.HTMLField(blank=True)),
-                ('operations_summary', tinymce.models.HTMLField(blank=True)),
-                ('logsheet', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='closeout', to='logsheet.logsheet')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("safety_issues", tinymce.models.HTMLField(blank=True)),
+                ("equipment_issues", tinymce.models.HTMLField(blank=True)),
+                ("operations_summary", tinymce.models.HTMLField(blank=True)),
+                (
+                    "logsheet",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="closeout",
+                        to="logsheet.logsheet",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='RevisionLog',
+            name="RevisionLog",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('revised_at', models.DateTimeField(auto_now_add=True)),
-                ('note', models.TextField(blank=True)),
-                ('logsheet', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='revisions', to='logsheet.logsheet')),
-                ('revised_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("revised_at", models.DateTimeField(auto_now_add=True)),
+                ("note", models.TextField(blank=True)),
+                (
+                    "logsheet",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="revisions",
+                        to="logsheet.logsheet",
+                    ),
+                ),
+                (
+                    "revised_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='MaintenanceIssue',
+            name="MaintenanceIssue",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('report_date', models.DateField(auto_now_add=True)),
-                ('description', models.TextField()),
-                ('grounded', models.BooleanField(default=False)),
-                ('resolved', models.BooleanField(default=False)),
-                ('resolution_notes', models.TextField(blank=True)),
-                ('resolved_date', models.DateField(blank=True, null=True)),
-                ('glider', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.glider')),
-                ('logsheet', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='maintenance_issues', to='logsheet.logsheet')),
-                ('reported_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
-                ('resolved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='resolved_maintenance', to=settings.AUTH_USER_MODEL)),
-                ('towplane', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("report_date", models.DateField(auto_now_add=True)),
+                ("description", models.TextField()),
+                ("grounded", models.BooleanField(default=False)),
+                ("resolved", models.BooleanField(default=False)),
+                ("resolution_notes", models.TextField(blank=True)),
+                ("resolved_date", models.DateField(blank=True, null=True)),
+                (
+                    "glider",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.glider",
+                    ),
+                ),
+                (
+                    "logsheet",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="maintenance_issues",
+                        to="logsheet.logsheet",
+                    ),
+                ),
+                (
+                    "reported_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "resolved_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="resolved_maintenance",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "towplane",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-report_date'],
+                "ordering": ["-report_date"],
             },
         ),
         migrations.CreateModel(
-            name='MaintenanceDeadline',
+            name="MaintenanceDeadline",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('description', models.CharField(choices=[('annual', 'Annual Inspection'), ('condition', 'Condition Inspection'), ('parachute', 'Parachute Repack'), ('transponder', 'Transponder Inspection'), ('letter', 'Program Letter')], max_length=32)),
-                ('due_date', models.DateField()),
-                ('glider', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.glider')),
-                ('towplane', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "description",
+                    models.CharField(
+                        choices=[
+                            ("annual", "Annual Inspection"),
+                            ("condition", "Condition Inspection"),
+                            ("parachute", "Parachute Repack"),
+                            ("transponder", "Transponder Inspection"),
+                            ("letter", "Program Letter"),
+                        ],
+                        max_length=32,
+                    ),
+                ),
+                ("due_date", models.DateField()),
+                (
+                    "glider",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.glider",
+                    ),
+                ),
+                (
+                    "towplane",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Flight',
+            name="Flight",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('launch_time', models.TimeField(blank=True, null=True)),
-                ('landing_time', models.TimeField(blank=True, null=True)),
-                ('duration', models.DurationField(blank=True, null=True)),
-                ('guest_pilot_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('guest_instructor_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('guest_towpilot_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('passenger_name', models.CharField(blank=True, help_text='Name of passenger if not a member', max_length=100)),
-                ('legacy_pilot_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('legacy_instructor_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('legacy_passenger_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('legacy_towpilot_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('launch_method', models.CharField(choices=[('tow', 'Towplane'), ('winch', 'Winch'), ('self', 'Self-Launch'), ('other', 'Other')], default='tow', max_length=10)),
-                ('flight_type', models.CharField(max_length=50)),
-                ('notes', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('release_altitude', models.IntegerField(blank=True, choices=[(0, '0 ft'), (100, '100 ft'), (200, '200 ft'), (300, '300 ft'), (400, '400 ft'), (500, '500 ft'), (600, '600 ft'), (700, '700 ft'), (800, '800 ft'), (900, '900 ft'), (1000, '1000 ft'), (1100, '1100 ft'), (1200, '1200 ft'), (1300, '1300 ft'), (1400, '1400 ft'), (1500, '1500 ft'), (1600, '1600 ft'), (1700, '1700 ft'), (1800, '1800 ft'), (1900, '1900 ft'), (2000, '2000 ft'), (2100, '2100 ft'), (2200, '2200 ft'), (2300, '2300 ft'), (2400, '2400 ft'), (2500, '2500 ft'), (2600, '2600 ft'), (2700, '2700 ft'), (2800, '2800 ft'), (2900, '2900 ft'), (3000, '3000 ft'), (3100, '3100 ft'), (3200, '3200 ft'), (3300, '3300 ft'), (3400, '3400 ft'), (3500, '3500 ft'), (3600, '3600 ft'), (3700, '3700 ft'), (3800, '3800 ft'), (3900, '3900 ft'), (4000, '4000 ft'), (4100, '4100 ft'), (4200, '4200 ft'), (4300, '4300 ft'), (4400, '4400 ft'), (4500, '4500 ft'), (4600, '4600 ft'), (4700, '4700 ft'), (4800, '4800 ft'), (4900, '4900 ft'), (5000, '5000 ft'), (5100, '5100 ft'), (5200, '5200 ft'), (5300, '5300 ft'), (5400, '5400 ft'), (5500, '5500 ft'), (5600, '5600 ft'), (5700, '5700 ft'), (5800, '5800 ft'), (5900, '5900 ft'), (6000, '6000 ft'), (6100, '6100 ft'), (6200, '6200 ft'), (6300, '6300 ft'), (6400, '6400 ft'), (6500, '6500 ft'), (6600, '6600 ft'), (6700, '6700 ft'), (6800, '6800 ft'), (6900, '6900 ft'), (7000, '7000 ft')], help_text='Release altitude in feet (0–7000 in 100ft steps)', null=True)),
-                ('tow_cost_actual', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('rental_cost_actual', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('split_type', models.CharField(blank=True, choices=[('even', '50/50'), ('tow', 'Tow Only'), ('rental', 'Rental Only'), ('full', 'Full Cost')], max_length=10, null=True)),
-                ('airfield', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='logsheet.airfield')),
-                ('instructor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='flights_as_instructor', to=settings.AUTH_USER_MODEL)),
-                ('passenger', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='flights_as_passenger', to=settings.AUTH_USER_MODEL)),
-                ('pilot', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='flights_as_pilot', to=settings.AUTH_USER_MODEL)),
-                ('split_with', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='shared_flights', to=settings.AUTH_USER_MODEL)),
-                ('tow_pilot', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='flights_as_tow_pilot', to=settings.AUTH_USER_MODEL)),
-                ('glider', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='logsheet.glider')),
-                ('logsheet', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='flights', to='logsheet.logsheet')),
-                ('towplane', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("launch_time", models.TimeField(blank=True, null=True)),
+                ("landing_time", models.TimeField(blank=True, null=True)),
+                ("duration", models.DurationField(blank=True, null=True)),
+                (
+                    "guest_pilot_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "guest_instructor_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "guest_towpilot_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "passenger_name",
+                    models.CharField(
+                        blank=True,
+                        help_text="Name of passenger if not a member",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "legacy_pilot_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "legacy_instructor_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "legacy_passenger_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "legacy_towpilot_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "launch_method",
+                    models.CharField(
+                        choices=[
+                            ("tow", "Towplane"),
+                            ("winch", "Winch"),
+                            ("self", "Self-Launch"),
+                            ("other", "Other"),
+                        ],
+                        default="tow",
+                        max_length=10,
+                    ),
+                ),
+                ("flight_type", models.CharField(max_length=50)),
+                ("notes", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "release_altitude",
+                    models.IntegerField(
+                        blank=True,
+                        choices=[
+                            (0, "0 ft"),
+                            (100, "100 ft"),
+                            (200, "200 ft"),
+                            (300, "300 ft"),
+                            (400, "400 ft"),
+                            (500, "500 ft"),
+                            (600, "600 ft"),
+                            (700, "700 ft"),
+                            (800, "800 ft"),
+                            (900, "900 ft"),
+                            (1000, "1000 ft"),
+                            (1100, "1100 ft"),
+                            (1200, "1200 ft"),
+                            (1300, "1300 ft"),
+                            (1400, "1400 ft"),
+                            (1500, "1500 ft"),
+                            (1600, "1600 ft"),
+                            (1700, "1700 ft"),
+                            (1800, "1800 ft"),
+                            (1900, "1900 ft"),
+                            (2000, "2000 ft"),
+                            (2100, "2100 ft"),
+                            (2200, "2200 ft"),
+                            (2300, "2300 ft"),
+                            (2400, "2400 ft"),
+                            (2500, "2500 ft"),
+                            (2600, "2600 ft"),
+                            (2700, "2700 ft"),
+                            (2800, "2800 ft"),
+                            (2900, "2900 ft"),
+                            (3000, "3000 ft"),
+                            (3100, "3100 ft"),
+                            (3200, "3200 ft"),
+                            (3300, "3300 ft"),
+                            (3400, "3400 ft"),
+                            (3500, "3500 ft"),
+                            (3600, "3600 ft"),
+                            (3700, "3700 ft"),
+                            (3800, "3800 ft"),
+                            (3900, "3900 ft"),
+                            (4000, "4000 ft"),
+                            (4100, "4100 ft"),
+                            (4200, "4200 ft"),
+                            (4300, "4300 ft"),
+                            (4400, "4400 ft"),
+                            (4500, "4500 ft"),
+                            (4600, "4600 ft"),
+                            (4700, "4700 ft"),
+                            (4800, "4800 ft"),
+                            (4900, "4900 ft"),
+                            (5000, "5000 ft"),
+                            (5100, "5100 ft"),
+                            (5200, "5200 ft"),
+                            (5300, "5300 ft"),
+                            (5400, "5400 ft"),
+                            (5500, "5500 ft"),
+                            (5600, "5600 ft"),
+                            (5700, "5700 ft"),
+                            (5800, "5800 ft"),
+                            (5900, "5900 ft"),
+                            (6000, "6000 ft"),
+                            (6100, "6100 ft"),
+                            (6200, "6200 ft"),
+                            (6300, "6300 ft"),
+                            (6400, "6400 ft"),
+                            (6500, "6500 ft"),
+                            (6600, "6600 ft"),
+                            (6700, "6700 ft"),
+                            (6800, "6800 ft"),
+                            (6900, "6900 ft"),
+                            (7000, "7000 ft"),
+                        ],
+                        help_text="Release altitude in feet (0–7000 in 100ft steps)",
+                        null=True,
+                    ),
+                ),
+                (
+                    "tow_cost_actual",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "rental_cost_actual",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "split_type",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("even", "50/50"),
+                            ("tow", "Tow Only"),
+                            ("rental", "Rental Only"),
+                            ("full", "Full Cost"),
+                        ],
+                        max_length=10,
+                        null=True,
+                    ),
+                ),
+                (
+                    "airfield",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="logsheet.airfield",
+                    ),
+                ),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="flights_as_instructor",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "passenger",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="flights_as_passenger",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "pilot",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="flights_as_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "split_with",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="shared_flights",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "tow_pilot",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="flights_as_tow_pilot",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "glider",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="logsheet.glider",
+                    ),
+                ),
+                (
+                    "logsheet",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="flights",
+                        to="logsheet.logsheet",
+                    ),
+                ),
+                (
+                    "towplane",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='AircraftMeister',
+            name="AircraftMeister",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('glider', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.glider')),
-                ('towplane', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "glider",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.glider",
+                    ),
+                ),
+                (
+                    "towplane",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='LogsheetPayment',
+            name="LogsheetPayment",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('payment_method', models.CharField(blank=True, choices=[('account', 'On Account'), ('check', 'Check'), ('zelle', 'Zelle'), ('cash', 'Cash')], max_length=10, null=True)),
-                ('note', models.CharField(blank=True, max_length=200)),
-                ('logsheet', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payments', to='logsheet.logsheet')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='logsheet_payments', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "payment_method",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("account", "On Account"),
+                            ("check", "Check"),
+                            ("zelle", "Zelle"),
+                            ("cash", "Cash"),
+                        ],
+                        max_length=10,
+                        null=True,
+                    ),
+                ),
+                ("note", models.CharField(blank=True, max_length=200)),
+                (
+                    "logsheet",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="payments",
+                        to="logsheet.logsheet",
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="logsheet_payments",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('logsheet', 'member')},
+                "unique_together": {("logsheet", "member")},
             },
         ),
         migrations.CreateModel(
-            name='TowplaneCloseout',
+            name="TowplaneCloseout",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('start_tach', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('end_tach', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('tach_time', models.DecimalField(blank=True, decimal_places=2, max_digits=6, null=True)),
-                ('fuel_added', models.DecimalField(blank=True, decimal_places=1, max_digits=5, null=True)),
-                ('notes', tinymce.models.HTMLField(blank=True)),
-                ('logsheet', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='towplane_closeouts', to='logsheet.logsheet')),
-                ('towplane', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='logsheet.towplane')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "start_tach",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "end_tach",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "tach_time",
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=6, null=True
+                    ),
+                ),
+                (
+                    "fuel_added",
+                    models.DecimalField(
+                        blank=True, decimal_places=1, max_digits=5, null=True
+                    ),
+                ),
+                ("notes", tinymce.models.HTMLField(blank=True)),
+                (
+                    "logsheet",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="towplane_closeouts",
+                        to="logsheet.logsheet",
+                    ),
+                ),
+                (
+                    "towplane",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="logsheet.towplane",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('logsheet', 'towplane')},
+                "unique_together": {("logsheet", "towplane")},
             },
         ),
     ]

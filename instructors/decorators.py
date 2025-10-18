@@ -1,10 +1,11 @@
 # instructors/decorators.py
 from functools import wraps
-from django.shortcuts import get_object_or_404, render, redirect
+
+from django.http import HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
+
 from members.models import Member
 from members.utils import is_active_member
-from django.http import HttpResponseForbidden
-
 
 ####################################################
 # instructor_required
@@ -21,6 +22,7 @@ from django.http import HttpResponseForbidden
 # def my_view(request, ...):
 #     ...
 ####################################################
+
 
 def instructor_required(view_func):
     @wraps(view_func)
@@ -40,6 +42,7 @@ def instructor_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
 
 ####################################################
 # member_or_instructor_required

@@ -1,12 +1,11 @@
-import requests
 import os
 import re
+from urllib.parse import urlparse
 
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from urllib.parse import urlparse
-
 
 #########################
 # debug_pipeline_data() Pipeline Function
@@ -24,6 +23,7 @@ from urllib.parse import urlparse
 # Note:
 # Should be removed or disabled in production to avoid printing sensitive data.
 
+
 def debug_pipeline_data(strategy, details, *args, **kwargs):
     if settings.DEBUG:
         print("🚀 OAuth details:", details)
@@ -31,12 +31,13 @@ def debug_pipeline_data(strategy, details, *args, **kwargs):
 
 ########################
 # create_username
-# Generates a clean, unique username during social-auth pipeline execution. 
-# 
-# Combines first name, last name (or nickname), strips invalid characters, 
-# and falls back to email prefix if names are missing. 
-# 
-# Overwrites details['username'] and returns it for downstream use. 
+# Generates a clean, unique username during social-auth pipeline execution.
+#
+# Combines first name, last name (or nickname), strips invalid characters,
+# and falls back to email prefix if names are missing.
+#
+# Overwrites details['username'] and returns it for downstream use.
+
 
 def create_username(strategy, details, backend, user=None, *args, **kwargs):
     if user:
@@ -58,7 +59,7 @@ def create_username(strategy, details, backend, user=None, *args, **kwargs):
     if first_clean and last_clean:
         base_username = f"{first_clean}.{last_clean}"
     elif email:
-        base_username = email.split('@')[0].lower()
+        base_username = email.split("@")[0].lower()
         base_username = re.sub(r"[^a-z0-9]", "", base_username)
     else:
         base_username = "user"
@@ -70,8 +71,9 @@ def create_username(strategy, details, backend, user=None, *args, **kwargs):
         username = f"{base_username}{counter}"
         counter += 1
 
-    details['username'] = username
+    details["username"] = username
     return {"username": username}
+
 
 #########################
 # set_default_membership_status() Pipeline Function
@@ -83,6 +85,7 @@ def create_username(strategy, details, backend, user=None, *args, **kwargs):
 
 # This prevents users from defaulting to full member access, and provides
 # a clean, typo-free base profile for further editing.
+
 
 def set_default_membership_status(strategy, user, *args, **kwargs):
     if not user.membership_status or user.membership_status.strip() == "":
@@ -110,6 +113,7 @@ def set_default_membership_status(strategy, user, *args, **kwargs):
 # - If the image cannot be downloaded or saved, the function silently fails
 #   and does not raise an exception (login still succeeds).
 
+
 def fetch_google_profile_picture(backend, user, response, *args, **kwargs):
     if backend.name == "google-oauth2":
         picture_url = response.get("picture")
@@ -118,6 +122,8 @@ def fetch_google_profile_picture(backend, user, response, *args, **kwargs):
                 result = requests.get(picture_url)
                 result.raise_for_status()
                 filename = os.path.basename(urlparse(picture_url).path)
-                user.profile_photo.save(filename, ContentFile(result.content), save=True)
+                user.profile_photo.save(
+                    filename, ContentFile(result.content), save=True
+                )
             except Exception as e:
                 print(f"Error fetching profile photo: {e}")

@@ -4,10 +4,11 @@ import django.contrib.auth.models
 import django.contrib.auth.validators
 import django.db.models.deletion
 import django.utils.timezone
-import members.models
 import tinymce.models
 from django.conf import settings
 from django.db import migrations, models
+
+import members.models
 
 
 class Migration(migrations.Migration):
@@ -15,104 +16,389 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
+        ("auth", "0012_alter_user_first_name_max_length"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Badge',
+            name="Badge",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100, unique=True)),
-                ('image', models.ImageField(blank=True, null=True, upload_to='badge_images/')),
-                ('description', tinymce.models.HTMLField(blank=True)),
-                ('order', models.PositiveIntegerField(default=0)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100, unique=True)),
+                (
+                    "image",
+                    models.ImageField(blank=True, null=True, upload_to="badge_images/"),
+                ),
+                ("description", tinymce.models.HTMLField(blank=True)),
+                ("order", models.PositiveIntegerField(default=0)),
             ],
             options={
-                'ordering': ['order'],
+                "ordering": ["order"],
             },
         ),
         migrations.CreateModel(
-            name='Member',
+            name="Member",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('username', models.CharField(error_messages={'unique': 'A user with that username already exists.'}, help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.', max_length=150, unique=True, validators=[django.contrib.auth.validators.UnicodeUsernameValidator()], verbose_name='username')),
-                ('first_name', models.CharField(blank=True, max_length=150, verbose_name='first name')),
-                ('last_name', models.CharField(blank=True, max_length=150, verbose_name='last name')),
-                ('email', models.EmailField(blank=True, max_length=254, verbose_name='email address')),
-                ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),
-                ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
-                ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('membership_status', models.CharField(blank=True, choices=[('Charter Member', 'Charter Member'), ('Full Member', 'Full Member'), ('Probationary Member', 'Probationary Member'), ('FAST Member', 'FAST Member'), ('Introductory Member', 'Introductory Member'), ('Affiliate Member', 'Affiliate Member'), ('Family Member', 'Family Member'), ('Service Member', 'Service Member'), ('Student Member', 'Student Member'), ('Transient Member', 'Transient Member'), ('Emeritus Member', 'Emeritus Member'), ('Honorary Member', 'Honorary Member'), ('Inactive', 'Inactive'), ('Non-Member', 'Non-Member'), ('Pending', 'Pending'), ('Deceased', 'Deceased')], default='Non-Member', max_length=20, null=True)),
-                ('middle_initial', models.CharField(blank=True, max_length=2, null=True)),
-                ('nickname', models.CharField(blank=True, max_length=50, null=True)),
-                ('name_suffix', models.CharField(blank=True, choices=[('', '—'), ('Jr.', 'Jr.'), ('Sr.', 'Sr.'), ('II', 'II'), ('III', 'III'), ('IV', 'IV'), ('V', 'V')], max_length=10, null=True)),
-                ('SSA_member_number', models.CharField(blank=True, max_length=20, null=True, unique=True)),
-                ('legacy_username', models.CharField(blank=True, max_length=50, null=True, unique=True)),
-                ('phone', models.CharField(blank=True, max_length=20, null=True)),
-                ('mobile_phone', models.CharField(blank=True, max_length=20, null=True)),
-                ('country', models.CharField(blank=True, default='US', max_length=2, null=True)),
-                ('address', models.TextField(blank=True, null=True)),
-                ('city', models.CharField(blank=True, max_length=50, null=True)),
-                ('state_code', models.CharField(blank=True, choices=[('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'), ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'), ('FL', 'Florida'), ('GA', 'Georgia'), ('HI', 'Hawaii'), ('ID', 'Idaho'), ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'), ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MD', 'Maryland'), ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'), ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'), ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'), ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'), ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'), ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'), ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'), ('WI', 'Wisconsin'), ('WY', 'Wyoming')], max_length=2, null=True)),
-                ('state_freeform', models.CharField(blank=True, max_length=50, null=True)),
-                ('zip_code', models.CharField(blank=True, max_length=10, null=True)),
-                ('profile_photo', models.ImageField(blank=True, null=True, upload_to='profile_photos/')),
-                ('glider_rating', models.CharField(choices=[('none', 'None'), ('student', 'Student'), ('transition', 'Transition'), ('private', 'Private'), ('commercial', 'Commercial')], default='student', max_length=10)),
-                ('instructor', models.BooleanField(default=False)),
-                ('towpilot', models.BooleanField(default=False)),
-                ('duty_officer', models.BooleanField(default=False)),
-                ('assistant_duty_officer', models.BooleanField(default=False)),
-                ('secretary', models.BooleanField(default=False)),
-                ('treasurer', models.BooleanField(default=False)),
-                ('webmaster', models.BooleanField(default=False)),
-                ('director', models.BooleanField(default=False)),
-                ('member_manager', models.BooleanField(default=False)),
-                ('rostermeister', models.BooleanField(default=False)),
-                ('joined_club', models.DateField(blank=True, null=True)),
-                ('emergency_contact', models.TextField(blank=True, null=True)),
-                ('public_notes', tinymce.models.HTMLField(blank=True, null=True)),
-                ('private_notes', tinymce.models.HTMLField(blank=True, null=True)),
-                ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
-                ('last_updated_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
-                ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "last_login",
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
+                ),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "username",
+                    models.CharField(
+                        error_messages={
+                            "unique": "A user with that username already exists."
+                        },
+                        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        max_length=150,
+                        unique=True,
+                        validators=[
+                            django.contrib.auth.validators.UnicodeUsernameValidator()
+                        ],
+                        verbose_name="username",
+                    ),
+                ),
+                (
+                    "first_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="first name"
+                    ),
+                ),
+                (
+                    "last_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="last name"
+                    ),
+                ),
+                (
+                    "email",
+                    models.EmailField(
+                        blank=True, max_length=254, verbose_name="email address"
+                    ),
+                ),
+                (
+                    "is_staff",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates whether the user can log into this admin site.",
+                        verbose_name="staff status",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
+                        verbose_name="active",
+                    ),
+                ),
+                (
+                    "date_joined",
+                    models.DateTimeField(
+                        default=django.utils.timezone.now, verbose_name="date joined"
+                    ),
+                ),
+                (
+                    "membership_status",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("Charter Member", "Charter Member"),
+                            ("Full Member", "Full Member"),
+                            ("Probationary Member", "Probationary Member"),
+                            ("FAST Member", "FAST Member"),
+                            ("Introductory Member", "Introductory Member"),
+                            ("Affiliate Member", "Affiliate Member"),
+                            ("Family Member", "Family Member"),
+                            ("Service Member", "Service Member"),
+                            ("Student Member", "Student Member"),
+                            ("Transient Member", "Transient Member"),
+                            ("Emeritus Member", "Emeritus Member"),
+                            ("Honorary Member", "Honorary Member"),
+                            ("Inactive", "Inactive"),
+                            ("Non-Member", "Non-Member"),
+                            ("Pending", "Pending"),
+                            ("Deceased", "Deceased"),
+                        ],
+                        default="Non-Member",
+                        max_length=20,
+                        null=True,
+                    ),
+                ),
+                (
+                    "middle_initial",
+                    models.CharField(blank=True, max_length=2, null=True),
+                ),
+                ("nickname", models.CharField(blank=True, max_length=50, null=True)),
+                (
+                    "name_suffix",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("", "—"),
+                            ("Jr.", "Jr."),
+                            ("Sr.", "Sr."),
+                            ("II", "II"),
+                            ("III", "III"),
+                            ("IV", "IV"),
+                            ("V", "V"),
+                        ],
+                        max_length=10,
+                        null=True,
+                    ),
+                ),
+                (
+                    "SSA_member_number",
+                    models.CharField(blank=True, max_length=20, null=True, unique=True),
+                ),
+                (
+                    "legacy_username",
+                    models.CharField(blank=True, max_length=50, null=True, unique=True),
+                ),
+                ("phone", models.CharField(blank=True, max_length=20, null=True)),
+                (
+                    "mobile_phone",
+                    models.CharField(blank=True, max_length=20, null=True),
+                ),
+                (
+                    "country",
+                    models.CharField(blank=True, default="US", max_length=2, null=True),
+                ),
+                ("address", models.TextField(blank=True, null=True)),
+                ("city", models.CharField(blank=True, max_length=50, null=True)),
+                (
+                    "state_code",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("AL", "Alabama"),
+                            ("AK", "Alaska"),
+                            ("AZ", "Arizona"),
+                            ("AR", "Arkansas"),
+                            ("CA", "California"),
+                            ("CO", "Colorado"),
+                            ("CT", "Connecticut"),
+                            ("DE", "Delaware"),
+                            ("FL", "Florida"),
+                            ("GA", "Georgia"),
+                            ("HI", "Hawaii"),
+                            ("ID", "Idaho"),
+                            ("IL", "Illinois"),
+                            ("IN", "Indiana"),
+                            ("IA", "Iowa"),
+                            ("KS", "Kansas"),
+                            ("KY", "Kentucky"),
+                            ("LA", "Louisiana"),
+                            ("ME", "Maine"),
+                            ("MD", "Maryland"),
+                            ("MA", "Massachusetts"),
+                            ("MI", "Michigan"),
+                            ("MN", "Minnesota"),
+                            ("MS", "Mississippi"),
+                            ("MO", "Missouri"),
+                            ("MT", "Montana"),
+                            ("NE", "Nebraska"),
+                            ("NV", "Nevada"),
+                            ("NH", "New Hampshire"),
+                            ("NJ", "New Jersey"),
+                            ("NM", "New Mexico"),
+                            ("NY", "New York"),
+                            ("NC", "North Carolina"),
+                            ("ND", "North Dakota"),
+                            ("OH", "Ohio"),
+                            ("OK", "Oklahoma"),
+                            ("OR", "Oregon"),
+                            ("PA", "Pennsylvania"),
+                            ("RI", "Rhode Island"),
+                            ("SC", "South Carolina"),
+                            ("SD", "South Dakota"),
+                            ("TN", "Tennessee"),
+                            ("TX", "Texas"),
+                            ("UT", "Utah"),
+                            ("VT", "Vermont"),
+                            ("VA", "Virginia"),
+                            ("WA", "Washington"),
+                            ("WV", "West Virginia"),
+                            ("WI", "Wisconsin"),
+                            ("WY", "Wyoming"),
+                        ],
+                        max_length=2,
+                        null=True,
+                    ),
+                ),
+                (
+                    "state_freeform",
+                    models.CharField(blank=True, max_length=50, null=True),
+                ),
+                ("zip_code", models.CharField(blank=True, max_length=10, null=True)),
+                (
+                    "profile_photo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="profile_photos/"
+                    ),
+                ),
+                (
+                    "glider_rating",
+                    models.CharField(
+                        choices=[
+                            ("none", "None"),
+                            ("student", "Student"),
+                            ("transition", "Transition"),
+                            ("private", "Private"),
+                            ("commercial", "Commercial"),
+                        ],
+                        default="student",
+                        max_length=10,
+                    ),
+                ),
+                ("instructor", models.BooleanField(default=False)),
+                ("towpilot", models.BooleanField(default=False)),
+                ("duty_officer", models.BooleanField(default=False)),
+                ("assistant_duty_officer", models.BooleanField(default=False)),
+                ("secretary", models.BooleanField(default=False)),
+                ("treasurer", models.BooleanField(default=False)),
+                ("webmaster", models.BooleanField(default=False)),
+                ("director", models.BooleanField(default=False)),
+                ("member_manager", models.BooleanField(default=False)),
+                ("rostermeister", models.BooleanField(default=False)),
+                ("joined_club", models.DateField(blank=True, null=True)),
+                ("emergency_contact", models.TextField(blank=True, null=True)),
+                ("public_notes", tinymce.models.HTMLField(blank=True, null=True)),
+                ("private_notes", tinymce.models.HTMLField(blank=True, null=True)),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "last_updated_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'user',
-                'verbose_name_plural': 'users',
-                'abstract': False,
+                "verbose_name": "user",
+                "verbose_name_plural": "users",
+                "abstract": False,
             },
             managers=[
-                ('objects', django.contrib.auth.models.UserManager()),
+                ("objects", django.contrib.auth.models.UserManager()),
             ],
         ),
         migrations.CreateModel(
-            name='Biography',
+            name="Biography",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('content', tinymce.models.HTMLField(blank=True, null=True)),
-                ('uploaded_image', models.ImageField(blank=True, null=True, upload_to=members.models.biography_upload_path)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('member', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("content", tinymce.models.HTMLField(blank=True, null=True)),
+                (
+                    "uploaded_image",
+                    models.ImageField(
+                        blank=True,
+                        null=True,
+                        upload_to=members.models.biography_upload_path,
+                    ),
+                ),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "member",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name_plural': 'Biographies',
+                "verbose_name_plural": "Biographies",
             },
         ),
         migrations.CreateModel(
-            name='MemberBadge',
+            name="MemberBadge",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date_awarded', models.DateField()),
-                ('notes', models.TextField(blank=True)),
-                ('badge', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='members.badge')),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='badges', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date_awarded", models.DateField()),
+                ("notes", models.TextField(blank=True)),
+                (
+                    "badge",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="members.badge"
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="badges",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('member', 'badge')},
+                "unique_together": {("member", "badge")},
             },
         ),
     ]

@@ -1,8 +1,9 @@
+from datetime import date, time, timedelta
 
 import pytest
-from datetime import timedelta, date, time
 from django.contrib.auth import get_user_model
-from logsheet.models import Logsheet, Flight
+
+from logsheet.models import Flight, Logsheet
 from members.models import Member
 
 User = get_user_model()
@@ -16,17 +17,17 @@ def another_member(db):
         is_active=True,
         first_name="Another",
         last_name="Member",
-        membership_status="Full Member"
+        membership_status="Full Member",
     )
     return user
 
 
 @pytest.fixture
-def logsheet_with_flights(db, airfield, active_member, another_member, glider, towplane):
+def logsheet_with_flights(
+    db, airfield, active_member, another_member, glider, towplane
+):
     logsheet = Logsheet.objects.create(
-        log_date=date.today(),
-        airfield=airfield,
-        created_by=active_member
+        log_date=date.today(), airfield=airfield, created_by=active_member
     )
     # Create at least one flight
     Flight.objects.create(
@@ -37,6 +38,6 @@ def logsheet_with_flights(db, airfield, active_member, another_member, glider, t
         launch_time=time(10, 0),
         landing_time=time(11, 0),
         split_with=another_member,
-        split_type='even'
+        split_type="even",
     )
     return logsheet

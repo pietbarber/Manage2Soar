@@ -1,10 +1,12 @@
 # duty_roster/templatetags/calendar_tags.py
 
-from django import template
 from calendar import Calendar
 from datetime import timedelta
 
+from django import template
+
 register = template.Library()
+
 
 @register.filter
 def make_week_chunks(days):

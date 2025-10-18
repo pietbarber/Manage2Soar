@@ -11,4 +11,4 @@ def generate_favicon_from_logo(input_file, output_file):
     img = Image.open(input_file)
     img = img.convert("RGBA")  # Ensure transparency is preserved if present
     icons = [img.resize(size, Image.LANCZOS) for size in sizes]
-    icons[0].save(output_file, format='ICO', sizes=sizes)
+    icons[0].save(output_file, format="ICO", sizes=sizes)

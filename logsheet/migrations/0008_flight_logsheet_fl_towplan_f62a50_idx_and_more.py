@@ -7,21 +7,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('logsheet', '0007_glider_next_100hr_due_and_more'),
+        ("logsheet", "0007_glider_next_100hr_due_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='flight',
-            index=models.Index(fields=['towplane', 'logsheet'], name='logsheet_fl_towplan_f62a50_idx'),
+            model_name="flight",
+            index=models.Index(
+                fields=["towplane", "logsheet"], name="logsheet_fl_towplan_f62a50_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='flight',
-            index=models.Index(fields=['tow_pilot', 'logsheet'], name='logsheet_fl_tow_pil_ba8695_idx'),
+            model_name="flight",
+            index=models.Index(
+                fields=["tow_pilot", "logsheet"], name="logsheet_fl_tow_pil_ba8695_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='towplanecloseout',
-            index=models.Index(fields=['towplane', 'logsheet'], name='logsheet_to_towplan_e6ce69_idx'),
+            model_name="towplanecloseout",
+            index=models.Index(
+                fields=["towplane", "logsheet"], name="logsheet_to_towplan_e6ce69_idx"
+            ),
         ),
     ]

@@ -1,37 +1,35 @@
+import csv
+
+from django.contrib import admin
+from django.contrib.admin import SimpleListFilter
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.db import models
-from .models import Member, MemberBadge
-from .models import Member, Badge, MemberBadge
-from .models import Member
-from .models import Biography
-from .models import Badge, MemberBadge
-from .models import Badge
-from tinymce.widgets import TinyMCE
+from django.http import HttpResponse
+from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 from reversion.admin import VersionAdmin
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from django.http import HttpResponse
-import csv
-from django.utils.html import format_html
-from django.contrib.admin import SimpleListFilter
+from tinymce.widgets import TinyMCE
+
+from .models import Badge, Biography, Member, MemberBadge
+
 # Custom filter for Active/Not active status
 
 
 class ActiveStatusFilter(SimpleListFilter):
-    title = 'Active status'
-    parameter_name = 'active'
+    title = "Active status"
+    parameter_name = "active"
 
     def lookups(self, request, model_admin):
         return (
-            ('active', 'Active'),
-            ('not_active', 'Not active'),
+            ("active", "Active"),
+            ("not_active", "Not active"),
         )
 
     def queryset(self, request, queryset):
-        if self.value() == 'active':
+        if self.value() == "active":
             return queryset.filter(is_active=True)
-        if self.value() == 'not_active':
+        if self.value() == "not_active":
             return queryset.filter(is_active=False)
         return queryset
 
@@ -39,8 +37,7 @@ class ActiveStatusFilter(SimpleListFilter):
 @admin.register(Biography)
 class BiographyAdmin(admin.ModelAdmin):
     list_display = ("member", "updated_at")
-    search_fields = ("member__first_name",
-                     "member__last_name", "member__email")
+    search_fields = ("member__first_name", "member__last_name", "member__email")
     ordering = ("-updated_at",)
 
 
@@ -56,11 +53,13 @@ class BiographyAdmin(admin.ModelAdmin):
 # Currently uses default behavior with no customizations, but can be extended
 # to include list_display, search_fields, filters, or inline editing.
 
+
 @admin.register(MemberBadge)
 class MemberBadgeAdmin(admin.ModelAdmin):
     list_display = ("member", "badge", "date_awarded")
     list_filter = ("badge",)
     search_fields = ("member__first_name", "member__last_name", "badge__name")
+
 
 #########################
 # BadgeAdmin Class
@@ -76,9 +75,9 @@ class MemberBadgeAdmin(admin.ModelAdmin):
 
 class BadgeAdmin(admin.ModelAdmin):
     formfield_overrides = {
-        models.TextField: {'widget': TinyMCE(attrs={'cols': 80, 'rows': 10})},
+        models.TextField: {"widget": TinyMCE(attrs={"cols": 80, "rows": 10})},
     }
-    search_fields = ['name', 'description']
+    search_fields = ["name", "description"]
 
 
 #########################
@@ -108,12 +107,21 @@ class MemberBadgeInline(admin.TabularInline):
 # It extends Django's built-in UserChangeForm and allows customization of field
 # display, validation, and behavior specific to the Member model.
 
+
 # This form is referenced by MemberAdmin via the 'form' attribute.
 class CustomMemberChangeForm(UserChangeForm):
     class Meta:
         model = Member
-        fields = ("username", "email", "first_name", "last_name",
-                  "membership_status", "instructor", "towpilot")
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "membership_status",
+            "instructor",
+            "towpilot",
+        )
+
 
 #########################
 # CustomMemberCreationForm Class
@@ -175,23 +183,54 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     def export_members_csv(self, request, queryset):
         # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
         fields = [
-            "username", "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
-            "email", "phone", "mobile_phone", "emergency_contact",
-            "membership_status", "date_joined", "private_glider_checkride_date",
-            "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
-            "director", "member_manager", "rostermeister", "webmaster", "secretary", "treasurer",
-            "address", "city", "state_code", "state_freeform", "zip_code", "country",
-            "pilot_certificate_number", "SSA_member_number", "ssa_url", "glider_rating",
-            "public_notes", "private_notes", "is_active", "is_staff", "is_superuser"
+            "username",
+            "first_name",
+            "middle_initial",
+            "last_name",
+            "name_suffix",
+            "nickname",
+            "email",
+            "phone",
+            "mobile_phone",
+            "emergency_contact",
+            "membership_status",
+            "date_joined",
+            "private_glider_checkride_date",
+            "instructor",
+            "towpilot",
+            "duty_officer",
+            "assistant_duty_officer",
+            "director",
+            "member_manager",
+            "rostermeister",
+            "webmaster",
+            "secretary",
+            "treasurer",
+            "address",
+            "city",
+            "state_code",
+            "state_freeform",
+            "zip_code",
+            "country",
+            "pilot_certificate_number",
+            "SSA_member_number",
+            "ssa_url",
+            "glider_rating",
+            "public_notes",
+            "private_notes",
+            "is_active",
+            "is_staff",
+            "is_superuser",
         ]
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename=members_export.csv'
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = "attachment; filename=members_export.csv"
         writer = csv.writer(response)
         writer.writerow(fields)
         for member in queryset:
             row = [getattr(member, f, "") for f in fields]
             writer.writerow(row)
         return response
+
     export_members_csv.short_description = "Export selected members to CSV"
     readonly_fields = ("profile_photo_preview",)
 
@@ -199,62 +238,117 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     form = CustomMemberChangeForm
     inlines = [MemberBadgeInline]
 
-    list_display = ("last_name", "first_name", "email",
-                    "membership_status")
+    list_display = ("last_name", "first_name", "email", "membership_status")
     search_fields = ("first_name", "last_name", "email", "username")
-    list_filter = ("membership_status", "instructor", "towpilot",
-                   "director", "member_manager", "rostermeister", ActiveStatusFilter)
+    list_filter = (
+        "membership_status",
+        "instructor",
+        "towpilot",
+        "director",
+        "member_manager",
+        "rostermeister",
+        ActiveStatusFilter,
+    )
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        ("Personal Info", {
-            "fields": (
-                "first_name", "middle_initial", "last_name", "name_suffix", "nickname",
-                "profile_photo", "profile_photo_preview",
-                "email", "phone", "mobile_phone", "emergency_contact"
-            )
-        }),
-        ("Membership", {
-            "fields": (
-                "membership_status", "date_joined", "private_glider_checkride_date",
-                "instructor", "towpilot", "duty_officer", "assistant_duty_officer",
-                "director", "member_manager", "rostermeister",
-                "webmaster", "secretary", "treasurer"
-            )
-        }),
-        ("Other Info", {
-            "fields": (
-                "address", "city", "state_code", "state_freeform", "zip_code", "country",
-                "pilot_certificate_number",
-                "SSA_member_number", "ssa_url", "glider_rating", "private_notes", "public_notes"
-            )
-        }),
-        ("Permissions", {
-            "fields": (
-                "is_active", "is_staff", "is_superuser", "groups", "user_permissions"
-            )
-        }),
-        ("Important Dates", {
-            "fields": (
-                "last_login",
-            )
-        }),
+        (
+            "Personal Info",
+            {
+                "fields": (
+                    "first_name",
+                    "middle_initial",
+                    "last_name",
+                    "name_suffix",
+                    "nickname",
+                    "profile_photo",
+                    "profile_photo_preview",
+                    "email",
+                    "phone",
+                    "mobile_phone",
+                    "emergency_contact",
+                )
+            },
+        ),
+        (
+            "Membership",
+            {
+                "fields": (
+                    "membership_status",
+                    "date_joined",
+                    "private_glider_checkride_date",
+                    "instructor",
+                    "towpilot",
+                    "duty_officer",
+                    "assistant_duty_officer",
+                    "director",
+                    "member_manager",
+                    "rostermeister",
+                    "webmaster",
+                    "secretary",
+                    "treasurer",
+                )
+            },
+        ),
+        (
+            "Other Info",
+            {
+                "fields": (
+                    "address",
+                    "city",
+                    "state_code",
+                    "state_freeform",
+                    "zip_code",
+                    "country",
+                    "pilot_certificate_number",
+                    "SSA_member_number",
+                    "ssa_url",
+                    "glider_rating",
+                    "private_notes",
+                    "public_notes",
+                )
+            },
+        ),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
+        ("Important Dates", {"fields": ("last_login",)}),
     )
 
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("username", "email", "first_name", "last_name", "password1", "password2"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "username",
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "password1",
+                    "password2",
+                ),
+            },
+        ),
     )
 
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
             return format_html(
                 '<img src="{}" style="max-height:200px; border:1px solid #ccc;" />',
-                obj.profile_photo.url
+                obj.profile_photo.url,
             )
         return ""
+
     profile_photo_preview.short_description = "Current Photo"
 
     def get_search_results(self, request, queryset, search_term):

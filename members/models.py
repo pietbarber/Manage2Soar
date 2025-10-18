@@ -1,28 +1,37 @@
+import os
 from datetime import timedelta
+
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, User
+from django.contrib.auth.models import AbstractUser, Group, User
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils.timezone import now
 from tinymce.models import HTMLField
+
+from members.constants.membership import (
+    DEFAULT_ACTIVE_STATUSES,
+    MEMBERSHIP_STATUS_CHOICES,
+    US_STATE_CHOICES,
+)
+from utils.upload_entropy import (
+    upload_badge_image,
+    upload_biography,
+    upload_profile_photo,
+)
+
 from .utils.avatar_generator import generate_identicon
-from utils.upload_entropy import upload_biography, upload_profile_photo, upload_badge_image
-import os
-from django.contrib.auth.models import Group
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES, MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
-from django.db import transaction
 
 
 def biography_upload_path(instance, filename):
-    return f'biography/{instance.member.username}/{filename}'
+    return f"biography/{instance.member.username}/{filename}"
 
 
 class Biography(models.Model):
-    member = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    member = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     content = HTMLField(blank=True, null=True)
     uploaded_image = models.ImageField(
-        upload_to=upload_biography, blank=True, null=True)
+        upload_to=upload_biography, blank=True, null=True
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -63,13 +72,19 @@ class Biography(models.Model):
 # Methods:
 # - is_active_member(): Returns True if the member has a qualifying active membership status
 
+
 class Member(AbstractUser):
     pilot_certificate_number = models.CharField(
-        max_length=32, blank=True, null=True,
-        help_text="FAA pilot certificate number (optional, but required for instructors giving instruction)")
+        max_length=32,
+        blank=True,
+        null=True,
+        help_text="FAA pilot certificate number (optional, but required for instructors giving instruction)",
+    )
     private_glider_checkride_date = models.DateField(
-        blank=True, null=True,
-        help_text="Date member passed practical checkride for Private Pilot Glider.")
+        blank=True,
+        null=True,
+        help_text="Date member passed practical checkride for Private Pilot Glider.",
+    )
     # Here are the legacy codes from the old database,
     # Legacy status codes:
     # M = Full Member
@@ -89,24 +104,29 @@ class Member(AbstractUser):
     membership_status = models.CharField(
         max_length=20,
         choices=MEMBERSHIP_STATUS_CHOICES,
-        default='Non-Member',
+        default="Non-Member",
         blank=True,
         null=True,
     )
 
     NAME_SUFFIX_CHOICES = [
-        ('', '—'),  # blank default
-        ('Jr.', 'Jr.'),
-        ('Sr.', 'Sr.'),
-        ('II', 'II'),
-        ('III', 'III'),
-        ('IV', 'IV'),
-        ('V', 'V'),
+        ("", "—"),  # blank default
+        ("Jr.", "Jr."),
+        ("Sr.", "Sr."),
+        ("II", "II"),
+        ("III", "III"),
+        ("IV", "IV"),
+        ("V", "V"),
     ]
 
     # Additional name-related fields
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='member_profile', null=True, blank=True)
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="member_profile",
+        null=True,
+        blank=True,
+    )
     middle_initial = models.CharField(max_length=2, blank=True, null=True)
     nickname = models.CharField(max_length=50, blank=True, null=True)
     name_suffix = models.CharField(
@@ -119,36 +139,39 @@ class Member(AbstractUser):
     # Additional contact information fields
 
     SSA_member_number = models.CharField(
-        max_length=20, unique=True, blank=True, null=True)
+        max_length=20, unique=True, blank=True, null=True
+    )
     ssa_url = models.URLField(
-        max_length=300, blank=True, null=True, help_text="Direct link to this member's SSA page for badges and achievements.")
+        max_length=300,
+        blank=True,
+        null=True,
+        help_text="Direct link to this member's SSA page for badges and achievements.",
+    )
     legacy_username = models.CharField(
-        max_length=50, unique=True, blank=True, null=True)
+        max_length=50, unique=True, blank=True, null=True
+    )
     phone = models.CharField(max_length=20, blank=True, null=True)
     mobile_phone = models.CharField(max_length=20, blank=True, null=True)
-    country = models.CharField(
-        max_length=2, blank=True, null=True, default='US')
+    country = models.CharField(max_length=2, blank=True, null=True, default="US")
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=50, blank=True, null=True)
     state_code = models.CharField(
-        max_length=2,
-        choices=US_STATE_CHOICES,
-        blank=True,
-        null=True
+        max_length=2, choices=US_STATE_CHOICES, blank=True, null=True
     )
     state_freeform = models.CharField(max_length=50, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
     profile_photo = models.ImageField(
-        upload_to=upload_profile_photo, blank=True, null=True)
+        upload_to=upload_profile_photo, blank=True, null=True
+    )
     GLIDER_RATING_CHOICES = [
-        ('none', 'None'),
-        ('student', 'Student'),
-        ('transition', 'Transition'),
-        ('private', 'Private'),
-        ('commercial', 'Commercial'),
+        ("none", "None"),
+        ("student", "Student"),
+        ("transition", "Transition"),
+        ("private", "Private"),
+        ("commercial", "Commercial"),
     ]
     glider_rating = models.CharField(
-        max_length=10, choices=GLIDER_RATING_CHOICES, default='student'
+        max_length=10, choices=GLIDER_RATING_CHOICES, default="student"
     )
 
     instructor = models.BooleanField(default=False)
@@ -169,18 +192,20 @@ class Member(AbstractUser):
     private_notes = HTMLField(blank=True, null=True)
 
     last_updated_by = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True)
+        "self", on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     @property
     def profile_image_url(self):
         from django.urls import reverse
+
         if self.profile_photo:
             # If it's a FieldFile, it has .url; if it's a str, build a URL
             if hasattr(self.profile_photo, "url"):
                 return self.profile_photo.url  # type: ignore[attr-defined]
             # Fallback for string paths
             return f"{settings.MEDIA_URL}{self.profile_photo}"
-        return reverse('pydenticon', kwargs={'username': self.username})
+        return reverse("pydenticon", kwargs={"username": self.username})
 
     ##################################
     # full_display_name
@@ -192,7 +217,7 @@ class Member(AbstractUser):
     @property
     def full_display_name(self):
         if self.nickname:
-            first = f'{self.nickname}'
+            first = f"{self.nickname}"
         else:
             first = self.first_name
 
@@ -242,13 +267,18 @@ class Member(AbstractUser):
             self.is_staff = True
         else:
             # Grant staff status to instructors, member managers, rostermeisters, or webmasters
-            self.is_staff = self.instructor or self.member_manager or self.rostermeister or self.webmaster
+            self.is_staff = (
+                self.instructor
+                or self.member_manager
+                or self.rostermeister
+                or self.webmaster
+            )
 
         # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
             filename = f"profile_{self.username}.png"
-            file_path = os.path.join('generated_avatars', filename)
-            if not os.path.exists(os.path.join('media', file_path)):
+            file_path = os.path.join("generated_avatars", filename)
+            if not os.path.exists(os.path.join("media", file_path)):
                 generate_identicon(self.username, file_path)
             self.profile_photo = file_path
 
@@ -265,6 +295,7 @@ class Member(AbstractUser):
 
     def __str__(self):
         return self.full_display_name
+
 
 #########################
 # Badge Model
@@ -283,16 +314,16 @@ class Member(AbstractUser):
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    image = models.ImageField(
-        upload_to=upload_badge_image, blank=True, null=True)
+    image = models.ImageField(upload_to=upload_badge_image, blank=True, null=True)
     description = HTMLField(blank=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order']
+        ordering = ["order"]
 
     def __str__(self):
         return self.name
+
 
 #########################
 # MemberBadge Model
@@ -308,13 +339,14 @@ class Badge(models.Model):
 
 class MemberBadge(models.Model):
     member = models.ForeignKey(
-        'Member', on_delete=models.CASCADE, related_name='badges')
+        "Member", on_delete=models.CASCADE, related_name="badges"
+    )
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     date_awarded = models.DateField()
     notes = models.TextField(blank=True)
 
     class Meta:
-        unique_together = ('member', 'badge')
+        unique_together = ("member", "badge")
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"

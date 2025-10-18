@@ -1,13 +1,18 @@
 # from .models import Towplane, Airfield  # Adjust import paths as needed
-from django.db import models
-from decimal import Decimal, ROUND_HALF_UP
-from utils.upload_entropy import upload_towplane_photo, upload_glider_photo, upload_airfield_photo
-from datetime import datetime, timedelta, date
-from tinymce.models import HTMLField
-from django.conf import settings
-from members.models import Member
-from django.core.validators import MinValueValidator
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
+from django.conf import settings
+from django.core.validators import MinValueValidator
+from django.db import models
+from tinymce.models import HTMLField
+
+from members.models import Member
+from utils.upload_entropy import (
+    upload_airfield_photo,
+    upload_glider_photo,
+    upload_towplane_photo,
+)
 
 ####################################################
 # Flight model
@@ -35,51 +40,69 @@ from django.core.validators import MinValueValidator
 #         Handles overnight flights by adjusting the landing time if it occurs before the launch time.
 # - __str__: Returns a string representation of the flight, including the pilot, glider, and launch time.
 
+
 class Flight(models.Model):
     class Meta:
         indexes = [
-            models.Index(fields=['pilot']),
-            models.Index(fields=['instructor']),
-            models.Index(fields=['passenger']),
-            models.Index(fields=['logsheet']),
-            models.Index(fields=['towplane', 'logsheet']),
-            models.Index(fields=['tow_pilot', 'logsheet']),
+            models.Index(fields=["pilot"]),
+            models.Index(fields=["instructor"]),
+            models.Index(fields=["passenger"]),
+            models.Index(fields=["logsheet"]),
+            models.Index(fields=["towplane", "logsheet"]),
+            models.Index(fields=["tow_pilot", "logsheet"]),
         ]
+
     logsheet = models.ForeignKey(
-        "Logsheet", on_delete=models.CASCADE, related_name="flights")
+        "Logsheet", on_delete=models.CASCADE, related_name="flights"
+    )
     launch_time = models.TimeField(blank=True, null=True)
     landing_time = models.TimeField(blank=True, null=True)
     pilot = models.ForeignKey(
-        "members.Member", on_delete=models.SET_NULL, null=True, related_name="flights_as_pilot")
-    instructor = models.ForeignKey("members.Member", on_delete=models.SET_NULL,
-                                   null=True, blank=True, related_name="flights_as_instructor")
-    glider = models.ForeignKey(
-        "logsheet.Glider", on_delete=models.SET_NULL, null=True)
-    tow_pilot = models.ForeignKey("members.Member", on_delete=models.SET_NULL,
-                                  null=True, blank=True, related_name="flights_as_tow_pilot")
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="flights_as_pilot",
+    )
+    instructor = models.ForeignKey(
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="flights_as_instructor",
+    )
+    glider = models.ForeignKey("logsheet.Glider", on_delete=models.SET_NULL, null=True)
+    tow_pilot = models.ForeignKey(
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="flights_as_tow_pilot",
+    )
     towplane = models.ForeignKey(
-        "Towplane", on_delete=models.SET_NULL, null=True, blank=True)
+        "Towplane", on_delete=models.SET_NULL, null=True, blank=True
+    )
     duration = models.DurationField(blank=True, null=True)
-    passenger = models.ForeignKey(Member, on_delete=models.SET_NULL,
-                                  null=True, blank=True, related_name="flights_as_passenger")
+    passenger = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="flights_as_passenger",
+    )
 
     # Guest name fallbacks (for legacy import)
     guest_pilot_name = models.CharField(max_length=100, blank=True, null=True)
-    guest_instructor_name = models.CharField(
-        max_length=100, blank=True, null=True)
-    guest_towpilot_name = models.CharField(
-        max_length=100, blank=True, null=True)
+    guest_instructor_name = models.CharField(max_length=100, blank=True, null=True)
+    guest_towpilot_name = models.CharField(max_length=100, blank=True, null=True)
 
     # Legacy name tracking for post-import cleanup or debug
     passenger_name = models.CharField(
-        max_length=100, blank=True, help_text="Name of passenger if not a member")
+        max_length=100, blank=True, help_text="Name of passenger if not a member"
+    )
     legacy_pilot_name = models.CharField(max_length=100, blank=True, null=True)
-    legacy_instructor_name = models.CharField(
-        max_length=100, blank=True, null=True)
-    legacy_passenger_name = models.CharField(
-        max_length=100, blank=True, null=True)
-    legacy_towpilot_name = models.CharField(
-        max_length=100, blank=True, null=True)
+    legacy_instructor_name = models.CharField(max_length=100, blank=True, null=True)
+    legacy_passenger_name = models.CharField(max_length=100, blank=True, null=True)
+    legacy_towpilot_name = models.CharField(max_length=100, blank=True, null=True)
 
     # Launch method for winch/self-launch/other
     class LaunchMethod(models.TextChoices):
@@ -94,8 +117,7 @@ class Flight(models.Model):
         default=LaunchMethod.TOWPLANE,
     )
     # Airfield will need to go back in right here.
-    airfield = models.ForeignKey(
-        "Airfield", on_delete=models.PROTECT, null=True)
+    airfield = models.ForeignKey("Airfield", on_delete=models.PROTECT, null=True)
 
     flight_type = models.CharField(max_length=50)  # dual, solo, intro, etc.
     notes = models.TextField(blank=True)
@@ -107,20 +129,20 @@ class Flight(models.Model):
         choices=RELEASE_ALTITUDE_CHOICES,
         blank=True,
         null=True,
-        help_text="Release altitude in feet (0–7000 in 100ft steps)"
+        help_text="Release altitude in feet (0–7000 in 100ft steps)",
     )
     tow_cost_actual = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True)
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
     rental_cost_actual = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True)
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
 
     def is_incomplete(self):
-        return (
-            self.landing_time is not None and (
-                self.release_altitude is None or
-                self.towplane is None or
-                self.tow_pilot is None
-            )
+        return self.landing_time is not None and (
+            self.release_altitude is None
+            or self.towplane is None
+            or self.tow_pilot is None
         )
 
     def get_missing_fields(self):
@@ -148,8 +170,7 @@ class Flight(models.Model):
         if self.release_altitude is None:
             return None
         return (
-            TowRate.objects
-            .filter(altitude__lte=self.release_altitude)
+            TowRate.objects.filter(altitude__lte=self.release_altitude)
             .order_by("-altitude")
             .values_list("price", flat=True)
             .first()
@@ -169,8 +190,7 @@ class Flight(models.Model):
         if self.release_altitude is None:
             return None
         return (
-            TowRate.objects
-            .filter(altitude__lte=self.release_altitude)
+            TowRate.objects.filter(altitude__lte=self.release_altitude)
             .order_by("-altitude")
             .values_list("price", flat=True)
             .first()
@@ -222,7 +242,9 @@ class Flight(models.Model):
 
             # Handle overnight flights (if landing before launch)
             if land_dt < launch_dt:
-                if (launch_dt - land_dt).total_seconds() < 16 * 3600:  # < 16 hours difference
+                if (
+                    launch_dt - land_dt
+                ).total_seconds() < 16 * 3600:  # < 16 hours difference
                     land_dt += timedelta(days=1)
                 else:
                     # probably a bad duration, so throw it away
@@ -241,7 +263,7 @@ class Flight(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="shared_flights"
+        related_name="shared_flights",
     )
 
     split_type = models.CharField(
@@ -250,10 +272,10 @@ class Flight(models.Model):
             ("even", "50/50"),
             ("tow", "Tow Only"),
             ("rental", "Rental Only"),
-            ("full", "Full Cost")
+            ("full", "Full Cost"),
         ],
         null=True,
-        blank=True
+        blank=True,
     )
 
     def __str__(self):
@@ -278,14 +300,15 @@ class Flight(models.Model):
 #
 class RevisionLog(models.Model):
     logsheet = models.ForeignKey(
-        "Logsheet", on_delete=models.CASCADE, related_name="revisions")
-    revised_by = models.ForeignKey(
-        Member, on_delete=models.SET_NULL, null=True)
+        "Logsheet", on_delete=models.CASCADE, related_name="revisions"
+    )
+    revised_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
     revised_at = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True)
 
     def __str__(self):
         return f"Revised by {self.revised_by} on {self.revised_at}"
+
 
 ####################################################
 # Towplane model
@@ -300,30 +323,38 @@ class Towplane(models.Model):
     make = models.CharField(max_length=100, blank=True, null=True)
     model = models.CharField(max_length=100, blank=True, null=True)
     n_number = models.CharField(max_length=50)  # e.g., N-number
-    photo = models.ImageField(
-        upload_to=upload_towplane_photo, blank=True, null=True)
+    photo = models.ImageField(upload_to=upload_towplane_photo, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     club_owned = models.BooleanField(default=False)
     initial_hours = models.DecimalField(
-        max_digits=8, decimal_places=1, default=Decimal("0.0"),
+        max_digits=8,
+        decimal_places=1,
+        default=Decimal("0.0"),
         validators=[MinValueValidator(0)],
         help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
     )
     oil_change_interval = models.DecimalField(
-        max_digits=5, decimal_places=1, default=Decimal("50.0"),
-        help_text="Hours between oil changes (default 50, but configurable per aircraft)."
+        max_digits=5,
+        decimal_places=1,
+        default=Decimal("50.0"),
+        help_text="Hours between oil changes (default 50, but configurable per aircraft).",
     )
     next_oil_change_due = models.DecimalField(
-        max_digits=8, decimal_places=1, blank=True, null=True,
-        help_text="Tach time at which next oil change is due."
+        max_digits=8,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Tach time at which next oil change is due.",
     )
     requires_100hr_inspection = models.BooleanField(
-        default=False,
-        help_text="Check if this towplane requires 100-hour inspections."
+        default=False, help_text="Check if this towplane requires 100-hour inspections."
     )
     next_100hr_due = models.DecimalField(
-        max_digits=8, decimal_places=1, blank=True, null=True,
-        help_text="Tach time at which next 100-hour inspection is due."
+        max_digits=8,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Tach time at which next 100-hour inspection is due.",
     )
 
     class Meta:
@@ -336,16 +367,11 @@ class Towplane(models.Model):
     @property
     def is_grounded(self):
         return MaintenanceIssue.objects.filter(
-            towplane=self,
-            grounded=True,
-            resolved=False
+            towplane=self, grounded=True, resolved=False
         ).exists()
 
     def get_active_issues(self):
-        return MaintenanceIssue.objects.filter(
-            towplane=self,
-            resolved=False
-        )
+        return MaintenanceIssue.objects.filter(towplane=self, resolved=False)
 
 
 ####################################################
@@ -363,36 +389,41 @@ class Glider(models.Model):
     n_number = models.CharField(max_length=20, unique=True)
     competition_number = models.CharField(max_length=10, blank=True)
     seats = models.PositiveIntegerField(default=2)
-    photo = models.ImageField(
-        upload_to=upload_glider_photo, blank=True, null=True)
+    photo = models.ImageField(upload_to=upload_glider_photo, blank=True, null=True)
     rental_rate = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True)
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
     max_rental_rate = models.DecimalField(
-        max_digits=6, decimal_places=2, blank=True, null=True)
+        max_digits=6, decimal_places=2, blank=True, null=True
+    )
     is_active = models.BooleanField(
         default=True,
-        help_text="Uncheck to hide this glider from flight entry dropdowns"
+        help_text="Uncheck to hide this glider from flight entry dropdowns",
     )
     club_owned = models.BooleanField(default=True)
     initial_hours = models.DecimalField(
-        max_digits=8, decimal_places=1, default=Decimal("0.0"),
+        max_digits=8,
+        decimal_places=1,
+        default=Decimal("0.0"),
         validators=[MinValueValidator(0)],
         help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
     )
     requires_100hr_inspection = models.BooleanField(
-        default=False,
-        help_text="Check if this glider requires 100-hour inspections."
+        default=False, help_text="Check if this glider requires 100-hour inspections."
     )
     next_100hr_due = models.DecimalField(
-        max_digits=8, decimal_places=1, blank=True, null=True,
-        help_text="Cumulative hours at which next 100-hour inspection is due."
+        max_digits=8,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Cumulative hours at which next 100-hour inspection is due.",
     )
 
     owners = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="gliders_owned",
         blank=True,
-        help_text="Members who own this glider"
+        help_text="Members who own this glider",
     )
 
     def __str__(self):
@@ -408,16 +439,11 @@ class Glider(models.Model):
     @property
     def is_grounded(self):
         return MaintenanceIssue.objects.filter(
-            glider=self,
-            grounded=True,
-            resolved=False
+            glider=self, grounded=True, resolved=False
         ).exists()
 
     def get_active_issues(self):
-        return MaintenanceIssue.objects.filter(
-            glider=self,
-            resolved=False
-        )
+        return MaintenanceIssue.objects.filter(glider=self, resolved=False)
 
 
 ####################################################
@@ -431,8 +457,7 @@ class Airfield(models.Model):
     identifier = models.CharField(max_length=10, unique=True)  # e.g., KFRR
     # e.g., Front Royal Warren County Airport
     name = models.CharField(max_length=100)
-    photo = models.ImageField(
-        upload_to=upload_airfield_photo, blank=True, null=True)
+    photo = models.ImageField(upload_to=upload_airfield_photo, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -457,20 +482,57 @@ class Logsheet(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     finalized = models.BooleanField(default=False)
 
-    duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True,
-                                     related_name="log_duty_officer", limit_choices_to={"duty_officer": True})
-    assistant_duty_officer = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True,
-                                               related_name="log_assistant_duty_officer", limit_choices_to={"assistant_duty_officer": True})
-    duty_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True,
-                                        blank=True, related_name="log_duty_instructor", limit_choices_to={"instructor": True})
-    surge_instructor = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True,
-                                         blank=True, related_name="log_surge_instructor", limit_choices_to={"instructor": True})
-    tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True,
-                                  blank=True, related_name="log_tow_pilot", limit_choices_to={"towpilot": True})
-    surge_tow_pilot = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True,
-                                        blank=True, related_name="log_surge_tow_pilot", limit_choices_to={"towpilot": True})
+    duty_officer = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_duty_officer",
+        limit_choices_to={"duty_officer": True},
+    )
+    assistant_duty_officer = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_assistant_duty_officer",
+        limit_choices_to={"assistant_duty_officer": True},
+    )
+    duty_instructor = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_duty_instructor",
+        limit_choices_to={"instructor": True},
+    )
+    surge_instructor = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_surge_instructor",
+        limit_choices_to={"instructor": True},
+    )
+    tow_pilot = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_tow_pilot",
+        limit_choices_to={"towpilot": True},
+    )
+    surge_tow_pilot = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="log_surge_tow_pilot",
+        limit_choices_to={"towpilot": True},
+    )
     default_towplane = models.ForeignKey(
-        Towplane, on_delete=models.SET_NULL, null=True, blank=True)
+        Towplane, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     class Meta:
         unique_together = ("log_date", "airfield")
@@ -479,8 +541,10 @@ class Logsheet(models.Model):
         return f"{self.log_date} @ {self.airfield}"
 
     def save(self, *args, **kwargs):
-        from logsheet.models import MaintenanceIssue
         from decimal import Decimal
+
+        from logsheet.models import MaintenanceIssue
+
         is_new = self.pk is None
         # Fetch previous finalized state if updating
         if not is_new:
@@ -539,7 +603,7 @@ class Logsheet(models.Model):
                                 resolved=False,
                             )
             # --- Glider 100hr checks ---
-            for glider in self.flights.values_list('glider', flat=True).distinct():
+            for glider in self.flights.values_list("glider", flat=True).distinct():
                 if not glider:
                     continue
                 g = Glider.objects.filter(pk=glider).first()
@@ -547,15 +611,25 @@ class Logsheet(models.Model):
                     continue
                 # Calculate cumulative hours for this glider up to this logsheet
                 # (Assume initial_hours + sum of all durations for this glider)
-                from django.db.models import Sum, F, ExpressionWrapper, DurationField
+                from django.db.models import DurationField, ExpressionWrapper, F, Sum
+
                 flights = g.flights_as_pilot.all().filter(
-                    logsheet__log_date__lte=self.log_date)
-                total_seconds = flights.aggregate(
-                    s=Sum(ExpressionWrapper(F('duration'),
-                          output_field=DurationField()))
-                )['s'].total_seconds() if flights.exists() else 0
-                cum_hours = (g.initial_hours or Decimal("0.0")) + \
-                    Decimal(total_seconds or 0) / Decimal(3600)
+                    logsheet__log_date__lte=self.log_date
+                )
+                total_seconds = (
+                    flights.aggregate(
+                        s=Sum(
+                            ExpressionWrapper(
+                                F("duration"), output_field=DurationField()
+                            )
+                        )
+                    )["s"].total_seconds()
+                    if flights.exists()
+                    else 0
+                )
+                cum_hours = (g.initial_hours or Decimal("0.0")) + Decimal(
+                    total_seconds or 0
+                ) / Decimal(3600)
                 due = g.next_100hr_due
                 hours_to_due = due - cum_hours
                 if hours_to_due <= 10 and hours_to_due > 0:
@@ -585,15 +659,18 @@ class Logsheet(models.Model):
 #
 class TowRate(models.Model):
     altitude = models.PositiveIntegerField(
-        help_text="Release altitude in feet (e.g. 2000)")
+        help_text="Release altitude in feet (e.g. 2000)"
+    )
     price = models.DecimalField(
-        max_digits=6, decimal_places=2, help_text="Price in USD")
+        max_digits=6, decimal_places=2, help_text="Price in USD"
+    )
 
     class Meta:
-        ordering = ['altitude']
+        ordering = ["altitude"]
 
     def __str__(self):
         return f"{self.altitude} ft – ${self.price:.2f}"
+
 
 ####################################################
 # LogsheetPayment model
@@ -618,10 +695,10 @@ class LogsheetPayment(models.Model):
             ("account", "On Account"),
             ("check", "Check"),
             ("zelle", "Zelle"),
-            ("cash", "Cash")
+            ("cash", "Cash"),
         ],
         null=True,
-        blank=True
+        blank=True,
     )
     note = models.CharField(max_length=200, blank=True)
 
@@ -630,6 +707,7 @@ class LogsheetPayment(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
+
 
 ####################################################
 # LogsheetCloseout model
@@ -644,10 +722,12 @@ class LogsheetPayment(models.Model):
 
 class LogsheetCloseout(models.Model):
     logsheet = models.OneToOneField(
-        Logsheet, on_delete=models.CASCADE, related_name="closeout")
+        Logsheet, on_delete=models.CASCADE, related_name="closeout"
+    )
     safety_issues = HTMLField(blank=True)
     equipment_issues = HTMLField(blank=True)
     operations_summary = HTMLField(blank=True)
+
 
 ####################################################
 # TowplaneCloseout model
@@ -672,16 +752,21 @@ class LogsheetCloseout(models.Model):
 
 class TowplaneCloseout(models.Model):
     logsheet = models.ForeignKey(
-        Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts")
+        Logsheet, on_delete=models.CASCADE, related_name="towplane_closeouts"
+    )
     towplane = models.ForeignKey(Towplane, on_delete=models.CASCADE)
     start_tach = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True)
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
     end_tach = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True)
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
     tach_time = models.DecimalField(
-        max_digits=6, decimal_places=2, null=True, blank=True)
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
     fuel_added = models.DecimalField(
-        max_digits=5, decimal_places=1, null=True, blank=True)
+        max_digits=5, decimal_places=1, null=True, blank=True
+    )
     notes = HTMLField(blank=True)
 
     class Meta:
@@ -719,32 +804,45 @@ class TowplaneCloseout(models.Model):
 class MaintenanceIssue(models.Model):
     def save(self, *args, **kwargs):
         from django.utils import timezone
+
         # Set report_date to logsheet.log_date if available, else today
         if self.logsheet and self.logsheet.log_date:
             self.report_date = self.logsheet.log_date
         elif not self.report_date:
             self.report_date = timezone.now().date()
         super().save(*args, **kwargs)
+
     glider = models.ForeignKey(
-        "logsheet.Glider", null=True, blank=True, on_delete=models.CASCADE)
+        "logsheet.Glider", null=True, blank=True, on_delete=models.CASCADE
+    )
     towplane = models.ForeignKey(
-        "logsheet.Towplane", null=True, blank=True, on_delete=models.CASCADE)
-    reported_by = models.ForeignKey(
-        Member, on_delete=models.SET_NULL, null=True)
+        "logsheet.Towplane", null=True, blank=True, on_delete=models.CASCADE
+    )
+    reported_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
     report_date = models.DateField()
-    logsheet = models.ForeignKey("Logsheet", on_delete=models.SET_NULL,
-                                 null=True, blank=True, related_name="maintenance_issues")
+    logsheet = models.ForeignKey(
+        "Logsheet",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="maintenance_issues",
+    )
 
     description = models.TextField()
     grounded = models.BooleanField(default=False)
     resolved = models.BooleanField(default=False)
     resolution_notes = models.TextField(blank=True)
     resolved_by = models.ForeignKey(
-        Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="resolved_maintenance")
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_maintenance",
+    )
     resolved_date = models.DateField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-report_date']
+        ordering = ["-report_date"]
 
     def __str__(self):
         aircraft = self.glider or self.towplane
@@ -754,19 +852,23 @@ class MaintenanceIssue(models.Model):
     def can_be_resolved_by(self, user):
         if user.is_superuser:
             return True
-        if self.glider and user.id in self.glider.aircraftmeister_set.values_list('member_id', flat=True):
+        if self.glider and user.id in self.glider.aircraftmeister_set.values_list(
+            "member_id", flat=True
+        ):
             return True
-        if self.towplane and user.id in self.towplane.aircraftmeister_set.values_list('member_id', flat=True):
+        if self.towplane and user.id in self.towplane.aircraftmeister_set.values_list(
+            "member_id", flat=True
+        ):
             return True
         return False
 
 
 class DeadlineType(models.TextChoices):
-    ANNUAL = "annual",      "Annual Inspection"
-    CONDITION = "condition",   "Condition Inspection"
-    PARACHUTE = "parachute",   "Parachute Repack"
+    ANNUAL = "annual", "Annual Inspection"
+    CONDITION = "condition", "Condition Inspection"
+    PARACHUTE = "parachute", "Parachute Repack"
     TRANSPONDER = "transponder", "Transponder Inspection"
-    LETTER = "letter",      "Program Letter"
+    LETTER = "letter", "Program Letter"
 
 
 DEADLINE_TYPES = [
@@ -796,10 +898,10 @@ DEADLINE_TYPES = DeadlineType.choices
 
 
 class MaintenanceDeadline(models.Model):
-    glider = models.ForeignKey(
-        Glider, on_delete=models.CASCADE, blank=True, null=True)
+    glider = models.ForeignKey(Glider, on_delete=models.CASCADE, blank=True, null=True)
     towplane = models.ForeignKey(
-        Towplane, on_delete=models.CASCADE, blank=True, null=True)
+        Towplane, on_delete=models.CASCADE, blank=True, null=True
+    )
     description = models.CharField(max_length=32, choices=DeadlineType.choices)
     due_date = models.DateField()
 
@@ -831,11 +933,12 @@ class MaintenanceDeadline(models.Model):
 # - __str__: Returns the member and aircraft they oversee.
 #
 
+
 class AircraftMeister(models.Model):
-    glider = models.ForeignKey(
-        Glider, null=True, blank=True, on_delete=models.CASCADE)
+    glider = models.ForeignKey(Glider, null=True, blank=True, on_delete=models.CASCADE)
     towplane = models.ForeignKey(
-        Towplane, null=True, blank=True, on_delete=models.CASCADE)
+        Towplane, null=True, blank=True, on_delete=models.CASCADE
+    )
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
 
     def __str__(self):

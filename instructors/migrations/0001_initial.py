@@ -16,140 +16,348 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='ClubQualificationType',
+            name="ClubQualificationType",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('code', models.CharField(max_length=30, unique=True)),
-                ('name', models.CharField(max_length=100)),
-                ('icon', models.ImageField(blank=True, null=True, upload_to='quals/icons/')),
-                ('applies_to', models.CharField(choices=[('student', 'Student'), ('rated', 'Rated'), ('both', 'Both')], default='both', max_length=10)),
-                ('is_obsolete', models.BooleanField(default=False)),
-                ('tooltip', models.TextField(blank=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("code", models.CharField(max_length=30, unique=True)),
+                ("name", models.CharField(max_length=100)),
+                (
+                    "icon",
+                    models.ImageField(blank=True, null=True, upload_to="quals/icons/"),
+                ),
+                (
+                    "applies_to",
+                    models.CharField(
+                        choices=[
+                            ("student", "Student"),
+                            ("rated", "Rated"),
+                            ("both", "Both"),
+                        ],
+                        default="both",
+                        max_length=10,
+                    ),
+                ),
+                ("is_obsolete", models.BooleanField(default=False)),
+                ("tooltip", models.TextField(blank=True)),
             ],
         ),
         migrations.CreateModel(
-            name='SyllabusDocument',
+            name="SyllabusDocument",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('slug', models.SlugField(unique=True)),
-                ('title', models.CharField(max_length=200)),
-                ('content', tinymce.models.HTMLField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("slug", models.SlugField(unique=True)),
+                ("title", models.CharField(max_length=200)),
+                ("content", tinymce.models.HTMLField()),
             ],
         ),
         migrations.CreateModel(
-            name='TrainingPhase',
+            name="TrainingPhase",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('number', models.PositiveSmallIntegerField()),
-                ('name', models.CharField(max_length=100)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("number", models.PositiveSmallIntegerField()),
+                ("name", models.CharField(max_length=100)),
             ],
             options={
-                'ordering': ['number'],
+                "ordering": ["number"],
             },
         ),
         migrations.CreateModel(
-            name='GroundInstruction',
+            name="GroundInstruction",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField()),
-                ('location', models.CharField(blank=True, max_length=100, null=True)),
-                ('duration', models.DurationField(blank=True, null=True)),
-                ('notes', tinymce.models.HTMLField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('instructor', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ground_given', to=settings.AUTH_USER_MODEL)),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ground_sessions', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField()),
+                ("location", models.CharField(blank=True, max_length=100, null=True)),
+                ("duration", models.DurationField(blank=True, null=True)),
+                ("notes", tinymce.models.HTMLField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="ground_given",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="ground_sessions",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-date'],
+                "ordering": ["-date"],
             },
         ),
         migrations.CreateModel(
-            name='InstructionReport',
+            name="InstructionReport",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('report_date', models.DateField()),
-                ('report_text', tinymce.models.HTMLField(blank=True)),
-                ('simulator', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('instructor', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='given_instruction_reports', to=settings.AUTH_USER_MODEL)),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='instruction_reports', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("report_date", models.DateField()),
+                ("report_text", tinymce.models.HTMLField(blank=True)),
+                ("simulator", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="given_instruction_reports",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="instruction_reports",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-report_date'],
-                'unique_together': {('student', 'instructor', 'report_date')},
+                "ordering": ["-report_date"],
+                "unique_together": {("student", "instructor", "report_date")},
             },
         ),
         migrations.CreateModel(
-            name='StudentProgressSnapshot',
+            name="StudentProgressSnapshot",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('solo_progress', models.FloatField(default=0.0)),
-                ('checkride_progress', models.FloatField(default=0.0)),
-                ('sessions', models.IntegerField(default=0)),
-                ('last_updated', models.DateTimeField(auto_now=True)),
-                ('student', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("solo_progress", models.FloatField(default=0.0)),
+                ("checkride_progress", models.FloatField(default=0.0)),
+                ("sessions", models.IntegerField(default=0)),
+                ("last_updated", models.DateTimeField(auto_now=True)),
+                (
+                    "student",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='TrainingLesson',
+            name="TrainingLesson",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('code', models.CharField(max_length=5, unique=True)),
-                ('title', models.CharField(max_length=100)),
-                ('description', tinymce.models.HTMLField(blank=True)),
-                ('far_requirement', models.CharField(blank=True, max_length=20)),
-                ('pts_reference', models.CharField(blank=True, max_length=30)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('phase', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='lessons', to='instructors.trainingphase')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("code", models.CharField(max_length=5, unique=True)),
+                ("title", models.CharField(max_length=100)),
+                ("description", tinymce.models.HTMLField(blank=True)),
+                ("far_requirement", models.CharField(blank=True, max_length=20)),
+                ("pts_reference", models.CharField(blank=True, max_length=30)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "phase",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="lessons",
+                        to="instructors.trainingphase",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['code'],
+                "ordering": ["code"],
             },
         ),
         migrations.CreateModel(
-            name='MemberQualification',
+            name="MemberQualification",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('is_qualified', models.BooleanField(default=True)),
-                ('date_awarded', models.DateField(blank=True, null=True)),
-                ('expiration_date', models.DateField(blank=True, null=True)),
-                ('notes', models.TextField(blank=True)),
-                ('imported', models.BooleanField(default=False)),
-                ('instructor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='issued_quals', to=settings.AUTH_USER_MODEL)),
-                ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('qualification', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='instructors.clubqualificationtype')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("is_qualified", models.BooleanField(default=True)),
+                ("date_awarded", models.DateField(blank=True, null=True)),
+                ("expiration_date", models.DateField(blank=True, null=True)),
+                ("notes", models.TextField(blank=True)),
+                ("imported", models.BooleanField(default=False)),
+                (
+                    "instructor",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="issued_quals",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "member",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "qualification",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="instructors.clubqualificationtype",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('member', 'qualification')},
+                "unique_together": {("member", "qualification")},
             },
         ),
         migrations.CreateModel(
-            name='LessonScore',
+            name="LessonScore",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('score', models.CharField(choices=[('1', 'Introduced (Instructor flew)'), ('2', 'Practiced (with instructor help)'), ('3', 'Solo Standard'), ('4', 'Checkride Standard'), ('!', 'Needs Attention (!)')], max_length=2)),
-                ('report', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lesson_scores', to='instructors.instructionreport')),
-                ('lesson', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='instructors.traininglesson')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "score",
+                    models.CharField(
+                        choices=[
+                            ("1", "Introduced (Instructor flew)"),
+                            ("2", "Practiced (with instructor help)"),
+                            ("3", "Solo Standard"),
+                            ("4", "Checkride Standard"),
+                            ("!", "Needs Attention (!)"),
+                        ],
+                        max_length=2,
+                    ),
+                ),
+                (
+                    "report",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="lesson_scores",
+                        to="instructors.instructionreport",
+                    ),
+                ),
+                (
+                    "lesson",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="instructors.traininglesson",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['lesson__code'],
-                'unique_together': {('report', 'lesson')},
+                "ordering": ["lesson__code"],
+                "unique_together": {("report", "lesson")},
             },
         ),
         migrations.CreateModel(
-            name='GroundLessonScore',
+            name="GroundLessonScore",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('score', models.CharField(choices=[('1', 'Introduced (Instructor flew)'), ('2', 'Practiced (with instructor help)'), ('3', 'Solo Standard'), ('4', 'Checkride Standard'), ('!', 'Needs Attention (!)')], max_length=2)),
-                ('session', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lesson_scores', to='instructors.groundinstruction')),
-                ('lesson', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='instructors.traininglesson')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "score",
+                    models.CharField(
+                        choices=[
+                            ("1", "Introduced (Instructor flew)"),
+                            ("2", "Practiced (with instructor help)"),
+                            ("3", "Solo Standard"),
+                            ("4", "Checkride Standard"),
+                            ("!", "Needs Attention (!)"),
+                        ],
+                        max_length=2,
+                    ),
+                ),
+                (
+                    "session",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="lesson_scores",
+                        to="instructors.groundinstruction",
+                    ),
+                ),
+                (
+                    "lesson",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="instructors.traininglesson",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['lesson__code'],
-                'unique_together': {('session', 'lesson')},
+                "ordering": ["lesson__code"],
+                "unique_together": {("session", "lesson")},
             },
         ),
     ]

@@ -6,43 +6,76 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('siteconfig', '0002_siteconfiguration_allow_glider_reservations_and_more'),
+        ("siteconfig", "0002_siteconfiguration_allow_glider_reservations_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='am_towpilot_title',
-            field=models.CharField(blank=True, default='AM Tow Pilot', help_text='We refer to the position of AM Tow Pilot as ... (optional)', max_length=40),
+            model_name="siteconfiguration",
+            name="am_towpilot_title",
+            field=models.CharField(
+                blank=True,
+                default="AM Tow Pilot",
+                help_text="We refer to the position of AM Tow Pilot as ... (optional)",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='instructor_title',
-            field=models.CharField(default='Instructor', help_text='We refer to the position of Instructor as ...', max_length=40),
+            model_name="siteconfiguration",
+            name="instructor_title",
+            field=models.CharField(
+                default="Instructor",
+                help_text="We refer to the position of Instructor as ...",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='pm_towpilot_title',
-            field=models.CharField(blank=True, default='PM Tow Pilot', help_text='We refer to the position of PM Tow Pilot as ... (optional)', max_length=40),
+            model_name="siteconfiguration",
+            name="pm_towpilot_title",
+            field=models.CharField(
+                blank=True,
+                default="PM Tow Pilot",
+                help_text="We refer to the position of PM Tow Pilot as ... (optional)",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='secondary_instructor_title',
-            field=models.CharField(blank=True, default='Secondary Instructor', help_text='We refer to the position of Secondary Instructor as ... (optional)', max_length=40),
+            model_name="siteconfiguration",
+            name="secondary_instructor_title",
+            field=models.CharField(
+                blank=True,
+                default="Secondary Instructor",
+                help_text="We refer to the position of Secondary Instructor as ... (optional)",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='surge_instructor_title',
-            field=models.CharField(blank=True, default='Surge Instructor', help_text='We refer to the position of Surge Instructor as ... (optional)', max_length=40),
+            model_name="siteconfiguration",
+            name="surge_instructor_title",
+            field=models.CharField(
+                blank=True,
+                default="Surge Instructor",
+                help_text="We refer to the position of Surge Instructor as ... (optional)",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='surge_towpilot_title',
-            field=models.CharField(blank=True, default='Surge Tow Pilot', help_text='We refer to the position of Surge Tow Pilot as ... (optional)', max_length=40),
+            model_name="siteconfiguration",
+            name="surge_towpilot_title",
+            field=models.CharField(
+                blank=True,
+                default="Surge Tow Pilot",
+                help_text="We refer to the position of Surge Tow Pilot as ... (optional)",
+                max_length=40,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='towpilot_title',
-            field=models.CharField(default='Tow Pilot', help_text='We refer to the position of Tow Pilot as ...', max_length=40),
+            model_name="siteconfiguration",
+            name="towpilot_title",
+            field=models.CharField(
+                default="Tow Pilot",
+                help_text="We refer to the position of Tow Pilot as ...",
+                max_length=40,
+            ),
         ),
     ]

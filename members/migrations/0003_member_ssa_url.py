@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0002_member_user'),
+        ("members", "0002_member_user"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='ssa_url',
-            field=models.URLField(blank=True, help_text="Direct link to this member's SSA page for badges and achievements.", max_length=300, null=True),
+            model_name="member",
+            name="ssa_url",
+            field=models.URLField(
+                blank=True,
+                help_text="Direct link to this member's SSA page for badges and achievements.",
+                max_length=300,
+                null=True,
+            ),
         ),
     ]

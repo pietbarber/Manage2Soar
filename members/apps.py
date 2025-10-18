@@ -11,8 +11,9 @@ from django.apps import AppConfig
 # - default_auto_field: sets the default primary key type for models in this app
 #   ("BigAutoField" = 64-bit integer autoincrement field)
 
-# This config can be extended with a ready() method to connect signals or 
+# This config can be extended with a ready() method to connect signals or
 # perform initialization logic when Django starts up.
+
 
 class MembersConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"

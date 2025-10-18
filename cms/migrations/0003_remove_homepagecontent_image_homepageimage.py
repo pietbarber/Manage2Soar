@@ -7,27 +7,47 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cms', '0002_alter_homepagecontent_content'),
+        ("cms", "0002_alter_homepagecontent_content"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='homepagecontent',
-            name='image',
+            model_name="homepagecontent",
+            name="image",
         ),
         migrations.CreateModel(
-            name='HomePageImage',
+            name="HomePageImage",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('image', models.ImageField(upload_to='homepage/gallery/')),
-                ('caption', models.CharField(blank=True, max_length=255)),
-                ('order', models.PositiveIntegerField(default=0, help_text='Order for display')),
-                ('homepage_content', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='images', to='cms.homepagecontent')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("image", models.ImageField(upload_to="homepage/gallery/")),
+                ("caption", models.CharField(blank=True, max_length=255)),
+                (
+                    "order",
+                    models.PositiveIntegerField(
+                        default=0, help_text="Order for display"
+                    ),
+                ),
+                (
+                    "homepage_content",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="images",
+                        to="cms.homepagecontent",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Homepage Image',
-                'verbose_name_plural': 'Homepage Images',
-                'ordering': ['order', 'id'],
+                "verbose_name": "Homepage Image",
+                "verbose_name_plural": "Homepage Images",
+                "ordering": ["order", "id"],
             },
         ),
     ]

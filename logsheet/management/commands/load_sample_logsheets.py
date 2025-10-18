@@ -1,10 +1,12 @@
+import random
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import timedelta
-import random
 
+from logsheet.models import Airfield, Logsheet, Towplane
 from members.models import Member
-from logsheet.models import Logsheet, Airfield, Towplane
+
 
 class Command(BaseCommand):
     help = "Load sample logsheets for testing purposes."
@@ -20,7 +22,9 @@ class Command(BaseCommand):
         towplanes = list(Towplane.objects.all())
 
         if not (airfields and members and towplanes):
-            self.stdout.write(self.style.ERROR("Not enough data to generate logsheets."))
+            self.stdout.write(
+                self.style.ERROR("Not enough data to generate logsheets.")
+            )
             return
 
         created = 0
@@ -46,4 +50,6 @@ class Command(BaseCommand):
             created += 1
             self.stdout.write(f"Created logsheet for {logsheet}")
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully created {created} sample logsheets."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Successfully created {created} sample logsheets.")
+        )

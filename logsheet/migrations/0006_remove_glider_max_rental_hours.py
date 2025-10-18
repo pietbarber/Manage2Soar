@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('logsheet', '0005_glider_max_rental_hours'),
+        ("logsheet", "0005_glider_max_rental_hours"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='glider',
-            name='max_rental_hours',
+            model_name="glider",
+            name="max_rental_hours",
         ),
     ]

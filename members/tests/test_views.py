@@ -1,7 +1,7 @@
-from django.core.files.uploadedfile import SimpleUploadedFile
 import pytest
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 
 from members.models import Biography
 
@@ -10,8 +10,13 @@ User = get_user_model()
 
 @pytest.mark.django_db
 def test_biography_view_shows_biography(client):
-    user = User.objects.create_user(username="jdoe", password="password",
-                                    first_name="John", last_name="Doe", membership_status="Full Member")
+    user = User.objects.create_user(
+        username="jdoe",
+        password="password",
+        first_name="John",
+        last_name="Doe",
+        membership_status="Full Member",
+    )
     Biography.objects.create(member=user, content="<p>Hello!</p>")
     client.force_login(user)  # ✅ log in as the test user
     url = reverse("members:biography_view", args=[user.pk])
@@ -23,7 +28,8 @@ def test_biography_view_shows_biography(client):
 @pytest.mark.django_db
 def test_biography_view_returns_404_for_missing_user(client):
     user = User.objects.create_user(
-        username="testuser", password="pass", membership_status="Full Member")
+        username="testuser", password="pass", membership_status="Full Member"
+    )
     client.force_login(user)  # ✅ Must be logged in to even trigger the 404
     # assuming this ID doesn't exist
     url = reverse("members:biography_view", args=[99999])
@@ -38,7 +44,7 @@ def test_set_password_get_shows_form(client, django_user_model):
         password="oldpass",
         # ✅ Must be one of the items in DEFAULT_ACTIVE_STATUSES
         membership_status="Full Member",
-        is_superuser=False
+        is_superuser=False,
     )
     client.force_login(user)
     url = reverse("members:set_password")
@@ -53,15 +59,18 @@ def test_set_password_mismatched_passwords(client, django_user_model):
         username="tester2",
         password="initial",
         membership_status="Full Member",
-        is_superuser=False
+        is_superuser=False,
     )
     client.force_login(user)
     url = reverse("members:set_password")
 
-    response = client.post(url, {
-        "new_password1": "newpass123",
-        "new_password2": "wrongpass456",  # mismatch on purpose
-    })
+    response = client.post(
+        url,
+        {
+            "new_password1": "newpass123",
+            "new_password2": "wrongpass456",  # mismatch on purpose
+        },
+    )
 
     assert response.status_code == 200  # Form should re-render with errors
 
@@ -69,14 +78,16 @@ def test_set_password_mismatched_passwords(client, django_user_model):
     print(response.content.decode())
 
     # ✅ Adjust this to match the actual error message used in your form
-    assert b"Passwords must match" in response.content or b"do not match" in response.content.lower()
+    assert (
+        b"Passwords must match" in response.content
+        or b"do not match" in response.content.lower()
+    )
 
 
 @pytest.mark.django_db
 def test_tinymce_upload_rejects_anonymous(client):
     url = reverse("members:tinymce_image_upload")
-    image_data = SimpleUploadedFile(
-        "test.jpg", b"fake", content_type="image/jpeg")
+    image_data = SimpleUploadedFile("test.jpg", b"fake", content_type="image/jpeg")
     response = client.post(url, {"file": image_data})
     assert response.status_code in (302, 403)
 
@@ -88,18 +99,22 @@ def test_tinymce_upload_accepts_image(client, django_user_model, settings):
         password="oldpass",
         # ✅ Must be one of the items in DEFAULT_ACTIVE_STATUSES
         membership_status="Full Member",
-        is_superuser=False
+        is_superuser=False,
     )
     client.force_login(user)
     url = reverse("members:tinymce_image_upload")
 
     image_data = SimpleUploadedFile(
-        "test.jpg", b"fake-image-content", content_type="image/jpeg")
+        "test.jpg", b"fake-image-content", content_type="image/jpeg"
+    )
     response = client.post(url, {"file": image_data})
 
     assert response.status_code == 200
     assert "location" in response.json()
     location = response.json()["location"]
     # Accept either local or cloud storage URLs
-    assert location.startswith(
-        "/media/") or location.startswith("http://") or location.startswith("https://")
+    assert (
+        location.startswith("/media/")
+        or location.startswith("http://")
+        or location.startswith("https://")
+    )

@@ -1,27 +1,26 @@
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 import base64
 import os
 from datetime import date
 
-from django.urls import reverse
 from django.conf import settings
-from django.core.paginator import Paginator
-from django.db.models import Prefetch, Func, F
-from django.http import JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
+from django.db.models import F, Func, Prefetch
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 
-from .forms import BiographyForm, SetPasswordForm, MemberProfilePhotoForm
-from instructors.models import InstructionReport, TrainingLesson
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
-from .models import Badge, MemberBadge
-from .models import Member, Biography
-from .utils.vcard_tools import generate_vcard_qr
-from .decorators import active_member_required
-from instructors.models import MemberQualification
 from cms.models import HomePageContent
+from instructors.models import InstructionReport, MemberQualification, TrainingLesson
+from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
+
+from .decorators import active_member_required
+from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
+from .models import Badge, Biography, Member, MemberBadge
+from .utils.vcard_tools import generate_vcard_qr
 
 #########################
 # member_list() View
@@ -49,30 +48,35 @@ def member_list(request):
     members = Member.objects.filter(membership_status__in=selected_statuses)
 
     selected_roles = request.GET.getlist("role")
-    if 'towpilot' in selected_roles:
+    if "towpilot" in selected_roles:
         members = members.filter(towpilot=True)
-    if 'instructor' in selected_roles:
+    if "instructor" in selected_roles:
         members = members.filter(instructor=True)
-    if 'director' in selected_roles:
+    if "director" in selected_roles:
         members = members.filter(director=True)
-    if 'dutyofficer' in selected_roles:
+    if "dutyofficer" in selected_roles:
         members = members.filter(duty_officer=True)
 
     members = members.annotate(
-        last_name_lower=Func(F('last_name'), function='LOWER')
-    ).order_by('last_name_lower', 'first_name')
+        last_name_lower=Func(F("last_name"), function="LOWER")
+    ).order_by("last_name_lower", "first_name")
 
     paginator = Paginator(members, 150)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    return render(request, "members/member_list.html", {
-        "page_obj": page_obj,
-        "paginator": paginator,
-        "members": page_obj.object_list,
-        "selected_statuses": selected_statuses,
-        "selected_roles": selected_roles,
-    })
+    return render(
+        request,
+        "members/member_list.html",
+        {
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "members": page_obj.object_list,
+            "selected_statuses": selected_statuses,
+            "selected_roles": selected_roles,
+        },
+    )
+
 
 #########################
 # member_view() View
@@ -108,7 +112,7 @@ def member_view(request, member_id):
     can_edit = is_self or request.user.is_superuser
 
     # Decide whether to show solo/checkride buttons
-    show_need_buttons = member.glider_rating not in ('private', 'commercial')
+    show_need_buttons = member.glider_rating not in ("private", "commercial")
 
     # Biography logic
     biography = getattr(member, "biography", None)
@@ -118,15 +122,13 @@ def member_view(request, member_id):
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
     qualifications = (
-        MemberQualification.objects
-        .filter(member=member, is_qualified=True)
-        .select_related('qualification', 'instructor')
-        .order_by('qualification__code')
+        MemberQualification.objects.filter(member=member, is_qualified=True)
+        .select_related("qualification", "instructor")
+        .order_by("qualification__code")
     )
 
     if is_self and request.method == "POST":
-        form = MemberProfilePhotoForm(
-            request.POST, request.FILES, instance=member)
+        form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile photo updated.")
@@ -165,6 +167,7 @@ def member_view(request, member_id):
 # Raises:
 # - Http404 if the member or biography does not exist
 
+
 @active_member_required
 def biography_view(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
@@ -180,12 +183,12 @@ def biography_view(request, member_id):
     else:
         form = BiographyForm(instance=biography)
 
-    return render(request, "members/biography.html", {
-        "form": form,
-        "biography": biography,
-        "member": member,
-        "can_edit": can_edit
-    })
+    return render(
+        request,
+        "members/biography.html",
+        {"form": form, "biography": biography, "member": member, "can_edit": can_edit},
+    )
+
 
 #########################
 # home() View
@@ -209,11 +212,16 @@ def home(request):
             completed=False
         ).count()
     # Fetch homepage content (latest)
-    homepage_content = HomePageContent.objects.order_by('-updated_at').first()
-    return render(request, "home.html", {
-        "pending_tests_count": pending_count,
-        "homepage_content": homepage_content,
-    })
+    homepage_content = HomePageContent.objects.order_by("-updated_at").first()
+    return render(
+        request,
+        "home.html",
+        {
+            "pending_tests_count": pending_count,
+            "homepage_content": homepage_content,
+        },
+    )
+
 
 #########################
 # set_password() View
@@ -242,10 +250,11 @@ def set_password(request):
             member.set_password(form.cleaned_data["new_password1"])
             member.save()
             messages.success(request, "Password changed successfully.")
-            return redirect('members:member_list')
+            return redirect("members:member_list")
     else:
         form = SetPasswordForm()
     return render(request, "members/set_password.html", {"form": form})
+
 
 #########################
 # tinymce_image_upload() View
@@ -269,17 +278,20 @@ def set_password(request):
 @active_member_required
 @csrf_exempt
 def tinymce_image_upload(request):
-    if request.method == 'POST' and request.FILES.get('file'):
-        f = request.FILES['file']
+    if request.method == "POST" and request.FILES.get("file"):
+        f = request.FILES["file"]
         # Save to 'tinymce/<filename>' in the default storage (GCS or local)
-    save_path = os.path.join('tinymce', f.name)
+    save_path = os.path.join("tinymce", f.name)
     saved_name = default_storage.save(save_path, ContentFile(f.read()))
     # Always return the public GCS URL
-    from django.conf import settings
     from urllib.parse import urljoin
+
+    from django.conf import settings
+
     url = urljoin(settings.MEDIA_URL, saved_name)
-    return JsonResponse({'location': url})
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+    return JsonResponse({"location": url})
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 #########################
 # badge_board() View
@@ -296,18 +308,17 @@ def tinymce_image_upload(request):
 @active_member_required
 def badge_board(request):
     active_members = Member.objects.filter(
-        membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        membership_status__in=DEFAULT_ACTIVE_STATUSES
+    )
 
     badges = Badge.objects.prefetch_related(
         Prefetch(
-            'memberbadge_set',
-            queryset=MemberBadge.objects.filter(
-                member__in=active_members
-            ).select_related('member').order_by('member__last_name', 'member__first_name'),
-            to_attr='filtered_memberbadges'
+            "memberbadge_set",
+            queryset=MemberBadge.objects.filter(member__in=active_members)
+            .select_related("member")
+            .order_by("member__last_name", "member__first_name"),
+            to_attr="filtered_memberbadges",
         )
-    ).order_by('order')
+    ).order_by("order")
 
-    return render(request, "members/badges.html", {
-        "badges": badges
-    })
+    return render(request, "members/badges.html", {"badges": badges})

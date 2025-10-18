@@ -1,9 +1,12 @@
 # analytics/views.py
 from datetime import date, datetime
 from typing import Any, Dict, cast
-from django.shortcuts import render
+
 from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render
+
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
 from . import queries
 
 
@@ -23,9 +26,10 @@ def dashboard(request):
     finalized_only = request.GET.get("all") != "1"
 
     # --- cumulative flights (defensive) ---
-    cumu_raw: Dict[str, Any] = queries.cumulative_flights_by_year(
-        start, end, finalized_only=finalized_only
-    ) or {}  # <- ensure dict, never None
+    cumu_raw: Dict[str, Any] = (
+        queries.cumulative_flights_by_year(start, end, finalized_only=finalized_only)
+        or {}
+    )  # <- ensure dict, never None
 
     labels = cast(list[int], cumu_raw.get("labels") or [])
     years_list = cast(list[int], cumu_raw.get("years") or [])
@@ -50,7 +54,8 @@ def dashboard(request):
         Dict[str, Any],
         queries.flights_by_year_by_aircraft(
             start, end, finalized_only=finalized_only, top_n=10
-        ) or {}
+        )
+        or {},
     )
     # --- Glider utilization date range (defaults to YTD) ---
 
@@ -70,49 +75,96 @@ def dashboard(request):
     util_start = util_start or default_start
     util_end = util_end or today
     util = queries.glider_utilization(
-        util_start, util_end, finalized_only=finalized_only, top_n=12)
+        util_start, util_end, finalized_only=finalized_only, top_n=12
+    )
     util_private = queries.glider_utilization(
-        util_start, util_end,
+        util_start,
+        util_end,
         finalized_only=finalized_only,
         top_n=12,
         fleet="private",
-        bucket_private=False,     # list each private ship individually
-        include_unknown=False,    # omit null-glider flights
+        bucket_private=False,  # list each private ship individually
+        include_unknown=False,  # omit null-glider flights
     )
 
     fy_years = cast(list[int], by_acft_raw.get("years") or [])
     fy_categories = cast(list[str], by_acft_raw.get("categories") or [])
     fy_matrix = cast(Dict[str, list[int]], by_acft_raw.get("matrix") or {})
-    fdays = queries.flying_days_by_member(
-        util_start, util_end, finalized_only=finalized_only, min_days=2) or {}
-    dur = queries.flight_duration_distribution(
-        util_start, util_end, finalized_only=finalized_only) or {}
-    pgf = queries.pilot_glider_flights(
-        util_start, util_end, finalized_only=finalized_only, min_flights=2) or {}
-    inst = queries.instructor_flights_by_member(
-        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
-    tow = queries.towpilot_flights_by_member(
-        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
-    long3h = queries.long_flights_by_pilot(
-        util_start, util_end, finalized_only=finalized_only, threshold_hours=3.0, top_n=30) or {}
-    duty = queries.duty_days_by_member(
-        util_start, util_end, finalized_only=finalized_only, top_n=30) or {}
+    fdays = (
+        queries.flying_days_by_member(
+            util_start, util_end, finalized_only=finalized_only, min_days=2
+        )
+        or {}
+    )
+    dur = (
+        queries.flight_duration_distribution(
+            util_start, util_end, finalized_only=finalized_only
+        )
+        or {}
+    )
+    pgf = (
+        queries.pilot_glider_flights(
+            util_start, util_end, finalized_only=finalized_only, min_flights=2
+        )
+        or {}
+    )
+    inst = (
+        queries.instructor_flights_by_member(
+            util_start, util_end, finalized_only=finalized_only, top_n=20
+        )
+        or {}
+    )
+    tow = (
+        queries.towpilot_flights_by_member(
+            util_start, util_end, finalized_only=finalized_only, top_n=20
+        )
+        or {}
+    )
+    long3h = (
+        queries.long_flights_by_pilot(
+            util_start,
+            util_end,
+            finalized_only=finalized_only,
+            threshold_hours=3.0,
+            top_n=30,
+        )
+        or {}
+    )
+    duty = (
+        queries.duty_days_by_member(
+            util_start, util_end, finalized_only=finalized_only, top_n=30
+        )
+        or {}
+    )
 
     # Tow pilot scheduled vs unscheduled chart data
-    tow_sched = queries.tow_pilot_schedule_vs_actual(
-        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    tow_sched = (
+        queries.tow_pilot_schedule_vs_actual(
+            util_start, util_end, finalized_only=finalized_only, top_n=20
+        )
+        or {}
+    )
 
     # Instructor scheduled vs unscheduled chart data
-    instructor_sched = queries.instructor_schedule_vs_actual(
-        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    instructor_sched = (
+        queries.instructor_schedule_vs_actual(
+            util_start, util_end, finalized_only=finalized_only, top_n=20
+        )
+        or {}
+    )
 
     # Combined duty days chart data
-    combined_duty = queries.combined_duty_days_vs_actual(
-        util_start, util_end, finalized_only=finalized_only, top_n=20) or {}
+    combined_duty = (
+        queries.combined_duty_days_vs_actual(
+            util_start, util_end, finalized_only=finalized_only, top_n=20
+        )
+        or {}
+    )
 
     # Time of day operations for yearly view (using start/end years)
-    time_ops = queries.time_of_day_operations(
-        start, end, finalized_only=finalized_only) or {}
+    time_ops = (
+        queries.time_of_day_operations(start, end, finalized_only=finalized_only) or {}
+    )
 
     ctx = {
         "year": end,
@@ -126,58 +178,50 @@ def dashboard(request):
         "instr": instr_json,
         "ops_days": ops_days_map,
         "current_year": current_year,
-
         "fy_years": fy_years,
         "fy_categories": fy_categories,
         "fy_matrix": fy_matrix,
-
-        "user_name": getattr(request.user, "full_display_name", request.user.get_username()),
+        "user_name": getattr(
+            request.user, "full_display_name", request.user.get_username()
+        ),
         "util_names": util.get("names", []),
         "util_flights": util.get("flights", []),
         "util_hours": util.get("hours", []),
         "util_avg_minutes": util.get("avg_minutes", []),
         "util_start": util_start.isoformat(),
         "util_end": util_end.isoformat(),
-
         "utilp_names": util_private.get("names", []),
         "utilp_flights": util_private.get("flights", []),
         "utilp_hours": util_private.get("hours", []),
         "utilp_avg_minutes": util_private.get("avg_minutes", []),
-
         # flying days
         "fd_names": fdays.get("names", []),
         "fd_days": fdays.get("days", []),
         "fd_ops_total": fdays.get("ops_days_total", 0),
-
         # duration distribution
         "dur_x_hours": dur.get("x_hours", []),
         "dur_cdf_pct": dur.get("cdf_pct", []),
         "dur_median_min": dur.get("median_min", 0),
         "dur_pct_gt": dur.get("pct_gt", {1: 0.0, 2: 0.0, 3: 0.0}),
         "dur_points": dur.get("points", []),
-
         # pilot flights (non-instruction)
         "pgf_names": pgf.get("names", []),
         "pgf_counts": pgf.get("counts", []),
-
-        "inst_names":  inst.get("names", []),
+        "inst_names": inst.get("names", []),
         "inst_labels": inst.get("labels", []),
         "inst_matrix": inst.get("matrix", {}),
         "inst_totals": inst.get("totals", []),
-        "inst_total":  inst.get("inst_total", 0),
-        "all_total":   inst.get("all_total", 0),
-
-        "tow_names":   tow.get("names", []),
-        "tow_labels":  tow.get("labels", []),
-        "tow_matrix":  tow.get("matrix", {}),
-        "tow_totals":  tow.get("totals", []),
-        "tow_total":   tow.get("tow_total", 0),
-
+        "inst_total": inst.get("inst_total", 0),
+        "all_total": inst.get("all_total", 0),
+        "tow_names": tow.get("names", []),
+        "tow_labels": tow.get("labels", []),
+        "tow_matrix": tow.get("matrix", {}),
+        "tow_totals": tow.get("totals", []),
+        "tow_total": tow.get("tow_total", 0),
         "long3h_names": long3h.get("names", []),
         "long3h_counts": long3h.get("counts", []),
         "long3h_longest_min": long3h.get("longest_min", 0),
         "long3h_thresh": long3h.get("threshold_hours", 3.0),
-
         "duty_names": duty.get("names", []),
         "duty_labels": duty.get("labels", ["DO", "ADO"]),
         "duty_matrix": duty.get("matrix", {"DO": [], "ADO": []}),
@@ -185,35 +229,35 @@ def dashboard(request):
         "duty_do_total": duty.get("do_total", 0),
         "duty_ado_total": duty.get("ado_total", 0),
         "duty_ops_days_total": duty.get("ops_days_total", 0),
-
-
         # Tow pilot scheduled vs unscheduled
         "tow_sched_names": tow_sched.get("names", []),
         "tow_sched_scheduled": tow_sched.get("scheduled", []),
         "tow_sched_unscheduled": tow_sched.get("unscheduled", []),
-        "tow_sched_labels": tow_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
-
+        "tow_sched_labels": tow_sched.get(
+            "labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]
+        ),
         # Instructor scheduled vs unscheduled
         "instructor_sched_names": instructor_sched.get("names", []),
         "instructor_sched_scheduled": instructor_sched.get("scheduled", []),
         "instructor_sched_unscheduled": instructor_sched.get("unscheduled", []),
-        "instructor_sched_labels": instructor_sched.get("labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]),
-
+        "instructor_sched_labels": instructor_sched.get(
+            "labels", ["Scheduled (Blue)", "Unscheduled (Burnt Orange)"]
+        ),
         # Combined duty days chart
         "combined_duty_names": combined_duty.get("names", []),
         "combined_duty_tow_days": combined_duty.get("tow_days", []),
         "combined_duty_inst_days": combined_duty.get("inst_days", []),
         "combined_duty_both_days": combined_duty.get("both_days", []),
-        "combined_duty_labels": combined_duty.get("labels", ["Tow Pilot Days", "Instructor Days", "Both Roles"]),
+        "combined_duty_labels": combined_duty.get(
+            "labels", ["Tow Pilot Days", "Instructor Days", "Both Roles"]
+        ),
         "combined_duty_dual_role": combined_duty.get("dual_role", []),
-
         # Time of day operations
         "timeops_takeoff_points": time_ops.get("takeoff_points", []),
         "timeops_landing_points": time_ops.get("landing_points", []),
         "timeops_mean_earliest_takeoff": time_ops.get("mean_earliest_takeoff", []),
         "timeops_mean_latest_landing": time_ops.get("mean_latest_landing", []),
         "timeops_total_flight_days": time_ops.get("total_flight_days", 0),
-
     }
 
     analytics_data = {
@@ -273,7 +317,6 @@ def dashboard(request):
             "totals": ctx.get("tow_totals", []),
             "tow_total": ctx.get("tow_total", 0),
         },
-
         "long3h": {
             "names": ctx.get("long3h_names", []),
             "counts": ctx.get("long3h_counts", []),
@@ -289,9 +332,6 @@ def dashboard(request):
             "ado_total": ctx.get("duty_ado_total", 0),
             "ops_days_total": ctx.get("duty_ops_days_total", 0),
         },
-
-
-
         "tow_sched": {
             "names": ctx.get("tow_sched_names", []),
             "scheduled": ctx.get("tow_sched_scheduled", []),
@@ -299,7 +339,6 @@ def dashboard(request):
             "labels": ctx.get("tow_sched_labels", []),
             "italicize": tow_sched.get("italicize", []),
         },
-
         "instructor_sched": {
             "names": ctx.get("instructor_sched_names", []),
             "scheduled": ctx.get("instructor_sched_scheduled", []),
@@ -307,7 +346,6 @@ def dashboard(request):
             "labels": ctx.get("instructor_sched_labels", []),
             "italicize": instructor_sched.get("italicize", []),
         },
-
         "combined_duty": {
             "names": ctx.get("combined_duty_names", []),
             "tow_days": ctx.get("combined_duty_tow_days", []),
@@ -316,7 +354,6 @@ def dashboard(request):
             "labels": ctx.get("combined_duty_labels", []),
             "dual_role": ctx.get("combined_duty_dual_role", []),
         },
-
         "time_ops": {
             "takeoff_points": ctx.get("timeops_takeoff_points", []),
             "landing_points": ctx.get("timeops_landing_points", []),
@@ -324,7 +361,6 @@ def dashboard(request):
             "mean_latest_landing": ctx.get("timeops_mean_latest_landing", []),
             "total_flight_days": ctx.get("timeops_total_flight_days", 0),
         },
-
     }
 
     ctx["analytics_data"] = analytics_data

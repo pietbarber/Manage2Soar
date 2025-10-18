@@ -13,9 +13,17 @@ import subprocess
 import sys
 
 # Update this list if you add/remove apps
-APPS = ["instructors", "members", "logsheet",
-        "duty_roster", "knowledgetest", "analytics",
-        "cms", "notifications", "siteconfig"]
+APPS = [
+    "instructors",
+    "members",
+    "logsheet",
+    "duty_roster",
+    "knowledgetest",
+    "analytics",
+    "cms",
+    "notifications",
+    "siteconfig",
+]
 
 
 def main():
@@ -30,17 +38,22 @@ def main():
         png_path = os.path.join(docs_dir, f"{app}.png")
 
         print(f"Generating {dot_path} …")
-        subprocess.check_call([
-            python, "manage.py", "graph_models", app,
-            "--arrow-shape", "normal",
-            "--group-models",    # group models by app
-            "--output", dot_path
-        ])
+        subprocess.check_call(
+            [
+                python,
+                "manage.py",
+                "graph_models",
+                app,
+                "--arrow-shape",
+                "normal",
+                "--group-models",  # group models by app
+                "--output",
+                dot_path,
+            ]
+        )
 
         print(f"Rendering {png_path} …")
-        subprocess.check_call([
-            "dot", "-Tpng", dot_path, "-o", png_path
-        ])
+        subprocess.check_call(["dot", "-Tpng", dot_path, "-o", png_path])
 
     print("\nAll ERDs generated successfully!")
 
@@ -50,5 +63,7 @@ if __name__ == "__main__":
         main()
     except subprocess.CalledProcessError as e:
         print(
-            f"\nError: command {e.cmd} failed with exit code {e.returncode}", file=sys.stderr)
+            f"\nError: command {e.cmd} failed with exit code {e.returncode}",
+            file=sys.stderr,
+        )
         sys.exit(e.returncode)

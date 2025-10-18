@@ -6,24 +6,24 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('siteconfig', '0003_siteconfiguration_am_towpilot_title_and_more'),
+        ("siteconfig", "0003_siteconfiguration_am_towpilot_title_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='siteconfiguration',
-            name='am_towpilot_title',
+            model_name="siteconfiguration",
+            name="am_towpilot_title",
         ),
         migrations.RemoveField(
-            model_name='siteconfiguration',
-            name='extra_config',
+            model_name="siteconfiguration",
+            name="extra_config",
         ),
         migrations.RemoveField(
-            model_name='siteconfiguration',
-            name='pm_towpilot_title',
+            model_name="siteconfiguration",
+            name="pm_towpilot_title",
         ),
         migrations.RemoveField(
-            model_name='siteconfiguration',
-            name='secondary_instructor_title',
+            model_name="siteconfiguration",
+            name="secondary_instructor_title",
         ),
     ]

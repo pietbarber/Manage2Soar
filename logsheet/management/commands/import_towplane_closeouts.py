@@ -1,9 +1,11 @@
 import psycopg2
-from django.core.management.base import BaseCommand
 from django.conf import settings
-from members.models import Member
-from logsheet.models import Logsheet, Airfield, Towplane, TowplaneCloseout
+from django.core.management.base import BaseCommand
+
+from logsheet.models import Airfield, Logsheet, Towplane, TowplaneCloseout
 from logsheet.utils.aliases import resolve_towplane
+from members.models import Member
+
 
 class Command(BaseCommand):
     help = "Import towplane closeout data from legacy towplane_data table"
@@ -11,13 +13,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Connecting to legacy towplane_data..."))
 
-        legacy = settings.DATABASES['legacy']
+        legacy = settings.DATABASES["legacy"]
         conn = psycopg2.connect(
-            dbname=legacy['NAME'],
-            user=legacy['USER'],
-            password=legacy['PASSWORD'],
-            host=legacy.get('HOST', ''),
-            port=legacy.get('PORT', ''),
+            dbname=legacy["NAME"],
+            user=legacy["USER"],
+            password=legacy["PASSWORD"],
+            host=legacy.get("HOST", ""),
+            port=legacy.get("PORT", ""),
         )
 
         with conn.cursor() as cursor:
@@ -39,7 +41,11 @@ class Command(BaseCommand):
                 airfield = Airfield.objects.get(identifier=field)
                 logsheet = Logsheet.objects.get(log_date=log_date, airfield=airfield)
             except (Airfield.DoesNotExist, Logsheet.DoesNotExist):
-                self.stdout.write(self.style.WARNING(f"⚠️  No Logsheet for {log_date} @ {field} — skipping"))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"⚠️  No Logsheet for {log_date} @ {field} — skipping"
+                    )
+                )
                 skipped += 1
                 continue
 
@@ -66,12 +72,18 @@ class Command(BaseCommand):
                     "tach_time": data["tach_time"],
                     "fuel_added": data["gas_added"],
                     "notes": comment or "",
-                }
+                },
             )
 
             if created_new:
                 created += 1
 
         conn.close()
-        self.stdout.write(self.style.SUCCESS(f"✅ Created {created} TowplaneCloseout records."))
-        self.stdout.write(self.style.NOTICE(f"⚠️ Skipped {skipped} due to missing logsheets, towplanes, or winch/canceled ops."))
+        self.stdout.write(
+            self.style.SUCCESS(f"✅ Created {created} TowplaneCloseout records.")
+        )
+        self.stdout.write(
+            self.style.NOTICE(
+                f"⚠️ Skipped {skipped} due to missing logsheets, towplanes, or winch/canceled ops."
+            )
+        )

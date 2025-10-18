@@ -6,32 +6,52 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cms', '0004_alter_homepageimage_image'),
+        ("cms", "0004_alter_homepageimage_image"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='homepagecontent',
-            options={'verbose_name': 'CMS Page Content', 'verbose_name_plural': 'CMS Page Content'},
+            name="homepagecontent",
+            options={
+                "verbose_name": "CMS Page Content",
+                "verbose_name_plural": "CMS Page Content",
+            },
         ),
         migrations.AlterModelOptions(
-            name='homepageimage',
-            options={'ordering': ['order', 'id'], 'verbose_name': 'CMS Page Image', 'verbose_name_plural': 'CMS Page Images'},
+            name="homepageimage",
+            options={
+                "ordering": ["order", "id"],
+                "verbose_name": "CMS Page Image",
+                "verbose_name_plural": "CMS Page Images",
+            },
         ),
         migrations.RenameField(
-            model_name='homepageimage',
-            old_name='homepage_content',
-            new_name='page',
+            model_name="homepageimage",
+            old_name="homepage_content",
+            new_name="page",
         ),
         migrations.AddField(
-            model_name='homepagecontent',
-            name='audience',
-            field=models.CharField(choices=[('public', 'Public (not logged in)'), ('member', 'Member (logged in)')], default='public', help_text='Who should see this page content?', max_length=10),
+            model_name="homepagecontent",
+            name="audience",
+            field=models.CharField(
+                choices=[
+                    ("public", "Public (not logged in)"),
+                    ("member", "Member (logged in)"),
+                ],
+                default="public",
+                help_text="Who should see this page content?",
+                max_length=10,
+            ),
         ),
         migrations.AddField(
-            model_name='homepagecontent',
-            name='slug',
-            field=models.SlugField(default='home', help_text="URL path for this page, e.g. 'home', 'about', 'contact'", max_length=100, unique=True),
+            model_name="homepagecontent",
+            name="slug",
+            field=models.SlugField(
+                default="home",
+                help_text="URL path for this page, e.g. 'home', 'about', 'contact'",
+                max_length=100,
+                unique=True,
+            ),
             preserve_default=False,
         ),
     ]

@@ -1,8 +1,11 @@
 import os
+
 from django.core.management.base import BaseCommand
+
 from instructors.models import TrainingLesson
 
 SYLLABUS_PATH = "legacy_syllabus_html"  # Change this path to your directory
+
 
 class Command(BaseCommand):
     help = "Import legacy .shtml lesson plans into TrainingLesson models"

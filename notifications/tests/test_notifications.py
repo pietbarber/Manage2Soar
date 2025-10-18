@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+
 from notifications.models import Notification
 
 User = get_user_model()
@@ -24,10 +25,8 @@ def test_mark_notification_read():
 
 @pytest.mark.django_db
 def test_notification_user_only_sees_own(client, django_user_model):
-    user1 = django_user_model.objects.create_user(
-        username="u1", password="pw1")
-    user2 = django_user_model.objects.create_user(
-        username="u2", password="pw2")
+    user1 = django_user_model.objects.create_user(username="u1", password="pw1")
+    user2 = django_user_model.objects.create_user(username="u2", password="pw2")
     Notification.objects.create(user=user1, message="Msg1")
     Notification.objects.create(user=user2, message="Msg2")
     client.force_login(user1)

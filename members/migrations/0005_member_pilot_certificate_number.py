@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('members', '0004_member_private_glider_checkride_date'),
+        ("members", "0004_member_private_glider_checkride_date"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='pilot_certificate_number',
-            field=models.CharField(blank=True, help_text='FAA pilot certificate number (optional, but required for instructors giving instruction)', max_length=32, null=True),
+            model_name="member",
+            name="pilot_certificate_number",
+            field=models.CharField(
+                blank=True,
+                help_text="FAA pilot certificate number (optional, but required for instructors giving instruction)",
+                max_length=32,
+                null=True,
+            ),
         ),
     ]

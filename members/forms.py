@@ -1,17 +1,16 @@
-
 import io
+from datetime import date, timedelta
 
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Column, Fieldset, Layout, Row, Submit
+from django import forms
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django import forms
-from datetime import date, timedelta
 from PIL import Image
 from tinymce.widgets import TinyMCE
-from .utils.image_processing import resize_and_crop_profile_photo
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Fieldset, Row, Column, Submit
 
-from .models import Badge, Biography, Member, MemberBadge, Biography
+from .models import Badge, Biography, Member, MemberBadge
+from .utils.image_processing import resize_and_crop_profile_photo
 
 #########################
 # MemberProfilePhotoForm Class
@@ -23,10 +22,12 @@ from .models import Badge, Biography, Member, MemberBadge, Biography
 # - model: Member
 # - fields: only includes profile_photo
 
+
 class MemberProfilePhotoForm(forms.ModelForm):
     class Meta:
         model = Member
-        fields = ['profile_photo']
+        fields = ["profile_photo"]
+
 
 #########################
 # BiographyForm Class
@@ -38,10 +39,12 @@ class MemberProfilePhotoForm(forms.ModelForm):
 # - model: Biography
 # - fields: includes body (HTML content of the biography)
 
+
 class BiographyForm(forms.ModelForm):
     class Meta:
         model = Biography
         fields = ["content"]
+
 
 #########################
 # SetPasswordForm Class
@@ -56,14 +59,11 @@ class BiographyForm(forms.ModelForm):
 # Methods:
 # - clean(): validates that the two passwords match
 
+
 class SetPasswordForm(forms.Form):
-    new_password1 = forms.CharField(
-        label="New password",
-        widget=forms.PasswordInput
-    )
+    new_password1 = forms.CharField(label="New password", widget=forms.PasswordInput)
     new_password2 = forms.CharField(
-        label="Confirm new password",
-        widget=forms.PasswordInput
+        label="Confirm new password", widget=forms.PasswordInput
     )
 
     def clean(self):

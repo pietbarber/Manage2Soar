@@ -1,8 +1,9 @@
 # manage2soar/storage_backends.py
 import os
+
 from django.conf import settings
-from storages.backends.gcloud import GoogleCloudStorage
 from django.contrib.staticfiles.storage import ManifestFilesMixin
+from storages.backends.gcloud import GoogleCloudStorage
 
 
 class MediaRootGCS(GoogleCloudStorage):
@@ -19,5 +20,4 @@ class StaticRootGCS(ManifestFilesMixin, GoogleCloudStorage):
     location = getattr(settings, "GS_STATIC_LOCATION", "static")
     default_acl = None
     file_overwrite = True
-    object_parameters = {
-        "cache_control": "public, max-age=31536000, immutable"}
+    object_parameters = {"cache_control": "public, max-age=31536000, immutable"}

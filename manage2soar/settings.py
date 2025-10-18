@@ -13,18 +13,18 @@
 #############################################################
 
 
-from google.oauth2 import service_account
-from django.conf.urls.static import static
-from django.conf import settings
-from django.shortcuts import redirect
-from django.contrib.messages import constants as messages
-from django.contrib.auth.decorators import login_required
-from dotenv import load_dotenv
+import logging
 import os
 from pathlib import Path
-import logging
-from django.contrib.staticfiles.finders import FileSystemFinder, AppDirectoriesFinder
 
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib.auth.decorators import login_required
+from django.contrib.messages import constants as messages
+from django.contrib.staticfiles.finders import AppDirectoriesFinder, FileSystemFinder
+from django.shortcuts import redirect
+from dotenv import load_dotenv
+from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # Define the base directory of the Django project.
@@ -43,7 +43,8 @@ else:
     # In production, environment variables are typically set directly.
     logger = logging.getLogger(__name__)
     logger.warning(
-        f".env file not found at {dotenv_path}. Relying on system environment variables.")
+        f".env file not found at {dotenv_path}. Relying on system environment variables."
+    )
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
@@ -87,10 +88,10 @@ INSTALLED_APPS = [
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
-LOGIN_URL = '/members/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/login/'
-AUTH_USER_MODEL = 'members.Member'
+LOGIN_URL = "/members/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
+AUTH_USER_MODEL = "members.Member"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -101,19 +102,19 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
-
 ]
 
-LOGIN_REQUIRED_MIDDLEWARE = (
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-)
+LOGIN_REQUIRED_MIDDLEWARE = ("django.contrib.auth.middleware.AuthenticationMiddleware",)
 
 
 def login_required_middleware(get_response):
     def middleware(request):
-        if not request.user.is_authenticated and not request.path.startswith('/accounts/login/'):
-            return redirect('login')
+        if not request.user.is_authenticated and not request.path.startswith(
+            "/accounts/login/"
+        ):
+            return redirect("login")
         return get_response(request)
+
     return middleware
 
 
@@ -123,16 +124,16 @@ DEFAULT_AIRFIELD_ID = 1
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        'DIRS': [BASE_DIR / "templates"],
-        'APP_DIRS': True,
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                'social_django.context_processors.backends',
-                'social_django.context_processors.login_redirect',
+                "social_django.context_processors.backends",
+                "social_django.context_processors.login_redirect",
                 "django.template.context_processors.media",
             ],
         },
@@ -146,64 +147,60 @@ WSGI_APPLICATION = "manage2soar.wsgi.application"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        "sslmode": "require"
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "sslmode": "require",
     },
-    'legacy': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('LEGACY_DB_NAME'),
-        'USER': os.getenv('LEGACY_DB_USER'),
-        'PASSWORD': os.getenv('LEGACY_DB_PASSWORD'),
-        'HOST': os.getenv('LEGACY_DB_HOST', 'localhost'),
-        'PORT': os.getenv('LEGACY_DB_PORT', '5555'),
-    }
+    "legacy": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("LEGACY_DB_NAME"),
+        "USER": os.getenv("LEGACY_DB_USER"),
+        "PASSWORD": os.getenv("LEGACY_DB_PASSWORD"),
+        "HOST": os.getenv("LEGACY_DB_HOST", "localhost"),
+        "PORT": os.getenv("LEGACY_DB_PORT", "5555"),
+    },
 }
 
 
 # These are to allow us to have users log in with Google OAuth2
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_KEY")
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv(
-    "SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET")
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET")
 
 SOCIAL_AUTH_PIPELINE = (
     # Standard steps
     # Get user details from provider
-    'social_core.pipeline.social_auth.social_details',
-    'social_core.pipeline.social_auth.social_uid',             # Get provider UID
+    "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_uid",  # Get provider UID
     # Check if auth is allowed
-    'social_core.pipeline.social_auth.auth_allowed',
+    "social_core.pipeline.social_auth.auth_allowed",
     # Try to find existing social user
-    'social_core.pipeline.social_auth.social_user',
-
+    "social_core.pipeline.social_auth.social_user",
     # 🔁 NEW: Associate by email if not linked yet (password-first → OAuth2)
-    'social_core.pipeline.social_auth.associate_by_email',
-
+    "social_core.pipeline.social_auth.associate_by_email",
     # 🛠️ Custom steps — insert after association
-    'members.pipeline.debug_pipeline_data',                    # Log details
+    "members.pipeline.debug_pipeline_data",  # Log details
     # Create proper username format
-    'members.pipeline.create_username',
+    "members.pipeline.create_username",
     # Default username getter
-    'social_core.pipeline.user.get_username',
+    "social_core.pipeline.user.get_username",
     # Create user if not found
-    'social_core.pipeline.user.create_user',
-    'members.pipeline.set_default_membership_status',          # Set membership status
+    "social_core.pipeline.user.create_user",
+    "members.pipeline.set_default_membership_status",  # Set membership status
     # Fetch profile picture from Google
-    'members.pipeline.fetch_google_profile_picture',
-
+    "members.pipeline.fetch_google_profile_picture",
     # Standard steps to finalize
-    'social_core.pipeline.social_auth.associate_user',         # Link social to user
-    'social_core.pipeline.social_auth.load_extra_data',        # Load extras
-    'social_core.pipeline.user.user_details',                  # Update user fields
+    "social_core.pipeline.social_auth.associate_user",  # Link social to user
+    "social_core.pipeline.social_auth.load_extra_data",  # Load extras
+    "social_core.pipeline.user.user_details",  # Update user fields
 )
 
 
@@ -241,8 +238,7 @@ GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", "media")
 # Credentials for GCS
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 if cred_path:
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-        cred_path)
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(cred_path)
 
 
 # Django 5.1+ storage backend configuration
@@ -264,7 +260,7 @@ MEDIA_URL = os.getenv(
 # print(f"[DEBUG] MEDIA_URL at settings load: {MEDIA_URL}")
 
 # These static directories are not on Google Storage Platform.
-STATIC_URL = '/static/'
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -289,8 +285,8 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTHENTICATION_BACKENDS = (
-    'social_core.backends.google.GoogleOAuth2',
-    'django.contrib.auth.backends.ModelBackend',
+    "social_core.backends.google.GoogleOAuth2",
+    "django.contrib.auth.backends.ModelBackend",
 )
 
 
@@ -298,10 +294,10 @@ AUTHENTICATION_BACKENDS = (
 # ALLOWED_HOSTS = ['10.76.0.0', '127.0.0.1',
 # 'localhost', 'm2s.skylinesoaring.org', '.skylinesoaring.org']
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 # Trust X-Forwarded-Proto header for HTTPS detection (required for OAuth2 redirect URI to use https)
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 DEBUG = True
@@ -316,34 +312,34 @@ EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
 
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
         },
     },
-    'loggers': {
-        'social': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
+    "loggers": {
+        "social": {
+            "handlers": ["console"],
+            "level": "DEBUG",
         },
-        'duty_roster.generator': {
-            'handlers': ['console'],
-            'level': 'WARNING',
+        "duty_roster.generator": {
+            "handlers": ["console"],
+            "level": "WARNING",
         },
     },
 }
 
-handler403 = 'members.views.custom_permission_denied_view'
+handler403 = "members.views.custom_permission_denied_view"
 
 # Use locally hosted TinyMCE JS
-TINYMCE_JS_URL = '/static/tinymce/tinymce.min.js'
+TINYMCE_JS_URL = "/static/tinymce/tinymce.min.js"
 
 TINYMCE_DEFAULT_CONFIG = {
-    "relative_urls": False,         # turn off relative URLs
-    "remove_script_host": False,    # strip protocol+host
-    "convert_urls": True,           # Ensure URLs are run through TinyMCE's converter
+    "relative_urls": False,  # turn off relative URLs
+    "remove_script_host": False,  # strip protocol+host
+    "convert_urls": True,  # Ensure URLs are run through TinyMCE's converter
     "height": 500,
     "menubar": "file edit view insert format tools table help",
     "plugins": "image link media code lists table",
@@ -356,9 +352,7 @@ TINYMCE_DEFAULT_CONFIG = {
     "file_picker_types": "image",
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
-    "table_default_attributes": {
-        "border": "1"
-    },
+    "table_default_attributes": {"border": "1"},
     "table_toolbar": (
         "tableprops cellprops | "
         "tableinsertrowbefore tableinsertrowafter tabledeleterow | "
@@ -368,4 +362,5 @@ TINYMCE_DEFAULT_CONFIG = {
 }
 
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
-    "notifications.context_processors.notifications")
+    "notifications.context_processors.notifications"
+)

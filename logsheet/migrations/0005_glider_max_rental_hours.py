@@ -6,13 +6,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('logsheet', '0004_alter_airfield_photo_alter_glider_photo_and_more'),
+        ("logsheet", "0004_alter_airfield_photo_alter_glider_photo_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='glider',
-            name='max_rental_hours',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Maximum billable rental hours per flight (leave blank for no cap).', max_digits=4, null=True),
+            model_name="glider",
+            name="max_rental_hours",
+            field=models.DecimalField(
+                blank=True,
+                decimal_places=2,
+                help_text="Maximum billable rental hours per flight (leave blank for no cap).",
+                max_digits=4,
+                null=True,
+            ),
         ),
     ]

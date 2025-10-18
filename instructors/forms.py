@@ -1,30 +1,37 @@
-from django import forms
-from members.models import Member
+from datetime import date, timedelta
+
 # TestBuilderForm: Form for creating written test templates
 from django import forms
-from .models import (
-    MemberQualification, ClubQualificationType, InstructionReport,
-    LessonScore, TrainingLesson, GroundInstruction,
-    GroundLessonScore, TrainingLesson, SCORE_CHOICES,
-    SyllabusDocument
-)
 from django.forms import formset_factory
-from datetime import timedelta
 from tinymce.widgets import TinyMCE
-from datetime import date
+
+from members.models import Member
+
+from .models import (
+    SCORE_CHOICES,
+    ClubQualificationType,
+    GroundInstruction,
+    GroundLessonScore,
+    InstructionReport,
+    LessonScore,
+    MemberQualification,
+    SyllabusDocument,
+    TrainingLesson,
+)
 
 
 class TestBuilderForm(forms.Form):
     pass_percentage = forms.DecimalField(
-        max_digits=5, decimal_places=2,
+        max_digits=5,
+        decimal_places=2,
         initial=100,
-        help_text="Minimum % score required to pass"
+        help_text="Minimum % score required to pass",
     )
 
     student = forms.ModelChoiceField(
         queryset=Member.objects.filter(is_active=True),
         help_text="Who should take this test",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
 
@@ -46,6 +53,7 @@ class InstructionReportForm(forms.ModelForm):
             "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
         }
 
+
 ####################################################
 # LessonScoreSimpleForm
 #
@@ -58,12 +66,14 @@ class InstructionReportForm(forms.ModelForm):
 
 class LessonScoreSimpleForm(forms.Form):
     lesson = forms.ModelChoiceField(
-        queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput())
+        queryset=TrainingLesson.objects.all(), widget=forms.HiddenInput()
+    )
     score = forms.ChoiceField(
         choices=[("", "---------")] + SCORE_CHOICES,
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"})
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
+
 
 ####################################################
 # LessonScoreSimpleFormSet
@@ -85,6 +95,7 @@ LessonScoreSimpleFormSet = formset_factory(LessonScoreSimpleForm, extra=0)
 # - duration: Text input parsed into timedelta.
 # - notes: HTMLField for detailed notes (TinyMCE widget).
 ####################################################
+
 
 class GroundInstructionForm(forms.ModelForm):
     class Meta:
@@ -112,7 +123,8 @@ class GroundInstructionForm(forms.ModelForm):
                 return timedelta(hours=hours, minutes=minutes, seconds=seconds)
             except ValueError:
                 raise forms.ValidationError(
-                    "Enter duration in HH:MM or HH:MM:SS format.")
+                    "Enter duration in HH:MM or HH:MM:SS format."
+                )
         elif isinstance(val, timedelta):
             return val
         elif not val:
@@ -130,12 +142,13 @@ class GroundInstructionForm(forms.ModelForm):
 # - score: Select field for SCORE_CHOICES with optional blank.
 ####################################################
 
+
 class GroundLessonScoreSimpleForm(forms.Form):
     lesson = forms.IntegerField(widget=forms.HiddenInput())
     score = forms.ChoiceField(
         choices=[("", "---------")] + SCORE_CHOICES,
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"})
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
 
@@ -148,10 +161,12 @@ class GroundLessonScoreSimpleForm(forms.Form):
 # - content: HTML content (TinyMCE widget).
 ####################################################
 
+
 class SyllabusDocumentForm(forms.ModelForm):
     class Meta:
         model = SyllabusDocument
-        fields = ['title', 'content']
+        fields = ["title", "content"]
+
 
 ####################################################
 # GroundLessonScoreFormSet
@@ -165,7 +180,7 @@ GroundLessonScoreFormSet = formset_factory(
     extra=0,
     can_delete=False,
     validate_min=False,
-    validate_max=False
+    validate_max=False,
 )
 
 ####################################################
@@ -180,36 +195,41 @@ GroundLessonScoreFormSet = formset_factory(
 class QualificationAssignForm(forms.ModelForm):
     class Meta:
         model = MemberQualification
-        fields = ['qualification', 'is_qualified',
-                  'expiration_date', 'date_awarded', 'notes']
+        fields = [
+            "qualification",
+            "is_qualified",
+            "expiration_date",
+            "date_awarded",
+            "notes",
+        ]
         widgets = {
-            'expiration_date': forms.DateInput(attrs={'type': 'date'}),
-            'date_awarded': forms.DateInput(attrs={'type': 'date'}),
-            'notes': forms.Textarea(attrs={'rows': 2}),
+            "expiration_date": forms.DateInput(attrs={"type": "date"}),
+            "date_awarded": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 2}),
         }
 
     def __init__(self, *args, instructor=None, student=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.instructor = instructor
         self.student = student
-        self.fields['date_awarded'].label = "Date Awarded (optional)"
-        self.fields['expiration_date'].label = "Expiration Date (optional)"
+        self.fields["date_awarded"].label = "Date Awarded (optional)"
+        self.fields["expiration_date"].label = "Expiration Date (optional)"
 
     from datetime import date  # at the top of forms.py
 
     def save(self, commit=True):
-        date_awarded = self.cleaned_data.get('date_awarded') or date.today()
+        date_awarded = self.cleaned_data.get("date_awarded") or date.today()
 
         instance, _ = MemberQualification.objects.update_or_create(
             member=self.student,
-            qualification=self.cleaned_data['qualification'],
+            qualification=self.cleaned_data["qualification"],
             defaults={
-                'is_qualified': self.cleaned_data['is_qualified'],
-                'expiration_date': self.cleaned_data['expiration_date'],
-                'date_awarded': date_awarded,
-                'notes': self.cleaned_data['notes'],
-                'instructor': self.instructor,
-                'imported': False,
-            }
+                "is_qualified": self.cleaned_data["is_qualified"],
+                "expiration_date": self.cleaned_data["expiration_date"],
+                "date_awarded": date_awarded,
+                "notes": self.cleaned_data["notes"],
+                "instructor": self.instructor,
+                "imported": False,
+            },
         )
         return instance

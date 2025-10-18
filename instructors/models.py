@@ -1,14 +1,15 @@
 from django.db import models
-from utils.upload_entropy import upload_quals_icon
 from tinymce.models import HTMLField
+
 from members.models import Member
+from utils.upload_entropy import upload_quals_icon
 
 SCORE_CHOICES = [
     ("1", "Introduced (Instructor flew)"),
     ("2", "Practiced (with instructor help)"),
     ("3", "Solo Standard"),
     ("4", "Checkride Standard"),
-    ("!", "Needs Attention (!)")
+    ("!", "Needs Attention (!)"),
 ]
 
 
@@ -34,6 +35,7 @@ class TrainingPhase(models.Model):
 
     def __str__(self):
         return f"{self.number} – {self.name}"
+
 
 ####################################################
 # TrainingLesson model
@@ -65,15 +67,17 @@ class TrainingLesson(models.Model):
 
     # FAA compliance tracking (from legacy fields)
     far_requirement = models.CharField(
-        max_length=20, blank=True)       # e.g., "61.87(i)(16)"
+        max_length=20, blank=True
+    )  # e.g., "61.87(i)(16)"
     pts_reference = models.CharField(
-        max_length=30, blank=True)         # e.g., "61.107(b)(6)(iv)"
+        max_length=30, blank=True
+    )  # e.g., "61.107(b)(6)(iv)"
     phase = models.ForeignKey(
         TrainingPhase,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="lessons"
+        related_name="lessons",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -90,6 +94,7 @@ class TrainingLesson(models.Model):
 
     def __str__(self):
         return f"{self.code} – {self.title}"
+
 
 ####################################################
 # SyllabusDocument model
@@ -115,6 +120,7 @@ class SyllabusDocument(models.Model):
     def __str__(self):
         return self.title
 
+
 ####################################################
 # InstructionReport model
 #
@@ -136,14 +142,10 @@ class SyllabusDocument(models.Model):
 
 class InstructionReport(models.Model):
     student = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name="instruction_reports"
+        Member, on_delete=models.CASCADE, related_name="instruction_reports"
     )
     instructor = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name="given_instruction_reports"
+        Member, on_delete=models.CASCADE, related_name="given_instruction_reports"
     )
     report_date = models.DateField()
     report_text = HTMLField(blank=True)  # Instructor's summary / essay
@@ -152,13 +154,13 @@ class InstructionReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('student', 'instructor', 'report_date')
-        ordering = ['-report_date']
+        unique_together = ("student", "instructor", "report_date")
+        ordering = ["-report_date"]
         indexes = [
-            models.Index(fields=['student']),
-            models.Index(fields=['instructor']),
-            models.Index(fields=['report_date']),
-            models.Index(fields=['student', 'instructor', 'report_date']),
+            models.Index(fields=["student"]),
+            models.Index(fields=["instructor"]),
+            models.Index(fields=["report_date"]),
+            models.Index(fields=["student", "instructor", "report_date"]),
         ]
 
     def __str__(self):
@@ -166,6 +168,7 @@ class InstructionReport(models.Model):
             f"{self.student.full_display_name} – {self.report_date}"
             f" by {self.instructor.full_display_name}"
         )
+
 
 ####################################################
 # LessonScore model
@@ -182,16 +185,15 @@ class InstructionReport(models.Model):
 
 class LessonScore(models.Model):
     report = models.ForeignKey(
-        InstructionReport,
-        on_delete=models.CASCADE,
-        related_name="lesson_scores"
+        InstructionReport, on_delete=models.CASCADE, related_name="lesson_scores"
     )
     lesson = models.ForeignKey(TrainingLesson, on_delete=models.CASCADE)
     score = models.CharField(max_length=2, choices=SCORE_CHOICES)
 
     class Meta:
-        unique_together = ('report', 'lesson')
-        ordering = ['lesson__code']
+        unique_together = ("report", "lesson")
+        ordering = ["lesson__code"]
+
 
 ####################################################
 # GroundInstruction model
@@ -215,14 +217,10 @@ class LessonScore(models.Model):
 
 class GroundInstruction(models.Model):
     student = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name="ground_sessions"
+        Member, on_delete=models.CASCADE, related_name="ground_sessions"
     )
     instructor = models.ForeignKey(
-        Member,
-        on_delete=models.CASCADE,
-        related_name="ground_given"
+        Member, on_delete=models.CASCADE, related_name="ground_given"
     )
     date = models.DateField()
     location = models.CharField(max_length=100, blank=True, null=True)
@@ -234,13 +232,14 @@ class GroundInstruction(models.Model):
     class Meta:
         ordering = ["-date"]
         indexes = [
-            models.Index(fields=['student']),
-            models.Index(fields=['instructor']),
-            models.Index(fields=['date']),
+            models.Index(fields=["student"]),
+            models.Index(fields=["instructor"]),
+            models.Index(fields=["date"]),
         ]
 
     def __str__(self):
         return f"{self.date} – {self.student} w/ {self.instructor}"
+
 
 ####################################################
 # GroundLessonScore model
@@ -260,9 +259,7 @@ class GroundInstruction(models.Model):
 
 class GroundLessonScore(models.Model):
     session = models.ForeignKey(
-        "GroundInstruction",
-        on_delete=models.CASCADE,
-        related_name="lesson_scores"
+        "GroundInstruction", on_delete=models.CASCADE, related_name="lesson_scores"
     )
     lesson = models.ForeignKey("TrainingLesson", on_delete=models.CASCADE)
     score = models.CharField(max_length=2, choices=SCORE_CHOICES)
@@ -273,6 +270,7 @@ class GroundLessonScore(models.Model):
 
     def __str__(self):
         return f"{self.lesson.code} – {self.get_score_display()}"
+
 
 ####################################################
 # ClubQualificationType model
@@ -294,19 +292,19 @@ class GroundLessonScore(models.Model):
 class ClubQualificationType(models.Model):
     # e.g. 'CFI', 'ASK-Back'
     code = models.CharField(max_length=30, unique=True)
-    name = models.CharField(max_length=100)              # Human-friendly name
-    icon = models.ImageField(
-        upload_to=upload_quals_icon, null=True, blank=True)
+    name = models.CharField(max_length=100)  # Human-friendly name
+    icon = models.ImageField(upload_to=upload_quals_icon, null=True, blank=True)
     applies_to = models.CharField(
         max_length=10,
-        choices=[('student', 'Student'), ('rated', 'Rated'), ('both', 'Both')],
-        default='both'
+        choices=[("student", "Student"), ("rated", "Rated"), ("both", "Both")],
+        default="both",
     )
     is_obsolete = models.BooleanField(default=False)
     tooltip = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
+
 
 ####################################################
 # MemberQualification model
@@ -327,15 +325,14 @@ class ClubQualificationType(models.Model):
 
 class MemberQualification(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
-    qualification = models.ForeignKey(
-        ClubQualificationType, on_delete=models.CASCADE)
+    qualification = models.ForeignKey(ClubQualificationType, on_delete=models.CASCADE)
     is_qualified = models.BooleanField(default=True)
     instructor = models.ForeignKey(
         Member,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name='issued_quals'
+        related_name="issued_quals",
     )
     date_awarded = models.DateField(null=True, blank=True)
     expiration_date = models.DateField(null=True, blank=True)
@@ -344,10 +341,11 @@ class MemberQualification(models.Model):
     imported = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('member', 'qualification')
+        unique_together = ("member", "qualification")
 
     def __str__(self):
         return f"{self.member} – {self.qualification.code}"
+
 
 ####################################################
 # StudentProgressSnapshot model
@@ -367,7 +365,7 @@ class MemberQualification(models.Model):
 
 class StudentProgressSnapshot(models.Model):
     student = models.OneToOneField(Member, on_delete=models.CASCADE)
-    solo_progress = models.FloatField(default=0.0)       # 0.0 to 1.0
+    solo_progress = models.FloatField(default=0.0)  # 0.0 to 1.0
     checkride_progress = models.FloatField(default=0.0)  # 0.0 to 1.0
     # total instructor sessions
     sessions = models.IntegerField(default=0)

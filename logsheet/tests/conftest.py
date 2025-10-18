@@ -1,9 +1,19 @@
-from .fixtures_finances import *
-from members.models import Member
-from logsheet.models import Glider, Towplane, Logsheet, MaintenanceIssue, AircraftMeister, Airfield
 from datetime import date
+
 import pytest
 from django.contrib.auth import get_user_model
+
+from logsheet.models import (
+    AircraftMeister,
+    Airfield,
+    Glider,
+    Logsheet,
+    MaintenanceIssue,
+    Towplane,
+)
+from members.models import Member
+
+from .fixtures_finances import *
 
 User = get_user_model()
 
@@ -16,7 +26,7 @@ def active_member(db):
         is_active=True,
         first_name="Active",
         last_name="Member",
-        membership_status="Full Member"
+        membership_status="Full Member",
     )
     return user
 
@@ -37,7 +47,7 @@ def meister_member(db, glider_for_meister):
         is_active=True,
         first_name="Meister",
         last_name="User",
-        membership_status="Full Member"  # assuming A = Active
+        membership_status="Full Member",  # assuming A = Active
     )
     AircraftMeister.objects.create(glider=glider_for_meister, member=user)
     return user
@@ -56,9 +66,7 @@ def towplane(db):
 @pytest.fixture
 def maintenance_issue(db, glider_for_meister):
     return MaintenanceIssue.objects.create(
-        description="Brake inspection needed",
-        glider=glider_for_meister,
-        resolved=False
+        description="Brake inspection needed", glider=glider_for_meister, resolved=False
     )
 
 
@@ -70,7 +78,5 @@ def airfield(db):
 @pytest.fixture
 def logsheet(db, airfield, active_member):
     return Logsheet.objects.create(
-        log_date=date.today(),
-        airfield=airfield,
-        created_by=active_member
+        log_date=date.today(), airfield=airfield, created_by=active_member
     )
