@@ -29,9 +29,15 @@ class Command(BaseCommand):
             aircraft = issue.glider or issue.towplane or "Unassigned"
             grounded_status = "GROUNDED" if issue.grounded else "Operational"
             lines.append(
-                f"- {aircraft}: {issue.description} (Reported: "
-                f"{issue.report_date.strftime('%Y-%m-%d')}) "
-                f"[{grounded_status}]"
+                "- "
+                + str(aircraft)
+                + ": "
+                + str(issue.description)
+                + " (Reported: "
+                + issue.report_date.strftime("%Y-%m-%d")
+                + ") ["
+                + grounded_status
+                + "]"
             )
 
             # Get assigned meisters

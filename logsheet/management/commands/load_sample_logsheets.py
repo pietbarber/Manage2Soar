@@ -48,8 +48,10 @@ class Command(BaseCommand):
                 default_towplane=random.choice(towplanes),
             )
             created += 1
-            self.stdout.write(f"Created logsheet for {logsheet}")
+            self.stdout.write("Created logsheet for " + str(logsheet))
 
         self.stdout.write(
-            self.style.SUCCESS(f"Successfully created {created} sample logsheets.")
+            self.style.SUCCESS(
+                "Successfully created " + str(created) + " sample logsheets."
+            )
         )

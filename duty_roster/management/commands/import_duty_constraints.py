@@ -43,8 +43,8 @@ class Command(BaseCommand):
             pref.preferred_day = raw.get("preferred-day") or pref.preferred_day
             pref.comment = raw.get("comment") or raw.get("web-comment") or pref.comment
             pref.dont_schedule = (
-                str(raw.get("dont-schedule", "")).lower() in
-                ("true", "1", "yes")
+                str(raw.get("dont-schedule", "")).lower()
+                in ("true", "1", "yes")
             )
 
             if raw.get("last-duty-date"):

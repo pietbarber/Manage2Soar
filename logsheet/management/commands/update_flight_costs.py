@@ -51,14 +51,24 @@ class Command(BaseCommand):
                     flight.save()
                     updated += 1
                     self.stdout.write(
-                        f"Updated flight ID {flight.pk} (tow: {tow}, rental: {rental})"
+                        "Updated flight ID "
+                        + str(flight.pk)
+                        + " (tow: "
+                        + str(tow)
+                        + ", rental: "
+                        + str(rental)
+                        + ")"
                     )
             if updated:
                 self.stdout.write(
                     self.style.SUCCESS(
                         (
-                            f"Updated {updated} flights for logsheet {logsheet} "
-                            f"on {logsheet.log_date}"
+                            "Updated "
+                            + str(updated)
+                            + " flights for logsheet "
+                            + str(logsheet)
+                            + " on "
+                            + str(logsheet.log_date)
                         )
                     )
                 )

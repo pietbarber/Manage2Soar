@@ -52,7 +52,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for listname, predicate in SYMPA_LISTS.items():
-            msg = "Syncing Sympa list '{}'…".format(listname)
+            msg = "Syncing Sympa list '" + listname + "'…"
             self.stdout.write(msg)
             try:
                 current = get_current_sympa_members(listname)
@@ -72,16 +72,14 @@ class Command(BaseCommand):
                     add_member(listname, email)
                     self.stdout.write(self.style.SUCCESS(" Added → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write(
-                        "ERROR adding {} to {}: {}".format(email, listname, e)
-                    )
+                    self.stderr.write("ERROR adding " + email +
+                                      " to " + listname + ": " + str(e))
             for email in sorted(to_remove):
                 try:
                     remove_member(listname, email)
                     self.stdout.write(self.style.WARNING(" Removed → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write(
-                        "ERROR removing {} from {}: {}".format(email, listname, e)
-                    )
+                    self.stderr.write("ERROR removing " + email +
+                                      " from " + listname + ": " + str(e))
 
         self.stdout.write(self.style.SUCCESS("✓ Sympa sync complete."))
