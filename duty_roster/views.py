@@ -325,17 +325,20 @@ def ops_intent_toggle(request, year, month, day):
     if "instruction" in available_as:
         days_until = (day_date - timezone.now().date()).days
         if days_until > 14:
+            # Short message and an action form; build in parts to keep lines short.
             response = (
                 '<p class="text-red-700">⏰ You can only request instruction '
                 'within 14 days of your duty date.</p>'
             )
-            response += (
-                f'<form hx-get="{request.path}form/" '
-                f'hx-post="{request.path}" '
+            path = request.path
+            form_html = (
+                f'<form hx-get="{path}form/" '
+                f'hx-post="{path}" '
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
                 '<button type="submit" class="btn btn-sm btn-primary">'
-                "🛩️ I Plan to Fly This Day</button></form>"
+                '🛩️ I Plan to Fly This Day</button></form>'
             )
+            response += form_html
             return HttpResponse(response)
 
     # SIGNUP FLOW
@@ -361,13 +364,17 @@ def ops_intent_toggle(request, year, month, day):
 
         # build the email
         subject = f"Instruction Signup on {day_date:%b %d}"
-        body = (
-            f"Student {request.user.full_display_name} signed up for instruction on "
-            f"{day_date:%B %d, %Y}.\n"
-            "Others signed up: " + (", ".join(students) or "None") + "\n"
-        )
+        # Build a short, readable email body.
+        student_name = request.user.full_display_name
+        date_str = day_date.strftime("%B %d, %Y")
+        others = ", ".join(students) if students else "None"
+        body_lines = [
+            f"Student {student_name} signed up for instruction on {date_str}.",
+            f"Others signed up: {others}",
+        ]
         if need_surge:
-            body += "Surge instructor may be needed.\n"
+            body_lines.append("Surge instructor may be needed.")
+        body = "\n".join(body_lines) + "\n"
 
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
@@ -387,14 +394,14 @@ def ops_intent_toggle(request, year, month, day):
 
         response = (
             '<p class="text-green-700">✅ You’re now marked as planning to fly '
-            "this day.</p>"
+            'this day.</p>'
         )
         btn = (
             '<button hx-post="' + request.path + '" '
             'hx-target="#ops-intent-response" '
             'hx-swap="innerHTML" '
             'class="btn btn-sm btn-danger">'
-            "Cancel Intent</button>"
+            'Cancel Intent</button>'
         )
         response += btn
 
@@ -426,7 +433,7 @@ def ops_intent_toggle(request, year, month, day):
             '<form hx-get="' + request.path + 'form/" '
             'hx-target="#ops-intent-response" hx-swap="innerHTML">'
             '<button type="submit" class="btn btn-sm btn-primary">'
-            "🛩️ I Plan to Fly This Day</button></form>"
+            '🛩️ I Plan to Fly This Day</button></form>'
         )
         response += form_html
 

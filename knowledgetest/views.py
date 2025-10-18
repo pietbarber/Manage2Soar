@@ -337,16 +337,18 @@ class WrittenTestSubmitView(View):
             ]
             breakdown_txt = ", ".join(breakdown_list)
 
+            # Build a compact report_text in pieces to keep source lines short.
+            outcome = "Passed" if attempt.passed else "Failed"
+            pct = f"{attempt.score_percentage:.0f}%"
+            report_text = (
+                f'Written test "{tmpl.name}" completed: {pct} '
+                f'({outcome}). Subject breakdown: {breakdown_txt}.'
+            )
             InstructionReport.objects.create(
                 student=request.user,
                 instructor=proctor,
                 report_date=timezone.now().date(),
-                report_text=(
-                    f'Written test "{tmpl.name}" completed: '
-                    f"{attempt.score_percentage:.0f}% "
-                    f'({"Passed" if attempt.passed else "Failed"}). '
-                    f"Subject breakdown: {breakdown_txt}."
-                ),
+                report_text=report_text,
             )
         return redirect("knowledgetest:quiz-result", attempt.pk)
 
