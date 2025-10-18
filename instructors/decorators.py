@@ -2,7 +2,7 @@
 from functools import wraps
 from django.shortcuts import get_object_or_404, render, redirect
 from members.models import Member
-from members.constants.membership import ALLOWED_MEMBERSHIP_STATUSES
+from members.utils import is_active_member
 from django.http import HttpResponseForbidden
 
 
@@ -30,11 +30,8 @@ def instructor_required(view_func):
         if not user.is_authenticated:
             return redirect("login")
 
-        # ✅ Allow all superusers
-        if user.is_superuser:
-            return view_func(request, *args, **kwargs)
-
-        if getattr(user, "membership_status", None) not in ALLOWED_MEMBERSHIP_STATUSES:
+        # Centralized check which handles superuser logic and statuses
+        if not is_active_member(user):
             return render(request, "403.html", status=403)
 
         if not getattr(user, "instructor", False):
@@ -71,11 +68,8 @@ def member_or_instructor_required(view_func):
         if not user.is_authenticated:
             return redirect("login")
 
-        # ✅ Allow superusers
-        if user.is_superuser:
-            return view_func(request, member_id, *args, **kwargs)
-
-        if getattr(user, "membership_status", None) not in ALLOWED_MEMBERSHIP_STATUSES:
+        # Centralized check which handles superuser logic and statuses
+        if not is_active_member(user):
             return render(request, "403.html", status=403)
 
         if user == member or getattr(user, "instructor", False):

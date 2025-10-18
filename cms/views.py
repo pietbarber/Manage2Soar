@@ -5,7 +5,7 @@ from django.conf import settings
 from cms.models import HomePageContent
 from django.shortcuts import get_object_or_404
 from .models import Page
-from members.constants import ALLOWED_MEMBERSHIP_STATUSES
+from members.utils import is_active_member
 
 
 def cms_page(request, **kwargs):
@@ -36,7 +36,7 @@ def cms_page(request, **kwargs):
     assert page is not None
     if not page.is_public:
         user = request.user
-        if not (user.is_authenticated and (user.is_superuser or getattr(user, 'membership_status', None) in ALLOWED_MEMBERSHIP_STATUSES)):
+        if not is_active_member(user):
             # Use LOGIN_URL and preserve next
             login_url = settings.LOGIN_URL
             return redirect(f"{login_url}?next={request.path}")
