@@ -344,11 +344,11 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
 
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
-            return format_html(
-                '<img src="{}" style="max-height:200px; '
-                'border:1px solid #ccc;" />',
-                obj.profile_photo.url,
+            img_html = (
+                '<img src="{}" style="max-height:200px;" '
+                'class="border" />'
             )
+            return format_html(img_html, obj.profile_photo.url)
         return ""
 
     profile_photo_preview.short_description = "Current Photo"
