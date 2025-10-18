@@ -24,7 +24,9 @@ def biography_upload_path(instance, filename):
 
 
 class Biography(models.Model):
-    member = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    member = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
     content = HTMLField(blank=True, null=True)
     uploaded_image = models.ImageField(
         upload_to=upload_biography, blank=True, null=True
@@ -127,7 +129,8 @@ class Member(AbstractUser):
         blank=True,
         null=True,
         help_text=(
-            "Direct link to this member's SSA page for badges and achievements."
+            "Direct link to this member's SSA page for badges and "
+            "achievements."
         ),
     )
     legacy_username = models.CharField(
@@ -135,7 +138,9 @@ class Member(AbstractUser):
     )
     phone = models.CharField(max_length=20, blank=True, null=True)
     mobile_phone = models.CharField(max_length=20, blank=True, null=True)
-    country = models.CharField(max_length=2, blank=True, null=True, default="US")
+    country = models.CharField(
+        max_length=2, blank=True, null=True, default="US"
+    )
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=50, blank=True, null=True)
     state_code = models.CharField(
@@ -299,7 +304,9 @@ class Member(AbstractUser):
 
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    image = models.ImageField(upload_to=upload_badge_image, blank=True, null=True)
+    image = models.ImageField(
+        upload_to=upload_badge_image, blank=True, null=True
+    )
     description = HTMLField(blank=True)
     order = models.PositiveIntegerField(default=0)
 
