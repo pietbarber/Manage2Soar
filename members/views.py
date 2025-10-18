@@ -79,28 +79,16 @@ def member_list(request):
 
 #########################
 # member_view() View
-# Renders the detail page for a specific member.
-# Displays member profile details including roles, contact info, badges,
-# QR code, biography, qualifications, and solo/checkride need buttons when applicable.
-# Access restricted to active members via @active_member_required.
 #
-# Arguments:
-# - request: the HTTP request object
-# - member_id: the primary key of the Member object to display
+# Renders the detail page for a specific member. The page displays profile
+# details such as roles, contact info, badges, the member's QR code, the
+# biography, qualifications, and (when applicable) solo/checkride buttons.
+# Access is restricted via the @active_member_required decorator.
 #
-# Context Variables Provided to Template:
-# - member: Member instance
-# - show_need_buttons: bool indicating whether to display solo/checkride buttons
-# - qr_base64: Base64-encoded QR code for vCard download
-# - form: MemberProfilePhotoForm instance (if editing own profile) or None
-# - is_self: bool, True if the viewer is the member
-# - can_edit: bool, True if the user can edit this profile
-# - biography: MemberBiography instance or None
-# - qualifications: QuerySet of MemberQualification objects
-# - today: current date
+# Context passed to the template includes:
+# - member, show_need_buttons, qr_base64, form, is_self, can_edit,
+#   biography, qualifications, and today
 #
-# Raises:
-# - Http404 if no Member exists with the given member_id
 #########################
 
 
@@ -284,7 +272,6 @@ def tinymce_image_upload(request):
     saved_name = default_storage.save(save_path, ContentFile(f.read()))
     # Always return the public GCS URL
     from urllib.parse import urljoin
-
 
     url = urljoin(settings.MEDIA_URL, saved_name)
     return JsonResponse({"location": url})

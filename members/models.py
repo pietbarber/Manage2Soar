@@ -41,34 +41,17 @@ class Biography(models.Model):
 #########################
 # Member Model
 
-# Extends Django's AbstractUser to represent a club member.
-# Includes personal information, contact details, SSA membership info,
-# club roles, and membership status.
+# Extends Django's AbstractUser to represent a club member. Contains
+# personal info, contact details, SSA membership info, club roles, and
+# membership status.
 
-# Fields:
-# - middle_initial: optional middle initial
-# - name_suffix: suffix (Jr., Sr., III, etc.)
-# - nickname: alternate first name or call sign
-# - phone / mobile_phone: contact numbers
-# - emergency_contact: emergency contact info
-# - address, city, state_code/state_freeform, zip_code, country: mailing address
-# - membership_status: current member status (active, student, etc.)
-# - SSA_member_number: Soaring Society of America ID
-# - glider_rating: pilot certification level (student, private, commercial)
-# - public_notes: viewable by all logged-in users
-# - private_notes: visible only to officers/managers
-# - profile_photo: optional image used in member directory
-# - instructor / towpilot / duty_officer / assistant_duty_officer: role booleans
-# - director / treasurer / secretary / webmaster / member_manager: club management roles
-# - legacy_username: preserved for linking imported data
-# - date_joined: original join date
-# - last_updated_by: tracks last editor of this record
-# - badges: M2M relation to awarded badges
-# - biography: optional related biography object
+# Key fields include name parts, contact numbers, address, membership
+# status, SSA member number, pilot rating, profile photos, role booleans,
+# legacy linking fields, notes, and related biography.
 
 # Methods:
-# - is_active_member(): Returns True if the member has a qualifying
-#   active membership status
+# - is_active_member(): Returns True when a member's status is in the
+#   canonical active list.
 
 
 class Member(AbstractUser):

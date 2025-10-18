@@ -33,11 +33,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        self.stdout.write(
-            self.style.NOTICE(
-                "Connecting to legacy database via settings.DATABASES['legacy']..."
-            )
-        )
+        notice_msg = "Connecting to legacy database via settings.DATABASES['legacy']..."
+        self.stdout.write(self.style.NOTICE(notice_msg))
 
         legacy = settings.DATABASES["legacy"]
         conn = psycopg2.connect(
@@ -80,9 +77,7 @@ class Command(BaseCommand):
                 continue
 
             if dry_run:
-                self.stdout.write(
-                    "[DRY RUN] Would import bio for {}".format(member)
-                )
+                self.stdout.write("[DRY RUN] Would import bio for {}".format(member))
             else:
                 biography, _ = Biography.objects.get_or_create(member=member)
                 biography.content = content

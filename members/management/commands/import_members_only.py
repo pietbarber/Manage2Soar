@@ -153,11 +153,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        self.stdout.write(
-            self.style.NOTICE(
-                "Connecting to legacy database via settings.DATABASES['legacy']..."
-            )
+        notice_msg = (
+            "Connecting to legacy database via settings.DATABASES['legacy']..."
         )
+        self.stdout.write(self.style.NOTICE(notice_msg))
 
         legacy = settings.DATABASES["legacy"]
         conn = psycopg2.connect(
@@ -302,13 +301,12 @@ class Command(BaseCommand):
 
             if dry_run:
                 self.stdout.write(
-                    f"[DRY RUN] Would import: {first} {last} ({username})"
+                    "[DRY RUN] Would import: {} {} ({})".format(first, last, username)
                 )
             else:
                 member.save()
-                self.stdout.write(f"Imported: {first} {last} ({username})")
+                self.stdout.write("Imported: {} {} ({})".format(first, last, username))
             imported += 1
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Import complete. Total imported: {imported}")
-        )
+        self.stdout.write(self.style.SUCCESS(
+            "Import complete. Total imported: {}".format(imported)))
