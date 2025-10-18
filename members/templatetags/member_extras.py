@@ -84,7 +84,9 @@ def render_duties(member):
     if member.webmaster:
         duties.append('<span title="Webmaster" class="emoji">🌐</span>')
     if member.director:
-        duties.append('<span title="Director" class="emoji"️>🎩</span>')
+        # The original string contained an invisible extra char after class attribute;
+        # keep the HTML simple and split across parts to avoid long lines.
+        duties.append('<span title="Director" class="emoji">🎩</span>')
     if member.member_manager:
         duties.append('<span title="Membership Manager" class="emoji">📇</span>')
 
