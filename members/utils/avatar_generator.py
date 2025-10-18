@@ -4,7 +4,10 @@ from django.core.files.storage import default_storage
 
 
 def generate_identicon(username, relative_path):
-    """Generate a unique identicon and save as a PNG image using Django's storage backend."""
+    """
+    Generate a unique identicon and save as a PNG image using Django's
+    storage backend.
+    """
     generator = pydenticon.Generator(
         5,
         5,  # grid size

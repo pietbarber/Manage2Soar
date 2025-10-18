@@ -343,7 +343,10 @@ def ops_intent_toggle(request, year, month, day):
     # SIGNUP FLOW
     if available_as:
         OpsIntent.objects.update_or_create(
-            member=request.user, date=day_date, defaults={"available_as": available_as}
+            response=(
+                '<p class="text-red-700">⏰ You can only request instruction '
+                'within 14 days of your duty date.</p>'
+            )
         )
 
         # who’s signed up now?

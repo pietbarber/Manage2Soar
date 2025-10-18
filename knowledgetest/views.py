@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_empty_preset():
-    # This function is called only when needed, preventing database queries at import time.
+    # This function is called only when needed. It prevents database
+    # queries at import time.
     codes = Question.objects.values_list("category__code", flat=True)
     return {code: 0 for code in codes}
 
