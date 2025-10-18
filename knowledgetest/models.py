@@ -131,7 +131,17 @@ class WrittenTestAttempt(models.Model):
 
     def __str__(self):
         status = "Passed" if self.passed else "Failed"
-        return f"{self.student} - {self.template.name} on {self.date_taken.date()} ({status})"
+        parts = [
+            str(self.student),
+            " - ",
+            str(self.template.name),
+            " on ",
+            str(self.date_taken.date()),
+            " (",
+            status,
+            ")",
+        ]
+        return "".join(parts)
 
 
 class WrittenTestAnswer(models.Model):

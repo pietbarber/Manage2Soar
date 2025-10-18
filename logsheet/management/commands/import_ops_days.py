@@ -130,7 +130,10 @@ class Command(BaseCommand):
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
                     self.stdout.write(
                         self.style.WARNING(
-                            "⚠️  Both AM and PM tow pilots differ for %s @ %s. AM: %s, PM: %s"
+                            (
+                                "⚠️  Both AM and PM tow pilots differ for %s @ %s. "
+                                "AM: %s, PM: %s"
+                            )
                             % (log_date, field, am_towpilot, pm_towpilot)
                         )
                     )

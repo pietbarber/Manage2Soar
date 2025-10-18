@@ -3,7 +3,10 @@ import secrets
 
 
 def upload_document_obfuscated(instance, filename):
-    """Store restricted files under cms/<page-slug>/<randomized-filename> preserving extension."""
+    """
+    Store restricted files under cms/<page-slug>/<randomized-filename>.
+    Preserve the original file extension.
+    """
     page_slug = instance.page.slug if instance.page else "uncategorized"
     name, ext = os.path.splitext(filename)
     token = secrets.token_urlsafe(8)

@@ -343,10 +343,9 @@ def ops_intent_toggle(request, year, month, day):
     # SIGNUP FLOW
     if available_as:
         OpsIntent.objects.update_or_create(
-            response=(
-                '<p class="text-red-700">⏰ You can only request instruction '
-                'within 14 days of your duty date.</p>'
-            )
+            member=request.user,
+            date=day_date,
+            defaults={"available_as": available_as},
         )
 
         # who’s signed up now?
@@ -394,7 +393,12 @@ def ops_intent_toggle(request, year, month, day):
                 fail_silently=True,
             )
 
-        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        # Always show a small success message to the user (even if no emails)
+        response = (
+            '<p class="text-green-700">'
+            '✅ You9re now marked as planning to fly this day.'
+            '</p>'
+        )
         btn_parts = [
             '<button hx-post="', request.path, '" ',
             'hx-target="#ops-intent-response" ',
