@@ -87,16 +87,17 @@ class Command(BaseCommand):
             due_date__lte=target_date + timedelta(days=30)
         )
 
-        lines = [f"🚨 Pre-Operations Summary for {target_date}", ""]
-
-        lines.append("👥 Assigned Duty Crew:")
-        lines.append("🎓 Instructor: %s" % instr_name)
-        lines.append("🎓 Surge Instructor: %s" % surge_instr_name)
-        lines.append("🛩️ Tow Pilot: %s" % tow_pilot_name)
-        lines.append("🛩️ Surge Tow Pilot: %s" % surge_tow_name)
-        lines.append("📋 Duty Officer: %s" % duty_officer_name)
-        lines.append("💪 Assistant DO: %s" % assistant_do_name)
-        lines.append("")
+        lines = [
+            f"🚨 Pre-Operations Summary for {target_date}", "", "👥 Assigned Duty Crew:"]
+        lines += [
+            f"🎓 Instructor: {instr_name}",
+            f"🎓 Surge Instructor: {surge_instr_name}",
+            f"🛩️ Tow Pilot: {tow_pilot_name}",
+            f"🛩️ Surge Tow Pilot: {surge_tow_name}",
+            f"📋 Duty Officer: {duty_officer_name}",
+            f"💪 Assistant DO: {assistant_do_name}",
+            "",
+        ]
 
         lines.append("🛑 Grounded Gliders:")
         if grounded_gliders:
@@ -130,7 +131,7 @@ class Command(BaseCommand):
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=to_emails,
             )
-            sent_msg = "\u2705 Email sent to: " + ", ".join(to_emails)
+            sent_msg = f"\u2705 Email sent to: {', '.join(to_emails)}"
             self.stdout.write(self.style.SUCCESS(sent_msg))
         else:
             self.stdout.write(

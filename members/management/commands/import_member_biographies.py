@@ -33,7 +33,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        notice_msg = "Connecting to legacy database via settings.DATABASES['legacy']..."
+        notice_msg = (
+            "Connecting to legacy database via settings.DATABASES['legacy']..."
+        )
         self.stdout.write(self.style.NOTICE(notice_msg))
 
         legacy = settings.DATABASES["legacy"]
@@ -88,6 +90,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Import complete. Total biographies processed: {}".format(imported)
+                f"Import complete. Total biographies processed: {imported}"
             )
         )

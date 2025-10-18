@@ -40,18 +40,14 @@ def get_active_members():
 # launch/landing times, pilot, instructor, glider, towplane, tow pilot,
 # release altitude, passenger, passenger_name and split/cost details.
 #
-# Widgets are customized for improved UX:
+# Widgets are customized for improved UX. Examples:
 # - TimeInput for "launch_time" and "landing_time" (type="time").
 # - Select widgets for dropdowns (pilot, instructor, glider, tow_pilot,
 #   towplane, release_altitude, passenger, split_type).
 # - TextInput for "passenger_name" with a helpful placeholder.
 #
-# The __init__ method customizes several querysets:
-# - Filters active towplanes for the "towplane" field.
-# - Filters members by role (instructor, towpilot) for their fields.
-# - Orders active members for split_with and other dropdowns.
-# When creating a new Flight, the form may pre-fill "launch_time" with
-# the current local time.
+# The __init__ method customizes querysets used by many dropdowns and may
+# pre-fill "launch_time" when creating a new Flight.
 class FlightForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()

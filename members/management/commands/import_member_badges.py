@@ -78,14 +78,12 @@ class Command(BaseCommand):
                     continue
 
                 if dry_run:
-                    msg = (
-                        "[DRY RUN] Would set SSA URL for " + str(member) + " to " + url
-                    )
+                    msg = f"[DRY RUN] Would set SSA URL for {member} to {url}"
                     self.stdout.write(msg)
                 else:
                     member.ssa_url = url
                     member.save(update_fields=["ssa_url"])
-                    msg = "Set SSA URL for " + str(member) + " to " + url
+                    msg = f"Set SSA URL for {member} to {url}"
                     self.stdout.write(msg)
 
                 updated += 1
@@ -132,12 +130,7 @@ class Command(BaseCommand):
                 continue
 
             if dry_run:
-                msg = (
-                    "[DRY RUN] Would assign "
-                    + str(badge_name)
-                    + " to "
-                    + str(member)
-                )
+                msg = f"[DRY RUN] Would assign {badge_name} to {member}"
                 self.stdout.write(msg)
             else:
                 mb, created = MemberBadge.objects.get_or_create(
@@ -149,17 +142,10 @@ class Command(BaseCommand):
                     },
                 )
                 if created:
-                    msg = (
-                        "Assigned " + str(badge_name) + " to " + str(member)
-                    )
+                    msg = f"Assigned {badge_name} to {member}"
                     self.stdout.write(msg)
                 else:
-                    msg = (
-                        str(badge_name)
-                        + " already exists for "
-                        + str(member)
-                        + ", skipping"
-                    )
+                    msg = f"{badge_name} already exists for {member}, skipping"
                     self.stdout.write(msg)
             imported += 1
 

@@ -332,9 +332,9 @@ def ops_intent_toggle(request, year, month, day):
             )
             path = request.path
             form_html = []
-            form_html.append("<form hx-get=\"" + path +
-                             "form/\" hx-post=\"" + path + "\"")
-            form_html.append('hx-target="#ops-intent-response" hx-swap="innerHTML">')
+            form_html.append("<form ")
+            form_html.append(f"hx-get=\"{path}form/\" hx-post=\"{path}\"")
+            form_html.append(' hx-target="#ops-intent-response" hx-swap="innerHTML">')
             form_html.append('<button type="submit" class="btn btn-sm btn-primary">')
             form_html.append('🛩️ I Plan to Fly This Day</button></form>')
             response += "".join(form_html)
@@ -394,11 +394,7 @@ def ops_intent_toggle(request, year, month, day):
             )
 
         # Always show a small success message to the user (even if no emails)
-        response = (
-            '<p class="text-green-700">'
-            '✅ You9re now marked as planning to fly this day.'
-            '</p>'
-        )
+        response = '<p class="text-green-700">✅ You\'re now marked as planning to fly this day.</p>'
         btn_parts = [
             '<button hx-post="', request.path, '" ',
             'hx-target="#ops-intent-response" ',
