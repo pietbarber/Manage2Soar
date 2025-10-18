@@ -17,28 +17,21 @@ from utils.upload_entropy import (
 ####################################################
 # Flight model
 #
-# This is the biggest model we've got, so pay attention!
+# Represents a single flight entry. Stores pilot, instructor, glider,
+# towplane and related metadata. Computes costs (tow and rental),
+# supports split payments, and exposes helpers for formatted displays.
 #
-# This model represents a single flight entry. It captures details about the
-# flight including pilot, instructor, glider, towplane, and other metadata.
-# The model also calculates costs (tow/rental), supports split payments, and
-# exposes helper properties for formatted display of those costs.
-#
-# Properties:
-# - tow_cost_calculated: tow cost from matching TowRate for release altitude.
-# - rental_cost_calculated: rental cost from glider rental_rate and duration.
-# - tow_cost: price lookup for the release altitude.
-# - tow_cost_display: formatted tow cost (string).
-# - rental_cost: computed rental cost (Decimal or None).
-# - rental_cost_display: formatted rental cost (string).
-# - total_cost: sum of tow + rental costs.
-# - total_cost_display: formatted total cost (string).
+# Notable properties:
+# - tow_cost_calculated: tow cost from the best matching TowRate for
+#   the release altitude.
+# - rental_cost_calculated: rental cost derived from the glider's
+#   rental_rate and the flight duration.
+# - tow_cost_display / rental_cost_display: user-facing formatted strings.
+# - total_cost / total_cost_display: aggregate values for the flight.
 #
 # Methods:
-# - save: Overrides the save method to calculate the flight duration based on
-#   launch and landing times.
-#   Handles overnight flights by adjusting the landing time if it occurs
-#   before the launch time.
+# - save: computes duration from launch/landing times and adjusts for
+#   overnight flights when landing precedes launch on the clock.
 
 
 class Flight(models.Model):
@@ -123,7 +116,12 @@ class Flight(models.Model):
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    RELEASE_ALTITUDE_CHOICES = [(i, f"{i} ft") for i in range(0, 7100, 100)]
+    # Release altitude choices: 0 to 7000 ft in 100 ft steps.
+    # Constructed across multiple lines to satisfy line-length rules.
+    RELEASE_ALTITUDE_CHOICES = [
+        (i, f"{i} ft")
+        for i in range(0, 7100, 100)
+    ]
 
     release_altitude = models.IntegerField(
         choices=RELEASE_ALTITUDE_CHOICES,
@@ -575,9 +573,9 @@ class Logsheet(models.Model):
                         hours_to_due = due - stop_tach
                         if hours_to_due <= 10 and hours_to_due > 0:
                             desc = (
-                                f"Towplane oil change due in {hours_to_due:.1f} "
-                                f"hours (at {due})."
-                            )
+                                "Towplane oil change due in {hours:.1f} "
+                                "hours (at {due})."
+                            ).format(hours=hours_to_due, due=due)
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
@@ -587,9 +585,9 @@ class Logsheet(models.Model):
                             )
                         elif hours_to_due <= 0:
                             desc = (
-                                f"Towplane oil change OVERDUE (due at {due}, "
-                                f"now {stop_tach})."
-                            )
+                                "Towplane oil change OVERDUE (due at {due}, "
+                                "now {stop})."
+                            ).format(due=due, stop=stop_tach)
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
@@ -604,7 +602,7 @@ class Logsheet(models.Model):
                         hours_to_due = due - stop_tach
                         if hours_to_due <= 10 and hours_to_due > 0:
                             desc = (
-                                f"Towplane 100-hour inspection due in "
+                                "Towplane 100-hour inspection due in "
                                 f"{hours_to_due:.1f} hours (at {due})."
                             )
                             MaintenanceIssue.objects.get_or_create(
@@ -616,8 +614,8 @@ class Logsheet(models.Model):
                             )
                         elif hours_to_due <= 0:
                             desc = (
-                                f"Towplane 100-hour inspection OVERDUE (due at {due}, "
-                                f"now {stop_tach})."
+                                "Towplane 100-hour inspection OVERDUE (due at "
+                                f"{due}, now {stop_tach})."
                             )
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
@@ -657,24 +655,26 @@ class Logsheet(models.Model):
                 due = g.next_100hr_due
                 hours_to_due = due - cum_hours
                 if hours_to_due <= 10 and hours_to_due > 0:
+                    msg = (
+                        "Glider 100-hour inspection due in {:.1f} "
+                        "hours (at {})."
+                    ).format(hours_to_due, due)
                     MaintenanceIssue.objects.get_or_create(
                         glider=g,
                         logsheet=self,
-                        description=(
-                            f"Glider 100-hour inspection due in {hours_to_due:.1f} "
-                            f"hours (at {due})."
-                        ),
+                        description=msg,
                         grounded=False,
                         resolved=False,
                     )
                 elif hours_to_due <= 0:
+                    msg = (
+                        "Glider 100-hour inspection OVERDUE (due at {}, "
+                        "now {:.1f})."
+                    ).format(due, cum_hours)
                     MaintenanceIssue.objects.get_or_create(
                         glider=g,
                         logsheet=self,
-                        description=(
-                            f"Glider 100-hour inspection OVERDUE (due at {due}, "
-                            f"now {cum_hours:.1f})."
-                        ),
+                        description=msg,
                         grounded=True,
                         resolved=False,
                     )

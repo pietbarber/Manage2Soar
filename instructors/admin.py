@@ -186,7 +186,8 @@ class ClubQualificationTypeAdmin(admin.ModelAdmin):
 # MemberQualificationAdmin
 #
 # Admin interface for MemberQualification model.
-# - list_display: 'member', 'qualification', 'is_qualified', 'date_awarded', 'expiration_date', 'imported'
+# - list_display: 'member', 'qualification', 'is_qualified', 'date_awarded',
+#   'expiration_date', 'imported'
 # - search_fields: 'member__username', 'qualification__code'
 # - list_filter: 'is_qualified', 'imported', 'qualification__code'
 # - autocomplete_fields: 'member', 'qualification', 'instructor'

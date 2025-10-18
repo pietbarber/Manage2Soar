@@ -23,7 +23,12 @@ class Command(BaseCommand):
 
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM towplane_data ORDER BY flight_date ASC")
-            columns = [col[0] for col in cursor.description]
+            # cursor.description may be None for some adapters if no results;
+            # guard against that to satisfy static analyzers (Pylance).
+            if cursor.description:
+                columns = [col[0] for col in cursor.description]
+            else:
+                columns = []
             rows = cursor.fetchall()
 
         created = 0
@@ -83,6 +88,10 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             self.style.NOTICE(
-                f"⚠️ Skipped {skipped} due to missing logsheets, towplanes, or winch/canceled ops."
+                (
+                    "⚠️ Skipped %s due to missing logsheets, towplanes, "
+                    "or winch/canceled ops."
+                )
+                % (skipped,)
             )
         )

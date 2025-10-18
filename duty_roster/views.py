@@ -387,15 +387,16 @@ def ops_intent_toggle(request, year, month, day):
 
         response = (
             '<p class="text-green-700">✅ You’re now marked as planning to fly '
-            'this day.</p>'
+            "this day.</p>"
         )
-        response += (
-            f'<button hx-post="{request.path}" '
+        btn = (
+            '<button hx-post="' + request.path + '" '
             'hx-target="#ops-intent-response" '
             'hx-swap="innerHTML" '
             'class="btn btn-sm btn-danger">'
             "Cancel Intent</button>"
         )
+        response += btn
 
     # CANCELLATION FLOW
     else:
@@ -406,8 +407,10 @@ def ops_intent_toggle(request, year, month, day):
             if duty_inst and duty_inst.email:
                 subject = f"Instruction Cancellation on {day_date:%b %d}"
                 body = (
-                    f"Student {request.user.full_display_name} cancelled their instruction signup "
-                    f"for {day_date:%B %d, %Y}."
+                    "Student {} cancelled their instruction signup for {}.".format(
+                        request.user.full_display_name,
+                        day_date.strftime("%B %d, %Y"),
+                    )
                 )
                 send_mail(
                     subject,
@@ -419,12 +422,13 @@ def ops_intent_toggle(request, year, month, day):
 
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
         response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
-        response += (
-            f'<form hx-get="{request.path}form/" '
+        form_html = (
+            '<form hx-get="' + request.path + 'form/" '
             'hx-target="#ops-intent-response" hx-swap="innerHTML">'
             '<button type="submit" class="btn btn-sm btn-primary">'
             "🛩️ I Plan to Fly This Day</button></form>"
         )
+        response += form_html
 
     # still check for surges across the board
     maybe_notify_surge_instructor(day_date)
@@ -463,8 +467,9 @@ def maybe_notify_surge_instructor(day_date):
             ),
             message=(
                 (
-                    f"There are currently {instruction_count} pilots requesting instruction for "
-                    f"{day_date.strftime('%A, %B %d, %Y')}."
+                    "There are currently {} pilots requesting instruction for {}.".format(
+                        instruction_count, day_date.strftime("%A, %B %d, %Y")
+                    )
                 )
                 + "\n\nYou may want to coordinate a surge instructor."
             ),
@@ -494,8 +499,9 @@ def maybe_notify_surge_towpilot(day_date):
             ),
             message=(
                 (
-                    f"There are currently {tow_count} pilots planning flights requiring tows on "
-                    f"{day_date.strftime('%A, %B %d, %Y')}."
+                    "There are currently {} pilots planning flights requiring tows on {}.".format(
+                        tow_count, day_date.strftime("%A, %B %d, %Y")
+                    )
                 )
                 + "\n\nYou may want to coordinate a surge tow pilot."
             ),

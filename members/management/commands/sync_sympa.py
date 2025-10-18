@@ -50,11 +50,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for listname, predicate in SYMPA_LISTS.items():
-            self.stdout.write(f"Syncing Sympa list '{listname}'…")
+            msg = "Syncing Sympa list '" + listname + "'…"
+            self.stdout.write(msg)
             try:
                 current = get_current_sympa_members(listname)
             except subprocess.CalledProcessError as e:
-                self.stderr.write(f"Failed to fetch members of {listname}: {e}")
+                err = "Failed to fetch members of {}: {}".format(listname, e)
+                self.stderr.write(err)
                 continue
 
             should_be = set(
@@ -66,14 +68,18 @@ class Command(BaseCommand):
             for email in sorted(to_add):
                 try:
                     add_member(listname, email)
-                    self.stdout.write(self.style.SUCCESS(f" Added → {email}"))
+                    self.stdout.write(self.style.SUCCESS(" Added → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write(f"ERROR adding {email} to {listname}: {e}")
+                    self.stderr.write(
+                        "ERROR adding {} to {}: {}".format(email, listname, e)
+                    )
             for email in sorted(to_remove):
                 try:
                     remove_member(listname, email)
-                    self.stdout.write(self.style.WARNING(f" Removed → {email}"))
+                    self.stdout.write(self.style.WARNING(" Removed → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write(f"ERROR removing {email} from {listname}: {e}")
+                    self.stderr.write(
+                        "ERROR removing {} from {}: {}".format(email, listname, e)
+                    )
 
         self.stdout.write(self.style.SUCCESS("✓ Sympa sync complete."))

@@ -37,7 +37,8 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
     response = client.get(url)
     assert response.status_code == 200
     assert b"Summary by Flight" in response.content
-    # Check for correct number of columns in a row (Pilot, Glider, Duration, Tow, Rental, Total, Edit Split)
+    # Check for correct number of columns in a row
+    # (Pilot, Glider, Duration, Tow, Rental, Total, Edit Split)
     assert response.content.count(b"<td") % 7 == 0
 
 

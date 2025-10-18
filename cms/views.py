@@ -18,7 +18,7 @@ def cms_page(request, **kwargs):
         slug = kwargs.get(f"slug{i}")
         if slug:
             slugs.append(slug)
-    logger.debug(f"cms_page: slugs={slugs}")
+    logger.debug("cms_page: slugs=%s", slugs)
     if not slugs:
         logger.debug("cms_page: No slugs, redirecting to home")
         return redirect("home")

@@ -1,7 +1,8 @@
 # ya know, sometimes, I don't want to construct a person's name from all these fields.
-# This is a small template filter that will display a member's name in a more human-readable format.
-# I wish people would be simple with a first name and a last name. Why do they have to be all difficult
-# with name suffixes, and middle initials, and nicknames? 😂
+# This is a small template filter.
+# It will display a member's name in a more human-readable format.
+# I wish people would be simple with a first name and a last name. Why do
+# they have to be all difficult with name suffixes, middle initials, and nicknames? 😂
 
 
 import re
@@ -117,32 +118,45 @@ def duty_emoji_legend():
         if config
         else "Assistant Duty Officer"
     )
-    html = (
-        "<div class='accordion mb-4' id='emojiLegendAccordion'>"
-        "<div class='accordion-item'>"
-        "<h2 class='accordion-header' id='headingLegend'>"
-        "<button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' "
-        "data-bs-target='#collapseLegend' aria-expanded='false' aria-controls='collapseLegend'>"
-        "📖 Expand to show Legend"
-        "</button>"
-        "</h2>"
-        "<div id='collapseLegend' class='accordion-collapse collapse' "
-        "aria-labelledby='headingLegend' data-bs-parent='#emojiLegendAccordion'>"
-        "<div class='accordion-body'>"
-        "<ul class='list-unstyled mb-0'>"
-        f"<li><span class='emoji'>🎓</span> – {instructor}</li>"
-        f"<li><span class='emoji'>🛩️</span> – {towpilot}</li>"
-        f"<li><span class='emoji'>📋</span> – {duty_officer}</li>"
-        f"<li><span class='emoji'>💪</span> – {assistant_duty_officer}</li>"
-        "<li><span class='emoji'>✍️</span> – Secretary</li>"
-        "<li><span class='emoji'>💰</span> – Treasurer</li>"
-        "<li><span class='emoji'>🌐</span> – Webmaster</li>"
-        "<li><span class='emoji'>🎩</span> – Director</li>"
-        "<li><span class='emoji'>📇</span> – Membership Manager</li>"
-        "</ul>"
-        "</div>"
-        "</div>"
-        "</div>"
-        "</div>"
-    )
+    parts = [
+        "<div class='accordion mb-4' id='emojiLegendAccordion'>",
+        "<div class='accordion-item'>",
+        "<h2 class='accordion-header' id='headingLegend'>",
+        (
+            "<button class='accordion-button collapsed' "
+            "type='button' data-bs-toggle='collapse' "
+            "data-bs-target='#collapseLegend' aria-expanded='false' "
+            "aria-controls='collapseLegend'>"
+        ),
+        "📖 Expand to show Legend</button>",
+        "</h2>",
+        (
+            "<div id='collapseLegend' class='accordion-collapse collapse' "
+            "aria-labelledby='headingLegend' "
+            "data-bs-parent='#emojiLegendAccordion'>"
+        ),
+        "<div class='accordion-body'>",
+        "<ul class='list-unstyled mb-0'>",
+    ]
+    parts += [
+        "<li><span class='emoji'>🎓</span> – {}</li>".format(instructor),
+        "<li><span class='emoji'>🛩️</span> – {}</li>".format(towpilot),
+        "<li><span class='emoji'>📋</span> – {}</li>".format(duty_officer),
+        "<li><span class='emoji'>💪</span> – {}</li>".format(
+            assistant_duty_officer
+        ),
+        "<li><span class='emoji'>✍️</span> – Secretary</li>",
+        "<li><span class='emoji'>💰</span> – Treasurer</li>",
+        "<li><span class='emoji'>🌐</span> – Webmaster</li>",
+        "<li><span class='emoji'>🎩</span> – Director</li>",
+        "<li><span class='emoji'>📇</span> – Membership Manager</li>",
+    ]
+    parts += [
+        "</ul>",
+        "</div>",
+        "</div>",
+        "</div>",
+        "</div>",
+    ]
+    html = "".join(parts)
     return mark_safe(html)

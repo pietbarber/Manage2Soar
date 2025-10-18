@@ -87,9 +87,11 @@ def instructor_schedule_vs_actual(
         italicize.append(tow_counts.get(pid, 0) > 0)
 
     # Sort by total (scheduled+unscheduled) desc, then name
-    data = sorted(
-        zip(data, italicize), key=lambda t: (-(t[0][2] + t[0][3]), t[0][1].lower())
-    )[:top_n]
+    def _sort_key(t):
+        total = t[0][2] + t[0][3]
+        return (-total, t[0][1].lower())
+
+    data = sorted(zip(data, italicize), key=_sort_key)[:top_n]
     names = [t[0][1] for t in data]
     scheduled = [t[0][2] for t in data]
     unscheduled = [t[0][3] for t in data]
@@ -170,9 +172,11 @@ def tow_pilot_schedule_vs_actual(
         italicize.append(inst_counts.get(pid, 0) > 0)
 
     # Sort by total (scheduled+unscheduled) desc, then name
-    data = sorted(
-        zip(data, italicize), key=lambda t: (-(t[0][2] + t[0][3]), t[0][1].lower())
-    )[:top_n]
+    def _sort_key(t):
+        total = t[0][2] + t[0][3]
+        return (-total, t[0][1].lower())
+
+    data = sorted(zip(data, italicize), key=_sort_key)[:top_n]
     names = [t[0][1] for t in data]
     scheduled = [t[0][2] for t in data]
     unscheduled = [t[0][3] for t in data]
@@ -281,10 +285,11 @@ def combined_duty_days_vs_actual(
                 dual_role_flags.append(True)
 
     # Sort by total duty days desc, then name
-    data = sorted(
-        zip(data, dual_role_flags),
-        key=lambda t: (-(t[0][2] + t[0][3] + t[0][4]), t[0][1].lower()),
-    )[:top_n]
+    def _combined_sort_key(t):
+        total = t[0][2] + t[0][3] + t[0][4]
+        return (-total, t[0][1].lower())
+
+    data = sorted(zip(data, dual_role_flags), key=_combined_sort_key)[:top_n]
     names = [t[0][1] for t in data]
     tow_days_list = [t[0][2] for t in data]
     inst_days_list = [t[0][3] for t in data]
@@ -386,7 +391,7 @@ def cumulative_flights_by_year(
 def flights_by_year_by_aircraft(
     start_year: int, end_year: int, *, finalized_only=True, top_n=10
 ):
-    # Pivot data for a stacked bar:
+    # Pivot data for a stacked bar. The returned structure looks like:
     #  {
     #    "years": [2015, ...],
     #    "categories": ["N341KS","N321K","GROB 103","Private","Other",...],

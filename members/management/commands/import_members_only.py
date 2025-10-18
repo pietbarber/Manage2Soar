@@ -142,8 +142,8 @@ def generate_username(first, last, nickname):
 
 class Command(BaseCommand):
     help = (
-        "Import legacy members from the SQL_ASCII database using psycopg2 via "
-        "settings.DATABASES['legacy']"
+        "Import legacy members from the SQL_ASCII database via psycopg2 "
+        "using settings.DATABASES['legacy']"
     )
 
     def add_arguments(self, parser):
@@ -190,9 +190,9 @@ class Command(BaseCommand):
 
             username = generate_username(first, last, nickname)
 
-            member = Member.objects.filter(legacy_username=handle).first() or Member(
-                legacy_username=handle, username=username
-            )
+            member = Member.objects.filter(legacy_username=handle).first()
+            if member is None:
+                member = Member(legacy_username=handle, username=username)
 
             nickname_match = re.search(r'"([^"]+)"', first)
             nickname = nickname_match.group(1) if nickname_match else None
@@ -209,9 +209,9 @@ class Command(BaseCommand):
             member.email = sanitize(row.get("email"))
             member.mobile_phone = sanitize(row.get("cell_phone"))
             member.phone = sanitize(row.get("phone1"))
-            member.address = (
-                f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}"
-            ).strip()
+            addr1 = sanitize(row.get("address1"))
+            addr2 = sanitize(row.get("address2"))
+            member.address = f"{addr1} {addr2}".strip()
             member.city = sanitize(row.get("city"))
             state_raw = sanitize(row.get("state")).upper()
             if state_raw in US_STATE_ABBREVIATIONS:
@@ -234,9 +234,9 @@ class Command(BaseCommand):
             ):
                 member.membership_status = "Deceased"
             else:
+                status_value = row.get("memberstatus")
                 member.membership_status = STATUS_MAP.get(
-                    str(row.get("memberstatus")) if row.get(
-                        "memberstatus") is not None else "",
+                    str(status_value) if status_value is not None else "",
                     "Non-Member",
                 )
 
@@ -286,9 +286,9 @@ class Command(BaseCommand):
             member.joined_club = make_aware(join_date)
 
             deceased_keywords = ["deceased"]
-            death_note = (
-                f"{row.get('official_title') or ''}{row.get('private_notes') or ''}"
-            ).lower()
+            title_text = row.get("official_title") or ""
+            private_text = row.get("private_notes") or ""
+            death_note = (f"{title_text}{private_text}").lower()
 
             if any(word in death_note for word in deceased_keywords):
                 member.membership_status = "Deceased"

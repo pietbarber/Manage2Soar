@@ -51,7 +51,12 @@ class Command(BaseCommand):
 
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM bios")
-            columns = [desc.name for desc in cursor.description]
+            if cursor.description is None:
+                columns = []
+            else:
+                # psycopg2 cursor.description is a sequence of tuples; the
+                # first element is the column name.
+                columns = [desc[0] for desc in cursor.description]
             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         imported = 0
@@ -69,23 +74,25 @@ class Command(BaseCommand):
             except Member.DoesNotExist:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"Skipping: No matching member for handle {handle}"
+                        "Skipping: No matching member for handle {}".format(handle)
                     )
                 )
                 continue
 
             if dry_run:
-                self.stdout.write(f"[DRY RUN] Would import bio for {member}")
+                self.stdout.write(
+                    "[DRY RUN] Would import bio for {}".format(member)
+                )
             else:
                 biography, _ = Biography.objects.get_or_create(member=member)
                 biography.content = content
                 biography.last_updated = last_updated
                 biography.save()
-                self.stdout.write(f"Imported biography for {member}")
+                self.stdout.write("Imported biography for {}".format(member))
             imported += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Import complete. Total biographies processed: {imported}"
+                "Import complete. Total biographies processed: {}".format(imported)
             )
         )

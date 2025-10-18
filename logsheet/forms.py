@@ -35,25 +35,23 @@ def get_active_members():
 
 
 # FlightForm
-# This form is used to handle the creation and editing of Flight model instances.
-# It includes fields for launch and landing times, pilot, instructor, glider,
-# towplane, tow pilot, release altitude, passenger, and cost-splitting
-# details.
-# Widgets are customized for better user experience:
-# - TimeInput widgets for "launch_time" and "landing_time" with "time"
-#   input type and "form-control" class.
-# - Select widgets for dropdown fields like "pilot", "instructor", "glider",
-#   "tow_pilot", "towplane", "release_altitude", "passenger", and
-#   "split_type" with "form-select" class.
-# - TextInput widgets for "passenger_name" with a placeholder and
-#   "form-control" class.
-# The __init__ method customizes querysets for specific fields:
-# - Filters active towplanes for "towplane".
-# - Filters members who are instructors for "instructor".
-# - Filters members who are tow pilots for "tow_pilot".
-# - Filters active members for "split_with", ordered by last name.
-# Additionally, if the form is for a new instance, the "launch_time" field is
-# pre-filled with the current local time.
+#
+# Form used to create and edit Flight model instances. Fields include
+# launch/landing times, pilot, instructor, glider, towplane, tow pilot,
+# release altitude, passenger, passenger_name and split/cost details.
+#
+# Widgets are customized for improved UX:
+# - TimeInput for "launch_time" and "landing_time" (type="time").
+# - Select widgets for dropdowns (pilot, instructor, glider, tow_pilot,
+#   towplane, release_altitude, passenger, split_type).
+# - TextInput for "passenger_name" with a helpful placeholder.
+#
+# The __init__ method customizes several querysets:
+# - Filters active towplanes for the "towplane" field.
+# - Filters members by role (instructor, towpilot) for their fields.
+# - Orders active members for split_with and other dropdowns.
+# When creating a new Flight, the form may pre-fill "launch_time" with
+# the current local time.
 class FlightForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
@@ -100,39 +98,43 @@ class FlightForm(forms.ModelForm):
                 # If both have landing times, check for overlap
                 if landing_time and other_landing:
                     if launch_time < other_landing and landing_time > other_launch:
-                        raise forms.ValidationError(
-                            (
-                                f"This glider is already scheduled for another flight "
-                                f"(ID {other.pk}) from {other_launch} to {other_landing}."
-                            )
+                        msg = (
+                            "This glider is already scheduled for another "
+                            "flight (ID {id}) from {start} to {end}."
                         )
+                        msg = msg.format(
+                            id=other.pk, start=other_launch, end=other_landing
+                        )
+                        raise forms.ValidationError(msg)
                 # If this flight has no landing, check if launch is during another flight
                 elif not landing_time and other_landing:
                     if launch_time < other_landing and launch_time >= other_launch:
-                        raise forms.ValidationError(
-                            (
-                                f"This glider is already airborne in another flight "
-                                f"(ID {other.pk}) from {other_launch} to {other_landing}."
-                            )
+                        msg = (
+                            "This glider is already airborne in another "
+                            "flight (ID {id}) from {start} to {end}."
                         )
+                        msg = msg.format(
+                            id=other.pk, start=other_launch, end=other_landing
+                        )
+                        raise forms.ValidationError(msg)
                 # If other flight has no landing, check for overlap
                 elif landing_time and not other_landing:
                     if landing_time > other_launch and launch_time <= other_launch:
-                        raise forms.ValidationError(
-                            (
-                                f"This glider is already airborne in another flight "
-                                f"(ID {other.pk}) starting at {other_launch}."
-                            )
+                        msg = (
+                            "This glider is already airborne in another "
+                            "flight (ID {id}) starting at {start}."
                         )
+                        msg = msg.format(id=other.pk, start=other_launch)
+                        raise forms.ValidationError(msg)
                 # If neither has landing time, both are open-ended
                 elif not landing_time and not other_landing:
                     if launch_time == other_launch:
-                        raise forms.ValidationError(
-                            (
-                                f"This glider is already airborne in another "
-                                f"open-ended flight (ID {other.pk}) at {other_launch}."
-                            )
+                        msg = (
+                            "This glider is already airborne in another "
+                            "open-ended flight (ID {id}) at {start}."
                         )
+                        msg = msg.format(id=other.pk, start=other_launch)
+                        raise forms.ValidationError(msg)
 
         return cleaned_data
 
@@ -325,8 +327,10 @@ class FlightForm(forms.ModelForm):
 
         common_choices = [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES]
         remaining_choices = [(alt, f"{alt} ft") for alt in remaining]
+        # Visual divider between common and remaining altitude choices
+        divider = ("", "────────")
         self.fields["release_altitude"].choices = (
-            common_choices + [("", "──────────")] + remaining_choices
+            common_choices + [divider] + remaining_choices
         )
 
         # Always use: active by last name, then inactive by last name

@@ -6,7 +6,10 @@ from members.models import Member
 
 
 class Command(BaseCommand):
-    help = "Import member profile photos from CSV. Assumes images are already in the correct media directory."
+    help = (
+        "Import member profile photos from CSV. Assumes images are already in "
+        "the correct media directory."
+    )
 
     def handle(self, *args, **kwargs):
         with open("member_photos.csv", newline="") as csvfile:
@@ -18,9 +21,11 @@ class Command(BaseCommand):
                         m.profile_photo = row["profile_photo"]
                         m.save()
                         self.stdout.write(
-                            self.style.SUCCESS(f"Set photo for {m.username}")
+                            self.style.SUCCESS("Set photo for {}".format(m.username))
                         )
                     except Member.DoesNotExist:
                         self.stdout.write(
-                            self.style.WARNING(f"Member {row['username']} not found.")
+                            self.style.WARNING(
+                                "Member {} not found.".format(row["username"])
+                            )
                         )

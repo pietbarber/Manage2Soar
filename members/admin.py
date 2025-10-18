@@ -181,7 +181,8 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     actions = ["export_members_csv"]
 
     def export_members_csv(self, request, queryset):
-        # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
+        # Define fields to export (exclude sensitive or generated fields such as
+        # password, profile_photo, legacy name, badges, and biography)
         fields = [
             "username",
             "first_name",
@@ -223,7 +224,9 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
             "is_superuser",
         ]
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename=members_export.csv"
+        response[
+            "Content-Disposition"
+        ] = "attachment; filename=members_export.csv"
         writer = csv.writer(response)
         writer.writerow(fields)
         for member in queryset:
@@ -344,7 +347,8 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
             return format_html(
-                '<img src="{}" style="max-height:200px; border:1px solid #ccc;" />',
+                '<img src="{}" '
+                'style="max-height:200px; border:1px solid #ccc;" />',
                 obj.profile_photo.url,
             )
         return ""

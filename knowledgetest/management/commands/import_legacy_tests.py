@@ -84,9 +84,10 @@ class Command(BaseCommand):
                                 self.stdout.write(
                                     self.style.WARNING(
                                         (
-                                            "Member with legacy_username '"
-                                            f"{updatedby}' not found; leaving updated_by NULL for Q{qnum}"
+                                            "Member with legacy_username '%s' not found; "
+                                            "leaving updated_by NULL for Q%s"
                                         )
+                                        % (updatedby, qnum)
                                     )
                                 )
 

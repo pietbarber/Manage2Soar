@@ -14,7 +14,10 @@ class Command(BaseCommand):
             writer.writerow(["username", "profile_photo"])
             for m in Member.objects.all():
                 writer.writerow(
-                    [m.username, m.profile_photo.name if m.profile_photo else ""]
+                    [
+                        m.username,
+                        m.profile_photo.name if m.profile_photo else "",
+                    ]
                 )
         self.stdout.write(
             self.style.SUCCESS(

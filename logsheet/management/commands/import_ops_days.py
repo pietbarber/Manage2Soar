@@ -109,9 +109,11 @@ class Command(BaseCommand):
 
             # Tow pilot mapping logic:
             # - If 'towpilot' is present, use as primary tow pilot.
-            # - If both 'am_towpilot' and 'pm_towpilot' are present and different, assign one as surge.
+            # - If both 'am_towpilot' and 'pm_towpilot' are present and different,
+            #   assign one as surge.
             # - If only one of am/pm is present, use as surge tow pilot.
-            # - If 'towpilot' is missing but am/pm present, assign am/pm as primary and surge as possible.
+            # - If 'towpilot' is missing but am/pm present, assign am/pm as primary
+            #   and surge as possible.
             towpilot = resolve_member(data.get("towpilot"))
             am_towpilot = resolve_member(data.get("am_towpilot"))
             pm_towpilot = resolve_member(data.get("pm_towpilot"))
@@ -128,23 +130,23 @@ class Command(BaseCommand):
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
                     self.stdout.write(
                         self.style.WARNING(
-                            (
-                                f"⚠️  Both AM and PM tow pilots differ for {log_date} @ "
-                                f"{field}. AM: {am_towpilot}, PM: {pm_towpilot}"
-                            )
+                            "⚠️  Both AM and PM tow pilots differ for %s @ %s. AM: %s, PM: %s"
+                            % (log_date, field, am_towpilot, pm_towpilot)
                         )
                     )
             elif am_towpilot or pm_towpilot:
-                # If no main towpilot, but am/pm present, assign am as main, pm as surge (if different)
+                # If no main towpilot, but am/pm are present,
+                # assign AM as main, PM as surge (if different)
                 logsheet.tow_pilot = am_towpilot or pm_towpilot
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
                     logsheet.surge_tow_pilot = pm_towpilot
                     self.stdout.write(
                         self.style.WARNING(
                             (
-                                f"⚠️  No main towpilot, but both AM and PM present and differ for {log_date} @ "
-                                f"{field}. AM: {am_towpilot}, PM: {pm_towpilot}"
+                                "⚠️  No main towpilot, but both AM and PM present and "
+                                "differ for %s @ %s. AM: %s, PM: %s"
                             )
+                            % (log_date, field, am_towpilot, pm_towpilot)
                         )
                     )
                 else:

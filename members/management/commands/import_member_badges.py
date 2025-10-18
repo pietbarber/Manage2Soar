@@ -147,7 +147,8 @@ class Command(BaseCommand):
                     msg = "Assigned {} to {}".format(badge_name, member)
                     self.stdout.write(msg)
                 else:
-                    msg = "{} already exists for {}, skipping".format(badge_name, member)
+                    msg = "{} already exists for {}, skipping".format(
+                        badge_name, member)
                     self.stdout.write(msg)
             imported += 1
 

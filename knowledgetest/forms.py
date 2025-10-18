@@ -34,7 +34,10 @@ class TestBuilderForm(forms.Form):
             attrs={
                 "rows": 2,
                 "class": "form-control mb-3",
-                "placeholder": "e.g. ASK-21 test, Pre-solo written, Duty Officer Responsibilities, etc.",
+                "placeholder": (
+                    "e.g. ASK-21 test, Pre-solo written, "
+                    "Duty Officer Responsibilities, etc."
+                ),
             }
         ),
         required=False,

@@ -50,23 +50,25 @@ def generate_roster(year=None, month=None):
     def eligible(role, m, day, assigned):
         p = prefs.get(m.id)
         if not p:
-            logger.debug(f"{m.full_display_name}: No DutyPreference found.")
+            logger.debug("%s: No DutyPreference found.", m.full_display_name)
             return False
         if p.dont_schedule:
-            logger.debug(f"{m.full_display_name}: 'Don't schedule' is set.")
+            logger.debug("%s: 'Don't schedule' is set.", m.full_display_name)
             return False
         if p.scheduling_suspended:
-            logger.debug(f"{m.full_display_name}: Scheduling suspended.")
+            logger.debug("%s: Scheduling suspended.", m.full_display_name)
             return False
         if (m.id, day) in blackouts:
-            logger.debug(f"{m.full_display_name}: Blacked out on {day}.")
+            logger.debug("%s: Blacked out on %s.", m.full_display_name, day)
             return False
         for o in assigned:
             if (m.id, o.id) in avoidances or (o.id, m.id) in avoidances:
-                logger.debug(f"{m.full_display_name}: Avoids {o.full_display_name}.")
+                logger.debug(
+                    "%s: Avoids %s.", m.full_display_name, o.full_display_name
+                )
                 return False
         if m in assigned:
-            logger.debug(f"{m.full_display_name}: Already assigned today.")
+            logger.debug("%s: Already assigned today.", m.full_display_name)
             return False
         flag = getattr(m, role, False)
         percent_fields = [
@@ -83,7 +85,9 @@ def generate_roster(year=None, month=None):
             pct = getattr(p, field, 0)
             if pct == 0:
                 logger.debug(
-                    f"{m.full_display_name}: Only eligible for {role}, percent is 0, treating as 100%."
+                    "%s: Only eligible for %s, percent is 0, treating as 100.",
+                    m.full_display_name,
+                    role,
                 )
                 pct = 100
         else:
@@ -94,21 +98,31 @@ def generate_roster(year=None, month=None):
                 pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
             if all_zero:
                 logger.debug(
-                    f"{m.full_display_name}: All eligible role percents are zero, treating {role} as 100%."
+                    "%s: All eligible role percents are zero, treating %s as 100.",
+                    m.full_display_name,
+                    role,
                 )
         if not flag:
             logger.debug(
-                f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
+                "%s: Not eligible for role %s (flag is False).",
+                m.full_display_name,
+                role,
             )
             return False
         if pct == 0:
-            logger.debug(f"{m.full_display_name}: {role} percent is 0.")
+            logger.debug("%s: %s percent is 0.", m.full_display_name, role)
             return False
         if assignments[m.id] >= getattr(p, "max_assignments_per_month", 0):
-            logger.debug(f"{m.full_display_name}: Max assignments per month reached.")
+            logger.debug(
+                "%s: Max assignments per month reached.", m.full_display_name
+            )
             return False
         logger.debug(
-            f"{m.full_display_name}: Eligible for {role} on {day} (pct={pct})."
+            "%s: Eligible for %s on %s (pct=%s).",
+            m.full_display_name,
+            role,
+            day,
+            pct,
         )
         return True
 
@@ -145,9 +159,12 @@ def generate_roster(year=None, month=None):
                 ):
                     w *= 3
                     break
-            logger.debug(
-                f"Candidate: {m.full_display_name}, base weight: {base}, final weight: {w}"
-            )
+                logger.debug(
+                    "Candidate: %s, base weight: %s, final weight: %s",
+                    m.full_display_name,
+                    base,
+                    w,
+                )
             weights.append(w)
         if not weights or sum(weights) == 0:
             logger.debug(f"No candidates with nonzero weights for role {role}.")

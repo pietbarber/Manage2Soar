@@ -129,6 +129,7 @@ def public_syllabus_detail(request, code):
     next_lesson = (
         lessons[idx + 1] if idx is not None and idx < len(lessons) - 1 else None
     )
+
     return render(
         request,
         "instructors/syllabus_detail.html",

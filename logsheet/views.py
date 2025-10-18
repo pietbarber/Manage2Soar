@@ -172,8 +172,8 @@ def delete_logsheet(request, pk):
         return redirect("logsheet:index")
     else:
         return HttpResponseForbidden(
-            "Logsheet cannot be deleted: it has flights, closeout, payments,"
-            " towplane summary, or is finalized."
+            "Logsheet cannot be deleted: it has flights, closeout, "
+            "payments, towplane summary, or is finalized."
         )
 
 

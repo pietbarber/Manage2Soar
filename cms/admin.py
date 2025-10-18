@@ -40,8 +40,9 @@ class PageAdmin(admin.ModelAdmin):
     inlines = [DocumentInline]
 
     admin_helper_message = (
-        "<b>CMS Pages:</b> Use this to create arbitrary pages and directories under "
-        "/cms/. Attach documents below. Leave 'Parent' blank for top-level pages."
+        "<b>CMS Pages:</b> Use this to create arbitrary pages and directories "
+        "under /cms/. Attach documents below. Leave 'Parent' blank for "
+        "top-level pages."
     )
 
 
@@ -58,8 +59,9 @@ class DocumentAdmin(admin.ModelAdmin):
     exclude = ("uploaded_by",)
 
     admin_helper_message = (
-        "<b>CMS Documents:</b> These are files (PDFs, images, etc.) attached to CMS Pages. "
-        "To add a document to a page, use the inline form on the CMS Page itself."
+        "<b>CMS Documents:</b> These are files (PDFs, images, etc.) "
+        "attached to CMS Pages. To add a document to a page, use the "
+        "inline form on the CMS Page itself."
     )
 
     def save_model(self, request, obj, form, change):
@@ -86,16 +88,18 @@ class HomePageContentAdmin(admin.ModelAdmin):
     inlines = [HomePageImageInline]
 
     admin_helper_message = (
-        "<b>CMS Page Content:</b> Use this to edit the homepage or member homepage "
-        "content. This is not used for arbitrary CMS pages under /cms/."
+        "<b>CMS Page Content:</b> Use this to edit the homepage or "
+        "member homepage content. This is not used for arbitrary CMS "
+        "pages under /cms/."
     )
 
 
 @admin.register(HomePageImage)
 class HomePageImageAdmin(admin.ModelAdmin):
     admin_helper_message = (
-        "<b>CMS Page Images:</b> These images are attached to homepage or member "
-        "homepage content. Use this to manage images for those special pages."
+        "<b>CMS Page Images:</b> These images are attached to homepage "
+        "or member homepage content. Use this to manage images for "
+        "those special pages."
     )
 
     def changelist_view(self, request, extra_context=None):

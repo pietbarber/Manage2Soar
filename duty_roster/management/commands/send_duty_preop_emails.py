@@ -62,27 +62,44 @@ class Command(BaseCommand):
 
         lines.append("👥 Assigned Duty Crew:")
         lines.append(
-            f"🎓 Instructor: {assignment.instructor.full_display_name if assignment.instructor else '—'}"
-        )
-        lines.append(
-            (
-                "🎓 Surge Instructor: "
-                f"{assignment.surge_instructor.full_display_name if assignment.surge_instructor else '—'}"
+            "🎓 Instructor: %s" % (
+                assignment.instructor.full_display_name if assignment.instructor else "—"
             )
         )
         lines.append(
-            f"🛩️ Tow Pilot: {assignment.tow_pilot.full_display_name if assignment.tow_pilot else '—'}"
+            "🎓 Surge Instructor: %s"
+            % (
+                assignment.surge_instructor.full_display_name
+                if assignment.surge_instructor
+                else "—"
+            )
         )
         lines.append(
-            f"🛩️ Surge Tow Pilot: {assignment.surge_tow_pilot.full_display_name if assignment.surge_tow_pilot else '—'}"
+            "🛩️ Tow Pilot: %s"
+            % (
+                assignment.tow_pilot.full_display_name if assignment.tow_pilot else "—"
+            )
         )
         lines.append(
-            f"📋 Duty Officer: {assignment.duty_officer.full_display_name if assignment.duty_officer else '—'}"
+            "🛩️ Surge Tow Pilot: %s"
+            % (
+                assignment.surge_tow_pilot.full_display_name
+                if assignment.surge_tow_pilot
+                else "—"
+            )
         )
         lines.append(
-            (
-                "💪 Assistant DO: "
-                f"{assignment.assistant_duty_officer.full_display_name if assignment.assistant_duty_officer else '—'}"
+            "📋 Duty Officer: %s"
+            % (
+                assignment.duty_officer.full_display_name if assignment.duty_officer else "—"
+            )
+        )
+        lines.append(
+            "💪 Assistant DO: %s"
+            % (
+                assignment.assistant_duty_officer.full_display_name
+                if assignment.assistant_duty_officer
+                else "—"
             )
         )
         lines.append("")
@@ -120,10 +137,7 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 self.style.SUCCESS(
-                    (
-                        "✅ Email sent to: "
-                        f"{', '.join(to_emails)}"
-                    )
+                    "✅ Email sent to: %s" % (", ".join(to_emails),)
                 )
             )
         else:
