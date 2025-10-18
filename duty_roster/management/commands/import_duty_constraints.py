@@ -42,11 +42,10 @@ class Command(BaseCommand):
             pref, _ = DutyPreference.objects.get_or_create(member=member)
             pref.preferred_day = raw.get("preferred-day") or pref.preferred_day
             pref.comment = raw.get("comment") or raw.get("web-comment") or pref.comment
-            pref.dont_schedule = str(raw.get("dont-schedule", "")).lower() in [
-                "true",
-                "1",
-                "yes",
-            ]
+            pref.dont_schedule = (
+                str(raw.get("dont-schedule", "")).lower() in
+                ("true", "1", "yes")
+            )
 
             if raw.get("last-duty-date"):
                 date_str = raw["last-duty-date"]
@@ -58,7 +57,9 @@ class Command(BaseCommand):
                         continue
                 else:
                     self.stdout.write(
-                        self.style.WARNING(f"Bad last-duty-date for {name}: {date_str}")
+                        self.style.WARNING(
+                            "Bad last-duty-date for {}: {}".format(name, date_str)
+                        )
                     )
 
             if pref.max_assignments_per_month in (None, 0):
@@ -91,7 +92,11 @@ class Command(BaseCommand):
                     )
                 except ValueError:
                     self.stdout.write(
-                        self.style.WARNING(f"Invalid blackout date for {name}: {bdate}")
+                        self.style.WARNING(
+                            "Invalid blackout date for {}: {}".format(name, bdate)
+                        )
                     )
 
-            self.stdout.write(self.style.SUCCESS(f"✅ Imported constraints for {name}"))
+            self.stdout.write(
+                self.style.SUCCESS("✅ Imported constraints for {}".format(name))
+            )

@@ -38,6 +38,33 @@ class Command(BaseCommand):
             self.stdout.write("❌ No scheduled ops for this date.")
             return
 
+        # Resolve crew display names into short variables to keep source lines
+        # under the length limit while preserving exact text.
+        instr_name = (
+            assignment.instructor.full_display_name if assignment.instructor else "—"
+        )
+        surge_instr_name = (
+            assignment.surge_instructor.full_display_name
+            if assignment.surge_instructor
+            else "—"
+        )
+        tow_pilot_name = (
+            assignment.tow_pilot.full_display_name if assignment.tow_pilot else "—"
+        )
+        surge_tow_name = (
+            assignment.surge_tow_pilot.full_display_name
+            if assignment.surge_tow_pilot
+            else "—"
+        )
+        duty_officer_name = (
+            assignment.duty_officer.full_display_name if assignment.duty_officer else "—"
+        )
+        assistant_do_name = (
+            assignment.assistant_duty_officer.full_display_name
+            if assignment.assistant_duty_officer
+            else "—"
+        )
+
         crew_fields = [
             assignment.instructor,
             assignment.surge_instructor,
@@ -61,47 +88,12 @@ class Command(BaseCommand):
         lines = [f"🚨 Pre-Operations Summary for {target_date}", ""]
 
         lines.append("👥 Assigned Duty Crew:")
-        lines.append(
-            "🎓 Instructor: %s" % (
-                assignment.instructor.full_display_name if assignment.instructor else "—"
-            )
-        )
-        lines.append(
-            "🎓 Surge Instructor: %s"
-            % (
-                assignment.surge_instructor.full_display_name
-                if assignment.surge_instructor
-                else "—"
-            )
-        )
-        lines.append(
-            "🛩️ Tow Pilot: %s"
-            % (
-                assignment.tow_pilot.full_display_name if assignment.tow_pilot else "—"
-            )
-        )
-        lines.append(
-            "🛩️ Surge Tow Pilot: %s"
-            % (
-                assignment.surge_tow_pilot.full_display_name
-                if assignment.surge_tow_pilot
-                else "—"
-            )
-        )
-        lines.append(
-            "📋 Duty Officer: %s"
-            % (
-                assignment.duty_officer.full_display_name if assignment.duty_officer else "—"
-            )
-        )
-        lines.append(
-            "💪 Assistant DO: %s"
-            % (
-                assignment.assistant_duty_officer.full_display_name
-                if assignment.assistant_duty_officer
-                else "—"
-            )
-        )
+        lines.append("🎓 Instructor: %s" % instr_name)
+        lines.append("🎓 Surge Instructor: %s" % surge_instr_name)
+        lines.append("🛩️ Tow Pilot: %s" % tow_pilot_name)
+        lines.append("🛩️ Surge Tow Pilot: %s" % surge_tow_name)
+        lines.append("📋 Duty Officer: %s" % duty_officer_name)
+        lines.append("💪 Assistant DO: %s" % assistant_do_name)
         lines.append("")
 
         lines.append("🛑 Grounded Gliders:")
@@ -129,17 +121,16 @@ class Command(BaseCommand):
         body = "\n".join(lines)
 
         if to_emails:
+            subject = "Pre-Ops Report for {}".format(assignment.date)
             send_mail(
-                subject=f"Pre-Ops Report for {assignment.date}",
+                subject=subject,
                 message=body,
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=to_emails,
             )
-            self.stdout.write(
-                self.style.SUCCESS(
-                    "✅ Email sent to: %s" % (", ".join(to_emails),)
-                )
-            )
+            self.stdout.write(self.style.SUCCESS("✅ Email sent to: {}".format(
+                ", ".join(to_emails)
+            )))
         else:
             self.stdout.write(
                 self.style.WARNING(
