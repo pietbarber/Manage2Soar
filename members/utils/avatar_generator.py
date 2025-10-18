@@ -5,8 +5,10 @@ from django.core.files.storage import default_storage
 
 def generate_identicon(username, relative_path):
     """
-    Generate a unique identicon and save as a PNG image using Django's
-    storage backend.
+    Generate a unique identicon and save it as a PNG image.
+
+    Uses Django's configured storage backend so this works with GCP, S3,
+    or the local filesystem depending on deployment.
     """
     generator = pydenticon.Generator(
         5,
@@ -18,5 +20,5 @@ def generate_identicon(username, relative_path):
     data = generator.generate(username, 250, 250, output_format="png")
     if isinstance(data, str):
         data = data.encode("utf-8")
-    # Save using Django's default storage (works with GCP, S3, etc.)
+    # Save using Django's default storage (works with GCP, S3, etc.).
     default_storage.save(relative_path, ContentFile(data))

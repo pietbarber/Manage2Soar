@@ -291,7 +291,8 @@ def tinymce_image_upload(request):
 # badge_board() View
 
 # Displays a public-facing badge leaderboard showing members and their earned badges.
-# Members are typically grouped or ranked by the number of badges, categories, or date awarded.
+# Members are typically grouped or ranked by the number of badges, categories,
+# or date awarded.
 
 # Only accessible to logged-in users.
 

@@ -295,7 +295,8 @@ AUTHENTICATION_BACKENDS = (
 
 ALLOWED_HOSTS = ["*"]
 
-# Trust X-Forwarded-Proto header for HTTPS detection (required for OAuth2 redirect URI to use https)
+# Trust X-Forwarded-Proto header for HTTPS detection.
+# This is required for OAuth2 redirect URIs to use https behind a proxy.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 

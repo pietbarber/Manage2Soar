@@ -80,7 +80,10 @@ def test_update_flight_split_ajax_invalid(client, active_member, logsheet_with_f
 
 @pytest.mark.django_db
 def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
-    """Clearing the split via AJAX should succeed and remove split_with and split_type."""
+    """
+    Clearing the split via AJAX should succeed and remove both
+    split_with and split_type.
+    """
     flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
     assert flight is not None, "Test setup failed: no Flight created."
     url = reverse("logsheet:update_flight_split", args=[flight.pk])
