@@ -26,7 +26,8 @@ class Command(BaseCommand):
             aircraft = issue.glider or issue.towplane or "Unassigned"
             grounded_status = "GROUNDED" if issue.grounded else "Operational"
             lines.append(
-                f"- {aircraft}: {issue.description} (Reported: {issue.report_date.strftime('%Y-%m-%d')}) [{grounded_status}]"
+                f"- {aircraft}: {issue.description} (Reported: "
+                f"{issue.report_date.strftime('%Y-%m-%d')}) [{grounded_status}]"
             )
 
             # Get assigned meisters
@@ -57,7 +58,10 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"✅ Sent maintenance summary to: {', '.join(recipients)}"
+                    (
+                        "✅ Sent maintenance summary to: "
+                        f"{', '.join(recipients)}"
+                    )
                 )
             )
         else:

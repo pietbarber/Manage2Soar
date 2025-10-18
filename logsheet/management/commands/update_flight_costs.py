@@ -6,7 +6,10 @@ from logsheet.models import Flight, Logsheet
 
 
 class Command(BaseCommand):
-    help = "Update flight costs for all logsheets after a given date, only if costs are missing or zero."
+    help = (
+        "Update flight costs for all logsheets after a given date, only if "
+        "costs are missing or zero."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -53,7 +56,10 @@ class Command(BaseCommand):
             if updated:
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Updated {updated} flights for logsheet {logsheet} on {logsheet.log_date}"
+                        (
+                            f"Updated {updated} flights for logsheet {logsheet} "
+                            f"on {logsheet.log_date}"
+                        )
                     )
                 )
             total_updated += updated

@@ -67,7 +67,8 @@ class Biography(models.Model):
 # - biography: optional related biography object
 
 # Methods:
-# - is_active_member(): Returns True if the member has a qualifying active membership status
+# - is_active_member(): Returns True if the member has a qualifying
+#   active membership status
 
 
 class Member(AbstractUser):
@@ -75,7 +76,10 @@ class Member(AbstractUser):
         max_length=32,
         blank=True,
         null=True,
-        help_text="FAA pilot certificate number (optional, but required for instructors giving instruction)",
+        help_text=(
+            "FAA pilot certificate number (optional, but required for "
+            "instructors giving instruction)."
+        ),
     )
     private_glider_checkride_date = models.DateField(
         blank=True,
@@ -263,7 +267,8 @@ class Member(AbstractUser):
         if self.is_superuser:
             self.is_staff = True
         else:
-            # Grant staff status to instructors, member managers, rostermeisters, or webmasters
+            # Grant staff status to instructors, member managers,
+            # rostermeisters, or webmasters
             self.is_staff = (
                 self.instructor
                 or self.member_manager
@@ -297,7 +302,8 @@ class Member(AbstractUser):
 #########################
 # Badge Model
 
-# Defines all possible badges that can be earned by members, such as SSA badges (A, B, C, etc.)
+# Defines all possible badges that can be earned by members, such as
+# SSA badges (A, B, C, etc.)
 # or club-specific awards.
 
 # Fields:

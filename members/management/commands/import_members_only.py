@@ -1,7 +1,6 @@
 import logging
+import re
 from datetime import datetime
-
-logging.basicConfig(level=logging.DEBUG)
 
 import psycopg2
 from django.conf import settings
@@ -10,6 +9,7 @@ from django.utils.timezone import make_aware
 
 from members.models import Member
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATUS_MAP = {
@@ -114,9 +114,6 @@ def sanitize(text):
         return ""
 
 
-import re
-
-
 def extract_nickname(first_name):
     match = re.search(r'"(.*?)"', first_name)
     if match:
@@ -144,7 +141,10 @@ def generate_username(first, last, nickname):
 
 
 class Command(BaseCommand):
-    help = "Import legacy members from the SQL_ASCII database using psycopg2 via settings.DATABASES['legacy']"
+    help = (
+        "Import legacy members from the SQL_ASCII database using psycopg2 via "
+        "settings.DATABASES['legacy']"
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -171,7 +171,13 @@ class Command(BaseCommand):
 
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM members")
-            columns = [desc.name for desc in cursor.description]
+            # psycopg2 cursor.description yields a sequence of 7-item tuples
+            # where the first element is the column name. Accessing .name
+            # on the tuple is incorrect and flagged by static analyzers.
+            if cursor.description is None:
+                columns = []
+            else:
+                columns = [desc[0] for desc in cursor.description]
             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         imported = 0
@@ -203,7 +209,9 @@ class Command(BaseCommand):
             member.email = sanitize(row.get("email"))
             member.mobile_phone = sanitize(row.get("cell_phone"))
             member.phone = sanitize(row.get("phone1"))
-            member.address = f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}".strip()
+            member.address = (
+                f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}"
+            ).strip()
             member.city = sanitize(row.get("city"))
             state_raw = sanitize(row.get("state")).upper()
             if state_raw in US_STATE_ABBREVIATIONS:
@@ -227,7 +235,9 @@ class Command(BaseCommand):
                 member.membership_status = "Deceased"
             else:
                 member.membership_status = STATUS_MAP.get(
-                    row.get("memberstatus"), "Non-Member"
+                    str(row.get("memberstatus")) if row.get(
+                        "memberstatus") is not None else "",
+                    "Non-Member",
                 )
 
             # Only activate if the member deserves it
@@ -245,7 +255,10 @@ class Command(BaseCommand):
             else:
                 member.is_active = False
 
-            member.glider_rating = RATING_MAP.get(row.get("rating"), "student")
+            rating_key = row.get("rating")
+            member.glider_rating = RATING_MAP.get(
+                str(rating_key) if rating_key is not None else "", "student"
+            )
             member.director = row.get("director")
             member.treasurer = row.get("treasurer")
             member.secretary = row.get("secretary")
@@ -255,22 +268,27 @@ class Command(BaseCommand):
             member.duty_officer = row.get("dutyofficer")
             member.assistant_duty_officer = row.get("ado")
             row.get("private_notes")
-            # logger.debug(f"{handle} raw_notes type: {type(raw_notes)} | content: {repr(raw_notes)[:100]}")
+            # debug: raw_notes repr truncated for brevity
 
             member.public_notes = sanitize(row.get("public_notes"))
             member.private_notes = sanitize(row.get("private_notes"))
-            # logger.debug(f"{handle} private_notes length after sanitize: {len(private_notes)}")
+            # debug: private_notes sanitized
 
             join_date = parse_date(row.get("joindate"))
             if not join_date:
                 try:
-                    join_date = datetime.fromtimestamp(int(row.get("lastupdated")))
+                    lastupdated = row.get("lastupdated")
+                    if lastupdated is None:
+                        raise ValueError("no lastupdated value")
+                    join_date = datetime.fromtimestamp(int(lastupdated))
                 except Exception:
                     join_date = datetime(2000, 1, 1)
             member.joined_club = make_aware(join_date)
 
             deceased_keywords = ["deceased"]
-            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower()
+            death_note = (
+                f"{row.get('official_title') or ''}{row.get('private_notes') or ''}"
+            ).lower()
 
             if any(word in death_note for word in deceased_keywords):
                 member.membership_status = "Deceased"

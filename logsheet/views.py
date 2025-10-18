@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_time
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST
+from typing import TYPE_CHECKING
 
 from members.decorators import active_member_required
 from members.models import Member
@@ -27,7 +28,6 @@ from .models import (
     AircraftMeister,
     Flight,
     Glider,
-    Logsheet,
     LogsheetCloseout,
     LogsheetPayment,
     MaintenanceDeadline,
@@ -36,6 +36,14 @@ from .models import (
     Towplane,
     TowplaneCloseout,
 )
+
+# Resolve the Logsheet model at runtime to avoid confusing static analyzers
+# about a circular class dependency. Import for type checking only.
+from django.apps import apps
+if TYPE_CHECKING:
+    from .models import Logsheet  # type: ignore
+else:
+    Logsheet = apps.get_model("logsheet", "Logsheet")
 
 
 @require_POST
@@ -164,7 +172,8 @@ def delete_logsheet(request, pk):
         return redirect("logsheet:index")
     else:
         return HttpResponseForbidden(
-            "Logsheet cannot be deleted: it has flights, closeout, payments, towplane summary, or is finalized."
+            "Logsheet cannot be deleted: it has flights, closeout, payments,"
+            " towplane summary, or is finalized."
         )
 
 
@@ -212,17 +221,19 @@ def index(request):
 #################################################
 # Handles the creation of a new logsheet.
 #
-# This view is accessible only to active members due to the `@active_member_required` decorator.
-# It processes both GET and POST requests:
-# - For GET requests, it initializes an empty `CreateLogsheetForm` and renders the logsheet creation page.
-# - For POST requests, it validates the submitted form data, creates a new logsheet instance, associates it with the currently logged-in user, and saves it to the database. If successful, it redirects the user to the logsheet management page and displays a success message.
+# This view is accessible only to active members via
+# the `@active_member_required` decorator. It handles GET and POST requests.
+# - GET: initialize an empty `CreateLogsheetForm` and render the creation page.
+# - POST: validate the submitted form, create a new logsheet instance,
+#   associate it with the logged-in user, and save it. On success redirect
+#   to the logsheet management page and display a success message.
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    request (HttpRequest): The HTTP request object containing metadata.
 #
 # Returns:
-#    HttpResponse: Renders the logsheet creation page with the form for GET requests.
-#    HttpResponseRedirect: Redirects to the logsheet management page upon successful creation of a logsheet.
+#    HttpResponse: Renders the creation page for GET requests.
+#    HttpResponseRedirect: Redirects after successful creation.
 
 
 @active_member_required
@@ -247,21 +258,21 @@ def create_logsheet(request):
 #################################################
 # manage_logsheet
 
-# This view handles the management of a specific logsheet.
+# This view handles management of a specific logsheet.
 #
 # It allows active members to:
-# - View all flights associated with the logsheet, with optional filtering by pilot or instructor name.
-# - Add new flights to the logsheet (if not finalized).
-# - Finalize the logsheet, locking in all calculated costs as actual costs.
-# - Reopen a finalized logsheet for revision (superusers only).
+# - view all flights for the logsheet, with optional pilot/instructor filters;
+# - add new flights when the logsheet is not finalized;
+# - finalize the logsheet (which locks calculated costs as actual costs);
+# - reopen a finalized logsheet for revision (superusers only).
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
-#    pk (int): The primary key of the logsheet to manage.
+#    request (HttpRequest): The HTTP request object.
+#    pk (int): Primary key of the logsheet to manage.
 #
 # Returns:
-#    HttpResponse: Renders the logsheet management page with the list of flights and a form for adding flights.
-#    HttpResponseRedirect: Redirects to the same page after performing actions like finalizing, revising, or adding flights.
+#    HttpResponse: Renders the management page with flights and add form.
+#    HttpResponseRedirect: Redirects after actions like finalize or add.
 
 
 @active_member_required
@@ -372,7 +383,8 @@ def manage_logsheet(request, pk):
 
         # Lock in cost values
         # That means take the temporary values we calculated for the costs
-        # and place them in these other variables that get perma-written to the database.
+    # and place them in these other variables that get perma-written to
+    # the database.
         for flight in flights:
             if flight.tow_cost_actual is None:
                 flight.tow_cost_actual = flight.tow_cost_calculated
@@ -393,9 +405,9 @@ def manage_logsheet(request, pk):
         return redirect("logsheet:manage", pk=logsheet.pk)
 
     # If the logsheet is finalized, prevent adding new flights
-    # This check is done here to ensure that only superusers can reopen finalized logbooks
-    # If there is a "revise", then we'll remove the finalized status
-    # and the logsheet can be returned to editing status.
+    # This check is done here to ensure that only superusers can reopen
+    # finalized logbooks. If there is a "revise", then we'll remove the
+    # finalized status and the logsheet can be returned to editing status.
     elif request.method == "POST":
 
         if "revise" in request.POST:
@@ -486,15 +498,14 @@ def view_flight(request, pk):
 
 # This view handles the listing of all logsheets.
 #
-# It allows active members to:
-# - View a list of all logsheets, optionally filtered by a search query.
-# - Search logsheets by log date, location, or the username of the creator.
+# It allows active members to view a list of logsheets, optionally filtered
+# by a search query, and to search by log date, location, or creator username.
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    request (HttpRequest): The incoming HTTP request object.
 #
 # Returns:
-#    HttpResponse: Renders the logsheet list page with the filtered or unfiltered list of logsheets.
+#    HttpResponse: Renders the logsheet list page (filtered or unfiltered).
 
 
 @active_member_required
@@ -575,13 +586,13 @@ def list_logsheets(request):
 # - Prevent edits if the logsheet is finalized (unless the user is a superuser).
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    request (HttpRequest): The incoming HTTP request.
 #    logsheet_pk (int): The primary key of the logsheet containing the flight.
 #    flight_pk (int): The primary key of the flight to edit.
 #
 # Returns:
 #    HttpResponse: Renders the flight editing form for GET requests.
-#    HttpResponseRedirect: Redirects to the logsheet management page upon successful update of the flight.
+#    HttpResponseRedirect: Redirects to manage page after updating a flight.
 
 
 @active_member_required
@@ -671,12 +682,12 @@ def edit_flight(request, logsheet_pk, flight_pk):
 # - Display a form for entering flight details.
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
-#    logsheet_pk (int): The primary key of the logsheet to which the flight will be added.
+#    request (HttpRequest): The incoming HTTP request.
+#    logsheet_pk (int): Primary key of the target logsheet.
 #
 # Returns:
 #    HttpResponse: Renders the flight addition form for GET requests.
-#    HttpResponseRedirect: Redirects to the logsheet management page upon successful addition of the flight.
+#    HttpResponseRedirect: Redirects to the manage page after adding a flight.
 
 
 @active_member_required
@@ -760,8 +771,10 @@ def add_flight(request, logsheet_pk):
 # This view handles the deletion of a flight from a specific logsheet.
 #
 # Decorators:
-# - @require_POST: Ensures that this view can only be accessed via a POST request, preventing accidental deletions through GET requests.
-# - @active_member_required: Restricts access to active members only, ensuring that only authorized users can perform this action.
+# - @require_POST: Ensures that this view can only be accessed via a POST
+#   request, preventing accidental deletions through GET requests.
+# - @active_member_required: Restricts access to active members only,
+#   ensuring that only authorized users can perform this action.
 #
 # Functionality:
 # - Deletes a flight associated with a logsheet if the logsheet is not finalized.
@@ -769,13 +782,13 @@ def add_flight(request, logsheet_pk):
 # - Displays a success message upon successful deletion.
 #
 # Args:
-#    request (HttpRequest): The HTTP request object containing metadata about the request.
+#    request (HttpRequest): The incoming HTTP request.
 #    logsheet_pk (int): The primary key of the logsheet containing the flight.
 #    flight_pk (int): The primary key of the flight to delete.
 #
 # Returns:
 #    HttpResponseForbidden: If the logsheet is finalized, deletion is forbidden.
-#    HttpResponseRedirect: Redirects to the logsheet management page after successful deletion.
+#    HttpResponseRedirect: Redirects to manage page after deletion.
 
 
 @require_POST
@@ -801,12 +814,13 @@ def delete_flight(request, logsheet_pk, flight_pk):
 # - View detailed breakdowns of flight costs.
 # - Display actual costs if finalized, or calculated costs if pending.
 # - Summarize financial data per pilot: flights, tow costs, rental costs, total costs.
-# - Calculate and distribute charges per member, accounting for split-payment arrangements.
+# - Calculate and distribute charges per member, accounting for split payments.
 # - Update payment methods and notes for each responsible member.
 # - Finalize the logsheet, locking in all costs and validating payment information.
 #
 # Internal Methods:
-# - flight_costs(flight): Returns tow, rental, and total costs depending on finalization state.
+# - flight_costs(flight): Returns tow, rental, and total costs depending on
+#   whether the logsheet is finalized.
 #
 # POST Handling:
 # - "Finalize" request:
@@ -821,7 +835,8 @@ def delete_flight(request, logsheet_pk, flight_pk):
 # - pk (int): Primary key of the logsheet to manage.
 #
 # Returns:
-# - HttpResponse: Renders the financial management page with cost breakdowns, summaries, and member charges.
+# - HttpResponse: Renders the financial management page with cost
+#   breakdowns, summaries, and member charges.
 #################################################
 
 
@@ -1047,7 +1062,8 @@ def manage_logsheet_finances(request, pk):
 #
 # Purpose:
 # Allows active members to edit the closeout information for a specific logsheet.
-# Updates include final duty crew assignments, towplane closeouts, and maintenance issues.
+# Updates include duty crew assignments, towplane closeouts, and maintenance
+# issues.
 # Editing is blocked if the logsheet is finalized, unless the user is a superuser.
 #
 # Behavior:
@@ -1064,7 +1080,7 @@ def manage_logsheet_finances(request, pk):
 # - pk (int): Primary key of the logsheet to edit.
 #
 # Returns:
-# - HttpResponse: Renders the closeout editing form page or redirects after successful save.
+# - HttpResponse: Renders the closeout edit form or redirects after save.
 #################################################
 
 
@@ -1171,22 +1187,20 @@ def view_logsheet_closeout(request, pk):
 # add_maintenance_issue
 #
 # Purpose:
-# Allows active members to submit a new maintenance issue during logsheet closeout.
-# Issues must be associated with either a glider or a towplane.
+# Allow active members to submit a maintenance issue during closeout.
+# Issues must be tied to either a glider or a towplane.
 #
 # Behavior:
-# - Accepts POST data from the MaintenanceIssueForm.
-# - Validates the form and ensures a glider or towplane is selected.
-# - Assigns the reporting member and associates the issue with the current logsheet.
-# - Saves the issue and displays success or error messages.
-# - Redirects back to the logsheet closeout editing page.
+# - Accept POST data from MaintenanceIssueForm and validate it.
+# - Ensure a glider or towplane is selected, set reporter and logsheet.
+# - Save the issue, show success/error messages, and redirect back.
 #
 # Args:
-# - request (HttpRequest): The incoming HTTP POST request containing maintenance issue data.
-# - logsheet_id (int): Primary key of the logsheet to associate the issue with.
+# - request (HttpRequest): Incoming POST with maintenance issue data.
+# - logsheet_id (int): Primary key of the related logsheet.
 #
 # Returns:
-# - HttpResponseRedirect: Redirects to the edit closeout page after submission attempt.
+# - HttpResponseRedirect: Redirects to the edit closeout page.
 #################################################
 
 
@@ -1287,21 +1301,20 @@ def maintenance_issues(request):
 # mark_issue_resolved
 #
 # Purpose:
-# Allows authorized Aircraft Meisters to mark maintenance issues as resolved.
-# Ensures only the assigned Meister for a glider or towplane can resolve its issues.
+# Allow Aircraft Meisters to mark maintenance issues as resolved. Only the
+# assigned Meister for the relevant glider or towplane may resolve issues.
 #
 # Behavior:
-# - Checks whether the logged-in member is an Aircraft Meister for the associated glider or towplane.
-# - If authorized, marks the maintenance issue as resolved and clears any grounding status.
-# - Displays success or error messages based on the outcome.
-# - Redirects back to the maintenance issues list after completion.
+# - Verify the user is the Aircraft Meister for the aircraft in question.
+# - If authorized, clear grounding, set resolved flag, and save.
+# - Show success/error messages and redirect back to the list.
 #
 # Args:
 # - request (HttpRequest): The incoming HTTP request.
-# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+# - issue_id (int): Primary key of the MaintenanceIssue.
 #
 # Returns:
-# - HttpResponseRedirect: Redirects to the maintenance issues list after attempting to resolve.
+# - HttpResponseRedirect: Redirects to the maintenance issues list.
 #################################################
 
 
@@ -1340,19 +1353,17 @@ def mark_issue_resolved(request, issue_id):
 # resolve_maintenance_modal
 #
 # Purpose:
-# Renders a modal window for resolving a specific maintenance issue.
-# Allows members to view issue details and enter resolution notes via a popup form.
+# Render a modal for resolving a maintenance issue and entering notes.
 #
 # Behavior:
-# - Fetches the targeted MaintenanceIssue by ID.
-# - Renders the maintenance_resolve_modal.html template with the issue details.
+# - Load the MaintenanceIssue by ID and render the resolve modal template.
 #
 # Args:
 # - request (HttpRequest): The incoming HTTP request.
-# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+# - issue_id (int): Primary key of the MaintenanceIssue.
 #
 # Returns:
-# - HttpResponse: Renders the modal popup template for maintenance resolution.
+# - HttpResponse: Renders the resolution modal popup.
 #################################################
 
 
@@ -1367,23 +1378,20 @@ def resolve_maintenance_modal(request, issue_id):
 # resolve_maintenance_issue
 #
 # Purpose:
-# Processes a POST request to mark a maintenance issue as resolved.
-# Allows members to add optional resolution notes during the resolution process.
+# Handle POST requests to mark a maintenance issue as resolved, with optional
+# resolution notes provided by the user.
 #
 # Behavior:
-# - Fetches the MaintenanceIssue by ID.
-# - (Permission checks assumed same as modal trigger; only active members allowed.)
-# - Records the resolving member and the resolution date.
-# - Saves resolution notes if provided, or applies a default note if none exist.
-# - Marks the issue as resolved and saves the update.
-# - Returns a JSON response signaling the frontend to reload.
+# - Load the MaintenanceIssue and perform permission checks as required.
+# - Record the resolver, date, and notes; mark the issue resolved and save.
+# - Return a JsonResponse instructing the frontend to reload.
 #
 # Args:
-# - request (HttpRequest): The incoming HTTP POST request containing resolution notes.
-# - issue_id (int): Primary key of the MaintenanceIssue to resolve.
+# - request (HttpRequest): Incoming POST with resolution notes.
+# - issue_id (int): Primary key of the MaintenanceIssue.
 #
 # Returns:
-# - JsonResponse: {"reload": True} to trigger a page or modal reload on the client side.
+# - JsonResponse: {'reload': True} on success.
 #################################################
 
 
@@ -1439,16 +1447,16 @@ def maintenance_resolve_modal(request, issue_id):
 # maintenance_mark_resolved
 #
 # Purpose:
-# Processes a POST request to mark a maintenance issue as resolved, requiring resolution notes.
-# Ensures that only authorized users can resolve the issue and enforces submission of notes.
+# Handle POST to mark a maintenance issue resolved, requiring resolution notes.
+# Only authorized users may resolve issues; notes are mandatory.
 #
 # Behavior:
 # - Fetches the MaintenanceIssue by ID.
-# - Verifies that the user is authorized to resolve the issue using `can_be_resolved_by()`.
-# - If unauthorized, returns an HTTP 403 Forbidden response.
-# - Requires non-empty resolution notes; if missing, returns a 400 Bad Request JSON error.
-# - Records the resolving user, date, and resolution notes.
-# - Saves the issue and returns a JSON response to trigger frontend reload.
+# - Verify the user is authorized via `can_be_resolved_by()`.
+# - If unauthorized, return HTTP 403 Forbidden.
+# - Require non-empty resolution notes; otherwise return HTTP 400 JSON error.
+# - Save resolver, date, and notes, then mark as resolved.
+# - Return a JSON response to trigger frontend reload.
 #
 # Args:
 # - request (HttpRequest): The incoming HTTP POST request.
@@ -1488,7 +1496,8 @@ def maintenance_mark_resolved(request, issue_id):
 #
 # Purpose:
 # Displays a sorted list of upcoming maintenance deadlines for gliders and towplanes.
-# Highlights overdue deadlines, deadlines due within 30 days, and future deadlines beyond 30 days.
+# Highlights overdue deadlines, deadlines due within 30 days, and future
+# deadlines beyond 30 days.
 #
 # Behavior:
 # - Fetches all MaintenanceDeadline records.
@@ -1650,7 +1659,8 @@ def _issues_by_day_for_glider(glider):
     for it in qs_resolved:
         it = dict(it)
         it["event_type"] = "resolved"
-        # Only add if not already present for this day (avoid double-listing if resolved same day as reported)
+    # Only add if not already present for this day (avoid
+    # double-listing if resolved same day as reported)
         if it["resolved_date"] != it["report_date"]:
             bucket.setdefault(it["resolved_date"], []).append(it)
     return bucket
@@ -1731,8 +1741,10 @@ def towplane_logbook(request, pk: int):
     # Use explicit dict construction to avoid defaultdict type confusion
     daily_data = {}
 
-    # Ensure all keys are initialized with correct types
-    # (float for day_hours/cum_hours, None for day/logsheet_pk, list for issues/deadlines)
+    # Ensure all keys are initialized with correct types. Types used:
+    # - float for day_hours/cum_hours
+    # - None for day/logsheet_pk
+    # - list for issues/deadlines
     from logsheet.models import Flight
 
     # Collect all unique tow_pilot IDs for mapping

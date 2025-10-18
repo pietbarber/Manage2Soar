@@ -83,7 +83,10 @@ class Command(BaseCommand):
                             except Member.DoesNotExist:
                                 self.stdout.write(
                                     self.style.WARNING(
-                                        f"Member with legacy_username '{updatedby}' not found; leaving updated_by NULL for Q{qnum}"
+                                        (
+                                            "Member with legacy_username '"
+                                            f"{updatedby}' not found; leaving updated_by NULL for Q{qnum}"
+                                        )
                                     )
                                 )
 

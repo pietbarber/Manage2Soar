@@ -6,6 +6,7 @@ from django.db.models import Count, F, Max, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from typing import Any, Dict
 
 from logsheet.models import Flight
 
@@ -86,7 +87,8 @@ def get_flight_summary_for_member(member):
 
     # Prepare totals accumulator
     flights_summary = []
-    totals = {"n_number": "Totals"}
+    # totals holds mixed types (ints, timedeltas, None), so annotate broadly
+    totals: Dict[str, Any] = {"n_number": "Totals"}
     for field in ("solo", "with", "given", "total"):
         totals[f"{field}_count"] = 0
         totals[f"{field}_time"] = timedelta(0)
@@ -144,8 +146,8 @@ def update_student_progress_snapshot(student):
 
     # 2. Identify required lesson IDs
     lessons = list(TrainingLesson.objects.all())
-    solo_ids = [l.id for l in lessons if l.far_requirement]
-    rating_ids = [l.id for l in lessons if l.is_required_for_private()]
+    solo_ids = [lesson.id for lesson in lessons if lesson.far_requirement]
+    rating_ids = [lesson.id for lesson in lessons if lesson.is_required_for_private()]
 
     solo_total = len(solo_ids)
     rating_total = len(rating_ids)

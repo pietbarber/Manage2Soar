@@ -117,31 +117,32 @@ def duty_emoji_legend():
         if config
         else "Assistant Duty Officer"
     )
-    return mark_safe(
-        f"""
-        <div class='accordion mb-4' id='emojiLegendAccordion'>
-            <div class='accordion-item'>
-                <h2 class='accordion-header' id='headingLegend'>
-                    <button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseLegend' aria-expanded='false' aria-controls='collapseLegend'>
-                        📖 Expand to show Legend
-                    </button>
-                </h2>
-                <div id='collapseLegend' class='accordion-collapse collapse' aria-labelledby='headingLegend' data-bs-parent='#emojiLegendAccordion'>
-                    <div class='accordion-body'>
-                        <ul class='list-unstyled mb-0'>
-                            <li><span class='emoji'>🎓</span> – {instructor}</li>
-                            <li><span class='emoji'>🛩️</span> – {towpilot}</li>
-                            <li><span class='emoji'>📋</span> – {duty_officer}</li>
-                            <li><span class='emoji'>💪</span> – {assistant_duty_officer}</li>
-                            <li><span class='emoji'>✍️</span> – Secretary</li>
-                            <li><span class='emoji'>💰</span> – Treasurer</li>
-                            <li><span class='emoji'>🌐</span> – Webmaster</li>
-                            <li><span class='emoji'>🎩</span> – Director</li>
-                            <li><span class='emoji'>📇</span> – Membership Manager</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
+    html = (
+        "<div class='accordion mb-4' id='emojiLegendAccordion'>"
+        "<div class='accordion-item'>"
+        "<h2 class='accordion-header' id='headingLegend'>"
+        "<button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' "
+        "data-bs-target='#collapseLegend' aria-expanded='false' aria-controls='collapseLegend'>"
+        "📖 Expand to show Legend"
+        "</button>"
+        "</h2>"
+        "<div id='collapseLegend' class='accordion-collapse collapse' "
+        "aria-labelledby='headingLegend' data-bs-parent='#emojiLegendAccordion'>"
+        "<div class='accordion-body'>"
+        "<ul class='list-unstyled mb-0'>"
+        f"<li><span class='emoji'>🎓</span> – {instructor}</li>"
+        f"<li><span class='emoji'>🛩️</span> – {towpilot}</li>"
+        f"<li><span class='emoji'>📋</span> – {duty_officer}</li>"
+        f"<li><span class='emoji'>💪</span> – {assistant_duty_officer}</li>"
+        "<li><span class='emoji'>✍️</span> – Secretary</li>"
+        "<li><span class='emoji'>💰</span> – Treasurer</li>"
+        "<li><span class='emoji'>🌐</span> – Webmaster</li>"
+        "<li><span class='emoji'>🎩</span> – Director</li>"
+        "<li><span class='emoji'>📇</span> – Membership Manager</li>"
+        "</ul>"
+        "</div>"
+        "</div>"
+        "</div>"
+        "</div>"
     )
+    return mark_safe(html)

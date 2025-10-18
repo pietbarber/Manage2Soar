@@ -136,7 +136,7 @@ def resolve_glider(legacy_name, flight_date):
 #########################################
 #  find_member_by_name
 #
-# Tries to match a name to legacy_username first, then falls back to first_name + last name.
+# Try matching a name to legacy_username first, then fallback to first+last name.
 
 
 def find_member_by_name(name):
@@ -221,7 +221,9 @@ class Command(BaseCommand):
                     self.style.NOTICE(f"Importing flights on or after {date_arg}")
                 )
                 cursor.execute(
-                    "SELECT * FROM flight_info2 WHERE flight_date >= %s ORDER BY flight_date ASC",
+                    "SELECT * FROM flight_info2 "
+                    "WHERE flight_date >= %s "
+                    "ORDER BY flight_date ASC",
                     [date_arg],
                 )
             else:
@@ -245,11 +247,19 @@ class Command(BaseCommand):
                 )
                 if not towplane_obj:
                     print(
-                        f"⚠️ No towplane matched for '{towplane_name}' on flight {data['flight_tracking_id']}"
+                        (
+                            f"⚠️ No towplane matched for '{towplane_name}' "
+                            f"on flight {data['flight_tracking_id']}"
+                        )
                     )
 
             count += 1
-            # print(f"Importing flight #{data['flight_tracking_id']} on {data['flight_date']}")
+            # print(
+            #     (
+            #         f"Importing flight #{data['flight_tracking_id']} on "
+            #         f"{data['flight_date']}"
+            #     )
+            # )
             print(".", end="", flush=True)
             print(f" {data['flight_date']} ") if count % 100 == 0 else None
 
@@ -268,7 +278,10 @@ class Command(BaseCommand):
             field_raw = data.get("field")
             if not field_raw or not isinstance(field_raw, str):
                 print(
-                    f"⚠️ Missing or invalid field value: {field_raw!r} — defaulting to KFRR"
+                    (
+                        f"⚠️ Missing or invalid field value: {field_raw!r} "
+                        "— defaulting to KFRR"
+                    )
                 )
                 airfield = Airfield.objects.get(identifier="KFRR")
             else:
@@ -277,7 +290,10 @@ class Command(BaseCommand):
                     airfield = Airfield.objects.get(identifier=field_code)
                 except Airfield.DoesNotExist:
                     print(
-                        f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') — defaulting to KFRR"
+                        (
+                            f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') "
+                            "— defaulting to KFRR"
+                        )
                     )
                     airfield = Airfield.objects.get(identifier="KFRR")
                     unknown_airfields.add(field_code)
@@ -348,7 +364,9 @@ def parse_money(val):
         return None
     try:
         return Decimal(str(val).replace("$", "").replace(",", ""))
-    except:
+    except Exception:
+        # If parsing fails, return None. We intentionally swallow errors
+        # for legacy data imports but could log when debugging.
         return None
 
 

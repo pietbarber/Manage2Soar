@@ -25,7 +25,16 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
     if not recipients:
         return
     subject = f"Maintenance Alert: {instance}"
-    body = f"A maintenance issue has been created for {instance.glider or instance.towplane}:\n\n{instance.description}\n\nGrounded: {'Yes' if instance.grounded else 'No'}\nLogsheet: {instance.logsheet}\n"
+    body = (
+        f"A maintenance issue has been created for {instance.glider or instance.towplane}:\n\n"
+        f"{instance.description}\n\n"
+        f"Grounded: {'Yes' if instance.grounded else 'No'}\n"
+        f"Logsheet: {instance.logsheet}\n"
+    )
     send_mail(
-        subject, body, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True
+        subject,
+        body,
+        settings.DEFAULT_FROM_EMAIL,
+        recipients,
+        fail_silently=True,
     )

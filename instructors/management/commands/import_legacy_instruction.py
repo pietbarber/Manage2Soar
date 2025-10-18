@@ -173,7 +173,10 @@ class Command(BaseCommand):
 
             status = "✅ Created" if created else "↺ Updated"
             self.stdout.write(
-                f"{status}: {student} / {instructor_member} / {date} (legacy essay time: {aware_legacy_dt})"
+                (
+                    f"{status}: {student} / {instructor_member} / {date} "
+                    f"(legacy essay time: {aware_legacy_dt})"
+                )
             )
 
     def import_ground_instruction(self, cursor, date_arg=None):
@@ -184,7 +187,8 @@ class Command(BaseCommand):
         if date_arg:
             cursor.execute(
                 """
-                SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
+                SELECT pilot, instructor, inst_date, duration,
+                       location, ground_tracking_id
                 FROM ground_inst
                 WHERE inst_date >= %s
             """,
@@ -193,7 +197,8 @@ class Command(BaseCommand):
         else:
             cursor.execute(
                 """
-                SELECT pilot, instructor, inst_date, duration, location, ground_tracking_id
+                SELECT pilot, instructor, inst_date, duration,
+                       location, ground_tracking_id
                 FROM ground_inst
             """
             )
@@ -210,7 +215,8 @@ class Command(BaseCommand):
                 defaults={"location": location, "duration": duration, "notes": ""},
             )
 
-            # Attach notes from instructor_reports2 — only if not used in InstructionReport
+            # Attach notes from instructor_reports2 — only if not used in
+            # InstructionReport
             cursor.execute(
                 """
                 SELECT report

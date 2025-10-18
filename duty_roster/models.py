@@ -35,7 +35,10 @@ class DutySlot(models.Model):
     def __str__(self):
         from siteconfig.utils import get_role_title
 
-        return f"{self.duty_day.date} – {get_role_title(self.role)} – {self.member.full_display_name}"
+        return (
+            f"{self.duty_day.date} – {get_role_title(self.role)} – "
+            f"{self.member.full_display_name}"
+        )
 
 
 class MemberBlackout(models.Model):
@@ -78,7 +81,10 @@ class DutyPreference(models.Model):
 
     allow_weekend_double = models.BooleanField(
         default=False,
-        help_text="I'm fine being scheduled both Saturday and Sunday on the same weekend",
+        help_text=(
+            "I'm fine being scheduled both Saturday and Sunday "
+            "on the same weekend"
+        ),
     )
 
     def __str__(self):
@@ -94,7 +100,10 @@ class DutyPairing(models.Model):
     )
 
     def __str__(self):
-        return f"{self.member.full_display_name} prefers to work with {self.pair_with.full_display_name}"
+        return (
+            f"{self.member.full_display_name} prefers to work with "
+            f"{self.pair_with.full_display_name}"
+        )
 
 
 class DutyAvoidance(models.Model):
@@ -106,7 +115,10 @@ class DutyAvoidance(models.Model):
     )
 
     def __str__(self):
-        return f"{self.member.full_display_name} must not work with {self.avoid_with.full_display_name}"
+        return (
+            f"{self.member.full_display_name} must not work with "
+            f"{self.avoid_with.full_display_name}"
+        )
 
 
 class DutyAssignment(models.Model):
@@ -165,7 +177,10 @@ class DutyAssignment(models.Model):
     notes = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"
+        return (
+            f"{self.date} @ "
+            f"{self.location.identifier if self.location else 'Unknown Field'}"
+        )
 
 
 class InstructionSlot(models.Model):
@@ -192,7 +207,10 @@ class InstructionSlot(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.student.full_display_name} for {self.assignment.date} ({self.status})"
+        return (
+            f"{self.student.full_display_name} for {self.assignment.date} "
+            f"({self.status})"
+        )
 
 
 class DutySwapRequest(models.Model):
@@ -223,7 +241,10 @@ class DutySwapRequest(models.Model):
             "TOW": "towpilot",
         }
         role_title = get_role_title(role_map.get(self.role, self.role))
-        return f"{role_title} swap for {self.original_date} by {self.requester.full_display_name}"
+        return (
+            f"{role_title} swap for {self.original_date} by "
+            f"{self.requester.full_display_name}"
+        )
 
 
 class DutySwapOffer(models.Model):
@@ -250,7 +271,10 @@ class DutySwapOffer(models.Model):
     responded_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.offered_by.full_display_name} → {self.swap_request.role} on {self.swap_request.original_date}"
+        return (
+            f"{self.offered_by.full_display_name} → {self.swap_request.role} on "
+            f"{self.swap_request.original_date}"
+        )
 
 
 class OpsIntent(models.Model):

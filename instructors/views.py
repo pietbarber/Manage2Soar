@@ -124,7 +124,7 @@ def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     # Get all lessons in code order
     lessons = list(TrainingLesson.objects.order_by("code"))
-    idx = next((i for i, l in enumerate(lessons) if l.code == code), None)
+    idx = next((i for i, lesson in enumerate(lessons) if lesson.code == code), None)
     prev_lesson = lessons[idx - 1] if idx is not None and idx > 0 else None
     next_lesson = (
         lessons[idx + 1] if idx is not None and idx < len(lessons) - 1 else None
@@ -700,7 +700,8 @@ def assign_qualification(request, member_id):
 #
 # Context:
 # - pending_reports: List of dicts with 'pilot', 'date', 'report_url'
-# - students_data: List of dicts with per-student 'solo_pct', 'rating_pct', 'sessions', 'solo_url', 'checkride_url'
+# - students_data: List of dicts with per-student 'solo_pct', 'rating_pct',
+#   'sessions', 'solo_url', 'checkride_url'
 # - rated_data: Same as students_data but for rated members
 ####################################################
 
@@ -922,8 +923,8 @@ def member_instruction_record(request, member_id):
 
     # 3) Precompute solo‐required vs rating‐required lesson IDs
     lessons = TrainingLesson.objects.all()
-    solo_ids = {L.id for L in lessons if L.is_required_for_solo()}
-    rating_ids = {L.id for L in lessons if L.is_required_for_private()}
+    solo_ids = {lesson.id for lesson in lessons if lesson.is_required_for_solo()}
+    rating_ids = {lesson.id for lesson in lessons if lesson.is_required_for_private()}
     total_solo = len(solo_ids) or 1
     total_rating = len(rating_ids) or 1
 
@@ -1398,7 +1399,9 @@ def member_logbook(request):
                 cert_part = f", {instructor_cert}CFI" if instructor_cert else ""
                 signature_html = (
                     f"{pre.strip()} "
-                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', 'Comic Sans MS', 'Dancing Script', cursive, sans-serif; font-size: 1.1em;\">{name}</span>"
+                    f"/s/ <span style=\"font-family: 'Lucida Handwriting', "
+                    f"'Comic Sans MS', 'Dancing Script', cursive, sans-serif; "
+                    f"font-size: 1.1em;\">{name}</span>"
                     f"{cert_part}"
                 )
             else:
@@ -1469,7 +1472,6 @@ def member_logbook(request):
                 "pic": "",
                 "inst_given": "",
                 "total": "",
-                "comments": ", ".join(ls.lesson.code for ls in g.lesson_scores.all()),
                 # raw-minute fields (all zero except ground_inst_m)
                 "ground_inst_m": gm,
                 "dual_received_m": 0,
@@ -1515,7 +1517,7 @@ def member_logbook(request):
     }
 
     for idx in range(0, len(rows), 10):
-        chunk = rows[idx : idx + 10]
+        chunk = rows[idx: idx + 10]
         page_number = idx // 10
 
         # Always set year_start for every page
@@ -1797,7 +1799,8 @@ def needed_for_checkride(request, member_id):
     )
 
     if total_hours >= 40:
-        # Block B: ≥40h heavier-than-air → need 10 solo flights + 3 recent training flights
+        # Block B: ≥40h heavier-than-air →
+        # need 10 solo flights + 3 recent training flights
         required = {
             "total_time": 3,  # need 3 h total glider time
             "solo_flights": 10,
@@ -1816,7 +1819,8 @@ def needed_for_checkride(request, member_id):
         )
 
     else:
-        # Block A: <40h → need 20 flights, incl 3 recent training; and 2h solo +10 launches
+        # Block A: <40h →
+        # need 20 flights (incl. 3 recent training), and 2h solo + 10 launches
         required = {
             "total_time": 10,  # need 10 h total glider time
             "total_flights": 20,
@@ -1969,8 +1973,6 @@ class CreateWrittenTestView(FormView):
                 continue
 
         # 4. Then, for each category, randomly choose unanswered ones
-        import random
-
         for code, cnt in weights.items():
             pool = list(
                 Question.objects.filter(category__code=code).exclude(qnum__in=must)
@@ -2013,7 +2015,10 @@ class WrittenTestReviewView(DjangoView):
 
 @active_member_required
 def export_member_logbook_csv(request):
-    """Export the member's logbook as CSV for Excel/Google Sheets with explicit instructor, pilot, passenger columns and constructed comments."""
+    """
+    Export the member's logbook as CSV for Excel/Google Sheets with explicit
+    instructor, pilot, passenger columns and constructed comments.
+    """
     member = request.user
 
     def format_hhmm(duration):
@@ -2067,7 +2072,8 @@ def export_member_logbook_csv(request):
             dur_m = int(f.duration.total_seconds() // 60) if f.duration else 0
             dual_m = solo_m = pic_m = inst_m = 0
             comments = ""
-            # Construct comments as in logbook.html: lesson codes for instruction, otherwise blank
+            # Construct comments as in logbook.html: lesson codes for
+            # instruction, otherwise blank
             if is_pilot and f.instructor:
                 rpt = InstructionReport.objects.filter(
                     student=member, instructor=f.instructor, report_date=date

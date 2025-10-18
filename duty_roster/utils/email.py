@@ -4,7 +4,11 @@ from django.core.mail import send_mail
 
 def notify_ops_status(assignment):
     print(
-        f"🧠 State: tow_pilot={assignment.tow_pilot}, duty_officer={assignment.duty_officer}, confirmed={assignment.is_confirmed}"
+        (
+            f"🧠 State: tow_pilot={assignment.tow_pilot}, "
+            f"duty_officer={assignment.duty_officer}, "
+            f"confirmed={assignment.is_confirmed}"
+        )
     )
 
     if not assignment or assignment.is_scheduled:
@@ -21,7 +25,11 @@ def notify_ops_status(assignment):
         do_title = get_role_title("duty_officer") or "Duty Officer"
         send_mail(
             subject=f"{subject_prefix} Ad-Hoc Operations Proposed for {ops_date}",
-            message=f"An ad-hoc ops day has been proposed for {ops_date}.\n\n{tow_title}s and {do_title.lower()}s needed!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
+            message=(
+                f"An ad-hoc ops day has been proposed for {ops_date}.\n\n"
+                f"{tow_title}s and {do_title.lower()}s needed!\n\n"
+                f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
+            ),
             from_email="noreply@default.manage2soar.com",
             recipient_list=[
                 "instructors@default.manage2soar.com",
@@ -41,7 +49,11 @@ def notify_ops_status(assignment):
             do_title = get_role_title("duty_officer") or "Duty Officer"
             send_mail(
                 subject=f"{subject_prefix} Ad-Hoc Ops Confirmed for {ops_date}",
-                message=f"We now have a {tow_title.lower()} and {do_title.lower()} for {ops_date} — operations are a go!\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/",
+                message=(
+                    f"We now have a {tow_title.lower()} and {do_title.lower()} "
+                    f"for {ops_date} — operations are a go!\n\n"
+                    f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
+                ),
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=["members@default.manage2soar.com"],
             )

@@ -16,9 +16,12 @@ EMAIL;TYPE=INTERNET,HOME:{member.email}
         vcard += f"TEL;TYPE=cell,voice:{member.mobile_phone}\n"
     if member.glider_rating:
         vcard += f"X-GLIDER-RATING:{member.glider_rating}\n"
-    vcard += f"""ADRi;TYPE=HOME:w:;;{member.address};{ member.city };{ member.state_code }{ member.state_freeform };{ member.zip_code }
-END:VCARD"""
+    vcard += (
+        f"ADRi;TYPE=HOME:w:;;{member.address};"
+        f"{member.city};{member.state_code}{member.state_freeform};{member.zip_code}\n"
+        "END:VCARD"
+    )
     qr = qrcode.make(vcard)
     buffer = BytesIO()
-    qr.save(buffer, format="PNG")
+    qr.save(buffer, "PNG")
     return buffer.getvalue()

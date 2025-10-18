@@ -19,26 +19,26 @@ from utils.upload_entropy import (
 #
 # This is the biggest model we've got, so pay attention!
 #
-# This model represents a single flight entry in the logsheet system. It captures details about the flight,
-# including the pilot, instructor, glider, towplane, and other relevant information. The model also calculates
-# costs associated with the flight, such as tow costs and rental costs, based on the provided data.
-# Additionally, it supports splitting costs between members and includes properties for displaying costs
-# in a user-friendly format.
+# This model represents a single flight entry. It captures details about the
+# flight including pilot, instructor, glider, towplane, and other metadata.
+# The model also calculates costs (tow/rental), supports split payments, and
+# exposes helper properties for formatted display of those costs.
 #
 # Properties:
-# - tow_cost_calculated: Calculates the tow cost based on the release altitude and tow rates.
-# - rental_cost_calculated: Calculates the rental cost based on the glider's rental rate and flight duration.
-# - tow_cost: Retrieves the tow cost based on the release altitude and tow rates.
-# - tow_cost_display: Returns a formatted string representation of the tow cost.
-# - rental_cost: Calculates the rental cost based on the glider's rental rate and flight duration.
-# - rental_cost_display: Returns a formatted string representation of the rental cost.
-# - total_cost: Calculates the total cost of the flight (tow cost + rental cost).
-# - total_cost_display: Returns a formatted string representation of the total cost.
+# - tow_cost_calculated: tow cost from matching TowRate for release altitude.
+# - rental_cost_calculated: rental cost from glider rental_rate and duration.
+# - tow_cost: price lookup for the release altitude.
+# - tow_cost_display: formatted tow cost (string).
+# - rental_cost: computed rental cost (Decimal or None).
+# - rental_cost_display: formatted rental cost (string).
+# - total_cost: sum of tow + rental costs.
+# - total_cost_display: formatted total cost (string).
 #
 # Methods:
-# - save: Overrides the save method to calculate the flight duration based on launch and landing times.
-#         Handles overnight flights by adjusting the landing time if it occurs before the launch time.
-# - __str__: Returns a string representation of the flight, including the pilot, glider, and launch time.
+# - save: Overrides the save method to calculate the flight duration based on
+#   launch and landing times.
+#   Handles overnight flights by adjusting the landing time if it occurs
+#   before the launch time.
 
 
 class Flight(models.Model):
@@ -279,15 +279,15 @@ class Flight(models.Model):
     )
 
     def __str__(self):
-        return f"{self.pilot} in {self.glider} at {self.launch_time}"
+        return f"{self.pilot} in {self.glider} at {self.launch_time:%H:%M}"
 
 
 ####################################################
 # RevisionLog model
 #
-# This model tracks revisions made to a logsheet. It records details about
-# who made the revision, when it was made, and any notes associated with the revision.
-# The RevisionLog is used when somebody reactivates a logsheet that was marked as "finalized"
+# This model tracks revisions made to a logsheet. It records who made the
+# revision, when it was made, and any associated notes. The RevisionLog is
+# used when a logsheet is reactivated after being marked 'finalized'.
 #
 # Fields:
 # - logsheet: The logsheet that was revised.
@@ -296,7 +296,8 @@ class Flight(models.Model):
 # - note: An optional note describing the revision.
 #
 # Methods:
-# - __str__: Returns a string representation of the revision, including the reviser and timestamp.
+# - __str__: Returns a string representation of the revision including
+#   reviser and timestamp.
 #
 class RevisionLog(models.Model):
     logsheet = models.ForeignKey(
@@ -331,13 +332,18 @@ class Towplane(models.Model):
         decimal_places=1,
         default=Decimal("0.0"),
         validators=[MinValueValidator(0)],
-        help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
+        help_text=(
+            "Starting Hobbs/total time when electronic logging began "
+            "(decimal hours)."
+        ),
     )
     oil_change_interval = models.DecimalField(
         max_digits=5,
         decimal_places=1,
         default=Decimal("50.0"),
-        help_text="Hours between oil changes (default 50, but configurable per aircraft).",
+        help_text=(
+            "Hours between oil changes (default 50, configurable per aircraft)."
+        ),
     )
     next_oil_change_due = models.DecimalField(
         max_digits=8,
@@ -405,7 +411,10 @@ class Glider(models.Model):
         decimal_places=1,
         default=Decimal("0.0"),
         validators=[MinValueValidator(0)],
-        help_text="Starting Hobbs/total time when electronic logging began (decimal hours).",
+        help_text=(
+            "Starting Hobbs/total time when electronic logging began "
+            "(decimal hours)."
+        ),
     )
     requires_100hr_inspection = models.BooleanField(
         default=False, help_text="Check if this glider requires 100-hour inspections."
@@ -561,22 +570,30 @@ class Logsheet(models.Model):
                 # Oil change logic
                 if towplane.next_oil_change_due:
                     due = towplane.next_oil_change_due
-                    towplane.oil_change_interval or Decimal("50.0")
+                    oil_interval = towplane.oil_change_interval or Decimal("50.0")
                     if stop_tach is not None:
                         hours_to_due = due - stop_tach
                         if hours_to_due <= 10 and hours_to_due > 0:
+                            desc = (
+                                f"Towplane oil change due in {hours_to_due:.1f} "
+                                f"hours (at {due})."
+                            )
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
-                                description=f"Towplane oil change due in {hours_to_due:.1f} hours (at {due}).",
+                                description=desc,
                                 grounded=False,
                                 resolved=False,
                             )
                         elif hours_to_due <= 0:
+                            desc = (
+                                f"Towplane oil change OVERDUE (due at {due}, "
+                                f"now {stop_tach})."
+                            )
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
-                                description=f"Towplane oil change OVERDUE (due at {due}, now {stop_tach}).",
+                                description=desc,
                                 grounded=True,
                                 resolved=False,
                             )
@@ -586,18 +603,26 @@ class Logsheet(models.Model):
                     if stop_tach is not None:
                         hours_to_due = due - stop_tach
                         if hours_to_due <= 10 and hours_to_due > 0:
+                            desc = (
+                                f"Towplane 100-hour inspection due in "
+                                f"{hours_to_due:.1f} hours (at {due})."
+                            )
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
-                                description=f"Towplane 100-hour inspection due in {hours_to_due:.1f} hours (at {due}).",
+                                description=desc,
                                 grounded=False,
                                 resolved=False,
                             )
                         elif hours_to_due <= 0:
+                            desc = (
+                                f"Towplane 100-hour inspection OVERDUE (due at {due}, "
+                                f"now {stop_tach})."
+                            )
                             MaintenanceIssue.objects.get_or_create(
                                 towplane=towplane,
                                 logsheet=self,
-                                description=f"Towplane 100-hour inspection OVERDUE (due at {due}, now {stop_tach}).",
+                                description=desc,
                                 grounded=True,
                                 resolved=False,
                             )
@@ -635,7 +660,10 @@ class Logsheet(models.Model):
                     MaintenanceIssue.objects.get_or_create(
                         glider=g,
                         logsheet=self,
-                        description=f"Glider 100-hour inspection due in {hours_to_due:.1f} hours (at {due}).",
+                        description=(
+                            f"Glider 100-hour inspection due in {hours_to_due:.1f} "
+                            f"hours (at {due})."
+                        ),
                         grounded=False,
                         resolved=False,
                     )
@@ -643,7 +671,10 @@ class Logsheet(models.Model):
                     MaintenanceIssue.objects.get_or_create(
                         glider=g,
                         logsheet=self,
-                        description=f"Glider 100-hour inspection OVERDUE (due at {due}, now {cum_hours:.1f}).",
+                        description=(
+                            f"Glider 100-hour inspection OVERDUE (due at {due}, "
+                            f"now {cum_hours:.1f})."
+                        ),
                         grounded=True,
                         resolved=False,
                     )
@@ -705,17 +736,20 @@ class LogsheetPayment(models.Model):
         unique_together = ("logsheet", "member")
 
     def __str__(self):
-        return f"{self.member} - {self.logsheet.log_date} ({self.payment_method or 'Unpaid'})"
+        return (
+            f"{self.member} - {self.logsheet.log_date} "
+            f"({self.payment_method or 'Unpaid'})"
+        )
 
 
 ####################################################
 # LogsheetCloseout model
 #
 # When the duty officer is ready to finalize a logsheet, there's one closeout page
-# that allows him to write up safety issues, equipment issues and a summary of the operations
-# This used to be done in an email, but the email gets lost to time.  Why not keep it
-# in our record for future generations to review, without having to trundle through the email
-# archives?
+# that allows him to write up safety issues, equipment issues and a summary
+# of the operations. This used to be done in an email, but the email gets
+# lost to time. Why not keep it in our record for future generations to
+# review, without having to trundle through the email archives?
 #
 
 
@@ -846,7 +880,8 @@ class MaintenanceIssue(models.Model):
     def __str__(self):
         aircraft = self.glider or self.towplane
         label = f"{aircraft}"
-        return f"{label} - {'Grounded' if self.grounded else 'Open'} - {self.description[:40]}"
+        status = "Grounded" if self.grounded else "Open"
+        return f"{label} - {status} - {self.description[:40]}"
 
     def can_be_resolved_by(self, user):
         if user.is_superuser:

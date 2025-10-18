@@ -1,21 +1,19 @@
-import logging
-
-logger = logging.getLogger("duty_roster.generator")
-# duty_roster/roster_generator.py
-
-import calendar
-import random
-from collections import defaultdict
-from datetime import date
-
+from members.models import Member
+from members.constants.membership import DEFAULT_ROLES
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
     MemberBlackout,
 )
-from members.constants.membership import DEFAULT_ROLES
-from members.models import Member
+from datetime import date
+from collections import defaultdict
+import random
+import calendar
+import logging
+
+logger = logging.getLogger("duty_roster.generator")
+# duty_roster/roster_generator.py
 
 
 def generate_roster(year=None, month=None):
@@ -155,8 +153,12 @@ def generate_roster(year=None, month=None):
             logger.debug(f"No candidates with nonzero weights for role {role}.")
             return None
         chosen = random.choices(cands, weights=weights, k=1)[0]
+        chosen_list = [m.full_display_name for m in cands]
         logger.debug(
-            f"Chose {chosen.full_display_name} for role {role} from {[m.full_display_name for m in cands]}"
+            "Chose %s for role %s from %s",
+            chosen.full_display_name,
+            role,
+            chosen_list,
         )
         return chosen
 

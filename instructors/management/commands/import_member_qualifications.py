@@ -32,7 +32,10 @@ class Command(BaseCommand):
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT handle, role_name, is_qualified, expiration_date, instructor, notes FROM quals"
+            (
+                "SELECT handle, role_name, is_qualified, expiration_date, "
+                "instructor, notes FROM quals"
+            )
         )
         rows = cursor.fetchall()
 
@@ -64,7 +67,10 @@ class Command(BaseCommand):
                     )
                 except Member.DoesNotExist:
                     logger.warning(
-                        f"Instructor '{instructor_handle}' not found for qualification '{role_name}' on '{handle}'."
+                        (
+                            f"Instructor '{instructor_handle}' not found for "
+                            f"qualification '{role_name}' on '{handle}'."
+                        )
                     )
 
             mq, created = MemberQualification.objects.update_or_create(

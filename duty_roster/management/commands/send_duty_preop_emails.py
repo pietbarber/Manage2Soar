@@ -65,7 +65,10 @@ class Command(BaseCommand):
             f"🎓 Instructor: {assignment.instructor.full_display_name if assignment.instructor else '—'}"
         )
         lines.append(
-            f"🎓 Surge Instructor: {assignment.surge_instructor.full_display_name if assignment.surge_instructor else '—'}"
+            (
+                "🎓 Surge Instructor: "
+                f"{assignment.surge_instructor.full_display_name if assignment.surge_instructor else '—'}"
+            )
         )
         lines.append(
             f"🛩️ Tow Pilot: {assignment.tow_pilot.full_display_name if assignment.tow_pilot else '—'}"
@@ -77,7 +80,10 @@ class Command(BaseCommand):
             f"📋 Duty Officer: {assignment.duty_officer.full_display_name if assignment.duty_officer else '—'}"
         )
         lines.append(
-            f"💪 Assistant DO: {assignment.assistant_duty_officer.full_display_name if assignment.assistant_duty_officer else '—'}"
+            (
+                "💪 Assistant DO: "
+                f"{assignment.assistant_duty_officer.full_display_name if assignment.assistant_duty_officer else '—'}"
+            )
         )
         lines.append("")
 
@@ -113,11 +119,19 @@ class Command(BaseCommand):
                 recipient_list=to_emails,
             )
             self.stdout.write(
-                self.style.SUCCESS(f"✅ Email sent to: {', '.join(to_emails)}")
+                self.style.SUCCESS(
+                    (
+                        "✅ Email sent to: "
+                        f"{', '.join(to_emails)}"
+                    )
+                )
             )
         else:
             self.stdout.write(
                 self.style.WARNING(
-                    "⚠️ No valid email addresses for duty crew. Email not sent."
+                    (
+                        "⚠️ No valid email addresses for duty crew. "
+                        "Email not sent."
+                    )
                 )
             )

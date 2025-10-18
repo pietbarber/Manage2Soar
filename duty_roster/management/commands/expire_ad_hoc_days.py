@@ -23,9 +23,12 @@ class Command(BaseCommand):
 
             send_mail(
                 subject=f"Ad-Hoc Ops Cancelled - {ops_date}",
-                message=f"""Ad-hoc ops on {ops_date} could not get sufficient interest to meet the minimum 
-duty crew of tow pilot and duty officer. The deadline has passed and the ops 
-have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/""",
+                message=(
+                    f"Ad-hoc ops on {ops_date} could not get sufficient interest to "
+                    "meet the minimum duty crew of tow pilot and duty officer. The "
+                    "deadline has passed and the ops have been cancelled for tomorrow.\n\n"
+                    f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
+                ),
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=["members@default.manage2soar.com"],
             )

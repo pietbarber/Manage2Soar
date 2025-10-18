@@ -325,10 +325,13 @@ def ops_intent_toggle(request, year, month, day):
     if "instruction" in available_as:
         days_until = (day_date - timezone.now().date()).days
         if days_until > 14:
-            response = '<p class="text-red-700">⏰ You can only request instruction within 14 days of your duty date.</p>'
+            response = (
+                '<p class="text-red-700">⏰ You can only request instruction '
+                'within 14 days of your duty date.</p>'
+            )
             response += (
                 f'<form hx-get="{request.path}form/" '
-                'hx-post="{request.path}"'
+                f'hx-post="{request.path}" '
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
                 '<button type="submit" class="btn btn-sm btn-primary">'
                 "🛩️ I Plan to Fly This Day</button></form>"
@@ -382,7 +385,10 @@ def ops_intent_toggle(request, year, month, day):
                 fail_silently=True,
             )
 
-        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        response = (
+            '<p class="text-green-700">✅ You’re now marked as planning to fly '
+            'this day.</p>'
+        )
         response += (
             f'<button hx-post="{request.path}" '
             'hx-target="#ops-intent-response" '
@@ -451,8 +457,17 @@ def maybe_notify_surge_instructor(day_date):
 
     if instruction_count > 3:
         send_mail(
-            subject=f"Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
-            message=f"There are currently {instruction_count} pilots requesting instruction for {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge instructor.",
+            subject=(
+                f"Surge Instructor May Be Needed - "
+                f"{day_date.strftime('%A, %B %d')}"
+            ),
+            message=(
+                (
+                    f"There are currently {instruction_count} pilots requesting instruction for "
+                    f"{day_date.strftime('%A, %B %d, %Y')}."
+                )
+                + "\n\nYou may want to coordinate a surge instructor."
+            ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=["instructors@default.manage2soar.com"],
             fail_silently=True,
@@ -473,8 +488,17 @@ def maybe_notify_surge_towpilot(day_date):
 
     if tow_count >= 6:
         send_mail(
-            subject=f"Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
-            message=f"There are currently {tow_count} pilots planning flights requiring tows on {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge tow pilot.",
+            subject=(
+                f"Surge Tow Pilot May Be Needed - "
+                f"{day_date.strftime('%A, %B %d')}"
+            ),
+            message=(
+                (
+                    f"There are currently {tow_count} pilots planning flights requiring tows on "
+                    f"{day_date.strftime('%A, %B %d, %Y')}."
+                )
+                + "\n\nYou may want to coordinate a surge tow pilot."
+            ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=["towpilots@default.manage2soar.com"],
             fail_silently=True,

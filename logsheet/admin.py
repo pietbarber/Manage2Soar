@@ -142,8 +142,9 @@ class FlightAdmin(admin.ModelAdmin):
         return obj.total_cost_display
 
 
-# Each time a member locks a flight log because it's finalized, no more changes can be done
-# to that flight log.  Of course, mistakes happen, and the log sheet needs to be revised.
+# Each time a member locks a flight log because it's finalized, no more changes
+# can be done to that flight log. Of course, mistakes happen, and the log sheet
+# needs to be revised.
 # A superuser can unlock the finalized boolean to allow edits to that logsheet again.
 # But each time that happens, a log entry gets added into this RevisionLog model.
 # The admin mode is here in case you need to scrub or edit any of those.  Maybe this
@@ -156,10 +157,9 @@ class RevisionLogAdmin(admin.ModelAdmin):
     list_filter = ("revised_by", "revised_at")
 
 
-# Each time the club operates at a new field for the first time, it needs to be added here.
-# When we start a logsheet for the day, we need to indicate the airfield where the operations take place.
-# If we as a club are starting an op at a new airfield, we need to add it here first. This is the only place
-# to add it.
+# Add a new Airfield here when the club starts operations at a field for the first time.
+# When creating a logsheet we choose the airfield for the day's operations. This
+# admin page is the place to add new airfield records.
 
 
 @admin.register(Airfield)
@@ -179,10 +179,11 @@ class AirfieldAdmin(admin.ModelAdmin):
     airfield_image_preview.short_description = "Current Photo"
 
 
-# The particulars of what day a logsheet happened, the airfield, who is on the duty roster for that day
-# are all kept in teh Logsheet model. If a logsheet is finalized is kept in this entry too.
-# One manual way to unfinalize a logsheet (open it up fo revisions) is to just flip the boolean in this
-# table with this admin interface.  This isn't ideal.
+# The particulars of what day a logsheet happened, the airfield, who is on the
+# duty roster for that day are all kept in the Logsheet model. If a logsheet
+# is finalized it is recorded here as well.
+# One manual way to unfinalize a logsheet (open it up for revisions) is to
+# flip the boolean in this table via the admin interface. This isn't ideal.
 
 
 @admin.register(Logsheet)
@@ -196,7 +197,8 @@ class LogsheetAdmin(admin.ModelAdmin):
 # Currently all tows are at the same rate for all tow planes, which could be a
 # problem in the future if we have some other tow plane come tow for us,
 # and they charge different rates. I'll have to think about it.
-# Also unfortunately, the prices are recorded in 100 feet increments, which is not very user-friendly.
+# Also unfortunately, the prices are recorded in 100-foot increments. This is
+# not very user-friendly for end users.
 # There is a script in the logsheet/management that allows you to paste the output into
 # a `./manage.py shell` command
 
@@ -294,7 +296,8 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
 
 # Admin configuration for MaintenanceDeadline objects
 # Displays upcoming maintenance deadlines for gliders and towplanes.
-# Used to manage and track important inspections like annuals, transponders, and parachute repacks.
+# Used to manage and track important inspections like annuals, transponders,
+# and parachute repacks.
 # Allows filtering and searching by aircraft and deadline type.
 
 
@@ -318,7 +321,8 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
 
 
 # Admin configuration for AircraftMeister objects
-# Assigns members as Meisters (responsible caretakers) for specific gliders or towplanes.
+# Assigns members as Meisters (responsible caretakers) for specific gliders
+# or towplanes.
 # Meisters are authorized to resolve maintenance issues for their assigned aircraft.
 # Allows quick lookup by aircraft or member.
 

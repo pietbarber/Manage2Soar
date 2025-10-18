@@ -2,14 +2,23 @@
 from collections import defaultdict
 from datetime import date, timedelta
 from itertools import chain
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, TypedDict, TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, DurationField, F, Max, Q, Sum
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.functions import Coalesce, ExtractWeekDay, ExtractYear
 
-from logsheet.models import Flight
+from django.apps import apps
+
+# Import Flight for type checking only to avoid confusing static analyzers
+# about a runtime class dependency cycle. At runtime resolve the model via
+# apps.get_model which is safe and avoids import-time cycles.
+if TYPE_CHECKING:
+    # Used by type checkers only
+    from logsheet.models import Flight  # type: ignore
+else:
+    Flight = apps.get_model("logsheet", "Flight")
 
 
 def instructor_schedule_vs_actual(
@@ -18,8 +27,11 @@ def instructor_schedule_vs_actual(
     """
     For each instructor:
       - blue: unique days scheduled as duty instructor (from submitted Logsheets)
-      - burnt orange: unique days with at least one instructional flight (Flight.instructor) when NOT scheduled as duty instructor
-    Returns sorted Y axis (most total days at top), and two lists per instructor: scheduled_days, unscheduled_days
+      - burnt orange: unique days with at least one instructional flight
+        (Flight.instructor) when NOT scheduled as duty instructor.
+
+    Returns sorted Y axis (most total days at top), and two lists per
+    instructor: scheduled_days, unscheduled_days.
     """
     from logsheet.models import Logsheet
 
@@ -97,9 +109,12 @@ def tow_pilot_schedule_vs_actual(
 ) -> Dict[str, Any]:
     """
     For each tow pilot:
-      - blue: unique days scheduled as duty tow pilot (from submitted Logsheets, not DutyAssignment)
-      - burnt orange: unique days with at least one tow (Flight) when NOT scheduled as duty tow pilot
-    Returns sorted Y axis (most total days at top), and two lists per pilot: scheduled_days, unscheduled_days
+      - blue: unique days scheduled as duty tow pilot (from submitted Logsheets)
+      - burnt orange: unique days with at least one tow (Flight) when NOT
+        scheduled as duty tow pilot.
+
+    Returns sorted Y axis (most total days at top), and two lists per
+    pilot: scheduled_days, unscheduled_days.
     """
     # 1. Get all scheduled tow pilot days (from submitted logsheets)
     from logsheet.models import Logsheet
@@ -182,9 +197,12 @@ def combined_duty_days_vs_actual(
 ) -> Dict[str, Any]:
     """
     For each member:
-      - Count unique days they did any duty (tow or instruct), not double-counting days when both.
-      - Flag dual-role members (did both at least once in period).
-    Returns sorted Y axis (most total days at top), and list per member: total duty days.
+      - Count unique days they did any duty (tow or instruct), without
+        double-counting days when they performed both roles.
+      - Flag dual-role members (did both at least once in the period).
+
+    Returns sorted Y axis (most total days at top), and list per member:
+    total duty days.
     """
     from logsheet.models import Logsheet
 
@@ -218,7 +236,8 @@ def combined_duty_days_vs_actual(
             if pid:
                 actual_by_member[pid].add(row["ops_date"])
 
-    # 3. For each member, count tow pilot and instructor days (no double-counting per day)
+    # 3. For each member, count tow pilot and instructor days (no
+    #    double-counting per day)
     all_ids = set(scheduled_by_member.keys()) | set(actual_by_member.keys())
     tow_days = defaultdict(set)
     inst_days = defaultdict(set)
@@ -433,7 +452,8 @@ def flights_by_year_by_aircraft(
     if not years:
         return {"years": [], "categories": [], "matrix": {}, "totals_by_cat": {}}
 
-    # Top-N categories by total (excluding "Private" which we append explicitly if present)
+    # Top-N categories by total (excluding "Private" which we append
+    # explicitly if present)
     have_private = "Private" in cat_counts
     sorted_cats = sorted(
         [c for c in cat_counts if c != "Private"], key=lambda c: (-cat_counts[c], c)
@@ -492,11 +512,14 @@ def glider_utilization(
 ) -> GliderUtilization:
     # Flights / total hours / avg minutes per glider in a date range.
 
-    # - fleet="all": club ships shown individually; non-club can be bucketed as "Private".
+    # - fleet="all": club ships shown individually; non-club can be
+    #   bucketed as "Private".
     # - fleet="club": include only glider.club_owned=True.
-    # - fleet="private": include only glider.club_owned=False (and include_unknown controls nulls).
+    # - fleet="private": include only glider.club_owned=False (and
+    #   include_unknown controls nulls).
 
-    # - When bucket_private=False, private ships are listed individually (no "Private" bucket).
+    # - When bucket_private=False, private ships are listed individually
+    #   (no "Private" bucket).
     # - Ships beyond top_n (by flights) grouped as "Other".
 
     qs = Flight.objects.filter(LANDED_ONLY)
@@ -670,7 +693,8 @@ def flying_days_by_member(
     min_days: int = 2,
 ) -> Dict[str, Any]:
     """
-    Count distinct ops days per member where they flew as pilot OR instructor OR tow pilot.
+    Count distinct ops days per member where they flew as pilot OR
+    instructor OR tow pilot.
     Returns { "names": [...], "days": [...], "ops_days_total": int }
     """
     from logsheet.models import Flight
@@ -739,7 +763,8 @@ def flight_duration_distribution(
     start_date: date, end_date: date, *, finalized_only=True, max_points=400
 ) -> Dict[str, Any]:
     """
-    Survival curve of flight durations: percent of flights with duration >= x (in hours).
+    Survival curve of flight durations: percent of flights with duration >=
+    x (in hours).
     Also returns the median (minutes) and shares over 1h/2h/3h.
 
     Returns
@@ -1189,7 +1214,6 @@ def time_of_day_operations(
     Where time_decimal represents time as decimal hours (e.g., 14.5 = 2:30 PM)
     """
     from collections import defaultdict
-
 
     from logsheet.models import Flight
 

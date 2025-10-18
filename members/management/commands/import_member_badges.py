@@ -89,7 +89,10 @@ class Command(BaseCommand):
                 updated += 1
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"SSA URL import complete. Total processed: {updated + skipped}, Updated: {updated}, Skipped: {skipped}"
+                    (
+                        "SSA URL import complete. Total processed: "
+                        f"{updated + skipped}, Updated: {updated}, Skipped: {skipped}"
+                    )
                 )
             )
             # If only updating SSA URLs, exit early

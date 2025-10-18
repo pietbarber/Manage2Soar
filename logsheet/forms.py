@@ -36,17 +36,24 @@ def get_active_members():
 
 # FlightForm
 # This form is used to handle the creation and editing of Flight model instances.
-# It includes fields for launch and landing times, pilot, instructor, glider, towplane, tow pilot, release altitude, passenger, and cost-splitting details.
+# It includes fields for launch and landing times, pilot, instructor, glider,
+# towplane, tow pilot, release altitude, passenger, and cost-splitting
+# details.
 # Widgets are customized for better user experience:
-# - TimeInput widgets for "launch_time" and "landing_time" with "time" input type and "form-control" class.
-# - Select widgets for dropdown fields like "pilot", "instructor", "glider", "tow_pilot", "towplane", "release_altitude", "passenger", and "split_type" with "form-select" class.
-# - TextInput widgets for "passenger_name" with a placeholder and "form-control" class.
+# - TimeInput widgets for "launch_time" and "landing_time" with "time"
+#   input type and "form-control" class.
+# - Select widgets for dropdown fields like "pilot", "instructor", "glider",
+#   "tow_pilot", "towplane", "release_altitude", "passenger", and
+#   "split_type" with "form-select" class.
+# - TextInput widgets for "passenger_name" with a placeholder and
+#   "form-control" class.
 # The __init__ method customizes querysets for specific fields:
 # - Filters active towplanes for "towplane".
 # - Filters members who are instructors for "instructor".
 # - Filters members who are tow pilots for "tow_pilot".
 # - Filters active members for "split_with", ordered by last name.
-# Additionally, if the form is for a new instance, the "launch_time" field is pre-filled with the current local time.
+# Additionally, if the form is for a new instance, the "launch_time" field is
+# pre-filled with the current local time.
 class FlightForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
@@ -94,25 +101,37 @@ class FlightForm(forms.ModelForm):
                 if landing_time and other_landing:
                     if launch_time < other_landing and landing_time > other_launch:
                         raise forms.ValidationError(
-                            f"This glider is already scheduled for another flight (ID {other.pk}) from {other_launch} to {other_landing}."
+                            (
+                                f"This glider is already scheduled for another flight "
+                                f"(ID {other.pk}) from {other_launch} to {other_landing}."
+                            )
                         )
                 # If this flight has no landing, check if launch is during another flight
                 elif not landing_time and other_landing:
                     if launch_time < other_landing and launch_time >= other_launch:
                         raise forms.ValidationError(
-                            f"This glider is already airborne in another flight (ID {other.pk}) from {other_launch} to {other_landing}."
+                            (
+                                f"This glider is already airborne in another flight "
+                                f"(ID {other.pk}) from {other_launch} to {other_landing}."
+                            )
                         )
                 # If other flight has no landing, check for overlap
                 elif landing_time and not other_landing:
                     if landing_time > other_launch and launch_time <= other_launch:
                         raise forms.ValidationError(
-                            f"This glider is already airborne in another flight (ID {other.pk}) starting at {other_launch}."
+                            (
+                                f"This glider is already airborne in another flight "
+                                f"(ID {other.pk}) starting at {other_launch}."
+                            )
                         )
                 # If neither has landing time, both are open-ended
                 elif not landing_time and not other_landing:
                     if launch_time == other_launch:
                         raise forms.ValidationError(
-                            f"This glider is already airborne in another open-ended flight (ID {other.pk}) at {other_launch}."
+                            (
+                                f"This glider is already airborne in another "
+                                f"open-ended flight (ID {other.pk}) at {other_launch}."
+                            )
                         )
 
         return cleaned_data
@@ -144,12 +163,6 @@ class FlightForm(forms.ModelForm):
             "tow_pilot": forms.Select(attrs={"class": "form-select"}),
             "towplane": forms.Select(attrs={"class": "form-select"}),
             "release_altitude": forms.Select(attrs={"class": "form-select"}),
-            "launch_time": forms.TextInput(
-                attrs={"type": "text", "class": "form-control"}
-            ),
-            "landing_time": forms.TextInput(
-                attrs={"type": "text", "class": "form-control"}
-            ),
             "passenger": forms.Select(attrs={"class": "form-select"}),
             "passenger_name": forms.TextInput(
                 attrs={"placeholder": "If not a member", "class": "form-control"}
@@ -171,57 +184,61 @@ class FlightForm(forms.ModelForm):
                     self.initial[field_name] = value[:5]
 
         # Pilot dropdown: optgroups for Active and Inactive
-        pilot_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES
-        ).order_by("last_name", "first_name")
+        pilot_active = (
+            Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+            .order_by("last_name", "first_name")
+        )
         pilot_inactive = Member.objects.filter(membership_status="Inactive").order_by(
             "last_name", "first_name"
         )
         pilot_optgroups = []
         if pilot_active.exists():
-            pilot_optgroups.append(
-                ("Active Members", [(m.pk, str(m)) for m in pilot_active])
-            )
+            active_choices = [(m.pk, str(m)) for m in pilot_active]
+            pilot_optgroups.append(("Active Members", active_choices))
         if pilot_inactive.exists():
-            pilot_optgroups.append(
-                ("Inactive Members", [(m.pk, str(m)) for m in pilot_inactive])
-            )
+            inactive_choices = [(m.pk, str(m)) for m in pilot_inactive]
+            pilot_optgroups.append(("Inactive Members", inactive_choices))
         self.fields["pilot"].choices = [("", "-------")] + pilot_optgroups
 
         # Instructor dropdown: optgroups for Active and Inactive instructors
-        instructor_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES, instructor=True
-        ).order_by("last_name", "first_name")
-        instructor_inactive = Member.objects.filter(
-            membership_status="Inactive", instructor=True
-        ).order_by("last_name", "first_name")
+        instructor_active = (
+            Member.objects.filter(
+                membership_status__in=DEFAULT_ACTIVE_STATUSES, instructor=True
+            )
+            .order_by("last_name", "first_name")
+        )
+        instructor_inactive = (
+            Member.objects.filter(membership_status="Inactive", instructor=True)
+            .order_by("last_name", "first_name")
+        )
         instructor_optgroups = []
         if instructor_active.exists():
-            instructor_optgroups.append(
-                ("Active Instructors", [(m.pk, str(m)) for m in instructor_active])
-            )
+            instr_active_choices = [(m.pk, str(m)) for m in instructor_active]
+            instructor_optgroups.append(("Active Instructors", instr_active_choices))
         if instructor_inactive.exists():
+            instr_inactive_choices = [(m.pk, str(m)) for m in instructor_inactive]
             instructor_optgroups.append(
-                ("Inactive Instructors", [(m.pk, str(m)) for m in instructor_inactive])
-            )
+                ("Inactive Instructors", instr_inactive_choices))
         self.fields["instructor"].choices = [("", "-------")] + instructor_optgroups
 
         # Tow pilot dropdown: optgroups for Active and Inactive tow pilots
-        tow_pilot_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES, towpilot=True
-        ).order_by("last_name", "first_name")
-        tow_pilot_inactive = Member.objects.filter(
-            membership_status="Inactive", towpilot=True
-        ).order_by("last_name", "first_name")
+        tow_pilot_active = (
+            Member.objects.filter(
+                membership_status__in=DEFAULT_ACTIVE_STATUSES, towpilot=True
+            )
+            .order_by("last_name", "first_name")
+        )
+        tow_pilot_inactive = (
+            Member.objects.filter(membership_status="Inactive", towpilot=True)
+            .order_by("last_name", "first_name")
+        )
         tow_pilot_optgroups = []
         if tow_pilot_active.exists():
-            tow_pilot_optgroups.append(
-                ("Active Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_active])
-            )
+            tow_active_choices = [(m.pk, str(m)) for m in tow_pilot_active]
+            tow_pilot_optgroups.append(("Active Tow Pilots", tow_active_choices))
         if tow_pilot_inactive.exists():
-            tow_pilot_optgroups.append(
-                ("Inactive Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_inactive])
-            )
+            tow_inactive_choices = [(m.pk, str(m)) for m in tow_pilot_inactive]
+            tow_pilot_optgroups.append(("Inactive Tow Pilots", tow_inactive_choices))
         self.fields["tow_pilot"].choices = [("", "-------")] + tow_pilot_optgroups
 
         # Passenger dropdown: active first, then inactive, exclude deceased
@@ -237,13 +254,11 @@ class FlightForm(forms.ModelForm):
             ).order_by("last_name", "first_name")
             optgroups = []
             if active_pass.exists():
-                optgroups.append(
-                    ("Active Members", [(m.pk, str(m)) for m in active_pass])
-                )
+                active_pass_choices = [(m.pk, str(m)) for m in active_pass]
+                optgroups.append(("Active Members", active_pass_choices))
             if inactive_pass.exists():
-                optgroups.append(
-                    ("Not Active Members", [(m.pk, str(m)) for m in inactive_pass])
-                )
+                inactive_pass_choices = [(m.pk, str(m)) for m in inactive_pass]
+                optgroups.append(("Not Active Members", inactive_pass_choices))
             self.fields["passenger"].choices = [("", "-------")] + optgroups
         tow_pilot_initial = self.initial.get("tow_pilot")
         tow_pilot_qs = get_active_members_with_role("towpilot")
@@ -308,10 +323,10 @@ class FlightForm(forms.ModelForm):
         # Remove common ones from the base list to avoid duplicates
         remaining = [alt for alt in ALL_ALTITUDES if alt not in COMMON_ALTITUDES]
 
+        common_choices = [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES]
+        remaining_choices = [(alt, f"{alt} ft") for alt in remaining]
         self.fields["release_altitude"].choices = (
-            [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES]
-            + [("", "──────────")]  # Optional visual divider
-            + [(alt, f"{alt} ft") for alt in remaining]
+            common_choices + [("", "──────────")] + remaining_choices
         )
 
         # Always use: active by last name, then inactive by last name
@@ -320,39 +335,48 @@ class FlightForm(forms.ModelForm):
         pilot_qs = list(active_qs.order_by("last_name", "first_name")) + list(
             inactive_qs.order_by("last_name", "first_name")
         )
-        self.fields["pilot"].queryset = Member.objects.filter(
-            pk__in=[m.pk for m in pilot_qs]
-        ).order_by(
-            models.Case(
-                models.When(
-                    membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)
-                ),
-                models.When(membership_status="Inactive", then=models.Value(1)),
-                default=models.Value(2),
-                output_field=IntegerField(),
+        pilot_pk_list = [m.pk for m in pilot_qs]
+        pilot_base_qs = Member.objects.filter(pk__in=pilot_pk_list)
+        pilot_order_case = models.Case(
+            models.When(
+                membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)
             ),
-            "last_name",
-            "first_name",
+            models.When(membership_status="Inactive", then=models.Value(1)),
+            default=models.Value(2),
+            output_field=IntegerField(),
+        )
+        self.fields["pilot"].queryset = pilot_base_qs.order_by(
+            pilot_order_case, "last_name", "first_name"
         )
 
         # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
 
 
 # CreateLogsheetForm
-# This form is used to handle the creation of Logsheet model instances. It includes fields for log date, airfield, duty crew roles, and the default towplane. The form ensures that only one logsheet exists for a specific date and airfield combination.
+# This form is used to handle the creation of Logsheet model instances. It
+# includes fields for log date, airfield, duty crew roles, and the default
+# towplane. The form ensures that only one logsheet exists for a specific
+# date and airfield combination.
 
 # Widgets:
-# - "log_date": DateInput widget with "date" input type and "form-control" class for selecting the log date.
-# - "airfield": Select widget with "form-select" class, pre-filtered to show only active airfields, ordered by name.
-# - Dropdown fields for duty crew roles ("duty_officer", "assistant_duty_officer", "duty_instructor", "surge_instructor", "tow_pilot", "surge_tow_pilot") and "default_towplane" are styled with the "form-select" class.
+# - "log_date": DateInput widget with "date" input type and "form-control"
+#   class for selecting the log date.
+# - "airfield": Select widget with "form-select" class, pre-filtered to show
+#   only active airfields, ordered by name.
+# - Dropdown fields for duty crew roles ("duty_officer",
+#   "assistant_duty_officer", "duty_instructor", "surge_instructor",
+#   "tow_pilot", "surge_tow_pilot") and "default_towplane" are styled
+#   with the "form-select" class.
 
 
 # Methods:
-#    - `clean`: Validates that a logsheet does not already exist for the selected date and airfield. Raises a ValidationError if a duplicate is found.
+#    - `clean`: Validates that a logsheet does not already exist for the selected
+#      date and airfield. Raises a ValidationError if a duplicate is found.
 #    - `__init__`:
-#        - Initializes the form with filtered querysets for dropdown fields:
+#        - Initializes the form with filtered querysets for dropdown fields.
 #        - Filters active airfields for "airfield".
-#        - Filters members based on their roles for duty crew fields (e.g., duty officer, instructor, tow pilot).
+#        - Filters members based on their roles for duty crew fields, e.g.
+#          duty officer, instructor, and tow pilot.
 #        - Orders members by last name for better usability.
 #        - Orders towplanes by name and n_number.
 #        - Sets the default airfield to "KFRR" if it exists.
@@ -685,7 +709,8 @@ class MaintenanceIssueForm(forms.ModelForm):
             club_owned=True, is_active=True
         )
 
-        # Custom towplane sort: club-owned first, then others, with optgroup labels (include inactive and grounded)
+        # Custom towplane sort: club-owned first, then others, with optgroup
+        # labels (include inactive and grounded)
         towplanes = Towplane.objects.all()
         club_towplanes = sorted(
             [tp for tp in towplanes if tp.club_owned], key=lambda t: t.name

@@ -11,7 +11,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-
         # Ensure import_bot exists
         import_user, created = Member.objects.get_or_create(
             username="import_bot",
@@ -129,7 +128,10 @@ class Command(BaseCommand):
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
                     self.stdout.write(
                         self.style.WARNING(
-                            f"⚠️  Both AM and PM tow pilots differ for {log_date} @ {field}. AM: {am_towpilot}, PM: {pm_towpilot}"
+                            (
+                                f"⚠️  Both AM and PM tow pilots differ for {log_date} @ "
+                                f"{field}. AM: {am_towpilot}, PM: {pm_towpilot}"
+                            )
                         )
                     )
             elif am_towpilot or pm_towpilot:
@@ -139,7 +141,10 @@ class Command(BaseCommand):
                     logsheet.surge_tow_pilot = pm_towpilot
                     self.stdout.write(
                         self.style.WARNING(
-                            f"⚠️  No main towpilot, but both AM and PM present and differ for {log_date} @ {field}. AM: {am_towpilot}, PM: {pm_towpilot}"
+                            (
+                                f"⚠️  No main towpilot, but both AM and PM present and differ for {log_date} @ "
+                                f"{field}. AM: {am_towpilot}, PM: {pm_towpilot}"
+                            )
                         )
                     )
                 else:
@@ -148,7 +153,9 @@ class Command(BaseCommand):
                 logsheet.tow_pilot = None
                 logsheet.surge_tow_pilot = None
                 self.stdout.write(
-                    self.style.WARNING(f"⚠️  No tow pilot info for {log_date} @ {field}")
+                    self.style.WARNING(
+                        f"⚠️  No tow pilot info for {log_date} @ {field}"
+                    )
                 )
 
             logsheet.save()
