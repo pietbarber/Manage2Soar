@@ -18,7 +18,10 @@ register = template.Library()
 
 @register.filter
 def full_display_name(member):
-    """Returns the member's full display name with nickname, middle initial, suffix, etc."""
+    """
+    Returns the member's full display name with nickname, middle initial,
+    suffix, etc.
+    """
     if not member:
         return ""
 

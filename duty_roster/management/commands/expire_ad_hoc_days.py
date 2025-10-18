@@ -23,11 +23,13 @@ class Command(BaseCommand):
 
             subject = "Ad-Hoc Ops Cancelled - {}".format(ops_date)
             header = (
-                "Ad-hoc ops on " + ops_date + " could not get sufficient interest to "
+                "Ad-hoc ops on " + ops_date + " could not get sufficient "
+                "interest to "
             )
             body = (
                 "meet the minimum duty crew of tow pilot and duty officer. "
-                "The deadline has passed and the ops have been cancelled for tomorrow.\n\n"
+                "The deadline has passed and the ops have been cancelled for "
+                "tomorrow.\n\n"
             )
             dashboard = "Calendar: " + settings.SITE_URL + "/duty_roster/calendar/"
             message = header + body + dashboard

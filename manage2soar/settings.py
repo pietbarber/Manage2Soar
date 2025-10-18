@@ -39,7 +39,10 @@ else:
     # In production, environment variables are typically set directly.
     logger = logging.getLogger(__name__)
     logger.warning(
-        f".env file not found at {dotenv_path}. Relying on system environment variables."
+        (
+            f".env file not found at {dotenv_path}. "
+            "Relying on system environment variables."
+        )
     )
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")

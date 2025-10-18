@@ -24,11 +24,10 @@ from .utils.vcard_tools import generate_vcard_qr
 #########################
 # member_list() View
 
-# Renders a list of all members, typically grouped or filtered by membership
-# status or role (e.g., instructor, tow pilot, director). Intended for logged-in
-# users.
-
-# Can be used to browse, link to member profiles, or assign operational roles.
+# Renders a list of all members, typically grouped or filtered by
+# membership status or role (e.g., instructor, tow pilot, director).
+# Intended for logged-in users. Can be used to browse, link to member
+# profiles, or assign operational roles.
 
 
 @active_member_required

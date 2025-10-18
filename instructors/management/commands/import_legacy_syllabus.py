@@ -22,7 +22,8 @@ class Command(BaseCommand):
             with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                 html = f.read()
 
-            title = f"Lesson {code.upper()}"  # Placeholder title; you can improve this later
+            # Placeholder title; you can improve this later
+            title = f"Lesson {code.upper()}"
 
             lesson, created = TrainingLesson.objects.get_or_create(code=code)
             lesson.description = html

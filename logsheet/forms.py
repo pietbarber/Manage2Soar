@@ -281,7 +281,8 @@ class FlightForm(forms.ModelForm):
 
         # Split with field removed for issue #165
 
-        # Custom towplane sort: club-owned active first, then others, with optgroup labels
+    # Custom towplane sort:
+    # club-owned active first, then others, with optgroup labels
         towplanes = [
             tp for tp in Towplane.objects.all() if tp.is_active and not tp.is_grounded
         ]
@@ -304,8 +305,9 @@ class FlightForm(forms.ModelForm):
             )
 
         self.fields["towplane"].choices = towplane_choices
-        # Optionally, add a visual divider for winch/self-launch if needed
-        # (Assumes these are represented as special Towplane objects or handled elsewhere)
+    # Optionally, add a visual divider for winch/self-launch if needed
+    # Assumes these are represented as special Towplane objects or
+    # handled elsewhere
 
         # Custom glider sort: club two-seaters, club one-seaters, private active, inactive
         gliders = Glider.objects.all()
@@ -353,7 +355,8 @@ class FlightForm(forms.ModelForm):
             pilot_order_case, "last_name", "first_name"
         )
 
-        # Removed glider_obj pilot auto-selection logic for clarity and to avoid undefined variable
+    # Removed glider_obj pilot auto-selection logic for clarity and to
+    # avoid undefined variable
 
 
 # CreateLogsheetForm
