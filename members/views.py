@@ -24,8 +24,9 @@ from .utils.vcard_tools import generate_vcard_qr
 #########################
 # member_list() View
 
-# Renders a list of all members, typically grouped or filtered by membership status
-# or role (e.g., instructor, tow pilot, director). Intended for logged-in users.
+# Renders a list of all members, typically grouped or filtered by membership
+# status or role (e.g., instructor, tow pilot, director). Intended for logged-in
+# users.
 
 # Can be used to browse, link to member profiles, or assign operational roles.
 
@@ -187,16 +188,16 @@ def biography_view(request, member_id):
 #########################
 # home() View
 #
-# Renders the homepage template (home.html). This view handles the root URL ("/")
-# and requires no authentication to access. It now also calculates and provides
-# the count of pending written tests assigned to the current user as
-# 'pending_tests_count' in the template context.
+# Renders the homepage template (home.html). This view handles the root URL
+# ("/") and requires no authentication. It also provides the count of pending
+# written tests assigned to the current user as 'pending_tests_count'.
 #
 # Defined in members/views.py and mapped in the project-wide urls.py:
 #     path("", member_views.home, name="home")
 #
 # Future enhancements may include turning this into a full dashboard,
-# displaying pending tests, recent instruction reports, and other user-specific data.
+# displaying pending tests, recent instruction reports, and other user-specific
+# data.
 
 
 def home(request):
