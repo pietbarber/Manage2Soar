@@ -340,8 +340,13 @@ class WrittenTestSubmitView(View):
             outcome = "Passed" if attempt.passed else "Failed"
             pct = f"{attempt.score_percentage:.0f}%"
             report_text = (
-                f'Written test "{tmpl.name}" completed: {pct} '
-                f'({outcome}). Subject breakdown: {breakdown_txt}.'
+                "Written test \"" + str(tmpl.name) + "\" completed: "
+                + pct
+                + " ("
+                + outcome
+                + "). Subject breakdown: "
+                + breakdown_txt
+                + "."
             )
             InstructionReport.objects.create(
                 student=request.user,

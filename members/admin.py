@@ -64,13 +64,15 @@ class MemberBadgeAdmin(admin.ModelAdmin):
 #########################
 # BadgeAdmin Class
 
-# This class defines the admin interface for the Badge model, which represents
-# all possible types of soaring badges that can be awarded to members (e.g., SSA A, B, C,
-# club-specific achievements, etc.).
+# This class defines the admin interface for the Badge model.
+# It represents all possible types of soaring badges that can be awarded to
+# members (e.g., SSA A, B, C, club-specific achievements, etc.).
 
-# Admin users can use this interface to create, edit, and manage badge definitions.
+# Admin users can use this interface to create, edit, and manage badge
+# definitions.
 
-# Fields typically include badge name, code, description, and any categorization fields.
+# Fields typically include badge name, code, description, and any
+# categorization fields.
 
 
 class BadgeAdmin(admin.ModelAdmin):

@@ -332,7 +332,8 @@ def ops_intent_toggle(request, year, month, day):
             )
             path = request.path
             form_html = []
-            form_html.append(f'<form hx-get="{path}form/" hx-post="{path}" ')
+            form_html.append("<form hx-get=\"" + path +
+                             "form/\" hx-post=\"" + path + "\"")
             form_html.append('hx-target="#ops-intent-response" hx-swap="innerHTML">')
             form_html.append('<button type="submit" class="btn btn-sm btn-primary">')
             form_html.append('🛩️ I Plan to Fly This Day</button></form>')
@@ -463,17 +464,14 @@ def maybe_notify_surge_instructor(day_date):
 
     if instruction_count > 3:
         send_mail(
-            subject=(
-                f"Surge Instructor May Be Needed - "
-                f"{day_date.strftime('%A, %B %d')}"
-            ),
+            subject=("Surge Instructor May Be Needed - " +
+                     day_date.strftime("%A, %B %d")),
             message=(
-                (
-                    "There are currently {} pilots requesting instruction for {}.".format(
-                        instruction_count, day_date.strftime("%A, %B %d, %Y")
-                    )
-                )
-                + "\n\nYou may want to coordinate a surge instructor."
+                "There are currently "
+                + str(instruction_count)
+                + " pilots requesting instruction for "
+                + day_date.strftime("%A, %B %d, %Y")
+                + ".\n\nYou may want to coordinate a surge instructor."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=["instructors@default.manage2soar.com"],
@@ -495,17 +493,14 @@ def maybe_notify_surge_towpilot(day_date):
 
     if tow_count >= 6:
         send_mail(
-            subject=(
-                f"Surge Tow Pilot May Be Needed - "
-                f"{day_date.strftime('%A, %B %d')}"
-            ),
+            subject=("Surge Tow Pilot May Be Needed - " +
+                     day_date.strftime("%A, %B %d")),
             message=(
-                (
-                    "There are currently {} pilots planning flights requiring tows on {}.".format(
-                        tow_count, day_date.strftime("%A, %B %d, %Y")
-                    )
-                )
-                + "\n\nYou may want to coordinate a surge tow pilot."
+                "There are currently "
+                + str(tow_count)
+                + " pilots planning flights requiring tows on "
+                + day_date.strftime("%A, %B %d, %Y")
+                + ".\n\nYou may want to coordinate a surge tow pilot."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=["towpilots@default.manage2soar.com"],

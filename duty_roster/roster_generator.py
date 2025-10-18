@@ -95,11 +95,15 @@ def generate_roster(year=None, month=None):
                 )
                 pct = 100
         else:
-            all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
+            all_zero = all(
+                getattr(p, f, 0) == 0 for f in eligible_role_fields
+            )
             if role == "assistant_duty_officer":
                 pct = p.ado_percent if not all_zero else 100
             else:
-                pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                pct = (
+                    getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                )
             if all_zero:
                 logger.debug(
                     "%s: All eligible role percents are zero, treating %s as 100.",
