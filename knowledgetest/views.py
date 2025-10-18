@@ -28,9 +28,8 @@ logger = logging.getLogger(__name__)
 
 def _get_empty_preset():
     # This function is called only when needed, preventing database queries at import time.
-    return {
-        code: 0 for code in Question.objects.values_list("category__code", flat=True)
-    }
+    codes = Question.objects.values_list("category__code", flat=True)
+    return {code: 0 for code in codes}
 
 
 def get_presets():
@@ -160,11 +159,12 @@ class CreateWrittenTestView(FormView):
             import re
 
             must = [int(n) for n in re.findall(r"\d+", data["must_include"])]
-        weights = {
-            code: data[f"weight_{code}"]
-            for code in QuestionCategory.objects.values_list("code", flat=True)
-            if data[f"weight_{code}"] > 0
-        }
+        weights = {}
+        codes = QuestionCategory.objects.values_list("code", flat=True)
+        for code in codes:
+            val = data.get(f"weight_{code}")
+            if val and val > 0:
+                weights[code] = val
         total = sum(weights.values())
         MAX_QUESTIONS = 50
         import random
@@ -180,14 +180,13 @@ class CreateWrittenTestView(FormView):
                 # Build a pool of all possible (non-must) questions
                 pool = []
                 for code, cnt in weights.items():
-                    pool.extend(
-                        list(
-                            Question.objects.filter(category__code=code).exclude(
-                                qnum__in=must
-                            )
+                    qs = list(
+                        Question.objects.filter(category__code=code).exclude(
+                            qnum__in=must
                         )
-                        * cnt
                     )
+                    if cnt:
+                        pool.extend(qs * cnt)
                 # Remove duplicates and already-included
                 pool = list({q.qnum: q for q in pool}.values())
                 needed = MAX_QUESTIONS - len(must)

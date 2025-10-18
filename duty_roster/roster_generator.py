@@ -176,7 +176,10 @@ def generate_roster(year=None, month=None):
             )
             return None
         chosen = random.choices(cands, weights=weights, k=1)[0]
-        chosen_list = [m.full_display_name for m in cands]
+        chosen_list = []
+        for cand in cands:
+            chosen_list.append(cand.full_display_name)
+
         logger.debug(
             "Chose %s for role %s from %s",
             chosen.full_display_name,

@@ -28,9 +28,8 @@ class Command(BaseCommand):
         else:
             target_date = now().date() + timedelta(days=1)
 
-        self.stdout.write(
-            self.style.NOTICE(f"Generating pre-op report for {target_date}")
-        )
+        notice_msg = f"Generating pre-op report for {target_date}"
+        self.stdout.write(self.style.NOTICE(notice_msg))
 
         try:
             assignment = DutyAssignment.objects.get(date=target_date, is_scheduled=True)
@@ -124,16 +123,14 @@ class Command(BaseCommand):
         body = "\n".join(lines)
 
         if to_emails:
-            subject = "Pre-Ops Report for {}".format(assignment.date)
+            subject = f"Pre-Ops Report for {assignment.date}"
             send_mail(
                 subject=subject,
                 message=body,
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=to_emails,
             )
-            sent_msg = "\u2705 Email sent to: {}".format(
-                ", ".join(to_emails)
-            )
+            sent_msg = f"\u2705 Email sent to: {', '.join(to_emails)}"
             self.stdout.write(self.style.SUCCESS(sent_msg))
         else:
             self.stdout.write(
