@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 
 from members.models import Member
 
-from . import generate_duty_roster
+from duty_roster.roster_generator import generate_roster as generate_duty_roster
 
 
 class Command(BaseCommand):
@@ -22,17 +22,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("Could not generate a complete roster."))
             return
 
-        self.stdout.write(
-            self.style.NOTICE(
-                f"\n📆 Duty Roster for {calendar.month_name[month]} {year}:"
-            )
-        )
+        notice = f"\n📆 Duty Roster for {calendar.month_name[month]} {year}:"
+        self.stdout.write(self.style.NOTICE(notice))
         for entry in schedule:
             day = entry["date"]
-            self.stdout.write(f"\n🗓 {day.strftime('%A, %B %d')}")
+            day_line = f"\n🗓 {day.strftime('%A, %B %d')}"
+            self.stdout.write(day_line)
             for role, member_id in entry["slots"].items():
                 if member_id:
                     m = Member.objects.get(pk=member_id)
-                    self.stdout.write(f"  - {role.title()}: {m.full_display_name}")
+                    self.stdout.write(
+                        f"  - {role.title()}: {m.full_display_name}"
+                    )
                 else:
-                    self.stdout.write(f"  - {role.title()}: ❌ None")
+                    none_line = f"  - {role.title()}: ❌ None"
+                    self.stdout.write(none_line)

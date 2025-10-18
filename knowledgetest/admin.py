@@ -36,9 +36,9 @@ class WrittenTestTemplateAdmin(admin.ModelAdmin):
 
     def assigned_to(self, obj):
         # Show the full display name for each assigned student
-        students = [
-            assignment.student.full_display_name for assignment in obj.assignments.all()
-        ]
+        students = []
+        for assignment in obj.assignments.all():
+            students.append(assignment.student.full_display_name)
         return ", ".join(students) if students else "-"
 
     assigned_to.short_description = "Assigned To"

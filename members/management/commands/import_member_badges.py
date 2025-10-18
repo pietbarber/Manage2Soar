@@ -78,27 +78,20 @@ class Command(BaseCommand):
                     continue
 
                 if dry_run:
-                    msg = (
-                        "[DRY RUN] Would set SSA URL for {} to {}".format(
-                            member, url
-                        )
-                    )
+                    msg = f"[DRY RUN] Would set SSA URL for {member} to {url}"
                     self.stdout.write(msg)
                 else:
                     member.ssa_url = url
                     member.save(update_fields=["ssa_url"])
-                    msg = "Set SSA URL for {} to {}".format(member, url)
+                    msg = f"Set SSA URL for {member} to {url}"
                     self.stdout.write(msg)
 
                 updated += 1
-            self.stdout.write(
-                self.style.SUCCESS(
-                    (
-                        "SSA URL import complete. Total processed: {}, Updated: {}, "
-                        "Skipped: {}"
-                    ).format(updated + skipped, updated, skipped)
-                )
+            summary = (
+                f"SSA URL import complete. Total processed: {updated + skipped}, "
+                f"Updated: {updated}, Skipped: {skipped}"
             )
+            self.stdout.write(self.style.SUCCESS(summary))
             # If only updating SSA URLs, exit early
             if not dry_run:
                 return
@@ -137,7 +130,7 @@ class Command(BaseCommand):
                 continue
 
             if dry_run:
-                msg = "[DRY RUN] Would assign {} to {}".format(badge_name, member)
+                msg = f"[DRY RUN] Would assign {badge_name} to {member}"
                 self.stdout.write(msg)
             else:
                 mb, created = MemberBadge.objects.get_or_create(
@@ -149,18 +142,15 @@ class Command(BaseCommand):
                     },
                 )
                 if created:
-                    msg = "Assigned {} to {}".format(badge_name, member)
+                    msg = f"Assigned {badge_name} to {member}"
                     self.stdout.write(msg)
                 else:
-                    msg = "{} already exists for {}, skipping".format(
-                        badge_name, member)
+                    msg = f"{badge_name} already exists for {member}, skipping"
                     self.stdout.write(msg)
             imported += 1
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                (
-                    "Import complete. Total processed: {}, Imported: {}, Skipped: {}"
-                ).format(imported + skipped, imported, skipped)
-            )
+        summary = (
+            f"Import complete. Total processed: {imported + skipped}, "
+            f"Imported: {imported}, Skipped: {skipped}"
         )
+        self.stdout.write(self.style.SUCCESS(summary))

@@ -331,14 +331,12 @@ def ops_intent_toggle(request, year, month, day):
                 'within 14 days of your duty date.</p>'
             )
             path = request.path
-            form_html = (
-                f'<form hx-get="{path}form/" '
-                f'hx-post="{path}" '
-                'hx-target="#ops-intent-response" hx-swap="innerHTML">'
-                '<button type="submit" class="btn btn-sm btn-primary">'
-                '🛩️ I Plan to Fly This Day</button></form>'
-            )
-            response += form_html
+            form_html = []
+            form_html.append(f'<form hx-get="{path}form/" hx-post="{path}" ')
+            form_html.append('hx-target="#ops-intent-response" hx-swap="innerHTML">')
+            form_html.append('<button type="submit" class="btn btn-sm btn-primary">')
+            form_html.append('🛩️ I Plan to Fly This Day</button></form>')
+            response += "".join(form_html)
             return HttpResponse(response)
 
     # SIGNUP FLOW
@@ -392,18 +390,15 @@ def ops_intent_toggle(request, year, month, day):
                 fail_silently=True,
             )
 
-        response = (
-            '<p class="text-green-700">✅ You’re now marked as planning to fly '
-            'this day.</p>'
-        )
-        btn = (
-            '<button hx-post="' + request.path + '" '
-            'hx-target="#ops-intent-response" '
-            'hx-swap="innerHTML" '
-            'class="btn btn-sm btn-danger">'
-            'Cancel Intent</button>'
-        )
-        response += btn
+        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
+        btn_parts = [
+            '<button hx-post="', request.path, '" ',
+            'hx-target="#ops-intent-response" ',
+            'hx-swap="innerHTML" ',
+            'class="btn btn-sm btn-danger">',
+            'Cancel Intent</button>',
+        ]
+        response += "".join(btn_parts)
 
     # CANCELLATION FLOW
     else:
