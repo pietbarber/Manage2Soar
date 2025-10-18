@@ -16,11 +16,18 @@ EMAIL;TYPE=INTERNET,HOME:{member.email}
         vcard += f"TEL;TYPE=cell,voice:{member.mobile_phone}\n"
     if member.glider_rating:
         vcard += f"X-GLIDER-RATING:{member.glider_rating}\n"
-    vcard += (
-        f"ADRi;TYPE=HOME:w:;;{member.address};"
-        f"{member.city};{member.state_code}{member.state_freeform};{member.zip_code}\n"
-        "END:VCARD"
+    adr_line = (
+        (
+            "ADRi;TYPE=HOME:w:;;{address};{city};{state}{freeform};{zip}\n"
+        ).format(
+            address=member.address,
+            city=member.city,
+            state=member.state_code,
+            freeform=member.state_freeform or "",
+            zip=member.zip_code,
+        )
     )
+    vcard += adr_line + "END:VCARD"
     qr = qrcode.make(vcard)
     buffer = BytesIO()
     qr.save(buffer, "PNG")

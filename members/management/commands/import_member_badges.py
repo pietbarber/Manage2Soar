@@ -44,11 +44,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         update_ssa_urls = options["update_ssa_urls"]
-        self.stdout.write(
-            self.style.NOTICE(
-                "Connecting to legacy database via settings.DATABASES['legacy']..."
-            )
+        msg = (
+            "Connecting to legacy database via settings.DATABASES['legacy']..."
         )
+        self.stdout.write(self.style.NOTICE(msg))
 
         legacy = settings.DATABASES["legacy"]
         conn = psycopg2.connect(
@@ -74,25 +73,28 @@ class Command(BaseCommand):
                     member = Member.objects.get(legacy_username=handle)
                 except Member.DoesNotExist:
                     logger.warning(
-                        f"No member found for handle '{handle}', skipping SSA URL"
+                        "No member found for handle '%s', skipping SSA URL",
+                        handle,
                     )
                     skipped += 1
                     continue
                 if dry_run:
-                    self.stdout.write(
-                        f"[DRY RUN] Would set SSA URL for {member} to {url}"
+                    msg = "[DRY RUN] Would set SSA URL for {} to {}".format(
+                        member, url
                     )
+                    self.stdout.write(msg)
                 else:
                     member.ssa_url = url
                     member.save(update_fields=["ssa_url"])
-                    self.stdout.write(f"Set SSA URL for {member} to {url}")
+                    msg = "Set SSA URL for {} to {}".format(member, url)
+                    self.stdout.write(msg)
                 updated += 1
             self.stdout.write(
                 self.style.SUCCESS(
                     (
-                        "SSA URL import complete. Total processed: "
-                        f"{updated + skipped}, Updated: {updated}, Skipped: {skipped}"
-                    )
+                        "SSA URL import complete. Total processed: {}, Updated: {}, "
+                        "Skipped: {}"
+                    ).format(updated + skipped, updated, skipped)
                 )
             )
             # If only updating SSA URLs, exit early
@@ -116,7 +118,9 @@ class Command(BaseCommand):
                 member = Member.objects.get(legacy_username=handle)
             except Member.DoesNotExist:
                 logger.warning(
-                    f"No member found for handle '{handle}', skipping badge '{badge_name}'"
+                    "No member found for handle '%s', skipping badge '%s'",
+                    handle,
+                    badge_name,
                 )
                 skipped += 1
                 continue
@@ -124,12 +128,15 @@ class Command(BaseCommand):
             try:
                 badge = Badge.objects.get(name__iexact=badge_name)
             except Badge.DoesNotExist:
-                logger.warning(f"Badge '{badge_name}' not found, skipping for {handle}")
+                logger.warning(
+                    "Badge '%s' not found, skipping for %s", badge_name, handle
+                )
                 skipped += 1
                 continue
 
             if dry_run:
-                self.stdout.write(f"[DRY RUN] Would assign {badge_name} to {member}")
+                msg = "[DRY RUN] Would assign {} to {}".format(badge_name, member)
+                self.stdout.write(msg)
             else:
                 mb, created = MemberBadge.objects.get_or_create(
                     member=member,
@@ -137,15 +144,18 @@ class Command(BaseCommand):
                     defaults={"date_awarded": earned_date or date.today(), "notes": ""},
                 )
                 if created:
-                    self.stdout.write(f"Assigned {badge_name} to {member}")
+                    msg = "Assigned {} to {}".format(badge_name, member)
+                    self.stdout.write(msg)
                 else:
-                    self.stdout.write(
-                        f"{badge_name} already exists for {member}, skipping"
-                    )
+                    msg = "{} already exists for {}, skipping".format(badge_name, member)
+                    self.stdout.write(msg)
             imported += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Import complete. Total processed: {imported + skipped}, Imported: {imported}, Skipped: {skipped}"
+                (
+                    "Import complete. Total processed: {}, Imported: {}, "
+                    "Skipped: {}"
+                ).format(imported + skipped, imported, skipped)
             )
         )

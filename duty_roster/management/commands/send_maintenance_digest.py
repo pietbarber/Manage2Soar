@@ -56,14 +56,9 @@ class Command(BaseCommand):
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=list(recipients),
             )
-            self.stdout.write(
-                self.style.SUCCESS(
-                    (
-                        "✅ Sent maintenance summary to: "
-                        f"{', '.join(recipients)}"
-                    )
-                )
-            )
+            sent_to = ", ".join(recipients)
+            msg = "✅ Sent maintenance summary to: {}".format(sent_to)
+            self.stdout.write(self.style.SUCCESS(msg))
         else:
             self.stdout.write(
                 self.style.WARNING("⚠️ No aircraft meisters with email found.")
