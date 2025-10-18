@@ -36,7 +36,9 @@ def get_current_sympa_members(listname):
 
 
 def add_member(listname, email):
-    subprocess.run(["/usr/bin/sympa.pl", "--add_member", listname, email], check=True)
+    subprocess.run(
+        ["/usr/bin/sympa.pl", "--add_member", listname, email], check=True
+    )
 
 
 def remove_member(listname, email):
@@ -71,13 +73,15 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(" Added → " + email))
                 except subprocess.CalledProcessError as e:
                     self.stderr.write(
-                        "ERROR adding {} to {}: {}".format(email, listname, e))
+                        "ERROR adding {} to {}: {}".format(email, listname, e)
+                    )
             for email in sorted(to_remove):
                 try:
                     remove_member(listname, email)
                     self.stdout.write(self.style.WARNING(" Removed → " + email))
                 except subprocess.CalledProcessError as e:
                     self.stderr.write(
-                        "ERROR removing {} from {}: {}".format(email, listname, e))
+                        "ERROR removing {} from {}: {}".format(email, listname, e)
+                    )
 
         self.stdout.write(self.style.SUCCESS("✓ Sympa sync complete."))

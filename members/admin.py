@@ -228,7 +228,9 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
         writer = csv.writer(response)
         writer.writerow(fields)
         for member in queryset:
-            row = [getattr(member, f, "") for f in fields]
+            row = []
+            for f in fields:
+                row.append(getattr(member, f, ""))
             writer.writerow(row)
         return response
 
