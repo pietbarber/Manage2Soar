@@ -72,48 +72,47 @@ def render_duties(member):
     if member.instructor:
         duties.append(f'<span title="{instructor}" class="emoji">🎓</span>')
     if member.towpilot:
-        duties.append(f'<span title="{towpilot}" class="emoji">🛩️</span>')
-    if member.duty_officer:
-        duties.append(f'<span title="{duty_officer}" class="emoji">📋</span>')
-    if member.assistant_duty_officer:
-        duties.append(f'<span title="{assistant_duty_officer}" class="emoji">💪</span>')
-    if member.secretary:
-        duties.append('<span title="Secretary" class="emoji">✍️</span>')
-    if member.treasurer:
-        duties.append('<span title="Treasurer" class="emoji">💰</span>')
-    if member.webmaster:
-        duties.append('<span title="Webmaster" class="emoji">🌐</span>')
-    if member.director:
-        # Keep the HTML simple and avoid very long source lines.
-        duties.append('<span title="Director" class="emoji">🎩</span>')
-    if member.member_manager:
-        duties.append('<span title="Membership Manager" class="emoji">📇</span>')
+        # Build the legend from a small list of (emoji, label) tuples. This
+        # keeps source lines short while producing the same HTML output.
+        entries = [
+            ("🎓", instructor),
+            ("🛩️", towpilot),
+            ("📋", duty_officer),
+            ("💪", assistant_duty_officer),
+            ("✍️", "Secretary"),
+            ("💰", "Treasurer"),
+            ("🌐", "Webmaster"),
+            ("🎩", "Director"),
+            ("📇", "Membership Manager"),
+        ]
 
-    return (
-        " ".join(duties)
-        if duties
-        else '<span class="text-muted fst-italic">None assigned</span>'
-    )
+        parts = [
+            "<div class='accordion mb-4' id='emojiLegendAccordion'>",
+            "<div class='accordion-item'>",
+            "<h2 class='accordion-header' id='headingLegend'>",
+            (
+                "<button class='accordion-button collapsed' "
+                "type='button' data-bs-toggle='collapse' "
+                "data-bs-target='#collapseLegend' aria-expanded='false' "
+                "aria-controls='collapseLegend'>"
+            ),
+            "📖 Expand to show Legend</button>",
+            "</h2>",
+            (
+                "<div id='collapseLegend' class='accordion-collapse collapse' "
+                "aria-labelledby='headingLegend' "
+                "data-bs-parent='#emojiLegendAccordion'>"
+            ),
+            "<div class='accordion-body'>",
+            "<ul class='list-unstyled mb-0'>",
+        ]
 
+        for emoji, label in entries:
+            parts.append(f"<li><span class='emoji'>{emoji}</span> – {label}</li>")
 
-@register.filter
-def pluck_ids(members):
-    return [str(member.pk) for member in members]
-
-
-@register.simple_tag
-def duty_emoji_legend():
-    # Get the first SiteConfiguration object, or use defaults if not found
-    config = SiteConfiguration.objects.first()
-    instructor = (
-        getattr(config, "instructor_title", "Instructor") if config else "Instructor"
-    )
-    towpilot = getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
-    duty_officer = (
-        getattr(config, "duty_officer_title", "Duty Officer")
-        if config
-        else "Duty Officer"
-    )
+        parts.extend(["</ul>", "</div>", "</div>", "</div>", "</div>"])
+        html = "".join(parts)
+        return mark_safe(html)
     assistant_duty_officer = (
         getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
         if config

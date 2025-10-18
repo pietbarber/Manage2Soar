@@ -41,18 +41,13 @@ class Biography(models.Model):
 #########################
 # Member Model
 
-# Extends Django's AbstractUser to represent a club member. Contains
-# personal info, contact details, SSA membership info, club roles, and
-# membership status.
+# The Member model extends Django's AbstractUser and stores club-specific
+# information: personal/contact fields, membership status, SSA numbers,
+# pilot ratings, profile photos, role flags (instructor, tow pilot, etc.),
+# legacy import keys, notes, and a related Biography.
 
-# Key fields include name parts, contact numbers, address, membership
-# status, SSA member number, pilot rating, profile photos, role booleans,
-# legacy linking fields, notes, and related biography.
-
-# Methods:
-# - is_active_member(): Returns True when a member's status is in the
-#   canonical active list.
-
+# Helper methods include is_active_member() which returns True when the
+# membership status is considered active by project defaults.
 
 class Member(AbstractUser):
     pilot_certificate_number = models.CharField(
