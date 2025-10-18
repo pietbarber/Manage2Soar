@@ -9,18 +9,18 @@ User = get_user_model()
 @pytest.mark.django_db
 def test_create_notification():
     user = User.objects.create(username="notifyuser")
-    notif = Notification.objects.create(user=user, message="Test notification")
+    Notification.objects.create(user=user, message="Test notification")
     assert Notification.objects.filter(user=user).exists()
 
 
 @pytest.mark.django_db
 def test_mark_notification_read():
     user = User.objects.create(username="notifyuser2")
-    notif = Notification.objects.create(user=user, message="Test", read=False)
-    notif.read = True
-    notif.save()
-    notif.refresh_from_db()
-    assert notif.read is True
+    n = Notification.objects.create(user=user, message="Test", read=False)
+    n.read = True
+    n.save()
+    n.refresh_from_db()
+    assert n.read is True
 
 
 @pytest.mark.django_db

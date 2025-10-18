@@ -1,15 +1,14 @@
 # logsheet/management/commands/import_legacy_flights.py
 
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import time
 from decimal import Decimal
 
 import psycopg2
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import connection
 
-from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane
+from logsheet.models import Airfield, Flight, Glider, Logsheet
 from logsheet.utils.aliases import resolve_towplane
 from members.models import Member
 

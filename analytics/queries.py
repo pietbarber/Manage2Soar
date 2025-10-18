@@ -2,14 +2,13 @@
 from collections import defaultdict
 from datetime import date, timedelta
 from itertools import chain
-from typing import Any, Dict, List, Tuple, TypedDict
+from typing import Any, Dict, List, TypedDict
 
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, DurationField, F, Max, Q, Sum
 from django.db.models.expressions import ExpressionWrapper
-from django.db.models.functions import Coalesce, Extract, ExtractWeekDay, ExtractYear
+from django.db.models.functions import Coalesce, ExtractWeekDay, ExtractYear
 
-from duty_roster.models import DutyAssignment
 from logsheet.models import Flight
 
 
@@ -1189,10 +1188,8 @@ def time_of_day_operations(
 
     Where time_decimal represents time as decimal hours (e.g., 14.5 = 2:30 PM)
     """
-    import datetime
     from collections import defaultdict
 
-    from django.db.models import Max, Min
 
     from logsheet.models import Flight
 

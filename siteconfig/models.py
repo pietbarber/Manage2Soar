@@ -1,4 +1,3 @@
-import os
 
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
@@ -116,7 +115,7 @@ class SiteConfiguration(models.Model):
                     outbuf.seek(0)
                     # Save to storage as 'favicon.ico' at root of MEDIA
                     default_storage.save("favicon.ico", outbuf)
-            except Exception as e:
+            except Exception:
                 # Log or handle error as needed
                 pass
 

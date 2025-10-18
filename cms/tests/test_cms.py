@@ -1,6 +1,5 @@
 import pytest
 from django.contrib.auth import get_user_model
-from django.urls import reverse
 
 from cms.models import HomePageContent
 
@@ -9,7 +8,7 @@ User = get_user_model()
 
 @pytest.mark.django_db
 def test_create_homepage_content():
-    page = HomePageContent.objects.create(
+    HomePageContent.objects.create(
         title="Test Page", slug="test-page", content="<p>Hello</p>"
     )
     assert HomePageContent.objects.filter(slug="test-page").exists()
@@ -34,7 +33,7 @@ def test_homepagecontent_view_visitor(client):
 
 @pytest.mark.django_db
 def test_homepagecontent_view_logged_in(client, django_user_model):
-    user = django_user_model.objects.create_user(
+    django_user_model.objects.create_user(
         username="user", password="pass", membership_status="Full Member"
     )
     client.login(username="user", password="pass")

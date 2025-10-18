@@ -17,11 +17,7 @@ import logging
 import os
 from pathlib import Path
 
-from django.conf import settings
-from django.conf.urls.static import static
-from django.contrib.auth.decorators import login_required
 from django.contrib.messages import constants as messages
-from django.contrib.staticfiles.finders import AppDirectoriesFinder, FileSystemFinder
 from django.shortcuts import redirect
 from dotenv import load_dotenv
 from google.oauth2 import service_account

@@ -5,4 +5,4 @@ class LogsheetConfig(AppConfig):
     name = "logsheet"
 
     def ready(self):
-        import logsheet.signals
+        pass

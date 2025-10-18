@@ -16,7 +16,7 @@ def test_public_page_and_document_accessible_anonymous(client, settings, tmp_pat
     (docs_dir / "public.pdf").write_bytes(b"%PDF-1.4 test")
 
     page = Page.objects.create(title="Public Page", slug="public-page", is_public=True)
-    doc = Document.objects.create(page=page, title="Public Doc", file="docs/public.pdf")
+    Document.objects.create(page=page, title="Public Doc", file="docs/public.pdf")
 
     # Prevent tests from attempting to contact GCS for file size lookups
     try:
@@ -52,9 +52,7 @@ def test_restricted_page_and_document_redirects_anonymous(client, settings, tmp_
     page = Page.objects.create(
         title="Private Page", slug="private-page", is_public=False
     )
-    doc = Document.objects.create(
-        page=page, title="Private Doc", file="docs/private.pdf"
-    )
+    Document.objects.create(page=page, title="Private Doc", file="docs/private.pdf")
 
     # Prevent tests from attempting to contact GCS for file size lookups
     try:

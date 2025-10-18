@@ -1,6 +1,5 @@
 from typing import Iterable, Optional
 
-from django.contrib.auth.models import AnonymousUser
 
 from ..constants import ALLOWED_MEMBERSHIP_STATUSES
 

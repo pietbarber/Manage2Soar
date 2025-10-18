@@ -1,7 +1,6 @@
 import pytest
 
 from logsheet.forms import MaintenanceIssueForm
-from logsheet.models import Glider
 
 
 @pytest.mark.django_db

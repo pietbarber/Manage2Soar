@@ -3,9 +3,8 @@ from typing import Optional
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, IntegerField, When
 from django.forms import modelformset_factory
-from django.utils.timezone import localtime, now
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue, Towplane
@@ -77,7 +76,6 @@ class FlightForm(forms.ModelForm):
             ):
                 # If missing, skip overlap check (or optionally raise a ValidationError)
                 return cleaned_data
-            from django.db.models import Q
 
             flights_qs = Flight.objects.filter(
                 glider=glider, logsheet__log_date=logsheet.log_date

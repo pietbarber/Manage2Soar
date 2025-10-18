@@ -1,11 +1,9 @@
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
 from django.urls import include, path
 
 from members import views
-from members import views as member_views
 
 from . import views
 from .views import tinymce_image_upload

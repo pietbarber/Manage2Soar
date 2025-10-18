@@ -1,8 +1,7 @@
-from datetime import date
 
 import pytest
 
-from logsheet.models import Airfield, Glider, Logsheet, MaintenanceIssue
+from logsheet.models import Airfield, MaintenanceIssue
 
 
 @pytest.mark.django_db

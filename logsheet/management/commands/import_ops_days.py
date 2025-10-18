@@ -11,7 +11,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        from members.models import Member
 
         # Ensure import_bot exists
         import_user, created = Member.objects.get_or_create(

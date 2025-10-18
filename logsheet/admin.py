@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from logsheet.models import AircraftMeister, MaintenanceDeadline, MaintenanceIssue
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 
 from .models import (
     Airfield,

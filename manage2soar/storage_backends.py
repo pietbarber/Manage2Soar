@@ -1,5 +1,4 @@
 # manage2soar/storage_backends.py
-import os
 
 from django.conf import settings
 from django.contrib.staticfiles.storage import ManifestFilesMixin

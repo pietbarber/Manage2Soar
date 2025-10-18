@@ -1,7 +1,6 @@
 from io import BytesIO
 
 import qrcode
-from django.core.files.base import ContentFile
 
 
 def generate_vcard_qr(member):

@@ -1,15 +1,12 @@
 import pytest
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from logsheet.models import (
     Airfield,
     Logsheet,
-    LogsheetCloseout,
     Towplane,
     TowplaneCloseout,
 )
-from members.models import Member
 
 
 @pytest.mark.django_db

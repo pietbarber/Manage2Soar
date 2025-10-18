@@ -1,21 +1,17 @@
 import csv
-import itertools
 import json
 import random
-import re
 from collections import OrderedDict, defaultdict, namedtuple
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 
 import qrcode
 from dateutil.relativedelta import relativedelta
-from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count, F, Max, Q, Sum, Value
-from django.forms import formset_factory
+from django.db.models import Max, Q
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -29,12 +25,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import FormView
 
-from instructors.decorators import instructor_required, member_or_instructor_required
+from instructors.decorators import instructor_required
 from instructors.forms import (
     GroundInstructionForm,
     GroundLessonScoreFormSet,
     InstructionReportForm,
-    LessonScoreSimpleForm,
     LessonScoreSimpleFormSet,
     QualificationAssignForm,
     SyllabusDocumentForm,
@@ -59,7 +54,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from knowledgetest.views import get_presets
-from logsheet.models import Flight, Logsheet
+from logsheet.models import Flight
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from members.decorators import active_member_required
 from members.models import Member
@@ -1111,7 +1106,6 @@ def member_instruction_record(request, member_id):
     )
 
     # Group blocks by date for template
-    from collections import OrderedDict
 
     daily_blocks = OrderedDict()
     for block in blocks:
@@ -1919,7 +1913,6 @@ class CreateWrittenTestView(FormView):
             if data[f"weight_{code}"] > 0
         }
         MAX_QUESTIONS = 50
-        import random
 
         if sum(weights.values()) + len(must) > MAX_QUESTIONS:
             must = list(dict.fromkeys(must))
@@ -2004,7 +1997,7 @@ class WrittenTestReviewView(DjangoView):
     template_name = "written_test/review.html"
 
     def get(self, request, pk, student_pk):
-        from knowledgetest.models import Member, Question, WrittenTestTemplate
+        from knowledgetest.models import Member, WrittenTestTemplate
 
         tmpl = get_object_or_404(WrittenTestTemplate, pk=pk)
         student = get_object_or_404(Member, pk=student_pk)

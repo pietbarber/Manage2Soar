@@ -1,0 +1,19 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+exclude = 
+    .venv,
+    venv,
+    env,
+    build,
+    dist,
+    */migrations/*,
+    .git,
+    generated_avatars,
+    node_modules,
+    .eggs,
+    .tox
+
+# Some migration files and vendored third-party code are acceptable to ignore
+per-file-ignores =
+    */migrations/*: E501,F401,F841

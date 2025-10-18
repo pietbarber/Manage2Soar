@@ -1,7 +1,6 @@
 # duty_roster/templatetags/calendar_tags.py
 
 from calendar import Calendar
-from datetime import timedelta
 
 from django import template
 

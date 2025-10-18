@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from members.forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
+from members.forms import BiographyForm, SetPasswordForm
 
 User = get_user_model()
 

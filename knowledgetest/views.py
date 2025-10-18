@@ -1,6 +1,5 @@
 import json
 import logging
-import sys
 
 from django.db import transaction
 from django.http import HttpResponseForbidden
@@ -10,7 +9,6 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.generic import DetailView, FormView, ListView, TemplateView, View
 
-from instructors.decorators import instructor_required, member_or_instructor_required
 from instructors.models import InstructionReport
 from knowledgetest.forms import TestBuilderForm, TestSubmissionForm
 from knowledgetest.models import (

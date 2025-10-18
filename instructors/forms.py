@@ -9,11 +9,8 @@ from members.models import Member
 
 from .models import (
     SCORE_CHOICES,
-    ClubQualificationType,
     GroundInstruction,
-    GroundLessonScore,
     InstructionReport,
-    LessonScore,
     MemberQualification,
     SyllabusDocument,
     TrainingLesson,

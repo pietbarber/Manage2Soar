@@ -11,7 +11,6 @@ from logsheet.models import (
     MaintenanceIssue,
     Towplane,
 )
-from members.models import Member
 
 from .fixtures_finances import *
 

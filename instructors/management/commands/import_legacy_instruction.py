@@ -7,7 +7,6 @@ import psycopg2
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
-from tinymce.models import HTMLField  # in case it's needed
 
 from instructors.models import (
     GroundInstruction,
@@ -113,7 +112,6 @@ class Command(BaseCommand):
             )
 
         import pytz
-        from django.utils.timezone import make_aware
 
         tz = (
             pytz.timezone(settings.TIME_ZONE)
@@ -180,7 +178,6 @@ class Command(BaseCommand):
 
     def import_ground_instruction(self, cursor, date_arg=None):
         # local import to avoid circularity
-        from instructors.models import GroundLessonScore
 
         self.stdout.write(self.style.NOTICE("Importing ground instruction sessions..."))
 

@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, F, OrderBy, Q, Sum, Value, Window
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -1720,7 +1720,6 @@ def towplane_logbook(request, pk: int):
     towplane = get_object_or_404(Towplane, pk=pk)
 
     # Get TowplaneCloseout records for this towplane, grouped by day
-    from collections import defaultdict
 
     closeouts = (
         TowplaneCloseout.objects.filter(towplane=towplane)

@@ -1,7 +1,6 @@
 # instructors/decorators.py
 from functools import wraps
 
-from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 from members.models import Member

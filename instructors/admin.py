@@ -1,4 +1,3 @@
-import reversion
 from django.contrib import admin
 from reversion.admin import VersionAdmin
 from tinymce.models import HTMLField

@@ -10,11 +10,10 @@ from django.core.paginator import Paginator
 from django.db.models import F, Func, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from cms.models import HomePageContent
-from instructors.models import InstructionReport, MemberQualification, TrainingLesson
+from instructors.models import MemberQualification
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
 
 from .decorators import active_member_required
@@ -286,7 +285,6 @@ def tinymce_image_upload(request):
     # Always return the public GCS URL
     from urllib.parse import urljoin
 
-    from django.conf import settings
 
     url = urljoin(settings.MEDIA_URL, saved_name)
     return JsonResponse({"location": url})

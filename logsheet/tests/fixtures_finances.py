@@ -1,10 +1,9 @@
-from datetime import date, time, timedelta
+from datetime import date, time
 
 import pytest
 from django.contrib.auth import get_user_model
 
 from logsheet.models import Flight, Logsheet
-from members.models import Member
 
 User = get_user_model()
 

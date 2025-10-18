@@ -1,16 +1,8 @@
-import io
-from datetime import date, timedelta
 
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Fieldset, Layout, Row, Submit
 from django import forms
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
-from PIL import Image
-from tinymce.widgets import TinyMCE
 
-from .models import Badge, Biography, Member, MemberBadge
-from .utils.image_processing import resize_and_crop_profile_photo
+from .models import Biography, Member
 
 #########################
 # MemberProfilePhotoForm Class

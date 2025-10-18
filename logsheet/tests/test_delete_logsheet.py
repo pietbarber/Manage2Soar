@@ -2,7 +2,6 @@ import pytest
 from django.urls import reverse
 
 from logsheet.models import Logsheet
-from members.models import Member
 
 
 @pytest.mark.django_db

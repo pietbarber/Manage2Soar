@@ -7,7 +7,6 @@ from .models import (
     Question,
     QuestionCategory,
     WrittenTestAnswer,
-    WrittenTestAssignment,
     WrittenTestAttempt,
     WrittenTestTemplate,
     WrittenTestTemplateQuestion,

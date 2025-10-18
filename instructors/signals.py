@@ -7,7 +7,7 @@ from django.apps import apps
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from .models import GroundInstruction, InstructionReport, StudentProgressSnapshot
+from .models import GroundInstruction, InstructionReport
 from .utils import update_student_progress_snapshot
 
 # Utility to check if it's safe to run signal DB code

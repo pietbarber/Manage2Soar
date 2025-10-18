@@ -1,5 +1,4 @@
 import calendar
-from calendar import Calendar, monthrange
 from collections import defaultdict
 from datetime import date
 from datetime import date as dt_date
@@ -17,7 +16,6 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
-from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST
@@ -34,7 +32,6 @@ from .forms import DutyAssignmentForm, DutyPreferenceForm
 from .models import (
     DutyAssignment,
     DutyAvoidance,
-    DutyDay,
     DutyPairing,
     DutyPreference,
     DutySlot,

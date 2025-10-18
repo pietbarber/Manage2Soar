@@ -1,11 +1,8 @@
 import os
-from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, Group, User
-from django.core.exceptions import ValidationError
+from django.contrib.auth.models import AbstractUser, Group
 from django.db import models, transaction
-from django.utils.timezone import now
 from tinymce.models import HTMLField
 
 from members.constants.membership import (
