@@ -19,7 +19,10 @@ class Command(BaseCommand):
             self.stdout.write("✅ No unresolved maintenance issues. Skipping email.")
             return
 
-        lines = [f"🔧 Maintenance Summary for {today.strftime('%A, %B %d, %Y')}", ""]
+        lines = [
+            f"🔧 Maintenance Summary for {today.strftime('%A, %B %d, %Y')}",
+            "",
+        ]
         recipients = set()
 
         for issue in open_issues:
@@ -27,7 +30,8 @@ class Command(BaseCommand):
             grounded_status = "GROUNDED" if issue.grounded else "Operational"
             lines.append(
                 f"- {aircraft}: {issue.description} (Reported: "
-                f"{issue.report_date.strftime('%Y-%m-%d')}) [{grounded_status}]"
+                f"{issue.report_date.strftime('%Y-%m-%d')}) "
+                f"[{grounded_status}]"
             )
 
             # Get assigned meisters
@@ -44,14 +48,20 @@ class Command(BaseCommand):
 
         lines.append("\nTotal Open Issues: " + str(open_issues.count()))
         lines.append(
-            "\nMaintenance Dashboard: {}/maintenance/".format(settings.SITE_URL)
+            "\nMaintenance Dashboard: {}/maintenance/".format(
+                settings.SITE_URL
+            )
         )
 
         body = "\n".join(lines)
 
         if recipients:
+            subject = (
+                "[Skyline Soaring] Maintenance Summary - "
+                f"{today.strftime('%B %d')}"
+            )
             send_mail(
-                subject=f"[Skyline Soaring] Maintenance Summary - {today.strftime('%B %d')}",
+                subject=subject,
                 message=body,
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=list(recipients),
