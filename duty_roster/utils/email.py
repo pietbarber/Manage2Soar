@@ -23,13 +23,16 @@ def notify_ops_status(assignment):
     if not assignment.tow_pilot and not assignment.duty_officer:
         tow_title = get_role_title("towpilot") or "Tow Pilot"
         do_title = get_role_title("duty_officer") or "Duty Officer"
+        calendar_url = f"{settings.SITE_URL}/duty_roster/calendar/"
+        subj = f"{subject_prefix} Ad-Hoc Operations Proposed for {ops_date}"
+        msg = (
+            f"An ad-hoc ops day has been proposed for {ops_date}.\n\n"
+            f"{tow_title}s and {do_title.lower()}s needed!\n\n"
+            f"Calendar: {calendar_url}"
+        )
         send_mail(
-            subject=f"{subject_prefix} Ad-Hoc Operations Proposed for {ops_date}",
-            message=(
-                f"An ad-hoc ops day has been proposed for {ops_date}.\n\n"
-                f"{tow_title}s and {do_title.lower()}s needed!\n\n"
-                f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
-            ),
+            subject=subj,
+            message=msg,
             from_email="noreply@default.manage2soar.com",
             recipient_list=[
                 "instructors@default.manage2soar.com",
@@ -47,13 +50,16 @@ def notify_ops_status(assignment):
 
             tow_title = get_role_title("towpilot") or "Tow Pilot"
             do_title = get_role_title("duty_officer") or "Duty Officer"
+            calendar_url = f"{settings.SITE_URL}/duty_roster/calendar/"
+            subj = f"{subject_prefix} Ad-Hoc Ops Confirmed for {ops_date}"
+            msg = (
+                f"We now have a {tow_title.lower()} and {do_title.lower()} "
+                f"for {ops_date}  operations are a go!\n\n"
+                f"Calendar: {calendar_url}"
+            )
             send_mail(
-                subject=f"{subject_prefix} Ad-Hoc Ops Confirmed for {ops_date}",
-                message=(
-                    f"We now have a {tow_title.lower()} and {do_title.lower()} "
-                    f"for {ops_date} — operations are a go!\n\n"
-                    f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
-                ),
+                subject=subj,
+                message=msg,
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=["members@default.manage2soar.com"],
             )
