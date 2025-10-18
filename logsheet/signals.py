@@ -25,12 +25,17 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
     if not recipients:
         return
     subject = f"Maintenance Alert: {instance}"
-    body = (
-        f"A maintenance issue has been created for {instance.glider or instance.towplane}:\n\n"
-        f"{instance.description}\n\n"
-        f"Grounded: {'Yes' if instance.grounded else 'No'}\n"
-        f"Logsheet: {instance.logsheet}\n"
-    )
+    aircraft = instance.glider or instance.towplane
+    grounded = "Yes" if instance.grounded else "No"
+    body_lines = [
+        f"A maintenance issue has been created for {aircraft}:",
+        "",
+        f"{instance.description}",
+        "",
+        f"Grounded: {grounded}",
+        f"Logsheet: {instance.logsheet}",
+    ]
+    body = "\n".join(body_lines) + "\n"
     send_mail(
         subject,
         body,

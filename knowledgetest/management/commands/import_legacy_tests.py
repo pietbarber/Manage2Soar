@@ -38,14 +38,13 @@ class Command(BaseCommand):
                     self.stdout.write(f"Category {qcode}: {status}")
 
                 # Import questions from test_contents
-                cursor.execute(
-                    """
-                    SELECT qnum, code, question, a, b, c, d, answer,
-                           explanation, lastupdated, updatedby
-                    FROM test_contents
-                    ORDER BY qnum;
-                    """
+                sql = (
+                    "SELECT qnum, code, question, a, b, c, d, answer, "
+                    "explanation, lastupdated, updatedby "
+                    "FROM test_contents "
+                    "ORDER BY qnum;"
                 )
+                cursor.execute(sql)
                 rows = cursor.fetchall()
 
                 with transaction.atomic():

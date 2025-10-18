@@ -130,7 +130,7 @@ class Command(BaseCommand):
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=to_emails,
             )
-            sent_msg = f"\u2705 Email sent to: {', '.join(to_emails)}"
+            sent_msg = "\u2705 Email sent to: " + ", ".join(to_emails)
             self.stdout.write(self.style.SUCCESS(sent_msg))
         else:
             self.stdout.write(
