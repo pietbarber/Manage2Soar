@@ -44,9 +44,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         update_ssa_urls = options["update_ssa_urls"]
-        msg = (
-            "Connecting to legacy database via settings.DATABASES['legacy']..."
-        )
+        msg = "Connecting to legacy database via settings.DATABASES['legacy']..."
         self.stdout.write(self.style.NOTICE(msg))
 
         legacy = settings.DATABASES["legacy"]
@@ -78,6 +76,7 @@ class Command(BaseCommand):
                     )
                     skipped += 1
                     continue
+
                 if dry_run:
                     msg = "[DRY RUN] Would set SSA URL for {} to {}".format(
                         member, url
@@ -88,6 +87,7 @@ class Command(BaseCommand):
                     member.save(update_fields=["ssa_url"])
                     msg = "Set SSA URL for {} to {}".format(member, url)
                     self.stdout.write(msg)
+
                 updated += 1
             self.stdout.write(
                 self.style.SUCCESS(
@@ -155,8 +155,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 (
-                    "Import complete. Total processed: {}, Imported: {}, "
-                    "Skipped: {}"
+                    "Import complete. Total processed: {}, Imported: {}, Skipped: {}"
                 ).format(imported + skipped, imported, skipped)
             )
         )

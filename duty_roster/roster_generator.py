@@ -167,7 +167,9 @@ def generate_roster(year=None, month=None):
                 )
             weights.append(w)
         if not weights or sum(weights) == 0:
-            logger.debug(f"No candidates with nonzero weights for role {role}.")
+            logger.debug(
+                "No candidates with nonzero weights for role %s.", role
+            )
             return None
         chosen = random.choices(cands, weights=weights, k=1)[0]
         chosen_list = [m.full_display_name for m in cands]
