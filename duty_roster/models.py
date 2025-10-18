@@ -35,10 +35,11 @@ class DutySlot(models.Model):
     def __str__(self):
         from siteconfig.utils import get_role_title
 
-        return (
-            f"{self.duty_day.date} – {get_role_title(self.role)} – "
-            f"{self.member.full_display_name}"
-        )
+        # Compose a readable string in parts so no single source line is too long.
+        role_title = get_role_title(self.role)
+        date_str = self.duty_day.date
+        member_name = self.member.full_display_name
+        return f"{date_str}  {role_title}  {member_name}"
 
 
 class MemberBlackout(models.Model):
@@ -51,7 +52,8 @@ class MemberBlackout(models.Model):
         ordering = ["date"]
 
     def __str__(self):
-        return f"{self.member.full_display_name} unavailable on {self.date}"
+        member_name = self.member.full_display_name
+        return f"{member_name} unavailable on {self.date}"
 
 
 class DutyPreference(models.Model):
@@ -100,10 +102,9 @@ class DutyPairing(models.Model):
     )
 
     def __str__(self):
-        return (
-            f"{self.member.full_display_name} prefers to work with "
-            f"{self.pair_with.full_display_name}"
-        )
+        member_name = self.member.full_display_name
+        pair_name = self.pair_with.full_display_name
+        return f"{member_name} prefers to work with {pair_name}"
 
 
 class DutyAvoidance(models.Model):
@@ -115,10 +116,9 @@ class DutyAvoidance(models.Model):
     )
 
     def __str__(self):
-        return (
-            f"{self.member.full_display_name} must not work with "
-            f"{self.avoid_with.full_display_name}"
-        )
+        member_name = self.member.full_display_name
+        avoid_name = self.avoid_with.full_display_name
+        return f"{member_name} must not work with {avoid_name}"
 
 
 class DutyAssignment(models.Model):
@@ -177,10 +177,11 @@ class DutyAssignment(models.Model):
     notes = models.TextField(blank=True)
 
     def __str__(self):
-        return (
-            f"{self.date} @ "
-            f"{self.location.identifier if self.location else 'Unknown Field'}"
+        date_str = self.date
+        location_id = (
+            self.location.identifier if self.location else "Unknown Field"
         )
+        return f"{date_str} @ {location_id}"
 
 
 class InstructionSlot(models.Model):
@@ -207,10 +208,8 @@ class InstructionSlot(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return (
-            f"{self.student.full_display_name} for {self.assignment.date} "
-            f"({self.status})"
-        )
+        student_name = self.student.full_display_name
+        return f"{student_name} for {self.assignment.date} ({self.status})"
 
 
 class DutySwapRequest(models.Model):
@@ -241,10 +240,8 @@ class DutySwapRequest(models.Model):
             "TOW": "towpilot",
         }
         role_title = get_role_title(role_map.get(self.role, self.role))
-        return (
-            f"{role_title} swap for {self.original_date} by "
-            f"{self.requester.full_display_name}"
-        )
+        requester_name = self.requester.full_display_name
+        return f"{role_title} swap for {self.original_date} by {requester_name}"
 
 
 class DutySwapOffer(models.Model):
@@ -271,10 +268,10 @@ class DutySwapOffer(models.Model):
     responded_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return (
-            f"{self.offered_by.full_display_name} → {self.swap_request.role} on "
-            f"{self.swap_request.original_date}"
-        )
+        offered = self.offered_by.full_display_name
+        role = self.swap_request.role
+        date = self.swap_request.original_date
+        return f"{offered}  {role} on {date}"
 
 
 class OpsIntent(models.Model):

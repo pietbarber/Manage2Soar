@@ -344,8 +344,11 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
 
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
+            # Build a short HTML snippet for the image preview. Keep the
+            # pieces on separate lines to stay under the line-length limit.
             img_html = (
-                '<img src="{}" style="max-height:200px;" '
+                '<img src="{}" '
+                'style="max-height:200px;" '
                 'class="border" />'
             )
             return format_html(img_html, obj.profile_photo.url)
