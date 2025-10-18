@@ -73,7 +73,10 @@ class Command(BaseCommand):
             assignment.duty_officer,
             assignment.assistant_duty_officer,
         ]
-        to_emails = [m.email for m in crew_fields if m and m.email]
+        to_emails = []
+        for m in crew_fields:
+            if m and m.email:
+                to_emails.append(m.email)
 
         grounded_gliders = MaintenanceIssue.objects.filter(
             glider__isnull=False, grounded=True, resolved=False
@@ -128,9 +131,10 @@ class Command(BaseCommand):
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=to_emails,
             )
-            self.stdout.write(self.style.SUCCESS("✅ Email sent to: {}".format(
+            sent_msg = "\u2705 Email sent to: {}".format(
                 ", ".join(to_emails)
-            )))
+            )
+            self.stdout.write(self.style.SUCCESS(sent_msg))
         else:
             self.stdout.write(
                 self.style.WARNING(

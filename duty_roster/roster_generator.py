@@ -29,17 +29,21 @@ def generate_roster(year=None, month=None):
         if d.month == month and d.weekday() in (5, 6)
     ]
     members = list(Member.objects.filter(is_active=True))
-    prefs = {
-        p.member_id: p for p in DutyPreference.objects.select_related("member").all()
-    }
-    avoidances = {(a.member_id, a.avoid_with_id) for a in DutyAvoidance.objects.all()}
+    # Map member_id -> DutyPreference for quick lookup
+    prefs = {}
+    for p in DutyPreference.objects.select_related("member").all():
+        prefs[p.member_id] = p
+
+    # Set of (member_id, avoid_with_id) pairs for quick containment checks
+    avoidances = set()
+    for a in DutyAvoidance.objects.all():
+        avoidances.add((a.member_id, a.avoid_with_id))
     pairings = defaultdict(set)
     for p in DutyPairing.objects.all():
         pairings[p.member_id].add(p.pair_with_id)
-    blackouts = {
-        (b.member_id, b.date)
-        for b in MemberBlackout.objects.filter(date__year=year, date__month=month)
-    }
+    blackouts = set()
+    for b in MemberBlackout.objects.filter(date__year=year, date__month=month):
+        blackouts.add((b.member_id, b.date))
     assignments = defaultdict(int)
 
     def last_key(m):
