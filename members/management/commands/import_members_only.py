@@ -254,7 +254,7 @@ class Command(BaseCommand):
             member.towpilot = row.get("towpilot")
             member.duty_officer = row.get("dutyofficer")
             member.assistant_duty_officer = row.get("ado")
-            raw_notes = row.get("private_notes")
+            row.get("private_notes")
             # logger.debug(f"{handle} raw_notes type: {type(raw_notes)} | content: {repr(raw_notes)[:100]}")
 
             member.public_notes = sanitize(row.get("public_notes"))

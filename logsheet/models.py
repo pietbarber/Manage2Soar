@@ -361,7 +361,6 @@ class Towplane(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        status = " (Inactive)" if not self.is_active else ""
         return f"{self.name} ({self.n_number})"
 
     @property
@@ -562,7 +561,7 @@ class Logsheet(models.Model):
                 # Oil change logic
                 if towplane.next_oil_change_due:
                     due = towplane.next_oil_change_due
-                    interval = towplane.oil_change_interval or Decimal("50.0")
+                    towplane.oil_change_interval or Decimal("50.0")
                     if stop_tach is not None:
                         hours_to_due = due - stop_tach
                         if hours_to_due <= 10 and hours_to_due > 0:

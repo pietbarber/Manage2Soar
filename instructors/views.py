@@ -237,10 +237,8 @@ def fill_instruction_report(request, student_id, report_date):
         report = InstructionReport.objects.get(
             student=student, instructor=instructor, report_date=report_date
         )
-        created = False
     except InstructionReport.DoesNotExist:
         report = None
-        created = False
 
     if report_date > now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
@@ -886,7 +884,7 @@ def member_instruction_record(request, member_id):
     )
 
     # ── Flying summary by glider ──
-    flights = Flight.objects.filter(pilot=member).select_related("logsheet", "aircraft")
+    Flight.objects.filter(pilot=member).select_related("logsheet", "aircraft")
 
     flights_summary = get_flight_summary_for_member(member)
 
@@ -1946,12 +1944,12 @@ class CreateWrittenTestView(FormView):
             )
         # Only assign the test if the student is not the instructor
         if data["student"] != self.request.user:
-            assignment = WrittenTestAssignment.objects.create(
+            WrittenTestAssignment.objects.create(
                 template=tmpl, student=data["student"], instructor=self.request.user
             )
             # Create notification for the student
             try:
-                notif = Notification.objects.create(
+                Notification.objects.create(
                     user=data["student"],
                     message=f"You have been assigned a new written test: {tmpl.name}",
                     url=reverse("knowledgetest:quiz-pending"),
@@ -2040,7 +2038,7 @@ def export_member_logbook_csv(request):
         .order_by("date")
     )
 
-    rating_date = getattr(member, "private_glider_checkride_date", None)
+    getattr(member, "private_glider_checkride_date", None)
     events = []
     for f in flights:
         events.append(

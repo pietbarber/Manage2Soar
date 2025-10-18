@@ -9,7 +9,7 @@ register = template.Library()
 
 @register.filter
 def make_week_chunks(days):
-    calendar = Calendar()
+    Calendar()
     weeks = []
     week = []
     for day in days:

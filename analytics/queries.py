@@ -714,7 +714,7 @@ def flying_days_by_member(
         }
 
     # Map IDs -> usernames once
-    User = get_user_model()
+    get_user_model()
     # uses full_display_name → full_name → username
     name_map = _display_name_map(ids)
 
