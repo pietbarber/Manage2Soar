@@ -22,13 +22,17 @@ class Command(BaseCommand):
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
 
             subject = "Ad-Hoc Ops Cancelled - {}".format(ops_date)
-            message = (
-                "Ad-hoc ops on {} could not get sufficient interest to ".format(
-                    ops_date)
-                + "meet the minimum duty crew of tow pilot and duty officer. The "
-                + "deadline has passed and the ops have been cancelled for tomorrow.\n\n"
-                + "Calendar: {}/duty_roster/calendar/".format(settings.SITE_URL)
+            header = "Ad-hoc ops on {} could not get sufficient interest to ".format(
+                ops_date
             )
+            body = (
+                "meet the minimum duty crew of tow pilot and duty officer. The "
+                "deadline has passed and the ops have been cancelled for tomorrow.\n\n"
+            )
+            dashboard = "Calendar: {}/duty_roster/calendar/".format(
+                settings.SITE_URL
+            )
+            message = header + body + dashboard
             send_mail(
                 subject=subject,
                 message=message,

@@ -78,8 +78,10 @@ class Command(BaseCommand):
                     continue
 
                 if dry_run:
-                    msg = "[DRY RUN] Would set SSA URL for {} to {}".format(
-                        member, url
+                    msg = (
+                        "[DRY RUN] Would set SSA URL for {} to {}".format(
+                            member, url
+                        )
                     )
                     self.stdout.write(msg)
                 else:
@@ -141,7 +143,10 @@ class Command(BaseCommand):
                 mb, created = MemberBadge.objects.get_or_create(
                     member=member,
                     badge=badge,
-                    defaults={"date_awarded": earned_date or date.today(), "notes": ""},
+                    defaults={
+                        "date_awarded": earned_date or date.today(),
+                        "notes": "",
+                    },
                 )
                 if created:
                     msg = "Assigned {} to {}".format(badge_name, member)
