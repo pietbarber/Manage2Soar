@@ -77,52 +77,10 @@ def render_duties(member):
     if member.instructor:
         duties.append(f'<span title="{instructor}" class="emoji">🎓</span>')
     if member.towpilot:
-        # Build the legend from a small list of (emoji, label) tuples. This
-        # keeps source lines short while producing the same HTML output.
-        entries = [
-            ("🎓", instructor),
-            ("🛩️", towpilot),
-            ("📋", duty_officer),
-            ("💪", assistant_duty_officer),
-            ("✍️", "Secretary"),
-            ("💰", "Treasurer"),
-            ("🌐", "Webmaster"),
-            ("🎩", "Director"),
-            ("📇", "Membership Manager"),
-        ]
-
-        parts = [
-            "<div class='accordion mb-4' id='emojiLegendAccordion'>",
-            "<div class='accordion-item'>",
-            "<h2 class='accordion-header' id='headingLegend'>",
-            "<button class='accordion-button collapsed' ",
-            "type='button' data-bs-toggle='collapse' ",
-            "data-bs-target='#collapseLegend' aria-expanded='false' ",
-            "aria-controls='collapseLegend'>",
-            "📖 Expand to show Legend</button>",
-            "</h2>",
-            "<div id='collapseLegend' class='accordion-collapse collapse' ",
-            "aria-labelledby='headingLegend' ",
-            "data-bs-parent='#emojiLegendAccordion'>",
-            "<div class='accordion-body'>",
-            "<ul class='list-unstyled mb-0'>",
-        ]
-
-        for emoji, label in entries:
-            li = (
-                f"<li><span class='emoji'>{emoji}</span> – "
-                f"{label}</li>"
-            )
-            parts.append(li)
-
-        parts.extend(["</ul>", "</div>", "</div>", "</div>", "</div>"])
-        html = "".join(parts)
-        return mark_safe(html)
-    assistant_duty_officer = (
-        getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
-        if config
-        else "Assistant Duty Officer"
-    )
+        # Append tow pilot emoji to duties instead of returning the legend here.
+        # The legend is built once later and returned if no duties are present.
+        duties.append(f'<span title="{towpilot}" class="emoji">🛩️</span>')
+    # assistant_duty_officer already set above; no need to repeat it
     parts = [
         "<div class='accordion mb-4' id='emojiLegendAccordion'>",
         "<div class='accordion-item'>",
@@ -159,4 +117,7 @@ def render_duties(member):
         "</div>",
     ]
     html = "".join(parts)
+    # If we have duties for this member, return those inline; otherwise show legend
+    if duties:
+        return mark_safe(" ".join(duties))
     return mark_safe(html)
