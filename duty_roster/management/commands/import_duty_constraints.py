@@ -58,7 +58,9 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(
                         self.style.WARNING(
-                            "Bad last-duty-date for {}: {}".format(name, date_str)
+                            "Bad last-duty-date for {}: {}".format(
+                                name, date_str
+                            )
                         )
                     )
 
@@ -93,7 +95,9 @@ class Command(BaseCommand):
                 except ValueError:
                     self.stdout.write(
                         self.style.WARNING(
-                            "Invalid blackout date for {}: {}".format(name, bdate)
+                            "Invalid blackout date for {}: {}".format(
+                                name, bdate
+                            )
                         )
                     )
 

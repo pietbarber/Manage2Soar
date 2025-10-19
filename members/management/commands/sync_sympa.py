@@ -57,7 +57,7 @@ class Command(BaseCommand):
             try:
                 current = get_current_sympa_members(listname)
             except subprocess.CalledProcessError as e:
-                err = "Failed to fetch members of {}: {}".format(listname, e)
+                err = f"Failed to fetch members of {listname}: {e}"
                 self.stderr.write(err)
                 continue
 
@@ -72,14 +72,16 @@ class Command(BaseCommand):
                     add_member(listname, email)
                     self.stdout.write(self.style.SUCCESS(" Added → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write("ERROR adding " + email +
-                                      " to " + listname + ": " + str(e))
+                    self.stderr.write(
+                        "ERROR adding " + email + " to " + listname + ": " + str(e)
+                    )
             for email in sorted(to_remove):
                 try:
                     remove_member(listname, email)
                     self.stdout.write(self.style.WARNING(" Removed → " + email))
                 except subprocess.CalledProcessError as e:
-                    self.stderr.write("ERROR removing " + email +
-                                      " from " + listname + ": " + str(e))
+                    self.stderr.write(
+                        "ERROR removing " + email + " from " + listname + ": " + str(e)
+                    )
 
         self.stdout.write(self.style.SUCCESS("✓ Sympa sync complete."))

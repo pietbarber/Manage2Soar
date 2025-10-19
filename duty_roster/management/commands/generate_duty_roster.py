@@ -22,7 +22,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("Could not generate a complete roster."))
             return
 
-        notice = f"\n📆 Duty Roster for {calendar.month_name[month]} {year}:"
+        notice = (
+            f"\n📆 Duty Roster for {calendar.month_name[month]} {year}:"
+        )
         self.stdout.write(self.style.NOTICE(notice))
         for entry in schedule:
             day = entry["date"]

@@ -28,17 +28,18 @@ class Command(BaseCommand):
         for issue in open_issues:
             aircraft = issue.glider or issue.towplane or "Unassigned"
             grounded_status = "GROUNDED" if issue.grounded else "Operational"
-            lines.append(
-                "- "
-                + str(aircraft)
-                + ": "
-                + str(issue.description)
-                + " (Reported: "
-                + issue.report_date.strftime("%Y-%m-%d")
-                + ") ["
-                + grounded_status
-                + "]"
-            )
+            parts = [
+                "- ",
+                str(aircraft),
+                ": ",
+                str(issue.description),
+                " (Reported: ",
+                issue.report_date.strftime("%Y-%m-%d"),
+                ") [",
+                grounded_status,
+                "]",
+            ]
+            lines.append("".join(parts))
 
             # Get assigned meisters
             if issue.glider:
