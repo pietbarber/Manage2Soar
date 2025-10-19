@@ -169,6 +169,10 @@ class OpsIntentAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("member", "date", "available_as_labels", "glider", "created_at")
     list_filter = ("date",)
     search_fields = ("member__first_name", "member__last_name")
+    admin_helper_message = (
+        "<b>Ops Intents:</b> Members' declared intent to fly (instruction, club, private)."
+        " These feed surge detection and tow planning — encourage members to sign up rather than messaging staff."
+    )
 
     def available_as_labels(self, obj):
         return ", ".join(obj.available_as_labels())
