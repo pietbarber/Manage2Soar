@@ -1,9 +1,5 @@
 {% extends "admin/change_list.html" %}
 {% block content %}
-  {% if admin_helper_message %}
-    <div style="background:#f3fbff;border:1px solid #cfeaff;padding:12px 16px;margin-bottom:24px;font-size:1.05em;">
-      {{ admin_helper_message|safe }}
-    </div>
-  {% endif %}
+  {% include "admin/_admin_helper.html" %}
   {{ block.super }}
 {% endblock %}
