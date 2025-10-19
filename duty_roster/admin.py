@@ -1,4 +1,5 @@
 from django.contrib import admin
+from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
     DutyAssignment,
@@ -16,40 +17,52 @@ from .models import (
 
 
 @admin.register(DutyDay)
-class DutyDayAdmin(admin.ModelAdmin):
+class DutyDayAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("date", "notes")
     search_fields = ("notes",)
     ordering = ("date",)
+    admin_helper_message = (
+        "<b>Duty Days:</b> Record the dates when club operations run. See duty_roster/docs/ for guidance."
+    )
 
 
 @admin.register(DutySlot)
-class DutySlotAdmin(admin.ModelAdmin):
+class DutySlotAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("duty_day", "role", "member")
     list_filter = ("role",)
     search_fields = ("member__first_name", "member__last_name")
     autocomplete_fields = ("member", "duty_day")
     ordering = ("duty_day", "role")
+    admin_helper_message = (
+        "<b>Duty Slots:</b> Individual role assignments for a duty day. Use Duty Assignments to manage whole-day crews."
+    )
 
 
 @admin.register(MemberBlackout)
-class MemberBlackoutAdmin(admin.ModelAdmin):
+class MemberBlackoutAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("member", "date", "note")
     search_fields = ("member__first_name", "member__last_name", "note")
     list_filter = ("date",)
     autocomplete_fields = ("member",)
     ordering = ("date",)
+    admin_helper_message = (
+        "<b>Member Blackouts:</b> Mark member unavailability so they are not scheduled during those dates."
+    )
 
 
 @admin.register(DutyPreference)
-class DutyPreferenceAdmin(admin.ModelAdmin):
+class DutyPreferenceAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("member", "preferred_day", "comment")
     search_fields = ("member__first_name", "member__last_name", "comment")
     list_filter = ("preferred_day",)
     autocomplete_fields = ["member"]
+    admin_helper_message = (
+        "<b>Duty Preferences:</b> Members' scheduling preferences and limits — these feed into automated roster generation."
+    )
 
 
 @admin.register(DutyPairing)
-class DutyPairingAdmin(admin.ModelAdmin):
+class DutyPairingAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("member", "pair_with")
     autocomplete_fields = ["member", "pair_with"]
     search_fields = (
@@ -58,10 +71,13 @@ class DutyPairingAdmin(admin.ModelAdmin):
         "pair_with__first_name",
         "pair_with__last_name",
     )
+    admin_helper_message = (
+        "<b>Pairings:</b> Preferred pairings to bias scheduling so members are often assigned together."
+    )
 
 
 @admin.register(DutyAvoidance)
-class DutyAvoidanceAdmin(admin.ModelAdmin):
+class DutyAvoidanceAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("member", "avoid_with")
     autocomplete_fields = ["member", "avoid_with"]
     search_fields = (
@@ -70,10 +86,13 @@ class DutyAvoidanceAdmin(admin.ModelAdmin):
         "avoid_with__first_name",
         "avoid_with__last_name",
     )
+    admin_helper_message = (
+        "<b>Avoidances:</b> Members who should not be scheduled to work together. Use sparingly and only when needed."
+    )
 
 
 @admin.register(DutyAssignment)
-class DutyAssignmentAdmin(admin.ModelAdmin):
+class DutyAssignmentAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "date",
         "location",
@@ -86,9 +105,13 @@ class DutyAssignmentAdmin(admin.ModelAdmin):
         "tow_surge_notified",
     )
 
+    admin_helper_message = (
+        "<b>Duty Assignments:</b> View and adjust duty rosters; use swap requests to coordinate changes rather than directly editing assigned members."
+    )
+
 
 @admin.register(InstructionSlot)
-class InstructionSlotAdmin(admin.ModelAdmin):
+class InstructionSlotAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("assignment", "student", "instructor", "status", "created_at")
     list_filter = ("status",)
     search_fields = (
@@ -97,10 +120,13 @@ class InstructionSlotAdmin(admin.ModelAdmin):
         "instructor__first_name",
         "instructor__last_name",
     )
+    admin_helper_message = (
+        "<b>Instruction Slots:</b> Student/instructor pairings for training flights; use to manage scheduled instruction."
+    )
 
 
 @admin.register(DutySwapRequest)
-class DutySwapRequestAdmin(admin.ModelAdmin):
+class DutySwapRequestAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "original_date",
         "role",
@@ -111,10 +137,13 @@ class DutySwapRequestAdmin(admin.ModelAdmin):
     )
     list_filter = ("role", "is_emergency", "is_fulfilled")
     search_fields = ("requester__first_name", "requester__last_name")
+    admin_helper_message = (
+        "<b>Swap Requests:</b> Members requesting coverage or swaps. Review offers and coordinate responses here."
+    )
 
 
 @admin.register(DutySwapOffer)
-class DutySwapOfferAdmin(admin.ModelAdmin):
+class DutySwapOfferAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "swap_request",
         "offered_by",
@@ -130,10 +159,18 @@ class DutySwapOfferAdmin(admin.ModelAdmin):
         "swap_request__requester__first_name",
         "swap_request__requester__last_name",
     )
+    admin_helper_message = (
+        "<b>Swap Offers:</b> Offers responding to swap requests; accept and track offers here."
+    )
 
 
 @admin.register(OpsIntent)
-class OpsIntentAdmin(admin.ModelAdmin):
-    list_display = ("member", "date", "available_as", "glider", "created_at")
+class OpsIntentAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = ("member", "date", "available_as_labels", "glider", "created_at")
     list_filter = ("date",)
     search_fields = ("member__first_name", "member__last_name")
+
+    def available_as_labels(self, obj):
+        return ", ".join(obj.available_as_labels())
+
+    available_as_labels.short_description = "Planned activities"

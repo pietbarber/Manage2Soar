@@ -437,6 +437,7 @@ def ops_intent_form(request, year, month, day):
         "duty_roster/ops_intent_form.html",
         {
             "day": day_date,
+            "available_activities": OpsIntent.AVAILABLE_ACTIVITIES,
         },
     )
 

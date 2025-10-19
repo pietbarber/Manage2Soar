@@ -1,0 +1,6 @@
+{% comment %}Small fragment to show a one-line helper message in admin pages{% endcomment %}
+{% if admin_helper_message %}
+  <div class="admin-helper" style="background:#f3fbff;border:1px solid #cfeaff;padding:10px;margin-bottom:16px;">
+    {{ admin_helper_message|safe }}
+  </div>
+{% endif %}

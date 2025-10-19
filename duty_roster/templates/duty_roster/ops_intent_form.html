@@ -5,18 +5,13 @@
 >
   {% csrf_token %}
   <p class="mb-1">I plan to fly this day. My intent:</p>
+  {% comment %} Render available activity checkboxes from the view-provided list. {% endcomment %}
+  {% for key,label in available_activities %}
   <div class="form-check">
-    <input class="form-check-input" type="checkbox" name="available_as" value="instruction" id="wantInstruction">
-    <label class="form-check-label" for="wantInstruction">I want instruction</label>
+    <input class="form-check-input" type="checkbox" name="available_as" value="{{ key }}" id="want{{ key|capfirst }}">
+    <label class="form-check-label" for="want{{ key|capfirst }}">{{ label }}</label>
   </div>
-  <div class="form-check">
-    <input class="form-check-input" type="checkbox" name="available_as" value="club" id="wantClub">
-    <label class="form-check-label" for="wantClub">I want to fly a club glider</label>
-  </div>
-  <div class="form-check">
-    <input class="form-check-input" type="checkbox" name="available_as" value="private" id="wantPrivate">
-    <label class="form-check-label" for="wantPrivate">I’ll be flying a private glider</label>
-  </div>
+  {% endfor %}
 
-  <button type="submit" class="btn btn-sm btn-primary mt-2">✅ Submit</button>
+  <button type="submit" class="btn btn-sm btn-primary mt-2">Submit</button>
 </form>

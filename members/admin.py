@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 from reversion.admin import VersionAdmin
+from utils.admin_helpers import AdminHelperMixin
 from tinymce.widgets import TinyMCE
 
 from .models import Badge, Biography, Member, MemberBadge
@@ -177,7 +178,7 @@ class CustomMemberCreationForm(UserCreationForm):
 
 
 @admin.register(Member)
-class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
+class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
     actions = ["export_members_csv"]
 
     def export_members_csv(self, request, queryset):
@@ -354,3 +355,8 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     def get_search_results(self, request, queryset, search_term):
         # Show all members (active and inactive) in admin
         return super().get_search_results(request, queryset, search_term)
+
+    # Short one-line helper shown at top of member admin pages
+    admin_helper_message = (
+        "<b>Members:</b> Manage member profiles and roles. For bulk exports and privacy settings see the docs."
+    )
