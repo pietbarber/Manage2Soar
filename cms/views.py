@@ -3,6 +3,8 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 
 from cms.models import HomePageContent
+from django.db.models import Max
+from django.urls import reverse
 from members.utils import is_active_member
 
 from .models import Page
@@ -42,7 +44,49 @@ def cms_page(request, **kwargs):
             # Use LOGIN_URL and preserve next
             login_url = settings.LOGIN_URL
             return redirect(f"{login_url}?next={request.path}")
-    return render(request, "cms/page.html", {"page": page})
+    # Build subpage metadata (doc counts and last-updated timestamps) to
+    # avoid doing this in the template and to prevent N+1 queries.
+    subpages = []
+    children = page.children.all().order_by("title")
+    for child in children:
+        # count documents attached to this child
+        doc_count = child.documents.count()
+        # find most recent document upload time
+        doc_max = (
+            child.documents.aggregate(max_uploaded=Max("uploaded_at"))
+            .get("max_uploaded")
+        )
+        # last updated is the later of the page's updated_at and latest document upload
+        last_updated = child.updated_at
+        if doc_max and doc_max > last_updated:
+            last_updated = doc_max
+        subpages.append({"page": child, "doc_count": doc_count,
+                        "last_updated": last_updated})
+
+    # Build breadcrumbs: Resources -> (parents...) -> current page
+    breadcrumbs = []
+    # Top-level 'Resources' link
+    try:
+        resources_url = reverse("cms:home")
+    except Exception:
+        resources_url = "/cms/"
+    breadcrumbs.append({"title": "Resources", "url": resources_url})
+
+    # Walk parent chain from root down to immediate parent
+    parents = []
+    p = page.parent
+    while p:
+        parents.append(p)
+        p = p.parent
+    parents.reverse()
+    for par in parents:
+        breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
+
+    return render(
+        request,
+        "cms/page.html",
+        {"page": page, "subpages": subpages, "breadcrumbs": breadcrumbs},
+    )
 
 
 def homepage(request):
@@ -71,7 +115,8 @@ def homepage(request):
             pages.append(
                 {
                     "page": p,
-                    "doc_count": p.documents.count(),
+                    # Count documents plus child directories as resources
+                    "doc_count": p.documents.count() + p.children.count(),
                     "is_public": p.is_public,
                     "can_view": can_view,
                 }
@@ -126,7 +171,8 @@ def homepage(request):
         pages.append(
             {
                 "page": p,
-                "doc_count": p.documents.count(),
+                # Include directories in the resource count so directories show up as resources
+                "doc_count": p.documents.count() + p.children.count(),
                 "is_public": p.is_public,
                 "can_view": can_view,
             }
