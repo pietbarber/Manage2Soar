@@ -175,10 +175,9 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_select_related = ("logsheet", "pilot", "instructor",
                            "glider", "towplane", "tow_pilot")
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        # Ensure we select related objects the admin needs and avoid unnecessary annotations
-        return qs.select_related("logsheet", "pilot", "instructor", "glider", "towplane", "tow_pilot")
+    # list_select_related is sufficient here; Django will apply the necessary
+    # select_related on the changelist queryset. Keeping an explicit
+    # get_queryset with the identical select_related call is redundant.
 
     def tow_cost(self, obj):
         return obj.tow_cost_display
@@ -329,9 +328,7 @@ class LogsheetPaymentAdmin(AdminHelperMixin, admin.ModelAdmin):
     # If you have lots of payments, limit rows per page for faster responses
     list_per_page = 50
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related("member", "logsheet")
+    # list_select_related on this admin avoids the need for a custom get_queryset.
 
     admin_helper_message = (
         "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."

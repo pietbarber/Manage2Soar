@@ -220,7 +220,7 @@ class CustomMemberCreationForm(UserCreationForm):
 
 @admin.register(Member)
 class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
-    actions = ["export_members_csv"]
+    actions = ["export_members_csv", "mark_inactive"]
 
     def export_members_csv(self, request, queryset):
         # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
@@ -400,8 +400,6 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
     # Short helper shown at top of member admin pages; full guidance lives in docs/admin/members_delete.md
     admin_helper_message = "Members: manage member profiles and roles. <br>See member deletion guidance."
     admin_helper_doc_url = "https://github.com/pietbarber/Manage2Soar/tree/main/members/docs/admin/members_delete.md"
-
-    actions = ["export_members_csv", "mark_inactive"]
 
     def mark_inactive(self, request, queryset):
         """Safe bulk action: mark selected members inactive instead of deleting.
