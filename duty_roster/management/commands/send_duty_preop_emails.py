@@ -88,7 +88,10 @@ class Command(BaseCommand):
         )
 
         lines = [
-            f"🚨 Pre-Operations Summary for {target_date}", "", "👥 Assigned Duty Crew:"]
+            f"🚨 Pre-Operations Summary for {target_date}",
+            "",
+            "👥 Assigned Duty Crew:",
+        ]
         lines += [
             f"🎓 Instructor: {instr_name}",
             f"🎓 Surge Instructor: {surge_instr_name}",

@@ -87,8 +87,9 @@ class Command(BaseCommand):
                     self.stdout.write(msg)
 
                 updated += 1
+            total = updated + skipped
             summary = (
-                f"SSA URL import complete. Total processed: {updated + skipped}, "
+                f"SSA URL import complete. Total processed: {total}, "
                 f"Updated: {updated}, Skipped: {skipped}"
             )
             self.stdout.write(self.style.SUCCESS(summary))
@@ -145,12 +146,16 @@ class Command(BaseCommand):
                     msg = f"Assigned {badge_name} to {member}"
                     self.stdout.write(msg)
                 else:
-                    msg = f"{badge_name} already exists for {member}, skipping"
+                    msg = (
+                        f"{badge_name} already exists for {member}, "
+                        "skipping"
+                    )
                     self.stdout.write(msg)
             imported += 1
 
+        total = imported + skipped
         summary = (
-            f"Import complete. Total processed: {imported + skipped}, "
+            f"Import complete. Total processed: {total}, "
             f"Imported: {imported}, Skipped: {skipped}"
         )
         self.stdout.write(self.style.SUCCESS(summary))

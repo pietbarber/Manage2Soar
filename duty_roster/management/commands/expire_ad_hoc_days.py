@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 "The deadline has passed and the ops have been cancelled for tomorrow.\n\n"
             )
             dashboard = f"Calendar: {settings.SITE_URL}/duty_roster/calendar/"
-            message = header + body + dashboard
+            message = "".join((header, body, dashboard))
             send_mail(
                 subject=subject,
                 message=message,

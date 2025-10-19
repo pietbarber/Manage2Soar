@@ -7,8 +7,8 @@ from members.models import Member
 
 class Command(BaseCommand):
     help = (
-        "Import member profile photos from CSV. Assumes images are already in "
-        "the correct media directory."
+        "Import member profile photos from CSV. Assumes images are already "
+        "in the correct media directory."
     )
 
     def handle(self, *args, **kwargs):
