@@ -1,6 +1,9 @@
 {% comment %}Small fragment to show a one-line helper message in admin pages{% endcomment %}
 {% if admin_helper_message %}
   <div class="admin-helper" style="background:#f3fbff;border:1px solid #cfeaff;padding:10px;margin-bottom:16px;">
-    {{ admin_helper_message|safe }}
+    <span class="helper-text">{{ admin_helper_message|safe }}</span>
+    {% if admin_helper_doc_url %}
+      <a class="helper-docs" href="{{ admin_helper_doc_url }}" target="_blank" rel="noopener noreferrer" style="margin-left:12px;padding:6px 10px;background:#6c7174;color:#fff;border-radius:14px;font-size:12px;text-decoration:none;">Docs</a>
+    {% endif %}
   </div>
 {% endif %}

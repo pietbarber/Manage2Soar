@@ -16,6 +16,27 @@ from .models import (
     TowRate,
 )
 from utils.admin_helpers import AdminHelperMixin
+from django.utils import timezone
+from datetime import timedelta
+
+
+class RecentLogsheetFilter(admin.SimpleListFilter):
+    title = "By logsheet"
+    parameter_name = "recent_logsheet"
+
+    def lookups(self, request, model_admin):
+        # Show logsheets from the last two years only
+        two_years_ago = timezone.now().date() - timedelta(days=365 * 2)
+        from .models import Logsheet
+
+        qs = Logsheet.objects.filter(log_date__gte=two_years_ago).order_by("-log_date")
+        return [(str(l.id), l.log_date.strftime("%Y-%m-%d")) for l in qs]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value:
+            return queryset.filter(logsheet_id=value)
+        return queryset
 
 
 # Admin configuration for managing Towplane objects
@@ -299,13 +320,25 @@ class LogsheetPaymentAdmin(AdminHelperMixin, admin.ModelAdmin):
         "payment_method",
         "note",
     )
-    list_filter = ("payment_method", "logsheet")
+    # Limit the 'By logsheet' filter to recent logs to avoid huge choice lists
+    list_filter = ("payment_method", RecentLogsheetFilter)
     search_fields = ("member__first_name", "member__last_name", "note")
     autocomplete_fields = ("member", "logsheet")
+    # Avoid N+1 queries for member/logsheet lookups in the changelist
+    list_select_related = ("member", "logsheet")
+    # If you have lots of payments, limit rows per page for faster responses
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("member", "logsheet")
 
     admin_helper_message = (
         "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."
     )
+
+
+# RecentLogsheetFilter is defined above so it can be referenced directly by LogsheetPaymentAdmin
 
 
 # Admin configuration for MaintenanceIssue objects

@@ -356,7 +356,19 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         # Show all members (active and inactive) in admin
         return super().get_search_results(request, queryset, search_term)
 
-    # Short one-line helper shown at top of member admin pages
-    admin_helper_message = (
-        "<b>Members:</b> Manage member profiles and roles. For bulk exports and privacy settings see the docs."
-    )
+    # Short helper shown at top of member admin pages; full guidance lives in docs/admin/members_delete.md
+    admin_helper_message = "Members: manage member profiles and roles. <br>See member deletion guidance."
+    admin_helper_doc_url = "https://github.com/pietbarber/Manage2Soar/tree/main/members/docs/admin/members_delete.md"
+
+    actions = ["export_members_csv", "mark_inactive"]
+
+    def mark_inactive(self, request, queryset):
+        """Safe bulk action: mark selected members inactive instead of deleting.
+
+        This preserves historical records (flights, reports, payments) while removing the member
+        from active lists and preventing login.
+        """
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"Marked {updated} members as inactive.")
+
+    mark_inactive.short_description = "Mark selected members inactive (safer than delete)"
