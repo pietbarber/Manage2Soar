@@ -2,6 +2,7 @@ from django.contrib import admin
 from reversion.admin import VersionAdmin
 from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
+from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
     ClubQualificationType,
@@ -27,11 +28,15 @@ from .models import (
 
 
 @admin.register(TrainingLesson)
-class TrainingLessonAdmin(VersionAdmin):
+class TrainingLessonAdmin(AdminHelperMixin, VersionAdmin):
     list_display = ("code", "title", "far_requirement", "pts_reference")
     list_filter = ("far_requirement", "pts_reference")
     search_fields = ("code", "title", "description")
     ordering = ("code",)
+
+    admin_helper_message = (
+        "Training lessons: syllabus content for instruction. Edit lesson HTML carefully; used in student progress reports."
+    )
 
 
 ####################################################
@@ -44,9 +49,13 @@ class TrainingLessonAdmin(VersionAdmin):
 
 
 @admin.register(TrainingPhase)
-class TrainingPhaseAdmin(VersionAdmin):
+class TrainingPhaseAdmin(AdminHelperMixin, VersionAdmin):
     list_display = ("number", "name")
     ordering = ("number",)
+
+    admin_helper_message = (
+        "Training phases: group lessons into phases; changing order affects syllabus structure."
+    )
 
 
 ####################################################
@@ -60,7 +69,7 @@ class TrainingPhaseAdmin(VersionAdmin):
 
 
 @admin.register(SyllabusDocument)
-class SyllabusDocumentAdmin(VersionAdmin):
+class SyllabusDocumentAdmin(AdminHelperMixin, VersionAdmin):
     list_display = ("slug", "title")
     search_fields = ("slug", "title", "content")
     formfield_overrides = {
@@ -75,6 +84,10 @@ class SyllabusDocumentAdmin(VersionAdmin):
             )
         },
     }
+
+    admin_helper_message = (
+        "Syllabus docs: HTML documents used in training pages. Use TinyMCE for content edits."
+    )
 
 
 ####################################################
@@ -103,11 +116,15 @@ class LessonScoreInline(admin.TabularInline):
 
 
 @admin.register(InstructionReport)
-class InstructionReportAdmin(admin.ModelAdmin):
+class InstructionReportAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("student", "instructor", "report_date")
     list_filter = ("report_date", "instructor")
     search_fields = ("student__last_name", "instructor__last_name")
     inlines = [LessonScoreInline]
+
+    admin_helper_message = (
+        "Instruction reports: instructor evaluations for students. Reports are audited and used for qualifications."
+    )
 
 
 ####################################################
@@ -120,9 +137,13 @@ class InstructionReportAdmin(admin.ModelAdmin):
 
 
 @admin.register(LessonScore)
-class LessonScoreAdmin(admin.ModelAdmin):
+class LessonScoreAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("report", "lesson", "score")
     list_filter = ("lesson", "score")
+
+    admin_helper_message = (
+        "Lesson scores: link training lessons to reports. Use inlines on reports for editing."
+    )
 
 
 ####################################################
@@ -151,7 +172,7 @@ class GroundLessonScoreInline(admin.TabularInline):
 
 
 @admin.register(GroundInstruction)
-class GroundInstructionAdmin(admin.ModelAdmin):
+class GroundInstructionAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("student", "instructor", "date", "location", "duration")
     list_filter = ("date", "instructor")
     search_fields = (
@@ -161,6 +182,10 @@ class GroundInstructionAdmin(admin.ModelAdmin):
         "instructor__last_name",
     )
     inlines = [GroundLessonScoreInline]
+
+    admin_helper_message = (
+        "Ground instruction: non-flight sessions such as briefings or simulator time. Records are used in progress calculations."
+    )
 
 
 ####################################################
@@ -175,11 +200,15 @@ class GroundInstructionAdmin(admin.ModelAdmin):
 
 
 @admin.register(ClubQualificationType)
-class ClubQualificationTypeAdmin(admin.ModelAdmin):
+class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("code", "name", "applies_to", "is_obsolete")
     search_fields = ("code", "name")
     list_filter = ("applies_to", "is_obsolete")
     ordering = ("code",)
+
+    admin_helper_message = (
+        "Qualification types: define club qualifications and tooltips. Updates affect member qualifications listings."
+    )
 
 
 ####################################################
@@ -194,7 +223,7 @@ class ClubQualificationTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(MemberQualification)
-class MemberQualificationAdmin(admin.ModelAdmin):
+class MemberQualificationAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "member",
         "qualification",
@@ -206,3 +235,7 @@ class MemberQualificationAdmin(admin.ModelAdmin):
     search_fields = ("member__username", "qualification__code")
     list_filter = ("is_qualified", "imported", "qualification__code")
     autocomplete_fields = ("member", "qualification", "instructor")
+
+    admin_helper_message = (
+        "Member qualifications: assign or revoke qualifications for members. Prefer issuing via the training workflow."
+    )
