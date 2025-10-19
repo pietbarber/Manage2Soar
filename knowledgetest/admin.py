@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.db import models
 from django.utils.html import format_html
 from tinymce.widgets import TinyMCE
+from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
     Question,
@@ -22,7 +23,7 @@ class TemplateQuestionInline(admin.TabularInline):
 
 
 @admin.register(WrittenTestTemplate)
-class WrittenTestTemplateAdmin(admin.ModelAdmin):
+class WrittenTestTemplateAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = [
         "name",
         "pass_percentage",
@@ -43,15 +44,23 @@ class WrittenTestTemplateAdmin(admin.ModelAdmin):
 
     assigned_to.short_description = "Assigned To"
 
+    admin_helper_message = (
+        "Test templates: define question sets and assignments. Editing templates affects future attempts."
+    )
+
 
 @admin.register(QuestionCategory)
-class QuestionCategoryAdmin(admin.ModelAdmin):
+class QuestionCategoryAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ["code", "description"]
     search_fields = ["code", "description"]
 
+    admin_helper_message = (
+        "Question categories: organize knowledge test questions. Keep codes stable for reporting."
+    )
+
 
 @admin.register(Question)
-class QuestionAdmin(admin.ModelAdmin):
+class QuestionAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = [
         "qnum",
         "category",
@@ -80,6 +89,10 @@ class QuestionAdmin(admin.ModelAdmin):
 
     media_preview.short_description = "Attachment"
 
+    admin_helper_message = (
+        "Questions: edit or add knowledge-test questions. Use attachments for diagrams or media."
+    )
+
 
 # Inline for attempt answers
 class AnswerInline(admin.TabularInline):
@@ -90,7 +103,7 @@ class AnswerInline(admin.TabularInline):
 
 
 @admin.register(WrittenTestAttempt)
-class WrittenTestAttemptAdmin(admin.ModelAdmin):
+class WrittenTestAttemptAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ["student", "template", "date_taken", "score_percentage", "passed"]
     list_filter = ["template", "passed"]
     search_fields = ["student__username"]
@@ -104,10 +117,18 @@ class WrittenTestAttemptAdmin(admin.ModelAdmin):
     ]
     inlines = [AnswerInline]
 
+    admin_helper_message = (
+        "Test attempts: read-only records of student attempts. Use for grading audits and support."
+    )
+
 
 @admin.register(WrittenTestAnswer)
-class WrittenTestAnswerAdmin(admin.ModelAdmin):
+class WrittenTestAnswerAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ["attempt", "question", "selected_answer", "is_correct"]
     list_filter = ["is_correct"]
     search_fields = ["attempt__student__username"]
     readonly_fields = ["attempt", "question", "selected_answer", "is_correct"]
+
+    admin_helper_message = (
+        "Attempt answers: read-only details of student responses for each attempt."
+    )

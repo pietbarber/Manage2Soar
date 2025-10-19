@@ -9,9 +9,51 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 from reversion.admin import VersionAdmin
+from utils.admin_helpers import AdminHelperMixin
 from tinymce.widgets import TinyMCE
 
 from .models import Badge, Biography, Member, MemberBadge
+
+
+# --- Register or replace social_django admin entries with helpful admin banners ---
+try:
+    from social_django.models import UserSocialAuth, Nonce, Association
+    from django.contrib import admin as django_admin
+
+    def register_or_replace(model, admin_class):
+        """If model is already registered in admin, unregister it first, then register our admin_class."""
+        try:
+            if model in django_admin.site._registry:
+                django_admin.site.unregister(model)
+        except Exception:
+            # If unregister fails for any reason, continue and attempt to register
+            pass
+        try:
+            django_admin.site.register(model, admin_class)
+        except Exception:
+            # If register fails, don't block app startup
+            pass
+
+    class UserSocialAuthAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        list_display = ("user", "provider", "uid")
+        search_fields = ("user__username", "provider", "uid")
+        admin_helper_message = "UserSocialAuth: external account links for members. Review before unlinking."
+
+    class AssociationAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        # Association doesn't always have uniform fields across versions; show a compact repr
+        list_display = ("__str__",)
+        admin_helper_message = "Association: backend association records for OAuth providers. Edit with care."
+
+    class NonceAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        list_display = ("__str__",)
+        admin_helper_message = "Nonce: one-time values used during OAuth handshakes. Typically safe to leave alone."
+
+    register_or_replace(UserSocialAuth, UserSocialAuthAdmin)
+    register_or_replace(Association, AssociationAdmin)
+    register_or_replace(Nonce, NonceAdmin)
+except Exception:
+    # social_django may not be available in some environments; skip registrations silently
+    pass
 
 # Custom filter for Active/Not active status
 
@@ -177,8 +219,8 @@ class CustomMemberCreationForm(UserCreationForm):
 
 
 @admin.register(Member)
-class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
-    actions = ["export_members_csv"]
+class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
+    actions = ["export_members_csv", "mark_inactive"]
 
     def export_members_csv(self, request, queryset):
         # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
@@ -354,3 +396,18 @@ class MemberAdmin(ImportExportModelAdmin, VersionAdmin, UserAdmin):
     def get_search_results(self, request, queryset, search_term):
         # Show all members (active and inactive) in admin
         return super().get_search_results(request, queryset, search_term)
+
+    # Short helper shown at top of member admin pages; full guidance lives in docs/admin/members_delete.md
+    admin_helper_message = "Members: manage member profiles and roles. <br>See member deletion guidance."
+    admin_helper_doc_url = "https://github.com/pietbarber/Manage2Soar/tree/main/members/docs/admin/members_delete.md"
+
+    def mark_inactive(self, request, queryset):
+        """Safe bulk action: mark selected members inactive instead of deleting.
+
+        This preserves historical records (flights, reports, payments) while removing the member
+        from active lists and preventing login.
+        """
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"Marked {updated} members as inactive.")
+
+    mark_inactive.short_description = "Mark selected members inactive (safer than delete)"

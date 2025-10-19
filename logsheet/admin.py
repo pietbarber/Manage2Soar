@@ -15,6 +15,28 @@ from .models import (
     TowplaneCloseout,
     TowRate,
 )
+from utils.admin_helpers import AdminHelperMixin
+from django.utils import timezone
+from datetime import timedelta
+
+
+class RecentLogsheetFilter(admin.SimpleListFilter):
+    title = "By logsheet"
+    parameter_name = "recent_logsheet"
+
+    def lookups(self, request, model_admin):
+        # Show logsheets from the last two years only
+        two_years_ago = timezone.now().date() - timedelta(days=365 * 2)
+        from .models import Logsheet
+
+        qs = Logsheet.objects.filter(log_date__gte=two_years_ago).order_by("-log_date")
+        return [(str(l.id), l.log_date.strftime("%Y-%m-%d")) for l in qs]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value:
+            return queryset.filter(logsheet_id=value)
+        return queryset
 
 
 # Admin configuration for managing Towplane objects
@@ -22,7 +44,7 @@ from .models import (
 # Each time we have a new tow plane, we need to add an object
 # with the admin interface here.
 @admin.register(Towplane)
-class TowplaneAdmin(admin.ModelAdmin):
+class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     list_display = (
         "name",
@@ -48,6 +70,11 @@ class TowplaneAdmin(admin.ModelAdmin):
         queryset = queryset.filter(is_active=True)
         return super().get_search_results(request, queryset, search_term)
 
+    admin_helper_message = (
+        "Towplanes: manage club tow planes and their inspection schedule. "
+        "Only active planes are shown by default in search."
+    )
+
 
 # Admin configuration for Glider objects.
 # Use this to add more gliders to the system.
@@ -57,7 +84,7 @@ class TowplaneAdmin(admin.ModelAdmin):
 
 
 @admin.register(Glider)
-class GliderAdmin(admin.ModelAdmin):
+class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "competition_number",
         "n_number",
@@ -103,6 +130,10 @@ class GliderAdmin(admin.ModelAdmin):
         # Elsewhere (like in forms), only show club-owned gliders
         return qs.filter(club_owned=True)
 
+    admin_helper_message = (
+        "Gliders: record club and member gliders. Use club-owned filters when configuring rentals."
+    )
+
 
 # The flight table is where most of the action for the logsheet lives.
 # This is a stop-gap to edit the database directly from the admin interface,
@@ -110,7 +141,8 @@ class GliderAdmin(admin.ModelAdmin):
 # This is kind of an ugly view in admin, because if we have a zillion flights,
 # they're all going to be listed here. I don't have any better solutions.
 @admin.register(Flight)
-class FlightAdmin(admin.ModelAdmin):
+class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
+    # Keep list display small and use select_related to avoid N+1 queries
     list_display = (
         "logsheet",
         "launch_time",
@@ -123,6 +155,7 @@ class FlightAdmin(admin.ModelAdmin):
         "tow_cost_actual",
         "rental_cost_actual",
     )
+    # Filter by related fields that are indexed; avoid expensive filters on non-indexed text
     list_filter = ("logsheet", "glider", "towplane", "instructor")
     search_fields = (
         "pilot__first_name",
@@ -132,6 +165,20 @@ class FlightAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("tow_cost", "rental_cost", "total_cost_display")
 
+    # Reduce rows per page so the admin page renders faster with large tables
+    list_per_page = 50
+
+    # Show a date drill-down if admins want to quickly jump by log date
+    date_hierarchy = "logsheet__log_date"
+
+    # Use select_related for FK fields used in list_display to avoid extra queries
+    list_select_related = ("logsheet", "pilot", "instructor",
+                           "glider", "towplane", "tow_pilot")
+
+    # list_select_related is sufficient here; Django will apply the necessary
+    # select_related on the changelist queryset. Keeping an explicit
+    # get_queryset with the identical select_related call is redundant.
+
     def tow_cost(self, obj):
         return obj.tow_cost_display
 
@@ -140,6 +187,11 @@ class FlightAdmin(admin.ModelAdmin):
 
     def total_cost_display(self, obj):
         return obj.total_cost_display
+
+    admin_helper_message = (
+        "Flights: low-level flight records for debugging or data fixes. Not used by the public site. "
+        "See docs/admin/flights.md for guidance."
+    )
 
 
 # Each time a member locks a flight log because it's finalized, no more changes can be done
@@ -151,9 +203,13 @@ class FlightAdmin(admin.ModelAdmin):
 
 
 @admin.register(RevisionLog)
-class RevisionLogAdmin(admin.ModelAdmin):
+class RevisionLogAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("logsheet", "revised_by", "revised_at")
     list_filter = ("revised_by", "revised_at")
+
+    admin_helper_message = (
+        "Revision logs: audit entries when finalized logs are unlocked. Edit with care."
+    )
 
 
 # Each time the club operates at a new field for the first time, it needs to be added here.
@@ -163,7 +219,7 @@ class RevisionLogAdmin(admin.ModelAdmin):
 
 
 @admin.register(Airfield)
-class AirfieldAdmin(admin.ModelAdmin):
+class AirfieldAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ["identifier", "name", "is_active"]
     search_fields = ["identifier", "name"]
     list_filter = ["is_active"]
@@ -178,6 +234,10 @@ class AirfieldAdmin(admin.ModelAdmin):
 
     airfield_image_preview.short_description = "Current Photo"
 
+    admin_helper_message = (
+        "Airfields: add or update fields where ops take place. Upload a photo to preview here."
+    )
+
 
 # The particulars of what day a logsheet happened, the airfield, who is on the duty roster for that day
 # are all kept in teh Logsheet model. If a logsheet is finalized is kept in this entry too.
@@ -186,10 +246,14 @@ class AirfieldAdmin(admin.ModelAdmin):
 
 
 @admin.register(Logsheet)
-class LogsheetAdmin(admin.ModelAdmin):
+class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("log_date", "airfield", "created_by", "finalized", "created_at")
     list_filter = ("airfield", "finalized")
     search_fields = ("airfield__name", "created_by__username")
+
+    admin_helper_message = (
+        "Logsheets: daily operation records. Finalizing a log locks it from edits."
+    )
 
 
 # The prices for tows to different altitudes are stored here.
@@ -202,10 +266,14 @@ class LogsheetAdmin(admin.ModelAdmin):
 
 
 @admin.register(TowRate)
-class TowRateAdmin(admin.ModelAdmin):
+class TowRateAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("altitude", "price")
     list_editable = ("price",)
     ordering = ("altitude",)
+
+    admin_helper_message = (
+        "Tow rates: edit prices for tow altitudes. Prices are shown in the booking UI."
+    )
 
 
 # Admin configuration for LogsheetCloseout objects
@@ -215,8 +283,12 @@ class TowRateAdmin(admin.ModelAdmin):
 
 
 @admin.register(LogsheetCloseout)
-class LogsheetCloseoutAdmin(admin.ModelAdmin):
+class LogsheetCloseoutAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("logsheet",)
+
+    admin_helper_message = (
+        "Closeouts: end-of-day summaries and safety notes. Typically read-only."
+    )
 
 
 # Admin configuration for TowplaneCloseout objects
@@ -226,8 +298,12 @@ class LogsheetCloseoutAdmin(admin.ModelAdmin):
 
 
 @admin.register(TowplaneCloseout)
-class TowplaneCloseoutAdmin(admin.ModelAdmin):
+class TowplaneCloseoutAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("logsheet", "towplane")
+
+    admin_helper_message = (
+        "Towplane closeouts: record tach times and fuel usage per logsheet."
+    )
 
 
 # Admin configuration for LogsheetPayment objects
@@ -236,16 +312,30 @@ class TowplaneCloseoutAdmin(admin.ModelAdmin):
 
 
 @admin.register(LogsheetPayment)
-class LogsheetPaymentAdmin(admin.ModelAdmin):
+class LogsheetPaymentAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "member",
         "logsheet",
         "payment_method",
         "note",
     )
-    list_filter = ("payment_method", "logsheet")
+    # Limit the 'By logsheet' filter to recent logs to avoid huge choice lists
+    list_filter = ("payment_method", RecentLogsheetFilter)
     search_fields = ("member__first_name", "member__last_name", "note")
     autocomplete_fields = ("member", "logsheet")
+    # Avoid N+1 queries for member/logsheet lookups in the changelist
+    list_select_related = ("member", "logsheet")
+    # If you have lots of payments, limit rows per page for faster responses
+    list_per_page = 50
+
+    # list_select_related on this admin avoids the need for a custom get_queryset.
+
+    admin_helper_message = (
+        "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."
+    )
+
+
+# RecentLogsheetFilter is defined above so it can be referenced directly by LogsheetPaymentAdmin
 
 
 # Admin configuration for MaintenanceIssue objects
@@ -256,7 +346,7 @@ class LogsheetPaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(MaintenanceIssue)
-class MaintenanceIssueAdmin(admin.ModelAdmin):
+class MaintenanceIssueAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = (
         "aircraft_display",
         "is_glider",
@@ -291,6 +381,10 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
     def description_short(self, obj):
         return obj.description[:50] + ("..." if len(obj.description) > 50 else "")
 
+    admin_helper_message = (
+        "Maintenance issues: record faults for aircraft. Use the grounded flag to block aircraft."
+    )
+
 
 # Admin configuration for MaintenanceDeadline objects
 # Displays upcoming maintenance deadlines for gliders and towplanes.
@@ -299,7 +393,7 @@ class MaintenanceIssueAdmin(admin.ModelAdmin):
 
 
 @admin.register(MaintenanceDeadline)
-class MaintenanceDeadlineAdmin(admin.ModelAdmin):
+class MaintenanceDeadlineAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("aircraft_n_number", "aircraft_type", "description", "due_date")
     list_filter = ("description", "due_date")
     search_fields = ("glider__n_number", "towplane__n_number")
@@ -316,6 +410,10 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
 
     aircraft_type.short_description = "Type"
 
+    admin_helper_message = (
+        "Maintenance deadlines: track inspections and important aircraft deadlines."
+    )
+
 
 # Admin configuration for AircraftMeister objects
 # Assigns members as Meisters (responsible caretakers) for specific gliders or towplanes.
@@ -324,7 +422,7 @@ class MaintenanceDeadlineAdmin(admin.ModelAdmin):
 
 
 @admin.register(AircraftMeister)
-class AircraftMeisterAdmin(admin.ModelAdmin):
+class AircraftMeisterAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("aircraft_display", "member")
     search_fields = ("glider__n_number", "towplane__n_number", "member__username")
     autocomplete_fields = ("glider", "towplane", "member")
@@ -333,3 +431,7 @@ class AircraftMeisterAdmin(admin.ModelAdmin):
         return obj.glider or obj.towplane
 
     aircraft_display.short_description = "Aircraft"
+
+    admin_helper_message = (
+        "Meisters: assign members as caretakers for aircraft. Use carefully; impacts maintenance workflows."
+    )

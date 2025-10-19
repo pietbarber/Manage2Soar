@@ -1,10 +1,11 @@
 from django.contrib import admin
 
 from .models import SiteConfiguration
+from utils.admin_helpers import AdminHelperMixin
 
 
 @admin.register(SiteConfiguration)
-class SiteConfigurationAdmin(admin.ModelAdmin):
+class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
     def has_add_permission(self, request):
         # Only allow adding if no config exists
         return not SiteConfiguration.objects.exists()
@@ -48,4 +49,8 @@ class SiteConfigurationAdmin(admin.ModelAdmin):
                 )
             },
         ),
+    )
+
+    admin_helper_message = (
+        "Site configuration: central site settings. Only the Webmaster should edit these values."
     )
