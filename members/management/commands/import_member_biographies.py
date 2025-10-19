@@ -73,19 +73,19 @@ class Command(BaseCommand):
             except Member.DoesNotExist:
                 self.stdout.write(
                     self.style.WARNING(
-                        "Skipping: No matching member for handle {}".format(handle)
+                        f"Skipping: No matching member for handle {handle}"
                     )
                 )
                 continue
 
             if dry_run:
-                self.stdout.write("[DRY RUN] Would import bio for {}".format(member))
+                self.stdout.write(f"[DRY RUN] Would import bio for {member}")
             else:
                 biography, _ = Biography.objects.get_or_create(member=member)
                 biography.content = content
                 biography.last_updated = last_updated
                 biography.save()
-                self.stdout.write("Imported biography for {}".format(member))
+                self.stdout.write(f"Imported biography for {member}")
             imported += 1
 
         self.stdout.write(

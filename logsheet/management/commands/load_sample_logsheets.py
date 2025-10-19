@@ -50,8 +50,5 @@ class Command(BaseCommand):
             created += 1
             self.stdout.write("Created logsheet for " + str(logsheet))
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                "Successfully created " + str(created) + " sample logsheets."
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(
+            "Successfully created " + str(created) + " sample logsheets."))

@@ -21,11 +21,11 @@ class Command(BaseCommand):
                         m.profile_photo = row["profile_photo"]
                         m.save()
                         self.stdout.write(
-                            self.style.SUCCESS("Set photo for {}".format(m.username))
+                            self.style.SUCCESS(f"Set photo for {m.username}")
                         )
                     except Member.DoesNotExist:
                         self.stdout.write(
                             self.style.WARNING(
-                                "Member {} not found.".format(row["username"])
+                                f"Member {row['username']} not found."
                             )
                         )

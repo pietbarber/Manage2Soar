@@ -33,9 +33,8 @@ class Command(BaseCommand):
             for role, member_id in entry["slots"].items():
                 if member_id:
                     m = Member.objects.get(pk=member_id)
-                    self.stdout.write(
-                        f"  - {role.title()}: {m.full_display_name}"
-                    )
+                    line = f"  - {role.title()}: " + m.full_display_name
+                    self.stdout.write(line)
                 else:
                     none_line = f"  - {role.title()}: ❌ None"
                     self.stdout.write(none_line)

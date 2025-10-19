@@ -130,7 +130,10 @@ class Command(BaseCommand):
         body = "\n".join(lines)
 
         if to_emails:
-            subject = f"Pre-Ops Report for {assignment.date}"
+            subject = (
+                f"Pre-Ops Report for "
+                f"{assignment.date}"
+            )
             send_mail(
                 subject=subject,
                 message=body,
@@ -143,9 +146,6 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.WARNING(
-                    (
-                        "⚠️ No valid email addresses for duty crew. "
-                        "Email not sent."
-                    )
+                    "⚠️ No valid email addresses for duty crew. Email not sent."
                 )
             )
