@@ -80,7 +80,7 @@ urlpatterns = [
     path("analytics/", include("analytics.urls")),
     path("", include("knowledgetest.urls")),
     # CMS root include is last so other app URL patterns are matched first.
-    path("", include(("cms.urls", "cms"), namespace="cms")),
+    path("", include("cms.urls")),
 ]
 
 # Serve media files in development only
