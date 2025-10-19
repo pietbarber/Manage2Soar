@@ -89,8 +89,12 @@ class Command(BaseCommand):
                 updated += 1
             total = updated + skipped
             summary = (
-                f"SSA URL import complete. Total processed: {total}, "
-                f"Updated: {updated}, Skipped: {skipped}"
+                "SSA URL import complete. Total processed: "
+                + str(total)
+                + ", Updated: "
+                + str(updated)
+                + ", Skipped: "
+                + str(skipped)
             )
             self.stdout.write(self.style.SUCCESS(summary))
             # If only updating SSA URLs, exit early
@@ -155,7 +159,11 @@ class Command(BaseCommand):
 
         total = imported + skipped
         summary = (
-            f"Import complete. Total processed: {total}, "
-            f"Imported: {imported}, Skipped: {skipped}"
+            "Import complete. Total processed: "
+            + str(total)
+            + ", Imported: "
+            + str(imported)
+            + ", Skipped: "
+            + str(skipped)
         )
         self.stdout.write(self.style.SUCCESS(summary))

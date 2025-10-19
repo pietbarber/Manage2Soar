@@ -130,8 +130,10 @@ def resolve_glider(legacy_name, flight_date):
         return Glider.objects.filter(n_number=match["n_number"]).first()
 
     msg = (
-        f"⚠️  Glider not resolved for legacy name '{legacy_name}' on "
-        f"{flight_date}"
+        "⚠️  Glider not resolved for legacy name '"
+        + legacy_name
+        + "' on "
+        + str(flight_date)
     )
     print(msg)
     return None
@@ -252,10 +254,10 @@ class Command(BaseCommand):
                 )
                 if not towplane_obj:
                     print(
-                        (
-                            f"⚠️ No towplane matched for '{towplane_name}' "
-                            f"on flight {data['flight_tracking_id']}"
-                        )
+                        "⚠️ No towplane matched for '"
+                        + towplane_name
+                        + "' on flight "
+                        + str(data["flight_tracking_id"])
                     )
 
             count += 1
@@ -283,10 +285,9 @@ class Command(BaseCommand):
             field_raw = data.get("field")
             if not field_raw or not isinstance(field_raw, str):
                 print(
-                    (
-                        f"⚠️ Missing or invalid field value: {field_raw!r} "
-                        "— defaulting to KFRR"
-                    )
+                    "⚠️ Missing or invalid field value: "
+                    + repr(field_raw)
+                    + " — defaulting to KFRR"
                 )
                 airfield = Airfield.objects.get(identifier="KFRR")
             else:
@@ -295,10 +296,11 @@ class Command(BaseCommand):
                     airfield = Airfield.objects.get(identifier=field_code)
                 except Airfield.DoesNotExist:
                     print(
-                        (
-                            f"⚠️ Unknown airfield '{field_code}' (raw: '{field_raw}') "
-                            "— defaulting to KFRR"
-                        )
+                        "⚠️ Unknown airfield '"
+                        + field_code
+                        + " (raw: '"
+                        + str(field_raw)
+                        + "') — defaulting to KFRR"
                     )
                     airfield = Airfield.objects.get(identifier="KFRR")
                     unknown_airfields.add(field_code)

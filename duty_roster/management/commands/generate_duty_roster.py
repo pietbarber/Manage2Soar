@@ -23,18 +23,27 @@ class Command(BaseCommand):
             return
 
         notice = (
-            f"\n📆 Duty Roster for {calendar.month_name[month]} {year}:"
+            "\n📆 Duty Roster for "
+            + str(calendar.month_name[month])
+            + " "
+            + str(year)
+            + ":"
         )
         self.stdout.write(self.style.NOTICE(notice))
         for entry in schedule:
             day = entry["date"]
-            day_line = f"\n🗓 {day.strftime('%A, %B %d')}"
+            day_line = "\n🗓 " + day.strftime("%A, %B %d")
             self.stdout.write(day_line)
             for role, member_id in entry["slots"].items():
                 if member_id:
                     m = Member.objects.get(pk=member_id)
-                    line = f"  - {role.title()}: " + m.full_display_name
+                    line = (
+                        "  - "
+                        + role.title()
+                        + ": "
+                        + m.full_display_name
+                    )
                     self.stdout.write(line)
                 else:
-                    none_line = f"  - {role.title()}: ❌ None"
+                    none_line = "  - " + role.title() + ": ❌ None"
                     self.stdout.write(none_line)

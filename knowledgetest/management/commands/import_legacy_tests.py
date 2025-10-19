@@ -40,9 +40,9 @@ class Command(BaseCommand):
                 # Import questions from test_contents
                 sql = (
                     "SELECT qnum, code, question, a, b, c, d, answer, "
-                    "explanation, lastupdated, updatedby "
-                    "FROM test_contents "
-                    "ORDER BY qnum;"
+                    + "explanation, lastupdated, updatedby "
+                    + "FROM test_contents "
+                    + "ORDER BY qnum;"
                 )
                 cursor.execute(sql)
                 rows = cursor.fetchall()
@@ -69,7 +69,11 @@ class Command(BaseCommand):
                         except QuestionCategory.DoesNotExist:
                             self.stdout.write(
                                 self.style.ERROR(
-                                    f"Skipping Q{qnum}: unknown category '{code}'"
+                                    "Skipping Q"
+                                    + str(qnum)
+                                    + ": unknown category '"
+                                    + code
+                                    + "'"
                                 )
                             )
                             continue

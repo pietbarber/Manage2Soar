@@ -16,16 +16,22 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Fetch active members
-        members = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        members = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES
+        )
         total = members.count()
-        self.stdout.write(self.style.NOTICE(
-            f"Starting backfill for {total} active members..."))
+        self.stdout.write(
+            self.style.NOTICE(
+                "Starting backfill for " + str(total) + " active members..."
+            )
+        )
 
         # Iterate and update
         for idx, member in enumerate(members, start=1):
             update_student_progress_snapshot(member)
             self.stdout.write(
-                f"[{idx}/{total}] Updated snapshot for {member.full_display_name}"
+                "[" + str(idx) + "/" + str(total) + "] Updated snapshot for "
+                + member.full_display_name
             )
 
         self.stdout.write(
