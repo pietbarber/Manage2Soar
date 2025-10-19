@@ -109,7 +109,11 @@ def render_duties(member):
         ]
 
         for emoji, label in entries:
-            parts.append(f"<li><span class='emoji'>{emoji}</span> – {label}</li>")
+            li = (
+                f"<li><span class='emoji'>{emoji}</span> – "
+                f"{label}</li>"
+            )
+            parts.append(li)
 
         parts.extend(["</ul>", "</div>", "</div>", "</div>", "</div>"])
         html = "".join(parts)
@@ -139,9 +143,8 @@ def render_duties(member):
         "<li><span class='emoji'>🎓</span> – {}</li>".format(instructor),
         "<li><span class='emoji'>🛩️</span> – {}</li>".format(towpilot),
         "<li><span class='emoji'>📋</span> – {}</li>".format(duty_officer),
-        "<li><span class='emoji'>💪</span> – {}</li>".format(
-            assistant_duty_officer
-        ),
+        "<li><span class='emoji'>💪</span> – "
+        "{}</li>".format(assistant_duty_officer),
         "<li><span class='emoji'>✍️</span> – Secretary</li>",
         "<li><span class='emoji'>💰</span> – Treasurer</li>",
         "<li><span class='emoji'>🌐</span> – Webmaster</li>",

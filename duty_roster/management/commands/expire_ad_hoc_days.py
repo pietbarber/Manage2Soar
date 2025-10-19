@@ -21,10 +21,16 @@ class Command(BaseCommand):
         for assignment in assignments:
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
 
-            subject = "Ad-Hoc Ops Cancelled - {}".format(ops_date)
-            header = (
-                f"Ad-hoc ops on {ops_date} could not get sufficient interest to "
+            subject = (
+                "Ad-Hoc Ops Cancelled - "
+                f"{ops_date}"
             )
+
+            header = (
+                "Ad-hoc ops on " f"{ops_date} "
+                "could not get sufficient interest to "
+            ).format(ops_date=ops_date)
+
             body = (
                 "meet the minimum duty crew of tow pilot and duty officer. "
                 "The deadline has passed and the ops have been cancelled for tomorrow.\n\n"

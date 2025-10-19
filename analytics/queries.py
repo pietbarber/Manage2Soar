@@ -26,9 +26,10 @@ def instructor_schedule_vs_actual(
 ) -> Dict[str, Any]:
     """
     For each instructor:
-      - blue: unique days scheduled as duty instructor (from submitted Logsheets)
-      - burnt orange: unique days with at least one instructional flight
-        (Flight.instructor) when NOT scheduled as duty instructor.
+      - blue: unique days scheduled as duty instructor
+        (from submitted Logsheets)
+      - burnt orange: unique days with at least one instructional
+        flight (Flight.instructor) when NOT scheduled as duty instructor.
 
     Returns sorted Y axis (most total days at top), and two lists per
     instructor: scheduled_days, unscheduled_days.

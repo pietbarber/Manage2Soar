@@ -1,7 +1,6 @@
 import calendar
 from collections import defaultdict
 from datetime import date
-from datetime import date as dt_date
 from datetime import timedelta
 
 from django.conf import settings
@@ -17,7 +16,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.timezone import now
+
 from django.views.decorators.http import require_GET, require_POST
 
 from duty_roster.utils.email import notify_ops_status
@@ -55,7 +54,7 @@ def blackout_manage(request):
     existing = MemberBlackout.objects.filter(member=member)
     existing_dates = set(b.date for b in existing)
 
-    today = now().date()
+    today = timezone.now().date()
 
     def generate_calendar(year, month):
         cal = calendar.Calendar()
@@ -309,9 +308,7 @@ def ops_intent_toggle(request, year, month, day):
     if not request.user.is_authenticated:
         return HttpResponse("Not authorized", status=403)
 
-    from django.conf import settings
-    from django.core.mail import send_mail
-    from django.utils import timezone
+    # use top-level imports (settings, send_mail, timezone) to avoid local imports
 
     day_date = date(year, month, day)
 
@@ -394,7 +391,10 @@ def ops_intent_toggle(request, year, month, day):
             )
 
         # Always show a small success message to the user (even if no emails)
-        response = '<p class="text-green-700">✅ You\'re now marked as planning to fly this day.</p>'
+        response = (
+            '<p class="text-green-700">✅ You\'re now marked as '
+            'planning to fly this day.</p>'
+        )
         btn_parts = [
             '<button hx-post="', request.path, '" ',
             'hx-target="#ops-intent-response" ',
@@ -413,10 +413,8 @@ def ops_intent_toggle(request, year, month, day):
             if duty_inst and duty_inst.email:
                 subject = f"Instruction Cancellation on {day_date:%b %d}"
                 body = (
-                    "Student {} cancelled their instruction signup for {}.".format(
-                        request.user.full_display_name,
-                        day_date.strftime("%B %d, %Y"),
-                    )
+                    f"Student {request.user.full_display_name} cancelled their "
+                    f"instruction signup for {day_date.strftime('%B %d, %Y')}"
                 )
                 send_mail(
                     subject,
@@ -681,8 +679,6 @@ def calendar_ado_signup(request, year, month, day):
 @require_POST
 @active_member_required
 def calendar_cancel_ops_day(request, year, month, day):
-    from datetime import date
-
     ops_date = date(int(year), int(month), int(day))
     assignment = get_object_or_404(DutyAssignment, date=ops_date)
 
@@ -721,8 +717,6 @@ def calendar_cancel_ops_day(request, year, month, day):
 
 @active_member_required
 def calendar_cancel_ops_modal(request, year, month, day):
-    from datetime import date
-
     ops_date = date(int(year), int(month), int(day))
     assignment = get_object_or_404(DutyAssignment, date=ops_date)
 
@@ -804,13 +798,11 @@ def propose_roster(request):
             request.session["proposed_roster"] = draft
 
         elif action == "publish":
-            from .models import DutyAssignment
-
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
             DutyAssignment.objects.filter(date__year=year, date__month=month).delete()
 
             for e in request.session.get("proposed_roster", []):
-                edt = dt_date.fromisoformat(e["date"])
+                edt = date.fromisoformat(e["date"])
                 assignment_data = {
                     "date": edt,
                     "location": default_field,
@@ -851,7 +843,7 @@ def propose_roster(request):
         ]
         request.session["proposed_roster"] = draft
     display = [
-        {"date": dt_date.fromisoformat(e["date"]), "slots": e["slots"]}
+        {"date": date.fromisoformat(e["date"]), "slots": e["slots"]}
         for e in request.session.get("proposed_roster", [])
     ]
     return render(

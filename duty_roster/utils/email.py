@@ -24,7 +24,10 @@ def notify_ops_status(assignment):
         tow_title = get_role_title("towpilot") or "Tow Pilot"
         do_title = get_role_title("duty_officer") or "Duty Officer"
         calendar_url = f"{settings.SITE_URL}/duty_roster/calendar/"
-        subj = f"{subject_prefix} Ad-Hoc Operations Proposed for {ops_date}"
+        subj = (
+            f"{subject_prefix} Ad-Hoc Operations Proposed for "
+            f"{ops_date}"
+        )
         msg_parts = [
             "An ad-hoc ops day has been proposed for ",
             ops_date,
@@ -58,7 +61,10 @@ def notify_ops_status(assignment):
             tow_title = get_role_title("towpilot") or "Tow Pilot"
             do_title = get_role_title("duty_officer") or "Duty Officer"
             calendar_url = f"{settings.SITE_URL}/duty_roster/calendar/"
-            subj = f"{subject_prefix} Ad-Hoc Ops Confirmed for {ops_date}"
+            subj = (
+                f"{subject_prefix} Ad-Hoc Ops Confirmed for "
+                f"{ops_date}"
+            )
             msg_parts = [
                 "We now have a ",
                 tow_title.lower(),
