@@ -103,7 +103,9 @@ MIDDLEWARE = [
     "django_htmx.middleware.HtmxMiddleware",
 ]
 
-LOGIN_REQUIRED_MIDDLEWARE = ("django.contrib.auth.middleware.AuthenticationMiddleware",)
+LOGIN_REQUIRED_MIDDLEWARE = (
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+)
 
 
 def login_required_middleware(get_response):
@@ -344,8 +346,9 @@ TINYMCE_DEFAULT_CONFIG = {
     "menubar": "file edit view insert format tools table help",
     "plugins": "image link media code lists table",
     "toolbar": (
-        "undo redo | bold italic underline | alignleft aligncenter alignright | "
-        "bullist numlist outdent indent | link image media | table | code"
+        "undo redo | bold italic underline | alignleft "
+        "aligncenter alignright | bullist numlist outdent indent | "
+        "link image media | table | code"
     ),
     "image_caption": True,
     "automatic_uploads": True,

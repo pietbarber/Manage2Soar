@@ -128,30 +128,22 @@ class Command(BaseCommand):
                     surge_candidates[0] if surge_candidates else None
                 )
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            (
-                                "⚠️  Both AM and PM tow pilots differ for %s @ %s. "
-                                "AM: %s, PM: %s"
-                            )
-                            % (log_date, field, am_towpilot, pm_towpilot)
-                        )
+                    warn_msg = (
+                        f"⚠️  Both AM and PM tow pilots differ for {log_date} @ {field}. "
+                        f"AM: {am_towpilot}, PM: {pm_towpilot}"
                     )
+                    self.stdout.write(self.style.WARNING(warn_msg))
             elif am_towpilot or pm_towpilot:
                 # If no main towpilot, but am/pm are present,
                 # assign AM as main, PM as surge (if different)
                 logsheet.tow_pilot = am_towpilot or pm_towpilot
                 if am_towpilot and pm_towpilot and am_towpilot != pm_towpilot:
                     logsheet.surge_tow_pilot = pm_towpilot
-                    self.stdout.write(
-                        self.style.WARNING(
-                            (
-                                "⚠️  No main towpilot, but both AM and PM present and "
-                                "differ for %s @ %s. AM: %s, PM: %s"
-                            )
-                            % (log_date, field, am_towpilot, pm_towpilot)
-                        )
+                    warn_msg = (
+                        f"⚠️  No main towpilot, but both AM and PM present and "
+                        f"differ for {log_date} @ {field}. AM: {am_towpilot}, PM: {pm_towpilot}"
                     )
+                    self.stdout.write(self.style.WARNING(warn_msg))
                 else:
                     logsheet.surge_tow_pilot = None
             else:

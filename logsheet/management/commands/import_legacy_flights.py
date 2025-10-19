@@ -129,14 +129,19 @@ def resolve_glider(legacy_name, flight_date):
     if match:
         return Glider.objects.filter(n_number=match["n_number"]).first()
 
-    print(f"⚠️  Glider not resolved for legacy name '{legacy_name}' on {flight_date}")
+    msg = (
+        f"⚠️  Glider not resolved for legacy name '{legacy_name}' on "
+        f"{flight_date}"
+    )
+    print(msg)
     return None
 
 
 #########################################
 #  find_member_by_name
 #
-# Try matching a name to legacy_username first, then fallback to first+last name.
+# Try matching a name to legacy_username first,
+# then fallback to first+last name.
 
 
 def find_member_by_name(name):

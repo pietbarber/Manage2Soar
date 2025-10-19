@@ -56,13 +56,8 @@ class Command(BaseCommand):
                     except ValueError:
                         continue
                 else:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            "Bad last-duty-date for {}: {}".format(
-                                name, date_str
-                            )
-                        )
-                    )
+                    msg = f"Bad last-duty-date for {name}: {date_str}"
+                    self.stdout.write(self.style.WARNING(msg))
 
             if pref.max_assignments_per_month in (None, 0):
                 pref.max_assignments_per_month = 2
@@ -93,14 +88,7 @@ class Command(BaseCommand):
                         member=member, date=blackout_date
                     )
                 except ValueError:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            "Invalid blackout date for {}: {}".format(
-                                name, bdate
-                            )
-                        )
-                    )
+                    msg = f"Invalid blackout date for {name}: {bdate}"
+                    self.stdout.write(self.style.WARNING(msg))
 
-            self.stdout.write(
-                self.style.SUCCESS("✅ Imported constraints for {}".format(name))
-            )
+            self.stdout.write(self.style.SUCCESS(f"✅ Imported constraints for {name}"))

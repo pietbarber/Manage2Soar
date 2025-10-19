@@ -28,7 +28,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--date",
             type=str,
-            help="Only import instruction records on or after this date (YYYY-MM-DD)",
+            help=(
+                "Only import instruction records on or after this date "
+                "(YYYY-MM-DD)"
+            ),
         )
 
     def handle(self, *args, **options):
@@ -66,7 +69,9 @@ class Command(BaseCommand):
             return Member.objects.get(legacy_username__iexact=handle)
         except Member.DoesNotExist:
             self.stderr.write(
-                self.style.ERROR(f"❌ Member with legacy handle '{handle}' not found")
+                self.style.ERROR(
+                    f"❌ Member with legacy handle '{handle}' not found"
+                )
             )
             raise SystemExit(1)
 

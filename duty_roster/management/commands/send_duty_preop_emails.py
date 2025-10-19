@@ -9,7 +9,10 @@ from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 
 
 class Command(BaseCommand):
-    help = "Send pre-op duty email showing grounded aircraft and upcoming maintenance"
+    help = (
+        "Send pre-op duty email showing grounded aircraft and "
+        "upcoming maintenance"
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
