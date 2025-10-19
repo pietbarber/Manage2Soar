@@ -141,43 +141,8 @@ def render_duties(member):
         # The legend is built once later and returned if no duties are present.
         duties.append(f'<span title="{towpilot}" class="emoji">🛩️</span>')
     # assistant_duty_officer already set above; no need to repeat it
-    parts = [
-        "<div class='accordion mb-4' id='emojiLegendAccordion'>",
-        "<div class='accordion-item'>",
-        "<h2 class='accordion-header' id='headingLegend'>",
-        "<button class='accordion-button collapsed' ",
-        "type='button' data-bs-toggle='collapse' ",
-        "data-bs-target='#collapseLegend' aria-expanded='false' ",
-        "aria-controls='collapseLegend'>",
-        "📖 Expand to show Legend</button>",
-        "</h2>",
-        "<div id='collapseLegend' class='accordion-collapse collapse' ",
-        "aria-labelledby='headingLegend' ",
-        "data-bs-parent='#emojiLegendAccordion'>",
-        "<div class='accordion-body'>",
-        "<ul class='list-unstyled mb-0'>",
-    ]
-    parts += [
-        "<li><span class='emoji'>🎓</span> – {}</li>".format(instructor),
-        "<li><span class='emoji'>🛩️</span> – {}</li>".format(towpilot),
-        "<li><span class='emoji'>📋</span> – {}</li>".format(duty_officer),
-        "<li><span class='emoji'>💪</span> – "
-        "{}</li>".format(assistant_duty_officer),
-        "<li><span class='emoji'>✍️</span> – Secretary</li>",
-        "<li><span class='emoji'>💰</span> – Treasurer</li>",
-        "<li><span class='emoji'>🌐</span> – Webmaster</li>",
-        "<li><span class='emoji'>🎩</span> – Director</li>",
-        "<li><span class='emoji'>📇</span> – Membership Manager</li>",
-    ]
-    parts += [
-        "</ul>",
-        "</div>",
-        "</div>",
-        "</div>",
-        "</div>",
-    ]
-    html = "".join(parts)
-    # If we have duties for this member, return those inline; otherwise show legend
+    # Return inline duty icons for the member, or a short fallback message.
     if duties:
         return mark_safe(" ".join(duties))
-    return mark_safe(html)
+    # No duties for this member; show a gentle placeholder.
+    return mark_safe("<em>None assigned</em>")
