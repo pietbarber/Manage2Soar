@@ -53,14 +53,27 @@ def homepage(request):
     if request.path.startswith("/cms"):
         from .models import Page
 
-        top_pages = Page.objects.filter(parent__isnull=True).order_by("title")
+        top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
         pages = []
-        for p in top_pages:
+        for p in top_pages_qs:
+            # Determine whether the current user may view links in this directory
+            can_view = True
+            if not p.is_public:
+                from members.utils import is_active_member
+
+                can_view = is_active_member(request.user)
+
+            # Only include non-public pages in the listing if the user may view them;
+            # otherwise, skip showing restricted directories to anonymous visitors.
+            if not p.is_public and not can_view:
+                continue
+
             pages.append(
                 {
                     "page": p,
                     "doc_count": p.documents.count(),
                     "is_public": p.is_public,
+                    "can_view": can_view,
                 }
             )
         return render(request, "cms/index.html", {"pages": pages})
@@ -98,14 +111,24 @@ def homepage(request):
     # Fallback: show CMS index of top-level pages
     from .models import Page
 
-    top_pages = Page.objects.filter(parent__isnull=True).order_by("title")
+    top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
     pages = []
-    for p in top_pages:
+    for p in top_pages_qs:
+        can_view = True
+        if not p.is_public:
+            from members.utils import is_active_member
+
+            can_view = is_active_member(request.user)
+
+        if not p.is_public and not can_view:
+            continue
+
         pages.append(
             {
                 "page": p,
                 "doc_count": p.documents.count(),
                 "is_public": p.is_public,
+                "can_view": can_view,
             }
         )
     return render(request, "cms/index.html", {"pages": pages})

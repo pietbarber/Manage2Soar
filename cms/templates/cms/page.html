@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ page.title }}</h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <h1 style="margin:0">{{ page.title }}</h1>
+    {% if user.is_authenticated %}
+      {% if user.webmaster or perms.cms.change_page %}
+        <div>
+          <a class="btn btn-sm btn-primary" href="{% url 'admin:cms_page_change' page.pk %}">Manage content</a>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
   <div>{{ page.content|safe }}</div>
   {% if page.children.exists %}
     <h3>Subpages</h3>
