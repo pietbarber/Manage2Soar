@@ -20,8 +20,8 @@ def cms_page(request, **kwargs):
             slugs.append(slug)
     logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
-        logger.debug("cms_page: No slugs, redirecting to home")
-        return redirect("home")
+        logger.debug("cms_page: No slugs, redirecting to cms:home")
+        return redirect("cms:home")
     parent = None
     page = None
     for slug in slugs:

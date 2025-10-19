@@ -33,7 +33,7 @@ urlpatterns = [
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("oauth/", include("social_django.urls", namespace="social")),
-    path("cms/", include("cms.urls")),
+    path("cms/", include(("cms.urls", "cms"), namespace="cms")),
     path(
         "password-reset/", auth_views.PasswordResetView.as_view(), name="password_reset"
     ),
@@ -80,7 +80,7 @@ urlpatterns = [
     path("analytics/", include("analytics.urls")),
     path("", include("knowledgetest.urls")),
     # CMS root include is last so other app URL patterns are matched first.
-    path("", include("cms.urls")),
+    path("", include(("cms.urls", "cms"), namespace="cms")),
 ]
 
 # Serve media files in development only

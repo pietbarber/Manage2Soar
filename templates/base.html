@@ -51,7 +51,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
       {% get_siteconfig as siteconfig %}
-      <a class="navbar-brand" href="{% url 'home' %}">
+  <a class="navbar-brand" href="{% url 'cms:home' %}">
         {% if siteconfig and siteconfig.club_logo %}
           <img src="{{ siteconfig.club_logo.url }}" alt="{{ siteconfig.club_name }} Logo" height="30" class="d-inline-block align-text-top me-2">
         {% else %}
@@ -79,7 +79,7 @@
               <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">Badge Board</a></li>
               <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{% url 'cms:index' %}">Resources</a></li>
+              <li><a class="dropdown-item" href="{% url 'cms:home' %}">Resources</a></li>
 
             </ul>
           </li>
