@@ -14,6 +14,47 @@ from tinymce.widgets import TinyMCE
 
 from .models import Badge, Biography, Member, MemberBadge
 
+
+# --- Register or replace social_django admin entries with helpful admin banners ---
+try:
+    from social_django.models import UserSocialAuth, Nonce, Association
+    from django.contrib import admin as django_admin
+
+    def register_or_replace(model, admin_class):
+        """If model is already registered in admin, unregister it first, then register our admin_class."""
+        try:
+            if model in django_admin.site._registry:
+                django_admin.site.unregister(model)
+        except Exception:
+            # If unregister fails for any reason, continue and attempt to register
+            pass
+        try:
+            django_admin.site.register(model, admin_class)
+        except Exception:
+            # If register fails, don't block app startup
+            pass
+
+    class UserSocialAuthAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        list_display = ("user", "provider", "uid")
+        search_fields = ("user__username", "provider", "uid")
+        admin_helper_message = "UserSocialAuth: external account links for members. Review before unlinking."
+
+    class AssociationAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        # Association doesn't always have uniform fields across versions; show a compact repr
+        list_display = ("__str__",)
+        admin_helper_message = "Association: backend association records for OAuth providers. Edit with care."
+
+    class NonceAdmin(AdminHelperMixin, django_admin.ModelAdmin):
+        list_display = ("__str__",)
+        admin_helper_message = "Nonce: one-time values used during OAuth handshakes. Typically safe to leave alone."
+
+    register_or_replace(UserSocialAuth, UserSocialAuthAdmin)
+    register_or_replace(Association, AssociationAdmin)
+    register_or_replace(Nonce, NonceAdmin)
+except Exception:
+    # social_django may not be available in some environments; skip registrations silently
+    pass
+
 # Custom filter for Active/Not active status
 
 
