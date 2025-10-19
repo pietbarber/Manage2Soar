@@ -300,14 +300,20 @@ class Command(BaseCommand):
             ]
 
             if dry_run:
-                self.stdout.write(
-                    "[DRY RUN] Would import: {} {} ({})".format(first, last, username)
+                msg = "[DRY RUN] Would import: {} {} ({})".format(
+                    first, last, username
                 )
+                self.stdout.write(msg)
             else:
                 member.save()
-                self.stdout.write("Imported: {} {} ({})".format(first, last, username))
+                msg = "Imported: {} {} ({})".format(
+                    first, last, username
+                )
+                self.stdout.write(msg)
             imported += 1
 
         self.stdout.write(
-            self.style.SUCCESS("Import complete. Total imported: {}".format(imported))
+            self.style.SUCCESS(
+                "Import complete. Total imported: {}".format(imported)
+            )
         )

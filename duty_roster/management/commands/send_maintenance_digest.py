@@ -54,11 +54,8 @@ class Command(BaseCommand):
                     recipients.add(meister.member.email)
 
         lines.append("\nTotal Open Issues: " + str(open_issues.count()))
-        lines.append(
-            "\nMaintenance Dashboard: {}/maintenance/".format(
-                settings.SITE_URL
-            )
-        )
+        dashboard_url = "{}/maintenance/".format(settings.SITE_URL)
+        lines.append("\nMaintenance Dashboard: " + dashboard_url)
 
         body = "\n".join(lines)
 
@@ -73,7 +70,7 @@ class Command(BaseCommand):
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=list(recipients),
             )
-            sent_to = ", ".join(recipients)
+            sent_to = ", ".join(sorted(recipients))
             msg = "✅ Sent maintenance summary to: {}".format(sent_to)
             self.stdout.write(self.style.SUCCESS(msg))
         else:

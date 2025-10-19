@@ -73,7 +73,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(" Added → " + email))
                 except subprocess.CalledProcessError as e:
                     self.stderr.write(
-                        "ERROR adding " + email + " to " + listname + ": " + str(e)
+                        f"ERROR adding {email} to {listname}: {e}"
                     )
             for email in sorted(to_remove):
                 try:
@@ -81,7 +81,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(" Removed → " + email))
                 except subprocess.CalledProcessError as e:
                     self.stderr.write(
-                        "ERROR removing " + email + " from " + listname + ": " + str(e)
+                        f"ERROR removing {email} from {listname}: {e}"
                     )
 
         self.stdout.write(self.style.SUCCESS("✓ Sympa sync complete."))
