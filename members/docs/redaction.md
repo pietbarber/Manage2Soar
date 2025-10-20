@@ -39,3 +39,20 @@ This document describes the "redact contact" feature: members can choose to supp
 - `members/templates/members/member_list.html` — list view now displays "Redacted" for suppressed members.
 - `members/templates/members/member_view.html` — informational modal and updated rendering for redacted fields.
 - `templates/base.html` — added `{% block extra_scripts %}` to ensure page scripts run after Bootstrap is available.
+
+## Recommended template pattern
+
+When using the `can_view_personal_info_tag` in templates prefer assigning the result to a variable and then using that variable in `{% if %}` checks. This avoids Django's TemplateIf parser raising errors when a tag appears inside a complex `{% if ... %}` expression. Example:
+
+```django
+{% load member_extras %}
+{% can_view_personal_info_tag member as can_view_personal %}
+
+{% if can_view_personal %}
+  <!-- show email/phone/address -->
+{% else %}
+  <em class="text-muted">Redacted</em>
+{% endif %}
+```
+
+This is the pattern used by the project and prevents subtle template parsing issues.

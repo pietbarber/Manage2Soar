@@ -40,6 +40,7 @@
 <table class="table table-bordered table-hover table-striped">
   <thead class="table-light">
     <tr>
+      {% can_view_personal_info_tag member as can_view_personal %}
       <th>Photo</th>
       <th>Name</th>
       <th>Phone</th>
@@ -64,9 +65,7 @@
       <td>{{ member.full_display_name }}{% if member.biography %} 📔{% endif %}</td>
 
       <td>
-        {% if member.redact_contact %}
-          <em class="text-muted">Redacted</em>
-        {% else %}
+        {% if can_view_personal %}
           {% if member.phone and member.phone == member.mobile_phone %}
           📞📱 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
           {% else %}
@@ -75,16 +74,18 @@
             <br>📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
             {% endif %}
           {% endif %}
+        {% else %}
+          <em class="text-muted">Redacted</em>
         {% endif %}
       </td>
       <td class="text-center">
         {{ member|render_duties|safe }}
       </td>
       <td>
-        {% if member.redact_contact %}
-          <em class="text-muted">Redacted</em>
-        {% else %}
+        {% if can_view_personal_info_tag member %}
           <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+        {% else %}
+          <em class="text-muted">Redacted</em>
         {% endif %}
       </td>
       <td>
