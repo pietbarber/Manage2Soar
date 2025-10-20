@@ -2,6 +2,7 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load member_extras %}
+{% load siteconfig_tags %}
 
 {% block title %}View Member: {{ member.full_display_name }}{% endblock %}
 
@@ -9,8 +10,9 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
-  {% if member.redact_contact and request.user.rostermeister %}
-  <!-- Modal shown to rostermeisters to inform about redaction policy -->
+  {% get_siteconfig as siteconfig %}
+  {% if member.redact_contact and request.user.member_manager %}
+  <!-- Modal shown to member_managers to inform about redaction policy -->
   <div class="modal fade" id="redaction-alert-modal" tabindex="-1" aria-labelledby="redactionAlertLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -20,7 +22,7 @@
         </div>
         <div class="modal-body">
           <p>This member has chosen to redact their personal contact information on the public members directory.</p>
-          <p>As a rostermeister, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
+          <p>As {{ siteconfig.membership_manager_title|default:'Member Meister' }}, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
@@ -32,7 +34,7 @@
   {# can_view_personal_info is computed in the view and passed in context #}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
-    {% if request.user.rostermeister or request.user.is_staff %}
+    {% if request.user.member_manager or request.user.is_staff %}
     <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-success btn-sm">
       Edit this member
     </a>
@@ -59,14 +61,9 @@
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail"
         style="max-width: 200px;">
-      {% elif request.user.rostermeister %}
+      {% elif request.user.member_manager %}
       <h5>Contact Card QR Code</h5>
-      <div>
-        <button type="button" class="btn btn-outline-secondary btn-sm spoiler-blind-btn" data-field="qr" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
-        <div class="mt-2 d-none spoiler-hidden" id="qr-{{ member.id }}">
-          <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width:200px;">
-        </div>
-      </div>
+      <div class="text-muted"><em>Redacted</em></div>
       {% else %}
       <h5>Contact Card QR Code</h5>
       <div class="text-muted"><em>Redacted</em></div>
@@ -83,15 +80,8 @@
             {% else %}
               {{ member.email }}
             {% endif %}
-          {% elif request.user.rostermeister %}
-            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="email" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
-            <span class="ms-2 d-none spoiler-hidden" id="email-{{ member.id }}">
-              {% if member.email and "@" in member.email %}
-                <a href="mailto:{{ member.email }}">{{ member.email }}</a>
-              {% else %}
-                {{ member.email }}
-              {% endif %}
-            </span>
+          {% elif request.user.member_manager %}
+            <div class="text-muted"><em>Redacted</em></div>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -106,9 +96,8 @@
             {% else %}
               📞 {{ phone_display }}
             {% endif %}
-          {% elif request.user.rostermeister and phone_display %}
-            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="phone" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
-            <span class="ms-2 d-none spoiler-hidden" id="phone-{{ member.id }}">{% if phone_link %}📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>{% else %}📞 {{ phone_display }}{% endif %}</span>
+          {% elif request.user.member_manager and phone_display %}
+            <div class="text-muted"><em>Redacted</em></div>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -124,9 +113,8 @@
             {% else %}
               📱 {{ mobile_display }}
             {% endif %}
-          {% elif request.user.rostermeister and mobile_display %}
-            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="mobile" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
-            <span class="ms-2 d-none spoiler-hidden" id="mobile-{{ member.id }}">{% if mobile_link %}📱 <a href="tel:{{ mobile_display }}">{{ mobile_display|format_us_phone }}</a>{% else %}📱 {{ mobile_display }}{% endif %}</span>
+          {% elif request.user.member_manager and mobile_display %}
+            <div class="text-muted"><em>Redacted</em></div>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -139,13 +127,8 @@
             {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
             {% endif %} {{ member.zip_code }}<br>
             {{ member.country }}
-          {% elif request.user.rostermeister and member.address %}
-            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="address" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
-            <div class="mt-2 d-none spoiler-hidden" id="address-{{ member.id }}">
-              {{ member.address }}<br>
-              {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
-              {{ member.country }}
-            </div>
+          {% elif request.user.member_manager and member.address %}
+            <div class="text-muted"><em>Redacted</em></div>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -202,6 +185,7 @@
         </a>
         {% endif %}
       {% endif %}
+      
 
       <div class="mt-3">
         <a href="{% if request.user.instructor %}
@@ -419,5 +403,24 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{% static 'js/redaction-blind.js' %}"></script>
+  <script>
+    // Defensive modal auto-show for member_manager when viewing a redacted member.
+    // Defensive modal auto-show for membership managers when viewing a redacted member.
+    (function showRedactionModal(retries) {
+      try {
+        var modalEl = document.getElementById('redaction-alert-modal');
+        if (!modalEl) return;
+        if (window.bootstrap && window.bootstrap.Modal) {
+          var m = new bootstrap.Modal(modalEl);
+          m.show();
+          return;
+        }
+      } catch (e) {
+        // ignore and retry below
+      }
+      if (retries > 0) {
+        setTimeout(function () { showRedactionModal(retries - 1); }, 100);
+      }
+    })(20);
+  </script>
 {% endblock %}

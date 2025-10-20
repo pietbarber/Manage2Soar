@@ -14,6 +14,10 @@ This document describes the unit tests for the `members` app.
 - Group/role assignment and permissions
 - Decorator logic (e.g., `active_member_required`)
 
+## Redaction tests
+- The redaction feature (toggle visibility and notification creation) is covered by tests in `members/tests/` including `test_toggle_redaction.py` and `test_notifications_on_toggle.py`.
+
+
 ## Also See
 - [README.md](README.md)
 - [models.md](models.md)

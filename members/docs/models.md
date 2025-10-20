@@ -17,6 +17,8 @@ This document describes the models in the `members` app and their relationships.
 - Stores all member profile data, authentication info, and group/role logic.
 - Methods for profile image, display name, group syncing, and status.
 
+See also: [Redaction of Personal Contact Information](redaction.md)
+
 ### `Badge`
 - Represents a badge that can be earned by a member.
 - Includes badge name, description, and image.

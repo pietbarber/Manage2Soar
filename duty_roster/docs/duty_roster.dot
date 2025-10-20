@@ -1,6 +1,6 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-10-19 12:01
+  // Created: 2025-10-20 10:48
   // Cli Options: duty_roster --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/duty_roster/docs/duty_roster.dot
 
   fontname = "Roboto"

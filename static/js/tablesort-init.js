@@ -40,6 +40,8 @@
     // If Tablesort isn't immediately available (loader may still be fetching),
     // poll for a short time before giving up.
     function tryInit(retriesLeft) {
+        // If there are no table.sort elements on this page, skip initialization entirely.
+        if (!document.querySelector('table.sort')) return;
         var ok = initTablesort();
         if (ok) return;
         if (retriesLeft <= 0) {
