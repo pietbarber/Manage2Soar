@@ -295,7 +295,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
     # Allow quick inline editing of membership status and redaction flag
     list_editable = ("membership_status", "redact_contact")
     # Allow filtering by redact flag in the admin sidebar
-    list_filter = list(list_filter) + ["redact_contact"]
+    list_filter = list_filter + ("redact_contact",)
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
