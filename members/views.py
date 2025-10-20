@@ -227,7 +227,7 @@ def toggle_redaction(request, member_id):
     if request.method == "POST":
         member.redact_contact = not member.redact_contact
         member.save()
-        # Create a notification for all rostermeisters so they are aware
+        # Create a notification for all member_managers so they are aware
         # that a member has toggled their redaction flag.
         try:
             if Notification is not None:
@@ -247,11 +247,11 @@ def toggle_redaction(request, member_id):
                 url = request.build_absolute_uri(
                     reverse("members:member_view", kwargs={"member_id": member.id}))
 
-                # Notify every user with rostermeister privilege, but dedupe
+                # Notify every user with member_manager privilege, but dedupe
                 # so we don't spam them if the same member toggles repeatedly.
                 from .models import Member as MemberModel
 
-                # Notify member managers (not rostermeisters) so club managers
+                # Notify member managers so club managers
                 # are alerted when a member toggles redaction.
                 member_managers = MemberModel.objects.filter(member_manager=True)
                 # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
