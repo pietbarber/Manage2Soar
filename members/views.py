@@ -132,46 +132,13 @@ def member_view(request, member_id):
     qr_png = generate_vcard_qr(member, include_contact=can_view_personal)
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
 
-    # Compute phone/mobile display values. Mask phone numbers for non-staff
-    # privileged viewers (show last 4 digits) and show full numbers only to
-    # the profile owner or staff/superusers.
-    def mask_phone(number):
-        digits = re.sub(r"\D", "", str(number))
-        if len(digits) >= 4:
-            last4 = digits[-4:]
-            return f"+1 ***-***-{last4}"
-        return "***-***-****"
+    # Compute phone/mobile display values. Use the canonical can_view_personal
+    # check (which includes member self, staff, and privileged viewers).
+    phone_display = member.phone if member.phone and can_view_personal else None
+    phone_link = bool(phone_display)
 
-    viewer_is_self = request.user == member
-    viewer_is_staff = getattr(request.user, "is_superuser", False) or getattr(
-        request.user, "is_staff", False)
-    viewer_privileged = is_privileged_viewer(request.user)
-
-    phone_display = None
-    phone_link = False
-    if member.phone:
-        if viewer_is_self or viewer_is_staff:
-            phone_display = member.phone
-            phone_link = True
-        elif viewer_privileged:
-            phone_display = mask_phone(member.phone)
-            phone_link = False
-        else:
-            phone_display = None
-            phone_link = False
-
-    mobile_display = None
-    mobile_link = False
-    if member.mobile_phone:
-        if viewer_is_self or viewer_is_staff:
-            mobile_display = member.mobile_phone
-            mobile_link = True
-        elif viewer_privileged:
-            mobile_display = mask_phone(member.mobile_phone)
-            mobile_link = False
-        else:
-            mobile_display = None
-            mobile_link = False
+    mobile_display = member.mobile_phone if member.mobile_phone and can_view_personal else None
+    mobile_link = bool(mobile_display)
 
     qualifications = (
         MemberQualification.objects.filter(member=member, is_qualified=True)

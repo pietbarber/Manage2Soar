@@ -1,8 +1,8 @@
 Notification deduplication for member redaction toggles
 =====================================================
 
-This project creates a `notifications.Notification` entry for rostermeisters when a
-member toggles their `redact_contact` flag. To avoid spamming rostermeisters, the
+This project creates a `notifications.Notification` entry for member managers when a
+member toggles their `redact_contact` flag. To avoid spamming member managers, the
 toggle handler deduplicates notifications created for the same member URL within a
 short time window.
 
