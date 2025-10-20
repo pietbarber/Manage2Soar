@@ -2,6 +2,7 @@ import base64
 import os
 from datetime import date, timedelta
 from django.utils import timezone
+import re
 
 from django.conf import settings
 from django.contrib import messages
@@ -21,6 +22,8 @@ from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
+from members.utils import can_view_personal_info as can_view_personal_info_fn
+from members.utils import is_privileged_viewer
 from django.urls import reverse
 
 try:
@@ -123,9 +126,52 @@ def member_view(request, member_id):
     # Biography logic
     biography = getattr(member, "biography", None)
 
-    # QR code generation
-    qr_png = generate_vcard_qr(member)
+    # Determine whether the requester can view personal info, and generate
+    # a QR code accordingly (redacted QR omits contact fields).
+    can_view_personal = can_view_personal_info_fn(request.user, member)
+    qr_png = generate_vcard_qr(member, include_contact=can_view_personal)
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
+
+    # Compute phone/mobile display values. Mask phone numbers for non-staff
+    # privileged viewers (show last 4 digits) and show full numbers only to
+    # the profile owner or staff/superusers.
+    def mask_phone(number):
+        digits = re.sub(r"\D", "", str(number))
+        if len(digits) >= 4:
+            last4 = digits[-4:]
+            return f"+1 ***-***-{last4}"
+        return "***-***-****"
+
+    viewer_is_self = request.user == member
+    viewer_is_staff = getattr(request.user, "is_superuser", False) or getattr(
+        request.user, "is_staff", False)
+    viewer_privileged = is_privileged_viewer(request.user)
+
+    phone_display = None
+    phone_link = False
+    if member.phone:
+        if viewer_is_self or viewer_is_staff:
+            phone_display = member.phone
+            phone_link = True
+        elif viewer_privileged:
+            phone_display = mask_phone(member.phone)
+            phone_link = False
+        else:
+            phone_display = None
+            phone_link = False
+
+    mobile_display = None
+    mobile_link = False
+    if member.mobile_phone:
+        if viewer_is_self or viewer_is_staff:
+            mobile_display = member.mobile_phone
+            mobile_link = True
+        elif viewer_privileged:
+            mobile_display = mask_phone(member.mobile_phone)
+            mobile_link = False
+        else:
+            mobile_display = None
+            mobile_link = False
 
     qualifications = (
         MemberQualification.objects.filter(member=member, is_qualified=True)
@@ -145,6 +191,7 @@ def member_view(request, member_id):
     context = {
         "member": member,
         "qr_base64": qr_base64,
+        "can_view_personal_info": can_view_personal,
         "form": form,
         "is_self": is_self,
         "can_edit": can_edit,
@@ -155,6 +202,10 @@ def member_view(request, member_id):
         "show_need_buttons": show_need_buttons,
         "pilot_certificate_number": member.pilot_certificate_number,
         "private_glider_checkride_date": member.private_glider_checkride_date,
+        "phone_display": phone_display,
+        "phone_link": phone_link,
+        "mobile_display": mobile_display,
+        "mobile_link": mobile_link,
     }
     return render(request, "members/member_view.html", context)
 

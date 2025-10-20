@@ -9,7 +9,7 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
-  {% can_view_personal_info_tag member as can_view_personal_info %}
+  {# can_view_personal_info is computed in the view and passed in context #}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
     {% if request.user.rostermeister or request.user.is_staff %}
@@ -35,9 +35,14 @@
       </form>
       {% endif %}
       <br><br>
+      {% if can_view_personal_info %}
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail"
         style="max-width: 200px;">
+      {% else %}
+      <h5>Contact Card QR Code</h5>
+      <div class="text-muted"><em>Redacted</em></div>
+      {% endif %}
     </div>
 
     <div class="col-md-8">
@@ -58,8 +63,12 @@
         {% if member.phone %}
         <li class="list-group-item">
           <strong>Phone:</strong>
-          {% if can_view_personal_info %}
-            📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a>
+          {% if phone_display %}
+            {% if phone_link %}
+              📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>
+            {% else %}
+              📞 {{ phone_display }}
+            {% endif %}
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -69,8 +78,12 @@
         {% if member.mobile_phone %}
         <li class="list-group-item">
           <strong>Mobile:</strong>
-          {% if can_view_personal_info %}
-            📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
+          {% if mobile_display %}
+            {% if mobile_link %}
+              📱 <a href="tel:{{ mobile_display }}">{{ mobile_display|format_us_phone }}</a>
+            {% else %}
+              📱 {{ mobile_display }}
+            {% endif %}
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
