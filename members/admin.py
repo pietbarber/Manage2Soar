@@ -348,6 +348,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "glider_rating",
                     "private_notes",
                     "public_notes",
+                    "redact_contact",
                 )
             },
         ),

@@ -191,6 +191,11 @@ class Member(AbstractUser):
     last_updated_by = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True
     )
+    # When True, personal contact details are hidden from non-privileged viewers
+    redact_contact = models.BooleanField(
+        default=False,
+        help_text="If set, personal contact details (address, phones, email, QR) are hidden from non-privileged viewers.",
+    )
 
     @property
     def profile_image_url(self):
