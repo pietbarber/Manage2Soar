@@ -11,7 +11,7 @@ User = get_user_model()
 @pytest.mark.django_db
 def test_member_can_toggle_own_redaction(client):
     m = Member.objects.create(
-        username="selft", email="self@example.com", membership_status="Full Member")
+        username="self", email="self@example.com", membership_status="Full Member")
     # login as the member
     client.force_login(m)
     url = reverse("members:toggle_redaction", args=[m.id])
