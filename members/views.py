@@ -20,6 +20,7 @@ from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
+from django.urls import reverse
 
 #########################
 # member_list() View
@@ -150,6 +151,33 @@ def member_view(request, member_id):
         "private_glider_checkride_date": member.private_glider_checkride_date,
     }
     return render(request, "members/member_view.html", context)
+
+
+@active_member_required
+def toggle_redaction(request, member_id):
+    """Toggle the redact_contact flag for a member.
+
+    Only the member themselves or a superuser may perform this action.
+    The view accepts POST requests from the member profile form and redirects
+    back to the member view after updating the flag.
+    """
+    member = get_object_or_404(Member, pk=member_id)
+
+    # Only the member themselves or superusers may toggle this flag
+    if request.user != member and not request.user.is_superuser:
+        return render(request, "403.html", status=403)
+
+    if request.method == "POST":
+        member.redact_contact = not member.redact_contact
+        member.save()
+        if member.redact_contact:
+            messages.success(
+                request, "Your personal contact information is now redacted.")
+        else:
+            messages.success(
+                request, "Your personal contact information is now visible to other members.")
+
+    return redirect("members:member_view", member_id=member.id)
 
 
 #########################
@@ -284,7 +312,6 @@ def tinymce_image_upload(request):
     saved_name = default_storage.save(save_path, ContentFile(f.read()))
     # Always return the public GCS URL
     from urllib.parse import urljoin
-
 
     url = urljoin(settings.MEDIA_URL, saved_name)
     return JsonResponse({"location": url})

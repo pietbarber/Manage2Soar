@@ -9,6 +9,7 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
+  {% can_view_personal_info_tag member as can_view_personal_info %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
     {% if request.user.rostermeister or request.user.is_staff %}
@@ -51,28 +52,45 @@
         {% endif %}
         <li class="list-group-item">
           <strong>Email:</strong>
-          {% if member.email and "@" in member.email %}
-          <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+          {% if can_view_personal_info %}
+            {% if member.email and "@" in member.email %}
+              <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+            {% else %}
+              {{ member.email }}
+            {% endif %}
           {% else %}
-          {{ member.email }}
+            <em class="text-muted">Redacted</em>
           {% endif %}
         </li>
         {% if member.phone %}
         <li class="list-group-item">
           <strong>Phone:</strong>
-          📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
+          {% if can_view_personal_info %}
+            📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
         {% endif %}
         {% if member.mobile_phone %}
         <li class="list-group-item">
           <strong>Mobile:</strong>
-          📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
+          {% if can_view_personal_info %}
+            📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
         {% endif %}
-        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }}<br>
-          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
-          {% endif %} {{ member.zip_code }}<br>
-          {{ member.country }}
+        <li class="list-group-item"><strong>Address:</strong> <br>
+          {% if can_view_personal_info %}
+            {{ member.address }}<br>
+            {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
+            {% endif %} {{ member.zip_code }}<br>
+            {{ member.country }}
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li>
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
@@ -112,12 +130,22 @@
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
 
-      {% if request.user == member or request.user.instructor %}
+    {% if request.user == member or request.user.instructor %}
       {% if show_need_buttons %}
       {% if not member.solo_date %}
       <a class="btn btn-warning" href="{% url 'instructors:needed_for_solo' member.id %}">
         What's still needed to solo?
       </a>
+      {% endif %}
+      {% if request.user == member %}
+      <form method="post" action="{% url 'members:toggle_redaction' member.id %}" onsubmit="return confirm('This will hide your personal contact details from other members. Continue?');">
+        {% csrf_token %}
+        {% if member.redact_contact %}
+          <button class="btn btn-outline-secondary mt-3">Un-redact my personal information</button>
+        {% else %}
+          <button class="btn btn-warning mt-3">Redact my personal information</button>
+        {% endif %}
+      </form>
       {% endif %}
       {% if not member.checkride_date %}
       <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
