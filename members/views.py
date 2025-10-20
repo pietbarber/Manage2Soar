@@ -431,16 +431,19 @@ def set_password(request):
 @active_member_required
 @csrf_exempt
 def tinymce_image_upload(request):
+    # Only accept POSTs with a file named 'file'
     if request.method == "POST" and request.FILES.get("file"):
         f = request.FILES["file"]
         # Save to 'tinymce/<filename>' in the default storage (GCS or local)
-    save_path = os.path.join("tinymce", f.name)
-    saved_name = default_storage.save(save_path, ContentFile(f.read()))
-    # Always return the public GCS URL
-    from urllib.parse import urljoin
+        save_path = os.path.join("tinymce", f.name)
+        saved_name = default_storage.save(save_path, ContentFile(f.read()))
+        # Always return the public GCS URL
+        from urllib.parse import urljoin
 
-    url = urljoin(settings.MEDIA_URL, saved_name)
-    return JsonResponse({"location": url})
+        url = urljoin(settings.MEDIA_URL, saved_name)
+        return JsonResponse({"location": url})
+
+    # For any other request method or missing file, return an error
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 
