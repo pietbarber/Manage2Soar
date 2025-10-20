@@ -217,7 +217,6 @@ def toggle_redaction(request, member_id):
                 # Notify every user with member_manager privilege, but dedupe
                 # so we don't spam them if the same member toggles repeatedly.
 
-
                 # Notify member managers so club managers
                 # are alerted when a member toggles redaction.
                 member_managers = Member.objects.filter(member_manager=True)
@@ -247,19 +246,29 @@ def toggle_redaction(request, member_id):
                             cutoff = timezone.now() - timedelta(hours=float(hours))
                     except Exception:
                         cutoff = timezone.now() - timedelta(hours=1)
-                for rm in member_managers:
-                    try:
-                        # If a recent notification exists for this recipient and URL,
-                        # skip creating another one.
-                        exists = Notification.objects.filter(
-                            user=rm, url=url, created_at__gte=cutoff
-                        ).exists()
-                        if exists:
+                try:
+                    # Avoid N+1 queries: fetch which member_manager user ids already
+                    # have a recent notification for this URL, then bulk-create
+                    # Notification objects for the remaining recipients.
+                    manager_ids = list(member_managers.values_list("id", flat=True))
+                    existing_user_ids = set(
+                        Notification.objects.filter(
+                            user_id__in=manager_ids, url=url, created_at__gte=cutoff
+                        ).values_list("user_id", flat=True)
+                    )
+
+                    to_create = []
+                    for rm in member_managers:
+                        if rm.id in existing_user_ids:
                             continue
-                        Notification.objects.create(user=rm, message=message, url=url)
-                    except Exception:
-                        # Fail softly if notification creation fails for any recipient
-                        continue
+                        to_create.append(Notification(
+                            user=rm, message=message, url=url))
+
+                    if to_create:
+                        Notification.objects.bulk_create(to_create)
+                except Exception:
+                    # Fail softly if notification logic fails for any reason
+                    pass
         except Exception:
             # Defensive: don't let notification failures break the toggle flow
             pass
