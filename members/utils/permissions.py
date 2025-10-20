@@ -6,7 +6,13 @@ def is_privileged_viewer(user):
         return False
     if user.is_superuser or getattr(user, "is_staff", False):
         return True
-    if getattr(user, "webmaster", False) or getattr(user, "treasurer", False):
+    # Role flags that should grant privileged viewing rights
+    if (
+        getattr(user, "webmaster", False)
+        or getattr(user, "treasurer", False)
+        or getattr(user, "member_manager", False)
+        or getattr(user, "rostermeister", False)
+    ):
         return True
     exempt_groups = getattr(settings, "MEMBERS_REDACT_EXEMPT_GROUPS", [])
     if not exempt_groups:
