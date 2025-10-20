@@ -216,11 +216,11 @@ def toggle_redaction(request, member_id):
 
                 # Notify every user with member_manager privilege, but dedupe
                 # so we don't spam them if the same member toggles repeatedly.
-                from .models import Member as MemberModel
+
 
                 # Notify member managers so club managers
                 # are alerted when a member toggles redaction.
-                member_managers = MemberModel.objects.filter(member_manager=True)
+                member_managers = Member.objects.filter(member_manager=True)
                 # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
                 # (integer minutes). For backward compatibility, a settings value
                 # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
