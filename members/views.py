@@ -251,7 +251,9 @@ def toggle_redaction(request, member_id):
                 # so we don't spam them if the same member toggles repeatedly.
                 from .models import Member as MemberModel
 
-                rostermeisters = MemberModel.objects.filter(rostermeister=True)
+                # Notify member managers (not rostermeisters) so club managers
+                # are alerted when a member toggles redaction.
+                member_managers = MemberModel.objects.filter(member_manager=True)
                 # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
                 # (integer minutes). For backward compatibility, a settings value
                 # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
@@ -278,7 +280,7 @@ def toggle_redaction(request, member_id):
                             cutoff = timezone.now() - timedelta(hours=float(hours))
                     except Exception:
                         cutoff = timezone.now() - timedelta(hours=1)
-                for rm in rostermeisters:
+                for rm in member_managers:
                     try:
                         # If a recent notification exists for this recipient and URL,
                         # skip creating another one.
