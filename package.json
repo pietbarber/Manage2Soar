@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "tinymce": "^8.1.2"
+    "tinymce": "^8.1.2",
+    "tablesort": "^5.2.1"
   }
 }
