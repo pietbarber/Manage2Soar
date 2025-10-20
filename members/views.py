@@ -28,7 +28,10 @@ from django.urls import reverse
 
 try:
     from notifications.models import Notification
-except Exception:
+except ImportError:
+    # Notifications app may be optional in some deployments; if it's not
+    # available, fall back to None and make notification-related code
+    # guarded by checks for Notification is not None.
     Notification = None
 
 #########################

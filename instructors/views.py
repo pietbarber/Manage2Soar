@@ -58,7 +58,13 @@ from logsheet.models import Flight
 from members.constants.membership import DEFAULT_ACTIVE_STATUSES
 from members.decorators import active_member_required
 from members.models import Member
-from notifications.models import Notification
+try:
+    from notifications.models import Notification
+except ImportError:
+    # Notifications app may be optional in some deployments; if it's not
+    # available, fall back to None and make notification-related code
+    # guarded by checks for Notification is not None.
+    Notification = None
 
 
 @require_POST
@@ -1517,7 +1523,7 @@ def member_logbook(request):
     }
 
     for idx in range(0, len(rows), 10):
-        chunk = rows[idx : idx + 10]
+        chunk = rows[idx: idx + 10]
         page_number = idx // 10
 
         # Always set year_start for every page
@@ -1901,6 +1907,7 @@ class CreateWrittenTestView(FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
+        import random
         # 1. Pull weights & must_include
         must = []
         if data["must_include"]:
@@ -1951,11 +1958,12 @@ class CreateWrittenTestView(FormView):
             )
             # Create notification for the student
             try:
-                notif = Notification.objects.create(
-                    user=data["student"],
-                    message=f"You have been assigned a new written test: {tmpl.name}",
-                    url=reverse("knowledgetest:quiz-pending"),
-                )
+                if Notification is not None:
+                    notif = Notification.objects.create(
+                        user=data["student"],
+                        message=f"You have been assigned a new written test: {tmpl.name}",
+                        url=reverse("knowledgetest:quiz-pending"),
+                    )
             except Exception as e:
                 print(f"Failed to create notification: {e}")
         order = 1
@@ -1971,7 +1979,6 @@ class CreateWrittenTestView(FormView):
                 continue
 
         # 4. Then, for each category, randomly choose unanswered ones
-        import random
 
         for code, cnt in weights.items():
             pool = list(
