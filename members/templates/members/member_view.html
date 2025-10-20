@@ -90,13 +90,13 @@
         {% if member.phone %}
         <li class="list-group-item">
           <strong>Phone:</strong>
-          {% if phone_display and not member.redact_contact or phone_display and request.user == member or phone_display and request.user.is_staff %}
+          {% if phone_display and can_view_personal_info %}
             {% if phone_link %}
               📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>
             {% else %}
               📞 {{ phone_display }}
             {% endif %}
-          {% elif request.user.member_manager and phone_display %}
+          {% elif phone_display %}
             <div class="text-muted"><em>Redacted</em></div>
           {% else %}
             <em class="text-muted">Redacted</em>
