@@ -1,9 +1,8 @@
 from django.conf import settings
+from django.conf.urls import handler403
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
-
-from members import views
 
 from . import views
 from .views import tinymce_image_upload
@@ -23,14 +22,13 @@ urlpatterns = [
         lambda req: redirect("instructors:member_training_grid", req.user.pk),
         name="training_progress",
     ),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path("<int:member_id>/toggle-redaction/",
+         views.toggle_redaction, name="toggle_redaction"),
+]
 
-from django.conf.urls import handler403
 
 handler403 = "django.views.defaults.permission_denied"
 
-from django.conf import settings
-from django.conf.urls.static import static
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

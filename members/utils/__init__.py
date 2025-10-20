@@ -5,5 +5,6 @@ import `from members.utils import is_active_member` and get a stable API.
 """
 
 from .membership import is_active_member
+from .permissions import can_view_personal_info, is_privileged_viewer
 
-__all__ = ["is_active_member"]
+__all__ = ["is_active_member", "can_view_personal_info", "is_privileged_viewer"]

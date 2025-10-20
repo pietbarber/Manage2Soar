@@ -1,6 +1,6 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2025-10-19 12:01
+  // Created: 2025-10-20 10:48
   // Cli Options: members --arrow-shape normal --group-models --output /home/pb/Projects/skylinesoaring/members/docs/members.dot
 
   fontname = "Roboto"
@@ -466,6 +466,14 @@ digraph model_graph {
       <FONT COLOR="#7B7B7B" FACE="Roboto">public_notes</FONT>
       </TD><TD ALIGN="LEFT">
       <FONT COLOR="#7B7B7B" FACE="Roboto">HTMLField</FONT>
+      </TD></TR>
+    
+    
+    
+      <TR><TD ALIGN="LEFT" BORDER="0">
+      <FONT FACE="Roboto">redact_contact</FONT>
+      </TD><TD ALIGN="LEFT">
+      <FONT FACE="Roboto">BooleanField</FONT>
       </TD></TR>
     
     

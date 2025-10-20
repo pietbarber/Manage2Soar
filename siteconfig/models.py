@@ -88,6 +88,15 @@ class SiteConfiguration(models.Model):
         help_text="We allow members to reserve club two seaters ahead of time.",
     )
 
+    # Notification dedupe: number of minutes to suppress duplicate redaction
+    # notifications for the same member URL. Editable by the Webmaster in the
+    # admin SiteConfiguration UI. If blank/zero, falls back to settings or
+    # application default.
+    redaction_notification_dedupe_minutes = models.PositiveIntegerField(
+        default=60,
+        help_text="Dedupe window (minutes) for member redaction notifications."
+    )
+
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
             raise ValidationError("Only one SiteConfiguration instance allowed.")

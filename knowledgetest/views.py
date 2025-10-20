@@ -21,7 +21,13 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
-from notifications.models import Notification
+try:
+    from notifications.models import Notification
+except ImportError:
+    # Notifications app may be optional in some deployments; if it's not
+    # available, fall back to None and make notification-related code
+    # guarded by checks for Notification is not None.
+    Notification = None
 
 logger = logging.getLogger(__name__)
 
@@ -212,11 +218,12 @@ class CreateWrittenTestView(FormView):
             )
         # Create notification for the student
         try:
-            Notification.objects.create(
-                user=data["student"],
-                message=f"You have been assigned a new written test: {tmpl.name}",
-                url=reverse("knowledgetest:quiz-pending"),
-            )
+            if Notification is not None:
+                Notification.objects.create(
+                    user=data["student"],
+                    message=f"You have been assigned a new written test: {tmpl.name}",
+                    url=reverse("knowledgetest:quiz-pending"),
+                )
         except Exception:
             pass
         order = 1

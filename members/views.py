@@ -1,6 +1,8 @@
 import base64
 import os
-from datetime import date
+from datetime import date, timedelta
+from django.utils import timezone
+import re
 
 from django.conf import settings
 from django.contrib import messages
@@ -20,6 +22,17 @@ from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
+from members.utils import can_view_personal_info as can_view_personal_info_fn
+from members.utils import is_privileged_viewer
+from django.urls import reverse
+
+try:
+    from notifications.models import Notification
+except ImportError:
+    # Notifications app may be optional in some deployments; if it's not
+    # available, fall back to None and make notification-related code
+    # guarded by checks for Notification is not None.
+    Notification = None
 
 #########################
 # member_list() View
@@ -116,9 +129,19 @@ def member_view(request, member_id):
     # Biography logic
     biography = getattr(member, "biography", None)
 
-    # QR code generation
-    qr_png = generate_vcard_qr(member)
+    # Determine whether the requester can view personal info, and generate
+    # a QR code accordingly (redacted QR omits contact fields).
+    can_view_personal = can_view_personal_info_fn(request.user, member)
+    qr_png = generate_vcard_qr(member, include_contact=can_view_personal)
     qr_base64 = base64.b64encode(qr_png).decode("utf-8")
+
+    # Compute phone/mobile display values. Use the canonical can_view_personal
+    # check (which includes member self, staff, and privileged viewers).
+    phone_display = member.phone if member.phone and can_view_personal else None
+    phone_link = bool(phone_display)
+
+    mobile_display = member.mobile_phone if member.mobile_phone and can_view_personal else None
+    mobile_link = bool(mobile_display)
 
     qualifications = (
         MemberQualification.objects.filter(member=member, is_qualified=True)
@@ -138,6 +161,7 @@ def member_view(request, member_id):
     context = {
         "member": member,
         "qr_base64": qr_base64,
+        "can_view_personal_info": can_view_personal,
         "form": form,
         "is_self": is_self,
         "can_edit": can_edit,
@@ -148,8 +172,117 @@ def member_view(request, member_id):
         "show_need_buttons": show_need_buttons,
         "pilot_certificate_number": member.pilot_certificate_number,
         "private_glider_checkride_date": member.private_glider_checkride_date,
+        "phone_display": phone_display,
+        "phone_link": phone_link,
+        "mobile_display": mobile_display,
+        "mobile_link": mobile_link,
     }
     return render(request, "members/member_view.html", context)
+
+
+@active_member_required
+def toggle_redaction(request, member_id):
+    """Toggle the redact_contact flag for a member.
+
+    Only the member themselves or a superuser may perform this action.
+    The view accepts POST requests from the member profile form and redirects
+    back to the member view after updating the flag.
+    """
+    member = get_object_or_404(Member, pk=member_id)
+
+    # Only the member themselves or superusers may toggle this flag
+    if request.user != member and not request.user.is_superuser:
+        return render(request, "403.html", status=403)
+
+    if request.method == "POST":
+        member.redact_contact = not member.redact_contact
+        member.save()
+        # Create a notification for all member_managers so they are aware
+        # that a member has toggled their redaction flag.
+        try:
+            if Notification is not None:
+                # Build a human-friendly message. If the actor is the member themself
+                # we phrase it as 'Member X has hidden...'; if an admin toggled for
+                # someone else we include both actor and subject.
+                if request.user == member:
+                    actor_name = member.full_display_name
+                    action = "hidden" if member.redact_contact else "made visible"
+                    message = f"Member {actor_name} has {action} their personal contact information on the members site."
+                else:
+                    actor_name = request.user.full_display_name
+                    subject_name = member.full_display_name
+                    action = "hidden" if member.redact_contact else "made visible"
+                    message = f"{actor_name} has {action} personal contact information for member {subject_name}."
+
+                url = request.build_absolute_uri(
+                    reverse("members:member_view", kwargs={"member_id": member.id}))
+
+                # Notify every user with member_manager privilege, but dedupe
+                # so we don't spam them if the same member toggles repeatedly.
+
+                # Notify member managers so club managers
+                # are alerted when a member toggles redaction.
+                member_managers = Member.objects.filter(member_manager=True)
+                # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
+                # (integer minutes). For backward compatibility, a settings value
+                # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
+                cutoff = None
+                # Prefer SiteConfiguration value when available
+                try:
+                    from siteconfig.models import SiteConfiguration
+
+                    sc = SiteConfiguration.objects.first()
+                    if sc and getattr(sc, "redaction_notification_dedupe_minutes", None):
+                        cutoff = timezone.now() - timedelta(minutes=int(sc.redaction_notification_dedupe_minutes))
+                except Exception:
+                    sc = None
+
+                if cutoff is None:
+                    try:
+                        minutes = getattr(
+                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None)
+                        if minutes is not None:
+                            cutoff = timezone.now() - timedelta(minutes=int(minutes))
+                        else:
+                            hours = getattr(
+                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1)
+                            cutoff = timezone.now() - timedelta(hours=float(hours))
+                    except Exception:
+                        cutoff = timezone.now() - timedelta(hours=1)
+                try:
+                    # Avoid N+1 queries: fetch which member_manager user ids already
+                    # have a recent notification for this URL, then bulk-create
+                    # Notification objects for the remaining recipients.
+                    manager_ids = list(member_managers.values_list("id", flat=True))
+                    existing_user_ids = set(
+                        Notification.objects.filter(
+                            user_id__in=manager_ids, url=url, created_at__gte=cutoff
+                        ).values_list("user_id", flat=True)
+                    )
+
+                    to_create = []
+                    for rm in member_managers:
+                        if rm.id in existing_user_ids:
+                            continue
+                        to_create.append(Notification(
+                            user=rm, message=message, url=url))
+
+                    if to_create:
+                        Notification.objects.bulk_create(to_create)
+                except Exception:
+                    # Fail softly if notification logic fails for any reason
+                    pass
+        except Exception:
+            # Defensive: don't let notification failures break the toggle flow
+            pass
+        if member.redact_contact:
+            messages.success(
+                request, "Your personal contact information is now redacted.")
+        else:
+            messages.success(
+                request, "Your personal contact information is now visible to other members.")
+
+    return redirect("members:member_view", member_id=member.id)
 
 
 #########################
@@ -277,17 +410,19 @@ def set_password(request):
 @active_member_required
 @csrf_exempt
 def tinymce_image_upload(request):
+    # Only accept POSTs with a file named 'file'
     if request.method == "POST" and request.FILES.get("file"):
         f = request.FILES["file"]
         # Save to 'tinymce/<filename>' in the default storage (GCS or local)
-    save_path = os.path.join("tinymce", f.name)
-    saved_name = default_storage.save(save_path, ContentFile(f.read()))
-    # Always return the public GCS URL
-    from urllib.parse import urljoin
+        save_path = os.path.join("tinymce", f.name)
+        saved_name = default_storage.save(save_path, ContentFile(f.read()))
+        # Always return the public GCS URL
+        from urllib.parse import urljoin
 
+        url = urljoin(settings.MEDIA_URL, saved_name)
+        return JsonResponse({"location": url})
 
-    url = urljoin(settings.MEDIA_URL, saved_name)
-    return JsonResponse({"location": url})
+    # For any other request method or missing file, return an error
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 

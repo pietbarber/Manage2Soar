@@ -2,6 +2,7 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load member_extras %}
+{% load siteconfig_tags %}
 
 {% block title %}View Member: {{ member.full_display_name }}{% endblock %}
 
@@ -9,9 +10,32 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
+  {% get_siteconfig as siteconfig %}
+  {% can_view_personal_info_tag member as can_view_personal %}
+  {% if member.redact_contact and request.user.member_manager %}
+  <!-- Modal shown to member_managers to inform about redaction policy -->
+  <div class="modal fade" id="redaction-alert-modal" tabindex="-1" aria-labelledby="redactionAlertLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="redactionAlertLabel">Redacted Contact Information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>This member has chosen to redact their personal contact information on the public members directory.</p>
+          <p>As {{ siteconfig.membership_manager_title|default:'Member Meister' }}, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {# can_view_personal_info is computed in the view and passed in context #}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
-    {% if request.user.rostermeister or request.user.is_staff %}
+    {% if request.user.member_manager or request.user.is_staff %}
     <a href="{% url 'admin:members_member_change' member.id %}" class="btn btn-success btn-sm">
       Edit this member
     </a>
@@ -34,46 +58,81 @@
       </form>
       {% endif %}
       <br><br>
+      {% if not member.redact_contact or request.user == member or request.user.is_staff %}
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail"
         style="max-width: 200px;">
+      {% elif request.user.member_manager %}
+      <h5>Contact Card QR Code</h5>
+      <div class="text-muted"><em>Redacted</em></div>
+      {% else %}
+      <h5>Contact Card QR Code</h5>
+      <div class="text-muted"><em>Redacted</em></div>
+      {% endif %}
     </div>
 
     <div class="col-md-8">
       <ul class="list-group">
-        {% if member.ssa_url %}
-        <li class="list-group-item">
-          <strong>SSA Badges at SSA.org:</strong>
-          <a href="{{ member.ssa_url }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm ms-2">
-            View at SSA &rarr;
-          </a>
-        </li>
-        {% endif %}
         <li class="list-group-item">
           <strong>Email:</strong>
-          {% if member.email and "@" in member.email %}
-          <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+          {% if can_view_personal %}
+            {% if member.email and "@" in member.email %}
+              <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+            {% else %}
+              {{ member.email }}
+            {% endif %}
           {% else %}
-          {{ member.email }}
+            <em class="text-muted">Redacted</em>
           {% endif %}
         </li>
+
         {% if member.phone %}
         <li class="list-group-item">
           <strong>Phone:</strong>
-          📞 <a href="tel:{{ member.phone }}">{{ member.phone|format_us_phone }}</a><br>
+          {% if can_view_personal and phone_display %}
+            {% if phone_link %}
+              📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>
+            {% else %}
+              📞 {{ phone_display }}
+            {% endif %}
+          {% elif phone_display %}
+            <div class="text-muted"><em>Redacted</em></div>
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
         {% endif %}
+
         {% if member.mobile_phone %}
         <li class="list-group-item">
           <strong>Mobile:</strong>
-          📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone|format_us_phone }}</a>
+          {% if can_view_personal and mobile_display %}
+            {% if mobile_link %}
+              📱 <a href="tel:{{ mobile_display }}">{{ mobile_display|format_us_phone }}</a>
+            {% else %}
+              📱 {{ mobile_display }}
+            {% endif %}
+          {% elif mobile_display %}
+            <div class="text-muted"><em>Redacted</em></div>
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
         {% endif %}
-        <li class="list-group-item"><strong>Address:</strong> <br>{{ member.address }}<br>
-          {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
-          {% endif %} {{ member.zip_code }}<br>
-          {{ member.country }}
+
+        <li class="list-group-item"><strong>Address:</strong> <br>
+          {% if can_view_personal and member.address %}
+            {{ member.address }}<br>
+            {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
+            {% endif %} {{ member.zip_code }}<br>
+            {{ member.country }}
+          {% elif member.address %}
+            <div class="text-muted"><em>Redacted</em></div>
+          {% else %}
+            <em class="text-muted">Redacted</em>
+          {% endif %}
         </li>
+
         <li class="list-group-item"><strong>Duties:</strong> {{ member|render_duties|safe }}</li>
         <li class="list-group-item"><strong>Glider Rating:</strong> {{ member.get_glider_rating_display }}</li>
         {% if pilot_certificate_number %}
@@ -89,7 +148,7 @@
         {% endif %}
         {% if request.user == member %}
         <li class="list-group-item">
-          <strong>User Name:</strong> {{ member.username }}
+          <strong>User Name:</strong> {{ member.username }}<br>
           <a href="{% url 'members:set_password' %}" class="btn btn-secondary mt-3 ms-3">Set Password</a>
         </li>
         {% endif %}
@@ -112,19 +171,20 @@
         <li class="list-group-item"><strong>Public Notes:</strong><br>{{ member.public_notes|safe }}</li>
       </ul>
 
-      {% if request.user == member or request.user.instructor %}
+    {% if request.user == member or request.user.instructor %}
       {% if show_need_buttons %}
       {% if not member.solo_date %}
       <a class="btn btn-warning" href="{% url 'instructors:needed_for_solo' member.id %}">
         What's still needed to solo?
       </a>
       {% endif %}
-      {% if not member.checkride_date %}
-      <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
-        What's still needed for checkride?
-      </a>
+        {% if not member.checkride_date %}
+        <a class="btn btn-danger" href="{% url 'instructors:needed_for_checkride' member.id %}">
+          What's still needed for checkride?
+        </a>
+        {% endif %}
       {% endif %}
-      {% endif %}
+      
 
       <div class="mt-3">
         <a href="{% if request.user.instructor %}
@@ -140,7 +200,8 @@
         </a>
       </div>
       {% endif %}
-      {% if request.user.instructor %}
+      {% if request.user.instructor and request.user != member %}
+
       <div class="mt-3">
         <a href="{% url 'instructors:log_ground_instruction' %}?student={{ member.id }}"
           class="btn btn-outline-primary btn-sm">
@@ -264,13 +325,17 @@
               {% else %}
               <p class="text-muted">No badges awarded yet.</p>
               {% endif %}
+
+              {# SSA link placed directly under the badges list per request #}
+              {% if member.ssa_url %}
+              <div class="mt-2">
+                <a href="{{ member.ssa_url }}" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm">View SSA badges on SSA.org &rarr;</a>
+              </div>
+              {% endif %}
             </div>
           </div>
         </div>
       </div>
-
-
-
 
     </div>
   </div>
@@ -293,4 +358,67 @@
   {% endif %}
 
 </div>
+  {# Redaction button/modal visible to the profile owner, placed after the main content so it's easy to find #}
+  {% if request.user == member %}
+  <div class="container mt-3">
+    <button type="button" class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="#redactConfirmModal">
+      {% if member.redact_contact %}Make my contact details visible to other members{% else %}Redact my personal information on members site{% endif %}
+    </button>
+
+    <!-- Redaction confirmation modal -->
+    <div class="modal fade" id="redactConfirmModal" tabindex="-1" aria-labelledby="redactConfirmModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="redactConfirmModalLabel">{% if member.redact_contact %}Make your details visible?{% else %}Hide your contact details?{% endif %}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            {% if member.redact_contact %}
+              If you proceed, your personal contact details (email, phone numbers, address and contact QR) will be visible to other members again.
+            {% else %}
+              If you proceed, your personal contact details (email, phone numbers, address and contact QR) will be hidden from other members. Club officers and administrators will still be able to see this information when necessary.
+            {% endif %}
+            <p class="mt-2"><strong>What is suppressed</strong></p>
+            <ul>
+              <li>Email address</li>
+              <li>Phone and mobile numbers</li>
+              <li>Postal address and QR contact card</li>
+            </ul>
+            <p class="text-muted small">You can reverse this at any time from your profile.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <form method="post" action="{% url 'members:toggle_redaction' member.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger">{% if member.redact_contact %}Make Visible{% else %}Hide My Contact Details{% endif %}</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    // Defensive modal auto-show for membership managers when viewing a redacted member.
+    (function showRedactionModal(retries) {
+      try {
+        var modalEl = document.getElementById('redaction-alert-modal');
+        if (!modalEl) return;
+        if (window.bootstrap && window.bootstrap.Modal) {
+          var m = new bootstrap.Modal(modalEl);
+          m.show();
+          return;
+        }
+      } catch (e) {
+        // ignore and retry below
+      }
+      if (retries > 0) {
+        setTimeout(function () { showRedactionModal(retries - 1); }, 100);
+      }
+    })(20);
+  </script>
 {% endblock %}

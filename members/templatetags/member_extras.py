@@ -145,3 +145,16 @@ def duty_emoji_legend():
         </div>
         """
     )
+
+
+@register.simple_tag(takes_context=True)
+def can_view_personal_info_tag(context, member):
+    """Template tag wrapper for members.utils.can_view_personal_info.
+
+    Usage: {% if can_view_personal_info_tag member %} ... {% endif %}
+    """
+    from members.utils import can_view_personal_info
+
+    request = context.get("request")
+    user = getattr(request, "user", None) if request else None
+    return can_view_personal_info(user, member)
