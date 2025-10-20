@@ -1,6 +1,5 @@
 from django.conf import settings
 
-from django.contrib.auth.models import Group
 
 
 def is_privileged_viewer(user):
