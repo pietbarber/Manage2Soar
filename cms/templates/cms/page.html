@@ -2,21 +2,15 @@
 {% block content %}
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <h1 style="margin:0">{{ page.title }}</h1>
-    {% if user.is_authenticated %}
-      {% if user.webmaster or perms.cms.change_page %}
-        <div>
-          <a class="btn btn-sm btn-primary" href="{% url 'admin:cms_page_change' page.pk %}">Manage content</a>
-        </div>
-      {% endif %}
+    {% if user.is_authenticated and perms.cms.change_page %}
+      <div>
+        <a class="btn btn-sm btn-primary" href="{% url 'admin:cms_page_change' page.pk %}">Manage content</a>
+      </div>
     {% endif %}
   </div>
   {% if breadcrumbs %}
     <nav aria-label="breadcrumb" style="margin:0.5rem 0;">
-      <style>
-        /* Use a small chevron as the breadcrumb divider (Bootstrap uses --bs-breadcrumb-divider) */
-        .breadcrumb { --bs-breadcrumb-divider: '›'; }
-      </style>
-      <ol class="breadcrumb">
+      <ol class="breadcrumb cms-breadcrumb">
         {% for crumb in breadcrumbs %}
           <li class="breadcrumb-item">
             <a href="{{ crumb.url }}">{{ crumb.title }}</a>
@@ -99,7 +93,7 @@
       });
     })();
   </script>
-  {% if page.documents.exists %}
+  {% if has_documents %}
     <h2>Documents</h2>
     <nav class="doc-nav">
       <ul>

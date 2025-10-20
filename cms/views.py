@@ -1,9 +1,10 @@
 # Generic CMS Page view for arbitrary pages and directories
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.views import redirect_to_login
 
 from cms.models import HomePageContent
-from django.db.models import Max
+from django.db.models import Count, Max
 from django.urls import reverse
 from members.utils import is_active_member
 
@@ -41,26 +42,24 @@ def cms_page(request, **kwargs):
     if not page.is_public:
         user = request.user
         if not is_active_member(user):
-            # Use LOGIN_URL and preserve next
-            login_url = settings.LOGIN_URL
-            return redirect(f"{login_url}?next={request.path}")
+            # Use Django's helper to redirect to login (handles encoding)
+            return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
+    # Annotate children with document counts and latest upload to avoid N+1
     subpages = []
-    children = page.children.all().order_by("title")
-    for child in children:
-        # count documents attached to this child
-        doc_count = child.documents.count()
-        # find most recent document upload time
-        doc_max = (
-            child.documents.aggregate(max_uploaded=Max("uploaded_at"))
-            .get("max_uploaded")
+    children = (
+        page.children.annotate(
+            doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
         )
+        .order_by("title")
+    )
+    for child in children:
         # last updated is the later of the page's updated_at and latest document upload
         last_updated = child.updated_at
-        if doc_max and doc_max > last_updated:
-            last_updated = doc_max
-        subpages.append({"page": child, "doc_count": doc_count,
+        if getattr(child, "doc_max", None) and child.doc_max > last_updated:
+            last_updated = child.doc_max
+        subpages.append({"page": child, "doc_count": getattr(child, "doc_count", 0),
                         "last_updated": last_updated})
 
     # Build breadcrumbs: Resources -> (parents...) -> current page
@@ -82,10 +81,14 @@ def cms_page(request, **kwargs):
     for par in parents:
         breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
 
+    # Whether the current page has documents (avoid calling .exists in template)
+    has_documents = page.documents.exists()
+
     return render(
         request,
         "cms/page.html",
-        {"page": page, "subpages": subpages, "breadcrumbs": breadcrumbs},
+        {"page": page, "subpages": subpages,
+            "breadcrumbs": breadcrumbs, "has_documents": has_documents},
     )
 
 

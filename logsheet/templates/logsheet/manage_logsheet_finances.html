@@ -223,35 +223,28 @@
 
 <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">Back to Flight Log</a>
 
-<!-- Table Sorting -->
-<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<!-- Table Sorting: use shared initializer. Attach page-specific behavior after tablesort is ready -->
 <script>
+  document.addEventListener('tablesort:ready', function () {
+    try {
+      // Ensure parser is available (tablesort-init defines it but may have been defined earlier)
+      try {
+        Tablesort.extend('last-name',
+          function () { return true; },
+          function (a, b) { return a.localeCompare(b); },
+          function (td) { return td.getAttribute && td.getAttribute('data-sort-value') ? td.getAttribute('data-sort-value') : td.textContent.trim(); }
+        );
+      } catch (e) { /* already defined; ignore */ }
 
-  // Custom parser: sort by data-sort-value if present, else fallback to text
-  Tablesort.extend('last-name',
-    function(th) {
-      // Always apply to columns with data-sort-method="last-name"
-      return true;
-    },
-    function(a, b) {
-      // a and b are already extracted values (strings)
-      return a.localeCompare(b);
-    },
-    function(td) {
-      // Extract data-sort-value from the cell, or fallback to text
-      return td.getAttribute && td.getAttribute('data-sort-value') ? td.getAttribute('data-sort-value') : td.textContent.trim();
+      document.querySelectorAll('table.sort').forEach(function (table) {
+        var ths = table.querySelectorAll('th');
+        if (ths.length > 0) {
+          ths[0].setAttribute('data-sort-method', 'last-name');
+        }
+      });
+    } catch (e) {
+      console.error('Error setting up tablesort on finances page:', e);
     }
-  );
-
-  document.addEventListener("DOMContentLoaded", function() {
-    document.querySelectorAll("table.sort").forEach(function(table) {
-      // For each table, set the first column (Pilot/Member) to use the custom parser
-      var ths = table.querySelectorAll('th');
-      if (ths.length > 0) {
-        ths[0].setAttribute('data-sort-method', 'last-name');
-      }
-      new Tablesort(table);
-    });
   });
 </script>
 <script>

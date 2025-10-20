@@ -49,8 +49,8 @@
   {% endif %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
 <script>
-  new Tablesort(document.getElementById('deadlines-table'));
+  // Tablesort initialized globally; nothing else required here. If special behavior is needed,
+  // listen for the 'tablesort:ready' event.
 </script>
 {% endblock %}

@@ -17,10 +17,10 @@ ENV PYTHONUNBUFFERED=1
 # Install Node.js (for vendoring frontend deps) and run npm vendor steps
 # Use Node 18 from nodesource (Debian bullseye compatible)
 RUN apt-get update \
-	&& apt-get install -y curl ca-certificates gnupg --no-install-recommends \
-	&& curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-	&& apt-get install -y nodejs --no-install-recommends \
-	&& rm -rf /var/lib/apt/lists/*
+    && apt-get install -y curl ca-certificates gnupg --no-install-recommends \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
 RUN if [ -f package.json ]; then npm run vendor:tablesort || true; fi
