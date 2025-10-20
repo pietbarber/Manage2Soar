@@ -25,7 +25,7 @@ def generate_vcard_qr(member, include_contact=True):
         if member.glider_rating:
             vcard_lines.append(f"X-GLIDER-RATING:{member.glider_rating}")
         # Address in a single ADR line (best-effort)
-        adr = f"ADRI;TYPE=HOME:w:;;{member.address or ''};{member.city or ''};{member.state_code or ''}{member.state_freeform or ''};{member.zip_code or ''}"
+        adr = f"ADR;TYPE=HOME:w:;;{member.address or ''};{member.city or ''};{member.state_code or ''}{member.state_freeform or ''};{member.zip_code or ''}"
         vcard_lines.append(adr)
     else:
         vcard_lines.append("NOTE: Contact information redacted")
