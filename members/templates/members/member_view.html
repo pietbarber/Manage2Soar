@@ -9,6 +9,26 @@
 {% duty_emoji_legend %}
 
 <div class="container mt-4">
+  {% if member.redact_contact and request.user.rostermeister %}
+  <!-- Modal shown to rostermeisters to inform about redaction policy -->
+  <div class="modal fade" id="redaction-alert-modal" tabindex="-1" aria-labelledby="redactionAlertLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="redactionAlertLabel">Redacted Contact Information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>This member has chosen to redact their personal contact information on the public members directory.</p>
+          <p>As a rostermeister, you may view this information when necessary. Please exercise discretion when sharing or using it.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   {# can_view_personal_info is computed in the view and passed in context #}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>{{ member.full_display_name }}</h2>
@@ -35,10 +55,18 @@
       </form>
       {% endif %}
       <br><br>
-      {% if can_view_personal_info %}
+      {% if not member.redact_contact or request.user == member or request.user.is_staff %}
       <h5>Contact Card QR Code</h5>
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail"
         style="max-width: 200px;">
+      {% elif request.user.rostermeister %}
+      <h5>Contact Card QR Code</h5>
+      <div>
+        <button type="button" class="btn btn-outline-secondary btn-sm spoiler-blind-btn" data-field="qr" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
+        <div class="mt-2 d-none spoiler-hidden" id="qr-{{ member.id }}">
+          <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-thumbnail" style="max-width:200px;">
+        </div>
+      </div>
       {% else %}
       <h5>Contact Card QR Code</h5>
       <div class="text-muted"><em>Redacted</em></div>
@@ -49,12 +77,21 @@
       <ul class="list-group">
         <li class="list-group-item">
           <strong>Email:</strong>
-          {% if can_view_personal_info %}
+          {% if not member.redact_contact or request.user == member or request.user.is_staff %}
             {% if member.email and "@" in member.email %}
               <a href="mailto:{{ member.email }}">{{ member.email }}</a>
             {% else %}
               {{ member.email }}
             {% endif %}
+          {% elif request.user.rostermeister %}
+            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="email" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
+            <span class="ms-2 d-none spoiler-hidden" id="email-{{ member.id }}">
+              {% if member.email and "@" in member.email %}
+                <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+              {% else %}
+                {{ member.email }}
+              {% endif %}
+            </span>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -63,12 +100,15 @@
         {% if member.phone %}
         <li class="list-group-item">
           <strong>Phone:</strong>
-          {% if phone_display %}
+          {% if phone_display and not member.redact_contact or phone_display and request.user == member or phone_display and request.user.is_staff %}
             {% if phone_link %}
               📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>
             {% else %}
               📞 {{ phone_display }}
             {% endif %}
+          {% elif request.user.rostermeister and phone_display %}
+            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="phone" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
+            <span class="ms-2 d-none spoiler-hidden" id="phone-{{ member.id }}">{% if phone_link %}📞 <a href="tel:{{ phone_display }}">{{ phone_display|format_us_phone }}</a>{% else %}📞 {{ phone_display }}{% endif %}</span>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -78,12 +118,15 @@
         {% if member.mobile_phone %}
         <li class="list-group-item">
           <strong>Mobile:</strong>
-          {% if mobile_display %}
+          {% if mobile_display and not member.redact_contact or mobile_display and request.user == member or mobile_display and request.user.is_staff %}
             {% if mobile_link %}
               📱 <a href="tel:{{ mobile_display }}">{{ mobile_display|format_us_phone }}</a>
             {% else %}
               📱 {{ mobile_display }}
             {% endif %}
+          {% elif request.user.rostermeister and mobile_display %}
+            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="mobile" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
+            <span class="ms-2 d-none spoiler-hidden" id="mobile-{{ member.id }}">{% if mobile_link %}📱 <a href="tel:{{ mobile_display }}">{{ mobile_display|format_us_phone }}</a>{% else %}📱 {{ mobile_display }}{% endif %}</span>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -91,11 +134,18 @@
         {% endif %}
 
         <li class="list-group-item"><strong>Address:</strong> <br>
-          {% if can_view_personal_info %}
+          {% if member.address and not member.redact_contact or member.address and request.user == member or member.address and request.user.is_staff %}
             {{ member.address }}<br>
             {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}
             {% endif %} {{ member.zip_code }}<br>
             {{ member.country }}
+          {% elif request.user.rostermeister and member.address %}
+            <button type="button" class="btn btn-sm btn-outline-secondary spoiler-blind-btn" data-field="address" data-member-id="{{ member.id }}">Redacted — click to reveal</button>
+            <div class="mt-2 d-none spoiler-hidden" id="address-{{ member.id }}">
+              {{ member.address }}<br>
+              {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+              {{ member.country }}
+            </div>
           {% else %}
             <em class="text-muted">Redacted</em>
           {% endif %}
@@ -366,4 +416,8 @@
     </div>
   </div>
   {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'js/redaction-blind.js' %}"></script>
 {% endblock %}

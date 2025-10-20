@@ -64,8 +64,9 @@
       <td>{{ member.full_display_name }}{% if member.biography %} 📔{% endif %}</td>
 
       <td>
-        {% can_view_personal_info_tag member as can_view_personal_info %}
-        {% if can_view_personal_info %}
+        {% if member.redact_contact %}
+          <em class="text-muted">Redacted</em>
+        {% else %}
           {% if member.phone and member.phone == member.mobile_phone %}
           📞📱 <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
           {% else %}
@@ -74,18 +75,16 @@
             <br>📱 <a href="tel:{{ member.mobile_phone }}">{{ member.mobile_phone }}</a>
             {% endif %}
           {% endif %}
-        {% else %}
-          <em class="text-muted">Redacted</em>
         {% endif %}
+      </td>
       <td class="text-center">
         {{ member|render_duties|safe }}
       </td>
       <td>
-        {% can_view_personal_info_tag member as can_view_personal_info %}
-        {% if can_view_personal_info %}
-          <a href="mailto:{{ member.email }}">{{ member.email }}</a>
-        {% else %}
+        {% if member.redact_contact %}
           <em class="text-muted">Redacted</em>
+        {% else %}
+          <a href="mailto:{{ member.email }}">{{ member.email }}</a>
         {% endif %}
       </td>
       <td>
