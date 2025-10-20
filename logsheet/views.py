@@ -1694,6 +1694,13 @@ def glider_logbook(request, pk: int):
             r["cum_hours"] = round(
                 float(r["cum_hours"]) + float(glider.initial_hours), 1
             )
+    # Ensure the template's shared column uses a consistent key: glider_tows
+    # For glider logbooks the rollup rows use 'flights' while the shared
+    # equipment_logbook template expects 'glider_tows' (used by towplane code).
+    # Populate 'glider_tows' from 'flights' so the column renders correctly.
+    for r in daily:
+        if "glider_tows" not in r:
+            r["glider_tows"] = r.get("flights", 0)
     context = {
         "object": glider,
         "object_type": "glider",
