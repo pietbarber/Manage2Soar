@@ -46,6 +46,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "equipment_manager_title",
                     "allow_glider_reservations",
                     "allow_two_seater_reservations",
+                    "redaction_notification_dedupe_minutes",
                 )
             },
         ),

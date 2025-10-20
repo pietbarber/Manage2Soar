@@ -79,6 +79,10 @@ urlpatterns = [
     ),
     path("analytics/", include("analytics.urls")),
     path("", include("knowledgetest.urls")),
+    # Expose notifications before the CMS root include so the CMS catch-all
+    # patterns don't intercept other app URLs like /notifications/.
+    path("notifications/", include("notifications.urls")),
+
     # CMS root include is last so other app URL patterns are matched first.
     path("", include("cms.urls")),
 ]
@@ -88,7 +92,3 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-
-urlpatterns += [
-    path("notifications/", include("notifications.urls")),
-]

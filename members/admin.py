@@ -280,7 +280,8 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
     form = CustomMemberChangeForm
     inlines = [MemberBadgeInline]
 
-    list_display = ("last_name", "first_name", "email", "membership_status")
+    list_display = ("last_name", "first_name", "email",
+                    "membership_status", "redact_contact")
     search_fields = ("first_name", "last_name", "email", "username")
     list_filter = (
         "membership_status",
@@ -291,6 +292,10 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         "rostermeister",
         ActiveStatusFilter,
     )
+    # Allow quick inline editing of membership status and redaction flag
+    list_editable = ("membership_status", "redact_contact")
+    # Allow filtering by redact flag in the admin sidebar
+    list_filter = list(list_filter) + ["redact_contact"]
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),

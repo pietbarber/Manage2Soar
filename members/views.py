@@ -1,6 +1,7 @@
 import base64
 import os
-from datetime import date
+from datetime import date, timedelta
+from django.utils import timezone
 
 from django.conf import settings
 from django.contrib import messages
@@ -21,6 +22,11 @@ from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
 from django.urls import reverse
+
+try:
+    from notifications.models import Notification
+except Exception:
+    Notification = None
 
 #########################
 # member_list() View
@@ -170,6 +176,73 @@ def toggle_redaction(request, member_id):
     if request.method == "POST":
         member.redact_contact = not member.redact_contact
         member.save()
+        # Create a notification for all rostermeisters so they are aware
+        # that a member has toggled their redaction flag.
+        try:
+            if Notification is not None:
+                # Build a human-friendly message. If the actor is the member themself
+                # we phrase it as 'Member X has hidden...'; if an admin toggled for
+                # someone else we include both actor and subject.
+                if request.user == member:
+                    actor_name = member.full_display_name
+                    action = "hidden" if member.redact_contact else "made visible"
+                    message = f"Member {actor_name} has {action} their personal contact information on the members site."
+                else:
+                    actor_name = request.user.full_display_name
+                    subject_name = member.full_display_name
+                    action = "hidden" if member.redact_contact else "made visible"
+                    message = f"{actor_name} has {action} personal contact information for member {subject_name}."
+
+                url = request.build_absolute_uri(
+                    reverse("members:member_view", kwargs={"member_id": member.id}))
+
+                # Notify every user with rostermeister privilege, but dedupe
+                # so we don't spam them if the same member toggles repeatedly.
+                from .models import Member as MemberModel
+
+                rostermeisters = MemberModel.objects.filter(rostermeister=True)
+                # Dedupe window: configurable via settings.REDACTION_NOTIFICATION_DEDUPE_MINUTES
+                # (integer minutes). For backward compatibility, a settings value
+                # REDACTION_NOTIFICATION_DEDUPE_HOURS may be provided. Default = 60 minutes.
+                cutoff = None
+                # Prefer SiteConfiguration value when available
+                try:
+                    from siteconfig.models import SiteConfiguration
+
+                    sc = SiteConfiguration.objects.first()
+                    if sc and getattr(sc, "redaction_notification_dedupe_minutes", None):
+                        cutoff = timezone.now() - timedelta(minutes=int(sc.redaction_notification_dedupe_minutes))
+                except Exception:
+                    sc = None
+
+                if cutoff is None:
+                    try:
+                        minutes = getattr(
+                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None)
+                        if minutes is not None:
+                            cutoff = timezone.now() - timedelta(minutes=int(minutes))
+                        else:
+                            hours = getattr(
+                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1)
+                            cutoff = timezone.now() - timedelta(hours=float(hours))
+                    except Exception:
+                        cutoff = timezone.now() - timedelta(hours=1)
+                for rm in rostermeisters:
+                    try:
+                        # If a recent notification exists for this recipient and URL,
+                        # skip creating another one.
+                        exists = Notification.objects.filter(
+                            user=rm, url=url, created_at__gte=cutoff
+                        ).exists()
+                        if exists:
+                            continue
+                        Notification.objects.create(user=rm, message=message, url=url)
+                    except Exception:
+                        # Fail softly if notification creation fails for any recipient
+                        continue
+        except Exception:
+            # Defensive: don't let notification failures break the toggle flow
+            pass
         if member.redact_contact:
             messages.success(
                 request, "Your personal contact information is now redacted.")
