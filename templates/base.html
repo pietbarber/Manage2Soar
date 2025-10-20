@@ -30,6 +30,7 @@
   <link href="{% static 'css/progress.css' %}" rel="stylesheet">
   <link href="{% static 'analytics/analytics.css' %}" rel="stylesheet">
   <link href="{% static 'css/cms-responsive.css' %}" rel="stylesheet">
+  <link href="{% static 'css/cms.css' %}" rel="stylesheet">
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -200,6 +201,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <!-- HTMX include -->
   <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <!-- Tablesort: use vendored local file for deterministic loading -->
+  <script src="{% static 'vendor/tablesort.min.js' %}"></script>
+  <script src="{% static 'js/tablesort-init.js' %}"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', (event) => {
       const token = document.cookie

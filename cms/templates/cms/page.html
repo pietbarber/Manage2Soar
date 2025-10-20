@@ -1,27 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ page.title }}</h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <h1 style="margin:0">{{ page.title }}</h1>
+    {% if user.is_authenticated and perms.cms.change_page %}
+      <div>
+        <a class="btn btn-sm btn-primary" href="{% url 'admin:cms_page_change' page.pk %}">Manage content</a>
+      </div>
+    {% endif %}
+  </div>
+  {% if breadcrumbs %}
+    <nav aria-label="breadcrumb" style="margin:0.5rem 0;">
+      <ol class="breadcrumb cms-breadcrumb">
+        {% for crumb in breadcrumbs %}
+          <li class="breadcrumb-item">
+            <a href="{{ crumb.url }}">{{ crumb.title }}</a>
+          </li>
+        {% endfor %}
+        <li class="breadcrumb-item active" aria-current="page">{{ page.title }}</li>
+      </ol>
+    </nav>
+  {% endif %}
+
   <div>{{ page.content|safe }}</div>
-  {% if page.children.exists %}
+  {% if subpages %}
     <h3>Subpages</h3>
-    <table class="table table-sm table-bordered" style="max-width:600px;">
-      <thead><tr><th>Title</th><th>URL</th></tr></thead>
+    <table id="subpagesTable" class="table table-sm table-bordered table-striped" style="max-width:800px;">
+      <thead>
+        <tr>
+          <th data-sort="text" data-key="title" style="cursor:pointer">Title &#x25B2;&#x25BC;</th>
+          <th data-sort="number" data-key="items" style="cursor:pointer">Items &#x25B2;&#x25BC;</th>
+          <th data-sort="datetime" data-key="updated" style="cursor:pointer">Last updated &#x25B2;&#x25BC;</th>
+        </tr>
+      </thead>
       <tbody>
-        {% for child in page.children.all %}
+        {% for item in subpages %}
           <tr>
-            <td><a href="{{ child.get_absolute_url }}">{{ child.title }}</a></td>
-            <td><code>{{ child.get_absolute_url }}</code></td>
+            <td data-key-title><a href="{{ item.page.get_absolute_url }}">{{ item.page.title|escape }}</a></td>
+            <td data-key-items>{{ item.doc_count }}</td>
+            <td data-key-updated>
+              {% if item.last_updated %}
+                <time datetime="{{ item.last_updated|date:'c' }}">{{ item.last_updated|date:"Y-m-d H:i" }}</time>
+                <br/>
+                <small class="text-muted">({{ item.last_updated|timesince }} ago)</small>
+              {% else %}
+                <small class="text-muted">No updates</small>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   {% endif %}
-  {% if page.parent %}
-    <nav class="upstream-nav" style="margin-bottom:1em;">
-      <a href="{{ page.parent.get_absolute_url }}" class="btn btn-outline-secondary">&larr; Up to {{ page.parent.title }}</a>
-    </nav>
-  {% endif %}
-  {% if page.documents.exists %}
+  <script>
+    // Simple table sorter for the subpages table. Works without external libs.
+    (function() {
+      const table = document.getElementById('subpagesTable');
+      if (!table) return;
+      const tbody = table.tBodies[0];
+      const headers = table.querySelectorAll('th[data-sort]');
+
+      function parseDateTime(cell) {
+        const time = cell.querySelector('time');
+        if (!time) return 0;
+        return Date.parse(time.getAttribute('datetime')) || 0;
+      }
+
+      headers.forEach((th, idx) => {
+        let asc = true;
+        th.addEventListener('click', () => {
+          const type = th.getAttribute('data-sort');
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          rows.sort((a, b) => {
+            let aVal, bVal;
+            if (type === 'number') {
+              aVal = parseInt(a.querySelector('[data-key-items]').textContent.trim()) || 0;
+              bVal = parseInt(b.querySelector('[data-key-items]').textContent.trim()) || 0;
+            } else if (type === 'datetime') {
+              aVal = parseDateTime(a.querySelector('[data-key-updated]'));
+              bVal = parseDateTime(b.querySelector('[data-key-updated]'));
+            } else {
+              aVal = a.querySelector('[data-key-title]').textContent.trim().toLowerCase();
+              bVal = b.querySelector('[data-key-title]').textContent.trim().toLowerCase();
+            }
+            if (aVal === bVal) return 0;
+            if (asc) return aVal > bVal ? 1 : -1;
+            return aVal < bVal ? 1 : -1;
+          });
+          // Re-attach rows in sorted order
+          rows.forEach(r => tbody.appendChild(r));
+          asc = !asc;
+        });
+      });
+    })();
+  </script>
+  {% if has_documents %}
     <h2>Documents</h2>
     <nav class="doc-nav">
       <ul>

@@ -26,7 +26,6 @@
     {% endif %}
 
     <link rel="stylesheet" href="/static/css/equipment_logbook.css">
-    <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
     <div class="table-responsive">
         <table class="table table-sm align-middle sort" id="equipmentLogbookTable">
             <thead class="table-light">
@@ -124,23 +123,22 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
-        </div>
-        <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    var table = document.getElementById('equipmentLogbookTable');
-                    if (table) {
-                        var ts = new Tablesort(table);
-                        // Force initial sort descending on Date column (first column)
-                        var dateHeader = table.querySelector('th[data-sort-method="date"]');
-                        if (dateHeader) {
-                            // Simulate two clicks to sort descending
-                            dateHeader.click();
-                            dateHeader.click();
+                </table>
+                </div>
+                <script>
+                    // After shared tablesort initializer runs, force initial descending sort on Date column
+                    document.addEventListener('tablesort:ready', function () {
+                        var table = document.getElementById('equipmentLogbookTable');
+                        if (table) {
+                            // Force initial sort descending on Date column (first column)
+                            var dateHeader = table.querySelector('th[data-sort-method="date"]');
+                            if (dateHeader) {
+                                dateHeader.click();
+                                dateHeader.click();
+                            }
                         }
-                    }
-                });
-        </script>
+                    });
+                </script>
 </div>
 <!-- Back to Top Button -->
 <button class="back-to-top" onclick="document.getElementById('top').scrollIntoView({behavior: 'smooth'})"

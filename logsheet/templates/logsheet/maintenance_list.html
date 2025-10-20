@@ -97,12 +97,10 @@
     </div>
   </div>
 <!-- Table Sorting -->
-<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<!-- Table Sorting: handled centrally; add per-page hooks via tablesort:ready if needed -->
 <script>
-  document.addEventListener("DOMContentLoaded", function() {
-    document.querySelectorAll("table").forEach(function(table) {
-      new Tablesort(table);
-    });
+  document.addEventListener('tablesort:ready', function () {
+    // No page-specific configuration needed currently for maintenance list
   });
 </script>
 {% endblock %}

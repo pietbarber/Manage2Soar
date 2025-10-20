@@ -92,12 +92,10 @@
     modal.show();
   }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<!-- Tablesort: shared initializer in base.html will initialize tables with class 'sort' or page-specific hooks -->
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("table").forEach(function (table) {
-      new Tablesort(table);
-    });
+  document.addEventListener('tablesort:ready', function () {
+    // Equipment list doesn't need special behavior; tablesort-init will initialize tables with class 'sort' if present.
   });
 </script>
 

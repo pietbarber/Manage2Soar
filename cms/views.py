@@ -1,8 +1,11 @@
 # Generic CMS Page view for arbitrary pages and directories
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.views import redirect_to_login
 
 from cms.models import HomePageContent
+from django.db.models import Count, Max
+from django.urls import reverse
 from members.utils import is_active_member
 
 from .models import Page
@@ -39,10 +42,54 @@ def cms_page(request, **kwargs):
     if not page.is_public:
         user = request.user
         if not is_active_member(user):
-            # Use LOGIN_URL and preserve next
-            login_url = settings.LOGIN_URL
-            return redirect(f"{login_url}?next={request.path}")
-    return render(request, "cms/page.html", {"page": page})
+            # Use Django's helper to redirect to login (handles encoding)
+            return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
+    # Build subpage metadata (doc counts and last-updated timestamps) to
+    # avoid doing this in the template and to prevent N+1 queries.
+    # Annotate children with document counts and latest upload to avoid N+1
+    subpages = []
+    children = (
+        page.children.annotate(
+            doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
+        )
+        .order_by("title")
+    )
+    for child in children:
+        # last updated is the later of the page's updated_at and latest document upload
+        last_updated = child.updated_at
+        if getattr(child, "doc_max", None) and child.doc_max > last_updated:
+            last_updated = child.doc_max
+        subpages.append({"page": child, "doc_count": getattr(child, "doc_count", 0),
+                        "last_updated": last_updated})
+
+    # Build breadcrumbs: Resources -> (parents...) -> current page
+    breadcrumbs = []
+    # Top-level 'Resources' link
+    try:
+        resources_url = reverse("cms:home")
+    except Exception:
+        resources_url = "/cms/"
+    breadcrumbs.append({"title": "Resources", "url": resources_url})
+
+    # Walk parent chain from root down to immediate parent
+    parents = []
+    p = page.parent
+    while p:
+        parents.append(p)
+        p = p.parent
+    parents.reverse()
+    for par in parents:
+        breadcrumbs.append({"title": par.title, "url": par.get_absolute_url()})
+
+    # Whether the current page has documents (avoid calling .exists in template)
+    has_documents = page.documents.exists()
+
+    return render(
+        request,
+        "cms/page.html",
+        {"page": page, "subpages": subpages,
+            "breadcrumbs": breadcrumbs, "has_documents": has_documents},
+    )
 
 
 def homepage(request):
@@ -53,14 +100,28 @@ def homepage(request):
     if request.path.startswith("/cms"):
         from .models import Page
 
-        top_pages = Page.objects.filter(parent__isnull=True).order_by("title")
+        top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
         pages = []
-        for p in top_pages:
+        for p in top_pages_qs:
+            # Determine whether the current user may view links in this directory
+            can_view = True
+            if not p.is_public:
+                from members.utils import is_active_member
+
+                can_view = is_active_member(request.user)
+
+            # Only include non-public pages in the listing if the user may view them;
+            # otherwise, skip showing restricted directories to anonymous visitors.
+            if not p.is_public and not can_view:
+                continue
+
             pages.append(
                 {
                     "page": p,
-                    "doc_count": p.documents.count(),
+                    # Count documents plus child directories as resources
+                    "doc_count": p.documents.count() + p.children.count(),
                     "is_public": p.is_public,
+                    "can_view": can_view,
                 }
             )
         return render(request, "cms/index.html", {"pages": pages})
@@ -98,14 +159,25 @@ def homepage(request):
     # Fallback: show CMS index of top-level pages
     from .models import Page
 
-    top_pages = Page.objects.filter(parent__isnull=True).order_by("title")
+    top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
     pages = []
-    for p in top_pages:
+    for p in top_pages_qs:
+        can_view = True
+        if not p.is_public:
+            from members.utils import is_active_member
+
+            can_view = is_active_member(request.user)
+
+        if not p.is_public and not can_view:
+            continue
+
         pages.append(
             {
                 "page": p,
-                "doc_count": p.documents.count(),
+                # Include directories in the resource count so directories show up as resources
+                "doc_count": p.documents.count() + p.children.count(),
                 "is_public": p.is_public,
+                "can_view": can_view,
             }
         )
     return render(request, "cms/index.html", {"pages": pages})
