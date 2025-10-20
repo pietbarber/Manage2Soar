@@ -1,10 +1,8 @@
-from django.conf.urls import handler403
 from django.conf import settings
+from django.conf.urls import handler403
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
-
-from members import views
 
 from . import views
 from .views import tinymce_image_upload
@@ -26,7 +24,7 @@ urlpatterns = [
     ),
     path("<int:member_id>/toggle-redaction/",
          views.toggle_redaction, name="toggle_redaction"),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
 
 
 handler403 = "django.views.defaults.permission_denied"
