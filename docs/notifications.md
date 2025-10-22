@@ -17,6 +17,9 @@ Configuration
 Defaults
 --------
 If neither setting is provided, the dedupe window defaults to 60 minutes.
+Related: the Logsheet app creates instructor notifications for completed
+instruction flights (see `logsheet/docs/signals.md`); those notifications are
+deduplicated by `log_date` and route instructors to the instructors dashboard.
 
 Examples
 --------
