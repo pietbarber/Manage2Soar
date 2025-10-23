@@ -4,6 +4,7 @@ from django.utils import timezone
 from datetime import time
 
 from logsheet.models import Flight, Logsheet
+from logsheet.models import Airfield
 from notifications.models import Notification
 
 User = get_user_model()
@@ -13,8 +14,10 @@ User = get_user_model()
 def test_instructor_notified_on_flight_creation(django_user_model):
     instructor = django_user_model.objects.create_user(username="inst", password="pw")
     pilot = django_user_model.objects.create_user(username="pilot", password="pw")
+    # Create an Airfield for the test DB instead of assuming a pre-existing id
+    af = Airfield.objects.create(identifier="TST", name="Test Airfield")
     log = Logsheet.objects.create(
-        log_date=timezone.now().date(), airfield_id=1, created_by=instructor)
+        log_date=timezone.now().date(), airfield=af, created_by=instructor)
     # Create flight with both pilot and instructor and completed times
     f = Flight.objects.create(
         logsheet=log,
@@ -32,8 +35,10 @@ def test_no_duplicate_notifications_same_day(django_user_model):
     instructor = django_user_model.objects.create_user(username="inst2", password="pw")
     pilot1 = django_user_model.objects.create_user(username="p1", password="pw")
     pilot2 = django_user_model.objects.create_user(username="p2", password="pw")
+    # Create an Airfield for the test DB instead of assuming a pre-existing id
+    af = Airfield.objects.create(identifier="TST2", name="Test Airfield 2")
     log = Logsheet.objects.create(
-        log_date=timezone.now().date(), airfield_id=1, created_by=instructor)
+        log_date=timezone.now().date(), airfield=af, created_by=instructor)
     # First flight creates notification (completed)
     Flight.objects.create(
         logsheet=log,
