@@ -8,33 +8,108 @@ from .models import MaintenanceIssue
 from .models import Flight
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.db.models.signals import pre_save
 from notifications.models import Notification
 from django.utils import timezone
 from datetime import timedelta
+from django.urls import reverse
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _create_notification_if_not_exists(user, message, url=None):
+    """Create a Notification for user unless an undismissed identical message exists.
+
+    This mirrors the message-based dedupe pattern used elsewhere in the project.
+    """
+    if user is None:
+        return None
+    try:
+        existing = Notification.objects.filter(
+            user=user, dismissed=False, message=message)
+        if existing.exists():
+            return None
+        return Notification.objects.create(user=user, message=message, url=url)
+    except Exception:
+        logger.exception("_create_notification_if_not_exists: failed")
+        return None
 
 
 @receiver(post_save, sender=MaintenanceIssue)
 def notify_meisters_on_issue(sender, instance, created, **kwargs):
-    if not created or instance.resolved:
-        return
-    # Only notify for oil/100hr/annual issues (simple keyword match)
-    keywords = ["oil change", "100-hour", "annual"]
-    if not any(k in (instance.description or "").lower() for k in keywords):
-        return
-    # Get all users in the "Meisters" group
+    # Notify assigned AircraftMeister members on creation and important updates.
     try:
-        group = Group.objects.get(name="Meisters")
-        recipients = list(group.user_set.values_list("email", flat=True))
-    except Group.DoesNotExist:
-        recipients = []
-    recipients = [e for e in recipients if e]
-    if not recipients:
+        # On create: notify all meisters assigned to the affected aircraft
+        if created:
+            if instance.glider:
+                meisters = instance.glider.aircraftmeister_set.select_related(
+                    "member").all()
+            elif instance.towplane:
+                meisters = instance.towplane.aircraftmeister_set.select_related(
+                    "member").all()
+            else:
+                meisters = []
+
+            if not meisters:
+                return
+
+            message = (
+                f"Maintenance issue reported for {instance.glider or instance.towplane}: {instance.description[:100]}"
+            )
+            # The maintenance view lists all issues; can't link to a PK-specific page per repo note
+            try:
+                url = reverse("logsheet:maintenance_issues")
+            except Exception:
+                url = None
+
+            for meister in meisters:
+                _create_notification_if_not_exists(meister.member, message, url=url)
+            return
+
+        # On update: notify when issue is resolved (resolved field flips to True)
+        # We capture previous resolved state in pre_save to detect transitions reliably.
+        prev_resolved = getattr(instance, "_previous_resolved", False)
+        if not prev_resolved and instance.resolved:
+            # Issue was just resolved
+            if instance.glider:
+                meisters = instance.glider.aircraftmeister_set.select_related(
+                    "member").all()
+            elif instance.towplane:
+                meisters = instance.towplane.aircraftmeister_set.select_related(
+                    "member").all()
+            else:
+                meisters = []
+
+            if not meisters:
+                return
+
+            resolver = instance.resolved_by.full_display_name if instance.resolved_by else "someone"
+            message = (
+                f"Maintenance issue resolved for {instance.glider or instance.towplane} by {resolver}: {instance.description[:100]}"
+            )
+            try:
+                url = reverse("logsheet:maintenance_issues")
+            except Exception:
+                url = None
+
+            for meister in meisters:
+                _create_notification_if_not_exists(meister.member, message, url=url)
+    except Exception:
+        logger.exception("notify_meisters_on_issue: unexpected exception")
         return
-    subject = f"Maintenance Alert: {instance}"
-    body = f"A maintenance issue has been created for {instance.glider or instance.towplane}:\n\n{instance.description}\n\nGrounded: {'Yes' if instance.grounded else 'No'}\nLogsheet: {instance.logsheet}\n"
-    send_mail(
-        subject, body, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True
-    )
+
+
+@receiver(pre_save, sender=MaintenanceIssue)
+def capture_previous_maintenance_state(sender, instance, **kwargs):
+    try:
+        if instance.pk:
+            prev = sender.objects.filter(pk=instance.pk).first()
+            instance._previous_resolved = getattr(prev, "resolved", False)
+        else:
+            instance._previous_resolved = False
+    except Exception:
+        instance._previous_resolved = False
 
 
 # Capture previous status before save so post_save can detect transitions
