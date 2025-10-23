@@ -68,11 +68,22 @@ def notify_student_on_ground_instruction(sender, instance, created, **kwargs):
         instructor = instance.instructor
         date_str = instance.date.isoformat()
         message = f"A ground instruction session with {instructor.full_display_name} on {date_str} was recorded."
+        # Link to the member's instruction-record page and anchor to the ground
+        # instruction date so the student sees it in the full page (not modal).
+        url = None
         try:
-            url = reverse("members:member_profile", args=[
-                          student.pk]) if student else None
+            base = reverse("instructors:member_instruction_record",
+                           args=[student.pk]) if student else None
+            if base:
+                url = f"{base}#ground-{date_str}"
+            else:
+                url = None
         except NoReverseMatch:
-            url = None
+            try:
+                url = reverse("members:member_view", args=[
+                              student.pk]) if student else None
+            except NoReverseMatch:
+                url = None
         _create_notification_if_not_exists(student, message, url=url)
     except Exception:
         logger.exception("notify_student_on_ground_instruction failed")

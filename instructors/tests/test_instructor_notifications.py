@@ -3,7 +3,7 @@ from datetime import date
 
 from django.urls import reverse
 
-from instructors.models import InstructionReport, GroundInstruction, MemberQualification
+from instructors.models import InstructionReport, GroundInstruction, MemberQualification, ClubQualificationType
 from members.models import Member, Badge, MemberBadge
 from notifications.models import Notification
 
@@ -49,8 +49,10 @@ def test_ground_instruction_creates_notification(django_user_model):
 def test_member_qualification_creates_notification(django_user_model):
     instr = django_user_model.objects.create_user(username="instq", password="pw")
     member = django_user_model.objects.create_user(username="memberq", password="pw")
+    # create a qualification type so the FK constraint is satisfied
+    qual_type = ClubQualificationType.objects.create(code="TESTQ", name="Test Qual")
     qual = MemberQualification.objects.create(
-        member=member, qualification_id=1, is_qualified=True, instructor=instr, date_awarded=date.today())
+        member=member, qualification=qual_type, is_qualified=True, instructor=instr, date_awarded=date.today())
     import instructors.signals as sigmod
     sigmod.notify_member_on_qualification(None, qual, True)
     assert Notification.objects.filter(
