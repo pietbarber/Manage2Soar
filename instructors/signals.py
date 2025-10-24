@@ -142,9 +142,13 @@ def notify_member_on_badge(sender, instance, created, **kwargs):
 
 
 def is_safe_to_run_signals():
+    # When running management commands that perform schema/data operations
+    # or test runs, we may want to avoid executing signal side-effects.
+    # Note: many developers run tests with pytest (argv contains 'pytest'),
+    # while Django's test runner uses 'test' in sys.argv. Check for both.
     return apps.ready and not any(
         cmd in sys.argv
-        for cmd in ["makemigrations", "migrate", "collectstatic", "loaddata", "test"]
+        for cmd in ["makemigrations", "migrate", "collectstatic", "loaddata", "test", "pytest"]
     )
 
 

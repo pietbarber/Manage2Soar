@@ -120,9 +120,7 @@ def capture_previous_flight_status(sender, instance, **kwargs):
 # Notify instructors when a flight with a pilot and instructor is created
 @receiver(post_save, sender=Flight)
 def notify_instructor_on_flight_created(sender, instance, created, **kwargs):
-    import logging
-
-    logger = logging.getLogger(__name__)
+    # Use module-level logger (defined at top of this module)
 
     # Only proceed when a new flight is created OR when an existing flight
     # transitions from not-landed to landed (i.e., landing_time added).
