@@ -2,7 +2,6 @@ import pytest
 from datetime import date
 
 from duty_roster.models import OpsIntent
-from members.models import Member
 
 
 @pytest.mark.django_db

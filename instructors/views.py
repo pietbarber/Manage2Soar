@@ -1909,7 +1909,6 @@ class CreateWrittenTestView(FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
-        import random
         # 1. Pull weights & must_include
         must = []
         if data["must_include"]:

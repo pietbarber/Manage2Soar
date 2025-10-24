@@ -1,10 +1,9 @@
 import pytest
 from datetime import date
 
-from django.urls import reverse
 
 from instructors.models import InstructionReport, GroundInstruction, MemberQualification, ClubQualificationType
-from members.models import Member, Badge, MemberBadge
+from members.models import Badge, MemberBadge
 from notifications.models import Notification
 
 
