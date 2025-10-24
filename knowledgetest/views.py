@@ -314,11 +314,11 @@ class WrittenTestSubmitView(View):
         # Build a breakdown of how many questions per category were on this test
         from django.db.models import Count
 
-        breakdown_qs = attempt.answers.values("question__category__code").annotate(
-            num=Count("pk")
-        )
+        breakdown_qs = attempt.answers.values(
+            "question__category__code", "question__category__description"
+        ).annotate(num=Count("pk"))
         breakdown = [
-            f"{entry['question__category__code']} ({entry['num']})"
+            f"{entry['question__category__description']} ({entry['num']})"
             for entry in breakdown_qs
         ]
         breakdown_txt = ", ".join(breakdown)
@@ -368,11 +368,11 @@ class WrittenTestSubmitView(View):
             # build a subject‐count breakdown
             from django.db.models import Count
 
-            breakdown_qs = attempt.answers.values("question__category__code").annotate(
-                num=Count("pk")
-            )
+            breakdown_qs = attempt.answers.values(
+                "question__category__code", "question__category__description"
+            ).annotate(num=Count("pk"))
             breakdown_list = [
-                f"{entry['question__category__code']} ({entry['num']})"
+                f"{entry['question__category__description']} ({entry['num']})"
                 for entry in breakdown_qs
             ]
             breakdown_txt = ", ".join(breakdown_list)
