@@ -12,7 +12,11 @@
   </div>
   <div class="d-flex align-items-center">
   <a href="{% url 'instructors:log_ground_instruction' %}?student_id={{ member.id }}" class="btn btn-outline-primary btn-sm me-2">✍️ Log Ground Instruction</a>
-    <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm">📊 View Training Grid</a>
+    <a href="{% url 'instructors:member_training_grid' member.id %}" class="btn btn-outline-primary btn-sm me-2">📊 View Training Grid</a>
+    {% if request.user == member %}
+      <a href="{% url 'knowledgetest:member-test-history' %}" class="btn btn-outline-info btn-sm me-2">📝 My Written Tests</a>
+      <a href="{% url 'knowledgetest:quiz-pending' %}" class="btn btn-outline-warning btn-sm">📋 Pending Tests</a>
+    {% endif %}
   </div>
 </div>
 <div id="charts-container" data-dates='{{ chart_dates_json|safe }}' data-solo='{{ chart_solo_json|safe }}'

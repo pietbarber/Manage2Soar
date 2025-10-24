@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📝 My Written Test History</h2>
+    <div>
+      <a href="{% url 'knowledgetest:quiz-pending' %}" class="btn btn-outline-primary btn-sm me-2">
+        📋 Pending Tests
+      </a>
+      <a href="{% url 'instructors:member_instruction_record' request.user.pk %}" class="btn btn-outline-secondary btn-sm">
+        📘 Back to Instruction Record
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ total_tests }}</h3>
+          <small>Total Tests</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ passed_tests }}</h3>
+          <small>Passed</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ failed_tests }}</h3>
+          <small>Failed</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if attempts %}
+    <!-- Tests List -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Test History</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Test Name</th>
+                <th>Score</th>
+                <th>Result</th>
+                <th>Instructor</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+                <tr>
+                  <td>
+                    <span class="fw-bold">{{ attempt.date_taken|date:"M j, Y" }}</span><br>
+                    <small class="text-muted">{{ attempt.date_taken|date:"g:i A" }}</small>
+                  </td>
+                  <td>
+                    <div class="fw-bold">{{ attempt.template.name }}</div>
+                    {% if attempt.template.description %}
+                      <small class="text-muted">{{ attempt.template.description|truncatechars:50 }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="fs-5 fw-bold">{{ attempt.score_percentage|floatformat:0 }}%</span><br>
+                    <small class="text-muted">Required: {{ attempt.template.pass_percentage }}%</small>
+                  </td>
+                  <td>
+                    {% if attempt.passed %}
+                      <span class="badge bg-success">✓ Passed</span>
+                    {% else %}
+                      <span class="badge bg-danger">✗ Failed</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if attempt.instructor %}
+                      {{ attempt.instructor.full_display_name }}
+                    {% elif attempt.template.created_by %}
+                      {{ attempt.template.created_by.full_display_name }}
+                      <small class="text-muted">(Creator)</small>
+                    {% else %}
+                      <em class="text-muted">System</em>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}" 
+                       class="btn btn-sm btn-outline-primary">
+                      📄 View Results
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+      <nav aria-label="Test history pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page=1">First</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+          {% endif %}
+          
+          <li class="page-item active">
+            <span class="page-link">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </span>
+          </li>
+          
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+
+  {% else %}
+    <!-- No Tests -->
+    <div class="alert alert-info text-center">
+      <h4>📝 No Written Tests Yet</h4>
+      <p class="mb-0">You haven't completed any written tests yet. Check your <a href="{% url 'knowledgetest:quiz-pending' %}">pending tests</a> to see if any are assigned.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

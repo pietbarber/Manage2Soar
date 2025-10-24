@@ -8,6 +8,8 @@ from .views import (
     WrittenTestStartView,
     WrittenTestSubmitView,
     WrittenTestAttemptDeleteView,
+    MemberWrittenTestHistoryView,
+    InstructorRecentTestsView,
 )
 
 app_name = "knowledgetest"
@@ -19,6 +21,9 @@ urlpatterns = [
     path("attempt/<int:pk>/delete/", WrittenTestAttemptDeleteView.as_view(),
          name="quiz-attempt-delete"),
     path("pending/", PendingTestsView.as_view(), name="quiz-pending"),
+    path("history/", MemberWrittenTestHistoryView.as_view(), name="member-test-history"),
+    path("instructor/recent/", InstructorRecentTestsView.as_view(),
+         name="instructor-recent-tests"),
     path(
         "tests/<int:pk>/review/<int:student_pk>/",
         WrittenTestReviewView.as_view(),

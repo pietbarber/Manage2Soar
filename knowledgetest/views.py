@@ -401,18 +401,29 @@ class WrittenTestResultView(DetailView):
     context_object_name = "attempt"
 
 
+@method_decorator(active_member_required, name="dispatch")
 class WrittenTestAttemptDeleteView(View):
-    """Allow staff or the grading instructor/template creator to delete an attempt."""
+    """Allow staff, students (own attempts), or the grading instructor/template creator to delete an attempt."""
+    template_name = "written_test/delete_confirm.html"
 
-    def post(self, request, pk):
-        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
-        user = request.user
-        allowed = (
+    def _check_permission(self, user, attempt):
+        """Check if user can delete this attempt"""
+        return (
             user.is_staff
+            or attempt.student == user  # Students can delete their own attempts
             or (attempt.instructor and attempt.instructor == user)
             or (attempt.template and attempt.template.created_by == user)
         )
-        if not allowed:
+
+    def get(self, request, pk):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
+        if not self._check_permission(request.user, attempt):
+            return HttpResponseForbidden("Not allowed to delete this attempt")
+        return render(request, self.template_name, {"attempt": attempt})
+
+    def post(self, request, pk):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
+        if not self._check_permission(request.user, attempt):
             return HttpResponseForbidden("Not allowed to delete this attempt")
         student_pk = attempt.student.pk
         attempt.delete()
@@ -428,3 +439,69 @@ class PendingTestsView(ListView):
         return WrittenTestAssignment.objects.filter(
             student=self.request.user, completed=False
         ).select_related("template")
+
+
+@method_decorator(active_member_required, name="dispatch")
+class MemberWrittenTestHistoryView(ListView):
+    """Shows all completed written tests for the current member."""
+    template_name = "written_test/member_history.html"
+    context_object_name = "attempts"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return WrittenTestAttempt.objects.filter(
+            student=self.request.user
+        ).select_related(
+            "template", "instructor"
+        ).prefetch_related(
+            "answers__question"
+        ).order_by("-date_taken")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add summary stats
+        attempts = self.get_queryset()
+        context.update({
+            "total_tests": attempts.count(),
+            "passed_tests": attempts.filter(passed=True).count(),
+            "failed_tests": attempts.filter(passed=False).count(),
+        })
+        return context
+
+
+@method_decorator(active_member_required, name="dispatch")
+class InstructorRecentTestsView(ListView):
+    """Shows recently completed written tests for all students - instructor view."""
+    template_name = "written_test/instructor_recent.html"
+    context_object_name = "attempts"
+    paginate_by = 50
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check if user is an instructor (has given instruction reports or is staff)
+        if not (request.user.is_staff or
+                InstructionReport.objects.filter(instructor=request.user).exists()):
+            return HttpResponseForbidden("Access restricted to instructors and staff")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Show tests from the last 30 days, most recent first
+        from datetime import timedelta
+        cutoff_date = timezone.now() - timedelta(days=30)
+
+        return WrittenTestAttempt.objects.filter(
+            date_taken__gte=cutoff_date
+        ).select_related(
+            "student", "template", "instructor"
+        ).order_by("-date_taken")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add summary stats for the period
+        attempts = self.get_queryset()
+        context.update({
+            "total_recent": attempts.count(),
+            "recent_passed": attempts.filter(passed=True).count(),
+            "recent_failed": attempts.filter(passed=False).count(),
+            "period_days": 30,
+        })
+        return context
