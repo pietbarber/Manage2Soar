@@ -2,7 +2,6 @@ import base64
 import os
 from datetime import date, timedelta
 from django.utils import timezone
-import re
 
 from django.conf import settings
 from django.contrib import messages
@@ -23,7 +22,6 @@ from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
 from members.utils import can_view_personal_info as can_view_personal_info_fn
-from members.utils import is_privileged_viewer
 from django.urls import reverse
 
 try:

@@ -326,6 +326,38 @@ class WrittenTestSubmitView(View):
             asn.attempt = attempt
             asn.completed = True
             asn.save(update_fields=["attempt", "completed"])
+            # Notify the assigning instructor (if any) and the test creator/proctor
+            try:
+                if Notification is not None:
+                    student_name = getattr(
+                        request.user, "full_display_name", str(request.user))
+                    score_pct = f"{attempt.score_percentage:.0f}%" if attempt.score_percentage is not None else "N/A"
+                    status = "Passed" if attempt.passed else "Failed"
+                    notif_msg = f"{student_name} has completed the written test '{tmpl.name}': {score_pct} ({status})."
+                    try:
+                        notif_url = reverse(
+                            "knowledgetest:quiz-result", args=[attempt.pk])
+                    except Exception:
+                        notif_url = None
+
+                    if asn.instructor:
+                        # Don't crash if creating notification fails
+                        try:
+                            Notification.objects.create(
+                                user=asn.instructor, message=notif_msg, url=notif_url)
+                        except Exception:
+                            pass
+
+                    # Also notify the proctor/creator if different
+                    if tmpl.created_by and tmpl.created_by != asn.instructor:
+                        try:
+                            Notification.objects.create(
+                                user=tmpl.created_by, message=notif_msg, url=notif_url)
+                        except Exception:
+                            pass
+            except Exception:
+                # swallow notification errors to avoid breaking test submit
+                pass
         except WrittenTestAssignment.DoesNotExist:
             pass
 

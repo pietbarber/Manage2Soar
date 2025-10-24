@@ -578,7 +578,9 @@ def member_training_grid(request, member_id):
 
 @instructor_required
 def log_ground_instruction(request):
-    student_id = request.GET.get("student")
+    # Accept either 'student' or 'student_id' as the query parameter for
+    # compatibility with multiple templates/links in the codebase.
+    student_id = request.GET.get("student") or request.GET.get("student_id")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
     lessons = TrainingLesson.objects.all().order_by("code")
 
@@ -1907,7 +1909,6 @@ class CreateWrittenTestView(FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
-        import random
         # 1. Pull weights & must_include
         must = []
         if data["must_include"]:

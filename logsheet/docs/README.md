@@ -108,3 +108,5 @@ See [models.md](models.md) for full details and ERD:
 
 - **2025-10** Major documentation update for logsheet app
 - **2025-08** Initial release: daily logsheets, flights, maintenance, closeouts
+ - **2025-10-21** Updated `logsheet.signals` to notify instructors when an instruction
+	 flight is created or transitions to 'landed' (post-flight report). See [Signals](signals.md).

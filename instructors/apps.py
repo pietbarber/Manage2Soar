@@ -17,7 +17,6 @@ class InstructorsConfig(AppConfig):
                 "migrate",
                 "collectstatic",
                 "loaddata",
-                "test",
             ]
         ):
             import instructors.signals  # noqa

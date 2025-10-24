@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Log Ground Instruction{% endblock %}
 {% block content %}
-<h2>Log Ground Instruction for {{ student.full_display_name }}</h2>
+<h2>
+  {% if student %}
+    Log Ground Instruction for {{ student.full_display_name }}
+  {% else %}
+    Log Ground Instruction
+  {% endif %}
+</h2>
 
 {% if messages %}
   {% for message in messages %}
@@ -104,6 +110,10 @@
     </tbody>
   </table>
   <button type="submit" class="btn btn-success">Save Ground Instruction</button>
-  <a href="{% url 'members:member_view' student.id %}" class="btn btn-secondary">Cancel</a>
+  {% if student %}
+    <a href="{% url 'members:member_view' student.id %}" class="btn btn-secondary">Cancel</a>
+  {% else %}
+    <a href="{% url 'instructors:log_ground_instruction' %}" class="btn btn-secondary">Cancel</a>
+  {% endif %}
 </form>
 {% endblock %}
