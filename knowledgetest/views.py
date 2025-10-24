@@ -306,6 +306,11 @@ class WrittenTestSubmitView(View):
         attempt.passed = score >= float(tmpl.pass_percentage)
 
         attempt.save()
+        # Build a URL to the attempt result so we can reuse it for notifications
+        try:
+            notif_url = reverse("knowledgetest:quiz-result", args=[attempt.pk])
+        except Exception:
+            notif_url = None
         # Build a breakdown of how many questions per category were on this test
         from django.db.models import Count
 
@@ -334,11 +339,7 @@ class WrittenTestSubmitView(View):
                     score_pct = f"{attempt.score_percentage:.0f}%" if attempt.score_percentage is not None else "N/A"
                     status = "Passed" if attempt.passed else "Failed"
                     notif_msg = f"{student_name} has completed the written test '{tmpl.name}': {score_pct} ({status})."
-                    try:
-                        notif_url = reverse(
-                            "knowledgetest:quiz-result", args=[attempt.pk])
-                    except Exception:
-                        notif_url = None
+                    # notif_url computed above
 
                     if asn.instructor:
                         # Don't crash if creating notification fails
@@ -376,6 +377,10 @@ class WrittenTestSubmitView(View):
             ]
             breakdown_txt = ", ".join(breakdown_list)
 
+            # Include a persistent link to the attempt result in the report_text
+            link_html = (
+                f' <a href="{notif_url}">View written test result</a>' if notif_url else ""
+            )
             InstructionReport.objects.create(
                 student=request.user,
                 instructor=proctor,
@@ -384,7 +389,7 @@ class WrittenTestSubmitView(View):
                     f'Written test "{tmpl.name}" completed: '
                     f"{attempt.score_percentage:.0f}% "
                     f'({"Passed" if attempt.passed else "Failed"}). '
-                    f"Subject breakdown: {breakdown_txt}."
+                    f"Subject breakdown: {breakdown_txt}." + link_html
                 ),
             )
         return redirect("knowledgetest:quiz-result", attempt.pk)
@@ -394,6 +399,25 @@ class WrittenTestResultView(DetailView):
     model = WrittenTestAttempt
     template_name = "written_test/result.html"
     context_object_name = "attempt"
+
+
+class WrittenTestAttemptDeleteView(View):
+    """Allow staff or the grading instructor/template creator to delete an attempt."""
+
+    def post(self, request, pk):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
+        user = request.user
+        allowed = (
+            user.is_staff
+            or (attempt.instructor and attempt.instructor == user)
+            or (attempt.template and attempt.template.created_by == user)
+        )
+        if not allowed:
+            return HttpResponseForbidden("Not allowed to delete this attempt")
+        student_pk = attempt.student.pk
+        attempt.delete()
+        # Redirect to the student's instruction record where the report lived
+        return redirect(reverse("instructors:member_instruction_record", args=[student_pk]))
 
 
 class PendingTestsView(ListView):
