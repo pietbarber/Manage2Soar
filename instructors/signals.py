@@ -1,15 +1,13 @@
 from .utils import update_student_progress_snapshot
-from .models import GroundInstruction, InstructionReport
+from .models import InstructionReport, GroundInstruction, MemberQualification
+from members.models import MemberBadge
+from notifications.models import Notification
 from django.apps import apps
 import sys
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse, NoReverseMatch
 import logging
-
-from .models import InstructionReport, GroundInstruction, MemberQualification
-from members.models import MemberBadge
-from notifications.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +56,9 @@ def notify_student_on_instruction_report(sender, instance, created, **kwargs):
         _create_notification_if_not_exists(student, message, url=url)
     except Exception:
         logger.exception("notify_student_on_instruction_report failed")
-        raise
+        # Don't re-raise from signal handlers; swallowing prevents breaking
+        # the main save operation (tests and production rely on this pattern).
+        return
 
 
 @receiver(post_save, sender=GroundInstruction)
@@ -87,7 +87,8 @@ def notify_student_on_ground_instruction(sender, instance, created, **kwargs):
         _create_notification_if_not_exists(student, message, url=url)
     except Exception:
         logger.exception("notify_student_on_ground_instruction failed")
-        raise
+        # Avoid re-raising inside signal handlers
+        return
 
 
 @receiver(post_save, sender=MemberQualification)
@@ -113,7 +114,8 @@ def notify_member_on_qualification(sender, instance, created, **kwargs):
         _create_notification_if_not_exists(member, message, url=url)
     except Exception:
         logger.exception("notify_member_on_qualification failed")
-        raise
+        # Avoid re-raising inside signal handlers
+        return
 
 
 @receiver(post_save, sender=MemberBadge)
@@ -131,7 +133,8 @@ def notify_member_on_badge(sender, instance, created, **kwargs):
         _create_notification_if_not_exists(member, message, url=url)
     except Exception:
         logger.exception("notify_member_on_badge failed")
-        raise
+        # Avoid re-raising inside signal handlers
+        return
 # instructors/signals.py
 
 

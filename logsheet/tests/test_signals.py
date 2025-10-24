@@ -19,7 +19,7 @@ def test_instructor_notified_on_flight_creation(django_user_model):
     log = Logsheet.objects.create(
         log_date=timezone.now().date(), airfield=af, created_by=instructor)
     # Create flight with both pilot and instructor and completed times
-    f = Flight.objects.create(
+    Flight.objects.create(
         logsheet=log,
         pilot=pilot,
         instructor=instructor,

@@ -1,17 +1,8 @@
-from django.conf import settings
-from django.contrib.auth.models import Group
-from django.core.mail import send_mail
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from .models import MaintenanceIssue
-from .models import Flight
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.db.models.signals import pre_save
+from .models import MaintenanceIssue, Flight
 from notifications.models import Notification
-from django.utils import timezone
-from datetime import timedelta
 from django.urls import reverse
 import logging
 

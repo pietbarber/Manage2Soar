@@ -14,7 +14,7 @@ def test_maintenance_issue_create_notifies_meisters():
     AircraftMeister.objects.create(glider=glider, member=meister)
 
     # Create an issue
-    issue = MaintenanceIssue.objects.create(
+    MaintenanceIssue.objects.create(
         glider=glider, reported_by=meister, report_date="2025-10-22", description="wingtip damage", grounded=False)
 
     # Expect a notification for the meister
@@ -57,9 +57,9 @@ def test_maintenance_notification_dedupe():
     AircraftMeister.objects.create(glider=glider, member=meister)
 
     # Create the same issue twice (simulate duplicate saves)
-    issue1 = MaintenanceIssue.objects.create(
+    MaintenanceIssue.objects.create(
         glider=glider, reported_by=meister, report_date="2025-10-22", description="battery low", grounded=False)
-    issue2 = MaintenanceIssue.objects.create(
+    MaintenanceIssue.objects.create(
         glider=glider, reported_by=meister, report_date="2025-10-22", description="battery low", grounded=False)
 
     notes = Notification.objects.filter(
