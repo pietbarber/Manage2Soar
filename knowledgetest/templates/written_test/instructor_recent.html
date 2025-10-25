@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📊 Recent Written Test Results</h2>
+    <div>
+      <small class="text-muted me-3">Last {{ period_days }} days</small>
+      <button class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">
+        🔄 Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ total_recent }}</h3>
+          <small>Total Tests ({{ period_days }} days)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ recent_passed }}</h3>
+          <small>Passed</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h3 class="mb-0">{{ recent_failed }}</h3>
+          <small>Failed</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if attempts %}
+    <!-- Tests List -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Recent Test Completions</h5>
+        <small class="text-muted">Most recent first</small>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date/Time</th>
+                <th>Student</th>
+                <th>Test</th>
+                <th>Score</th>
+                <th>Result</th>
+                <th>Graded By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+                <tr class="{% if not attempt.passed %}table-warning{% endif %}">
+                  <td>
+                    <div class="fw-bold">{{ attempt.date_taken|date:"M j" }}</div>
+                    <small class="text-muted">{{ attempt.date_taken|date:"g:i A" }}</small>
+                  </td>
+                  <td>
+                    <div class="fw-bold">{{ attempt.student.full_display_name }}</div>
+                    <small class="text-muted">{{ attempt.student.membership_status|default:"Member" }}</small>
+                  </td>
+                  <td>
+                    <div class="fw-bold">{{ attempt.template.name }}</div>
+                    {% if attempt.template.description %}
+                      <small class="text-muted d-block">{{ attempt.template.description|truncatechars:40 }}</small>
+                    {% endif %}
+                    <small class="badge bg-secondary">{{ attempt.answers.count }} questions</small>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <span class="fs-5 fw-bold me-2">{{ attempt.score_percentage|floatformat:0 }}%</span>
+                      {% if attempt.passed %}
+                        <span class="badge bg-success">✓</span>
+                      {% else %}
+                        <span class="badge bg-danger">✗</span>
+                      {% endif %}
+                    </div>
+                    <small class="text-muted">Required: {{ attempt.template.pass_percentage }}%</small>
+                  </td>
+                  <td>
+                    {% if attempt.passed %}
+                      <span class="badge bg-success px-3">Passed</span>
+                    {% else %}
+                      <span class="badge bg-danger px-3">Failed</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if attempt.instructor %}
+                      <div>{{ attempt.instructor.full_display_name }}</div>
+                    {% elif attempt.template.created_by %}
+                      <div>{{ attempt.template.created_by.full_display_name }}</div>
+                      <small class="text-muted">(Test Creator)</small>
+                    {% else %}
+                      <em class="text-muted">System</em>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}" 
+                         class="btn btn-outline-primary"
+                         title="View detailed results">
+                        📄 Results
+                      </a>
+                      <a href="{% url 'instructors:member_instruction_record' attempt.student.pk %}" 
+                         class="btn btn-outline-secondary"
+                         title="View student's instruction record">
+                        📘 Record
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+      <nav aria-label="Recent tests pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page=1">First</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+          {% endif %}
+          
+          <li class="page-item active">
+            <span class="page-link">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </span>
+          </li>
+          
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+
+  {% else %}
+    <!-- No Recent Tests -->
+    <div class="alert alert-info text-center">
+      <h4>📝 No Recent Tests</h4>
+      <p class="mb-0">No written tests have been completed in the last {{ period_days }} days.</p>
+    </div>
+  {% endif %}
+</div>
+
+<style>
+/* Custom styling for better readability */
+.table td {
+    vertical-align: middle;
+}
+.table-warning {
+    --bs-table-bg: #fff3cd;
+    --bs-table-striped-bg: #ffecb5;
+}
+</style>
+{% endblock %}

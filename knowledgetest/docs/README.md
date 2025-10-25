@@ -10,6 +10,7 @@ Welcome to the documentation for the **knowledgetest** Django app. This director
 - [Forms](forms.md)
 - [Views](views.md)
 - [Management Commands](management.md)
+- [Tests](tests.md)
 
 ---
 
@@ -19,6 +20,7 @@ Welcome to the documentation for the **knowledgetest** Django app. This director
 - See [forms.md](forms.md) for form logic and validation.
 - Check [views.md](views.md) for all view classes and functions.
 - Use [management.md](management.md) for import and admin scripts.
+- Read [tests.md](tests.md) for comprehensive test coverage documentation.
 
 ---
 
@@ -27,3 +29,4 @@ Welcome to the documentation for the **knowledgetest** Django app. This director
 - [Forms](forms.md)
 - [Views](views.md)
 - [Management Commands](management.md)
+- [Tests](tests.md)

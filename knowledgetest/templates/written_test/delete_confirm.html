@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Delete Written Test Attempt{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Confirm Deletion
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">Are you sure you want to delete this written test attempt?</h5>
+                        <p class="mb-0">This action cannot be undone. All associated answers and scores will be permanently deleted.</p>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <strong>Test:</strong> {{ attempt.template.name }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Student:</strong> {{ attempt.student.full_display_name }}
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <strong>Date Taken:</strong> {{ attempt.date_taken|date:"M d, Y g:i A" }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Score:</strong>
+                            {% if attempt.score_percentage %}
+                                {{ attempt.score_percentage|floatformat:0 }}%
+                                {% if attempt.passed %}
+                                    <span class="badge bg-success">Passed</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Failed</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">Not scored</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Cancel
+                        </a>
+                        
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" 
+                                    onclick="return confirm('Are you absolutely sure? This written test attempt and all its data will be permanently deleted.');">
+                                <i class="fas fa-trash me-2"></i>Delete Permanently
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

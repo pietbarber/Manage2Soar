@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.html import format_html
 from django.views.generic import DetailView, FormView, ListView, TemplateView, View
 
 from instructors.models import InstructionReport
@@ -30,6 +31,30 @@ except ImportError:
     Notification = None
 
 logger = logging.getLogger(__name__)
+
+
+def generate_test_subject_breakdown(attempt):
+    """
+    Generate a human-readable breakdown of test subjects for a WrittenTestAttempt.
+
+    Args:
+        attempt: WrittenTestAttempt instance
+
+    Returns:
+        str: Formatted breakdown like "Soaring Technique (5), Ground Fundamentals (10)"
+    """
+    from django.db.models import Count
+
+    breakdown_qs = attempt.answers.values(
+        "question__category__code", "question__category__description"
+    ).annotate(num=Count("pk"))
+
+    breakdown_list = [
+        f"{entry['question__category__description']} ({entry['num']})"
+        for entry in breakdown_qs
+    ]
+
+    return ", ".join(breakdown_list)
 
 
 def _get_empty_preset():
@@ -306,17 +331,13 @@ class WrittenTestSubmitView(View):
         attempt.passed = score >= float(tmpl.pass_percentage)
 
         attempt.save()
+        # Build a URL to the attempt result so we can reuse it for notifications
+        try:
+            notif_url = reverse("knowledgetest:quiz-result", args=[attempt.pk])
+        except Exception:
+            notif_url = None
         # Build a breakdown of how many questions per category were on this test
-        from django.db.models import Count
-
-        breakdown_qs = attempt.answers.values("question__category__code").annotate(
-            num=Count("pk")
-        )
-        breakdown = [
-            f"{entry['question__category__code']} ({entry['num']})"
-            for entry in breakdown_qs
-        ]
-        breakdown_txt = ", ".join(breakdown)
+        breakdown_txt = generate_test_subject_breakdown(attempt)
 
         # 1) Mark any assignment complete
         try:
@@ -334,11 +355,7 @@ class WrittenTestSubmitView(View):
                     score_pct = f"{attempt.score_percentage:.0f}%" if attempt.score_percentage is not None else "N/A"
                     status = "Passed" if attempt.passed else "Failed"
                     notif_msg = f"{student_name} has completed the written test '{tmpl.name}': {score_pct} ({status})."
-                    try:
-                        notif_url = reverse(
-                            "knowledgetest:quiz-result", args=[attempt.pk])
-                    except Exception:
-                        notif_url = None
+                    # notif_url computed above
 
                     if asn.instructor:
                         # Don't crash if creating notification fails
@@ -365,17 +382,13 @@ class WrittenTestSubmitView(View):
         proctor = tmpl.created_by
         if proctor:
             # build a subject‐count breakdown
-            from django.db.models import Count
+            breakdown_txt = generate_test_subject_breakdown(attempt)
 
-            breakdown_qs = attempt.answers.values("question__category__code").annotate(
-                num=Count("pk")
+            # Include a persistent link to the attempt result in the report_text
+            link_html = (
+                format_html(' <a href="{}">View written test result</a>',
+                            notif_url) if notif_url else ""
             )
-            breakdown_list = [
-                f"{entry['question__category__code']} ({entry['num']})"
-                for entry in breakdown_qs
-            ]
-            breakdown_txt = ", ".join(breakdown_list)
-
             InstructionReport.objects.create(
                 student=request.user,
                 instructor=proctor,
@@ -384,7 +397,7 @@ class WrittenTestSubmitView(View):
                     f'Written test "{tmpl.name}" completed: '
                     f"{attempt.score_percentage:.0f}% "
                     f'({"Passed" if attempt.passed else "Failed"}). '
-                    f"Subject breakdown: {breakdown_txt}."
+                    f"Subject breakdown: {breakdown_txt}." + link_html
                 ),
             )
         return redirect("knowledgetest:quiz-result", attempt.pk)
@@ -396,6 +409,36 @@ class WrittenTestResultView(DetailView):
     context_object_name = "attempt"
 
 
+@method_decorator(active_member_required, name="dispatch")
+class WrittenTestAttemptDeleteView(View):
+    """Allow staff, students (own attempts), or the grading instructor/template creator to delete an attempt."""
+    template_name = "written_test/delete_confirm.html"
+
+    def _check_permission(self, user, attempt):
+        """Check if user can delete this attempt"""
+        return (
+            user.is_staff
+            or attempt.student == user  # Students can delete their own attempts
+            or (attempt.instructor and attempt.instructor == user)
+            or (attempt.template and attempt.template.created_by == user)
+        )
+
+    def get(self, request, pk):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
+        if not self._check_permission(request.user, attempt):
+            return HttpResponseForbidden("Not allowed to delete this attempt")
+        return render(request, self.template_name, {"attempt": attempt})
+
+    def post(self, request, pk):
+        attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
+        if not self._check_permission(request.user, attempt):
+            return HttpResponseForbidden("Not allowed to delete this attempt")
+        student_pk = attempt.student.pk
+        attempt.delete()
+        # Redirect to the student's instruction record where the report lived
+        return redirect(reverse("instructors:member_instruction_record", args=[student_pk]))
+
+
 class PendingTestsView(ListView):
     template_name = "written_test/pending.html"
     context_object_name = "assignments"
@@ -404,3 +447,69 @@ class PendingTestsView(ListView):
         return WrittenTestAssignment.objects.filter(
             student=self.request.user, completed=False
         ).select_related("template")
+
+
+@method_decorator(active_member_required, name="dispatch")
+class MemberWrittenTestHistoryView(ListView):
+    """Shows all completed written tests for the current member."""
+    template_name = "written_test/member_history.html"
+    context_object_name = "attempts"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return WrittenTestAttempt.objects.filter(
+            student=self.request.user
+        ).select_related(
+            "template", "instructor"
+        ).prefetch_related(
+            "answers__question"
+        ).order_by("-date_taken")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add summary stats
+        attempts = self.get_queryset()
+        context.update({
+            "total_tests": attempts.count(),
+            "passed_tests": attempts.filter(passed=True).count(),
+            "failed_tests": attempts.filter(passed=False).count(),
+        })
+        return context
+
+
+@method_decorator(active_member_required, name="dispatch")
+class InstructorRecentTestsView(ListView):
+    """Shows recently completed written tests for all students - instructor view."""
+    template_name = "written_test/instructor_recent.html"
+    context_object_name = "attempts"
+    paginate_by = 50
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check if user is an instructor (has given instruction reports or is staff)
+        if not (request.user.is_staff or
+                InstructionReport.objects.filter(instructor=request.user).exists()):
+            return HttpResponseForbidden("Access restricted to instructors and staff")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Show tests from the last 30 days, most recent first
+        from datetime import timedelta
+        cutoff_date = timezone.now() - timedelta(days=30)
+
+        return WrittenTestAttempt.objects.filter(
+            date_taken__gte=cutoff_date
+        ).select_related(
+            "student", "template", "instructor"
+        ).order_by("-date_taken")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add summary stats for the period
+        attempts = self.get_queryset()
+        context.update({
+            "total_recent": attempts.count(),
+            "recent_passed": attempts.filter(passed=True).count(),
+            "recent_failed": attempts.filter(passed=False).count(),
+            "period_days": 30,
+        })
+        return context

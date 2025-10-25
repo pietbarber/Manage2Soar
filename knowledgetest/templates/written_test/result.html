@@ -10,32 +10,104 @@
     {% else %}
       <span class="badge bg-danger">Failed</span>
     {% endif %}
+    <small class="text-muted ms-2">(Required: {{ attempt.template.pass_percentage }}% to pass)</small>
   </p>
   <hr/>
 
+  {% comment %}Delete button for authorised instructors / staff{% endcomment %}
+  {% if request.user.is_staff or request.user == attempt.instructor or request.user == attempt.template.created_by %}
+    <form method="post" action="{% url 'knowledgetest:quiz-attempt-delete' attempt.pk %}" class="mb-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this test record? This action cannot be undone and will permanently delete the attempt and all associated answers.');">🗑️ Remove Test Record</button>
+    </form>
+  {% endif %}
+
   <div class="list-group">
     {% for ans in attempt.answers.all %}
-    <div class="list-group-item">
-      <strong>Q{{ ans.question.qnum }}.</strong>
-      <div class="question-text">
-        {{ ans.question.question_text|safe }}
-      </div>
-      Your answer:
-      <span class="{% if ans.is_correct %}text-success{% else %}text-danger{% endif %}">
-        {{ ans.selected_answer }}
-      </span>
-      &mdash; Correct:
-      <strong>{{ ans.question.correct_answer }}</strong>
-      {% if ans.question.explanation %}
-        <div class="explanation mt-2 text-muted">
-          {{ ans.question.explanation|safe }}
+      {% with q=ans.question %}
+      {# Highlight card if the student's answer was incorrect #}
+      <div class="list-group-item {% if not ans.is_correct %}border-danger bg-light{% endif %}">
+        <div class="d-flex justify-content-between">
+          <div>
+            <strong>Q{{ q.qnum }}.</strong>
+            <div class="question-text mt-1">{{ q.question_text|safe }}</div>
+          </div>
+          <div class="text-end">
+            {% if ans.is_correct %}
+              <span class="badge bg-success">Correct</span>
+            {% else %}
+              <span class="badge bg-danger">Incorrect</span>
+            {% endif %}
+          </div>
         </div>
-      {% endif %}
-    </div>
-  {% endfor %}
-  
 
+        <ul class="list-group list-group-flush mt-2">
+          {% if q.option_a %}
+            <li class="{% if 'A' == q.correct_answer %}list-group-item list-group-item-success{% elif 'A' == ans.selected_answer %}list-group-item list-group-item-danger{% else %}list-group-item{% endif %}">
+              <strong>A.</strong>
+              <span class="ms-2">{{ q.option_a|safe }}</span>
+              {% if 'A' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">✓</span>
+              {% endif %}
+              {% if 'A' == ans.selected_answer and 'A' != q.correct_answer %}
+                <span class="ms-2 badge bg-danger">Your answer</span>
+              {% elif 'A' == ans.selected_answer and 'A' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">Your answer</span>
+              {% endif %}
+            </li>
+          {% endif %}
+          {% if q.option_b %}
+            <li class="{% if 'B' == q.correct_answer %}list-group-item list-group-item-success{% elif 'B' == ans.selected_answer %}list-group-item list-group-item-danger{% else %}list-group-item{% endif %}">
+              <strong>B.</strong>
+              <span class="ms-2">{{ q.option_b|safe }}</span>
+              {% if 'B' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">✓</span>
+              {% endif %}
+              {% if 'B' == ans.selected_answer and 'B' != q.correct_answer %}
+                <span class="ms-2 badge bg-danger">Your answer</span>
+              {% elif 'B' == ans.selected_answer and 'B' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">Your answer</span>
+              {% endif %}
+            </li>
+          {% endif %}
+          {% if q.option_c %}
+            <li class="{% if 'C' == q.correct_answer %}list-group-item list-group-item-success{% elif 'C' == ans.selected_answer %}list-group-item list-group-item-danger{% else %}list-group-item{% endif %}">
+              <strong>C.</strong>
+              <span class="ms-2">{{ q.option_c|safe }}</span>
+              {% if 'C' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">✓</span>
+              {% endif %}
+              {% if 'C' == ans.selected_answer and 'C' != q.correct_answer %}
+                <span class="ms-2 badge bg-danger">Your answer</span>
+              {% elif 'C' == ans.selected_answer and 'C' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">Your answer</span>
+              {% endif %}
+            </li>
+          {% endif %}
+          {% if q.option_d %}
+            <li class="{% if 'D' == q.correct_answer %}list-group-item list-group-item-success{% elif 'D' == ans.selected_answer %}list-group-item list-group-item-danger{% else %}list-group-item{% endif %}">
+              <strong>D.</strong>
+              <span class="ms-2">{{ q.option_d|safe }}</span>
+              {% if 'D' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">✓</span>
+              {% endif %}
+              {% if 'D' == ans.selected_answer and 'D' != q.correct_answer %}
+                <span class="ms-2 badge bg-danger">Your answer</span>
+              {% elif 'D' == ans.selected_answer and 'D' == q.correct_answer %}
+                <span class="ms-2 badge bg-success">Your answer</span>
+              {% endif %}
+            </li>
+          {% endif %}
+        </ul>
 
+        {% if q.explanation %}
+          <div class="explanation mt-2 text-muted">
+            {{ q.explanation|safe }}
+          </div>
+        {% endif %}
+      </div>
+      {% endwith %}
+    {% endfor %}
   </div>
 </div>
 {% endblock %}
