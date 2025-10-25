@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.html import format_html
 from django.views.generic import DetailView, FormView, ListView, TemplateView, View
 
 from instructors.models import InstructionReport
@@ -30,6 +31,30 @@ except ImportError:
     Notification = None
 
 logger = logging.getLogger(__name__)
+
+
+def generate_test_subject_breakdown(attempt):
+    """
+    Generate a human-readable breakdown of test subjects for a WrittenTestAttempt.
+
+    Args:
+        attempt: WrittenTestAttempt instance
+
+    Returns:
+        str: Formatted breakdown like "Soaring Technique (5), Ground Fundamentals (10)"
+    """
+    from django.db.models import Count
+
+    breakdown_qs = attempt.answers.values(
+        "question__category__code", "question__category__description"
+    ).annotate(num=Count("pk"))
+
+    breakdown_list = [
+        f"{entry['question__category__description']} ({entry['num']})"
+        for entry in breakdown_qs
+    ]
+
+    return ", ".join(breakdown_list)
 
 
 def _get_empty_preset():
@@ -312,16 +337,7 @@ class WrittenTestSubmitView(View):
         except Exception:
             notif_url = None
         # Build a breakdown of how many questions per category were on this test
-        from django.db.models import Count
-
-        breakdown_qs = attempt.answers.values(
-            "question__category__code", "question__category__description"
-        ).annotate(num=Count("pk"))
-        breakdown = [
-            f"{entry['question__category__description']} ({entry['num']})"
-            for entry in breakdown_qs
-        ]
-        breakdown_txt = ", ".join(breakdown)
+        breakdown_txt = generate_test_subject_breakdown(attempt)
 
         # 1) Mark any assignment complete
         try:
@@ -366,20 +382,12 @@ class WrittenTestSubmitView(View):
         proctor = tmpl.created_by
         if proctor:
             # build a subject‐count breakdown
-            from django.db.models import Count
-
-            breakdown_qs = attempt.answers.values(
-                "question__category__code", "question__category__description"
-            ).annotate(num=Count("pk"))
-            breakdown_list = [
-                f"{entry['question__category__description']} ({entry['num']})"
-                for entry in breakdown_qs
-            ]
-            breakdown_txt = ", ".join(breakdown_list)
+            breakdown_txt = generate_test_subject_breakdown(attempt)
 
             # Include a persistent link to the attempt result in the report_text
             link_html = (
-                f' <a href="{notif_url}">View written test result</a>' if notif_url else ""
+                format_html(' <a href="{}">View written test result</a>',
+                            notif_url) if notif_url else ""
             )
             InstructionReport.objects.create(
                 student=request.user,
