@@ -277,7 +277,7 @@ def fill_instruction_report(request, student_id, report_date):
                         report=report, lesson=lesson, score=score
                     )
 
-            messages.success(request, "Instruction report submitted successfully.")
+            messages.success(request, "Flight instruction logged successfully.")
             return redirect(
                 "instructors:member_instruction_record", member_id=student.id
             )

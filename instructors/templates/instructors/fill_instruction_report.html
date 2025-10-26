@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Instruction Report{% endblock %}
+{% block title %}Log Flight Instruction{% endblock %}
 {% block content %}
-<h2>Instruction Report for {{ student.full_display_name }} – {{ report_date|date:"F j, Y" }}</h2>
+<h2>Log Flight Instruction for {{ student.full_display_name }} – {{ report_date|date:"F j, Y" }}</h2>
 
 <form method="post">
   {% csrf_token %}
@@ -40,7 +40,7 @@
     </tbody>
   </table>
 
-  <button type="submit" class="btn btn-success">Save Instruction Report</button>
+  <button type="submit" class="btn btn-success">Save Flight Instruction</button>
   <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-secondary">Cancel</a>
 </form>
 {% endblock %}

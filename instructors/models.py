@@ -5,11 +5,11 @@ from members.models import Member
 from utils.upload_entropy import upload_quals_icon
 
 SCORE_CHOICES = [
-    ("1", "Introduced (Instructor flew)"),
-    ("2", "Practiced (with instructor help)"),
-    ("3", "Solo Standard"),
-    ("4", "Checkride Standard"),
-    ("!", "Needs Attention (!)"),
+    ("1", "1 - Introduced (Discussed/Demonstrated)"),
+    ("2", "2 - Practiced"),
+    ("3", "3 - Solo Standard"),
+    ("4", "4 - Checkride Standard"),
+    ("!", "! - Needs Attention"),
 ]
 
 
