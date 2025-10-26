@@ -133,3 +133,76 @@ class HomePageImage(models.Model):
 
     def __str__(self):
         return self.caption or f"Image {self.pk}"
+
+
+# Site Feedback Model for Issue #117
+class SiteFeedback(models.Model):
+    FEEDBACK_TYPE_CHOICES = [
+        ('bug', 'Bug Report'),
+        ('feature', 'Feature Request'),
+        ('help', 'Help Request'),
+        ('other', 'Other'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        help_text="User who submitted the feedback"
+    )
+    feedback_type = models.CharField(
+        max_length=20,
+        choices=FEEDBACK_TYPE_CHOICES,
+        default='other'
+    )
+    referring_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="URL of the page where feedback was submitted from"
+    )
+    subject = models.CharField(max_length=200)
+    message = HTMLField(help_text="Detailed feedback message")
+
+    # Status tracking
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='open'
+    )
+
+    # Admin response
+    admin_response = HTMLField(blank=True, null=True)
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='feedback_responses',
+        help_text="Webmaster who responded to this feedback"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Site Feedback"
+        verbose_name_plural = "Site Feedback"
+
+    def __str__(self):
+        return f"{self.get_feedback_type_display()}: {self.subject} - {self.user.full_display_name}"
+
+    def save(self, *args, **kwargs):
+        # Auto-set resolved_at when status changes to resolved
+        if self.status == 'resolved' and not self.resolved_at:
+            from django.utils import timezone
+            self.resolved_at = timezone.now()
+        super().save(*args, **kwargs)

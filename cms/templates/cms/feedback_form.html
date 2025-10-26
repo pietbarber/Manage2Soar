@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Submit Feedback{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-comment-dots me-2"></i>
+                        Submit Site Feedback
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Help us improve the site by reporting issues, suggesting features, or asking for help.
+                        {% if referring_url %}
+                            <br><small><strong>Page:</strong> {{ referring_url }}</small>
+                        {% endif %}
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form.media }}
+                        
+                        <div class="mb-3">
+                            {{ form.feedback_type.label_tag }}
+                            {{ form.feedback_type }}
+                            {% if form.feedback_type.help_text %}
+                                <div class="form-text">{{ form.feedback_type.help_text }}</div>
+                            {% endif %}
+                            {{ form.feedback_type.errors }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.subject.label_tag }}
+                            {{ form.subject }}
+                            {% if form.subject.help_text %}
+                                <div class="form-text">{{ form.subject.help_text }}</div>
+                            {% endif %}
+                            {{ form.subject.errors }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.message.label_tag }}
+                            {{ form.message }}
+                            {% if form.message.help_text %}
+                                <div class="form-text">{{ form.message.help_text }}</div>
+                            {% endif %}
+                            {{ form.message.errors }}
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-1"></i>
+                                Submit Feedback
+                            </button>
+                            <a href="{% if referring_url %}{{ referring_url }}{% else %}{% url 'cms:home' %}{% endif %}" 
+                               class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <h6 class="alert-heading">
+                    <i class="fas fa-info-circle me-1"></i>
+                    What happens next?
+                </h6>
+                <ul class="mb-0">
+                    <li>Webmasters will be notified of your feedback</li>
+                    <li>They'll review and respond as needed</li>
+                    <li>For urgent issues, you can also contact the board directly</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
