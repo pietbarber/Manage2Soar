@@ -1,0 +1,31 @@
+{% load siteconfig_tags %}
+{% if user.is_authenticated %}
+  {% comment %}
+  Footer template for authenticated users only.
+  Uses the same dark styling as the navbar and excludes from print views.
+  {% endcomment %}
+  <footer class="footer bg-dark text-light mt-5 py-4 no-print-nav">
+    <div class="container">
+      {% get_siteconfig as siteconfig %}
+      {{ footer_content.content|safe }}
+      
+      <hr class="border-secondary">
+      
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <small class="text-muted">
+            © {% now "Y" %} {{ siteconfig.club_name|default:'Skyline Soaring Club' }}
+          </small>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <small class="text-muted">
+            Powered by 
+            <a href="https://github.com/pietbarber/Manage2Soar" class="text-info" target="_blank">
+              Manage2Soar
+            </a>
+          </small>
+        </div>
+      </div>
+    </div>
+  </footer>
+{% endif %}

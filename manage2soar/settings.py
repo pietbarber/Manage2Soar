@@ -360,3 +360,7 @@ TINYMCE_DEFAULT_CONFIG = {
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
     "notifications.context_processors.notifications"
 )
+
+TEMPLATES[0]["OPTIONS"]["context_processors"].append(
+    "cms.context_processors.footer_content"
+)

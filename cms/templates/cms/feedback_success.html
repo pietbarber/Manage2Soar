@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback Submitted{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+                
+                <h2 class="text-success mb-3">Thank You!</h2>
+                
+                <p class="lead mb-4">
+                    Your feedback has been submitted successfully.
+                </p>
+                
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">What's Next?</h6>
+                    <ul class="mb-0 text-start">
+                        <li>Webmasters have been notified</li>
+                        <li>You'll receive updates if action is taken</li>
+                        <li>Critical issues will be addressed promptly</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-4">
+                    <a href="{% url 'cms:home' %}" class="btn btn-primary me-2">
+                        <i class="fas fa-home me-1"></i>
+                        Back to Home
+                    </a>
+                    <a href="{% url 'cms:feedback' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-plus me-1"></i>
+                        Submit More Feedback
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

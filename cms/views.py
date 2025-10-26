@@ -1,39 +1,44 @@
 # Generic CMS Page view for arbitrary pages and directories
+import logging
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.views import redirect_to_login
-
-from cms.models import HomePageContent
-from django.db.models import Count, Max
+from django.contrib import messages
 from django.urls import reverse
+
+from cms.models import HomePageContent, SiteFeedback
+from cms.forms import SiteFeedbackForm
+from members.decorators import active_member_required
+from django.db.models import Count, Max
 from members.utils import is_active_member
 
 from .models import Page
 
+# Module-level logger to avoid repeated getLogger calls
+logger = logging.getLogger(__name__)
+
 
 def cms_page(request, **kwargs):
     # Accepts named kwargs: slug1, slug2, slug3 from urls.py
-    import logging
-
-    logger = logging.getLogger("cms.debug")
+    debug_logger = logging.getLogger("cms.debug")
     slugs = []
     for i in range(1, 4):
         slug = kwargs.get(f"slug{i}")
         if slug:
             slugs.append(slug)
-    logger.debug(f"cms_page: slugs={slugs}")
+    debug_logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
-        logger.debug("cms_page: No slugs, redirecting to cms:home")
+        debug_logger.debug("cms_page: No slugs, redirecting to cms:home")
         return redirect("cms:home")
     parent = None
     page = None
     for slug in slugs:
-        logger.debug(
+        debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
         page = get_object_or_404(Page, slug=slug, parent=parent)
         parent = page
-    logger.debug(f"cms_page: Found page {page}")
+    debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
     # Access control: if the page is not public, require the same membership
     # checks we use for the homepage logic. If the user is not authorized,
@@ -181,6 +186,84 @@ def homepage(request):
             }
         )
     return render(request, "cms/index.html", {"pages": pages})
+
+
+# Site Feedback Views for Issue #117
+
+@active_member_required
+def submit_feedback(request):
+    """
+    View for submitting site feedback.
+    Captures referring URL and notifies webmasters.
+    """
+    referring_url = request.GET.get('from', request.META.get('HTTP_REFERER', ''))
+
+    if request.method == 'POST':
+        form = SiteFeedbackForm(request.POST)
+        if form.is_valid():
+            feedback = form.save(commit=False)
+            feedback.user = request.user
+            feedback.referring_url = referring_url
+            feedback.save()
+
+            # Send notification to webmasters
+            _notify_webmasters_of_feedback(feedback)
+
+            messages.success(
+                request,
+                "Thank you for your feedback! Webmasters have been notified and will respond soon."
+            )
+            return redirect('cms:feedback_success')
+    else:
+        form = SiteFeedbackForm()
+
+    return render(request, 'cms/feedback_form.html', {
+        'form': form,
+        'referring_url': referring_url,
+    })
+
+
+@active_member_required
+def feedback_success(request):
+    """Simple success page after feedback submission."""
+    return render(request, 'cms/feedback_success.html')
+
+
+def _notify_webmasters_of_feedback(feedback):
+    """
+    Send notifications to all webmasters about new feedback.
+    """
+    try:
+        from notifications.models import Notification
+        from members.models import Member
+
+        webmasters = Member.objects.filter(webmaster=True, is_active=True)
+
+        for webmaster in webmasters:
+            try:
+                notification_message = (
+                    f"New site feedback from {feedback.user.full_display_name}: "
+                    f"{feedback.get_feedback_type_display()} - {feedback.subject}"
+                )
+
+                # Link to admin interface for feedback management
+                notification_url = f"/admin/cms/sitefeedback/{feedback.pk}/change/"
+
+                Notification.objects.create(
+                    user=webmaster,
+                    message=notification_message,
+                    url=notification_url
+                )
+            except Exception as e:
+                # Log but don't fail - feedback submission should still work
+                logger.error(f"Failed to notify webmaster {webmaster}: {e}")
+
+    except ImportError:
+        # Notifications app not available
+        pass
+    except Exception as e:
+        # Log but don't fail
+        logger.error(f"Failed to notify webmasters of feedback: {e}")
 
 
 # Create your views here.
