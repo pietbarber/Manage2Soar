@@ -1,10 +1,94 @@
 # Models in knowledgetest/models.py
 
-This document describes all models in `knowledgetest/models.py` and includes the ERD for this app.
+This document describes all models in `knowledgetest/models.py` and includes the database schema for this app.
 
 ---
 
-![KnowledgeTest ERD](knowledgetest.png)
+## Database Schema
+
+```mermaid
+erDiagram
+    Member ||--o{ WrittenTestTemplate : created_by
+    Member ||--o{ WrittenTestAttempt : student
+    Member ||--o{ WrittenTestAssignment : assigned_to
+    Member ||--o{ WrittenTestAssignment : created_by
+    
+    QuestionCategory {
+        int id PK
+        string code UK
+        text description
+    }
+    
+    Question {
+        int id PK
+        int category_id FK
+        text question
+        string a
+        string b
+        string c
+        string d
+        string answer
+        text explanation
+        datetime lastupdated
+        string updatedby
+    }
+    
+    WrittenTestTemplate {
+        int id PK
+        string name
+        text description
+        int created_by_id FK
+        datetime created_at
+        boolean active
+        int time_limit_minutes
+        decimal passing_score
+    }
+    
+    WrittenTestTemplateQuestion {
+        int id PK
+        int template_id FK
+        int question_id FK
+        int question_order
+    }
+    
+    WrittenTestAttempt {
+        int id PK
+        int template_id FK
+        int student_id FK
+        datetime started_at
+        datetime completed_at
+        decimal score_percentage
+        boolean passed
+        string status
+    }
+    
+    WrittenTestAnswer {
+        int id PK
+        int attempt_id FK
+        int question_id FK
+        string selected_answer
+        boolean correct
+        datetime answered_at
+    }
+    
+    WrittenTestAssignment {
+        int id PK
+        int template_id FK
+        int assigned_to_id FK
+        int created_by_id FK
+        date due_date
+        boolean completed
+        datetime created_at
+    }
+    
+    QuestionCategory ||--o{ Question : categorizes
+    WrittenTestTemplate ||--o{ WrittenTestTemplateQuestion : contains
+    Question ||--o{ WrittenTestTemplateQuestion : used_in
+    WrittenTestTemplate ||--o{ WrittenTestAttempt : attempts
+    WrittenTestTemplate ||--o{ WrittenTestAssignment : assignments
+    WrittenTestAttempt ||--o{ WrittenTestAnswer : answers
+    Question ||--o{ WrittenTestAnswer : answered
+```
 
 ## QuestionCategory
 - **Purpose:** Groups questions by category code and description.

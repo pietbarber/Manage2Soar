@@ -16,7 +16,7 @@ Welcome to the documentation for the **knowledgetest** Django app. This director
 
 ## Getting Started
 
-- Review [models.md](models.md) for the data model and ERD.
+- Review [models.md](models.md) for the data model and database schema.
 - See [forms.md](forms.md) for form logic and validation.
 - Check [views.md](views.md) for all view classes and functions.
 - Use [management.md](management.md) for import and admin scripts.

@@ -45,9 +45,7 @@ The **Logsheet** app manages all flight operations, aircraft, maintenance, and f
 
 ## Core Models
 
-See [models.md](models.md) for full details and ERD:
-
-![Logsheet ERD](logsheet.png)
+See [models.md](models.md) for full details and database schema.
 
 - **Flight:** single flight log entry (pilots, aircraft, times, costs)
 - **Logsheet:** daily logsheet (flights, crew, closeout)
@@ -61,7 +59,7 @@ See [models.md](models.md) for full details and ERD:
 ## Implementation Notes
 
 - **Templates:** `templates/logsheet/` (dashboard, forms, closeout, maintenance)
-- **Models:** `logsheet/models.py` (see ERD above)
+- **Models:** `logsheet/models.py` (see database schema in models.md)
 - **Forms:** `logsheet/forms.py` (flight, logsheet, closeout, maintenance)
 - **Signals:** `logsheet/signals.py` (notifies rostermeisters on new issues)
 - **Admin:** all core models are editable via Django admin

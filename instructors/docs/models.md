@@ -11,9 +11,146 @@ Detailed descriptions of all Django models in the **instructors** app.
 
 ---
 
-## Entity Relationship Diagram
+## Database Schema
 
-![Instructors Erd](instructors.png)
+```mermaid
+erDiagram
+    Member ||--o{ TrainingLesson : student
+    Member ||--o{ TrainingLesson : instructor
+    Member ||--o{ InstructionReport : student
+    Member ||--o{ InstructionReport : instructor
+    Member ||--o{ GroundInstruction : student
+    Member ||--o{ GroundInstruction : instructor
+    Member ||--o{ MemberQualification : member
+    Member ||--o{ StudentProgressSnapshot : student
+    
+    TrainingPhase {
+        int id PK
+        string name
+        text description
+        int sequence_order
+        boolean is_solo_phase
+        boolean active
+    }
+    
+    TrainingLesson {
+        int id PK
+        int student_id FK
+        int instructor_id FK
+        int phase_id FK
+        int syllabus_document_id FK
+        date lesson_date
+        time duration
+        text pre_flight_notes
+        text post_flight_notes
+        string lesson_status
+        decimal grade_score
+        boolean phase_complete
+        datetime created_at
+        datetime updated_at
+    }
+    
+    SyllabusDocument {
+        int id PK
+        string title
+        text content
+        int phase_id FK
+        int lesson_number
+        boolean required
+        int order
+        boolean active
+    }
+    
+    InstructionReport {
+        int id PK
+        int student_id FK
+        int instructor_id FK
+        date report_date
+        text essay
+        text student_performance
+        text areas_for_improvement
+        text next_lesson_focus
+        boolean student_ready_for_solo
+        boolean student_ready_for_checkride
+        datetime created_at
+        datetime updated_at
+    }
+    
+    LessonScore {
+        int id PK
+        int instruction_report_id FK
+        int syllabus_document_id FK
+        int score
+        text notes
+    }
+    
+    GroundInstruction {
+        int id PK
+        int student_id FK
+        int instructor_id FK
+        date session_date
+        time duration
+        string topic
+        text content_covered
+        text student_questions
+        text homework_assigned
+        decimal grade_score
+        datetime created_at
+        datetime updated_at
+    }
+    
+    GroundLessonScore {
+        int id PK
+        int ground_instruction_id FK
+        int syllabus_document_id FK
+        int score
+        text notes
+    }
+    
+    ClubQualificationType {
+        int id PK
+        string name
+        text description
+        boolean requires_instructor_signoff
+        boolean requires_checkride
+        int prerequisite_hours
+        boolean active
+    }
+    
+    MemberQualification {
+        int id PK
+        int member_id FK
+        int qualification_type_id FK
+        date date_earned
+        int instructor_id FK
+        text notes
+        boolean active
+        datetime created_at
+        datetime updated_at
+    }
+    
+    StudentProgressSnapshot {
+        int id PK
+        int student_id FK
+        date snapshot_date
+        json progress_data
+        int total_lessons
+        decimal avg_score
+        boolean solo_ready
+        boolean checkride_ready
+        datetime created_at
+    }
+    
+    TrainingPhase ||--o{ SyllabusDocument : contains
+    TrainingPhase ||--o{ TrainingLesson : organized_by
+    SyllabusDocument ||--o{ TrainingLesson : lesson_plan
+    SyllabusDocument ||--o{ LessonScore : scored_on
+    SyllabusDocument ||--o{ GroundLessonScore : ground_score
+    InstructionReport ||--o{ LessonScore : contains_scores
+    GroundInstruction ||--o{ GroundLessonScore : scored_lesson
+    ClubQualificationType ||--o{ MemberQualification : qualification_type
+    Member ||--o{ MemberQualification : instructor_signoff
+```
 ---
 
 ## TrainingPhase

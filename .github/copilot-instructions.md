@@ -43,9 +43,9 @@
   - Test config: `pytest.ini`, per-app `tests.py`.
 - **Static files:**
   - Collect with `python manage.py collectstatic`.
-- **ERD generation:**
-  - Requires `graphviz` system package.
-  - Run: `python generate_erds.py`
+- **Database documentation:**
+  - Database schemas are documented using Mermaid diagrams in each app's docs.
+  - See comprehensive workflow documentation at `docs/workflows/`.
 
 ## Project Conventions
 - **Authentication:** Google OAuth2 (default), fallback to Django login.
