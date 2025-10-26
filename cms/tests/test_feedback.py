@@ -50,14 +50,14 @@ class TestSiteFeedbackModel:
         """Test creating a basic feedback entry"""
         feedback = SiteFeedback.objects.create(
             user=active_member,
-            feedback_type='bug_report',
+            feedback_type='bug',
             subject='Test Bug',
             message='This is a test bug report',
             referring_url='http://example.com/test-page/'
         )
 
         assert feedback.user == active_member
-        assert feedback.feedback_type == 'bug_report'
+        assert feedback.feedback_type == 'bug'
         assert feedback.subject == 'Test Bug'
         assert feedback.status == 'open'  # default status
         assert feedback.referring_url == 'http://example.com/test-page/'
@@ -98,13 +98,13 @@ class TestSiteFeedbackModel:
         """Test that feedback is ordered by creation date (newest first)"""
         feedback1 = SiteFeedback.objects.create(
             user=active_member,
-            feedback_type='bug_report',
+            feedback_type='bug',
             subject='First Bug',
             message='First bug report'
         )
         feedback2 = SiteFeedback.objects.create(
             user=active_member,
-            feedback_type='bug_report',
+            feedback_type='bug',
             subject='Second Bug',
             message='Second bug report'
         )

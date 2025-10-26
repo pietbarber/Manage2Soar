@@ -1,4 +1,5 @@
 # Generic CMS Page view for arbitrary pages and directories
+import logging
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.views import redirect_to_login
@@ -13,30 +14,31 @@ from members.utils import is_active_member
 
 from .models import Page
 
+# Module-level logger to avoid repeated getLogger calls
+logger = logging.getLogger(__name__)
+
 
 def cms_page(request, **kwargs):
     # Accepts named kwargs: slug1, slug2, slug3 from urls.py
-    import logging
-
-    logger = logging.getLogger("cms.debug")
+    debug_logger = logging.getLogger("cms.debug")
     slugs = []
     for i in range(1, 4):
         slug = kwargs.get(f"slug{i}")
         if slug:
             slugs.append(slug)
-    logger.debug(f"cms_page: slugs={slugs}")
+    debug_logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
-        logger.debug("cms_page: No slugs, redirecting to cms:home")
+        debug_logger.debug("cms_page: No slugs, redirecting to cms:home")
         return redirect("cms:home")
     parent = None
     page = None
     for slug in slugs:
-        logger.debug(
+        debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
         page = get_object_or_404(Page, slug=slug, parent=parent)
         parent = page
-    logger.debug(f"cms_page: Found page {page}")
+    debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
     # Access control: if the page is not public, require the same membership
     # checks we use for the homepage logic. If the user is not authorized,
@@ -254,8 +256,6 @@ def _notify_webmasters_of_feedback(feedback):
                 )
             except Exception as e:
                 # Log but don't fail - feedback submission should still work
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to notify webmaster {webmaster}: {e}")
 
     except ImportError:
@@ -263,8 +263,6 @@ def _notify_webmasters_of_feedback(feedback):
         pass
     except Exception as e:
         # Log but don't fail
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Failed to notify webmasters of feedback: {e}")
 
 
