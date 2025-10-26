@@ -122,7 +122,7 @@ class SiteFeedbackAdmin(admin.ModelAdmin):
     list_filter = ('feedback_type', 'status', 'created_at')
     search_fields = ('subject', 'user__first_name', 'user__last_name', 'message')
     readonly_fields = ('user', 'created_at', 'updated_at',
-                       'referring_url', 'responded_by')
+                       'responded_by')
 
     # Group fields logically
     fieldsets = (
@@ -163,14 +163,6 @@ class SiteFeedbackAdmin(admin.ModelAdmin):
             return obj.responded_by.full_display_name
         return '-'
     responded_by_name.short_description = 'Responded By'
-
-    def get_readonly_fields(self, request, obj=None):
-        """Make responded_by readonly and auto-populate it"""
-        readonly = list(self.readonly_fields)
-        # Always make responded_by readonly - it gets set automatically
-        if 'responded_by' not in readonly:
-            readonly.append('responded_by')
-        return readonly
 
     def mark_resolved(self, request, queryset):
         """Bulk action to mark feedback as resolved"""

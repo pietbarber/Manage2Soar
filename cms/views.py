@@ -9,7 +9,6 @@ from cms.models import HomePageContent, SiteFeedback
 from cms.forms import SiteFeedbackForm
 from members.decorators import active_member_required
 from django.db.models import Count, Max
-from django.urls import reverse
 from members.utils import is_active_member
 
 from .models import Page
