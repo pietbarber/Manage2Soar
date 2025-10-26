@@ -52,15 +52,21 @@ graph TB
     Instruction --> Knowledge[Knowledge Tests]
     Member --> Knowledge
     
-    click Member "./02-member-lifecycle.md" "Member Lifecycle Documentation"
-    click Duty "./05-duty-roster-workflow.md" "Duty Roster Workflow Documentation"
-    click Instruction "./03-instruction-workflow.md" "Instruction Workflow Documentation"
-    click Logsheet "./04-logsheet-workflow.md" "Flight Operations Documentation"
-    click Payment "./07-payment-workflow.md" "Payment Processing Documentation"
-    click Maintenance "./06-maintenance-workflow.md" "Maintenance Workflow Documentation"
-    click Ground "./08-ground-instruction.md" "Ground Instruction Documentation"
-    click Knowledge "./09-knowledge-test-lifecycle.md" "Knowledge Test Documentation"
+    style Member fill:#e1f5fe
+    style Logsheet fill:#f3e5f5
+    style Instruction fill:#e8f5e8
+    style Payment fill:#fff3e0
 ```
+
+**Quick Navigation:**
+- 👤 [Member Lifecycle](02-member-lifecycle.md) - User management & authentication
+- 📚 [Instruction Process](03-instruction-workflow.md) - Flight training management  
+- 📊 [Flight Operations](04-logsheet-workflow.md) - Daily flight operations (operational heart)
+- 📅 [Duty Roster](05-duty-roster-workflow.md) - Duty scheduling system
+- 🔧 [Maintenance](06-maintenance-workflow.md) - Aircraft maintenance tracking
+- 💰 [Payment Processing](07-payment-workflow.md) - Financial processing
+- 🏫 [Ground Instruction](08-ground-instruction.md) - Classroom training
+- 📝 [Knowledge Tests](09-knowledge-test-lifecycle.md) - Written test administration
 
 ## 📚 **Related Documentation**
 
@@ -69,41 +75,19 @@ graph TB
 - **API Reference**: See individual app `models.py`, `views.py`, and `admin.py` files
 - **Project README**: [/README.md](../../README.md) for overall project information
 
-## �️ **Interactive Workflow Navigation**
+## 📋 **Complete Workflow List**
 
-Click any workflow below to jump directly to its documentation:
-
-```mermaid
-flowchart TD
-    Start([🏠 Workflow Hub]) --> System[📋 System Overview]
-    System --> Member[👤 Member Lifecycle]
-    System --> Operations[🛩️ Flight Operations]
-    
-    Member --> Instruction[📚 Instruction Process]
-    Member --> Knowledge[📝 Knowledge Tests]
-    
-    Operations --> Logsheet[📊 Flight Logsheet]
-    Operations --> Duty[📅 Duty Roster]
-    Operations --> Maintenance[🔧 Maintenance]
-    
-    Instruction --> Ground[🏫 Ground Instruction]
-    Logsheet --> Payment[💰 Payment Processing]
-    
-    click System "./01-system-overview.md" "System Architecture & Data Flow"
-    click Member "./02-member-lifecycle.md" "User Management & Authentication"
-    click Instruction "./03-instruction-workflow.md" "Flight Training Management"
-    click Logsheet "./04-logsheet-workflow.md" "Daily Flight Operations"
-    click Duty "./05-duty-roster-workflow.md" "Duty Scheduling System"
-    click Maintenance "./06-maintenance-workflow.md" "Aircraft Maintenance Tracking"
-    click Payment "./07-payment-workflow.md" "Financial Processing"
-    click Ground "./08-ground-instruction.md" "Classroom Training"
-    click Knowledge "./09-knowledge-test-lifecycle.md" "Written Test Administration"
-    
-    style Start fill:#e1f5fe
-    style System fill:#f3e5f5
-    style Operations fill:#e8f5e8
-    style Member fill:#fff3e0
-```
+| Workflow | Description | Key Focus |
+|----------|-------------|-----------|
+| [📋 System Overview](01-system-overview.md) | High-level architecture and data flow | Foundation understanding |
+| [👤 Member Lifecycle](02-member-lifecycle.md) | User management & authentication | User onboarding |
+| [📚 Instruction Process](03-instruction-workflow.md) | Flight training management | Training operations |
+| [📊 Flight Operations](04-logsheet-workflow.md) | Daily flight operations | Operational heart |
+| [📅 Duty Roster](05-duty-roster-workflow.md) | Duty scheduling system | Resource planning |  
+| [🔧 Maintenance](06-maintenance-workflow.md) | Aircraft maintenance tracking | Fleet management |
+| [💰 Payment Processing](07-payment-workflow.md) | Financial processing | Business operations |
+| [🏫 Ground Instruction](08-ground-instruction.md) | Classroom training | Knowledge transfer |
+| [📝 Knowledge Tests](09-knowledge-test-lifecycle.md) | Written test administration | Assessment & validation |
 
 ## �🚀 **Getting Started**
 
