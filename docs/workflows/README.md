@@ -51,6 +51,15 @@ graph TB
     Instruction --> Ground[Ground Instruction]
     Instruction --> Knowledge[Knowledge Tests]
     Member --> Knowledge
+    
+    click Member "02-member-lifecycle.md" "Member Lifecycle Documentation"
+    click Duty "05-duty-roster-workflow.md" "Duty Roster Workflow Documentation"
+    click Instruction "03-instruction-workflow.md" "Instruction Workflow Documentation"
+    click Logsheet "04-logsheet-workflow.md" "Flight Operations Documentation"
+    click Payment "07-payment-workflow.md" "Payment Processing Documentation"
+    click Maintenance "06-maintenance-workflow.md" "Maintenance Workflow Documentation"
+    click Ground "08-ground-instruction.md" "Ground Instruction Documentation"
+    click Knowledge "09-knowledge-test-lifecycle.md" "Knowledge Test Documentation"
 ```
 
 ## 📚 **Related Documentation**
@@ -60,7 +69,43 @@ graph TB
 - **API Reference**: See individual app `models.py`, `views.py`, and `admin.py` files
 - **Project README**: [/README.md](../../README.md) for overall project information
 
-## 🚀 **Getting Started**
+## �️ **Interactive Workflow Navigation**
+
+Click any workflow below to jump directly to its documentation:
+
+```mermaid
+flowchart TD
+    Start([🏠 Workflow Hub]) --> System[📋 System Overview]
+    System --> Member[👤 Member Lifecycle]
+    System --> Operations[🛩️ Flight Operations]
+    
+    Member --> Instruction[📚 Instruction Process]
+    Member --> Knowledge[📝 Knowledge Tests]
+    
+    Operations --> Logsheet[📊 Flight Logsheet]
+    Operations --> Duty[📅 Duty Roster]
+    Operations --> Maintenance[🔧 Maintenance]
+    
+    Instruction --> Ground[🏫 Ground Instruction]
+    Logsheet --> Payment[💰 Payment Processing]
+    
+    click System "01-system-overview.md" "System Architecture & Data Flow"
+    click Member "02-member-lifecycle.md" "User Management & Authentication"
+    click Instruction "03-instruction-workflow.md" "Flight Training Management"
+    click Logsheet "04-logsheet-workflow.md" "Daily Flight Operations"
+    click Duty "05-duty-roster-workflow.md" "Duty Scheduling System"
+    click Maintenance "06-maintenance-workflow.md" "Aircraft Maintenance Tracking"
+    click Payment "07-payment-workflow.md" "Financial Processing"
+    click Ground "08-ground-instruction.md" "Classroom Training"
+    click Knowledge "09-knowledge-test-lifecycle.md" "Written Test Administration"
+    
+    style Start fill:#e1f5fe
+    style System fill:#f3e5f5
+    style Operations fill:#e8f5e8
+    style Member fill:#fff3e0
+```
+
+## �🚀 **Getting Started**
 
 **New to the system?** Start with [System Overview](01-system-overview.md) to understand the big picture.
 
