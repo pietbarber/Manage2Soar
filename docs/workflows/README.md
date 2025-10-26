@@ -52,14 +52,14 @@ graph TB
     Instruction --> Knowledge[Knowledge Tests]
     Member --> Knowledge
     
-    click Member "02-member-lifecycle.md" "Member Lifecycle Documentation"
-    click Duty "05-duty-roster-workflow.md" "Duty Roster Workflow Documentation"
-    click Instruction "03-instruction-workflow.md" "Instruction Workflow Documentation"
-    click Logsheet "04-logsheet-workflow.md" "Flight Operations Documentation"
-    click Payment "07-payment-workflow.md" "Payment Processing Documentation"
-    click Maintenance "06-maintenance-workflow.md" "Maintenance Workflow Documentation"
-    click Ground "08-ground-instruction.md" "Ground Instruction Documentation"
-    click Knowledge "09-knowledge-test-lifecycle.md" "Knowledge Test Documentation"
+    click Member "./02-member-lifecycle.md" "Member Lifecycle Documentation"
+    click Duty "./05-duty-roster-workflow.md" "Duty Roster Workflow Documentation"
+    click Instruction "./03-instruction-workflow.md" "Instruction Workflow Documentation"
+    click Logsheet "./04-logsheet-workflow.md" "Flight Operations Documentation"
+    click Payment "./07-payment-workflow.md" "Payment Processing Documentation"
+    click Maintenance "./06-maintenance-workflow.md" "Maintenance Workflow Documentation"
+    click Ground "./08-ground-instruction.md" "Ground Instruction Documentation"
+    click Knowledge "./09-knowledge-test-lifecycle.md" "Knowledge Test Documentation"
 ```
 
 ## 📚 **Related Documentation**
@@ -89,15 +89,15 @@ flowchart TD
     Instruction --> Ground[🏫 Ground Instruction]
     Logsheet --> Payment[💰 Payment Processing]
     
-    click System "01-system-overview.md" "System Architecture & Data Flow"
-    click Member "02-member-lifecycle.md" "User Management & Authentication"
-    click Instruction "03-instruction-workflow.md" "Flight Training Management"
-    click Logsheet "04-logsheet-workflow.md" "Daily Flight Operations"
-    click Duty "05-duty-roster-workflow.md" "Duty Scheduling System"
-    click Maintenance "06-maintenance-workflow.md" "Aircraft Maintenance Tracking"
-    click Payment "07-payment-workflow.md" "Financial Processing"
-    click Ground "08-ground-instruction.md" "Classroom Training"
-    click Knowledge "09-knowledge-test-lifecycle.md" "Written Test Administration"
+    click System "./01-system-overview.md" "System Architecture & Data Flow"
+    click Member "./02-member-lifecycle.md" "User Management & Authentication"
+    click Instruction "./03-instruction-workflow.md" "Flight Training Management"
+    click Logsheet "./04-logsheet-workflow.md" "Daily Flight Operations"
+    click Duty "./05-duty-roster-workflow.md" "Duty Scheduling System"
+    click Maintenance "./06-maintenance-workflow.md" "Aircraft Maintenance Tracking"
+    click Payment "./07-payment-workflow.md" "Financial Processing"
+    click Ground "./08-ground-instruction.md" "Classroom Training"
+    click Knowledge "./09-knowledge-test-lifecycle.md" "Written Test Administration"
     
     style Start fill:#e1f5fe
     style System fill:#f3e5f5
