@@ -179,7 +179,11 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 
 ## 📄 Documentation
 
-Extensive documentation is available in each app's `docs/` folder (e.g., `members/docs/README.md`, `logsheet/docs/README.md`, etc.) and in this main `README.md`. For details on models, workflows, and integration, see the per-app docs and the project root documentation.
+### **📋 Workflow Documentation**
+**NEW!** Comprehensive workflow documentation with visual process flows is available at **[docs/workflows/](docs/workflows/)** - perfect for new users and system understanding.
+
+### **🔧 Technical Documentation**
+Extensive technical documentation is available in each app's `docs/` folder (e.g., `members/docs/README.md`, `logsheet/docs/README.md`, etc.) and in this main `README.md`. For details on models, workflows, and integration, see the per-app docs and the project root documentation.
 
 ## 🤝 Contributing
 
