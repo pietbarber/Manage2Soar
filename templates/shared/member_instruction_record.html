@@ -222,7 +222,17 @@
       {# Essays for all blocks that have them #}
       {% for block in day.blocks %}
       {% if block.report.report_text %}
-      <h5>📝 Instructor Essay</h5>
+      <div class="d-flex justify-content-between align-items-center">
+        <h5>📝 Instructor Essay</h5>
+        {# Edit button - only show if current user is the instructor and report is within 7 days #}
+        {% if request.user == block.report.instructor and block.days_ago <= 7 %}
+          <a href="{% url 'instructors:fill_instruction_report' member.id block.report.report_date|date:'Y-m-d' %}" 
+             class="btn btn-sm btn-outline-primary ms-2" 
+             title="Edit this report (available for 7 days after creation)">
+            <i class="fas fa-edit"></i> Edit
+          </a>
+        {% endif %}
+      </div>
       <div class="border p-3 bg-white card-body mb-2" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.report_text|safe }}
         <div class="mt-2 small text-muted">
@@ -231,6 +241,10 @@
             <img src="{{ block.report.instructor.profile_photo.url }}" alt="{{ block.report.instructor.full_display_name }}" class="rounded-circle me-1" style="height:2.4em; width:2.4em; object-fit:cover; vertical-align:middle; border:1px solid #ccc;" />
           {% endif %}
           {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
+          {# Show edit indicator if report was modified #}
+          {% if block.report.updated_at > block.report.created_at %}
+            <em class="text-info">(edited {{ block.report.updated_at|date:"Y-m-d H:i" }})</em>
+          {% endif %}
         </div>
       </div>
       {% elif block.report.notes %}
