@@ -1,0 +1,127 @@
+/* Flight Form Styling */
+.flight-form-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border-left: 4px solid transparent;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.flight-form-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.flight-form-section:nth-child(2) {
+    border-left-color: #0d6efd;
+}
+
+.flight-form-section:nth-child(3) {
+    border-left-color: #198754;
+}
+
+.flight-form-section:nth-child(4) {
+    border-left-color: #ffc107;
+}
+
+.flight-form-section h6 {
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.9rem;
+}
+
+.required-field::after {
+    content: " *";
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.form-label {
+    color: #495057;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-select,
+.form-control {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    transition: all 0.3s ease;
+}
+
+.form-select:focus,
+.form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    transform: translateY(-1px);
+}
+
+.input-group .btn {
+    border-radius: 0 8px 8px 0;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+.input-group .form-control {
+    border-radius: 8px 0 0 8px;
+}
+
+input[type="time"],
+input.timeinput {
+    min-width: 120px;
+    font-family: 'Courier New', monospace;
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-info:hover {
+    transform: translateY(-1px);
+}
+
+/* Modal Enhancements */
+.modal-dialog {
+    max-width: 900px;
+}
+
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Bootstrap Icons Enhancement */
+.bi {
+    vertical-align: -0.125em;
+}
+
+/* Error Styling */
+.is-invalid {
+    border-color: #dc3545;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.invalid-feedback,
+.text-danger {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.now-btn {
+    margin-left: 0.5em !important;
+}
