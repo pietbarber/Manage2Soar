@@ -4,8 +4,7 @@ django-tinymce
 python-dotenv
 social-auth-app-django
 Pillow
-django-crispy-forms
-crispy-bootstrap4
+
 qrcode[pil]
 requests
 pydenticon

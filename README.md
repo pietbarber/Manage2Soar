@@ -44,10 +44,9 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 - **PostgreSQL** (with `psycopg2-binary`)
 
 ### Frontend
-- **Bootstrap 5** (via CDN)
-- **django-crispy-forms**
-- **crispy-bootstrap4**
+- **Bootstrap 5** (via CDN) - Modern responsive UI framework
 - **django-tinymce** (WYSIWYG editor)
+- **Native Bootstrap form rendering** - Professional form styling without third-party dependencies
 
 ### Core Python/Django Packages
 - **Pillow** (image processing)

@@ -1,24 +1,30 @@
-{% block content %}
-<style>
-input[type="time"], input.timeinput {
-  max-width: 6em;
-  min-width: 4em;
-  display: inline-block;
-}
-.now-btn {
-  margin-left: 0.5em !important;
-}
-</style>
-
 {% load static %}
-{% load crispy_forms_tags %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/flight-forms.css' %}">
+{% endblock %}
+
+{% block content %}
+
 {% load member_extras %}
 
-<div class="modal-header">
-  <h5 class="modal-title">
-    {% if form.instance.pk %}Edit Flight{% else %}Add Flight{% endif %}
-  </h5>
-  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Enhanced Modal Header -->
+<div class="modal-header bg-primary text-white">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-airplane me-2 fs-4"></i>
+    <div>
+      <h5 class="modal-title mb-0">
+        {% if form.instance.pk %}
+          <i class="bi bi-pencil-square me-1"></i>Edit Flight
+        {% else %}
+          <i class="bi bi-plus-circle me-1"></i>Add New Flight
+        {% endif %}
+      </h5>
+      <small class="opacity-75">{{ logsheet.log_date }} @ {{ logsheet.airfield }}</small>
+    </div>
+  </div>
+  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 
 <form method="post" enctype="multipart/form-data" id="edit-flight-form"
@@ -27,138 +33,230 @@ input[type="time"], input.timeinput {
             {% else %}
             {% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}
             {% endif %}">
-  <div class="modal-body">
+  <div class="modal-body p-4">
     {% if form.non_field_errors %}
-      <div class="alert alert-danger" role="alert">
+      <div class="alert alert-danger border-0 mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
         {{ form.non_field_errors }}
       </div>
     {% endif %}
     {% csrf_token %}
-    <table class="table table-borderless align-middle">
-      <tbody>
-        <tr>
-          <th scope="row" class="text-end">Glider*</th>
-          <td>
-            <select name="{{ form.glider.name }}" id="{{ form.glider.id_for_label }}" class="form-select">
-              <option value="">---------</option>
-              <optgroup label="Club gliders">
-                {% for glider in club_gliders %}
-                  <option value="{{ glider.pk }}"
-                          data-seats="{{ glider.seats }}"
-                          data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                    {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
-                    {{ glider }}
-                  </option>
-                {% endfor %}
-              </optgroup>
-              <optgroup label="Private gliders">
-                {% for glider in club_private %}
-                  <option value="{{ glider.pk }}"
-                          data-seats="{{ glider.seats }}"
-                          data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                    {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
-                    {{ glider }}
-                  </option>
-                {% endfor %}
-              </optgroup>
-              <optgroup label="Inactive gliders">
-                {% for glider in inactive_gliders %}
-                  <option value="{{ glider.pk }}"
-                          data-seats="{{ glider.seats }}"
-                          data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                    {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
-                    {{ glider }}
-                  </option>
-                {% endfor %}
-              </optgroup>
-            </select>
-            {{ form.glider.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Pilot*</th>
-          <td>
-            {{ form.pilot }}
-            {{ form.pilot.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Instructor</th>
-          <td>
-            {{ form.instructor }}
-            {{ form.instructor.errors }}
-          </td>
-        </tr>
-
-        <tr>
-          <th scope="row" class="text-end">Passenger</th>
-          <td>
-            {{ form.passenger }}
-            {{ form.passenger.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Passenger Name</th>
-          <td>
-            {{ form.passenger_name }}
-            {{ form.passenger_name.errors }}
-          </td>
-        </tr>
-
-       <tr>
-          <th scope="row" class="text-end">Towpilot</th>
-          <td>
-            {{ form.tow_pilot }}
-            {{ form.tow_pilot.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Towplane</th>
-          <td>
-            {{ form.towplane }}
-            {{ form.towplane.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Launch Time</th>
-          <td class="d-flex align-items-center">
-            {# Render launch_time field with no initial value and narrow width #}
+    
+  <!-- Aircraft & Crew Section -->
+  <div class="flight-form-section flight-form-section--primary p-3 mb-4">
+      <h6 class="text-primary mb-3">
+        <i class="bi bi-airplane-engines me-2"></i>Aircraft & Crew
+      </h6>
+      
+      <div class="row g-3">
+        <!-- Glider Selection -->
+        <div class="col-md-6">
+          <label for="{{ form.glider.id_for_label }}" class="form-label fw-semibold required-field">
+            <i class="bi bi-airplane me-1"></i>Glider
+          </label>
+          <select name="{{ form.glider.name }}" id="{{ form.glider.id_for_label }}" class="form-select{% if form.glider.errors %} is-invalid{% endif %}">
+            <option value="">Choose a glider...</option>
+            <optgroup label="🏆 Club Gliders">
+              {% for glider in club_gliders %}
+                <option value="{{ glider.pk }}"
+                        data-seats="{{ glider.seats }}"
+                        data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                  {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ glider }}
+                </option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🏠 Private Gliders">
+              {% for glider in club_private %}
+                <option value="{{ glider.pk }}"
+                        data-seats="{{ glider.seats }}"
+                        data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                  {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ glider }}
+                </option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="💤 Inactive Gliders">
+              {% for glider in inactive_gliders %}
+                <option value="{{ glider.pk }}"
+                        data-seats="{{ glider.seats }}"
+                        data-owner-ids="{% for owner in glider.owners.all %}{{ owner.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                  {% if form.glider.value|stringformat:"s" == glider.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ glider }}
+                </option>
+              {% endfor %}
+            </optgroup>
+          </select>
+          {% if form.glider.errors %}
+            <div class="invalid-feedback">
+              {% for error in form.glider.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Pilot Selection -->
+        <div class="col-md-6">
+          <label for="{{ form.pilot.id_for_label }}" class="form-label fw-semibold required-field">
+            <i class="bi bi-person-badge me-1"></i>Pilot
+          </label>
+          {{ form.pilot }}
+          {% if form.pilot.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.pilot.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Instructor -->
+        <div class="col-md-6">
+          <label for="{{ form.instructor.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-mortarboard me-1"></i>Instructor
+          </label>
+          {{ form.instructor }}
+          {% if form.instructor.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.instructor.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Passenger -->
+        <div class="col-md-6">
+          <label for="{{ form.passenger.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-person me-1"></i>Passenger (Member)
+          </label>
+          {{ form.passenger }}
+          {% if form.passenger.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.passenger.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Passenger Name (Non-member) -->
+        <div class="col-md-6">
+          <label for="{{ form.passenger_name.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-person-plus me-1"></i>Passenger Name (Non-member)
+          </label>
+          {{ form.passenger_name }}
+          {% if form.passenger_name.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.passenger_name.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+  <!-- Tow Operations Section -->
+  <div class="flight-form-section flight-form-section--success p-3 mb-4">
+      <h6 class="text-success mb-3">
+        <i class="bi bi-truck me-2"></i>Tow Operations
+      </h6>
+      
+      <div class="row g-3">
+        <!-- Tow Pilot -->
+        <div class="col-md-6">
+          <label for="{{ form.tow_pilot.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-person-gear me-1"></i>Tow Pilot
+          </label>
+          {{ form.tow_pilot }}
+          {% if form.tow_pilot.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.tow_pilot.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        
+        <!-- Towplane -->
+        <div class="col-md-6">
+          <label for="{{ form.towplane.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-airplane-engines me-1"></i>Towplane
+          </label>
+          {{ form.towplane }}
+          {% if form.towplane.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.towplane.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+  <!-- Flight Times & Altitude Section -->
+  <div class="flight-form-section flight-form-section--warning p-3 mb-4">
+      <h6 class="text-warning mb-3">
+        <i class="bi bi-clock me-2"></i>Flight Times & Altitude
+      </h6>
+      
+      <div class="row g-3">
+        <!-- Launch Time -->
+        <div class="col-md-4">
+          <label for="{{ form.launch_time.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-arrow-up-circle me-1"></i>Launch Time
+          </label>
+          <div class="input-group">
             <input type="time"
                    name="{{ form.launch_time.name }}"
                    id="{{ form.launch_time.id_for_label }}"
-                   class="form-control timeinput"
+                   class="form-control timeinput{% if form.launch_time.errors %} is-invalid{% endif %}"
                    value="{{ form.launch_time.value|default_if_none:'' }}"
-                   placeholder="--:-- 🕓">
-            <button type="button" class="btn btn-outline-secondary btn-sm now-btn" id="now-launch-btn">NOW</button>
-            {{ form.launch_time.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Landing Time</th>
-          <td class="d-flex align-items-center">
+                   placeholder="--:--">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="now-launch-btn">
+              <i class="bi bi-clock-fill me-1"></i>NOW
+            </button>
+            {% if form.launch_time.errors %}
+              <div class="invalid-feedback">
+                {% for error in form.launch_time.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <!-- Landing Time -->
+        <div class="col-md-4">
+          <label for="{{ form.landing_time.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-arrow-down-circle me-1"></i>Landing Time
+          </label>
+          <div class="input-group">
             <input type="time"
                    name="{{ form.landing_time.name }}"
                    id="{{ form.landing_time.id_for_label }}"
-                   class="form-control timeinput"
+                   class="form-control timeinput{% if form.landing_time.errors %} is-invalid{% endif %}"
                    value="{{ form.landing_time.value|default_if_none:'' }}"
-                   placeholder="--:-- 🕓">
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="now-landing-btn">NOW</button>
-            {{ form.landing_time.errors }}
-          </td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">Release Altitude</th>
-          <td class="d-flex align-items-center gap-2">
+                   placeholder="--:--">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="now-landing-btn">
+              <i class="bi bi-clock-fill me-1"></i>NOW
+            </button>
+            {% if form.landing_time.errors %}
+              <div class="invalid-feedback">
+                {% for error in form.landing_time.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <!-- Release Altitude -->
+        <div class="col-md-4">
+          <label for="{{ form.release_altitude.id_for_label }}" class="form-label fw-semibold">
+            <i class="bi bi-graph-up me-1"></i>Release Altitude (AGL)
+          </label>
+          <div class="input-group">
             {{ form.release_altitude }}
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="alt-2k-btn">2K</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-1" id="alt-3k-btn">3K</button>
-            {{ form.release_altitude.errors }}
-            <div class="form-text" class="text-end">Release altitude in feet (0–7000 in 100ft steps)</div>
-          </td>
-        </tr>
-        <!-- Split With and Split Type fields removed for issue #165. -->
-      </tbody>
-    </table>
+            <button type="button" class="btn btn-outline-info btn-sm" id="alt-2k-btn">2K</button>
+            <button type="button" class="btn btn-outline-info btn-sm" id="alt-3k-btn">3K</button>
+            {% if form.release_altitude.errors %}
+              <div class="invalid-feedback">
+                {% for error in form.release_altitude.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+          <div class="form-text">
+            <i class="bi bi-info-circle me-1"></i>Altitude in feet (0–7000, 100ft steps)
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="modal-footer">
