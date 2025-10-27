@@ -2,7 +2,8 @@
 
 ## Project Overview
 - **Manage2Soar** is a Django 5.2 web application for soaring club management: members, gliders, badges, operations, analytics, and instruction.
-- Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`.
+- Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
+- **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
 ## Testing & Coverage
 - All Django apps must have comprehensive test coverage using pytest and pytest-django.
 - Use `pytest --cov` or the VS Code "Run test with coverage" feature to ensure all code paths are tested.
@@ -44,8 +45,13 @@
 - **Static files:**
   - Collect with `python manage.py collectstatic`.
 - **Database documentation:**
-  - Database schemas are documented using Mermaid diagrams in each app's docs.
+  - Database schemas are documented using Mermaid diagrams in each app's `docs/models.md` files.
+  - Mermaid visualizations available as PNG exports (e.g., `erd.png` in project root).
   - See comprehensive workflow documentation at `docs/workflows/`.
+- **CronJobs & Scheduled Tasks:**
+  - Use `utils.management.commands.base_cronjob.BaseCronJobCommand` for all scheduled tasks.
+  - Distributed locking prevents race conditions across multiple Kubernetes pods.
+  - See `docs/cronjob-architecture.md` for complete implementation guide.
 
 ## Project Conventions
 - **Authentication:** Google OAuth2 (default), fallback to Django login.
@@ -53,7 +59,8 @@
 - **Rich text:** Uses `django-tinymce` for bios, instruction, essays.
 - **Analytics:** All charts are read-only, exportable (PNG/SVG/CSV), see `analytics/README.md`.
 - **Operations:** Flight logs (`logsheet`), duty roster (`duty_roster`), and instruction (`instructors`) are tightly integrated.
-- **Email notifications:** Automated for operations, reminders, and ad-hoc events.
+- **Email notifications:** Automated for operations, reminders, and ad-hoc events via distributed CronJob system.
+- **Distributed Systems:** PostgreSQL-backed locking for multi-pod coordination, production Kubernetes deployment.
 
 ## Patterns & Structure
 - **App structure:** Each app has `models.py`, `views.py`, `admin.py`, `urls.py`, and `tests.py`.
@@ -61,9 +68,10 @@
 - **Docs:** See per-app `docs/` folders and main `README.md`.
 - **Data import/export:** Use Django admin or custom scripts in `loaddata/`.
 - **Custom logic:** See `duty_roster/roster_generator.py`, `analytics/queries.py`, `instructors/utils.py`.
+- **Scheduled Tasks:** CronJob commands in `*/management/commands/` using `BaseCronJobCommand` framework.
 
 ## Integration & Dependencies
-- **External:** Google OAuth2, Chart.js (frontend), Graphviz (ERD), Pillow, qrcode, vobject, django-reversion, django-htmx.
+- **External:** Google OAuth2, Chart.js (frontend), Pillow, qrcode, vobject, django-reversion, django-htmx.
 - **Internal:** Cross-app model relations, signals, and shared templates.
 
 ## Examples
