@@ -66,7 +66,7 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 - **pytest**
 
 ### System Requirements
-- **graphviz** (required for ERD generation via `generate_erds.py`)
+- No additional system packages required - all dependencies are Python packages
 
 
 ### Deployment & Cloud
@@ -75,7 +75,7 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 
 ### Notes
 - All Python dependencies are listed in `requirements.txt`.
-- System package `graphviz` must be installed separately (e.g., `sudo apt install graphviz`).
+- Database schemas are documented using Mermaid diagrams in each app's documentation.
 
 # Manage2Soar – Duty Roster & Operations Management
 
@@ -179,7 +179,11 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 
 ## 📄 Documentation
 
-Extensive documentation is available in each app's `docs/` folder (e.g., `members/docs/README.md`, `logsheet/docs/README.md`, etc.) and in this main `README.md`. For details on models, workflows, and integration, see the per-app docs and the project root documentation.
+### **📋 Workflow Documentation**
+**NEW!** Comprehensive workflow documentation with visual process flows is available at **[docs/workflows/](docs/workflows/)** - perfect for new users and system understanding.
+
+### **🔧 Technical Documentation**
+Extensive technical documentation is available in each app's `docs/` folder (e.g., `members/docs/README.md`, `logsheet/docs/README.md`, etc.) and in this main `README.md`. For details on models, workflows, and integration, see the per-app docs and the project root documentation.
 
 ## 🤝 Contributing
 

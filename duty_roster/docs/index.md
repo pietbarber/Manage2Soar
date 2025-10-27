@@ -2,7 +2,7 @@
 
 [→ Duty Roster AppConfig (apps.py)](apps.md) | [→ Management Commands](management.md) | [→ Views](views.md)
 
-![Duty Roster ERD](duty_roster.png)
+See [README.md](README.md) for database schema diagrams.
 
 The **Duty Roster** app manages scheduling and assignments for Duty Officers (DO), Assistant Duty Officers (ADO), and other operational roles. It integrates with members, logsheet, and notification systems to ensure smooth club operations.
 
@@ -52,7 +52,7 @@ The **Duty Roster** app manages scheduling and assignments for Duty Officers (DO
 ## Implementation Notes
 
 - **Templates:** `templates/duty_roster/` (calendar, list, blackout, propose)
-- **Models:** `duty_roster/models.py` (see ERD above)
+- **Models:** `duty_roster/models.py` (see database schema in README.md)
 - **Admin:** all core models are editable via Django admin
 - **Permissions:** only rostermeisters can generate or edit rosters; all can view
 - **Roster Generation:** see `duty_roster/roster_generator.py` for logic
