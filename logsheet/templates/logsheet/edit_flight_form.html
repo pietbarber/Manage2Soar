@@ -1,26 +1,12 @@
-{% block content %}
-<style>
-input[type="time"], input.timeinput {
-  max-width: 6em;
-  min-width: 4em;
-  display: inline-block;
-}
-.now-btn {
-  margin-left: 0.5em !important;
-}
-.flight-form-section {
-  background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%);
-  border-left: 4px solid #007bff;
-  border-radius: 0.375rem;
-}
-.required-field::after {
-  content: " *";
-  color: #dc3545;
-  font-weight: bold;
-}
-</style>
-
 {% load static %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/flight-forms.css' %}">
+{% endblock %}
+
+{% block content %}
+
 {% load member_extras %}
 
 <!-- Enhanced Modal Header -->
@@ -56,8 +42,8 @@ input[type="time"], input.timeinput {
     {% endif %}
     {% csrf_token %}
     
-    <!-- Aircraft & Crew Section -->
-    <div class="flight-form-section p-3 mb-4">
+  <!-- Aircraft & Crew Section -->
+  <div class="flight-form-section flight-form-section--primary p-3 mb-4">
       <h6 class="text-primary mb-3">
         <i class="bi bi-airplane-engines me-2"></i>Aircraft & Crew
       </h6>
@@ -162,8 +148,8 @@ input[type="time"], input.timeinput {
       </div>
     </div>
     
-    <!-- Tow Operations Section -->
-    <div class="flight-form-section p-3 mb-4">
+  <!-- Tow Operations Section -->
+  <div class="flight-form-section flight-form-section--success p-3 mb-4">
       <h6 class="text-success mb-3">
         <i class="bi bi-truck me-2"></i>Tow Operations
       </h6>
@@ -197,8 +183,8 @@ input[type="time"], input.timeinput {
       </div>
     </div>
     
-    <!-- Flight Times & Altitude Section -->
-    <div class="flight-form-section p-3 mb-4">
+  <!-- Flight Times & Altitude Section -->
+  <div class="flight-form-section flight-form-section--warning p-3 mb-4">
       <h6 class="text-warning mb-3">
         <i class="bi bi-clock me-2"></i>Flight Times & Altitude
       </h6>

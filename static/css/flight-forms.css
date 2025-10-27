@@ -1,26 +1,39 @@
-/* Flight Form Styling */
+/* Flight Form Styling (scoped and maintainable)
+     - Use modifier classes instead of nth-child to avoid fragile order-dependent styling
+     - Expose a few CSS variables so the theme is configurable
+*/
+:root {
+    --flight-section-bg-1: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    --flight-section-border-width: 4px;
+    --flight-section-radius: 12px;
+    --flight-section-padding: 1rem;
+    --flight-section-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .flight-form-section {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 12px;
-    border-left: 4px solid transparent;
-    transition: all 0.3s ease;
+    background: var(--flight-section-bg-1);
+    border-radius: var(--flight-section-radius);
+    border-left: var(--flight-section-border-width) solid transparent;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
     margin-bottom: 1.5rem;
+    padding: var(--flight-section-padding);
 }
 
 .flight-form-section:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--flight-section-hover-shadow);
 }
 
-.flight-form-section:nth-child(2) {
+/* Color variants: apply explicitly in templates */
+.flight-form-section--primary {
     border-left-color: #0d6efd;
 }
 
-.flight-form-section:nth-child(3) {
+.flight-form-section--success {
     border-left-color: #198754;
 }
 
-.flight-form-section:nth-child(4) {
+.flight-form-section--warning {
     border-left-color: #ffc107;
 }
 
@@ -71,7 +84,8 @@
 input[type="time"],
 input.timeinput {
     min-width: 120px;
-    font-family: 'Courier New', monospace;
+    /* Prefer the generic monospace family for portability */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Helvetica Neue', monospace;
 }
 
 .btn-outline-secondary:hover,
@@ -90,7 +104,8 @@ input.timeinput {
 }
 
 /* Bootstrap Icons Enhancement */
-.bi {
+/* Avoid global icon overrides; scope to flight form where needed */
+.flight-form-section .bi {
     vertical-align: -0.125em;
 }
 
@@ -123,5 +138,5 @@ input.timeinput {
 }
 
 .now-btn {
-    margin-left: 0.5em !important;
+    margin-left: 0.5em;
 }
