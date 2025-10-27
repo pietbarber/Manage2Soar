@@ -24,11 +24,13 @@
 - If you see `NoReverseMatch`, check that the URL name exists in your `urls.py`.
 - If you see 404s in tests, verify that the URL is actually implemented and included.
 - If content assertions fail, ensure the test data matches the view's query logic (e.g., correct slug and audience).
+- **CRITICAL**: After any changes to `urls.py` (especially CMS routes), immediately run `pytest` to catch broken tests, reverse lookups, and template references.
 
 ## Maintenance
 - Scaffold new tests for any new models, views, or permission logic.
 - Remove or update tests if endpoints or model fields are removed or renamed.
 - Use coverage reports to identify and fill gaps in test coverage.
+- **URL Changes**: Always run full test suite after modifying `urls.py` - URL changes can break tests, reverse lookups, and CMS content rendering across multiple apps.
 - Data flows between apps via Django ORM models and signals. Analytics is read-only, built on `logsheet` and `members` data.
 
 ## Key Workflows
@@ -47,7 +49,10 @@
 - **Database documentation:**
   - Database schemas are documented using Mermaid diagrams in each app's `docs/models.md` files.
   - Mermaid visualizations available as PNG exports (e.g., `erd.png` in project root).
-  - See comprehensive workflow documentation at `docs/workflows/`.
+  - See comprehensive workflow documentation at `docs/workflows/` - **essential reading for understanding business processes**.
+- **Workflow Integration:**
+  - Before making changes, consult `docs/workflows/` to understand how modifications fit into established business processes.
+  - Workflows document member lifecycles, operational procedures, and cross-app integrations with detailed Mermaid diagrams.
 - **CronJobs & Scheduled Tasks:**
   - Use `utils.management.commands.base_cronjob.BaseCronJobCommand` for all scheduled tasks.
   - Distributed locking prevents race conditions across multiple Kubernetes pods.
@@ -66,6 +71,7 @@
 - **App structure:** Each app has `models.py`, `views.py`, `admin.py`, `urls.py`, and `tests.py`.
 - **Templates:** Per-app in `templates/`; global in `templates/` root.
 - **Docs:** See per-app `docs/` folders and main `README.md`.
+- **Business Process Documentation:** `docs/workflows/` contains detailed Mermaid diagrams showing member lifecycles, operational procedures, and cross-app integrations. **Always consult relevant workflows before implementing changes.**
 - **Data import/export:** Use Django admin or custom scripts in `loaddata/`.
 - **Custom logic:** See `duty_roster/roster_generator.py`, `analytics/queries.py`, `instructors/utils.py`.
 - **Scheduled Tasks:** CronJob commands in `*/management/commands/` using `BaseCronJobCommand` framework.
