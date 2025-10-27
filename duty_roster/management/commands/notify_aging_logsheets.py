@@ -32,7 +32,7 @@ class Command(BaseCronJobCommand):
         # Find unfinalized logsheets older than the cutoff
         aging_logsheets = Logsheet.objects.filter(
             finalized=False,
-            created_at__lt=cutoff_date
+            log_date__lt=cutoff_date.date()
         ).select_related(
             'duty_officer',
             'assistant_duty_officer',

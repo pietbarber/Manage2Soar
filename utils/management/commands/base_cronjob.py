@@ -144,9 +144,10 @@ class BaseCronJobCommand(BaseCommand):
         except IntegrityError:
             # Lock already exists - check if it's expired
             try:
-                existing_lock = CronJobLock.objects.select_for_update(nowait=True).get(
-                    job_name=self.job_name
-                )
+                with transaction.atomic():
+                    existing_lock = CronJobLock.objects.select_for_update(nowait=True).get(
+                        job_name=self.job_name
+                    )
 
                 if existing_lock.is_expired():
                     # Lock is expired, try to replace it
