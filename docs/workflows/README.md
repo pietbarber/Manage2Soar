@@ -71,7 +71,7 @@ graph TB
 ## 📚 **Related Documentation**
 
 - **App-Specific Docs**: Each Django app has detailed documentation in its `docs/` directory
-- **ERDs**: Database relationship diagrams are generated with `generate_erds.py`
+- **Database Schemas**: Database relationship diagrams are maintained as Mermaid diagrams directly in markdown files
 - **API Reference**: See individual app `models.py`, `views.py`, and `admin.py` files
 - **Project README**: [/README.md](../../README.md) for overall project information
 

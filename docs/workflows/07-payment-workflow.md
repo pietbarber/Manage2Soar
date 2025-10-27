@@ -18,15 +18,12 @@ flowchart TD
     A[Flight Completed] --> B[Extract Flight Data]
     B --> C[Calculate Tow Costs]
     B --> D[Calculate Rental Costs]
-    B --> E[Calculate Instruction Costs]
     
     C --> F[Apply Tow Rate Table]
     D --> G[Apply Hourly Rental Rates]
-    E --> H[Apply Instruction Rates]
     
     F --> I[Total Cost Calculation]
     G --> I
-    H --> I
     
     I --> J{Cost Splitting Required?}
     J -->|Yes| K[Apply Split Logic]
@@ -115,15 +112,12 @@ sequenceDiagram
 flowchart TD
     A[Flight Data Input] --> B[Tow Cost Calculation]
     A --> C[Rent Cost Calculation]
-    A --> D[Instruction Cost Calculation]
     
     B --> E[Release Altitude * Tow Rate]
     C --> F[Flight Duration * Hourly Rate]
-    D --> G[Instruction Time * Instructor Rate]
     
     E --> H[Apply Member Discounts]
     F --> H
-    G --> H
     
     H --> I{Cost Splitting?}
     I -->|Equal Split| J[Total Cost ÷ Participants]
@@ -187,7 +181,6 @@ erDiagram
         int instructor_id FK
         decimal tow_cost_calculated
         decimal rental_cost_calculated
-        decimal instruction_cost_calculated
         decimal total_cost
         string cost_split_method
         json cost_split_details
@@ -231,6 +224,7 @@ erDiagram
     }
     
     Member ||--o{ Flight : pilots
+    Member ||--o{ Flight : instructs
     Member ||--o{ MemberCharge : charged
     Member ||--o{ Payment : makes
     Flight ||--o{ MemberCharge : generates
@@ -392,6 +386,7 @@ flowchart LR
 - ✅ Analytics integration for financial reporting
 
 ### **Identified Gaps**
+- 🟡 **Instructor Compensation**: No system for tracking or processing instructor payments for flight instruction services
 - 🟡 **Payment Gateway Integration**: No automated electronic payment processing
 - 🟡 **Mobile Payment Options**: Limited mobile-friendly payment interfaces
 - 🟡 **Recurring Payments**: No support for membership dues or subscription billing
@@ -399,6 +394,7 @@ flowchart LR
 - 🟡 **External Accounting**: Limited integration with external accounting systems
 
 ### **Improvement Opportunities**
+- 🔄 **Instructor Payment System**: Comprehensive system for billing students and compensating instructors for flight instruction services
 - 🔄 **Online Payment Portal**: Full-featured member payment portal with multiple payment methods
 - 🔄 **Payment Gateway Integration**: Integration with PayPal, Stripe, or other payment processors
 - 🔄 **Mobile Payments**: Support for mobile wallets and contactless payments

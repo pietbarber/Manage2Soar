@@ -2,138 +2,109 @@
 
 ## Manager Overview
 
-The ground instruction workflow manages classroom-based training and theoretical knowledge transfer that complements flight instruction. This includes ground school sessions, individual briefings, safety seminars, and knowledge assessments that are essential for pilot development and regulatory compliance.
+The ground instruction workflow manages the logging and tracking of individual ground-based instructional sessions between instructors and students. This is a simple system for recording one-on-one briefings, theoretical discussions, and lesson-specific training that supports flight instruction and student development.
 
 **Key Stages:**
-1. **Curriculum Planning** - Develop ground school syllabus and learning objectives
-2. **Session Scheduling** - Plan and schedule ground instruction sessions
-3. **Content Delivery** - Conduct ground school classes and individual briefings
-4. **Progress Tracking** - Monitor student understanding and completion
-5. **Knowledge Assessment** - Validate learning through tests and evaluations
+1. **Session Logging** - Record individual ground instruction sessions
+2. **Content Documentation** - Document topics covered and lesson progress
+3. **Progress Tracking** - Track student advancement through training lessons
+4. **Performance Scoring** - Score student performance on specific training lessons
 
 ## Process Flow
 
 ```mermaid
 flowchart TD
-    A[Ground School Planning] --> B[Define Learning Objectives]
-    B --> C[Create Session Schedule]
-    C --> D[Assign Instructors]
-    D --> E[Prepare Training Materials]
+    A[Instructor Plans Session] --> B[Schedule with Student]
+    B --> C[Conduct Ground Instruction]
     
-    E --> F[Schedule Ground Sessions]
-    F --> G[Student Registration]
-    G --> H[Conduct Ground Instruction]
+    C --> D{Session Type}
+    D -->|Pre-Flight Brief| E[Flight Preparation Discussion]
+    D -->|Post-Flight Debrief| F[Flight Review & Analysis]
+    D -->|Theory Session| G[Aerodynamics/Procedures Study]
+    D -->|Knowledge Review| H[Lesson-Specific Training]
     
-    H --> I{Session Type}
-    I -->|Group Class| J[Classroom Instruction]
-    I -->|Individual Brief| K[One-on-One Training]
-    I -->|Safety Seminar| L[Safety Topic Presentation]
-    I -->|Pre-Flight Brief| M[Flight Preparation]
+    E --> I[Document Session Details]
+    F --> I
+    G --> I
+    H --> I
     
-    J --> N[Record Attendance]
-    K --> O[Document Individual Progress]
-    L --> P[Safety Knowledge Update]
-    M --> Q[Flight Readiness Assessment]
-    
-    N --> R[Update Student Records]
-    O --> R
-    P --> S[Safety Database Update]
-    Q --> T[Pre-Flight Approval]
-    
-    R --> U{Knowledge Check Required?}
-    U -->|Yes| V[Administer Knowledge Test]
-    U -->|No| W[Continue Training]
-    
-    V --> X{Test Results}
-    X -->|Pass| Y[Advance to Next Topic]
-    X -->|Fail| Z[Additional Ground Study]
-    
-    S --> AA[Safety Compliance Update]
-    T --> BB[Flight Authorization]
-    W --> CC[Session Complete]
-    Y --> CC
-    Z --> H
+    I --> J[Score Individual Lessons]
+    J --> K[Save Session Record]
+    K --> L[Update Student Progress]
+    L --> M[Notify Student]
+    M --> N[Session Complete]
     
     style A fill:#e1f5fe
-    style CC fill:#e8f5e8
-    style Z fill:#fff3e0
+    style N fill:#e8f5e8
 ```
 
 ## Technical Implementation
 
 ### **Models Involved**
-- **`instructors.SyllabusDocument`**: Ground school curriculum and materials
-- **`instructors.TrainingLesson`**: Individual ground instruction sessions
-- **`instructors.TrainingPhase`**: Organized learning modules
-- **`knowledgetest.TestSession`**: Knowledge assessments and evaluations
-- **`members.Member`**: Students and ground school instructors
-- **`cms.Page`**: Ground school materials and reference documents
+- **`instructors.GroundInstruction`**: Individual ground instruction sessions
+- **`instructors.GroundLessonScore`**: Lesson-specific performance scores
+- **`instructors.TrainingLesson`**: Training syllabus lesson definitions
+- **`instructors.TrainingPhase`**: Organized training phases
+- **`members.Member`**: Students and instructors
 
 ### **Key Files**
 - **Models**: `instructors/models.py` - Ground instruction data structures
-- **Views**: `instructors/views.py` - Ground school management interface
-- **Utils**: `instructors/utils.py` - Progress tracking and assessment logic
-- **Knowledge Tests**: `knowledgetest/` - Assessment and testing functionality
-- **Content Management**: `cms/` - Training materials and documentation
+- **Views**: `instructors/views.py` - Ground instruction logging interface
+- **Forms**: `instructors/forms.py` - Ground instruction session forms
+- **Templates**: `instructors/templates/` - Ground instruction logging UI
+- **Signals**: `instructors/signals.py` - Progress tracking and notifications
 
-### **Ground School Session Management**
+### **Ground Instruction Session Logging**
 
 ```mermaid
 sequenceDiagram
-    participant Instructor as Ground Instructor
+    participant Instructor as Instructor
     participant System as Manage2Soar
     participant Student as Student
-    participant Knowledge as Knowledge Test System
     participant Progress as Progress Tracker
     
-    Instructor->>System: Plan Ground School Session
-    System->>System: Create Session Record
-    System->>Student: Send Session Notification
+    Instructor->>System: Access Ground Instruction Form
+    System->>System: Load Training Lessons
+    System->>Instructor: Display Session Form
     
-    Student->>System: Register for Session
-    System->>Instructor: Update Attendance List
+    Instructor->>System: Complete Session Details
+    Instructor->>System: Score Individual Lessons
+    Instructor->>System: Save Ground Session
     
-    Instructor->>System: Conduct Ground Session
-    System->>System: Record Attendance
-    System->>System: Document Topics Covered
-    
-    alt Knowledge Assessment Required
-        System->>Knowledge: Generate Knowledge Test
-        Knowledge->>Student: Administer Test
-        Student->>Knowledge: Complete Test
-        Knowledge->>System: Return Test Results
-    end
+    System->>System: Create GroundInstruction Record
+    System->>System: Save GroundLessonScore Records
     
     System->>Progress: Update Student Progress
-    Progress->>System: Calculate Completion Status
-    System->>Student: Send Progress Update
-    System->>Instructor: Generate Session Report
+    System->>Student: Send Session Notification
+    System->>Instructor: Confirm Session Saved
 ```
 
-### **Ground Instruction Categories**
+### **Ground Instruction Session Types**
 
 ```mermaid
 flowchart TD
-    A[Ground Instruction] --> B[Formal Ground School]
-    A --> C[Individual Briefings]
-    A --> D[Safety Seminars]
-    A --> E[Specialized Training]
+    A[Ground Instruction Session] --> B[Pre-Flight Briefing]
+    A --> C[Post-Flight Debrief]
+    A --> D[Theory Discussion]
+    A --> E[Lesson Review]
     
-    B --> F[Private Pilot Ground School]
-    B --> G[Commercial Pilot Preparation]
-    B --> H[Instructor Development]
+    B --> F[Weather Analysis]
+    B --> G[Flight Planning]
+    B --> H[Aircraft Systems]
+    B --> I[Safety Considerations]
     
-    C --> I[Pre-Flight Briefings]
-    C --> J[Post-Flight Debriefs]
-    C --> K[One-on-One Tutoring]
+    C --> J[Flight Performance Review]
+    C --> K[Learning Points Discussion]
+    C --> L[Areas for Improvement]
+    C --> M[Next Steps Planning]
     
-    D --> L[Monthly Safety Meetings]
-    D --> M[Accident Case Studies]
-    D --> N[Weather Briefings]
+    D --> N[Aerodynamics Concepts]
+    D --> O[Regulations & Procedures]
+    D --> P[Emergency Procedures]
     
-    E --> O[Contest Training]
-    E --> P[Cross-Country Preparation]
-    E --> Q[Advanced Techniques]
+    E --> Q[Lesson-Specific Scoring]
+    E --> R[Progress Assessment]
+    E --> S[Remedial Training]
     
     style B fill:#e3f2fd
     style C fill:#f3e5f5
@@ -176,79 +147,52 @@ stateDiagram-v2
 erDiagram
     Member {
         int id PK
-        string name
+        string username
+        string first_name
+        string last_name
         boolean instructor
-        boolean ground_instructor
     }
     
     TrainingPhase {
         int id PK
+        int number
         string name
-        text description
-        int sequence_order
-        boolean ground_phase
     }
     
-    SyllabusDocument {
+    TrainingLesson {
         int id PK
+        string code
         string title
-        text content
+        text description
         int phase_id FK
-        int lesson_number
-        string document_type
-        boolean required
+        string far_requirement
+        string pts_reference
     }
     
-    GroundSession {
+    GroundInstruction {
         int id PK
+        int student_id FK
         int instructor_id FK
-        int phase_id FK
-        date session_date
-        time duration
-        string session_type
-        text topics_covered
-        text materials_used
-        int max_students
+        date date
+        string location
+        duration duration
+        text notes
+        datetime created_at
+        datetime updated_at
     }
     
-    GroundAttendance {
+    GroundLessonScore {
         int id PK
-        int ground_session_id FK
-        int student_id FK
-        boolean attended
-        decimal participation_score
-        text instructor_notes
+        int session_id FK
+        int lesson_id FK
+        string score
     }
     
-    TestSession {
-        int id PK
-        int student_id FK
-        int syllabus_document_id FK
-        date test_date
-        decimal score_percentage
-        boolean passed
-        text feedback
-    }
-    
-    StudentProgress {
-        int id PK
-        int student_id FK
-        int phase_id FK
-        date started_date
-        date completed_date
-        decimal completion_percentage
-        string status
-    }
-    
-    Member ||--o{ GroundSession : instructs
-    Member ||--o{ GroundAttendance : attends
-    Member ||--o{ TestSession : takes
-    Member ||--o{ StudentProgress : tracks
-    TrainingPhase ||--o{ SyllabusDocument : contains
-    TrainingPhase ||--o{ GroundSession : covers
-    TrainingPhase ||--o{ StudentProgress : phase_of
-    GroundSession ||--o{ GroundAttendance : records
-    SyllabusDocument ||--o{ TestSession : tests
+    Member ||--o{ GroundInstruction : student
+    Member ||--o{ GroundInstruction : instructor  
+    TrainingPhase ||--o{ TrainingLesson : contains
+    GroundInstruction ||--o{ GroundLessonScore : session
+    TrainingLesson ||--o{ GroundLessonScore : lesson
 ```
 
 ## Key Integration Points
@@ -269,69 +213,53 @@ flowchart LR
     H --> I[Flight Test Readiness]
 ```
 
-### **Knowledge Test Integration**
-Ground instruction feeds directly into formal testing:
+### **Progress Tracking Integration**
+Ground instruction integrates with overall student progress tracking:
 
 ```mermaid
 flowchart TD
-    A[Ground Instruction Complete] --> B[Knowledge Test Available]
-    B --> C[Student Takes Test]
-    C --> D{Test Results}
-    
-    D -->|Pass| E[Advance to Next Phase]
-    D -->|Fail| F[Additional Ground Study]
-    
-    E --> G[Flight Training Authorization]
-    F --> H[Remedial Instruction]
-    H --> I[Retest Available]
-    I --> C
+    A[Ground Instruction Session] --> B[Lesson Scores Recorded]
+    B --> C[Student Progress Updated]
+    C --> D[Training Record Updated]
+    D --> E[Progress Visible to Student]
+    E --> F[Instructor Progress Reports]
 ```
 
-### **Safety Program Integration**
-Ground instruction supports overall safety management:
+### **Flight Training Integration**
+Ground instruction complements flight training activities:
 
 ```mermaid
 flowchart LR
-    A[Safety Incidents] --> B[Safety Analysis]
-    B --> C[Ground School Topic Update]
-    C --> D[Safety Seminar Planning]
-    D --> E[Member Safety Education]
-    E --> F[Safety Culture Improvement]
-    
-    C --> G[Training Material Updates]
-    G --> H[Instructor Briefings]
-    H --> I[Enhanced Safety Training]
+    A[Pre-Flight Brief] --> B[Flight Lesson]
+    B --> C[Post-Flight Debrief]
+    C --> D[Ground Session Logged]
+    D --> E[Lesson Scores Updated]
+    E --> F[Next Flight Planned]
 ```
 
 ## Common Workflows
 
-### **Monthly Ground School Series**
+### **Individual Ground Instruction Session**
 
 ```mermaid
 flowchart TD
-    A[Plan Monthly Ground School] --> B[Select Topic Sequence]
-    B --> C[Schedule Instructor Assignments]
-    C --> D[Prepare Training Materials]
-    D --> E[Announce Session Schedule]
+    A[Instructor Identifies Need] --> B[Schedule Session with Student]
+    B --> C[Prepare Session Content]
+    C --> D[Conduct Ground Instruction]
     
-    E --> F[Student Registration Period]
-    F --> G[Conduct Weekly Sessions]
-    G --> H[Track Attendance]
-    H --> I[Monitor Student Progress]
+    D --> E[Document Session Details]
+    E --> F[Score Relevant Lessons]
+    F --> G[Save Session to System]
+    G --> H[Student Receives Notification]
     
-    I --> J{Month Complete?}
-    J -->|No| G
-    J -->|Yes| K[Administer Final Assessment]
-    
-    K --> L[Grade Assessments]
-    L --> M[Update Student Records]
-    M --> N[Plan Next Month's Topics]
+    H --> I[Review Session in Training Record]
+    I --> J[Plan Follow-up Sessions]
     
     style A fill:#e1f5fe
-    style N fill:#e8f5e8
+    style J fill:#e8f5e8
 ```
 
-### **Individual Student Briefing Process**
+### **Pre-Flight Briefing Workflow**
 
 ```mermaid
 flowchart LR
@@ -342,78 +270,74 @@ flowchart LR
     
     E --> F[Flight Training Session]
     F --> G[Post-Flight Debrief]
-    G --> H[Lesson Performance Review]
-    H --> I[Identify Learning Points]
-    I --> J[Plan Next Lesson]
-    
-    J --> K[Update Training Record]
-    K --> L[Schedule Next Session]
+    G --> H[Log Ground Session]
+    H --> I[Score Lesson Performance]
+    I --> J[Update Training Record]
 ```
 
-### **Safety Seminar Management**
+### **Theory Discussion Session**
 
 ```mermaid
 flowchart TD
-    A[Safety Topic Identified] --> B[Research and Preparation]
-    B --> C[Schedule Safety Seminar]
-    C --> D[Invite All Members]
-    D --> E[Prepare Presentation Materials]
+    A[Student Has Questions] --> B[Schedule Theory Session]
+    B --> C[Prepare Reference Materials]
+    C --> D[Conduct Discussion]
     
-    E --> F[Conduct Safety Seminar]
-    F --> G[Member Q&A Session]
-    G --> H[Document Key Points]
-    H --> I[Update Safety Database]
+    D --> E[Cover Aerodynamics Concepts]
+    D --> F[Review Regulations]
+    D --> G[Discuss Procedures]
     
-    I --> J[Distribute Summary]
-    J --> K[Track Member Attendance]
-    K --> L[Follow-up Actions]
-    L --> M[Safety Culture Assessment]
+    E --> H[Document Session]
+    F --> H
+    G --> H
+    H --> I[Score Understanding]
+    I --> J[Plan Additional Study]
 ```
 
 ## Known Gaps & Improvements
 
 ### **Current Strengths**
-- ✅ Comprehensive syllabus management and organization
-- ✅ Integration with flight instruction and progress tracking
-- ✅ Knowledge test integration for assessment validation
-- ✅ Flexible session types (group, individual, safety seminars)
-- ✅ Attendance tracking and progress monitoring
-- ✅ Safety training integration
+- ✅ Simple session logging for individual ground instruction
+- ✅ Integration with flight instruction progress tracking
+- ✅ Lesson-specific scoring and progress monitoring
+- ✅ Automatic student notifications of completed sessions
+- ✅ Historical session tracking and instructor records
 
 ### **Identified Gaps**
-- 🟡 **Online Learning Platform**: No support for remote/online ground instruction
-- 🟡 **Multimedia Content**: Limited support for videos, animations, and interactive content
-- 🟡 **Learning Management**: No formal LMS features like assignments or discussions
-- 🟡 **Progress Analytics**: Limited analytics on learning effectiveness and outcomes
-- 🟡 **Mobile Access**: Ground school materials not optimized for mobile devices
+- 🟡 **Group Sessions**: No support for formal group classes or ground schools
+- 🟡 **Session Scheduling**: No built-in scheduling system for ground instruction
+- 🟡 **Content Management**: No formal curriculum or materials management
+- 🟡 **Attendance Tracking**: Limited to individual sessions, no group attendance
+- 🟡 **Knowledge Testing**: No formal testing integration specific to ground instruction
 
 ### **Improvement Opportunities**
-- 🔄 **Online Learning Portal**: Full-featured online learning management system
-- 🔄 **Interactive Content**: Support for videos, simulations, and interactive exercises
-- 🔄 **Adaptive Learning**: Personalized learning paths based on student progress
-- 🔄 **Gamification**: Achievement badges and progress incentives
-- 🔄 **Collaborative Learning**: Discussion forums and peer learning features
+- 🔄 **Formal Ground School**: Support for scheduled group classes and attendance tracking
+- 🔄 **Session Scheduling**: Calendar integration and scheduling tools for ground instruction
+- 🔄 **Curriculum Management**: Structured ground school curriculum and materials
+- 🔄 **Student Portal**: Self-service access for students to view ground instruction history
+- 🔄 **Progress Analytics**: Enhanced analytics on ground instruction effectiveness
+- 🔄 **Payment Integration**: Ground instruction billing and payment tracking (currently no payment structure exists)
 
-### **Content Management**
-- 🔄 **Content Versioning**: Track and manage updates to training materials
-- 🔄 **Resource Library**: Comprehensive library of training resources and references
-- 🔄 **Content Creation Tools**: Better tools for instructors to create and update materials
-- 🔄 **External Content Integration**: Integration with external training resources and materials
-- 🔄 **Quality Assurance**: Review and approval process for training content
+### **Content and Materials**
+- 🔄 **Reference Materials**: Library of ground school materials and references
+- 🔄 **Multimedia Content**: Support for videos, presentations, and interactive content
+- 🔄 **External Resources**: Integration with external training materials and resources
+- 🔄 **Content Organization**: Better organization and categorization of training materials
+- 🔄 **Mobile Access**: Mobile-optimized access to ground instruction materials
 
-### **Assessment and Analytics**
-- 🔄 **Advanced Assessment**: More sophisticated testing and evaluation capabilities
-- 🔄 **Learning Analytics**: Detailed analytics on student learning patterns and outcomes
-- 🔄 **Instructor Analytics**: Performance metrics for ground instructors
+### **Assessment and Evaluation**
+- 🔄 **Knowledge Testing**: Integration with formal knowledge testing system
+- 🔄 **Progress Visualization**: Better visual representation of student progress
 - 🔄 **Competency Tracking**: Formal competency-based progression tracking
-- 🔄 **Certification Management**: Track and manage instructor certifications and currency
+- 🔄 **Session Analytics**: Analytics on ground instruction session effectiveness
+- 🔄 **Instructor Feedback**: Enhanced feedback mechanisms for instructors
 
-### **Communication and Collaboration**
-- 🔄 **Student Communication**: Enhanced communication tools between instructors and students
-- 🔄 **Parent/Guardian Portal**: Access for parents of younger students
-- 🔄 **Study Groups**: Tools for organizing and managing student study groups
-- 🔄 **Instructor Collaboration**: Better coordination tools for ground school instructors
-- 🔄 **Calendar Integration**: Integration with personal and club calendars
+### **Communication and Planning**
+- 🔄 **Session Planning**: Tools for planning and preparing ground instruction sessions
+- 🔄 **Student Communication**: Enhanced communication between instructors and students
+- 🔄 **Session Reminders**: Automated reminders for scheduled ground instruction
+- 🔄 **Progress Reports**: Automated progress reports for students and instructors
+- 🔄 **Calendar Integration**: Integration with club and personal calendars
 
 ## Related Workflows
 
