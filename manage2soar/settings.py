@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "siteconfig",
     "storages",
     "notifications",
+    "utils",
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
