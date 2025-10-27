@@ -1,0 +1,314 @@
+# Kubernetes CronJob Manifests for Manage2Soar Notifications
+# These CronJobs run scheduled tasks in the Kubernetes cluster with distributed locking
+
+---
+# Daily: Aging Logsheet Notifications (8:00 AM UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: notify-aging-logsheets
+  namespace: default
+spec:
+  schedule: "0 8 * * *" # Daily at 8:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid # Prevent overlapping executions
+  jobTemplate:
+    spec:
+      backoffLimit: 2 # Retry failed jobs twice
+      activeDeadlineSeconds: 900 # 15 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: notify-aging-logsheets
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - notify_aging_logsheets
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
+# Daily: Pre-operation Duty Emails (6:00 AM UTC for next day)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: send-duty-preop-emails
+  namespace: default
+spec:
+  schedule: "0 6 * * *" # Daily at 6:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600 # 10 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: send-duty-preop-emails
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - send_duty_preop_emails
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
+# Daily: Expire Ad-hoc Days (6:00 PM UTC for tomorrow)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: expire-ad-hoc-days
+  namespace: default
+spec:
+  schedule: "0 18 * * *" # Daily at 6:00 PM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300 # 5 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: expire-ad-hoc-days
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - expire_ad_hoc_days
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
+# Weekly: Late SPR Notifications (Monday 10:00 AM UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: notify-late-sprs
+  namespace: default
+spec:
+  schedule: "0 10 * * 1" # Weekly on Monday at 10:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1200 # 20 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: notify-late-sprs
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - notify_late_sprs
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
+# Weekly: Maintenance Digest (Sunday 9:00 AM UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: send-maintenance-digest
+  namespace: default
+spec:
+  schedule: "0 9 * * 0" # Weekly on Sunday at 9:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600 # 10 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: send-maintenance-digest
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - send_maintenance_digest
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
+# Monthly: Duty Delinquent Report (1st of month, 7:00 AM UTC)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: report-duty-delinquents
+  namespace: default
+spec:
+  schedule: "0 7 1 * *" # Monthly on 1st at 7:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800 # 30 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: report-duty-delinquents
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - report_duty_delinquents
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
