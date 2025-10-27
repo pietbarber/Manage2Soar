@@ -163,6 +163,146 @@ Uses PostgreSQL's atomic operations:
 - Include process ID for uniqueness within pod restarts
 - No sensitive information in pod identifiers
 
+## kubectl Commands Reference
+
+### 🚀 Deployment Commands
+```bash
+# Deploy all CronJobs to Kubernetes cluster
+kubectl apply -f k8s-cronjobs.yaml
+
+# Update existing CronJobs (after YAML changes)
+kubectl apply -f k8s-cronjobs.yaml
+
+# Delete all CronJobs (if needed)
+kubectl delete -f k8s-cronjobs.yaml
+```
+
+### 📊 Monitoring Commands
+```bash
+# List all CronJobs with schedule and status
+kubectl get cronjobs
+
+# Get detailed information about all CronJobs
+kubectl describe cronjobs
+
+# Check specific CronJob details
+kubectl describe cronjob notify-aging-logsheets
+kubectl describe cronjob notify-late-sprs
+kubectl describe cronjob report-duty-delinquents
+
+# List recent job executions (shows actual runs)
+kubectl get jobs
+
+# List jobs with timestamps and labels
+kubectl get jobs --show-labels
+
+# Check running pods from CronJobs
+kubectl get pods --selector=job-name
+```
+
+### 📝 Log Viewing Commands
+```bash
+# View logs from most recent successful job
+kubectl logs job/notify-aging-logsheets-$(date +%Y%m%d%H%M)
+
+# View logs from specific job execution
+kubectl logs job/notify-aging-logsheets-28413210
+
+# Follow logs in real-time (if job is running)
+kubectl logs -f job/notify-aging-logsheets-28413210
+
+# Get logs from all job pods
+kubectl logs -l job-name=notify-aging-logsheets
+
+# View previous job execution logs
+kubectl logs job/notify-aging-logsheets-28413150 --previous
+```
+
+### 🧪 Testing Commands
+```bash
+# Create manual job execution from CronJob (for testing)
+kubectl create job --from=cronjob/notify-aging-logsheets test-aging-logsheets-$(date +%H%M)
+kubectl create job --from=cronjob/notify-late-sprs test-late-sprs-$(date +%H%M)
+kubectl create job --from=cronjob/report-duty-delinquents test-duty-report-$(date +%H%M)
+
+# Monitor test job execution
+kubectl get jobs | grep test-
+kubectl logs job/test-aging-logsheets-1234
+
+# Clean up test jobs
+kubectl delete job test-aging-logsheets-1234
+kubectl delete jobs -l job-name=test-
+```
+
+### 🔍 Troubleshooting Commands
+```bash
+# Check CronJob events and errors
+kubectl get events --field-selector involvedObject.kind=CronJob
+kubectl get events --field-selector involvedObject.kind=Job
+
+# View CronJob configuration
+kubectl get cronjob notify-aging-logsheets -o yaml
+kubectl get cronjob notify-late-sprs -o yaml
+
+# Check job failure reasons
+kubectl describe job failed-job-name
+
+# Force delete stuck jobs
+kubectl delete job stuck-job-name --force --grace-period=0
+
+# Check resource usage
+kubectl top pods -l app=manage2soar
+
+# Verify secrets and config maps
+kubectl get secrets manage2soar-env
+kubectl describe secret gcp-sa-key
+```
+
+### 📈 Production Monitoring
+```bash
+# Check last execution status of all CronJobs
+kubectl get cronjobs -o wide
+
+# View job history (successful and failed)
+kubectl get jobs --sort-by=.metadata.creationTimestamp
+
+# Monitor job completion over time
+watch 'kubectl get jobs | tail -10'
+
+# Check CronJob suspension status
+kubectl get cronjobs -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.suspend}{"\n"}{end}'
+```
+
+### ⚙️ Management Commands
+```bash
+# Suspend a CronJob (stop scheduling new jobs)
+kubectl patch cronjob notify-aging-logsheets -p '{"spec":{"suspend":true}}'
+
+# Resume a suspended CronJob
+kubectl patch cronjob notify-aging-logsheets -p '{"spec":{"suspend":false}}'
+
+# Update CronJob schedule
+kubectl patch cronjob notify-aging-logsheets -p '{"spec":{"schedule":"0 9 * * *"}}'
+
+# Scale down main application (affects CronJob execution)
+kubectl scale deployment manage2soar --replicas=1
+```
+
+### 🚨 Emergency Commands
+```bash
+# Stop all CronJob scheduling immediately
+kubectl get cronjobs -o name | xargs -I {} kubectl patch {} -p '{"spec":{"suspend":true}}'
+
+# Resume all CronJob scheduling
+kubectl get cronjobs -o name | xargs -I {} kubectl patch {} -p '{"spec":{"suspend":false}}'
+
+# Delete all failed jobs
+kubectl delete jobs --field-selector=status.successful=0
+
+# Clean up job history (keep only recent ones)
+kubectl delete jobs --field-selector=status.successful=1 --field-selector=metadata.creationTimestamp<$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ')
+```
+
 ## Testing Strategy
 
 ### Unit Tests
