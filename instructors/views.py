@@ -55,7 +55,7 @@ from knowledgetest.models import (
 )
 from knowledgetest.views import get_presets
 from logsheet.models import Flight
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from members.utils.membership import get_active_membership_statuses
 from members.decorators import active_member_required
 from members.models import Member
 try:
@@ -719,9 +719,10 @@ def assign_qualification(request, member_id):
 def progress_dashboard(request):
     # ————————————————————————————————
     # 1) split “students” vs “rated” by glider_rating
+    active_statuses = get_active_membership_statuses()
     students_qs = (
         Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES, glider_rating="student"
+            membership_status__in=active_statuses, glider_rating="student"
         )
         .annotate(
             last_flight=Max("flights_as_pilot__logsheet__log_date"),
@@ -730,7 +731,7 @@ def progress_dashboard(request):
     )
 
     rated_qs = (
-        Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        Member.objects.filter(membership_status__in=active_statuses)
         .exclude(glider_rating="student")
         .annotate(
             last_flight=Max("flights_as_pilot__logsheet__log_date"),

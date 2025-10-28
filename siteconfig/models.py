@@ -130,3 +130,47 @@ class SiteConfiguration(models.Model):
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
+
+
+class MembershipStatus(models.Model):
+    """
+    Configurable membership statuses for the club.
+    This replaces the hardcoded membership status lists in members.constants.
+    """
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="The display name for this membership status (e.g., 'Full Member')"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether members with this status are considered 'active' and can access member features"
+    )
+    sort_order = models.PositiveIntegerField(
+        default=100,
+        help_text="Sort order for display in dropdowns and lists (lower numbers appear first)"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description of what this membership status means"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Membership Status"
+        verbose_name_plural = "Membership Statuses"
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_active_statuses(cls):
+        """Get all membership statuses that are marked as active."""
+        return cls.objects.filter(is_active=True).values_list('name', flat=True)
+
+    @classmethod
+    def get_all_status_choices(cls):
+        """Get all membership statuses as Django field choices."""
+        return [(status.name, status.name) for status in cls.objects.all().order_by('sort_order', 'name')]

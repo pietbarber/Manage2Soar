@@ -1,9 +1,9 @@
-## instructors/management/commands/backfill_student_progress_snapshots.py
+# instructors/management/commands/backfill_student_progress_snapshots.py
 
 from django.core.management.base import BaseCommand
 
 from instructors.utils import update_student_progress_snapshot
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from members.utils.membership import get_active_membership_statuses
 from members.models import Member
 
 
@@ -17,7 +17,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Fetch active members
-        members = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        active_statuses = get_active_membership_statuses()
+        members = Member.objects.filter(membership_status__in=active_statuses)
         total = members.count()
         self.stdout.write(
             self.style.NOTICE(f"Starting backfill for {total} active members...")

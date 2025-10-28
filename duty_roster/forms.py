@@ -93,10 +93,11 @@ class DutyAssignmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Optional: Limit dropdowns to members with the right roles
-        from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+        from members.utils.membership import get_active_membership_statuses
 
+        active_statuses = get_active_membership_statuses()
         active_members = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES
+            membership_status__in=active_statuses
         )
         self.fields["instructor"].queryset = active_members.filter(
             instructor=True

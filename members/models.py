@@ -19,6 +19,19 @@ from utils.upload_entropy import (
 from .utils.avatar_generator import generate_identicon
 
 
+def get_membership_status_choices():
+    """
+    Get membership status choices dynamically from the MembershipStatus model.
+    Falls back to hardcoded choices during migrations or if MembershipStatus doesn't exist.
+    """
+    try:
+        from siteconfig.models import MembershipStatus
+        return MembershipStatus.get_all_status_choices()
+    except (ImportError, Exception):
+        # Fallback to hardcoded choices during migrations or if table doesn't exist
+        return MEMBERSHIP_STATUS_CHOICES
+
+
 def biography_upload_path(instance, filename):
     return f"biography/{instance.member.username}/{filename}"
 
@@ -99,8 +112,8 @@ class Member(AbstractUser):
     # S = Service Member
 
     membership_status = models.CharField(
-        max_length=20,
-        choices=MEMBERSHIP_STATUS_CHOICES,
+        max_length=50,  # Increased length to accommodate longer status names
+        choices=MEMBERSHIP_STATUS_CHOICES,  # Fallback for migrations
         default="Non-Member",
         blank=True,
         null=True,
@@ -237,7 +250,13 @@ class Member(AbstractUser):
     # Used for filtering members in operational roles and UI.
 
     def is_active_member(self):
-        return self.membership_status in DEFAULT_ACTIVE_STATUSES
+        try:
+            from siteconfig.models import MembershipStatus
+            active_statuses = list(MembershipStatus.get_active_statuses())
+            return self.membership_status in active_statuses
+        except (ImportError, Exception):
+            # Fallback to hardcoded list during migrations or if table doesn't exist
+            return self.membership_status in DEFAULT_ACTIVE_STATUSES
 
     def _desired_group_names(self):
         names = []
@@ -261,6 +280,16 @@ class Member(AbstractUser):
             desired.append(grp)
         # Atomic replace; avoids add/remove churn
         self.groups.set(desired)
+
+    @classmethod
+    def get_membership_status_choices(cls):
+        """Get dynamic membership status choices for forms."""
+        try:
+            from siteconfig.models import MembershipStatus
+            return MembershipStatus.get_all_status_choices()
+        except (ImportError, Exception):
+            # Fallback during migrations or if table doesn't exist
+            return MEMBERSHIP_STATUS_CHOICES
 
     def save(self, *args, **kwargs):
         # 1) pre-save flags
