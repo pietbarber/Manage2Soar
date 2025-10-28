@@ -4,6 +4,15 @@ Test suite for the notification management commands.
 Tests the actual production commands: aging logsheets, late SPRs, and duty delinquents.
 These are the commands running in production Kubernetes CronJobs.
 """
+from utils.models import CronJobLock
+from notifications.models import Notification
+from members.models import Member
+from logsheet.models import Flight, Logsheet, Airfield
+from instructors.management.commands.notify_late_sprs import Command as LateSPRsCommand
+from instructors.models import InstructionReport
+from duty_roster.management.commands.report_duty_delinquents import Command as DutyDelinquentsCommand
+from duty_roster.management.commands.notify_aging_logsheets import Command as AgingLogsheetsCommand
+from duty_roster.models import DutySlot, DutyAssignment
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
@@ -12,17 +21,8 @@ from io import StringIO
 from django.test import TestCase, TransactionTestCase
 from django.core.management import call_command
 from django.utils import timezone
-from django.contrib.auth.models import User
-
-from duty_roster.models import DutySlot, DutyAssignment
-from duty_roster.management.commands.notify_aging_logsheets import Command as AgingLogsheetsCommand
-from duty_roster.management.commands.report_duty_delinquents import Command as DutyDelinquentsCommand
-from instructors.models import InstructionReport
-from instructors.management.commands.notify_late_sprs import Command as LateSPRsCommand
-from logsheet.models import Flight, Logsheet
-from members.models import Member
-from notifications.models import Notification
-from utils.models import CronJobLock
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 
 class TestAgingLogsheetsCommand(TransactionTestCase):
@@ -30,13 +30,10 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
 
     def setUp(self):
         """Set up test data."""
-        # Create test users and members
-        self.duty_officer = User.objects.create_user(
-            username='duty_officer',
-            email='duty@test.com'
-        )
+        # Create test member who will act as duty officer
         self.duty_member = Member.objects.create(
-            user=self.duty_officer,
+            username='duty_officer',
+            email='duty@test.com',
             first_name='Duty',
             last_name='Officer',
             membership_status='Full Member'
@@ -44,18 +41,21 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
 
         # Create aging logsheet (8 days old)
         old_date = timezone.now().date() - timedelta(days=8)
+        airfield = Airfield.objects.create(identifier='KFRR', name='KFRR Field')
         self.aging_logsheet = Logsheet.objects.create(
-            date=old_date,
-            airfield='KFRR',
-            finalized=False
+            log_date=old_date,
+            airfield=airfield,
+            created_by=self.duty_member,
+            finalized=False,
         )
 
         # Create fresh logsheet (3 days old)
         fresh_date = timezone.now().date() - timedelta(days=3)
         self.fresh_logsheet = Logsheet.objects.create(
-            date=fresh_date,
-            airfield='KFRR',
-            finalized=False
+            log_date=fresh_date,
+            airfield=airfield,
+            created_by=self.duty_member,
+            finalized=False,
         )
 
         # Create duty assignment for the aging logsheet date
@@ -128,7 +128,7 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
 
         assert 'Aging Logsheet' in subject
         assert str(self.aging_logsheet.date) in message
-        assert self.duty_officer.email in recipient_list
+        assert self.duty_member.email in recipient_list
 
     def test_creates_in_app_notification(self):
         """Test that in-app notifications are created."""
@@ -137,7 +137,7 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
                 self.command.handle(verbosity=1)
 
         # Should create notification
-        notification = Notification.objects.get(user=self.duty_officer)
+        notification = Notification.objects.get(user=self.duty_member)
         assert 'aging logsheet' in notification.message.lower()
         assert str(self.aging_logsheet.date) in notification.message
 
@@ -147,25 +147,18 @@ class TestLateSPRsCommand(TransactionTestCase):
 
     def setUp(self):
         """Set up test data."""
-        # Create instructor
-        self.instructor_user = User.objects.create_user(
-            username='instructor',
-            email='instructor@test.com'
-        )
+        # Create instructor and student as Member instances
         self.instructor = Member.objects.create(
-            user=self.instructor_user,
+            username='instructor',
+            email='instructor@test.com',
             first_name='Test',
             last_name='Instructor',
             membership_status='Full Member'
         )
 
-        # Create student
-        self.student_user = User.objects.create_user(
-            username='student',
-            email='student@test.com'
-        )
         self.student = Member.objects.create(
-            user=self.student_user,
+            username='student',
+            email='student@test.com',
             first_name='Test',
             last_name='Student',
             membership_status='Full Member'
@@ -243,30 +236,23 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
 
     def setUp(self):
         """Set up test data."""
-        # Create flying member
-        self.flying_user = User.objects.create_user(
-            username='flying_member',
-            email='flyer@test.com'
-        )
+        # Create flying and non-flying members directly
         self.flying_member = Member.objects.create(
-            user=self.flying_user,
+            username='flying_member',
+            email='flyer@test.com',
             first_name='Flying',
             last_name='Member',
             membership_status='Full Member',
-            join_date=timezone.now().date() - timedelta(days=365)  # Joined a year ago
+            joined_club=timezone.now().date() - timedelta(days=365),  # Joined a year ago
         )
 
-        # Create non-flying member
-        self.non_flying_user = User.objects.create_user(
-            username='non_flying_member',
-            email='nonflyer@test.com'
-        )
         self.non_flying_member = Member.objects.create(
-            user=self.non_flying_user,
+            username='non_flying_member',
+            email='nonflyer@test.com',
             first_name='Non Flying',
             last_name='Member',
             membership_status='Full Member',
-            join_date=timezone.now().date() - timedelta(days=365)
+            joined_club=timezone.now().date() - timedelta(days=365),
         )
 
         # Create flights for flying member (but no duty)
@@ -351,16 +337,13 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
     def test_excludes_new_members(self):
         """Test that recently joined members are excluded."""
         # Create new member who joined recently
-        new_user = User.objects.create_user(
-            username='new_member',
-            email='new@test.com'
-        )
         new_member = Member.objects.create(
-            user=new_user,
+            username='new_member',
+            email='new@test.com',
             first_name='New',
             last_name='Member',
             membership_status='Full Member',
-            join_date=timezone.now().date() - timedelta(days=30)  # Joined recently
+            joined_club=timezone.now().date() - timedelta(days=30),  # Joined recently
         )
 
         # Add flights for new member

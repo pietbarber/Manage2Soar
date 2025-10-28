@@ -67,10 +67,24 @@ class BaseCronJobCommand(BaseCommand):
         self.verbosity = options.get('verbosity', 1)
         self.dry_run = options.get('dry_run', False)
         # Rebind stdout at handle time so tests that patch sys.stdout or
-        # pass a custom stdout to call_command will capture output. Respect
-        # an explicit ``self.stdout`` assigned by tests/consumers; otherwise
-        # prefer provided options['stdout'] or fall back to sys.stdout.
-        self.stdout = options.get('stdout') or getattr(self, 'stdout', sys.stdout)
+        # pass a custom stdout to call_command will capture output.
+        # Behavior rules:
+        # - If an explicit stdout was passed in options, honor it.
+        # - If the command instance already had a custom stdout set by
+        #   the caller (e.g. tests assigned a StringIO to `command.stdout`),
+        #   do NOT clobber it.
+        # - Otherwise, fall back to the current sys.stdout (which may be
+        #   patched by tests).
+        if options.get('stdout') is not None:
+            self.stdout = options.get('stdout')
+        else:
+            # Only override the existing stdout if it is the real sys.stdout
+            # (i.e. not previously set by a test to a StringIO). This lets
+            # tests that assign `command.stdout = StringIO()` keep their
+            # capture buffer.
+            current_stdout = getattr(self, 'stdout', None)
+            if current_stdout is sys.stdout or current_stdout is None:
+                self.stdout = sys.stdout
         force = options.get('force', False)
         # Always print dry-run header if requested
         if self.dry_run:

@@ -10,7 +10,7 @@
     {% else %}
       <span class="badge bg-danger">Failed</span>
     {% endif %}
-    <small class="text-muted ms-2">(Required: {{ attempt.template.pass_percentage|floatformat:1 }}% to pass)</small>
+  <small class="text-muted ms-2">(Required: {{ attempt.template.pass_percentage|floatformat:0 }}% to pass)</small>
   </p>
   <hr/>
 
