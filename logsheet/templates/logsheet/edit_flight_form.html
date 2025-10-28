@@ -1,13 +1,8 @@
 {% load static %}
-
-{% block extra_css %}
-  {{ block.super }}
-  <link rel="stylesheet" href="{% static 'css/flight-forms.css' %}">
-{% endblock %}
-
-{% block content %}
-
 {% load member_extras %}
+
+<!-- Include CSS for this modal -->
+<link rel="stylesheet" href="{% static 'css/flight-forms.css' %}">
 
 <!-- Enhanced Modal Header -->
 <div class="modal-header bg-primary text-white">
@@ -275,4 +270,3 @@
   <footer style="font-size: 0.8em; color: gray;">
     Template: <code>logsheet/edit_flight_form.html</code>
   </footer>
-{% endblock %}
