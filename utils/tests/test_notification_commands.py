@@ -12,9 +12,9 @@ from instructors.management.commands.notify_late_sprs import Command as LateSPRs
 from instructors.models import InstructionReport
 from duty_roster.management.commands.report_duty_delinquents import Command as DutyDelinquentsCommand
 from duty_roster.management.commands.notify_aging_logsheets import Command as AgingLogsheetsCommand
-from duty_roster.models import DutySlot, DutyAssignment
+from duty_roster.models import DutySlot, DutyAssignment, DutyDay
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from unittest.mock import Mock, patch, MagicMock
 from io import StringIO
 
@@ -58,24 +58,18 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
             finalized=False,
         )
 
-        # Create duty assignment for the aging logsheet date
-        self.duty_slot = DutySlot.objects.create(
-            date=old_date,
-            position='Duty Officer',
-            required=True
-        )
-        self.duty_assignment = DutyAssignment.objects.create(
-            slot=self.duty_slot,
-            member=self.duty_member
-        )
+        # Assign duty officer directly on the logsheet (current system)
+        self.aging_logsheet.duty_officer = self.duty_member
+        self.aging_logsheet.save()
 
         self.command = AgingLogsheetsCommand()
 
     def test_identifies_aging_logsheets(self):
         """Test that command identifies logsheets older than 7 days."""
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_notification') as mock_send:
-                self.command.handle(dry_run=True, verbosity=1)
+            with patch.object(self.command, '_send_notification') as mock_send:
+                # Execute non-dry run but patch the notifier to avoid external side-effects
+                self.command.handle(dry_run=False, verbosity=1)
 
         # Should identify 1 aging logsheet
         mock_send.assert_called_once()
@@ -91,8 +85,8 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         self.aging_logsheet.delete()
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_notification') as mock_send:
-                self.command.handle(dry_run=True, verbosity=1)
+            with patch.object(self.command, '_send_notification') as mock_send:
+                self.command.handle(dry_run=False, verbosity=1)
 
         # Should not send any notifications
         mock_send.assert_not_called()
@@ -104,13 +98,13 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         self.aging_logsheet.save()
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_notification') as mock_send:
-                self.command.handle(dry_run=True, verbosity=1)
+            with patch.object(self.command, '_send_notification') as mock_send:
+                self.command.handle(dry_run=False, verbosity=1)
 
         # Should not send notifications for finalized logsheets
         mock_send.assert_not_called()
 
-    @patch('django.core.mail.send_mail')
+    @patch('duty_roster.management.commands.notify_aging_logsheets.send_mail')
     def test_sends_email_notification(self, mock_send_mail):
         """Test that email notifications are sent."""
         with patch('sys.stdout', new_callable=StringIO):
@@ -127,19 +121,18 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         recipient_list = args[3]
 
         assert 'Aging Logsheet' in subject
-        assert str(self.aging_logsheet.date) in message
+        assert str(self.aging_logsheet.log_date) in message
         assert self.duty_member.email in recipient_list
 
     def test_creates_in_app_notification(self):
         """Test that in-app notifications are created."""
         with patch('sys.stdout', new_callable=StringIO):
-            with patch('django.core.mail.send_mail'):
-                self.command.handle(verbosity=1)
+            self.command.handle(verbosity=1)
 
         # Should create notification
         notification = Notification.objects.get(user=self.duty_member)
         assert 'aging logsheet' in notification.message.lower()
-        assert str(self.aging_logsheet.date) in notification.message
+        assert str(self.aging_logsheet.log_date) in notification.message
 
 
 class TestLateSPRsCommand(TransactionTestCase):
@@ -166,12 +159,22 @@ class TestLateSPRsCommand(TransactionTestCase):
 
         # Create flight requiring SPR (8 days ago)
         flight_date = timezone.now().date() - timedelta(days=8)
+        airfield = Airfield.objects.create(identifier='KFRR', name='KFRR Field')
+        logsheet = Logsheet.objects.create(
+            log_date=flight_date,
+            airfield=airfield,
+            created_by=self.instructor,
+            finalized=True,
+        )
+
         self.flight = Flight.objects.create(
-            date=flight_date,
+            logsheet=logsheet,
             pilot=self.student,
             instructor=self.instructor,
-            aircraft_type='Training',
-            duration_minutes=60
+            flight_type='dual',
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            airfield=airfield,
         )
 
         self.command = LateSPRsCommand()
@@ -179,8 +182,8 @@ class TestLateSPRsCommand(TransactionTestCase):
     def test_identifies_overdue_sprs(self):
         """Test that command identifies flights without SPRs."""
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_escalated_notification') as mock_send:
-                self.command.handle(dry_run=True, verbosity=1)
+            with patch.object(self.command, '_send_notification') as mock_send:
+                self.command.handle(dry_run=False, verbosity=1)
 
         # Should identify overdue SPR
         mock_send.assert_called_once()
@@ -194,17 +197,28 @@ class TestLateSPRsCommand(TransactionTestCase):
     def test_escalation_levels(self):
         """Test different escalation levels based on days overdue."""
         # Test 15-day overdue flight (should be level 2)
+        old_date = timezone.now().date() - timedelta(days=15)
+        old_airfield = Airfield.objects.create(identifier='KXYZ', name='Old Field')
+        old_logsheet = Logsheet.objects.create(
+            log_date=old_date,
+            airfield=old_airfield,
+            created_by=self.instructor,
+            finalized=True,
+        )
+
         old_flight = Flight.objects.create(
-            date=timezone.now().date() - timedelta(days=15),
+            logsheet=old_logsheet,
             pilot=self.student,
             instructor=self.instructor,
-            aircraft_type='Training',
-            duration_minutes=60
+            flight_type='dual',
+            launch_time=time(9, 0),
+            landing_time=time(10, 0),
+            airfield=old_airfield,
         )
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_escalated_notification') as mock_send:
-                self.command.handle(dry_run=True, verbosity=1)
+            with patch.object(self.command, '_send_notification') as mock_send:
+                self.command.handle(dry_run=False, verbosity=1)
 
         # Should have multiple calls for different escalation levels
         assert mock_send.call_count == 2
@@ -217,7 +231,7 @@ class TestLateSPRsCommand(TransactionTestCase):
         """Test that flights with SPRs are not flagged."""
         # Create SPR for the flight
         InstructionReport.objects.create(
-            flight=self.flight,
+            report_date=self.flight.logsheet.log_date,
             instructor=self.instructor,
             student=self.student,
             report_text='Test SPR'
@@ -257,11 +271,22 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
 
         # Create flights for flying member (but no duty)
         for i in range(5):
+            flight_date = timezone.now().date() - timedelta(days=30 + i*10)
+            af = Airfield.objects.create(identifier=f'AF{i}', name=f'Field {i}')
+            ls = Logsheet.objects.create(
+                log_date=flight_date,
+                airfield=af,
+                created_by=self.flying_member,
+                finalized=True,
+            )
+
             Flight.objects.create(
-                date=timezone.now().date() - timedelta(days=30 + i*10),
+                logsheet=ls,
                 pilot=self.flying_member,
-                aircraft_type='Club',
-                duration_minutes=60
+                flight_type='solo',
+                launch_time=time(10, 0),
+                landing_time=time(11, 0),
+                airfield=af,
             )
 
         self.command = DutyDelinquentsCommand()
@@ -269,11 +294,11 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
     def test_identifies_delinquent_members(self):
         """Test that flying members without duty are identified."""
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_report') as mock_send:
+            with patch.object(self.command, '_send_delinquency_report') as mock_send:
                 self.command.handle(
                     lookback_months=12,
                     min_flights=1,
-                    dry_run=True,
+                    dry_run=False,
                     verbosity=1
                 )
 
@@ -292,22 +317,17 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         """Test that members who did duty are not flagged."""
         # Create duty assignment for flying member
         duty_date = timezone.now().date() - timedelta(days=60)
-        duty_slot = DutySlot.objects.create(
-            date=duty_date,
-            position='Duty Officer',
-            required=True
-        )
-        DutyAssignment.objects.create(
-            slot=duty_slot,
-            member=self.flying_member
-        )
+        # Create a duty day and assign the flying member as duty officer
+        duty_day = DutyDay.objects.create(date=duty_date)
+        DutySlot.objects.create(
+            duty_day=duty_day, member=self.flying_member, role='duty_officer')
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_report') as mock_send:
+            with patch.object(self.command, '_send_delinquency_report') as mock_send:
                 self.command.handle(
                     lookback_months=12,
                     min_flights=1,
-                    dry_run=True,
+                    dry_run=False,
                     verbosity=1
                 )
 
@@ -321,11 +341,11 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         """Test that command parameters work correctly."""
         # Test with stricter minimum flights requirement
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_report') as mock_send:
+            with patch.object(self.command, '_send_delinquency_report') as mock_send:
                 self.command.handle(
                     lookback_months=12,
                     min_flights=10,  # Require 10+ flights
-                    dry_run=True,
+                    dry_run=False,
                     verbosity=1
                 )
 
@@ -347,19 +367,29 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         )
 
         # Add flights for new member
+        af_new = Airfield.objects.create(identifier='ANew', name='New Field')
+        ls_new = Logsheet.objects.create(
+            log_date=timezone.now().date() - timedelta(days=15),
+            airfield=af_new,
+            created_by=new_member,
+            finalized=True,
+        )
+
         Flight.objects.create(
-            date=timezone.now().date() - timedelta(days=15),
+            logsheet=ls_new,
             pilot=new_member,
-            aircraft_type='Club',
-            duration_minutes=60
+            flight_type='solo',
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            airfield=af_new,
         )
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_report') as mock_send:
+            with patch.object(self.command, '_send_delinquency_report') as mock_send:
                 self.command.handle(
                     lookback_months=12,
                     min_flights=1,
-                    dry_run=True,
+                    dry_run=False,
                     verbosity=1
                 )
 
