@@ -165,6 +165,25 @@ class MembershipStatus(models.Model):
     def __str__(self):
         return self.name
 
+    def delete(self, *args, **kwargs):
+        """Override delete to prevent deletion if members are using this status."""
+        # Import here to avoid circular imports
+        try:
+            from members.models import Member
+            members_with_status = Member.objects.filter(membership_status=self.name)
+            if members_with_status.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError(
+                    f'Cannot delete membership status "{self.name}" - '
+                    f'{members_with_status.count()} members currently have this status. '
+                    f'Change their status first, then delete this membership status.'
+                )
+        except ImportError:
+            # During migrations, Member model might not be available
+            pass
+
+        super().delete(*args, **kwargs)
+
     @classmethod
     def get_active_statuses(cls):
         """Get all membership statuses that are marked as active."""

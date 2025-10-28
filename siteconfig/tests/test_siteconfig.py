@@ -143,3 +143,41 @@ def test_membership_status_defaults():
     assert status.description == ""  # Default should be empty string
     assert status.created_at is not None
     assert status.updated_at is not None
+
+
+@pytest.mark.django_db
+def test_membership_status_deletion_protection():
+    """Test that membership statuses cannot be deleted if members are using them."""
+    from members.models import Member
+    from django.core.exceptions import ValidationError
+
+    # Create a status and a member using it
+    status = MembershipStatus.objects.create(
+        name="Test Protected Status", is_active=True)
+    member = Member.objects.create(
+        username="test_member",
+        membership_status="Test Protected Status"
+    )
+
+    # Try to delete the status - should fail
+    with pytest.raises(ValidationError) as exc_info:
+        status.delete()
+
+    assert "Cannot delete membership status" in str(exc_info.value)
+    assert "1 members currently have this status" in str(exc_info.value)
+
+    # Status should still exist
+    assert MembershipStatus.objects.filter(name="Test Protected Status").exists()
+
+
+@pytest.mark.django_db
+def test_membership_status_deletion_success():
+    """Test that unused membership statuses can be deleted successfully."""
+    # Create a status that no member uses
+    status = MembershipStatus.objects.create(name="Unused Status", is_active=True)
+
+    # Should be able to delete without error
+    status.delete()
+
+    # Status should be gone
+    assert not MembershipStatus.objects.filter(name="Unused Status").exists()

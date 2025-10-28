@@ -96,3 +96,36 @@ def test_dynamic_membership_status_changes():
 
     # Should now be inactive
     assert not is_active_member(user)
+
+
+@pytest.mark.django_db
+def test_membership_status_deletion_integration():
+    """Test the integration between membership status deletion protection and member access."""
+    from django.core.exceptions import ValidationError
+
+    # Create a status and member
+    status = MembershipStatus.objects.create(name="Protected Status", is_active=True)
+    member = User.objects.create_user(
+        username="protected_member",
+        password="x",
+        membership_status="Protected Status"
+    )
+
+    # Member should be active initially
+    assert is_active_member(member)
+
+    # Try to delete status - should be protected
+    with pytest.raises(ValidationError):
+        status.delete()
+
+    # Status still exists, member still active
+    assert MembershipStatus.objects.filter(name="Protected Status").exists()
+    assert is_active_member(member)
+
+    # Change member to different status, then deletion should work
+    member.membership_status = "Another Status"
+    member.save()
+
+    # Now deletion should succeed (no members using it)
+    status.delete()
+    assert not MembershipStatus.objects.filter(name="Protected Status").exists()

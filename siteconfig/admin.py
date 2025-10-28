@@ -95,11 +95,49 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete membership statuses
-        # But be careful - this could break existing member records
         return (
             request.user.is_superuser
             or request.user.groups.filter(name="Webmasters").exists()
         )
+
+    def delete_model(self, request, obj):
+        """Override delete to check if status is in use by any members."""
+        from members.models import Member
+
+        members_with_status = Member.objects.filter(membership_status=obj.name)
+        if members_with_status.exists():
+            from django.contrib import messages
+            messages.error(
+                request,
+                f'Cannot delete "{obj.name}" - {members_with_status.count()} members currently have this status. '
+                f'Change their status first, then delete this membership status.'
+            )
+            return
+
+        super().delete_model(request, obj)
+        from django.contrib import messages
+        messages.success(
+            request, f'Successfully deleted membership status "{obj.name}".')
+
+    def delete_queryset(self, request, queryset):
+        """Override bulk delete to check if any statuses are in use."""
+        from members.models import Member
+        from django.contrib import messages
+
+        for obj in queryset:
+            members_with_status = Member.objects.filter(membership_status=obj.name)
+            if members_with_status.exists():
+                messages.error(
+                    request,
+                    f'Cannot delete "{obj.name}" - {members_with_status.count()} members currently have this status.'
+                )
+                return
+
+        # If we get here, none are in use
+        deleted_names = [obj.name for obj in queryset]
+        queryset.delete()
+        messages.success(
+            request, f'Successfully deleted membership statuses: {", ".join(deleted_names)}.')
 
     admin_helper_message = (
         "Membership Statuses: Configure the available membership statuses for your club. "
