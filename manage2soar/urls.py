@@ -23,6 +23,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from instructors import views as instr_views
+from cms import views as cms_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -79,6 +80,9 @@ urlpatterns = [
     ),
     path("analytics/", include("analytics.urls")),
     path("", include("knowledgetest.urls")),
+    # Explicit root name for legacy code/tests that reverse('home') without
+    # namespace. The CMS homepage is the canonical root view.
+    path("", cms_views.homepage, name="home"),
     # Expose notifications before the CMS root include so the CMS catch-all
     # patterns don't intercept other app URLs like /notifications/.
     path("notifications/", include("notifications.urls")),

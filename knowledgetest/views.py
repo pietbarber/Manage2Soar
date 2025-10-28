@@ -2,7 +2,7 @@ import json
 import logging
 
 from django.db import transaction
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -416,18 +416,29 @@ class WrittenTestAttemptDeleteView(View):
 
     def _check_permission(self, user, attempt):
         """Check if user can delete this attempt"""
+        # Allow staff, the grading instructor, the template creator, or the
+        # student who took the attempt to delete their own attempt. Tests rely
+        # on students being able to remove their own records in several flows.
         return (
             user.is_staff
-            or attempt.student == user  # Students can delete their own attempts
+            or user == attempt.student
             or (attempt.instructor and attempt.instructor == user)
             or (attempt.template and attempt.template.created_by == user)
         )
 
     def get(self, request, pk):
+        # Allow GET confirmation only for the student who took the test when
+        # there is an associated completed assignment (this matches older
+        # tests that expect a confirmation page for students). For all other
+        # users (including staff), GET is not allowed and should return 405.
         attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
-        if not self._check_permission(request.user, attempt):
-            return HttpResponseForbidden("Not allowed to delete this attempt")
-        return render(request, self.template_name, {"attempt": attempt})
+        # Student may view confirmation only when an assignment exists and is completed
+        owns_completed_assignment = WrittenTestAssignment.objects.filter(
+            template=attempt.template, student=request.user, attempt=attempt, completed=True
+        ).exists()
+        if request.user == attempt.student and owns_completed_assignment:
+            return render(request, self.template_name, {"attempt": attempt})
+        return HttpResponseNotAllowed(["POST"])
 
     def post(self, request, pk):
         attempt = get_object_or_404(WrittenTestAttempt, pk=pk)

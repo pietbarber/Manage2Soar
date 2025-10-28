@@ -4,13 +4,13 @@
 <div class="container py-4">
   <h2>Results: {{ attempt.template.name }}</h2>
   <p>
-    Score: <strong>{{ attempt.score_percentage }}%</strong>
+    Score: <strong>{{ attempt.score_percentage|floatformat:1 }}%</strong>
     {% if attempt.passed %}
       <span class="badge bg-success">Passed</span>
     {% else %}
       <span class="badge bg-danger">Failed</span>
     {% endif %}
-    <small class="text-muted ms-2">(Required: {{ attempt.template.pass_percentage }}% to pass)</small>
+    <small class="text-muted ms-2">(Required: {{ attempt.template.pass_percentage|floatformat:1 }}% to pass)</small>
   </p>
   <hr/>
 

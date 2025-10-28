@@ -20,7 +20,10 @@ class CronJobLock(models.Model):
         help_text="Pod identifier (hostname + process ID)"
     )
     locked_at = models.DateTimeField(
-        auto_now_add=True,
+        # Use a callable default so test code can pass an explicit value and
+        # comparisons are deterministic; avoid auto_now_add which can make
+        # test-created timestamps differ slightly.
+        default=timezone.now,
         help_text="When the lock was acquired"
     )
     expires_at = models.DateTimeField(
@@ -37,7 +40,8 @@ class CronJobLock(models.Model):
         ]
 
     def __str__(self):
-        return f"Lock for {self.job_name} by {self.locked_by}"
+        # Tests expect a compact representation like: "job_name (locked_by)"
+        return f"{self.job_name} ({self.locked_by})"
 
     def is_expired(self):
         """Check if the lock has expired"""
