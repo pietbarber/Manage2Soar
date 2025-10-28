@@ -73,18 +73,13 @@ class BaseCronJobCommand(BaseCommand):
         # - If the command instance already had a custom stdout set by
         #   the caller (e.g. tests assigned a StringIO to `command.stdout`),
         #   do NOT clobber it.
-        # - Otherwise, fall back to the current sys.stdout (which may be
-        #   patched by tests).
+        # - Otherwise, use the current sys.stdout (which may be patched by tests).
         if options.get('stdout') is not None:
             self.stdout = options.get('stdout')
-        else:
-            # Only override the existing stdout if it is the real sys.stdout
-            # (i.e. not previously set by a test to a StringIO). This lets
-            # tests that assign `command.stdout = StringIO()` keep their
-            # capture buffer.
-            current_stdout = getattr(self, 'stdout', None)
-            if current_stdout is sys.stdout or current_stdout is None:
-                self.stdout = sys.stdout
+        elif not hasattr(self, 'stdout') or self.stdout is None:
+            # If no stdout is set, use current sys.stdout (may be patched)
+            self.stdout = sys.stdout
+        # If self.stdout is already set (e.g., by a test), leave it alone
         force = options.get('force', False)
         # Always print dry-run header if requested
         if self.dry_run:

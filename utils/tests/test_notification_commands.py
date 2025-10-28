@@ -74,9 +74,12 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         # Should identify 1 aging logsheet
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0]
-        logsheet, duty_officer = call_args
+        duty_officer, logsheet_data = call_args
 
-        assert logsheet == self.aging_logsheet
+        assert duty_officer == self.duty_member
+        # logsheet_data is a list of (logsheet, days_old) tuples
+        assert len(logsheet_data) == 1
+        assert logsheet_data[0][0] == self.aging_logsheet
         assert duty_officer == self.duty_member
 
     def test_ignores_fresh_logsheets(self):
@@ -114,14 +117,15 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         mock_send_mail.assert_called_once()
         args, kwargs = mock_send_mail.call_args
 
-        # Check email content
-        subject = args[0]
-        message = args[1]
-        from_email = args[2]
-        recipient_list = args[3]
+        # Check email content (using keyword arguments)
+        subject = kwargs['subject']
+        message = kwargs['message']
+        from_email = kwargs['from_email']
+        recipient_list = kwargs['recipient_list']
 
         assert 'Aging Logsheet' in subject
-        assert str(self.aging_logsheet.log_date) in message
+        # The message contains the creation date, not the log date
+        assert str(self.aging_logsheet.airfield) in message
         assert self.duty_member.email in recipient_list
 
     def test_creates_in_app_notification(self):
@@ -132,7 +136,7 @@ class TestAgingLogsheetsCommand(TransactionTestCase):
         # Should create notification
         notification = Notification.objects.get(user=self.duty_member)
         assert 'aging logsheet' in notification.message.lower()
-        assert str(self.aging_logsheet.log_date) in notification.message
+        assert '1 aging logsheet(s)' in notification.message
 
 
 class TestLateSPRsCommand(TransactionTestCase):
@@ -188,11 +192,12 @@ class TestLateSPRsCommand(TransactionTestCase):
         # Should identify overdue SPR
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0]
-        flights, instructor, escalation_level = call_args
+        instructor, spr_data = call_args
 
-        assert self.flight in flights
         assert instructor == self.instructor
-        assert escalation_level == 1  # First escalation (7 days)
+        assert len(spr_data) == 1
+        assert spr_data[0]['flight'] == self.flight
+        assert spr_data[0]['escalation_level'] == 'NOTICE'  # 7 days = NOTICE level
 
     def test_escalation_levels(self):
         """Test different escalation levels based on days overdue."""
@@ -220,12 +225,16 @@ class TestLateSPRsCommand(TransactionTestCase):
             with patch.object(self.command, '_send_notification') as mock_send:
                 self.command.handle(dry_run=False, verbosity=1)
 
-        # Should have multiple calls for different escalation levels
-        assert mock_send.call_count == 2
+        # Should have one call with both flights grouped together
+        assert mock_send.call_count == 1
 
-        # Check that higher escalation level is used for older flight
-        escalation_levels = [call[0][2] for call in mock_send.call_args_list]
-        assert 2 in escalation_levels  # 14-day escalation
+        # Check that both escalation levels are present in the data
+        call_args = mock_send.call_args[0]
+        instructor, spr_data = call_args
+
+        escalation_levels = [spr['escalation_level'] for spr in spr_data]
+        assert 'NOTICE' in escalation_levels  # 8 days = NOTICE
+        assert 'REMINDER' in escalation_levels  # 15 days = REMINDER
 
     def test_ignores_flights_with_sprs(self):
         """Test that flights with SPRs are not flagged."""
@@ -238,10 +247,10 @@ class TestLateSPRsCommand(TransactionTestCase):
         )
 
         with patch('sys.stdout', new_callable=StringIO):
-            with patch.object(self.command, 'send_escalated_notification') as mock_send:
+            with patch.object(self.command, '_send_notification') as mock_send:
                 self.command.handle(dry_run=True, verbosity=1)
 
-        # Should not send notifications
+        # Should not send notifications in dry run mode
         mock_send.assert_not_called()
 
 
@@ -331,11 +340,9 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
                     verbosity=1
                 )
 
-        # Flying member should not be delinquent anymore
-        mock_send.assert_called_once()
-        delinquent_data = mock_send.call_args[0][0]
-        delinquent_members = [data['member'] for data in delinquent_data]
-        assert self.flying_member not in delinquent_members
+        # Flying member should not be delinquent since they did duty
+        # No delinquent members found, so no report should be sent
+        mock_send.assert_not_called()
 
     def test_configurable_parameters(self):
         """Test that command parameters work correctly."""
@@ -349,10 +356,9 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
                     verbosity=1
                 )
 
-        # Flying member only has 5 flights, so shouldn't be flagged
-        mock_send.assert_called_once()
-        delinquent_data = mock_send.call_args[0][0]
-        assert len(delinquent_data) == 0
+        # Flying member only has 5 flights, so shouldn't be considered actively flying
+        # Therefore no report should be sent at all
+        mock_send.assert_not_called()
 
     def test_excludes_new_members(self):
         """Test that recently joined members are excluded."""

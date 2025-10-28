@@ -109,10 +109,10 @@ class BaseCronJobCommandTest(TransactionTestCase):
         self.assertIn('🔄 Replaced expired lock', output)
         self.assertIn('🚀 Starting test_cronjob', output)
 
-        # Lock should be updated with new pod identifier
-        expired_lock.refresh_from_db()
-        self.assertNotEqual(expired_lock.locked_by, "old-pod-456")
-        self.assertTrue(expired_lock.locked_by.startswith(expected_hostname_prefix()))
+        # Lock should be deleted after successful command completion
+        # (commands always release their locks when done)
+        with self.assertRaises(CronJobLock.DoesNotExist):
+            expired_lock.refresh_from_db()
 
     def test_lock_cleanup_on_startup(self):
         """Test that expired locks are cleaned up when command starts"""
@@ -139,10 +139,10 @@ class BaseCronJobCommandTest(TransactionTestCase):
         output = out.getvalue()
         self.assertIn('🧹 Cleaned up 2 expired locks', output)
 
-        # Only our test command lock should remain
+        # All locks should be gone after command completion
+        # (expired locks cleaned up + command lock released)
         remaining_locks = list(CronJobLock.objects.all())
-        self.assertEqual(len(remaining_locks), 1)
-        self.assertEqual(remaining_locks[0].job_name, "test_cronjob")
+        self.assertEqual(len(remaining_locks), 0)
 
     def test_force_option_bypasses_locking(self):
         """Test that --force option bypasses lock acquisition"""

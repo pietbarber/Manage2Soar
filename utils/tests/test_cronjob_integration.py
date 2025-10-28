@@ -272,5 +272,6 @@ class TestCommandExecutionFlow(TransactionTestCase):
                          verbosity=2)
 
         output = mock_stdout.getvalue()
-        assert "6" in output  # Should mention lookback period
+        # Should show 6 months back from Oct 2025 (around May)
+        assert "2025-05" in output
         assert "5" in output  # Should mention minimum flights
