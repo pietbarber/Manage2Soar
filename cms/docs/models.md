@@ -121,6 +121,7 @@ erDiagram
 - Anti-spam features: IP address tracking, keyword detection
 - Status workflow: new → read → responded → closed
 - Admin assignment and internal notes system
+- **Multi-club integration**: Uses `SiteConfiguration` fields for customizable contact page content, address, and operations info
 
 ## Key Features
 
@@ -152,3 +153,4 @@ erDiagram
 ## Also See
 - [README.md](README.md)
 - [index.md](index.md)
+- [SiteConfig Models](../../siteconfig/docs/models.md) - Multi-club configuration integration for VisitorContact

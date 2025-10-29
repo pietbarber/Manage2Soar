@@ -14,18 +14,32 @@ erDiagram
         string domain_name
         string club_abbreviation
         string club_logo
-        string membership_manager_title
-        string equipment_manager_title
-        string duty_officer_title
-        string assistant_duty_officer_title
-        string instructor_title
-        int redaction_notification_dedupe_minutes
+        string club_nickname
+        text contact_welcome_text
+        text contact_response_info
+        string club_address_line1
+        string club_address_line2
+        string club_city
+        string club_state
+        string club_zip_code
+        string club_country
+        string club_phone
+        text operations_info
         boolean schedule_instructors
         boolean schedule_tow_pilots
         boolean schedule_duty_officers
         boolean schedule_assistant_duty_officers
-        datetime created_at
-        datetime updated_at
+        string duty_officer_title
+        string assistant_duty_officer_title
+        string towpilot_title
+        string surge_towpilot_title
+        string instructor_title
+        string surge_instructor_title
+        string membership_manager_title
+        string equipment_manager_title
+        boolean allow_glider_reservations
+        boolean allow_two_seater_reservations
+        int redaction_notification_dedupe_minutes
     }
     
     MembershipStatus {
@@ -40,10 +54,12 @@ erDiagram
 ```
 
 ## SiteConfiguration
-- **Purpose:** Stores site-wide configuration settings and customizable role titles for the club.
-- **Key Features:** Singleton model (only one instance allowed), configurable role titles, scheduling toggles
-- **Fields:** club_name, domain_name, club_abbreviation, club_logo, various role titles, scheduling settings
-- **Usage:** Accessed via template tags and admin interface, controls site-wide behavior and branding
+- **Purpose:** Stores site-wide configuration settings for multi-club support, including branding, contact information, and operational preferences.
+- **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management
+- **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
+- **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
+- **Operational Settings:** Scheduling preferences, reservation controls, notification settings
+- **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 
 ## MembershipStatus
 - **Purpose:** Configurable membership statuses that replace hardcoded membership types (Issue #169).
@@ -57,8 +73,9 @@ erDiagram
 
 ### SiteConfiguration
 - **Standalone model**: No foreign key relationships, acts as a global configuration singleton
-- **Template integration**: Accessed via `{% load siteconfig_tags %}` template tag
-- **Admin interface**: Single object editing interface
+- **CMS Integration**: Contact fields power the visitor contact form (`/contact/`) for multi-club deployment
+- **Template integration**: Accessed via `{% load siteconfig_tags %}` template tag and direct context in CMS views
+- **Admin interface**: Single object editing interface with collapsible fieldsets for contact and scheduling options
 
 ### MembershipStatus  
 - **Referenced by Member model**: `Member.membership_status` field uses dynamic choices from this model
@@ -90,6 +107,19 @@ from siteconfig.models import SiteConfiguration
 config = SiteConfiguration.objects.first()
 print(config.club_name)
 print(config.membership_manager_title)
+
+# Access contact form configuration
+print(config.contact_welcome_text)
+print(config.club_address_line1)
+print(config.club_phone)
+
+# Check operational settings
+if config.schedule_instructors:
+    print("This club schedules instructors ahead of time")
+    
+# Access customizable role titles
+print(f"Duty officers are called: {config.duty_officer_title}")
+print(f"Instructors are called: {config.instructor_title}")
 ```
 
 ### MembershipStatus
@@ -109,7 +139,21 @@ MembershipStatus.objects.create(
 
 ---
 
+## Integration Notes
+
+### Issue #70 - Visitor Contact System
+The contact-related fields in `SiteConfiguration` (added in migration 0008) power the visitor contact form system:
+- `contact_welcome_text` and `contact_response_info` provide customizable messaging
+- Address fields enable Google Maps integration and location display
+- `club_phone` and `operations_info` offer additional contact methods
+- All fields support multi-club deployment by making previously hardcoded content configurable
+
+The CMS contact form (`/contact/`) automatically uses these fields via template context, eliminating the need for hardcoded club-specific information.
+
+---
+
 ## Also See
 - [README (App Overview)](README.md)
 - [Membership Status Management](membership-statuses.md)
 - [Template Tags Documentation](../templatetags/)
+- [CMS Models Documentation](../../cms/docs/models.md) - VisitorContact integration
