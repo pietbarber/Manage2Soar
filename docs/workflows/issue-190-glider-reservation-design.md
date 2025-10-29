@@ -59,25 +59,14 @@ flowchart TD
     CC --> AA
     BB -->|Yes| Y
     
-    Y --> DD{Auto-Approve?}
-    DD -->|Yes| EE[Status: Confirmed]
-    DD -->|No| FF[Status: Pending Approval]
-    
-    EE --> GG[Send Confirmation]
-    FF --> HH[Notify Approvers]
-    
-    GG --> II[Reservation Complete]
-    HH --> JJ[Await Approval]
-    
-    JJ --> KK{Approved?}
-    KK -->|Yes| EE
-    KK -->|No| LL[Send Rejection Notice]
-    LL --> MM[End - Rejected]
+    Y --> DD[Create Reservation]
+    DD --> EE[Status: Confirmed]
+    EE --> FF[Send Confirmation]
+    FF --> GG[Reservation Complete]
     
     style A fill:#e1f5fe
-    style II fill:#e8f5e8
+    style GG fill:#e8f5e8
     style S fill:#ffebee
-    style MM fill:#ffebee
 ```
 
 ### Qualification Validation Workflow
@@ -186,59 +175,48 @@ flowchart TD
     style X fill:#ffebee
 ```
 
-### Approval Workflow
+### First-Come-First-Served System
+
+The reservation system operates on a **first-come-first-served** basis with automatic confirmation upon successful validation. No approval workflows or gatekeepers required.
 
 ```mermaid
 flowchart TD
-    A[Reservation Created] --> B{Auto-Approve Criteria?}
+    A[Reservation Request] --> B[Validate Qualifications]
+    B --> C{Qualifications Met?}
     
-    B -->|Solo Flight + Qualified Member| C[Auto-Approve]
-    B -->|Instruction + Assigned Instructor| C
-    B -->|Regular Operations| C
+    C -->|No| D[Show Requirements]
+    D --> E[End - Qualification Required]
     
-    B -->|Badge Flight| D[Require Badge Official Approval]
-    B -->|Check Flight| E[Require Check Pilot Approval]
-    B -->|Other| F[Require Admin Approval]
-    B -->|Weekend/Holiday| G[Require Duty Officer Approval]
-    B -->|Long Duration| H[Require Special Approval]
+    C -->|Yes| F[Check Time Conflicts]
+    F --> G{Time Available?}
     
-    C --> I[Status: Confirmed]
+    G -->|No| H[Show Alternative Times]
+    H --> I[End - Time Conflict]
     
-    D --> J[Notify Badge Official]
-    E --> K[Notify Check Pilot]
-    F --> L[Notify Administrator]
-    G --> M[Notify Duty Officer]
-    H --> N[Notify Operations Manager]
+    G -->|Yes| J[Check Aircraft Status]
+    J --> K{Aircraft Available?}
     
-    J --> O{Badge Official Response}
-    K --> P{Check Pilot Response}
-    L --> Q{Admin Response}
-    M --> R{Duty Officer Response}
-    N --> S{Ops Manager Response}
+    K -->|No| L[Show Maintenance Status]
+    L --> M[End - Aircraft Unavailable]
     
-    O -->|Approve| I
-    P -->|Approve| I
-    Q -->|Approve| I
-    R -->|Approve| I
-    S -->|Approve| I
+    K -->|Yes| N[Create Reservation]
+    N --> O[Status: Confirmed]
+    O --> P[Send Confirmation]
+    P --> Q[Reservation Active]
     
-    O -->|Reject| T[Status: Rejected]
-    P -->|Reject| T
-    Q -->|Reject| T
-    R -->|Reject| T
-    S -->|Reject| T
-    
-    I --> U[Send Confirmation Email]
-    T --> V[Send Rejection Email]
-    
-    U --> W[Reservation Active]
-    V --> X[Reservation Cancelled]
-    
-    style I fill:#e8f5e8
-    style W fill:#e8f5e8
-    style T fill:#ffebee
-    style X fill:#ffebee
+    style A fill:#e1f5fe
+    style Q fill:#e8f5e8
+    style E fill:#ffebee
+    style I fill:#ffebee
+    style M fill:#ffebee
 ```
+
+**Key Principles:**
+- ✅ **First registered wins** - No priority system or approval hierarchy
+- ✅ **Qualification validation** - System enforces member credentials automatically  
+- ✅ **Time conflict prevention** - Double-booking impossible
+- ✅ **Aircraft status checking** - Maintenance issues block reservations
+- ✅ **Immediate confirmation** - No waiting for human approval
 
 ### Conflict Resolution Workflow
 
@@ -387,7 +365,6 @@ class GliderReservation(models.Model):
     
     # Status tracking
     STATUS_CHOICES = [
-        ('pending', 'Pending Approval'),
         ('confirmed', 'Confirmed'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
@@ -396,7 +373,7 @@ class GliderReservation(models.Model):
     status = models.CharField(
         max_length=15, 
         choices=STATUS_CHOICES, 
-        default='pending'
+        default='confirmed'
     )
     
     # Optional instructor assignment
@@ -421,19 +398,7 @@ class GliderReservation(models.Model):
     
     # Administrative tracking
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        'members.Member',
-        on_delete=models.CASCADE,
-        related_name='reservations_created'
-    )
-    approved_at = models.DateTimeField(null=True, blank=True)
-    approved_by = models.ForeignKey(
-        'members.Member',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='reservations_approved'
-    )
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         unique_together = ['glider', 'date', 'start_time']
@@ -441,7 +406,6 @@ class GliderReservation(models.Model):
         indexes = [
             models.Index(fields=['date', 'glider']),
             models.Index(fields=['member', 'date']),
-            models.Index(fields=['status']),
         ]
     
     def __str__(self):
@@ -604,15 +568,17 @@ class GliderReservation(models.Model):
 
 ## Validation Rules Summary
 
-| Reservation Type | Instructor Required | Special Validation | Duration Limits |
+| Reservation Type | Instructor Required | Qualification Validation | Duration Limits |
 |------------------|--------------------|--------------------|-----------------|
 | Instruction | ✅ Yes | Training phase check | 1-4 hours |
 | Solo | ❌ No | Solo endorsement | Variable |
-| Badge | ⚠️ Badge Official | Badge prerequisites | Full day |
+| Badge | ❌ No* | Badge prerequisites | Full day |
 | Check | ✅ Yes | Check pilot qualification | 1-3 hours |
 | Flight Review | ✅ Yes (CFI-G) | BFR currency check | 2+ hours |
 | FAA Wings | ✅ Yes | Wings enrollment | Variable |
-| Other | ⚠️ Case-by-case | Admin approval | Variable |
+| Other | ❌ No | Basic qualifications | Variable |
+
+*Badge flights: First-come-first-served. Badge Official coordination happens outside the reservation system.
 
 ## Next Implementation Steps
 
