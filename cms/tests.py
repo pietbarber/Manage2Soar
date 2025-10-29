@@ -365,6 +365,8 @@ class VisitorContactAdminTests(TestCase):
         self.assertIn('email', readonly_fields)
         self.assertIn('subject', readonly_fields)
         self.assertIn('message', readonly_fields)
+        # Security: prevent manual assignment
+        self.assertIn('handled_by', readonly_fields)
 
     def test_admin_no_add_permission(self):
         """Test that contacts cannot be manually created in admin."""
@@ -454,3 +456,98 @@ class VisitorContactIntegrationTests(TestCase):
         # Test success page
         response = self.client.get('/contact/success/')
         self.assertEqual(response.status_code, 200)
+
+
+class VisitorContactAdminSecurityTests(TestCase):
+    """Security tests for the VisitorContact admin interface."""
+
+    def setUp(self):
+        # Create two users to test admin assignment security
+        self.active_admin = User.objects.create_user(
+            username='activeadmin',
+            email='active@skylinesoaring.org',
+            first_name='Active',
+            last_name='Admin',
+            is_staff=True,
+            is_active=True,
+            member_manager=True
+        )
+
+        self.deceased_user = User.objects.create_user(
+            username='deceasedmember',
+            email='deceased@skylinesoaring.org',
+            first_name='Deceased',
+            last_name='Member',
+            is_staff=True,
+            is_active=False,  # Simulating deceased/inactive
+            member_manager=True
+        )
+
+        # Create a visitor contact
+        self.contact = VisitorContact.objects.create(
+            name='Test Visitor',
+            email='visitor@example.com',
+            subject='Test Subject',
+            message='Test message',
+            ip_address='192.168.1.100'
+        )
+
+        # Set up admin instance
+        self.admin = VisitorContactAdmin(VisitorContact, AdminSite())
+
+    def test_handled_by_readonly_on_edit(self):
+        """Test that handled_by field becomes readonly when editing existing contact."""
+        # Mock request
+        from django.http import HttpRequest
+        request = HttpRequest()
+        request.user = self.active_admin
+
+        # Check readonly fields for existing object
+        readonly_fields = self.admin.get_readonly_fields(request, self.contact)
+
+        # handled_by should be readonly when editing
+        self.assertIn('handled_by', readonly_fields)
+        # Contact details should also be readonly
+        self.assertIn('name', readonly_fields)
+        self.assertIn('email', readonly_fields)
+
+    def test_save_model_sets_current_user(self):
+        """Test that save_model always sets handled_by to current user."""
+        from django.http import HttpRequest
+
+        # Mock request
+        request = HttpRequest()
+        request.user = self.active_admin
+
+        # Mock form with changed data
+        form = MagicMock()
+        # Initially, contact has no handler
+        form.changed_data = ['status', 'admin_notes']
+        self.assertIsNone(self.contact.handled_by)
+
+        # Simulate admin save with current user
+        self.admin.save_model(request, self.contact, form, change=True)
+
+        # Should be set to current user, not allow manual assignment
+        self.assertEqual(self.contact.handled_by, self.active_admin)
+
+    def test_cannot_assign_to_different_user(self):
+        """Test that handled_by cannot be manually set to a different user."""
+        from django.http import HttpRequest
+
+        # Mock request with active admin
+        request = HttpRequest()
+        request.user = self.active_admin
+
+        # Mock form with changed data
+        form = MagicMock()
+        # Try to manually set to deceased user (security vulnerability)
+        form.changed_data = ['status']
+        self.contact.handled_by = self.deceased_user
+
+        # Admin save should override with current user
+        self.admin.save_model(request, self.contact, form, change=True)
+
+        # Should be current user, NOT the manually set deceased user
+        self.assertEqual(self.contact.handled_by, self.active_admin)
+        self.assertNotEqual(self.contact.handled_by, self.deceased_user)
