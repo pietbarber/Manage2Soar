@@ -51,6 +51,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "operations_info",
                 ),
                 "description": "Contact form and location information for visitors",
+                "classes": ("collapse",),
             },
         ),
         (
@@ -61,7 +62,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "schedule_tow_pilots",
                     "schedule_duty_officers",
                     "schedule_assistant_duty_officers",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
         (
