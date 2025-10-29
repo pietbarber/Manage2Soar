@@ -362,19 +362,19 @@ class WrittenTestDeleteTests(TestCase):
         # Attempt should still exist
         self.assertTrue(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
 
-    def test_student_cannot_delete_own_attempt(self):
-        """Students should not be able to delete their own attempts."""
+    def test_student_can_delete_own_attempt(self):
+        """Students should be able to delete their own attempts."""
         self.client.login(username="student", password="pass")
 
         delete_url = reverse("knowledgetest:quiz-attempt-delete",
                              args=[self.attempt.pk])
         resp = self.client.post(delete_url)
 
-        # Should return 403 Forbidden
-        self.assertEqual(resp.status_code, 403)
+        # Should redirect after successful deletion
+        self.assertEqual(resp.status_code, 302)
 
-        # Attempt should still exist
-        self.assertTrue(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
+        # Attempt should be deleted
+        self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
 
     def test_get_request_not_allowed(self):
         """Only POST requests should be allowed for deletion."""

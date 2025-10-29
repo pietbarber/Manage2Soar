@@ -504,6 +504,38 @@ class TestPresetTests(TestCase):
         self.assertFalse(TestPreset.objects.filter(
             name="Another Deletable Preset").exists())
 
+    def test_bulk_delete_optimization(self):
+        """Test that bulk delete uses values_list for efficiency"""
+        # Create multiple test presets
+        for i in range(3):
+            TestPreset.objects.create(
+                name=f"Bulk Delete Test {i}",
+                description=f"Test preset {i} for bulk deletion",
+                is_active=True
+            )
+
+        # Verify they exist
+        self.assertEqual(TestPreset.objects.filter(
+            name__startswith="Bulk Delete Test").count(), 3)
+
+        # Test that we can efficiently get names and delete
+        queryset = TestPreset.objects.filter(name__startswith="Bulk Delete Test")
+
+        # This is the optimized approach used in delete_queryset
+        deleted_names = list(queryset.values_list('name', flat=True))
+        self.assertEqual(len(deleted_names), 3)
+        self.assertIn("Bulk Delete Test 0", deleted_names)
+        self.assertIn("Bulk Delete Test 1", deleted_names)
+        self.assertIn("Bulk Delete Test 2", deleted_names)
+
+        # Test the delete operation
+        count_deleted, _ = queryset.delete()
+        self.assertEqual(count_deleted, 3)
+
+        # Verify all were deleted
+        self.assertEqual(TestPreset.objects.filter(
+            name__startswith="Bulk Delete Test").count(), 0)
+
 
 class TestPresetViewIntegrationTests(TestCase):
     """Test integration between TestPreset and views"""

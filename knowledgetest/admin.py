@@ -191,28 +191,30 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         return format_html('<br>'.join(formatted_items)) if formatted_items else 'No questions configured'
     formatted_weights.short_description = 'Question Distribution'
 
+    def _has_preset_permission(self, request, allow_cfi: bool = True):
+        """
+        Helper for preset permissions.
+        Webmaster and superuser always allowed.
+        Chief Flight Instructor allowed only if allow_cfi is True.
+        """
+        user = request.user
+        if user.is_superuser or user.groups.filter(name="Webmasters").exists():
+            return True
+        if allow_cfi and user.groups.filter(name="Chief Flight Instructor").exists():
+            return True
+        return False
+
     def has_change_permission(self, request, obj=None):
-        # Only allow Webmaster or superuser to edit test presets
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-            or request.user.groups.filter(name="Chief Flight Instructor").exists()
-        )
+        # Only allow Webmaster, superuser, or Chief Flight Instructor to edit test presets
+        return self._has_preset_permission(request, allow_cfi=True)
 
     def has_add_permission(self, request):
-        # Only allow Webmaster or superuser to add test presets
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-            or request.user.groups.filter(name="Chief Flight Instructor").exists()
-        )
+        # Only allow Webmaster, superuser, or Chief Flight Instructor to add test presets
+        return self._has_preset_permission(request, allow_cfi=True)
 
     def has_delete_permission(self, request, obj=None):
         # Only allow Webmaster or superuser to delete test presets
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-        )
+        return self._has_preset_permission(request, allow_cfi=False)
 
     def delete_model(self, request, obj):
         """Override delete to provide confirmation message."""
@@ -226,10 +228,15 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         """Override bulk delete to provide confirmation message."""
         from django.contrib import messages
 
-        deleted_names = [obj.name for obj in queryset]
-        queryset.delete()
-        messages.success(
-            request, f'Successfully deleted test presets: {", ".join(deleted_names)}.')
+        # Efficiently get names before deletion using values_list
+        deleted_names = list(queryset.values_list('name', flat=True))
+        count = queryset.delete()[0]  # delete() returns (count, {model: count})
+
+        if deleted_names:
+            messages.success(
+                request, f'Successfully deleted {count} test presets: {", ".join(deleted_names)}.')
+        else:
+            messages.success(request, f'Successfully deleted {count} test presets.')
 
     admin_helper_message = (
         "Test Presets: Configure reusable test templates with predefined question distributions. "
