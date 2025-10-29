@@ -18,7 +18,7 @@
                         <h4 class="alert-heading">Thank you for contacting us!</h4>
                         <p>
                             Your message has been sent to our member managers. We appreciate 
-                            your interest in Skyline Soaring Club and will get back to you soon.
+                            your interest in {{ site_config.club_name }} and will get back to you soon.
                         </p>
                         <hr>
                         <p class="mb-0">
@@ -48,7 +48,9 @@
                     <p>Here are some things you might find interesting:</p>
                     <ul>
                         <li><strong>Learn about soaring:</strong> Gliding is an amazing way to experience flight in its purest form</li>
-                        <li><strong>Visit our airfield:</strong> We're located at Front Royal-Warren County Airport</li>
+                        {% if site_config.club_address_line1 %}
+                        <li><strong>Visit our airfield:</strong> We're located at {{ site_config.club_address_line1 }}{% if site_config.club_city %}, {{ site_config.club_city }}{% endif %}</li>
+                        {% endif %}
                         <li><strong>Watch us fly:</strong> Visitors are welcome to observe operations on flying days</li>
                         <li><strong>Training programs:</strong> We offer comprehensive instruction for all skill levels</li>
                     </ul>

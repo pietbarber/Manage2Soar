@@ -224,7 +224,7 @@ class VisitorContactAdmin(admin.ModelAdmin):
     admin_helper_message = (
         "<b>Visitor Contacts:</b> Manage contact form submissions from website visitors. "
         "These are public inquiries from people interested in the club, replacing the "
-        "spam-prone welcome@skylinesoaring.org email address."
+        "spam-prone club public contact email address."
     )
 
     def ip_display(self, obj):

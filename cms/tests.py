@@ -176,7 +176,7 @@ class VisitorContactViewTests(TestCase):
     def test_contact_form_submission_success(self, mock_send_mail):
         """Test successful contact form submission."""
         # Create a member manager to receive the email
-        member_manager = User.objects.create_user(
+        User.objects.create_user(
             username='manager',
             email='manager@skylinesoaring.org',
             member_manager=True,
@@ -274,13 +274,6 @@ class VisitorContactEmailTests(TestCase):
 
     def test_email_sent_to_member_managers(self):
         """Test that emails are sent to member managers."""
-        contact = VisitorContact.objects.create(
-            name="John Doe",
-            email="john@example.com",
-            subject="Test inquiry",
-            message="This is a test message."
-        )
-
         # Submit form to trigger email
         form_data = {
             'name': 'John Doe',

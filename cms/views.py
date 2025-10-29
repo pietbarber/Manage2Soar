@@ -6,7 +6,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.urls import reverse
 
-from cms.models import HomePageContent, SiteFeedback, VisitorContact
+from cms.models import HomePageContent
 from cms.forms import SiteFeedbackForm, VisitorContactForm
 from members.decorators import active_member_required
 from django.db.models import Count, Max
@@ -306,8 +306,13 @@ def contact(request):
 
 def contact_success(request):
     """Success page after visitor contact form submission."""
+    # Get site configuration for club-specific information
+    from siteconfig.models import SiteConfiguration
+    site_config = SiteConfiguration.objects.first()
+
     return render(request, 'cms/contact_success.html', {
-        'page_title': 'Message Sent Successfully'
+        'page_title': 'Message Sent Successfully',
+        'site_config': site_config,
     })
 
 
@@ -329,6 +334,10 @@ def _notify_member_managers_of_contact(contact_submission):
     try:
         from django.core.mail import send_mail
         from members.models import Member
+        from siteconfig.models import SiteConfiguration
+
+        # Get site configuration for domain info
+        site_config = SiteConfiguration.objects.first()
 
         # Get all member managers
         member_managers = Member.objects.filter(
@@ -375,7 +384,7 @@ Message:
 You can respond directly to this visitor at: {safe_email}
 
 To manage this contact in the admin interface:
-{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://skylinesoaring.org'}/admin/cms/visitorcontact/{contact_submission.pk}/change/
+{settings.SITE_URL if hasattr(settings, 'SITE_URL') else f'https://{site_config.domain_name}' if site_config and site_config.domain_name else 'https://localhost:8000'}/admin/cms/visitorcontact/{contact_submission.pk}/change/
 
 This message was sent automatically by the club website contact form.
         """.strip()
