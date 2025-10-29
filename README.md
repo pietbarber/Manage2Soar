@@ -17,6 +17,7 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 ## Key Features
 - Secure Google OAuth2 login (with Django fallback)
 - Role-based access for all club roles (admin, instructor, member, etc.)
+- **Configurable membership statuses** - Clubs can customize their membership types (Issue #169)
 - Member profiles with bios, photos, badges, and qualifications
 - SSA badge management and badge board
 - Glider fleet and rental management

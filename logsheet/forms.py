@@ -8,7 +8,7 @@ from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue, Towplane
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from members.utils.membership import get_active_membership_statuses
 from members.models import Member
 
 from .models import (
@@ -22,15 +22,17 @@ from .models import (
 
 
 def get_active_members_with_role(role_flag: Optional[str] = None):
-    qs = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+    active_statuses = get_active_membership_statuses()
+    qs = Member.objects.filter(membership_status__in=active_statuses)
     if role_flag:
         qs = qs.filter(**{role_flag: True})
     return qs.order_by("last_name", "first_name")
 
 
 def get_active_members():
+    active_statuses = get_active_membership_statuses()
     return Member.objects.filter(
-        membership_status__in=DEFAULT_ACTIVE_STATUSES
+        membership_status__in=active_statuses
     ).order_by("last_name", "first_name")
 
 
@@ -171,8 +173,9 @@ class FlightForm(forms.ModelForm):
                     self.initial[field_name] = value[:5]
 
         # Pilot dropdown: optgroups for Active and Inactive
+        active_statuses = get_active_membership_statuses()
         pilot_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES
+            membership_status__in=active_statuses
         ).order_by("last_name", "first_name")
         pilot_inactive = Member.objects.filter(membership_status="Inactive").order_by(
             "last_name", "first_name"
@@ -190,7 +193,7 @@ class FlightForm(forms.ModelForm):
 
         # Instructor dropdown: optgroups for Active and Inactive instructors
         instructor_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES, instructor=True
+            membership_status__in=active_statuses, instructor=True
         ).order_by("last_name", "first_name")
         instructor_inactive = Member.objects.filter(
             membership_status="Inactive", instructor=True
@@ -208,7 +211,7 @@ class FlightForm(forms.ModelForm):
 
         # Tow pilot dropdown: optgroups for Active and Inactive tow pilots
         tow_pilot_active = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES, towpilot=True
+            membership_status__in=active_statuses, towpilot=True
         ).order_by("last_name", "first_name")
         tow_pilot_inactive = Member.objects.filter(
             membership_status="Inactive", towpilot=True
@@ -228,7 +231,7 @@ class FlightForm(forms.ModelForm):
         if "passenger" in self.fields:
             deceased_status = ["Deceased"]
             active_pass = (
-                Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+                Member.objects.filter(membership_status__in=active_statuses)
                 .exclude(membership_status__in=deceased_status)
                 .order_by("last_name", "first_name")
             )
@@ -315,7 +318,8 @@ class FlightForm(forms.ModelForm):
         )
 
         # Always use: active by last name, then inactive by last name
-        active_qs = Member.objects.filter(membership_status__in=DEFAULT_ACTIVE_STATUSES)
+        active_statuses = get_active_membership_statuses()
+        active_qs = Member.objects.filter(membership_status__in=active_statuses)
         inactive_qs = Member.objects.filter(membership_status="Inactive")
         pilot_qs = list(active_qs.order_by("last_name", "first_name")) + list(
             inactive_qs.order_by("last_name", "first_name")
@@ -325,7 +329,7 @@ class FlightForm(forms.ModelForm):
         ).order_by(
             models.Case(
                 models.When(
-                    membership_status__in=DEFAULT_ACTIVE_STATUSES, then=models.Value(0)
+                    membership_status__in=active_statuses, then=models.Value(0)
                 ),
                 models.When(membership_status="Inactive", then=models.Value(1)),
                 default=models.Value(2),

@@ -15,7 +15,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES, STATUS_ALIASES
+from members.constants.membership import STATUS_ALIASES
+from members.utils.membership import get_active_membership_statuses
 
 from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
@@ -438,8 +439,9 @@ def tinymce_image_upload(request):
 
 @active_member_required
 def badge_board(request):
+    active_statuses = get_active_membership_statuses()
     active_members = Member.objects.filter(
-        membership_status__in=DEFAULT_ACTIVE_STATUSES
+        membership_status__in=active_statuses
     )
 
     badges = Badge.objects.prefetch_related(

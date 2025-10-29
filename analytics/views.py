@@ -5,7 +5,7 @@ from typing import Any, Dict, cast
 from django.contrib.auth.decorators import user_passes_test
 from django.shortcuts import render
 
-from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+from members.utils.membership import get_active_membership_statuses
 
 from . import queries
 
@@ -15,7 +15,8 @@ def _is_active_member(user):
         return False
     if getattr(user, "is_superuser", False):
         return True
-    return getattr(user, "membership_status", None) in DEFAULT_ACTIVE_STATUSES
+    active_statuses = get_active_membership_statuses()
+    return getattr(user, "membership_status", None) in active_statuses
 
 
 @user_passes_test(_is_active_member, login_url="login")
