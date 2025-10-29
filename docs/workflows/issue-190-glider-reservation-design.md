@@ -607,3 +607,303 @@ class GliderReservation(models.Model):
 8. **Integration Testing**: Validate with existing duty roster calendar system
 
 This comprehensive reservation system will provide the advanced scheduling capabilities requested in Issue #190 while maintaining safety and regulatory compliance.
+
+## Critical Issue: Qualification System Odontogenesis
+
+### Problem Statement
+
+**Current State**: The qualification badges (`ClubQualificationType` and `MemberQualification`) are purely **visual indicators** with no enforcement mechanism. A member with an "ASK-21" badge has no actual system-enforced permission to reserve or fly the ASK-21 glider.
+
+**Required Solution**: The qualification system requires **odontogenesis** - the development and formation of functional enforcement mechanisms that link qualification badges to specific aircraft access permissions.
+
+### Enhanced Qualification Architecture
+
+#### New Model: GliderQualificationRequirement
+
+```python
+class GliderQualificationRequirement(models.Model):
+    """
+    Links specific gliders to required qualifications for access.
+    This gives "teeth" to the qualification badge system.
+    """
+    
+    glider = models.ForeignKey('logsheet.Glider', on_delete=models.CASCADE)
+    qualification = models.ForeignKey('instructors.ClubQualificationType', on_delete=models.CASCADE)
+    
+    # Requirement type
+    REQUIREMENT_TYPE_CHOICES = [
+        ('solo', 'Solo Flight Authorization'),
+        ('dual', 'Dual Flight Authorization'),  
+        ('either', 'Solo OR Dual Authorization'),
+        ('pic', 'Pilot-in-Command Authorization'),
+        ('checkout', 'Aircraft Type Checkout'),
+    ]
+    requirement_type = models.CharField(
+        max_length=15, 
+        choices=REQUIREMENT_TYPE_CHOICES,
+        default='either'
+    )
+    
+    # Additional constraints
+    minimum_hours_total = models.DecimalField(
+        max_digits=6, 
+        decimal_places=1, 
+        null=True, 
+        blank=True,
+        help_text="Minimum total flight hours required"
+    )
+    minimum_hours_type = models.DecimalField(
+        max_digits=6, 
+        decimal_places=1, 
+        null=True, 
+        blank=True,
+        help_text="Minimum hours in this aircraft type"
+    )
+    requires_instructor_present = models.BooleanField(
+        default=False,
+        help_text="Instructor must be present for this aircraft"
+    )
+    requires_current_medical = models.BooleanField(
+        default=False,
+        help_text="Valid medical certificate required"
+    )
+    
+    # Special restrictions
+    max_wind_speed = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Maximum wind speed for solo operations (knots)"
+    )
+    max_crosswind = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Maximum crosswind component (knots)"
+    )
+    
+    # Administrative
+    created_date = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        unique_together = ['glider', 'qualification', 'requirement_type']
+        ordering = ['glider', 'requirement_type']
+    
+    def __str__(self):
+        return f"{self.glider} requires {self.qualification.code} for {self.get_requirement_type_display()}"
+```
+
+#### Enhanced Qualification Validation System
+
+```python
+class GliderAccessValidator:
+    """
+    Enforces qualification requirements for glider access.
+    This completes the odontogenesis of the qualification badges.
+    """
+    
+    @staticmethod
+    def can_member_access_glider(member, glider, flight_type='solo'):
+        """
+        Check if member has required qualifications for glider access.
+        
+        Args:
+            member: Member instance
+            glider: Glider instance
+            flight_type: 'solo', 'dual', or 'pic'
+            
+        Returns:
+            tuple: (is_authorized: bool, missing_requirements: list)
+        """
+        
+        # Get all requirements for this glider
+        requirements = GliderQualificationRequirement.objects.filter(
+            glider=glider,
+            requirement_type__in=[flight_type, 'either']
+        )
+        
+        if not requirements.exists():
+            # No specific requirements = open access
+            return True, []
+        
+        missing_requirements = []
+        
+        for req in requirements:
+            # Check if member has the required qualification
+            member_qual = MemberQualification.objects.filter(
+                member=member,
+                qualification=req.qualification,
+                is_qualified=True
+            ).first()
+            
+            if not member_qual:
+                missing_requirements.append(f"Missing {req.qualification.name}")
+                continue
+            
+            # Check if qualification is current (not expired)
+            if member_qual.expiration_date and member_qual.expiration_date < timezone.now().date():
+                missing_requirements.append(f"{req.qualification.name} expired on {member_qual.expiration_date}")
+                continue
+            
+            # Check minimum hours requirements
+            if req.minimum_hours_total:
+                total_hours = member.get_total_flight_hours()  # Method to implement
+                if total_hours < req.minimum_hours_total:
+                    missing_requirements.append(f"Need {req.minimum_hours_total} total hours (have {total_hours})")
+            
+            if req.minimum_hours_type:
+                type_hours = member.get_aircraft_type_hours(glider.model)  # Method to implement
+                if type_hours < req.minimum_hours_type:
+                    missing_requirements.append(f"Need {req.minimum_hours_type} hours in {glider.model} (have {type_hours})")
+        
+        is_authorized = len(missing_requirements) == 0
+        return is_authorized, missing_requirements
+    
+    @staticmethod
+    def get_accessible_gliders(member, flight_type='solo'):
+        """
+        Get list of gliders member is qualified to access.
+        """
+        accessible_gliders = []
+        
+        for glider in Glider.objects.filter(is_active=True, club_owned=True):
+            is_authorized, _ = GliderAccessValidator.can_member_access_glider(
+                member, glider, flight_type
+            )
+            if is_authorized:
+                accessible_gliders.append(glider)
+        
+        return accessible_gliders
+```
+
+### Integration with Reservation System
+
+#### Enhanced GliderReservation Validation
+
+```python
+# Update the GliderReservation.clean() method
+def clean(self):
+    """Enhanced validation with qualification enforcement"""
+    from django.core.exceptions import ValidationError
+    
+    # Existing validations...
+    
+    # NEW: Enforce qualification requirements
+    flight_type = 'solo' if self.reservation_type == 'solo' else 'dual'
+    is_authorized, missing_requirements = GliderAccessValidator.can_member_access_glider(
+        self.member, self.glider, flight_type
+    )
+    
+    if not is_authorized:
+        raise ValidationError(
+            f"Member not qualified for {self.glider}: {', '.join(missing_requirements)}"
+        )
+```
+
+### Database Migration Plan
+
+#### Step 1: Create GliderQualificationRequirement Table
+```sql
+CREATE TABLE duty_roster_gliderqualificationrequirement (
+    id BIGSERIAL PRIMARY KEY,
+    glider_id BIGINT NOT NULL REFERENCES logsheet_glider(id),
+    qualification_id BIGINT NOT NULL REFERENCES instructors_clubqualificationtype(id),
+    requirement_type VARCHAR(15) NOT NULL DEFAULT 'either',
+    minimum_hours_total DECIMAL(6,1) NULL,
+    minimum_hours_type DECIMAL(6,1) NULL,
+    requires_instructor_present BOOLEAN NOT NULL DEFAULT FALSE,
+    requires_current_medical BOOLEAN NOT NULL DEFAULT FALSE,
+    max_wind_speed INTEGER NULL,
+    max_crosswind INTEGER NULL,
+    created_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    notes TEXT NOT NULL DEFAULT '',
+    UNIQUE(glider_id, qualification_id, requirement_type)
+);
+```
+
+#### Step 2: Populate Initial Requirements
+```python
+# Example data population for common club aircraft
+ASK_21_qual = ClubQualificationType.objects.get(code='ASK-21')
+ASK_21_glider = Glider.objects.get(competition_number='ASK')
+
+GliderQualificationRequirement.objects.create(
+    glider=ASK_21_glider,
+    qualification=ASK_21_qual,
+    requirement_type='solo',
+    minimum_hours_total=10.0,
+    notes='Standard ASK-21 solo checkout required'
+)
+```
+
+### Administrative Interface
+
+#### Enhanced Admin for Glider Requirements
+```python
+@admin.register(GliderQualificationRequirement)
+class GliderQualificationRequirementAdmin(admin.ModelAdmin):
+    list_display = ('glider', 'qualification', 'requirement_type', 'minimum_hours_total')
+    list_filter = ('requirement_type', 'glider__model', 'qualification__code')
+    search_fields = ('glider__competition_number', 'qualification__name')
+    autocomplete_fields = ('glider', 'qualification')
+    
+    fieldsets = (
+        (None, {
+            'fields': ('glider', 'qualification', 'requirement_type')
+        }),
+        ('Hour Requirements', {
+            'fields': ('minimum_hours_total', 'minimum_hours_type')
+        }),
+        ('Safety Restrictions', {
+            'fields': ('requires_instructor_present', 'requires_current_medical', 
+                      'max_wind_speed', 'max_crosswind')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        })
+    )
+```
+
+### User Interface Updates
+
+#### Member Qualification Display
+```html
+<!-- Enhanced member qualification display with aircraft access -->
+<div class="qualification-badge">
+    <img src="{{ qual.icon.url }}" alt="{{ qual.name }}">
+    <div class="qualification-details">
+        <strong>{{ qual.name }}</strong>
+        <div class="authorized-aircraft">
+            <small class="text-muted">
+                Authorizes: 
+                {% for glider in qual.authorized_gliders.all %}
+                    {{ glider.competition_number }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </small>
+        </div>
+    </div>
+</div>
+```
+
+#### Reservation Form Enhancement
+```html
+<!-- Glider selection with qualification indicators -->
+<select name="glider" class="form-control">
+  {% for glider in available_gliders %}
+    <option value="{{ glider.id }}" 
+            {% if not glider.user_qualified %}disabled{% endif %}>
+      {{ glider }} 
+      {% if not glider.user_qualified %} - QUALIFICATION REQUIRED{% endif %}
+    </option>
+  {% endfor %}
+</select>
+```
+
+### Implementation Priority
+
+1. **Phase 1**: Create `GliderQualificationRequirement` model and admin
+2. **Phase 2**: Implement `GliderAccessValidator` validation logic
+3. **Phase 3**: Integrate validation into reservation system
+4. **Phase 4**: Update UI to show qualification status and requirements
+5. **Phase 5**: Populate initial qualification requirements for existing aircraft
+
+This odontogenic enhancement transforms the qualification badges from **cosmetic indicators** to **functional access controls**, ensuring that only properly qualified members can reserve and operate specific aircraft through systematic enforcement development.
