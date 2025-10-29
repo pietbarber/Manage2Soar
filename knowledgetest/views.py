@@ -15,6 +15,7 @@ from knowledgetest.forms import TestBuilderForm, TestSubmissionForm
 from knowledgetest.models import (
     Question,
     QuestionCategory,
+    TestPreset,
     WrittenTestAnswer,
     WrittenTestAssignment,
     WrittenTestAttempt,
@@ -57,66 +58,9 @@ def generate_test_subject_breakdown(attempt):
     return ", ".join(breakdown_list)
 
 
-def _get_empty_preset():
-    # This function is called only when needed, preventing database queries at import time.
-    return {
-        code: 0 for code in Question.objects.values_list("category__code", flat=True)
-    }
-
-
 def get_presets():
-    return {
-        "ASK21": {
-            "ACRO": 0,
-            "AIM": 5,
-            "AMF": 0,
-            "ASK21": 19,
-            "DO": 0,
-            "Discus": 0,
-            "FAR": 5,
-            "GF": 10,
-            "GFH": 10,
-            "GNDOPS": 5,
-            "PW5": 0,
-            "SSC": 5,
-            "ST": 5,
-            "WX": 4,
-        },
-        "PW5": {
-            "ACRO": 0,
-            "AIM": 5,
-            "AMF": 5,
-            "ASK21": 0,
-            "DO": 0,
-            "Discus": 0,
-            "FAR": 5,
-            "GF": 10,
-            "GFH": 10,
-            "GNDOPS": 5,
-            "PW5": 24,
-            "SSC": 5,
-            "ST": 5,
-            "WX": 4,
-        },
-        "DISCUS": {
-            "ACRO": 0,
-            "AIM": 0,
-            "AMF": 0,
-            "ASK21": 0,
-            "DO": 0,
-            "Discus": 22,
-            "FAR": 5,
-            "GF": 10,
-            "GFH": 0,
-            "GNDOPS": 5,
-            "PW5": 0,
-            "SSC": 0,
-            "ST": 5,
-            "WX": 0,
-        },
-        "ACRO": {"ACRO": 30},
-        "EMPTY": _get_empty_preset(),
-    }
+    """Get test presets from database - maintains compatibility with existing code."""
+    return TestPreset.get_presets_as_dict()
 
 
 class WrittenTestStartView(TemplateView):
@@ -169,15 +113,18 @@ class CreateWrittenTestView(FormView):
         preset = self.request.GET.get("preset")
         if preset:
             presets = get_presets()
-            kw["preset"] = presets.get(preset.upper())
+            kw["preset"] = presets.get(preset)
         else:
             kw["preset"] = None  # Or a default preset if applicable
         return kw
 
     def get_context_data(self, **ctx):
         ctx = super().get_context_data(**ctx)
-        presets = get_presets()
-        ctx["presets"] = presets.keys()
+        # Load active presets from database
+        active_presets = TestPreset.get_active_presets()
+        ctx["presets"] = [preset.name for preset in active_presets]
+        # For template access to descriptions, etc.
+        ctx["preset_objects"] = active_presets
         return ctx
 
     def form_invalid(self, form):
