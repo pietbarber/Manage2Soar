@@ -45,17 +45,7 @@ flowchart TD
     U --> V[Suggest Alternative Times]
     V --> O
     
-    T -->|No Conflict| W{Instructor Required?}
-    W -->|Yes| X[Select Instructor]
-    W -->|No| Y[Create Reservation]
-    
-    X --> Z{Instructor Available?}
-    Z -->|No| AA[Show Available Instructors]
-    AA --> X
-    Z -->|Yes| BB{Instructor Qualified?}
-    BB -->|No| CC[Instructor Qualification Error]
-    CC --> AA
-    BB -->|Yes| Y
+    T -->|No Conflict| Y[Create Reservation]
     
     Y --> DD[Status: Confirmed]
     DD --> EE[Send Confirmation]
@@ -98,32 +88,27 @@ flowchart TD
     S -->|Current| U{Single or Two-Seater?}
     
     U -->|Single-Seater| V[Rated Pilot Solo Flight]
-    U -->|Two-Seater| W{Instruction Flight?}
-    W -->|Yes| X{Member is CFI?}
-    X -->|Yes| Y[Rated CFI Giving Instruction]
-    X -->|No| Z[Rated Pilot Receiving Instruction]
-    W -->|No| AA[Rated Pilot Recreational Flight]
+    U -->|Two-Seater| W[Rated Pilot Passenger Flight]
     
-    F --> BB[Proceed - Instructor Required]
+    F --> BB[End - Dual Instruction Only]
     H --> CC[End - Aircraft Checkout Required]
     J --> DD[End - Currency Flight Required]
     M --> EE[Proceed - Student Solo Approved]
-    N --> BB
+    N --> FF[Proceed - Student Dual Approved]
     P --> EE
     R --> CC
-    T --> FF[End - Qualification Expired]
-    V --> GG[Proceed - Rated Solo Approved]
-    Y --> HH[Proceed - CFI Instruction Approved]
-    Z --> BB
-    AA --> GG
+    T --> GG[End - Qualification Expired]
+    V --> HH[Proceed - Rated Solo Approved]
+    W --> II[Proceed - Rated Passenger Flight]
     
-    style BB fill:#e8f5e8
     style EE fill:#e8f5e8
-    style GG fill:#e8f5e8
+    style FF fill:#e8f5e8
     style HH fill:#e8f5e8
+    style II fill:#e8f5e8
+    style BB fill:#ffebee
     style CC fill:#ffebee
     style DD fill:#ffebee
-    style FF fill:#ffebee
+    style GG fill:#ffebee
 ```
 
 ### Instructor Assignment Workflow
