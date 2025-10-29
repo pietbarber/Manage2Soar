@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Message Sent Successfully{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Message Sent Successfully!
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success" role="alert">
+                        <h4 class="alert-heading">Thank you for contacting us!</h4>
+                        <p>
+                            Your message has been sent to our member managers. We appreciate 
+                            your interest in Skyline Soaring Club and will get back to you soon.
+                        </p>
+                        <hr>
+                        <p class="mb-0">
+                            <strong>What's next?</strong> We typically respond within 24-48 hours. 
+                            Keep an eye on your email inbox (and check your spam folder just in case).
+                        </p>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{% url 'cms:home' %}" class="btn btn-primary">
+                            <i class="fas fa-home me-1"></i>
+                            Return to Home Page
+                        </a>
+                        <a href="{% url 'cms:contact' %}" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-envelope me-1"></i>
+                            Send Another Message
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">While You Wait...</h5>
+                </div>
+                <div class="card-body">
+                    <p>Here are some things you might find interesting:</p>
+                    <ul>
+                        <li><strong>Learn about soaring:</strong> Gliding is an amazing way to experience flight in its purest form</li>
+                        <li><strong>Visit our airfield:</strong> We're located at Front Royal-Warren County Airport</li>
+                        <li><strong>Watch us fly:</strong> Visitors are welcome to observe operations on flying days</li>
+                        <li><strong>Training programs:</strong> We offer comprehensive instruction for all skill levels</li>
+                    </ul>
+                    
+                    <div class="alert alert-light mt-3">
+                        <strong>Pro tip:</strong> If you're interested in a trial flight or introductory lesson, 
+                        be sure to mention that in your contact message - we love introducing new people to soaring!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

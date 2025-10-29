@@ -6,8 +6,8 @@ from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.urls import reverse
 
-from cms.models import HomePageContent, SiteFeedback
-from cms.forms import SiteFeedbackForm
+from cms.models import HomePageContent, SiteFeedback, VisitorContact
+from cms.forms import SiteFeedbackForm, VisitorContactForm
 from members.decorators import active_member_required
 from django.db.models import Count, Max
 from members.utils import is_active_member
@@ -264,6 +264,145 @@ def _notify_webmasters_of_feedback(feedback):
     except Exception as e:
         # Log but don't fail
         logger.error(f"Failed to notify webmasters of feedback: {e}")
+
+
+# Visitor Contact Views for Issue #70
+
+def contact(request):
+    """
+    Public contact form for visitors to reach the club.
+    No authentication required - this replaces exposing welcome@skylinesoaring.org
+    """
+    if request.method == 'POST':
+        form = VisitorContactForm(request.POST)
+        if form.is_valid():
+            contact_submission = form.save(commit=False)
+
+            # Capture IP address for spam prevention
+            contact_submission.ip_address = _get_client_ip(request)
+            contact_submission.save()
+
+            # Send notification to member managers
+            _notify_member_managers_of_contact(contact_submission)
+
+            messages.success(
+                request,
+                "Thank you for contacting us! We'll get back to you soon."
+            )
+            return redirect('cms:contact_success')
+    else:
+        form = VisitorContactForm()
+
+    return render(request, 'cms/contact.html', {
+        'form': form,
+        'page_title': 'Contact Skyline Soaring Club'
+    })
+
+
+def contact_success(request):
+    """Success page after visitor contact form submission."""
+    return render(request, 'cms/contact_success.html', {
+        'page_title': 'Message Sent Successfully'
+    })
+
+
+def _get_client_ip(request):
+    """Get the visitor's IP address for logging purposes."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+def _notify_member_managers_of_contact(contact_submission):
+    """
+    Send notifications to member managers about new visitor contact.
+    This replaces sending emails to the spam-prone welcome@skylinesoaring.org
+    """
+    try:
+        from django.core.mail import send_mail
+        from members.models import Member
+
+        # Get all member managers
+        member_managers = Member.objects.filter(
+            member_manager=True,
+            is_active=True
+        )
+
+        if not member_managers.exists():
+            # Fallback to webmasters if no member managers
+            member_managers = Member.objects.filter(
+                webmaster=True,
+                is_active=True
+            )
+
+        # Prepare email content
+        subject = f"New Visitor Contact: {contact_submission.subject}"
+
+        message = f"""
+A new visitor has contacted Skyline Soaring Club through the website.
+
+Visitor Details:
+- Name: {contact_submission.name}
+- Email: {contact_submission.email}
+- Phone: {contact_submission.phone or 'Not provided'}
+- Subject: {contact_submission.subject}
+- Submitted: {contact_submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}
+
+Message:
+{contact_submission.message}
+
+---
+You can respond directly to this visitor at: {contact_submission.email}
+
+To manage this contact in the admin interface:
+{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://skylinesoaring.org'}/admin/cms/visitorcontact/{contact_submission.pk}/change/
+
+This message was sent automatically by the Skyline Soaring website contact form.
+        """.strip()
+
+        # Send email to each member manager
+        recipient_emails = [
+            manager.email for manager in member_managers if manager.email]
+
+        if recipient_emails:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=recipient_emails,
+                fail_silently=False,  # We want to know if email fails
+            )
+
+        # Also create notifications in the system if available
+        try:
+            from notifications.models import Notification
+
+            for manager in member_managers:
+                notification_message = (
+                    f"New visitor contact from {contact_submission.name}: "
+                    f"{contact_submission.subject}"
+                )
+
+                notification_url = f"/admin/cms/visitorcontact/{contact_submission.pk}/change/"
+
+                Notification.objects.create(
+                    user=manager,
+                    message=notification_message,
+                    url=notification_url
+                )
+        except ImportError:
+            # Notifications app not available
+            pass
+        except Exception as e:
+            # Log but don't fail
+            logger.error(f"Failed to create notifications for visitor contact: {e}")
+
+    except Exception as e:
+        # Log the error but don't fail the contact submission
+        logger.error(f"Failed to notify member managers of visitor contact: {e}")
 
 
 # Create your views here.

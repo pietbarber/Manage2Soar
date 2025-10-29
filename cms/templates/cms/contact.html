@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Skyline Soaring Club{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-envelope me-2"></i>
+                        Contact Skyline Soaring Club
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Interested in learning to fly gliders? Have questions about our club? 
+                        We'd love to hear from you! Fill out the form below and one of our 
+                        member managers will get back to you soon.
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.name.label_tag }}
+                                {{ form.name }}
+                                {% if form.name.help_text %}
+                                    <div class="form-text">{{ form.name.help_text }}</div>
+                                {% endif %}
+                                {{ form.name.errors }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.email.label_tag }}
+                                {{ form.email }}
+                                {% if form.email.help_text %}
+                                    <div class="form-text">{{ form.email.help_text }}</div>
+                                {% endif %}
+                                {{ form.email.errors }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.phone.label_tag }}
+                                {{ form.phone }}
+                                {% if form.phone.help_text %}
+                                    <div class="form-text">{{ form.phone.help_text }}</div>
+                                {% endif %}
+                                {{ form.phone.errors }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.subject.label_tag }}
+                                {{ form.subject }}
+                                {% if form.subject.help_text %}
+                                    <div class="form-text">{{ form.subject.help_text }}</div>
+                                {% endif %}
+                                {{ form.subject.errors }}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.message.label_tag }}
+                            {{ form.message }}
+                            {% if form.message.help_text %}
+                                <div class="form-text">{{ form.message.help_text }}</div>
+                            {% endif %}
+                            {{ form.message.errors }}
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane me-1"></i>
+                                Send Message
+                            </button>
+                            <a href="{% url 'cms:home' %}" class="btn btn-secondary">
+                                Back to Home
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <h6 class="alert-heading">
+                    <i class="fas fa-info-circle me-1"></i>
+                    What happens next?
+                </h6>
+                <ul class="mb-0">
+                    <li>Our member managers will receive your message immediately</li>
+                    <li>We typically respond within 24-48 hours</li>
+                    <li>For urgent questions, feel free to visit us at the airfield during operations</li>
+                    <li>All contact information is kept private and not shared with third parties</li>
+                </ul>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Other Ways to Reach Us</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-map-marker-alt me-2"></i>Visit Us</h6>
+                            <p class="text-muted">
+                                Skyline Soaring Club<br>
+                                Front Royal-Warren County Airport<br>
+                                122 Airport Dr<br>
+                                Front Royal, VA 22630
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-plane me-2"></i>Operations</h6>
+                            <p class="text-muted">
+                                We typically fly on weekends and some weekdays<br>
+                                when weather permits. Check our calendar or<br>
+                                contact us for current schedule information.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,6 +9,9 @@ urlpatterns = [
     # Site feedback URLs (Issue #117)
     path("feedback/", views.submit_feedback, name="feedback"),
     path("feedback/success/", views.feedback_success, name="feedback_success"),
+    # Visitor contact URLs (Issue #70)
+    path("contact/", views.contact, name="contact"),
+    path("contact/success/", views.contact_success, name="contact_success"),
     # /cms/<slug>/ or /cms/<parent>/<slug>/ (supports up to 3 levels for now)
     re_path(r"^(?P<slug1>[-\w]+)/$", views.cms_page, name="cms_page"),
     re_path(
