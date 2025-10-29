@@ -13,6 +13,17 @@ erDiagram
     Member ||--o{ WrittenTestAssignment : assigned_to
     Member ||--o{ WrittenTestAssignment : created_by
     
+    TestPreset {
+        int id PK
+        string name UK
+        text description
+        json category_weights
+        boolean is_active
+        int sort_order
+        datetime created_at
+        datetime updated_at
+    }
+    
     QuestionCategory {
         int id PK
         string code UK
@@ -89,6 +100,12 @@ erDiagram
     WrittenTestAttempt ||--o{ WrittenTestAnswer : answers
     Question ||--o{ WrittenTestAnswer : answered
 ```
+
+## TestPreset
+- **Purpose:** Configurable test presets that define question distribution across categories for standardized tests.
+- **Fields:** name (unique), description, category_weights (JSONField), is_active, sort_order, created_at, updated_at
+- **Key Features:** Database-driven presets replace hardcoded test configurations, deletion protection for referenced presets
+- **Usage:** Staff can manage presets via Django admin, presets can be applied via URL parameters in test creation
 
 ## QuestionCategory
 - **Purpose:** Groups questions by category code and description.
