@@ -74,12 +74,12 @@ flowchart TD
     I -->|Expired| J[Require Currency Flight]
     I -->|Current| K{Single-Seater Request?}
     
-    K -->|Yes - Single Seater| L{Instructor Present?}
-    L -->|No| M[Student Solo - Check Weather/DO]
-    L -->|Yes| N[Dual Instruction Flight]
-    K -->|No - Two Seater| O{Instructor Present?}
-    O -->|No| P[Student Solo Two-Seater]
-    O -->|Yes| N
+    K -->|Yes - Single Seater| L{Instructor Scheduled?}
+    L -->|No| M[Block - No Instructor Coverage]
+    L -->|Yes| N[Student Solo Single-Seater]
+    K -->|No - Two Seater| O{Instructor Scheduled?}
+    O -->|No| P[Block - No Instructor Coverage]
+    O -->|Yes| Q[Student Solo Two-Seater]
     
     D --> Q{Aircraft Type Qualified?}
     Q -->|No| R[Require Club Checkout]
@@ -93,21 +93,22 @@ flowchart TD
     F --> BB[End - Dual Instruction Only]
     H --> CC[End - Aircraft Checkout Required]
     J --> DD[End - Currency Flight Required]
-    M --> EE[Proceed - Student Solo Approved]
-    N --> FF[Proceed - Student Dual Approved]
+    M --> EE[End - No Instructor Scheduled]
+    N --> FF[Proceed - Student Solo Approved]
     P --> EE
+    Q --> FF
     R --> CC
     T --> GG[End - Qualification Expired]
     V --> HH[Proceed - Rated Solo Approved]
     W --> II[Proceed - Rated Passenger Flight]
     
-    style EE fill:#e8f5e8
     style FF fill:#e8f5e8
     style HH fill:#e8f5e8
     style II fill:#e8f5e8
     style BB fill:#ffebee
     style CC fill:#ffebee
     style DD fill:#ffebee
+    style EE fill:#ffebee
     style GG fill:#ffebee
 ```
 
@@ -661,7 +662,7 @@ class GliderAccessValidator:
     """
     
     @staticmethod
-    def can_member_access_glider(member, glider, flight_type='solo'):
+    def can_member_access_glider(member, glider, flight_type='solo', date=None):
         """
         Check if member has required qualifications for glider access.
         Primary validation based on pilot rating status, not aircraft configuration.
@@ -670,6 +671,7 @@ class GliderAccessValidator:
             member: Member instance
             glider: Glider instance
             flight_type: 'solo', 'dual', or 'pic'
+            date: Flight date (required for student solo validation)
             
         Returns:
             tuple: (is_authorized: bool, missing_requirements: list)
@@ -737,10 +739,21 @@ class GliderAccessValidator:
                     pass
         
         # STEP 4: Rating-specific additional validation
-        if is_student_pilot:
-            # Student pilots have additional restrictions
-            if flight_type == 'solo' and glider.seats == 1:
-                # Single-seater solo requires specific endorsement
+        if is_student_pilot and flight_type == 'solo':
+            # CRITICAL: Student solo flights require instructor presence (insurance requirement)
+            from duty_roster.models import DutySlot
+            
+            instructor_scheduled = DutySlot.objects.filter(
+                duty_day__date=date,  # Assumes date parameter passed in
+                role='instructor',
+                member__instructor=True
+            ).exists()
+            
+            if not instructor_scheduled:
+                missing_requirements.append("Student solo flights require an instructor to be scheduled on duty")
+            
+            # Additional single-seater requirements
+            if glider.seats == 1:
                 solo_endorsement = MemberQualification.objects.filter(
                     member=member,
                     qualification__code__icontains='solo',
@@ -819,7 +832,7 @@ def clean(self):
     # NEW: Enforce qualification requirements
     flight_type = 'solo' if self.reservation_type == 'solo' else 'dual'
     is_authorized, missing_requirements = GliderAccessValidator.can_member_access_glider(
-        self.member, self.glider, flight_type
+        self.member, self.glider, flight_type, self.date
     )
     
     if not is_authorized:
