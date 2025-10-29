@@ -84,40 +84,59 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Check Member Qualifications] --> B{Single or Two-Seater?}
+    A[Check Member Qualifications] --> B{Rated Pilot or Student?}
     
-    B -->|Single-Seater| C[Check Solo Endorsement]
-    B -->|Two-Seater| D[Check Dual Authorization]
+    B -->|Student Pilot| C[Student Validation Path]
+    B -->|Rated Pilot| D[Rated Pilot Validation Path]
     
-    C --> E{Current Solo Endorsement?}
-    E -->|No| F[Require Solo Check]
-    E -->|Yes| G{Aircraft Type Endorsed?}
-    G -->|No| H[Require Type Rating]
-    G -->|Yes| I{Currency Requirements?}
+    C --> E{Has Solo Endorsement?}
+    E -->|No| F[Dual Instruction Only]
+    E -->|Yes| G{Aircraft Type Checkout?}
+    G -->|No| H[Require Aircraft Checkout]
+    G -->|Yes| I{Solo Currency Current?}
     I -->|Expired| J[Require Currency Flight]
-    I -->|Current| K[Qualification Approved]
+    I -->|Current| K{Single-Seater Request?}
     
-    D --> L{Instructor Present?}
-    L -->|No| M[Require Instructor]
-    L -->|Yes| N{Member Authorized for Dual?}
-    N -->|No| O[Check Dual Prerequisites]
-    N -->|Yes| K
+    K -->|Yes - Single Seater| L{Instructor Present?}
+    L -->|No| M[Student Solo - Check Weather/DO]
+    L -->|Yes| N[Dual Instruction Flight]
+    K -->|No - Two Seater| O{Instructor Present?}
+    O -->|No| P[Student Solo Two-Seater]
+    O -->|Yes| N
     
-    F --> P[End - Solo Required]
-    H --> Q[End - Type Rating Required]
-    J --> R[End - Currency Required]
-    M --> S[End - Instructor Required]
-    O --> T[End - Dual Auth Required]
+    D --> Q{Aircraft Type Qualified?}
+    Q -->|No| R[Require Club Checkout]
+    Q -->|Yes| S{Qualification Current?}
+    S -->|Expired| T[Qualification Expired]
+    S -->|Current| U{Single or Two-Seater?}
     
-    K --> U[Proceed with Reservation]
+    U -->|Single-Seater| V[Rated Pilot Solo Flight]
+    U -->|Two-Seater| W{Instruction Flight?}
+    W -->|Yes| X{Member is CFI?}
+    X -->|Yes| Y[Rated CFI Giving Instruction]
+    X -->|No| Z[Rated Pilot Receiving Instruction]
+    W -->|No| AA[Rated Pilot Recreational Flight]
     
-    style K fill:#e8f5e8
-    style U fill:#e8f5e8
-    style P fill:#ffebee
-    style Q fill:#ffebee
-    style R fill:#ffebee
-    style S fill:#ffebee
-    style T fill:#ffebee
+    F --> BB[Proceed - Instructor Required]
+    H --> CC[End - Aircraft Checkout Required]
+    J --> DD[End - Currency Flight Required]
+    M --> EE[Proceed - Student Solo Approved]
+    N --> BB
+    P --> EE
+    R --> CC
+    T --> FF[End - Qualification Expired]
+    V --> GG[Proceed - Rated Solo Approved]
+    Y --> HH[Proceed - CFI Instruction Approved]
+    Z --> BB
+    AA --> GG
+    
+    style BB fill:#e8f5e8
+    style EE fill:#e8f5e8
+    style GG fill:#e8f5e8
+    style HH fill:#e8f5e8
+    style CC fill:#ffebee
+    style DD fill:#ffebee
+    style FF fill:#ffebee
 ```
 
 ### Instructor Assignment Workflow
