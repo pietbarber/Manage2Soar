@@ -25,34 +25,34 @@ flowchart TD
     G --> I
     H --> I
     
-    J --> K[Filter Available Aircraft]
-    K --> L{Any Qualified Aircraft?}
+    I --> J[Filter Available Aircraft]
+    J --> K{Any Qualified Aircraft?}
     
-    L -->|No| M[No Available Aircraft Notice]
-    M --> N[End - No Options Available]
+    K -->|No| L[No Available Aircraft Notice]
+    L --> M[End - No Options Available]
     
-    L -->|Yes| O[Show Qualified Aircraft Only]
-    O --> P[Select from Qualified List]
-    P --> Q{Aircraft Available for Time?}
+    K -->|Yes| N[Show Qualified Aircraft Only]
+    N --> O[Select from Qualified List]
+    O --> P{Aircraft Available for Time?}
     
-    Q -->|No| R[Show Alternative Times]
-    R --> S[End - Time Conflict]
+    P -->|No| Q[Show Alternative Times]
+    Q --> R[End - Time Conflict]
     
-    Q -->|Yes| T{Time Conflict Check}
-    T -->|Conflict| U[Show Conflicts]
-    U --> V[Suggest Alternative Times]
-    V --> O
+    P -->|Yes| S{Time Conflict Check}
+    S -->|Conflict| T[Show Conflicts]
+    T --> U[Suggest Alternative Times]
+    U --> N
     
-    T -->|No Conflict| Y[Create Reservation]
+    S -->|No Conflict| V[Create Reservation]
     
-    Y --> DD[Status: Confirmed]
-    DD --> EE[Send Confirmation]
-    EE --> FF[Reservation Complete]
+    V --> W[Status: Confirmed]
+    W --> X[Send Confirmation]
+    X --> Y[Reservation Complete]
     
     style A fill:#e1f5fe
-    style FF fill:#e8f5e8
-    style N fill:#ffebee
-    style S fill:#ffebee
+    style Y fill:#e8f5e8
+    style M fill:#ffebee
+    style R fill:#ffebee
 ```
 
 ### Qualification Validation Workflow
