@@ -293,9 +293,14 @@ def contact(request):
     else:
         form = VisitorContactForm()
 
+    # Get site configuration for club-specific information
+    from siteconfig.models import SiteConfiguration
+    site_config = SiteConfiguration.objects.first()
+
     return render(request, 'cms/contact.html', {
         'form': form,
-        'page_title': 'Contact Skyline Soaring Club'
+        'site_config': site_config,
+        'page_title': f'Contact {site_config.club_name if site_config else "Our Club"}'
     })
 
 

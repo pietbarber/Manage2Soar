@@ -24,7 +24,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
     readonly_fields = ()
     fieldsets = (
         (
-            None,
+            "Basic Information",
             {
                 "fields": (
                     "club_name",
@@ -32,10 +32,42 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "club_abbreviation",
                     "club_logo",
                     "club_nickname",
+                )
+            },
+        ),
+        (
+            "Contact Information",
+            {
+                "fields": (
+                    "contact_welcome_text",
+                    "contact_response_info",
+                    "club_address_line1",
+                    "club_address_line2",
+                    "club_city",
+                    "club_state",
+                    "club_zip_code",
+                    "club_country",
+                    "club_phone",
+                    "operations_info",
+                ),
+                "description": "Contact form and location information for visitors",
+            },
+        ),
+        (
+            "Scheduling Options",
+            {
+                "fields": (
                     "schedule_instructors",
                     "schedule_tow_pilots",
                     "schedule_duty_officers",
                     "schedule_assistant_duty_officers",
+                )
+            },
+        ),
+        (
+            "Role Terminology",
+            {
+                "fields": (
                     "duty_officer_title",
                     "assistant_duty_officer_title",
                     "towpilot_title",
@@ -44,10 +76,19 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "surge_instructor_title",
                     "membership_manager_title",
                     "equipment_manager_title",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Advanced Options",
+            {
+                "fields": (
                     "allow_glider_reservations",
                     "allow_two_seater_reservations",
                     "redaction_notification_dedupe_minutes",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
     )

@@ -151,12 +151,19 @@ class VisitorContactViewTests(TestCase):
 
     def setUp(self):
         self.client = Client()
+        # Create SiteConfiguration for testing
+        from siteconfig.models import SiteConfiguration
+        self.site_config = SiteConfiguration.objects.create(
+            club_name='Test Soaring Club',
+            domain_name='test.example.com',
+            club_abbreviation='TSC'
+        )
 
     def test_contact_page_get(self):
         """Test that the contact page loads successfully."""
         response = self.client.get(reverse('cms:contact'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Contact Skyline Soaring Club')
+        self.assertContains(response, 'Contact Test Soaring Club')
         self.assertContains(response, 'form')
 
     def test_contact_page_no_auth_required(self):
