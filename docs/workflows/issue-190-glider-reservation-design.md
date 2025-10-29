@@ -57,13 +57,12 @@ flowchart TD
     CC --> AA
     BB -->|Yes| Y
     
-    Y --> DD[Create Reservation]
-    DD --> EE[Status: Confirmed]
-    EE --> FF[Send Confirmation]
-    FF --> GG[Reservation Complete]
+    Y --> DD[Status: Confirmed]
+    DD --> EE[Send Confirmation]
+    EE --> FF[Reservation Complete]
     
     style A fill:#e1f5fe
-    style GG fill:#e8f5e8
+    style FF fill:#e8f5e8
     style N fill:#ffebee
     style S fill:#ffebee
 ```
