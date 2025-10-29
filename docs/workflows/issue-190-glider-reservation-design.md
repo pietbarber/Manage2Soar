@@ -73,9 +73,9 @@ flowchart TD
     O -->|No| P[Block - No Instructor Coverage]
     O -->|Yes| Q[Student Solo Two-Seater]
     
-    D --> Q{Aircraft Type Qualified?}
-    Q -->|No| R[Require Club Checkout]
-    Q -->|Yes| S{Qualification Current?}
+    D --> AA{Aircraft Type Qualified?}
+    AA -->|No| R[Require Club Checkout]
+    AA -->|Yes| S{Qualification Current?}
     S -->|Expired| T[Qualification Expired]
     S -->|Current| U{Single or Two-Seater?}
     
@@ -88,9 +88,9 @@ flowchart TD
     M --> EE[End - No Instructor Scheduled]
     N --> FF[Proceed - Student Solo Approved]
     P --> EE
-    Q --> FF
+    Q --> FF[Proceed - Student Solo Approved]
     R --> CC
-    T --> GG[End - Qualification Expired]
+    T --> JJ[End - Qualification Expired]
     V --> HH[Proceed - Rated Solo Approved]
     W --> II[Proceed - Rated Passenger Flight]
     
@@ -101,7 +101,7 @@ flowchart TD
     style CC fill:#ffebee
     style DD fill:#ffebee
     style EE fill:#ffebee
-    style GG fill:#ffebee
+    style JJ fill:#ffebee
 ```
 
 ### Fun Flying Only - No Instructors
