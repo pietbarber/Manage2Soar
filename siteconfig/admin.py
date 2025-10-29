@@ -103,13 +103,13 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
     def delete_model(self, request, obj):
         """Override delete to check if status is in use by any members."""
         from members.models import Member
+        from django.contrib import messages
 
-        members_with_status = Member.objects.filter(membership_status=obj.name)
-        if members_with_status.exists():
-            from django.contrib import messages
+        member_count = Member.objects.filter(membership_status=obj.name).count()
+        if member_count > 0:
             messages.error(
                 request,
-                f'Cannot delete "{obj.name}" - {members_with_status.count()} members currently have this status. '
+                f'Cannot delete "{obj.name}" - {member_count} members currently have this status. '
                 f'Change their status first, then delete this membership status.'
             )
             return
@@ -125,11 +125,11 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         from django.contrib import messages
 
         for obj in queryset:
-            members_with_status = Member.objects.filter(membership_status=obj.name)
-            if members_with_status.exists():
+            member_count = Member.objects.filter(membership_status=obj.name).count()
+            if member_count > 0:
                 messages.error(
                     request,
-                    f'Cannot delete "{obj.name}" - {members_with_status.count()} members currently have this status.'
+                    f'Cannot delete "{obj.name}" - {member_count} members currently have this status.'
                 )
                 return
 

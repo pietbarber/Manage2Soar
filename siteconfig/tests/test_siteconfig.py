@@ -149,12 +149,11 @@ def test_membership_status_defaults():
 def test_membership_status_deletion_protection():
     """Test that membership statuses cannot be deleted if members are using them."""
     from members.models import Member
-    from django.core.exceptions import ValidationError
 
     # Create a status and a member using it
     status = MembershipStatus.objects.create(
         name="Test Protected Status", is_active=True)
-    member = Member.objects.create(
+    Member.objects.create(
         username="test_member",
         membership_status="Test Protected Status"
     )

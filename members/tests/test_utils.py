@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from members.utils import is_active_member
 from members.utils.membership import get_active_membership_statuses
@@ -101,8 +102,6 @@ def test_dynamic_membership_status_changes():
 @pytest.mark.django_db
 def test_membership_status_deletion_integration():
     """Test the integration between membership status deletion protection and member access."""
-    from django.core.exceptions import ValidationError
-
     # Create a status and member
     status = MembershipStatus.objects.create(name="Protected Status", is_active=True)
     member = User.objects.create_user(

@@ -170,12 +170,13 @@ class MembershipStatus(models.Model):
         # Import here to avoid circular imports
         try:
             from members.models import Member
-            members_with_status = Member.objects.filter(membership_status=self.name)
-            if members_with_status.exists():
-                from django.core.exceptions import ValidationError
+            from django.core.exceptions import ValidationError
+
+            member_count = Member.objects.filter(membership_status=self.name).count()
+            if member_count > 0:
                 raise ValidationError(
                     f'Cannot delete membership status "{self.name}" - '
-                    f'{members_with_status.count()} members currently have this status. '
+                    f'{member_count} members currently have this status. '
                     f'Change their status first, then delete this membership status.'
                 )
         except ImportError:
