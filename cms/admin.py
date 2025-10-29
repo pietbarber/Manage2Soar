@@ -267,8 +267,8 @@ class VisitorContactAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """Auto-set handled_by when member manager takes action"""
         if change and ('status' in form.changed_data or 'admin_notes' in form.changed_data):
-            if not obj.handled_by:
-                obj.handled_by = request.user
+            # Always set to current user when making changes, regardless of existing value
+            obj.handled_by = request.user
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
@@ -279,7 +279,8 @@ class VisitorContactAdmin(admin.ModelAdmin):
         """Make contact details readonly - this is submitted data"""
         readonly = list(self.readonly_fields)
         if obj:  # Editing existing object
-            readonly.extend(['name', 'email', 'phone', 'subject', 'message'])
+            readonly.extend(['name', 'email', 'phone',
+                            'subject', 'message', 'handled_by'])
         return readonly
 
 
