@@ -644,20 +644,20 @@ class GliderQualificationRequirement(models.Model):
         default='either'
     )
     
-    # Additional constraints
+    # Optional experience constraints (configurable per club)
     minimum_hours_total = models.DecimalField(
         max_digits=6, 
         decimal_places=1, 
         null=True, 
         blank=True,
-        help_text="Minimum total flight hours required"
+        help_text="Optional: Minimum total flight hours (club configurable)"
     )
     minimum_hours_type = models.DecimalField(
         max_digits=6, 
         decimal_places=1, 
         null=True, 
         blank=True,
-        help_text="Minimum hours in this aircraft type"
+        help_text="Optional: Minimum hours in this aircraft type (club configurable)"
     )
     requires_instructor_present = models.BooleanField(
         default=False,
@@ -668,17 +668,8 @@ class GliderQualificationRequirement(models.Model):
         help_text="Valid medical certificate required"
     )
     
-    # Special restrictions
-    max_wind_speed = models.IntegerField(
-        null=True, 
-        blank=True,
-        help_text="Maximum wind speed for solo operations (knots)"
-    )
-    max_crosswind = models.IntegerField(
-        null=True, 
-        blank=True,
-        help_text="Maximum crosswind component (knots)"
-    )
+    # NOTE: Weather/wind constraints removed - these are operational decisions
+    # for PIC and Duty Officer, not software enforcement
     
     # Administrative
     created_date = models.DateTimeField(auto_now_add=True)
@@ -744,16 +735,25 @@ class GliderAccessValidator:
                 missing_requirements.append(f"{req.qualification.name} expired on {member_qual.expiration_date}")
                 continue
             
-            # Check minimum hours requirements
-            if req.minimum_hours_total:
-                total_hours = member.get_total_flight_hours()  # Method to implement
-                if total_hours < req.minimum_hours_total:
-                    missing_requirements.append(f"Need {req.minimum_hours_total} total hours (have {total_hours})")
+            # Check optional minimum hours requirements (if club enables this)
+            # NOTE: Many clubs prefer not to enforce this due to external training
+            if req.minimum_hours_total and hasattr(member, 'get_total_flight_hours'):
+                try:
+                    total_hours = member.get_total_flight_hours()
+                    if total_hours < req.minimum_hours_total:
+                        missing_requirements.append(f"Club policy: Need {req.minimum_hours_total} total hours (have {total_hours})")
+                except:
+                    # External training records not available - skip enforcement
+                    pass
             
-            if req.minimum_hours_type:
-                type_hours = member.get_aircraft_type_hours(glider.model)  # Method to implement
-                if type_hours < req.minimum_hours_type:
-                    missing_requirements.append(f"Need {req.minimum_hours_type} hours in {glider.model} (have {type_hours})")
+            if req.minimum_hours_type and hasattr(member, 'get_aircraft_type_hours'):
+                try:
+                    type_hours = member.get_aircraft_type_hours(glider.model)
+                    if type_hours < req.minimum_hours_type:
+                        missing_requirements.append(f"Club policy: Need {req.minimum_hours_type} hours in {glider.model} (have {type_hours})")
+                except:
+                    # External training records not available - skip enforcement
+                    pass
         
         is_authorized = len(missing_requirements) == 0
         return is_authorized, missing_requirements
@@ -853,9 +853,8 @@ class GliderQualificationRequirementAdmin(admin.ModelAdmin):
         ('Hour Requirements', {
             'fields': ('minimum_hours_total', 'minimum_hours_type')
         }),
-        ('Safety Restrictions', {
-            'fields': ('requires_instructor_present', 'requires_current_medical', 
-                      'max_wind_speed', 'max_crosswind')
+        ('Safety Requirements', {
+            'fields': ('requires_instructor_present', 'requires_current_medical')
         }),
         ('Notes', {
             'fields': ('notes',)
