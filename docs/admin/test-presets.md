@@ -60,12 +60,30 @@ Available category codes can be found in the QuestionCategory table.
 
 ## Deleting Presets
 
-⚠️ **Important**: Presets that are referenced by existing test templates cannot be deleted. The system will show an error message if you try to delete a protected preset.
+⚠️ **Important**: Before deleting presets, manually verify that no existing test templates reference them.
 
-To delete an unused preset:
-1. Click on the preset name to edit it
-2. Click the **"Delete"** button at the bottom left
-3. Confirm the deletion
+### Manual Verification Process
+
+1. **Check for template references** using Django shell:
+   ```python
+   from knowledgetest.models import WrittenTestTemplate
+   
+   # Check if any templates might reference the preset
+   preset_name = "PRESET_TO_DELETE"
+   templates = WrittenTestTemplate.objects.filter(name__icontains=preset_name)
+   
+   for template in templates:
+       print(f"Template: {template.name} (ID: {template.id})")
+       print(f"Created: {template.created_at}")
+       print("---")
+   ```
+
+2. **Review each template** to confirm it doesn't actually use the preset
+
+3. **Safe deletion steps**:
+   - Click on the preset name to edit it
+   - Click the **"Delete"** button at the bottom left  
+   - Confirm the deletion
 
 ## Using Presets in Test Creation
 

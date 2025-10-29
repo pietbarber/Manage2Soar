@@ -215,42 +215,17 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         )
 
     def delete_model(self, request, obj):
-        """Override delete to check if preset is in use by any templates."""
+        """Override delete to provide confirmation message."""
         from django.contrib import messages
-
-        # Check if any templates reference this preset
-        template_count = WrittenTestTemplate.objects.filter(
-            name__icontains=obj.name
-        ).count()
-
-        if template_count > 0:
-            messages.error(
-                request,
-                f'Cannot delete "{obj.name}" - {template_count} test templates may be referencing this preset. '
-                f'Please review existing tests first.'
-            )
-            return
 
         super().delete_model(request, obj)
         messages.success(
             request, f'Successfully deleted test preset "{obj.name}".')
 
     def delete_queryset(self, request, queryset):
-        """Override bulk delete to check if any presets are in use."""
+        """Override bulk delete to provide confirmation message."""
         from django.contrib import messages
 
-        for obj in queryset:
-            template_count = WrittenTestTemplate.objects.filter(
-                name__icontains=obj.name
-            ).count()
-            if template_count > 0:
-                messages.error(
-                    request,
-                    f'Cannot delete "{obj.name}" - {template_count} test templates may be referencing this preset.'
-                )
-                return
-
-        # If we get here, none are in use
         deleted_names = [obj.name for obj in queryset]
         queryset.delete()
         messages.success(
@@ -260,5 +235,6 @@ class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Test Presets: Configure reusable test templates with predefined question distributions. "
         "Active presets are available when creating new tests. "
         "Sort order controls the display order in the test creation interface. "
-        "⚠️ Be careful when deleting presets - existing tests may reference them!"
+        "⚠️ Before deleting presets, manually verify that no existing test templates reference them. "
+        "See docs/admin/test-presets.md for manual review procedures."
     )

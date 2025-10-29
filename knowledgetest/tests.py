@@ -477,36 +477,32 @@ class TestPresetTests(TestCase):
         self.assertEqual(preset_with_questions.get_total_questions(), 18)
         self.assertEqual(preset_empty.get_total_questions(), 0)
 
-    def test_preset_deletion_protection(self):
-        """Test that presets cannot be deleted if templates reference them"""
-        from django.core.exceptions import ValidationError
-
+    def test_preset_deletion_no_protection(self):
+        """Test that presets can be deleted (no automatic protection)"""
         # Create a preset and a template that might reference it
-        preset = TestPreset.objects.create(name="Protected Preset", is_active=True)
-        template = WrittenTestTemplate.objects.create(
-            name="Test using Protected Preset data",
+        preset = TestPreset.objects.create(name="Deletable Preset", is_active=True)
+        WrittenTestTemplate.objects.create(
+            name="Test using Deletable Preset data",
             pass_percentage=70
         )
 
-        # Try to delete the preset - should fail due to template reference
-        with self.assertRaises(ValidationError) as context:
-            preset.delete()
+        # Deletion should succeed - no automatic protection
+        preset.delete()
 
-        self.assertIn("Cannot delete test preset", str(context.exception))
-        self.assertIn("Protected Preset", str(context.exception))
-
-        # Preset should still exist
-        self.assertTrue(TestPreset.objects.filter(name="Protected Preset").exists())
+        # Preset should be gone
+        self.assertFalse(TestPreset.objects.filter(name="Deletable Preset").exists())
 
     def test_preset_deletion_success(self):
         """Test that unused presets can be deleted successfully"""
-        preset = TestPreset.objects.create(name="Deletable Preset", is_active=True)
+        preset = TestPreset.objects.create(
+            name="Another Deletable Preset", is_active=True)
 
         # Should be able to delete without error
         preset.delete()
 
         # Preset should be gone
-        self.assertFalse(TestPreset.objects.filter(name="Deletable Preset").exists())
+        self.assertFalse(TestPreset.objects.filter(
+            name="Another Deletable Preset").exists())
 
 
 class TestPresetViewIntegrationTests(TestCase):

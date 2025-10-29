@@ -218,23 +218,11 @@ class TestPreset(models.Model):
         return self.name
 
     def delete(self, *args, **kwargs):
-        """Override delete to prevent deletion if templates are using this preset."""
-        # Check if any WrittenTestTemplate references this preset name
-        # We'll check against template names that contain this preset name
-        from django.core.exceptions import ValidationError
-
-        # Look for templates that might reference this preset
-        template_count = WrittenTestTemplate.objects.filter(
-            name__icontains=self.name
-        ).count()
-
-        if template_count > 0:
-            raise ValidationError(
-                f'Cannot delete test preset "{self.name}" - '
-                f'{template_count} test templates may be referencing this preset. '
-                f'Please review existing tests before deletion.'
-            )
-
+        """
+        Override delete. No automatic protection; admins must manually verify
+        that no templates reference this preset before deletion.
+        See docs/admin/test-presets.md for manual review steps.
+        """
         super().delete(*args, **kwargs)
 
     @classmethod
