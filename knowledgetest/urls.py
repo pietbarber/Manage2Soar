@@ -3,6 +3,7 @@ from django.urls import path
 from instructors.views import WrittenTestReviewView
 
 from .views import (
+    CreateWrittenTestView,
     PendingTestsView,
     WrittenTestResultView,
     WrittenTestStartView,
@@ -15,6 +16,7 @@ from .views import (
 app_name = "knowledgetest"
 
 urlpatterns = [
+    path("create/", CreateWrittenTestView.as_view(), name="create"),
     path("tests/<int:pk>/start/", WrittenTestStartView.as_view(), name="quiz-start"),
     path("tests/<int:pk>/submit/", WrittenTestSubmitView.as_view(), name="quiz-submit"),
     path("attempt/<int:pk>/", WrittenTestResultView.as_view(), name="quiz-result"),

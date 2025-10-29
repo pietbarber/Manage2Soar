@@ -7,6 +7,7 @@ from utils.admin_helpers import AdminHelperMixin
 from .models import (
     Question,
     QuestionCategory,
+    TestPreset,
     WrittenTestAnswer,
     WrittenTestAttempt,
     WrittenTestTemplate,
@@ -131,4 +132,116 @@ class WrittenTestAnswerAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     admin_helper_message = (
         "Attempt answers: read-only details of student responses for each attempt."
+    )
+
+
+@admin.register(TestPreset)
+class TestPresetAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = ('name', 'description_preview', 'total_questions',
+                    'is_active', 'sort_order', 'created_at')
+    list_editable = ('is_active', 'sort_order')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('sort_order', 'name')
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'is_active', 'sort_order')
+        }),
+        ('Question Weights', {
+            'fields': ('category_weights', 'formatted_weights'),
+            'description': 'Configure how many questions from each category to include in tests using this preset.'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    readonly_fields = ('created_at', 'updated_at', 'formatted_weights')
+
+    def description_preview(self, obj):
+        """Show truncated description in list view."""
+        if obj.description:
+            return obj.description[:50] + ('...' if len(obj.description) > 50 else '')
+        return '-'
+    description_preview.short_description = 'Description'
+
+    def total_questions(self, obj):
+        """Show total number of questions in this preset."""
+        return obj.get_total_questions()
+    total_questions.short_description = 'Total Questions'
+
+    def formatted_weights(self, obj):
+        """Display category weights in a readable format."""
+        if not obj.category_weights:
+            return 'No questions configured'
+
+        # Get categories for context
+        from .models import QuestionCategory
+        categories = {
+            cat.code: cat.description for cat in QuestionCategory.objects.all()}
+
+        formatted_items = []
+        for code, weight in obj.category_weights.items():
+            if weight > 0:
+                desc = categories.get(code, code)
+                formatted_items.append(f'{desc} ({code}): {weight}')
+
+        return format_html('<br>'.join(formatted_items)) if formatted_items else 'No questions configured'
+    formatted_weights.short_description = 'Question Distribution'
+
+    def _has_preset_permission(self, request, allow_cfi: bool = True):
+        """
+        Helper for preset permissions.
+        Webmaster and superuser always allowed.
+        Chief Flight Instructor allowed only if allow_cfi is True.
+        """
+        user = request.user
+        if user.is_superuser or user.groups.filter(name="Webmasters").exists():
+            return True
+        if allow_cfi and user.groups.filter(name="Chief Flight Instructor").exists():
+            return True
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Only allow Webmaster, superuser, or Chief Flight Instructor to edit test presets
+        return self._has_preset_permission(request, allow_cfi=True)
+
+    def has_add_permission(self, request):
+        # Only allow Webmaster, superuser, or Chief Flight Instructor to add test presets
+        return self._has_preset_permission(request, allow_cfi=True)
+
+    def has_delete_permission(self, request, obj=None):
+        # Only allow Webmaster or superuser to delete test presets
+        return self._has_preset_permission(request, allow_cfi=False)
+
+    def delete_model(self, request, obj):
+        """Override delete to provide confirmation message."""
+        from django.contrib import messages
+
+        super().delete_model(request, obj)
+        messages.success(
+            request, f'Successfully deleted test preset "{obj.name}".')
+
+    def delete_queryset(self, request, queryset):
+        """Override bulk delete to provide confirmation message."""
+        from django.contrib import messages
+
+        # Efficiently get names before deletion using values_list
+        deleted_names = list(queryset.values_list('name', flat=True))
+        count = queryset.delete()[0]  # delete() returns (count, {model: count})
+
+        if deleted_names:
+            messages.success(
+                request, f'Successfully deleted {count} test presets: {", ".join(deleted_names)}.')
+        else:
+            messages.success(request, f'Successfully deleted {count} test presets.')
+
+    admin_helper_message = (
+        "Test Presets: Configure reusable test templates with predefined question distributions. "
+        "Active presets are available when creating new tests. "
+        "Sort order controls the display order in the test creation interface. "
+        "⚠️ Before deleting presets, manually verify that no existing test templates reference them. "
+        "See docs/admin/test-presets.md for manual review procedures."
     )

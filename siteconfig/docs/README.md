@@ -1,8 +1,46 @@
-# SiteConfiguration fields
+# Site Configuration App Documentation
 
-This document lists the important `SiteConfiguration` fields used by the application 
+Welcome to the documentation for the **siteconfig** Django app. This directory contains guides for contributors and maintainers.
 
-## Overview
+---
+
+## Key Features
+
+### Site-Wide Configuration
+The siteconfig app provides centralized configuration management for club-specific settings:
+
+- **Club branding**: Name, logo, abbreviation, and domain configuration
+- **Role title customization**: Configurable titles for various club positions
+- **Scheduling controls**: Enable/disable scheduling for different role types
+- **Notification settings**: Redaction notification deduplication controls
+
+### Configurable Membership Statuses (Issue #169)
+The siteconfig app now supports **configurable membership statuses** that can be managed through the Django admin interface:
+
+- **Database-driven statuses**: Membership statuses are now stored in the database instead of being hardcoded
+- **Django admin interface**: Staff users can create, edit, and manage membership statuses through `/admin/`
+- **Active/Inactive control**: Each status can be marked as active (grants member access) or inactive
+- **Backward compatibility**: Existing functionality preserved with automatic migration of hardcoded statuses
+- **Custom ordering**: Sort statuses in logical display order
+
+---
+
+## Contents
+
+- [Models](models.md)
+- [Membership Status Management](membership-statuses.md)
+
+---
+
+## Getting Started
+
+- Review [models.md](models.md) for the data model and database schema
+- See [membership-statuses.md](membership-statuses.md) for detailed membership status management
+- Use the Django admin interface to configure site settings and membership statuses
+
+---
+
+## App Overview
 
 The `SiteConfiguration` model stores site-wide settings and customizable role titles. There should only be one instance of this model. The admin UI provides an editor for the single SiteConfiguration object.
 

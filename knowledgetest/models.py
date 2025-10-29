@@ -179,3 +179,65 @@ class WrittenTestAssignment(models.Model):
 
     def __str__(self):
         return f"{self.template.name} → {self.student}"
+
+
+# Test Presets - configurable test templates
+
+
+class TestPreset(models.Model):
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Name of the test preset (e.g., 'ASK21', 'PW5', 'Duty Officer')"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description of what this preset is for"
+    )
+    category_weights = models.JSONField(
+        default=dict,
+        help_text="Dictionary mapping question category codes to the number of questions to include"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this preset is available for creating new tests"
+    )
+    sort_order = models.PositiveIntegerField(
+        default=100,
+        help_text="Display order (lower numbers appear first)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        verbose_name = "Test Preset"
+        verbose_name_plural = "Test Presets"
+
+    def __str__(self):
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        """
+        Override delete. No automatic protection; admins must manually verify
+        that no templates reference this preset before deletion.
+        See docs/admin/test-presets.md for manual review steps.
+        """
+        super().delete(*args, **kwargs)
+
+    @classmethod
+    def get_active_presets(cls):
+        """Get all test presets that are marked as active."""
+        return cls.objects.filter(is_active=True).order_by('sort_order', 'name')
+
+    @classmethod
+    def get_presets_as_dict(cls):
+        """Get active presets as a dictionary matching the old format."""
+        presets = {}
+        for preset in cls.get_active_presets():
+            presets[preset.name] = preset.category_weights
+        return presets
+
+    def get_total_questions(self):
+        """Calculate the total number of questions in this preset."""
+        return sum(self.category_weights.values()) if self.category_weights else 0
