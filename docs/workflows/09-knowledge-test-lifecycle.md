@@ -58,12 +58,13 @@ flowchart TD
 ## Technical Implementation
 
 ### **Models Involved**
+- **`knowledgetest.TestPreset`**: Configurable test presets with category weight distributions
 - **`knowledgetest.Question`**: Individual test questions and answers
 - **`knowledgetest.QuestionCategory`**: Topic organization for questions
-- **`knowledgetest.Test`**: Test definitions and configurations
-- **`knowledgetest.TestSession`**: Individual test-taking sessions
-- **`knowledgetest.StudentAnswer`**: Student responses to questions
-- **`knowledgetest.TestResult`**: Final scores and outcomes
+- **`knowledgetest.WrittenTestTemplate`**: Test definitions and configurations
+- **`knowledgetest.WrittenTestAttempt`**: Individual test-taking sessions
+- **`knowledgetest.WrittenTestAnswer`**: Student responses to questions
+- **`knowledgetest.WrittenTestAssignment`**: Test assignments to students
 - **`members.Member`**: Students taking tests and instructors creating them
 
 ### **Key Files**
@@ -125,23 +126,28 @@ flowchart TD
     E --> F[Test Assembly]
     F --> G{Test Type}
     
-    G -->|Random Selection| H[Algorithm Selection]
-    G -->|Manual Selection| I[Instructor Choice]
-    G -->|Adaptive| J[Performance-Based]
+    G -->|Preset-Based| H[Configurable Presets]
+    G -->|Random Selection| I[Algorithm Selection]
+    G -->|Manual Selection| J[Instructor Choice]
+    G -->|Adaptive| K[Performance-Based]
     
-    H --> K[Balanced Topic Coverage]
-    I --> L[Custom Test Design]
-    J --> M[Dynamic Difficulty]
+    H --> L[Load Test Preset]
+    L --> M[Apply Category Weights]
+    I --> N[Balanced Topic Coverage]
+    J --> O[Custom Test Design]
+    K --> P[Dynamic Difficulty]
     
-    K --> N[Generated Test]
-    L --> N
-    M --> N
+    M --> Q[Generated Test]
+    N --> Q
+    O --> Q
+    P --> Q
     
-    N --> O[Test Validation]
-    O --> P[Ready for Administration]
+    Q --> R[Test Validation]
+    R --> S[Ready for Administration]
     
     style B fill:#e3f2fd
-    style P fill:#e8f5e8
+    style H fill:#fff3e0
+    style S fill:#e8f5e8
 ```
 
 ### **Test Security and Integrity**
@@ -184,85 +190,95 @@ erDiagram
         boolean instructor
     }
     
+    TestPreset {
+        int id PK
+        string name UK
+        text description
+        json category_weights
+        boolean is_active
+        int sort_order
+        datetime created_at
+        datetime updated_at
+    }
+    
     QuestionCategory {
         int id PK
-        string name
+        string code UK
         text description
-        int parent_category_id FK
     }
     
     Question {
         int id PK
         int category_id FK
-        text question_text
-        string question_type
-        json answer_choices
-        json correct_answers
+        text question
+        string a
+        string b
+        string c
+        string d
+        string answer
         text explanation
-        int difficulty_level
-        boolean active
+        datetime lastupdated
+        string updatedby
     }
     
-    Test {
+    WrittenTestTemplate {
         int id PK
-        string title
+        string name
         text description
         int created_by_id FK
-        int questions_count
-        int time_limit_minutes
-        decimal passing_score
-        boolean randomize_questions
-        boolean active
-        date created_at
+        datetime created_at
+        decimal pass_percentage
+        duration time_limit
     }
     
-    TestQuestion {
+    WrittenTestTemplateQuestion {
         int id PK
-        int test_id FK
+        int template_id FK
         int question_id FK
-        int question_order
+        int order
     }
     
-    TestSession {
+    WrittenTestAttempt {
         int id PK
-        int test_id FK
+        int template_id FK
         int student_id FK
         datetime started_at
         datetime completed_at
         decimal score_percentage
         boolean passed
-        string session_status
-        json session_data
+        string status
     }
     
-    StudentAnswer {
+    WrittenTestAnswer {
         int id PK
-        int test_session_id FK
+        int attempt_id FK
         int question_id FK
-        json student_response
+        string selected_answer
         boolean correct
-        decimal points_earned
+        datetime answered_at
     }
     
-    TestResult {
+    WrittenTestAssignment {
         int id PK
-        int test_session_id FK
-        decimal final_score
-        boolean passed
-        text feedback
-        json category_scores
-        datetime generated_at
+        int template_id FK
+        int student_id FK
+        int instructor_id FK
+        date due_date
+        boolean completed
+        datetime created_at
     }
     
-    Member ||--o{ Test : creates
-    Member ||--o{ TestSession : takes
+    Member ||--o{ WrittenTestTemplate : creates
+    Member ||--o{ WrittenTestAttempt : takes
+    Member ||--o{ WrittenTestAssignment : assigned_to
+    Member ||--o{ WrittenTestAssignment : created_by
     QuestionCategory ||--o{ Question : contains
-    Question ||--o{ TestQuestion : used_in
-    Test ||--o{ TestQuestion : includes
-    Test ||--o{ TestSession : administered_as
-    TestSession ||--o{ StudentAnswer : contains
-    TestSession ||--o{ TestResult : produces
-    Question ||--o{ StudentAnswer : answered
+    Question ||--o{ WrittenTestTemplateQuestion : used_in
+    WrittenTestTemplate ||--o{ WrittenTestTemplateQuestion : includes
+    WrittenTestTemplate ||--o{ WrittenTestAttempt : administered_as
+    WrittenTestTemplate ||--o{ WrittenTestAssignment : assignments
+    WrittenTestAttempt ||--o{ WrittenTestAnswer : contains
+    Question ||--o{ WrittenTestAnswer : answered
 ```
 
 ## Key Integration Points
@@ -327,6 +343,60 @@ flowchart LR
     F --> I[Better Assessments]
     G --> J[Training Program Improvement]
 ```
+
+### **Configurable Test Presets (Issue #135)**
+
+The knowledge test system now supports database-driven test presets that replace hardcoded configurations:
+
+```mermaid
+flowchart TD
+    A[Administrator Access] --> B[Django Admin Interface]
+    B --> C[Manage Test Presets]
+    C --> D{Action Required}
+    
+    D -->|Create New| E[Define Preset Name]
+    D -->|Edit Existing| F[Select Existing Preset]
+    D -->|Delete Unused| G[Remove Old Preset]
+    
+    E --> H[Set Category Weights]
+    F --> I[Modify Category Weights]
+    G --> J[Confirm Deletion Protection]
+    
+    H --> K[Configure Active Status]
+    I --> L[Update Sort Order]
+    J --> M{References Exist?}
+    
+    K --> N[Save New Preset]
+    L --> O[Save Changes]
+    M -->|Yes| P[Deletion Blocked]
+    M -->|No| Q[Preset Deleted]
+    
+    N --> R[Preset Available for Use]
+    O --> R
+    P --> S[Error Message Shown]
+    Q --> T[Preset Removed]
+    
+    R --> U[Instructors Can Use Preset]
+    U --> V[Test Creation with Preset]
+    V --> W[Automatic Form Population]
+    
+    style A fill:#e1f5fe
+    style R fill:#e8f5e8
+    style P fill:#ffebee
+```
+
+**Key Benefits:**
+- **Flexibility**: Clubs can customize test configurations without code changes
+- **Consistency**: Standardized test formats for specific aircraft or topics
+- **Safety**: Deletion protection prevents accidental removal of active presets
+- **Usability**: URL parameters automatically populate test creation forms
+
+**Available Presets** (migrated from legacy system):
+- **ASK21**: ASK-21 aircraft-specific test (73 questions)
+- **PW5**: PW-5 aircraft-specific test (78 questions)
+- **DISCUS**: Discus aircraft-specific test (47 questions)
+- **ACRO**: Aerobatics-focused test (30 questions)
+- **EMPTY**: Blank preset for custom test creation
 
 ## Common Workflows
 
@@ -415,6 +485,7 @@ flowchart TD
 ## Known Gaps & Improvements
 
 ### **Current Strengths**
+- ✅ **Configurable test presets** - Database-driven test configurations replace hardcoded values
 - ✅ Comprehensive question bank management system
 - ✅ Secure test administration with time tracking
 - ✅ Automatic grading and immediate feedback
