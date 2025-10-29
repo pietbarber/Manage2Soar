@@ -343,29 +343,41 @@ def _notify_member_managers_of_contact(contact_submission):
                 is_active=True
             )
 
-        # Prepare email content
-        subject = f"New Visitor Contact: {contact_submission.subject}"
+        # Prepare email content with proper escaping to prevent email injection
+        # Strip newlines and control characters from subject to prevent header injection
+        safe_subject = ''.join(
+            char for char in contact_submission.subject if char.isprintable() and char not in '\r\n')
+        subject = f"New Visitor Contact: {safe_subject[:100]}"  # Limit subject length
+
+        # Sanitize all user input in email body
+        safe_name = contact_submission.name.replace('\r', '').replace('\n', ' ')
+        safe_email = contact_submission.email.replace('\r', '').replace('\n', ' ')
+        safe_phone = (contact_submission.phone or 'Not provided').replace(
+            '\r', '').replace('\n', ' ')
+        safe_user_subject = contact_submission.subject.replace(
+            '\r', '').replace('\n', ' ')
+        safe_message = contact_submission.message  # Keep original formatting for message content
 
         message = f"""
-A new visitor has contacted Skyline Soaring Club through the website.
+A new visitor has contacted the club through the website.
 
 Visitor Details:
-- Name: {contact_submission.name}
-- Email: {contact_submission.email}
-- Phone: {contact_submission.phone or 'Not provided'}
-- Subject: {contact_submission.subject}
+- Name: {safe_name}
+- Email: {safe_email}
+- Phone: {safe_phone}
+- Subject: {safe_user_subject}
 - Submitted: {contact_submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}
 
 Message:
-{contact_submission.message}
+{safe_message}
 
 ---
-You can respond directly to this visitor at: {contact_submission.email}
+You can respond directly to this visitor at: {safe_email}
 
 To manage this contact in the admin interface:
 {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://skylinesoaring.org'}/admin/cms/visitorcontact/{contact_submission.pk}/change/
 
-This message was sent automatically by the Skyline Soaring website contact form.
+This message was sent automatically by the club website contact form.
         """.strip()
 
         # Send email to each member manager
