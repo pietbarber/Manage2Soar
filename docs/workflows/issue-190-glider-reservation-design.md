@@ -15,17 +15,15 @@ flowchart TD
     B --> D[Solo Flight]
     B --> E[Badge Flight]
     B --> F[Check Flight]
-    B --> G[Flight Review]
-    B --> H[FAA Wings]
-    B --> I[Other]
+    B --> G[Flight Review/FAA Wings]
+    B --> H[Other]
     
-    C --> J[Select Date/Time]
-    D --> J
-    E --> J
-    F --> J
-    G --> J
-    H --> J
-    I --> J
+    C --> I[Select Date/Time]
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
     
     J --> K[Filter Available Aircraft]
     K --> L{Any Qualified Aircraft?}
@@ -118,46 +116,36 @@ flowchart TD
 flowchart TD
     A[Instructor Required] --> B{Reservation Type}
     
-    B -->|Flight Instruction| C[Match Training Phase]
-    B -->|Flight Review| D[Require CFI-G]
-    B -->|FAA Wings| E[Require Wings Qualified CFI]
-    B -->|Check Flight| F[Require Check Pilot Authority]
-    B -->|Badge Flight| G[Require Badge Official]
-    B -->|Other| H[Admin Review Required]
+    B -->|Flight Instruction| C[Find Available CFI-G]
+    B -->|Flight Review/FAA Wings| C
+    B -->|Check Flight| C
+    B -->|Badge Flight| C
+    B -->|Other| C
     
-    C --> I[Find Available CFI-G]
-    D --> I
-    E --> J[Find Wings CFI]
-    F --> K[Find Check Pilot]
-    G --> L[Find Badge Official]
-    H --> M[Manual Assignment]
+    C --> D{Instructor Available?}
     
-    I --> N{Instructor Available?}
-    J --> N
-    K --> N
-    L --> N
-    M --> N
+    D -->|No| E[Request Coverage]
+    D -->|Yes| F[Student Added to Queue]
     
-    N -->|No| O[Request Coverage]
-    N -->|Yes| P{Instructor Accepts?}
+    E --> G[Surge Instructor Request]
+    G --> H{Coverage Found?}
+    H -->|No| I[Reschedule Required]
+    H -->|Yes| J[Assign Coverage Instructor]
     
-    O --> Q[Surge Instructor Request]
-    Q --> R{Coverage Found?}
-    R -->|No| S[Reschedule Required]
-    R -->|Yes| T[Assign Coverage Instructor]
+    J --> F
+    F --> K[Instructor Manages Queue]
     
-    P -->|No| U[Find Alternative]
-    P -->|Yes| V[Confirm Assignment]
+    I --> L[End - No Coverage]
     
-    U --> I
-    T --> V
-    V --> W[Instructor Assigned]
-    
-    S --> X[End - No Coverage]
-    
-    style W fill:#e8f5e8
-    style X fill:#ffebee
+    style K fill:#e8f5e8
+    style L fill:#ffebee
 ```
+
+**Key Simplifications:**
+- **All CFI-G instructors** can handle all instruction types (Wings, Check, Badge Official duties)
+- **No admin review** required for any reservation type
+- **Flight Review and FAA Wings** use identical workflow
+- **Student queue management** is handled by the instructor, not the system
 
 ### First-Come-First-Served System
 
@@ -209,49 +197,42 @@ flowchart TD
     A[Time Conflict Detected] --> B{Conflict Type}
     
     B -->|Same Aircraft| C[Aircraft Double-Booked]
-    B -->|Same Instructor| D[Instructor Double-Booked]
-    B -->|Maintenance Window| E[Maintenance Conflict]
-    B -->|Weather Hold| F[Weather Restriction]
+    B -->|Maintenance Window| D[Maintenance Conflict]
     
-    C --> G[Show Alternative Times]
-    D --> H[Show Alternative Instructors]
-    E --> I[Show Aircraft Status]
-    F --> J[Show Weather Forecast]
+    C --> E[Show Alternative Times/Aircraft]
+    D --> F[Show Aircraft Status]
     
-    G --> K{Accept Alternative?}
-    H --> L{Accept Alternative?}
-    I --> M{Maintenance Complete?}
-    J --> N{Weather Improves?}
+    E --> G{Accept Alternative?}
+    F --> H{Maintenance Complete?}
     
-    K -->|Yes| O[Update Reservation]
-    L -->|Yes| O
-    M -->|Yes| P[Clear Maintenance Flag]
-    N -->|Yes| Q[Remove Weather Hold]
+    G -->|Yes| I[Update Reservation]
+    H -->|Yes| J[Clear Maintenance Flag]
     
-    K -->|No| R[Manual Scheduling]
-    L -->|No| R
-    M -->|No| S[Cancel - Maintenance]
-    N -->|No| T[Cancel - Weather]
+    G -->|No| K[Manual Scheduling]
+    H -->|No| L[Cancel - Maintenance]
     
-    P --> U[Reservation Confirmed]
-    Q --> U
-    O --> U
+    J --> M[Reservation Confirmed]
+    I --> M
     
-    R --> V{Resolution Found?}
-    V -->|Yes| U
-    V -->|No| W[Escalate to Admin]
+    K --> N{Resolution Found?}
+    N -->|Yes| M
+    N -->|No| O[Escalate to Admin]
     
-    W --> X[Admin Intervention]
-    X --> Y{Admin Decision}
-    Y -->|Approve Override| U
-    Y -->|Deny Request| Z[Reservation Denied]
+    O --> P[Admin Intervention]
+    P --> Q{Admin Decision}
+    Q -->|Approve Override| M
+    Q -->|Deny Request| R[Reservation Denied]
     
-    S --> Z
-    T --> Z
+    L --> R
     
-    style U fill:#e8f5e8
-    style Z fill:#ffebee
+    style M fill:#e8f5e8
+    style R fill:#ffebee
 ```
+
+**Simplified Conflict Resolution:**
+- **Removed instructor double-booking** - instructors manage their own student queues
+- **Removed weather restrictions** - system doesn't track weather conditions
+- **Focus on aircraft availability** and maintenance windows only
 
 ### Daily Operations Workflow
 
@@ -337,8 +318,7 @@ class GliderReservation(models.Model):
         ('solo', 'Solo Flight'),
         ('badge', 'Badge Flight'),
         ('check', 'Check Flight'),
-        ('flight_review', 'Flight Review'),
-        ('faa_wings', 'FAA Wings'),
+        ('flight_review', 'Flight Review/FAA Wings'),
         ('other', 'Other'),
     ]
     reservation_type = models.CharField(
@@ -512,24 +492,17 @@ class GliderReservation(models.Model):
 - **Validation**: Check pilot must be current and qualified
 - **Duration**: 1-2 hours typically
 
-### Flight Review
-- **Purpose**: Biennial Flight Review (BFR) as required by FAR 61.56
-- **Requirements**: CFI-G (Certified Flight Instructor - Glider)
-- **Validation**: Pilot must be due for flight review
-- **Duration**: Minimum 1 hour flight, 1 hour ground
-- **Notes**: Required every 24 calendar months for currency
-
-### FAA Wings
-- **Purpose**: FAA Wings Pilot Proficiency Program participation
-- **Requirements**: Qualified instructor, specific training objectives
-- **Validation**: Member enrolled in Wings program
-- **Duration**: Variable based on specific Wings credit requirements
-- **Notes**: Voluntary safety program providing flight review alternatives
+### Flight Review/FAA Wings
+- **Purpose**: Biennial Flight Review (BFR) or FAA Wings Program participation
+- **Requirements**: CFI-G (all club instructors qualified for both)
+- **Validation**: Basic currency/program enrollment check
+- **Duration**: Variable (1+ hour flight typical)
+- **Notes**: Combined workflow since any CFI-G can handle both types
 
 ### Other
 - **Purpose**: Miscellaneous flights not covered by standard categories
-- **Requirements**: Case-by-case approval
-- **Validation**: Administrative review required
+- **Requirements**: No special approval needed
+- **Validation**: Standard aircraft qualification only
 - **Duration**: Variable
 - **Notes**: Examples: demo flights, aircraft checkout, maintenance test flights
 
@@ -557,12 +530,30 @@ class GliderReservation(models.Model):
 | Instruction | ✅ Yes | Training phase check | 1-4 hours |
 | Solo | ❌ No | Solo endorsement | Variable |
 | Badge | ❌ No* | Badge prerequisites | Full day |
-| Check | ✅ Yes | Check pilot qualification | 1-3 hours |
-| Flight Review | ✅ Yes (CFI-G) | BFR currency check | 2+ hours |
-| FAA Wings | ✅ Yes | Wings enrollment | Variable |
+| Check | ✅ Yes (any CFI-G) | Check pilot qualification | 1-3 hours |
+| Flight Review/Wings | ✅ Yes (any CFI-G) | Currency/enrollment check | Variable |
 | Other | ❌ No | Basic qualifications | Variable |
 
 *Badge flights: First-come-first-served. Badge Official coordination happens outside the reservation system.
+*All CFI-G instructors qualified for Wings, Check, and Badge Official duties.
+
+## Workflow Simplifications (Updated)
+
+### Instructor Assignment Reality
+- **Universal CFI-G Capability**: All club CFI-G instructors handle Wings, Flight Reviews, Check flights, and Badge Official duties
+- **No Specialized Categories**: Eliminated separate "Wings CFI", "Check Pilot", "Badge Official" requirements
+- **Student Queue Management**: Instructors manage their own student queues - no system-based instructor conflicts
+- **No Admin Review**: "Other" reservations require no special approval
+
+### Conflict Resolution Reality  
+- **Aircraft-Only Conflicts**: Focus on aircraft double-booking and maintenance windows
+- **No Instructor Conflicts**: Removed instructor double-booking since they manage their own queues
+- **No Weather Integration**: System doesn't track weather conditions for conflict resolution
+- **Simplified Decision Tree**: Streamlined to actual club operational conflicts
+
+### Combined Reservation Types
+- **Flight Review/FAA Wings**: Merged into single workflow since any CFI-G can handle both
+- **Reduced Types**: From 7 reservation types to 6 (eliminated FAA Wings as separate category)
 
 ## Next Implementation Steps
 
