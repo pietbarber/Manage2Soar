@@ -11,48 +11,42 @@ This document outlines the comprehensive glider reservation system that will tra
 flowchart TD
     A[Member Initiates Reservation] --> B{Select Reservation Type}
     
-    B --> C[Flight Instruction]
-    B --> D[Solo Flight]
-    B --> E[Badge Flight]
-    B --> F[Check Flight]
-    B --> G[Flight Review/FAA Wings]
-    B --> H[Other]
+    B --> C[Solo Flight]
+    B --> D[Badge Flight] 
+    B --> E[Other]
     
-    C --> I[Select Date/Time]
-    D --> I
-    E --> I
-    F --> I
-    G --> I
-    H --> I
+    C --> F[Select Date/Time]
+    D --> F
+    E --> F
     
-    I --> J[Filter Available Aircraft]
-    J --> K{Any Qualified Aircraft?}
+    F --> G[Filter Available Aircraft]
+    G --> H{Any Qualified Aircraft?}
     
-    K -->|No| L[No Available Aircraft Notice]
-    L --> M[End - No Options Available]
+    H -->|No| I[No Available Aircraft Notice]
+    I --> J[End - No Options Available]
     
-    K -->|Yes| N[Show Qualified Aircraft Only]
-    N --> O[Select from Qualified List]
-    O --> P{Aircraft Available for Time?}
+    H -->|Yes| K[Show Qualified Aircraft Only]
+    K --> L[Select from Qualified List]
+    L --> M{Aircraft Available for Time?}
     
-    P -->|No| Q[Show Alternative Times]
-    Q --> R[End - Time Conflict]
+    M -->|No| N[Show Alternative Times]
+    N --> O[End - Time Conflict]
     
-    P -->|Yes| S{Time Conflict Check}
-    S -->|Conflict| T[Show Conflicts]
-    T --> U[Suggest Alternative Times]
-    U --> N
+    M -->|Yes| P{Time Conflict Check}
+    P -->|Conflict| Q[Show Conflicts]
+    Q --> R[Suggest Alternative Times]
+    R --> K
     
-    S -->|No Conflict| V[Create Reservation]
+    P -->|No Conflict| S[Create Reservation]
     
-    V --> W[Status: Confirmed]
-    W --> X[Send Confirmation]
-    X --> Y[Reservation Complete]
+    S --> T[Status: Confirmed]
+    T --> U[Send Confirmation]
+    U --> V[Reservation Complete]
     
     style A fill:#e1f5fe
-    style Y fill:#e8f5e8
-    style M fill:#ffebee
-    style R fill:#ffebee
+    style V fill:#e8f5e8
+    style J fill:#ffebee
+    style O fill:#ffebee
 ```
 
 ### Qualification Validation Workflow
@@ -110,42 +104,14 @@ flowchart TD
     style GG fill:#ffebee
 ```
 
-### Instructor Assignment Workflow
+### Fun Flying Only - No Instructors
 
-```mermaid
-flowchart TD
-    A[Instructor Required] --> B{Reservation Type}
-    
-    B -->|Flight Instruction| C[Find Available CFI-G]
-    B -->|Flight Review/FAA Wings| C
-    B -->|Check Flight| C
-    B -->|Badge Flight| C
-    B -->|Other| C
-    
-    C --> D{Instructor Available?}
-    
-    D -->|No| E[Request Coverage]
-    D -->|Yes| F[Student Added to Queue]
-    
-    E --> G[Surge Instructor Request]
-    G --> H{Coverage Found?}
-    H -->|No| I[Reschedule Required]
-    H -->|Yes| J[Assign Coverage Instructor]
-    
-    J --> F
-    F --> K[Instructor Manages Queue]
-    
-    I --> L[End - No Coverage]
-    
-    style K fill:#e8f5e8
-    style L fill:#ffebee
-```
+**Glider reservations are exclusively for member fun flying:**
+- **Solo Flight**: Member flying alone for recreation
+- **Badge Flight**: Solo flights for badge/achievement purposes  
+- **Other**: Miscellaneous fun flying (demo flights, checkout flights, etc.)
 
-**Key Simplifications:**
-- **All CFI-G instructors** can handle all instruction types (Wings, Check, Badge Official duties)
-- **No admin review** required for any reservation type
-- **Flight Review and FAA Wings** use identical workflow
-- **Student queue management** is handled by the instructor, not the system
+**No instruction-related reservations** - instruction scheduling is handled separately through the instructor scheduling system.
 
 ### First-Come-First-Served System
 
@@ -314,11 +280,8 @@ class GliderReservation(models.Model):
     
     # Reservation type with comprehensive options
     RESERVATION_TYPE_CHOICES = [
-        ('instruction', 'Flight Instruction'),
         ('solo', 'Solo Flight'),
         ('badge', 'Badge Flight'),
-        ('check', 'Check Flight'),
-        ('flight_review', 'Flight Review/FAA Wings'),
         ('other', 'Other'),
     ]
     reservation_type = models.CharField(
@@ -340,15 +303,7 @@ class GliderReservation(models.Model):
         default='confirmed'
     )
     
-    # Optional instructor assignment
-    instructor = models.ForeignKey(
-        'members.Member',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='instruction_reservations',
-        help_text="Required for instruction, review, and check flights"
-    )
+    # No instructor field - glider reservations are for fun flying only
     
     # Additional details
     purpose = models.TextField(
@@ -468,50 +423,28 @@ class GliderReservation(models.Model):
 
 ## Reservation Type Specifications
 
-### Flight Instruction
-- **Purpose**: Primary flight training for students
-- **Requirements**: Instructor required, appropriate aircraft for training phase
-- **Validation**: Student must have active training record
-- **Duration**: Typically 1-3 hours
-
 ### Solo Flight
-- **Purpose**: Independent flight by qualified pilot
+- **Purpose**: Independent recreational flight by qualified pilot
 - **Requirements**: Current solo endorsement for aircraft type
-- **Validation**: Member must meet currency requirements
+- **Validation**: Member must meet currency requirements for aircraft
 - **Duration**: Variable based on flight plan
+- **Notes**: Primary fun flying reservation type
 
 ### Badge Flight
-- **Purpose**: Official badge/rating attempts (Silver, Gold, Diamond badges)
-- **Requirements**: Badge Official present, full-day aircraft access
-- **Validation**: Member must meet badge prerequisites
+- **Purpose**: Solo badge/rating attempts (Silver, Gold, Diamond badges)
+- **Requirements**: Member qualifications for badge type
+- **Validation**: Member must meet badge prerequisites  
 - **Duration**: Typically full day (sunrise to sunset)
-
-### Check Flight
-- **Purpose**: Proficiency checks, rating validation, insurance requirements
-- **Requirements**: Designated check pilot, specific aircraft
-- **Validation**: Check pilot must be current and qualified
-- **Duration**: 1-2 hours typically
-
-### Flight Review/FAA Wings
-- **Purpose**: Biennial Flight Review (BFR) or FAA Wings Program participation
-- **Requirements**: CFI-G (all club instructors qualified for both)
-- **Validation**: Basic currency/program enrollment check
-- **Duration**: Variable (1+ hour flight typical)
-- **Notes**: Combined workflow since any CFI-G can handle both types
+- **Notes**: Badge Official coordination happens outside reservation system
 
 ### Other
-- **Purpose**: Miscellaneous flights not covered by standard categories
-- **Requirements**: No special approval needed
-- **Validation**: Standard aircraft qualification only
+- **Purpose**: Miscellaneous fun flying not covered by standard categories
+- **Requirements**: Standard aircraft qualifications only
+- **Validation**: Basic qualification check for aircraft type
 - **Duration**: Variable
 - **Notes**: Examples: demo flights, aircraft checkout, maintenance test flights
 
 ## Integration with Existing Systems
-
-### Connection to Instructors App
-- Link `instructor` field to qualified instructors from `instructors.models`
-- Validate instructor qualifications for specific reservation types
-- Track training progress for instruction reservations
 
 ### Connection to Logsheet App
 - Validate against `logsheet.Glider` availability and grounding status
@@ -527,15 +460,35 @@ class GliderReservation(models.Model):
 
 | Reservation Type | Instructor Required | Qualification Validation | Duration Limits |
 |------------------|--------------------|--------------------|-----------------|
-| Instruction | ✅ Yes | Training phase check | 1-4 hours |
-| Solo | ❌ No | Solo endorsement | Variable |
-| Badge | ❌ No* | Badge prerequisites | Full day |
-| Check | ✅ Yes (any CFI-G) | Check pilot qualification | 1-3 hours |
-| Flight Review/Wings | ✅ Yes (any CFI-G) | Currency/enrollment check | Variable |
-| Other | ❌ No | Basic qualifications | Variable |
+| Solo | ❌ No | Aircraft qualification only | Variable |
+| Badge | ❌ No | Badge prerequisites + aircraft qual | Full day |
+| Other | ❌ No | Basic aircraft qualifications | Variable |
 
-*Badge flights: First-come-first-served. Badge Official coordination happens outside the reservation system.
-*All CFI-G instructors qualified for Wings, Check, and Badge Official duties.
+**Key Points:**
+- **No instructors involved** - all reservation types are for independent fun flying
+- **First-come-first-served** - automatic confirmation upon qualification validation
+- **Badge Official coordination** happens outside the reservation system
+
+## Critical System Separation
+
+### Glider Reservations vs. Instruction Scheduling
+
+**Glider Reservations (This System):**
+- ✅ **Solo Flight**: Member flying alone for fun
+- ✅ **Badge Flight**: Solo badge attempts
+- ✅ **Other**: Demo flights, checkouts, maintenance tests
+- 🚫 **NO INSTRUCTORS** - pure member fun flying only
+
+**Instruction Scheduling (Separate System):**
+- ✅ **Flight Instruction**: Student-instructor training
+- ✅ **Flight Reviews**: CFI-G conducting BFRs
+- ✅ **Check Flights**: Instructor conducting proficiency checks
+- ✅ **FAA Wings**: Instructor-led Wings program flights
+
+**Why Separate?**
+- Different workflows: Fun flying vs. educational/regulatory
+- Different validation: Aircraft qualification vs. instructor availability
+- Different scheduling: Time-specific reservations vs. instructor queues
 
 ## Workflow Simplifications (Updated)
 
