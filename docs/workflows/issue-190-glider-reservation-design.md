@@ -715,6 +715,7 @@ class GliderAccessValidator:
     def can_member_access_glider(member, glider, flight_type='solo'):
         """
         Check if member has required qualifications for glider access.
+        Primary validation based on pilot rating status, not aircraft configuration.
         
         Args:
             member: Member instance
@@ -725,18 +726,30 @@ class GliderAccessValidator:
             tuple: (is_authorized: bool, missing_requirements: list)
         """
         
-        # Get all requirements for this glider
+        missing_requirements = []
+        
+        # STEP 1: Check pilot rating status (primary validation)
+        is_rated_pilot = member.glider_rating in ['private', 'commercial']
+        is_student_pilot = member.glider_rating == 'student'
+        
+        if not (is_rated_pilot or is_student_pilot):
+            missing_requirements.append(f"Member rating '{member.glider_rating}' not recognized for flight operations")
+            return False, missing_requirements
+        
+        # STEP 2: Get glider-specific requirements
         requirements = GliderQualificationRequirement.objects.filter(
             glider=glider,
             requirement_type__in=[flight_type, 'either']
         )
         
         if not requirements.exists():
-            # No specific requirements = open access
+            # No specific requirements - apply basic rating-based validation
+            if is_student_pilot and flight_type == 'solo':
+                missing_requirements.append("Student pilots require solo endorsement for solo flights")
+                return False, missing_requirements
             return True, []
         
-        missing_requirements = []
-        
+        # STEP 3: Validate specific glider qualifications
         for req in requirements:
             # Check if member has the required qualification
             member_qual = MemberQualification.objects.filter(
@@ -749,7 +762,7 @@ class GliderAccessValidator:
                 missing_requirements.append(f"Missing {req.qualification.name}")
                 continue
             
-            # Check if qualification is current (not expired)
+            # CRITICAL: Check if qualification is current (odontogenesis enforcement!)
             if member_qual.expiration_date and member_qual.expiration_date < timezone.now().date():
                 missing_requirements.append(f"{req.qualification.name} expired on {member_qual.expiration_date}")
                 continue
@@ -773,6 +786,19 @@ class GliderAccessValidator:
                 except:
                     # External training records not available - skip enforcement
                     pass
+        
+        # STEP 4: Rating-specific additional validation
+        if is_student_pilot:
+            # Student pilots have additional restrictions
+            if flight_type == 'solo' and glider.seats == 1:
+                # Single-seater solo requires specific endorsement
+                solo_endorsement = MemberQualification.objects.filter(
+                    member=member,
+                    qualification__code__icontains='solo',
+                    is_qualified=True
+                ).exists()
+                if not solo_endorsement:
+                    missing_requirements.append("Student pilot requires solo endorsement for single-seater aircraft")
         
         is_authorized = len(missing_requirements) == 0
         return is_authorized, missing_requirements
