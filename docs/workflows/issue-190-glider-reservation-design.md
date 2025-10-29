@@ -13,47 +13,52 @@ flowchart TD
     
     B --> C[Solo Flight]
     B --> D[Badge Flight] 
-    B --> E[Other]
+    B --> E[Guest Flying]
+    B --> F[Other]
     
-    C --> F[Select Date/Time]
-    D --> F
-    E --> F
+    C --> G[Select Date/Time]
+    D --> G
+    E --> G
+    F --> G
     
-    F --> G[Filter Available Aircraft]
-    G --> H{Any Qualified Aircraft?}
+    G --> H[Filter Available Aircraft]
+    H --> I{Any Qualified Aircraft?}
     
-    H -->|No| I[No Available Aircraft Notice]
-    I --> J[End - No Options Available]
+    I -->|No| J[No Available Aircraft Notice]
+    J --> K[End - No Options Available]
     
-    H -->|Yes| K[Show Qualified Aircraft Only]
-    K --> L[Select from Qualified List]
-    L --> M{Aircraft Available for Time?}
+    I -->|Yes| L[Show Qualified Aircraft Only]
+    L --> M[Select from Qualified List]
+    M --> N{Aircraft Available for Time?}
     
-    M -->|No| N[Show Alternative Times]
-    N --> O[End - Time Conflict]
+    N -->|No| O[Show Alternative Times]
+    O --> P[End - Time Conflict]
     
-    M -->|Yes| P{Time Conflict Check}
-    P -->|Conflict| Q[Show Conflicts]
-    Q --> R[Suggest Alternative Times]
-    R --> K
+    N -->|Yes| Q{Time Conflict Check}
+    Q -->|Conflict| R[Show Conflicts]
+    R --> S[Suggest Alternative Times]
+    S --> L
     
-    P -->|No Conflict| S[Create Reservation]
+    Q -->|No Conflict| T[Create Reservation]
     
-    S --> T[Status: Confirmed]
-    T --> U[Send Confirmation]
-    U --> V[Reservation Complete]
+    T --> U[Status: Confirmed]
+    U --> V[Send Confirmation]
+    V --> W[Reservation Complete]
     
     style A fill:#e1f5fe
-    style V fill:#e8f5e8
-    style J fill:#ffebee
-    style O fill:#ffebee
+    style W fill:#e8f5e8
+    style K fill:#ffebee
+    style P fill:#ffebee
 ```
 
 ### Qualification Validation Workflow
 
 ```mermaid
 flowchart TD
-    A[Check Member Qualifications] --> B{Rated Pilot or Student?}
+    A[Check Member Qualifications] --> A1{Current Safety Meeting?}
+    
+    A1 -->|No| A2[Block - Safety Meeting Required]
+    A1 -->|Yes| B{Rated Pilot or Student?}
     
     B -->|Student Pilot| C[Student Validation Path]
     B -->|Rated Pilot| D[Rated Pilot Validation Path]
@@ -82,6 +87,7 @@ flowchart TD
     U -->|Single-Seater| V[Rated Pilot Solo Flight]
     U -->|Two-Seater| W[Rated Pilot Passenger Flight]
     
+    A2 --> A3[End - Safety Meeting Required]
     F --> BB[End - Dual Instruction Only]
     H --> CC[End - Aircraft Checkout Required]
     J --> DD[End - Currency Flight Required]
@@ -97,6 +103,7 @@ flowchart TD
     style FF fill:#e8f5e8
     style HH fill:#e8f5e8
     style II fill:#e8f5e8
+    style A3 fill:#ffebee
     style BB fill:#ffebee
     style CC fill:#ffebee
     style DD fill:#ffebee
@@ -174,30 +181,23 @@ flowchart TD
     G -->|Yes| I[Update Reservation]
     H -->|Yes| J[Clear Maintenance Flag]
     
-    G -->|No| K[Manual Scheduling]
+    G -->|No| K[Reservation Denied]
     H -->|No| L[Cancel - Maintenance]
     
     J --> M[Reservation Confirmed]
     I --> M
     
-    K --> N{Resolution Found?}
-    N -->|Yes| M
-    N -->|No| O[Escalate to Admin]
-    
-    O --> P[Admin Intervention]
-    P --> Q{Admin Decision}
-    Q -->|Approve Override| M
-    Q -->|Deny Request| R[Reservation Denied]
-    
-    L --> R
+    L --> K
     
     style M fill:#e8f5e8
-    style R fill:#ffebee
+    style K fill:#ffebee
 ```
 
 **Simplified Conflict Resolution:**
 - **Removed instructor double-booking** - instructors manage their own student queues
-- **Removed weather restrictions** - system doesn't track weather conditions
+- **Removed weather restrictions** - system doesn't track weather conditions  
+- **Removed admin escalation** - no one available to arbitrate conflicts
+- **Simple binary outcome**: Accept alternative → Confirmed, or Decline → Denied
 - **Focus on aircraft availability** and maintenance windows only
 
 ### Daily Operations Workflow
@@ -282,6 +282,7 @@ class GliderReservation(models.Model):
     RESERVATION_TYPE_CHOICES = [
         ('solo', 'Solo Flight'),
         ('badge', 'Badge Flight'),
+        ('guest', 'Guest Flying'),
         ('other', 'Other'),
     ]
     reservation_type = models.CharField(
@@ -437,12 +438,19 @@ class GliderReservation(models.Model):
 - **Duration**: Typically full day (sunrise to sunset)
 - **Notes**: Badge Official coordination happens outside reservation system
 
+### Guest Flying
+- **Purpose**: Members bringing guests for demo flights (Section 2.3.2)
+- **Requirements**: Member acting as pilot-in-command with guest as passenger
+- **Validation**: Member must be qualified for two-seater aircraft
+- **Duration**: Variable, typically 1-2 hours
+- **Notes**: Compliance with operations manual guest flying requirements
+
 ### Other
 - **Purpose**: Miscellaneous fun flying not covered by standard categories
 - **Requirements**: Standard aircraft qualifications only
 - **Validation**: Basic qualification check for aircraft type
 - **Duration**: Variable
-- **Notes**: Examples: demo flights, aircraft checkout, maintenance test flights
+- **Notes**: Examples: aircraft checkout, maintenance test flights
 
 ## Integration with Existing Systems
 
@@ -460,14 +468,31 @@ class GliderReservation(models.Model):
 
 | Reservation Type | Instructor Required | Qualification Validation | Duration Limits |
 |------------------|--------------------|--------------------|-----------------|
-| Solo | ❌ No | Aircraft qualification only | Variable |
-| Badge | ❌ No | Badge prerequisites + aircraft qual | Full day |
-| Other | ❌ No | Basic aircraft qualifications | Variable |
+| Solo | ❌ No | Safety meeting + aircraft qual | Variable |
+| Badge | ❌ No | Safety meeting + badge prereqs + aircraft qual | Full day |
+| Guest Flying | ❌ No | Safety meeting + two-seater qual | Variable |
+| Other | ❌ No | Safety meeting + basic aircraft qual | Variable |
 
 **Key Points:**
+- **Mandatory Safety Meeting** - annual requirement enforced for ALL reservations (Section 1.5.6)
 - **No instructors involved** - all reservation types are for independent fun flying
+- **Guest Flying compliance** - explicit support for Section 2.3.2 operations manual requirements
 - **First-come-first-served** - automatic confirmation upon qualification validation
 - **Badge Official coordination** happens outside the reservation system
+
+## Operations Manual Compliance
+
+### Section 1.5.6 - Safety Meeting Requirement
+- **Annual Mandatory Safety Meeting** qualification badge now enforced
+- **System blocks reservations** if safety meeting attendance is expired
+- **Qualification badge renewed annually** with attendance tracking
+- **Previously decorative** qualification now has enforcement "teeth"
+
+### Section 2.3 - Glider Scheduling
+- **Guest Flying (Section 2.3.2)** explicitly supported as reservation type
+- **Member as PIC** for guest demonstration flights
+- **Launch sequencing** remains duty officer responsibility (not automated)
+- **Compliance with all operations manual** scheduling requirements
 
 ## Critical System Separation
 
@@ -622,6 +647,17 @@ class GliderAccessValidator:
         """
         
         missing_requirements = []
+        
+        # STEP 0: Check mandatory safety meeting (Section 1.5.6)
+        current_year = timezone.now().year
+        safety_meeting_qual = member.qualifications.filter(
+            qualification_type__name='Safety Meeting',
+            date_earned__year=current_year
+        ).first()
+        
+        if not safety_meeting_qual:
+            missing_requirements.append('Current year safety meeting attendance required')
+            return False, missing_requirements
         
         # STEP 1: Check pilot rating status (primary validation)
         is_rated_pilot = member.glider_rating in ['private', 'commercial']
