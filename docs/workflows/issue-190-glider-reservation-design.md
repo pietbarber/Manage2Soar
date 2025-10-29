@@ -27,25 +27,23 @@ flowchart TD
     H --> J
     I --> J
     
-    J --> K[Select Glider]
-    K --> L{Glider Available?}
+    J --> K[Filter Available Aircraft]
+    K --> L{Any Qualified Aircraft?}
     
-    L -->|No| M[Show Available Aircraft]
-    M --> K
+    L -->|No| M[No Available Aircraft Notice]
+    M --> N[End - No Options Available]
     
-    L -->|Yes| N{Grounded Check}
-    N -->|Grounded| O[Maintenance Alert]
-    O --> M
+    L -->|Yes| O[Show Qualified Aircraft Only]
+    O --> P[Select from Qualified List]
+    P --> Q{Aircraft Available for Time?}
     
-    N -->|Available| P{Qualification Check}
-    P -->|Failed| Q[Qualification Error]
-    Q --> R[Show Requirements]
-    R --> S[End - Requirements Not Met]
+    Q -->|No| R[Show Alternative Times]
+    R --> S[End - Time Conflict]
     
-    P -->|Passed| T{Time Conflict Check}
+    Q -->|Yes| T{Time Conflict Check}
     T -->|Conflict| U[Show Conflicts]
     U --> V[Suggest Alternative Times]
-    V --> J
+    V --> O
     
     T -->|No Conflict| W{Instructor Required?}
     W -->|Yes| X[Select Instructor]
@@ -66,6 +64,7 @@ flowchart TD
     
     style A fill:#e1f5fe
     style GG fill:#e8f5e8
+    style N fill:#ffebee
     style S fill:#ffebee
 ```
 
@@ -196,7 +195,7 @@ flowchart TD
     G -->|Yes| J[Check Aircraft Status]
     J --> K{Aircraft Available?}
     
-    K -->|No| L[Show Maintenance Status]
+    K -->|No| L[Show Grounding Reason]
     L --> M[End - Aircraft Unavailable]
     
     K -->|Yes| N[Create Reservation]
@@ -770,20 +769,55 @@ class GliderAccessValidator:
         return is_authorized, missing_requirements
     
     @staticmethod
-    def get_accessible_gliders(member, flight_type='solo'):
+    def get_accessible_gliders(member, flight_type='solo', date=None):
         """
         Get list of gliders member is qualified to access.
+        This is the FIRST step - filter options before presenting to user.
         """
         accessible_gliders = []
         
         for glider in Glider.objects.filter(is_active=True, club_owned=True):
+            # Skip grounded aircraft entirely
+            if glider.is_grounded:
+                continue
+                
+            # Check if member is qualified for this aircraft
             is_authorized, _ = GliderAccessValidator.can_member_access_glider(
                 member, glider, flight_type
             )
             if is_authorized:
-                accessible_gliders.append(glider)
+                accessible_gliders.append({
+                    'glider': glider,
+                    'qualification_status': 'qualified',
+                    'available_times': glider.get_available_times(date) if date else None
+                })
         
         return accessible_gliders
+    
+    @staticmethod
+    def get_user_friendly_aircraft_list(member, flight_type='solo', date=None):
+        """
+        Returns a clean list for UI display - only shows what user can actually book.
+        No teasing with unavailable options!
+        """
+        accessible = GliderAccessValidator.get_accessible_gliders(member, flight_type, date)
+        
+        if not accessible:
+            return {
+                'aircraft': [],
+                'message': f"No aircraft available for {flight_type} flights. Contact an instructor about additional qualifications.",
+                'suggestions': [
+                    "Complete required aircraft checkouts",
+                    "Ensure qualifications are current",
+                    "Check with CFI about training requirements"
+                ]
+            }
+        
+        return {
+            'aircraft': accessible,
+            'message': f"Available aircraft for {flight_type} flights:",
+            'total_count': len(accessible)
+        }
 ```
 
 ### Integration with Reservation System
