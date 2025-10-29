@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Document, HomePageContent, HomePageImage, Page, SiteFeedback
+from .models import Document, HomePageContent, HomePageImage, Page, SiteFeedback, VisitorContact
 
 # --- CMS Arbitrary Page and Document Admin ---
 
@@ -187,6 +187,101 @@ class SiteFeedbackAdmin(admin.ModelAdmin):
         if change and 'admin_response' in form.changed_data and obj.admin_response:
             obj.responded_by = request.user
         super().save_model(request, obj, form, change)
+
+
+# Visitor Contact Admin for Issue #70
+
+@admin.register(VisitorContact)
+class VisitorContactAdmin(admin.ModelAdmin):
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["admin_helper_message"] = self.admin_helper_message
+        return super().changelist_view(request, extra_context=extra_context)
+
+    list_display = ('submitted_at', 'name', 'email', 'subject',
+                    'status', 'handled_by_name', 'ip_display')
+    list_filter = ('status', 'submitted_at')
+    search_fields = ('name', 'email', 'subject', 'message')
+    readonly_fields = ('submitted_at', 'ip_address')
+
+    # Group fields logically
+    fieldsets = (
+        ('Contact Details', {
+            'fields': ('name', 'email', 'phone', 'subject', 'message')
+        }),
+        ('Status & Management', {
+            'fields': ('status', 'handled_by', 'admin_notes')
+        }),
+        ('Metadata', {
+            'fields': ('submitted_at', 'ip_address'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    # Allow filtering and bulk status updates
+    actions = ['mark_read', 'mark_responded', 'mark_closed']
+
+    admin_helper_message = (
+        "<b>Visitor Contacts:</b> Manage contact form submissions from website visitors. "
+        "These are public inquiries from people interested in the club, replacing the "
+        "spam-prone club public contact email address."
+    )
+
+    def ip_display(self, obj):
+        """Display IP address in a truncated format for privacy"""
+        if obj.ip_address:
+            # Show only first 3 octets for privacy
+            parts = obj.ip_address.split('.')
+            if len(parts) == 4:
+                return f"{parts[0]}.{parts[1]}.{parts[2]}.xxx"
+            return obj.ip_address[:12] + "..."
+        return '-'
+    ip_display.short_description = 'IP (Partial)'
+
+    def handled_by_name(self, obj):
+        """Display who handled this contact in the list view"""
+        if obj.handled_by:
+            return obj.handled_by.full_display_name
+        return '-'
+    handled_by_name.short_description = 'Handled By'
+
+    def mark_read(self, request, queryset):
+        """Bulk action to mark contacts as read"""
+        updated = queryset.update(status='read')
+        self.message_user(request, f'{updated} contact submissions marked as read.')
+    mark_read.short_description = "Mark selected items as read"
+
+    def mark_responded(self, request, queryset):
+        """Bulk action to mark contacts as responded"""
+        updated = queryset.update(status='responded')
+        self.message_user(
+            request, f'{updated} contact submissions marked as responded.')
+    mark_responded.short_description = "Mark selected items as responded"
+
+    def mark_closed(self, request, queryset):
+        """Bulk action to mark contacts as closed"""
+        updated = queryset.update(status='closed')
+        self.message_user(request, f'{updated} contact submissions marked as closed.')
+    mark_closed.short_description = "Mark selected items as closed"
+
+    def save_model(self, request, obj, form, change):
+        """Auto-set handled_by when member manager takes action"""
+        if change and ('status' in form.changed_data or 'admin_notes' in form.changed_data):
+            # Always set to current user when making changes, regardless of existing value
+            obj.handled_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_add_permission(self, request):
+        """Prevent manual creation of contacts - they should come from the form"""
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        """Make contact details readonly - this is submitted data"""
+        readonly = list(self.readonly_fields)
+        if obj:  # Editing existing object
+            readonly.extend(['name', 'email', 'phone',
+                            'subject', 'message', 'handled_by'])
+        return readonly
 
 
 # Register your models here.

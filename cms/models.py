@@ -206,3 +206,74 @@ class SiteFeedback(models.Model):
             from django.utils import timezone
             self.resolved_at = timezone.now()
         super().save(*args, **kwargs)
+
+
+# Visitor Contact Model for Issue #70
+class VisitorContact(models.Model):
+    """
+    Model to store contact form submissions from visitors (non-members).
+    Replaces the need to expose welcome@skylinesoaring.org to spam.
+    """
+    name = models.CharField(
+        max_length=100,
+        help_text="Visitor's full name"
+    )
+    email = models.EmailField(
+        help_text="Visitor's email address for follow-up"
+    )
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Optional phone number"
+    )
+    subject = models.CharField(
+        max_length=200,
+        help_text="Brief subject line for the inquiry"
+    )
+    message = models.TextField(
+        help_text="Detailed message from the visitor"
+    )
+
+    # Metadata
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="IP address for spam prevention"
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    # Status tracking
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('read', 'Read'),
+        ('responded', 'Responded'),
+        ('closed', 'Closed'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='new'
+    )
+
+    # Admin tracking
+    handled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Member who handled this inquiry"
+    )
+    admin_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Internal notes for member managers"
+    )
+
+    class Meta:
+        ordering = ['-submitted_at']
+        verbose_name = "Visitor Contact"
+        verbose_name_plural = "Visitor Contacts"
+
+    def __str__(self):
+        return f"{self.name} - {self.subject} ({self.submitted_at.strftime('%Y-%m-%d')})"

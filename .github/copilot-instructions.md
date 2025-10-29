@@ -4,6 +4,15 @@
 - **Manage2Soar** is a Django 5.2 web application for soaring club management: members, gliders, badges, operations, analytics, and instruction.
 - Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
 - **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
+
+## GitHub Issue Lookup
+- **CRITICAL**: When user references an issue by number (e.g., "work on issue 70"), use this MCP pattern:
+  - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"` to get all open issues, then filter for the specific number
+  - **Method 2 (Fallback)**: `mcp_github_github_search_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `query="[issue_number]"` (simple number only, no GitHub syntax)
+- **DO NOT USE**: 
+  - `mcp_github_github_get_issue` (tool doesn't exist)
+  - GitHub search syntax like `"number:70"` or `"is:issue 70"` (fails in search)
+- This eliminates the "three different attempts" pattern - use Method 1 first, then Method 2 if needed.
 ## Testing & Coverage
 - All Django apps must have comprehensive test coverage using pytest and pytest-django.
 - Use `pytest --cov` or the VS Code "Run test with coverage" feature to ensure all code paths are tested.

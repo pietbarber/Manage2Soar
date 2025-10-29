@@ -20,6 +20,48 @@ class SiteConfiguration(models.Model):
         max_length=40, blank=True, help_text="Nickname or short name (e.g. Skyline)"
     )
 
+    # Contact information
+    contact_welcome_text = models.TextField(
+        blank=True,
+        default="Interested in learning to fly gliders? Have questions about our club? We'd love to hear from you! Fill out the form below and one of our member managers will get back to you soon.",
+        help_text="Welcome text displayed on the contact form page"
+    )
+    contact_response_info = models.TextField(
+        blank=True,
+        default="Our member managers will receive your message immediately\nWe typically respond within 24-48 hours\nFor urgent questions, feel free to visit us at the airfield during operations\nAll contact information is kept private and not shared with third parties",
+        help_text="Information about what happens after contact form submission (one item per line)"
+    )
+
+    # Club location
+    club_address_line1 = models.CharField(
+        max_length=100, blank=True, help_text="Street address line 1"
+    )
+    club_address_line2 = models.CharField(
+        max_length=100, blank=True, help_text="Street address line 2 (optional)"
+    )
+    club_city = models.CharField(
+        max_length=50, blank=True, help_text="City"
+    )
+    club_state = models.CharField(
+        max_length=50, blank=True, help_text="State/Province"
+    )
+    club_zip_code = models.CharField(
+        max_length=20, blank=True, help_text="ZIP/Postal code"
+    )
+    club_country = models.CharField(
+        max_length=50, blank=True, default="USA", help_text="Country"
+    )
+
+    # Contact methods
+    club_phone = models.CharField(
+        max_length=20, blank=True, help_text="Main club phone number (optional)"
+    )
+    operations_info = models.TextField(
+        blank=True,
+        default="We typically fly on weekends and some weekdays when weather permits. Check our calendar or contact us for current schedule information.",
+        help_text="Information about club operations schedule"
+    )
+
     # Scheduling options
     schedule_instructors = models.BooleanField(
         default=False, help_text="We schedule Instructors ahead of time"
