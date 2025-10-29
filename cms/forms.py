@@ -41,7 +41,7 @@ class VisitorContactForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Your full name',
+                'placeholder': 'Full name',
                 'required': True
             }),
             'email': forms.EmailInput(attrs={
@@ -51,11 +51,11 @@ class VisitorContactForm(forms.ModelForm):
             }),
             'phone': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': '(optional) Your phone number'
+                'placeholder': 'Phone number'
             }),
             'subject': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Brief subject of your inquiry',
+                'placeholder': 'Brief subject',
                 'required': True
             }),
             'message': forms.Textarea(attrs={
@@ -74,7 +74,6 @@ class VisitorContactForm(forms.ModelForm):
         }
         help_texts = {
             'message': 'Please provide as much detail as possible so we can help you effectively.',
-            'phone': 'Optional - provide if you prefer a phone call response.',
         }
 
     def clean_email(self):
