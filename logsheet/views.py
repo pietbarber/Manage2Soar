@@ -253,7 +253,7 @@ def create_logsheet(request):
 # - View all flights associated with the logsheet, with optional filtering by pilot or instructor name.
 # - Add new flights to the logsheet (if not finalized).
 # - Finalize the logsheet, locking in all calculated costs as actual costs.
-# - Reopen a finalized logsheet for revision (superusers only).
+# - Reopen a finalized logsheet for revision (authorized users only).
 #
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
@@ -393,13 +393,15 @@ def manage_logsheet(request, pk):
         return redirect("logsheet:manage", pk=logsheet.pk)
 
     # If the logsheet is finalized, prevent adding new flights
-    # This check is done here to ensure that only superusers can reopen finalized logbooks
+    # This check is done here to ensure that only authorized users can reopen finalized logbooks
     # If there is a "revise", then we'll remove the finalized status
     # and the logsheet can be returned to editing status.
     elif request.method == "POST":
 
         if "revise" in request.POST:
-            if request.user.is_superuser:
+            from logsheet.utils.permissions import can_unfinalize_logsheet
+            
+            if can_unfinalize_logsheet(request.user, logsheet):
                 logsheet.finalized = False
                 logsheet.save()
 
@@ -411,7 +413,9 @@ def manage_logsheet(request, pk):
 
             else:
                 return HttpResponseForbidden(
-                    "Only superusers can revise a finalized logsheet."
+                    "You do not have permission to unfinalize this logsheet. "
+                    "Only superusers, treasurers, webmasters, or the duty officer "
+                    "who finalized it can unfinalize a logsheet."
                 )
             return redirect("logsheet:manage", pk=logsheet.pk)
 
@@ -430,10 +434,12 @@ def manage_logsheet(request, pk):
     ).count()
     flight_pending = flights.filter(launch_time__isnull=True).count()
 
+    from logsheet.utils.permissions import can_edit_logsheet
+    
     context = {
         "logsheet": logsheet,
         "flights": flights,
-        "can_edit": not logsheet.finalized or request.user.is_superuser,
+        "can_edit": can_edit_logsheet(request.user, logsheet),
         "revisions": revisions,
         "flight_total": flight_total,
         "flight_landed": flight_landed,
@@ -572,7 +578,7 @@ def list_logsheets(request):
 #
 # It allows active members to:
 # - Edit the details of a flight associated with a logsheet.
-# - Prevent edits if the logsheet is finalized (unless the user is a superuser).
+# - Prevent edits if the logsheet is finalized (unless the user is authorized).
 #
 # Args:
 #    request (HttpRequest): The HTTP request object containing metadata about the request.
@@ -589,8 +595,9 @@ def edit_flight(request, logsheet_pk, flight_pk):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
     flight = get_object_or_404(Flight, pk=flight_pk, logsheet=logsheet)
 
-    # Only allow edits if not finalized
-    if logsheet.finalized and not request.user.is_superuser:
+    # Only allow edits if user has permission
+    from logsheet.utils.permissions import can_edit_logsheet
+    if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
     # Build sorted glider list for template
@@ -1048,7 +1055,7 @@ def manage_logsheet_finances(request, pk):
 # Purpose:
 # Allows active members to edit the closeout information for a specific logsheet.
 # Updates include final duty crew assignments, towplane closeouts, and maintenance issues.
-# Editing is blocked if the logsheet is finalized, unless the user is a superuser.
+# Editing is blocked if the logsheet is finalized, unless the user is authorized.
 #
 # Behavior:
 # - Ensures that each towplane used on the logsheet has a TowplaneCloseout record.
@@ -1076,7 +1083,8 @@ def edit_logsheet_closeout(request, pk):
         logsheet=logsheet
     ).select_related("reported_by", "glider", "towplane")
 
-    if logsheet.finalized and not request.user.is_superuser:
+    from logsheet.utils.permissions import can_edit_logsheet
+    if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
     # Identify towplanes used in this logsheet
