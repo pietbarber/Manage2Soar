@@ -57,6 +57,23 @@ Replaced hardcoded membership statuses with fully configurable system supporting
 
 ---
 
+### [Issue #198 - Logsheet Unfinalization Permissions](issue-198-logsheet-unfinalization-permissions.md)
+**Status**: Complete ✅ | **Date**: October 29, 2025 | **Branch**: `main` | **Commit**: `5faf279`
+
+Enhanced logsheet unfinalization permissions expanding access beyond superuser-only restriction while maintaining security controls.
+
+**Key Achievements**:
+- ✅ Multi-role authorization system (4 authorized user types)
+- ✅ Original finalizer "oops" capability via RevisionLog tracking
+- ✅ Treasurer and webmaster universal access for corrections
+- ✅ Security protection against unauthorized access ("any random joe")
+- ✅ Comprehensive test coverage (14 test scenarios)
+- ✅ Enhanced error messages and UI feedback
+
+**Technologies**: Django permissions, RevisionLog integration, Role-based access control, Member model fields
+
+---
+
 ### [GitHub MCP Integration Enhancement](github-mcp-integration-enhancement.md)
 **Status**: Complete ✅ | **Date**: October 29, 2025 | **Scope**: Development Workflow
 
