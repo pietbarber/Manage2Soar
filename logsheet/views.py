@@ -400,7 +400,7 @@ def manage_logsheet(request, pk):
 
         if "revise" in request.POST:
             from logsheet.utils.permissions import can_unfinalize_logsheet
-            
+
             if can_unfinalize_logsheet(request.user, logsheet):
                 logsheet.finalized = False
                 logsheet.save()
@@ -435,7 +435,7 @@ def manage_logsheet(request, pk):
     flight_pending = flights.filter(launch_time__isnull=True).count()
 
     from logsheet.utils.permissions import can_edit_logsheet
-    
+
     context = {
         "logsheet": logsheet,
         "flights": flights,

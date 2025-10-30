@@ -79,3 +79,79 @@ def logsheet(db, airfield, active_member):
     return Logsheet.objects.create(
         log_date=date.today(), airfield=airfield, created_by=active_member
     )
+
+
+@pytest.fixture
+def member_instructor(db):
+    """Creates a member who is an instructor"""
+    user = User.objects.create_user(
+        username="instructor_user",
+        password="testpass123",
+        is_active=True,
+        first_name="Instructor",
+        last_name="Smith",
+        membership_status="Full Member",
+        instructor=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_instructor2(db):
+    """Creates a second member who is an instructor"""
+    user = User.objects.create_user(
+        username="instructor_user2",
+        password="testpass123",
+        is_active=True,
+        first_name="Second",
+        last_name="Instructor",
+        membership_status="Full Member",
+        instructor=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_towpilot(db):
+    """Creates a member who is a tow pilot"""
+    user = User.objects.create_user(
+        username="towpilot_user",
+        password="testpass123",
+        is_active=True,
+        first_name="Towpilot",
+        last_name="Jones",
+        membership_status="Full Member",
+        towpilot=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_towpilot2(db):
+    """Creates a second member who is a tow pilot"""
+    user = User.objects.create_user(
+        username="towpilot_user2",
+        password="testpass123",
+        is_active=True,
+        first_name="Second",
+        last_name="Towpilot",
+        membership_status="Full Member",
+        towpilot=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_instructor_towpilot(db):
+    """Creates a member who is both an instructor and tow pilot"""
+    user = User.objects.create_user(
+        username="instructor_towpilot_user",
+        password="testpass123",
+        is_active=True,
+        first_name="Multi",
+        last_name="Role",
+        membership_status="Full Member",
+        instructor=True,
+        towpilot=True,
+    )
+    return user

@@ -385,12 +385,29 @@ class CreateLogsheetForm(forms.ModelForm):
         cleaned_data = super().clean()
         log_date = cleaned_data.get("log_date")
         airfield = cleaned_data.get("airfield")
+        duty_instructor = cleaned_data.get("duty_instructor")
+        surge_instructor = cleaned_data.get("surge_instructor")
+        tow_pilot = cleaned_data.get("tow_pilot")
+        surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
 
+        # Check if logsheet already exists for this date and airfield
         if log_date and airfield:
             if Logsheet.objects.filter(log_date=log_date, airfield=airfield).exists():
                 raise ValidationError(
                     "A logsheet for this date and airfield already exists."
                 )
+
+        # Prevent instructor from being the same as surge instructor
+        if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
+            raise ValidationError(
+                "The instructor and surge instructor cannot be the same person."
+            )
+
+        # Prevent tow pilot from being the same as surge tow pilot
+        if tow_pilot and surge_tow_pilot and tow_pilot == surge_tow_pilot:
+            raise ValidationError(
+                "The tow pilot and surge tow pilot cannot be the same person."
+            )
 
         return cleaned_data
 
@@ -545,6 +562,27 @@ class LogsheetCloseoutForm(forms.ModelForm):
 
 
 class LogsheetDutyCrewForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        duty_instructor = cleaned_data.get("duty_instructor")
+        surge_instructor = cleaned_data.get("surge_instructor")
+        tow_pilot = cleaned_data.get("tow_pilot")
+        surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
+
+        # Prevent instructor from being the same as surge instructor
+        if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
+            raise ValidationError(
+                "The instructor and surge instructor cannot be the same person."
+            )
+
+        # Prevent tow pilot from being the same as surge tow pilot
+        if tow_pilot and surge_tow_pilot and tow_pilot == surge_tow_pilot:
+            raise ValidationError(
+                "The tow pilot and surge tow pilot cannot be the same person."
+            )
+
+        return cleaned_data
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Restrict all duty crew dropdowns to active members, alphabetized by last and first name
