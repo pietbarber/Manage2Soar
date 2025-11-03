@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Duty Delinquents Detail Report{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="summary-header">
+        <h1><i class="fas fa-exclamation-triangle"></i> Duty Delinquents Detail Report</h1>
+        <p class="mb-2">
+            <strong>{{ total_count }}</strong> members have flown {{ min_flights }}+ times in the last {{ lookback_months }} months 
+            but haven't performed any duty since {{ duty_cutoff_date|date:"F j, Y" }}.
+        </p>
+        <p class="mb-0">
+            <small>
+                Report generated: {{ report_date|date:"F j, Y" }} | 
+                Minimum membership: {{ min_membership_months }} months |
+                Active only (Full/Student/Life members)
+            </small>
+        </p>
+    </div>
+
+    {% if duty_delinquents %}
+        <!-- Table of Contents -->
+        <div class="toc-card">
+            <h3><i class="fas fa-list"></i> Quick Navigation - {{ total_count }} Delinquent Members</h3>
+            <p class="mb-3 text-muted">Click on any name to jump directly to their details card:</p>
+            <div class="toc-grid">
+                {% for delinquent in duty_delinquents %}
+                <div class="toc-item">
+                    <a href="#member-{{ delinquent.member.id }}">
+                        <strong>{{ delinquent.member.last_name }}, {{ delinquent.member.first_name }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            {{ delinquent.flight_count }} flights | 
+                            {% if delinquent.eligible_roles %}
+                                {{ delinquent.eligible_roles|join:", " }}
+                            {% else %}
+                                General Member
+                            {% endif %}
+                        </small>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                {% for delinquent in duty_delinquents %}
+                <div class="delinquent-card" id="member-{{ delinquent.member.id }}">
+                    <div class="card-inner">
+                        <div class="delinquent-header">
+                            <div class="member-photo">
+                                {% if delinquent.member.profile_photo %}
+                                    <img src="{{ delinquent.member.profile_photo.url }}" 
+                                         alt="{{ delinquent.member.full_display_name }}" 
+                                         title="{{ delinquent.member.full_display_name }}"
+                                         height="60" class="rounded-circle me-2">
+                                {% else %}
+                                    <img src="{% static 'images/default-avatar-100px.png' %}" 
+                                         alt="Default avatar" 
+                                         title="{{ delinquent.member.full_display_name }}"
+                                         height="60" class="rounded-circle me-2">
+                                {% endif %}
+                            </div>
+                            <div class="member-content">
+                                <div class="member-info">
+                                    <h4>
+                                        {{ delinquent.member.full_display_name }}
+                                        {% if delinquent.member.membership_status != "Full Member" %}
+                                            <small class="text-muted">({{ delinquent.member.membership_status }})</small>
+                                        {% endif %}
+                                    </h4>
+                                    <div class="member-contact">
+                                        <i class="fas fa-envelope"></i> {{ delinquent.member.email }}
+                                        {% if delinquent.member.phone %}
+                                            | <i class="fas fa-phone"></i> {{ delinquent.member.phone }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="member-stats">
+                                    <span class="stats-badge flights-badge">
+                                        {{ delinquent.flight_count }} flight{{ delinquent.flight_count|pluralize }}
+                                    </span>
+                                    <span class="stats-badge membership-badge">
+                                        {{ delinquent.membership_duration }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% if delinquent.is_suspended %}
+                        <div class="suspension-alert">
+                            <i class="fas fa-ban"></i> <strong>Scheduling Suspended</strong>
+                            {% if delinquent.suspension_reason %}
+                                <br>Reason: {{ delinquent.suspension_reason }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    {% if delinquent.dont_schedule %}
+                        <div class="suspension-alert suspension-alert-critical">
+                            <i class="fas fa-stop-circle"></i> <strong>Do Not Schedule</strong> - Member opted out of automatic scheduling
+                        </div>
+                    {% endif %}
+
+                    <div class="detail-grid">
+                        <div class="detail-section">
+                            <h6><i class="fas fa-user-tag"></i> Eligible Roles</h6>
+                            {% if delinquent.eligible_roles %}
+                                <div class="roles-list">
+                                    {% for role in delinquent.eligible_roles %}
+                                        <span class="role-badge">{{ role }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-muted">
+                                    <i class="fas fa-info-circle"></i> No specific duty roles assigned
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="detail-section">
+                            <h6><i class="fas fa-calendar-check"></i> Last Duty Performance</h6>
+                            {% if delinquent.last_duty_info.has_duty %}
+                                <div>
+                                    <strong>{{ delinquent.last_duty_info.last_duty_date|date:"F j, Y" }}</strong><br>
+                                    Role: {{ delinquent.last_duty_info.last_duty_role }}<br>
+                                    <small class="text-muted">
+                                        {{ delinquent.last_duty_info.last_duty_type }}
+                                        {% if delinquent.last_duty_info.flight_count %}
+                                            ({{ delinquent.last_duty_info.flight_count }} times)
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            {% else %}
+                                <div class="no-duty-alert">
+                                    <i class="fas fa-exclamation-circle"></i> No duty recorded in the last {{ lookback_months }} months
+                                    <br><small>No flight instruction, towing, or duty officer assignments found</small>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="detail-section">
+                            <h6><i class="fas fa-plane"></i> Recent Flight Activity</h6>
+                            <div>
+                                <strong>{{ delinquent.flight_count }}</strong> flights since {{ duty_cutoff_date|date:"M j, Y" }}
+                                {% if delinquent.most_recent_flight %}
+                                    <br>
+                                    Most recent: <strong>{{ delinquent.most_recent_flight|date:"F j, Y" }}</strong>
+                                    {% if delinquent.most_recent_flight_logsheet %}
+                                        <br>
+                                        <small class="text-muted">
+                                            <a href="{% url 'logsheet:manage' delinquent.most_recent_flight_logsheet.id %}" 
+                                               target="_blank" 
+                                               class="text-decoration-none">
+                                                <i class="fas fa-external-link-alt"></i> 
+                                                Logsheet {{ delinquent.most_recent_flight_logsheet.id }}
+                                            </a>
+                                            ({{ delinquent.most_recent_flight_logsheet.airfield.name }})
+                                        </small>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <h6><i class="fas fa-calendar-times"></i> Availability Issues</h6>
+                            {% if delinquent.current_blackouts %}
+                                <div class="mb-2">
+                                    <strong>Upcoming Blackouts:</strong>
+                                    {% for blackout in delinquent.current_blackouts %}
+                                        <div class="blackout-item">
+                                            <span class="blackout-date">{{ blackout.date|date:"M j, Y" }}</span>
+                                            {% if blackout.note %}
+                                                <br><small>{{ blackout.note }}</small>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if delinquent.recent_blackouts %}
+                                <div>
+                                    <strong>Recent Blackouts:</strong>
+                                    {% for blackout in delinquent.recent_blackouts %}
+                                        <div class="blackout-item">
+                                            <span class="blackout-date">{{ blackout.date|date:"M j" }}</span>
+                                            {% if blackout.note %}
+                                                - {{ blackout.note }}
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if not delinquent.current_blackouts and not delinquent.recent_blackouts %}
+                                <div class="text-muted">
+                                    <i class="fas fa-check-circle"></i> No recorded availability issues
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                {% if not forloop.last %}
+                    <div class="member-separator"></div>
+                {% endif %}
+            {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-success" role="alert">
+            <h4 class="alert-heading"><i class="fas fa-check-circle"></i> Great news!</h4>
+            <p>No duty delinquents found. All active members who have been flying are also performing their duty obligations.</p>
+            <hr>
+            <p class="mb-0">
+                <small>
+                    Criteria: Members with {{ min_flights }}+ flights in {{ lookback_months }} months, 
+                    {{ min_membership_months }}+ months membership, and no duty since {{ duty_cutoff_date|date:"F j, Y" }}.
+                </small>
+            </p>
+        </div>
+    {% endif %}
+
+    <div class="mt-4 text-center">
+        <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-primary">
+            <i class="fas fa-calendar-alt"></i> Back to Duty Calendar
+        </a>
+        <a href="{% url 'members:member_list' %}" class="btn btn-secondary">
+            <i class="fas fa-users"></i> View All Members
+        </a>
+    </div>
+</div>
+{% endblock %}

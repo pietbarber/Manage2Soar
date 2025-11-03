@@ -29,10 +29,25 @@
 - Use `active_member_required` for views that require a valid, active member. This decorator checks both authentication and membership status.
 - In tests, create users with a valid `membership_status` (e.g., `"Full Member"`) to pass this decorator.
 
+## CSS & Static Files Management
+- **CRITICAL**: Always run `python manage.py collectstatic` after making changes to CSS files in `static/` directories. Changes to CSS files are NOT visible until collected.
+- **CSS Architecture**: 
+  - Use external CSS files in `static/css/` instead of inline `<style>` tags in templates
+  - Check existing CSS in `static/css/baseline.css` for conflicting rules before creating new styles
+  - CSS specificity issues can cause "styling not working" problems - use browser dev tools to inspect actual applied styles
+  - When CSS "isn't working", check: 1) `collectstatic` was run, 2) CSS selectors match actual HTML elements, 3) specificity conflicts with existing CSS
+- **CSS Debugging Process**:
+  1. Make CSS changes in `static/css/` files
+  2. Run `python manage.py collectstatic --noinput`
+  3. Test in browser (hard refresh with Ctrl+F5 to clear cache)
+  4. Use browser dev tools to verify CSS is actually being applied
+  5. If still not working, check for CSS specificity conflicts with existing rules
+
 ## Troubleshooting
 - If you see `NoReverseMatch`, check that the URL name exists in your `urls.py`.
 - If you see 404s in tests, verify that the URL is actually implemented and included.
 - If content assertions fail, ensure the test data matches the view's query logic (e.g., correct slug and audience).
+- **CSS Issues**: If styling appears broken, always check if `collectstatic` was run after CSS changes.
 - **CRITICAL**: After any changes to `urls.py` (especially CMS routes), immediately run `pytest` to catch broken tests, reverse lookups, and template references.
 
 ## Maintenance
@@ -54,7 +69,8 @@
   - Use `pytest` (preferred) or `python manage.py test`.
   - Test config: `pytest.ini`, per-app `tests.py`.
 - **Static files:**
-  - Collect with `python manage.py collectstatic`.
+  - **ALWAYS** collect with `python manage.py collectstatic --noinput` after CSS/JS changes.
+  - CSS changes are NOT visible until collected - this is the number one cause of "styling not working" issues.
 - **Database documentation:**
   - Database schemas are documented using Mermaid diagrams in each app's `docs/models.md` files.
   - Mermaid visualizations available as PNG exports (e.g., `erd.png` in project root).
