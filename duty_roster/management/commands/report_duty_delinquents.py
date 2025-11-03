@@ -245,7 +245,7 @@ class Command(BaseCronJobCommand):
                 Notification.objects.create(
                     user=member_meister,
                     message=f"📊 Monthly duty delinquency report: {len(duty_delinquents)} member(s) need follow-up",
-                    url="/members/"
+                    url="/duty_roster/duty-delinquents/detail/"
                 )
 
             self.log_success(

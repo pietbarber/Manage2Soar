@@ -868,3 +868,215 @@ def calendar_view(request, year=None, month=None):
     if request.headers.get("HX-Request") == "true":
         return render(request, "duty_roster/partials/calendar_grid.html", context)
     return render(request, "duty_roster/calendar.html", context)
+
+
+@user_passes_test(lambda u: u.is_authenticated and (
+    u.rostermeister or u.member_manager or u.director or u.is_superuser
+))
+def duty_delinquents_detail(request):
+    """
+    Detailed view of members who haven't been performing duty.
+    Accessible only to rostermeister, member-meister, directors, and superusers.
+    """
+    from datetime import timedelta
+    from django.db.models import Q, Count
+    from django.utils.timezone import now
+    from logsheet.models import Flight
+    from members.models import Member
+    from duty_roster.models import DutySlot, DutyAssignment, MemberBlackout, DutyPreference
+
+    # Parameters (could be made configurable via URL params)
+    lookback_months = 12
+    min_flights = 3
+    min_membership_months = 3
+
+    # Calculate date ranges
+    today = now().date()
+    duty_cutoff_date = today - timedelta(days=lookback_months * 30)
+    membership_cutoff_date = today - timedelta(days=min_membership_months * 30)
+    recent_flight_cutoff = today - timedelta(days=lookback_months * 30)
+
+    # Step 1: Find all members who have been in the club for 3+ months
+    eligible_members = Member.objects.filter(
+        Q(joined_club__lt=membership_cutoff_date) | Q(joined_club__isnull=True),
+        membership_status__in=['Full Member', 'Student Member', 'Life Member']
+    ).exclude(
+        membership_status__in=['Inactive', 'Terminated', 'Suspended']
+    )
+
+    # Step 2: Find members who have been actively flying
+    active_flyers = eligible_members.filter(
+        flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
+        flights_as_pilot__logsheet__finalized=True
+    ).annotate(
+        flight_count=Count('flights_as_pilot', distinct=True)
+    ).filter(
+        flight_count__gte=min_flights
+    ).distinct()
+
+    # Step 3: Build detailed report for each active flyer
+    duty_delinquents = []
+
+    for member in active_flyers:
+        # Check if member has performed any duty in the lookback period
+        duty_performed = _has_performed_duty_detailed(member, duty_cutoff_date)
+
+        if not duty_performed['has_duty']:
+            # Get member's flight details
+            flight_count = Flight.objects.filter(
+                pilot=member,
+                logsheet__log_date__gte=recent_flight_cutoff,
+                logsheet__finalized=True
+            ).count()
+
+            # Get most recent flight
+            recent_flight = Flight.objects.filter(
+                pilot=member,
+                logsheet__log_date__gte=recent_flight_cutoff,
+                logsheet__finalized=True
+            ).order_by('-logsheet__log_date').first()
+
+            # Get member's roles
+            roles = []
+            if member.duty_officer:
+                roles.append('Duty Officer')
+            if member.assistant_duty_officer:
+                roles.append('Assistant Duty Officer')
+            if member.instructor:
+                roles.append('Instructor')
+            if member.towpilot:
+                roles.append('Tow Pilot')
+
+            # Get blackout information (current and recent)
+            current_blackouts = MemberBlackout.objects.filter(
+                member=member,
+                date__gte=today,
+                date__lte=today + timedelta(days=90)  # Next 3 months
+            ).order_by('date')
+
+            recent_blackouts = MemberBlackout.objects.filter(
+                member=member,
+                date__gte=duty_cutoff_date,
+                date__lt=today
+            ).order_by('-date')[:5]  # Last 5 blackouts in the period
+
+            # Get duty preferences and suspension info
+            try:
+                duty_preference = DutyPreference.objects.get(member=member)
+                is_suspended = duty_preference.scheduling_suspended
+                suspension_reason = duty_preference.suspended_reason
+                dont_schedule = duty_preference.dont_schedule
+            except DutyPreference.DoesNotExist:
+                is_suspended = False
+                suspension_reason = None
+                dont_schedule = False
+
+            duty_delinquents.append({
+                'member': member,
+                'flight_count': flight_count,
+                'most_recent_flight': recent_flight.logsheet.log_date if recent_flight else None,
+                'most_recent_flight_logsheet': recent_flight.logsheet if recent_flight else None,
+                'membership_duration': _calculate_membership_duration(member, today),
+                'eligible_roles': roles,
+                'last_duty_info': duty_performed,
+                'current_blackouts': current_blackouts,
+                'recent_blackouts': recent_blackouts,
+                'is_suspended': is_suspended,
+                'suspension_reason': suspension_reason,
+                'dont_schedule': dont_schedule,
+            })
+
+    # Sort by flight count (most active first)
+    duty_delinquents.sort(key=lambda x: x['flight_count'], reverse=True)
+
+    context = {
+        'duty_delinquents': duty_delinquents,
+        'lookback_months': lookback_months,
+        'min_flights': min_flights,
+        'min_membership_months': min_membership_months,
+        'duty_cutoff_date': duty_cutoff_date,
+        'report_date': today,
+        'total_count': len(duty_delinquents),
+    }
+
+    return render(request, 'duty_roster/duty_delinquents_detail.html', context)
+
+
+def _has_performed_duty_detailed(member, cutoff_date):
+    """
+    Check if member has performed any duty since cutoff_date with detailed info
+    """
+    from django.db.models import Q
+    from duty_roster.models import DutySlot, DutyAssignment
+
+    # Check DutySlot assignments (newer system)
+    recent_duty_slots = DutySlot.objects.filter(
+        member=member,
+        duty_day__date__gte=cutoff_date
+    ).order_by('-duty_day__date')
+
+    latest_slot = recent_duty_slots.first()
+    if latest_slot is not None:
+        return {
+            'has_duty': True,
+            'last_duty_date': latest_slot.duty_day.date,
+            'last_duty_role': latest_slot.role,
+            'last_duty_type': 'DutySlot'
+        }
+
+    # Check DutyAssignment assignments (older system)
+    duty_assignments = DutyAssignment.objects.filter(
+        Q(duty_officer=member) |
+        Q(assistant_duty_officer=member) |
+        Q(instructor=member) |
+        Q(surge_instructor=member) |
+        Q(tow_pilot=member) |
+        Q(surge_tow_pilot=member),
+        date__gte=cutoff_date
+    ).order_by('-date')
+
+    latest_assignment = duty_assignments.first()
+    if latest_assignment is not None:
+        # Determine what role they had
+        role = []
+        if latest_assignment.duty_officer == member:
+            role.append('Duty Officer')
+        if latest_assignment.assistant_duty_officer == member:
+            role.append('Assistant Duty Officer')
+        if latest_assignment.instructor == member:
+            role.append('Instructor')
+        if latest_assignment.surge_instructor == member:
+            role.append('Surge Instructor')
+        if latest_assignment.tow_pilot == member:
+            role.append('Tow Pilot')
+        if latest_assignment.surge_tow_pilot == member:
+            role.append('Surge Tow Pilot')
+
+        return {
+            'has_duty': True,
+            'last_duty_date': latest_assignment.date,
+            'last_duty_role': ', '.join(role),
+            'last_duty_type': 'DutyAssignment'
+        }
+
+    return {
+        'has_duty': False,
+        'last_duty_date': None,
+        'last_duty_role': None,
+        'last_duty_type': None
+    }
+
+
+def _calculate_membership_duration(member, today):
+    """Calculate how long the member has been in the club"""
+    if member.joined_club:
+        delta = today - member.joined_club
+        years = delta.days // 365
+        months = (delta.days % 365) // 30
+
+        if years > 0:
+            return f"{years} year(s), {months} month(s)"
+        else:
+            return f"{months} month(s)"
+    else:
+        return "Unknown (no join date)"
