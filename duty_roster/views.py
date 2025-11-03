@@ -986,8 +986,8 @@ def duty_delinquents_detail(request):
                 'dont_schedule': dont_schedule,
             })
 
-    # Sort by flight count (most active first)
-    duty_delinquents.sort(key=lambda x: x['flight_count'], reverse=True)
+    # Sort by last name for easy navigation
+    duty_delinquents.sort(key=lambda x: x['member'].last_name.lower())
 
     context = {
         'duty_delinquents': duty_delinquents,
@@ -1004,59 +1004,112 @@ def duty_delinquents_detail(request):
 
 def _has_performed_duty_detailed(member, cutoff_date):
     """
-    Check if member has performed any duty since cutoff_date with detailed info
+    Check if member has performed any duty since cutoff_date with detailed info.
+    For instructors and tow pilots, checks actual flight participation.
+    For duty officers and assistant duty officers, checks scheduled assignments.
     """
     from django.db.models import Q
     from duty_roster.models import DutySlot, DutyAssignment
+    from logsheet.models import Flight
 
-    # Check DutySlot assignments (newer system)
-    recent_duty_slots = DutySlot.objects.filter(
-        member=member,
-        duty_day__date__gte=cutoff_date
-    ).order_by('-duty_day__date')
+    # Check actual flight participation for instructors and tow pilots
+    # This is more important than just being scheduled
 
-    latest_slot = recent_duty_slots.first()
-    if latest_slot is not None:
+    # Check if they performed instruction (appeared as instructor in flights)
+    instruction_flights = Flight.objects.filter(
+        instructor=member,
+        logsheet__log_date__gte=cutoff_date,
+        logsheet__finalized=True
+    ).order_by('-logsheet__log_date')
+
+    latest_instruction = instruction_flights.first()
+    if latest_instruction is not None:
         return {
             'has_duty': True,
-            'last_duty_date': latest_slot.duty_day.date,
-            'last_duty_role': latest_slot.role,
+            'last_duty_date': latest_instruction.logsheet.log_date,
+            'last_duty_role': 'Instructor (Flight)',
+            'last_duty_type': 'Flight Activity',
+            'flight_count': instruction_flights.count()
+        }
+
+    # Check if they performed towing (appeared as tow pilot in flights)
+    towing_flights = Flight.objects.filter(
+        tow_pilot=member,
+        logsheet__log_date__gte=cutoff_date,
+        logsheet__finalized=True
+    ).order_by('-logsheet__log_date')
+
+    latest_towing = towing_flights.first()
+    if latest_towing is not None:
+        return {
+            'has_duty': True,
+            'last_duty_date': latest_towing.logsheet.log_date,
+            'last_duty_role': 'Tow Pilot (Flight)',
+            'last_duty_type': 'Flight Activity',
+            'flight_count': towing_flights.count()
+        }
+
+    # For duty officers and assistant duty officers, check scheduled assignments
+    # (since this is the only way to track their participation)
+
+    # Check DutySlot assignments (newer system) - only for DO/ADO roles
+    duty_officer_slots = DutySlot.objects.filter(
+        member=member,
+        duty_day__date__gte=cutoff_date,
+        role__in=['duty_officer', 'assistant_duty_officer']
+    ).order_by('-duty_day__date')
+
+    latest_do_slot = duty_officer_slots.first()
+    if latest_do_slot is not None:
+        role_display = 'Duty Officer' if latest_do_slot.role == 'duty_officer' else 'Assistant Duty Officer'
+        return {
+            'has_duty': True,
+            'last_duty_date': latest_do_slot.duty_day.date,
+            'last_duty_role': f'{role_display} (Scheduled)',
             'last_duty_type': 'DutySlot'
         }
 
-    # Check DutyAssignment assignments (older system)
+    # Check DutyAssignment assignments (older system) - only for DO/ADO
     duty_assignments = DutyAssignment.objects.filter(
-        Q(duty_officer=member) |
-        Q(assistant_duty_officer=member) |
-        Q(instructor=member) |
-        Q(surge_instructor=member) |
-        Q(tow_pilot=member) |
-        Q(surge_tow_pilot=member),
+        Q(duty_officer=member) | Q(assistant_duty_officer=member),
         date__gte=cutoff_date
     ).order_by('-date')
 
-    latest_assignment = duty_assignments.first()
-    if latest_assignment is not None:
-        # Determine what role they had
+    latest_do_assignment = duty_assignments.first()
+    if latest_do_assignment is not None:
         role = []
-        if latest_assignment.duty_officer == member:
+        if latest_do_assignment.duty_officer == member:
             role.append('Duty Officer')
-        if latest_assignment.assistant_duty_officer == member:
+        if latest_do_assignment.assistant_duty_officer == member:
             role.append('Assistant Duty Officer')
-        if latest_assignment.instructor == member:
-            role.append('Instructor')
-        if latest_assignment.surge_instructor == member:
-            role.append('Surge Instructor')
-        if latest_assignment.tow_pilot == member:
-            role.append('Tow Pilot')
-        if latest_assignment.surge_tow_pilot == member:
-            role.append('Surge Tow Pilot')
 
         return {
             'has_duty': True,
-            'last_duty_date': latest_assignment.date,
-            'last_duty_role': ', '.join(role),
+            'last_duty_date': latest_do_assignment.date,
+            'last_duty_role': f"{', '.join(role)} (Scheduled)",
             'last_duty_type': 'DutyAssignment'
+        }
+
+    # Also check if instructors/tow pilots were scheduled (less important but still relevant)
+    scheduled_slots = DutySlot.objects.filter(
+        member=member,
+        duty_day__date__gte=cutoff_date,
+        role__in=['instructor', 'surge_instructor', 'tow_pilot', 'surge_tow_pilot']
+    ).order_by('-duty_day__date')
+
+    latest_scheduled = scheduled_slots.first()
+    if latest_scheduled is not None:
+        role_map = {
+            'instructor': 'Instructor',
+            'surge_instructor': 'Surge Instructor',
+            'tow_pilot': 'Tow Pilot',
+            'surge_tow_pilot': 'Surge Tow Pilot'
+        }
+        return {
+            'has_duty': True,
+            'last_duty_date': latest_scheduled.duty_day.date,
+            'last_duty_role': f"{role_map[latest_scheduled.role]} (Scheduled Only)",
+            'last_duty_type': 'DutySlot - Scheduled'
         }
 
     return {

@@ -274,8 +274,43 @@ class HelperFunctionTests(TestCase):
 
         self.assertTrue(result['has_duty'])
         self.assertEqual(result['last_duty_date'], duty_date)
-        self.assertEqual(result['last_duty_role'], "instructor")
-        self.assertEqual(result['last_duty_type'], "DutySlot")
+        self.assertEqual(result['last_duty_role'], "Instructor (Scheduled Only)")
+        self.assertEqual(result['last_duty_type'], "DutySlot - Scheduled")
+
+    def test_has_performed_duty_detailed_with_instruction_flight(self):
+        """Test helper function when member has performed actual instruction"""
+        from logsheet.models import Logsheet, Glider, Flight, Airfield
+
+        # Create test data
+        airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+        glider = Glider.objects.create(make="Test", model="Glider", n_number="N12345")
+
+        flight_date = date.today() - timedelta(days=30)
+        logsheet = Logsheet.objects.create(
+            log_date=flight_date,
+            airfield=airfield,
+            created_by=self.member,
+            finalized=True
+        )
+
+        # Create flight where member was instructor
+        Flight.objects.create(
+            pilot=self.member,  # Different member as pilot
+            instructor=self.member,  # Our test member as instructor
+            glider=glider,
+            logsheet=logsheet,
+            launch_time=time(10, 0, 0),
+            landing_time=time(11, 0, 0)
+        )
+
+        cutoff_date = date.today() - timedelta(days=365)
+        result = _has_performed_duty_detailed(self.member, cutoff_date)
+
+        self.assertTrue(result['has_duty'])
+        self.assertEqual(result['last_duty_date'], flight_date)
+        self.assertEqual(result['last_duty_role'], "Instructor (Flight)")
+        self.assertEqual(result['last_duty_type'], "Flight Activity")
+        self.assertEqual(result['flight_count'], 1)
 
     def test_calculate_membership_duration_with_join_date(self):
         """Test membership duration calculation with join date"""
