@@ -385,10 +385,15 @@ class CreateLogsheetForm(forms.ModelForm):
         cleaned_data = super().clean()
         log_date = cleaned_data.get("log_date")
         airfield = cleaned_data.get("airfield")
+        duty_officer = cleaned_data.get("duty_officer")
         duty_instructor = cleaned_data.get("duty_instructor")
         surge_instructor = cleaned_data.get("surge_instructor")
         tow_pilot = cleaned_data.get("tow_pilot")
         surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
+
+        # Initialize warnings list
+        if not hasattr(self, 'warnings'):
+            self.warnings = []
 
         # Check if logsheet already exists for this date and airfield
         if log_date and airfield:
@@ -397,16 +402,29 @@ class CreateLogsheetForm(forms.ModelForm):
                     "A logsheet for this date and airfield already exists."
                 )
 
-        # Prevent instructor from being the same as surge instructor
+        # PROHIBITIONS: Prevent instructor from being the same as surge instructor
         if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
             raise ValidationError(
                 "The instructor and surge instructor cannot be the same person."
             )
 
-        # Prevent tow pilot from being the same as surge tow pilot
+        # PROHIBITIONS: Prevent tow pilot from being the same as surge tow pilot
         if tow_pilot and surge_tow_pilot and tow_pilot == surge_tow_pilot:
             raise ValidationError(
                 "The tow pilot and surge tow pilot cannot be the same person."
+            )
+
+        # WARNINGS: Check for dual-role assignments that are allowed but noteworthy
+        if duty_officer and duty_instructor and duty_officer == duty_instructor:
+            self.warnings.append(
+                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Instructor. "
+                f"This has historical precedent but may impact operational efficiency."
+            )
+
+        if duty_officer and tow_pilot and duty_officer == tow_pilot:
+            self.warnings.append(
+                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Tow Pilot. "
+                f"Please ensure adequate coverage for both responsibilities."
             )
 
         return cleaned_data
@@ -564,21 +582,39 @@ class LogsheetCloseoutForm(forms.ModelForm):
 class LogsheetDutyCrewForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
+        duty_officer = cleaned_data.get("duty_officer")
         duty_instructor = cleaned_data.get("duty_instructor")
         surge_instructor = cleaned_data.get("surge_instructor")
         tow_pilot = cleaned_data.get("tow_pilot")
         surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
 
-        # Prevent instructor from being the same as surge instructor
+        # Initialize warnings list
+        if not hasattr(self, 'warnings'):
+            self.warnings = []
+
+        # PROHIBITIONS: Prevent instructor from being the same as surge instructor
         if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
             raise ValidationError(
                 "The instructor and surge instructor cannot be the same person."
             )
 
-        # Prevent tow pilot from being the same as surge tow pilot
+        # PROHIBITIONS: Prevent tow pilot from being the same as surge tow pilot
         if tow_pilot and surge_tow_pilot and tow_pilot == surge_tow_pilot:
             raise ValidationError(
                 "The tow pilot and surge tow pilot cannot be the same person."
+            )
+
+        # WARNINGS: Check for dual-role assignments that are allowed but noteworthy
+        if duty_officer and duty_instructor and duty_officer == duty_instructor:
+            self.warnings.append(
+                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Instructor. "
+                f"This has historical precedent but may impact operational efficiency."
+            )
+
+        if duty_officer and tow_pilot and duty_officer == tow_pilot:
+            self.warnings.append(
+                f"⚠️ {duty_officer.get_full_name()} is serving as both Duty Officer and Tow Pilot. "
+                f"Please ensure adequate coverage for both responsibilities."
             )
 
         return cleaned_data

@@ -155,3 +155,51 @@ def member_instructor_towpilot(db):
         towpilot=True,
     )
     return user
+
+
+@pytest.fixture
+def member_duty_officer(db):
+    """Creates a member who is a duty officer and assistant duty officer"""
+    user = User.objects.create_user(
+        username="duty_officer_user",
+        password="testpass123",
+        is_active=True,
+        first_name="Duty",
+        last_name="Officer",
+        membership_status="Full Member",
+        duty_officer=True,
+        assistant_duty_officer=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_duty_officer_instructor(db):
+    """Creates a member who is both duty officer and instructor"""
+    user = User.objects.create_user(
+        username="duty_officer_instructor_user",
+        password="testpass123",
+        is_active=True,
+        first_name="DutyOfficer",
+        last_name="Instructor",
+        membership_status="Full Member",
+        duty_officer=True,
+        instructor=True,
+    )
+    return user
+
+
+@pytest.fixture
+def member_duty_officer_towpilot(db):
+    """Creates a member who is both duty officer and tow pilot"""
+    user = User.objects.create_user(
+        username="duty_officer_towpilot_user",
+        password="testpass123",
+        is_active=True,
+        first_name="DutyOfficer",
+        last_name="Towpilot",
+        membership_status="Full Member",
+        duty_officer=True,
+        towpilot=True,
+    )
+    return user

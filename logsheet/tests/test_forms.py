@@ -203,3 +203,141 @@ def test_duty_crew_form_allows_same_person_different_roles(member_instructor_tow
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
+
+
+# Tests for warning functionality (new dual-role warnings)
+@pytest.mark.django_db
+def test_create_logsheet_form_warns_duty_officer_instructor(member_duty_officer_instructor, airfield):
+    """Test that duty officer = instructor generates a warning but allows form submission"""
+    from datetime import timedelta
+    future_date = date.today() + timedelta(days=45)  # Avoid conflicts
+
+    form = CreateLogsheetForm(
+        data={
+            "log_date": future_date,
+            "airfield": airfield.id,
+            "duty_officer": member_duty_officer_instructor.id,
+            "duty_instructor": member_duty_officer_instructor.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    assert "serving as both Duty Officer and Instructor" in form.warnings[0]
+    assert "historical precedent" in form.warnings[0]
+
+
+@pytest.mark.django_db
+def test_create_logsheet_form_warns_duty_officer_towpilot(member_duty_officer_towpilot, airfield):
+    """Test that duty officer = tow pilot generates a warning but allows form submission"""
+    from datetime import timedelta
+    future_date = date.today() + timedelta(days=46)  # Avoid conflicts
+
+    form = CreateLogsheetForm(
+        data={
+            "log_date": future_date,
+            "airfield": airfield.id,
+            "duty_officer": member_duty_officer_towpilot.id,
+            "tow_pilot": member_duty_officer_towpilot.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    assert "serving as both Duty Officer and Tow Pilot" in form.warnings[0]
+    assert "adequate coverage" in form.warnings[0]
+
+
+@pytest.mark.django_db
+def test_create_logsheet_form_multiple_warnings(member_duty_officer_instructor, airfield):
+    """Test that multiple warnings can be generated simultaneously"""
+    from datetime import timedelta
+    future_date = date.today() + timedelta(days=47)  # Avoid conflicts
+
+    # This member is both instructor and tow pilot, serving as duty officer for both
+    # But first we need to make them a tow pilot too
+    member_duty_officer_instructor.towpilot = True
+    member_duty_officer_instructor.save()
+
+    form = CreateLogsheetForm(
+        data={
+            "log_date": future_date,
+            "airfield": airfield.id,
+            "duty_officer": member_duty_officer_instructor.id,
+            "duty_instructor": member_duty_officer_instructor.id,
+            "tow_pilot": member_duty_officer_instructor.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 2
+    warning_text = ' '.join(form.warnings)
+    assert "serving as both Duty Officer and Instructor" in warning_text
+    assert "serving as both Duty Officer and Tow Pilot" in warning_text
+
+
+@pytest.mark.django_db
+def test_create_logsheet_form_no_warning_duty_officer_assistant(member_duty_officer, airfield):
+    """Test that duty officer = assistant duty officer does NOT generate a warning"""
+    from datetime import timedelta
+    future_date = date.today() + timedelta(days=48)  # Avoid conflicts
+
+    form = CreateLogsheetForm(
+        data={
+            "log_date": future_date,
+            "airfield": airfield.id,
+            "duty_officer": member_duty_officer.id,
+            "assistant_duty_officer": member_duty_officer.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+
+
+@pytest.mark.django_db
+def test_duty_crew_form_warns_duty_officer_instructor(member_duty_officer_instructor):
+    """Test that duty crew form warns for duty officer = instructor"""
+    form = LogsheetDutyCrewForm(
+        data={
+            "duty_officer": member_duty_officer_instructor.id,
+            "duty_instructor": member_duty_officer_instructor.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    assert "serving as both Duty Officer and Instructor" in form.warnings[0]
+
+
+@pytest.mark.django_db
+def test_duty_crew_form_warns_duty_officer_towpilot(member_duty_officer_towpilot):
+    """Test that duty crew form warns for duty officer = tow pilot"""
+    form = LogsheetDutyCrewForm(
+        data={
+            "duty_officer": member_duty_officer_towpilot.id,
+            "tow_pilot": member_duty_officer_towpilot.id,
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    assert "serving as both Duty Officer and Tow Pilot" in form.warnings[0]
+
+
+@pytest.mark.django_db
+def test_form_warnings_with_blank_duty_officer(member_instructor, member_towpilot, airfield):
+    """Test that no warnings are generated when duty officer is blank"""
+    from datetime import timedelta
+    future_date = date.today() + timedelta(days=49)  # Avoid conflicts
+
+    form = CreateLogsheetForm(
+        data={
+            "log_date": future_date,
+            "airfield": airfield.id,
+            "duty_instructor": member_instructor.id,
+            "tow_pilot": member_towpilot.id,
+            # duty_officer intentionally omitted
+        }
+    )
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
