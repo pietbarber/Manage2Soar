@@ -3,7 +3,6 @@ from datetime import date, timedelta, time
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from django.utils.timezone import now
 
 from members.models import Member
 from logsheet.models import Logsheet, Glider, Flight, Airfield
