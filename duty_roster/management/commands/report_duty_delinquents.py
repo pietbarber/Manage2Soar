@@ -217,13 +217,17 @@ class Command(BaseCronJobCommand):
         report_lines.extend([
             "Please follow up with these members regarding their duty obligations.",
             "",
+            "📊 DETAILED REPORT WITH MEMBER PHOTOS AND CONTACT INFO:",
+            f"   {settings.SITE_URL}/duty_roster/duty-delinquents/detail/",
+            "",
             "Criteria for this report:",
             f"• Members with 3+ months of membership",
             f"• Members who have flown 3+ times in the last {lookback_months} months",
             f"• Members who have NOT performed any duty in the last {lookback_months} months",
             "",
-            f"Member Directory: {settings.SITE_URL}/members/",
-            f"Duty Roster: {settings.SITE_URL}/duty_roster/",
+            "Additional Resources:",
+            f"• Member Directory: {settings.SITE_URL}/members/",
+            f"• Duty Roster: {settings.SITE_URL}/duty_roster/",
             "",
             "- Manage2Soar Automated Reports"
         ])

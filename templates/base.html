@@ -97,6 +97,14 @@
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}">📅 Calendar</a>
               </li>
+              {% if user.is_authenticated and user.rostermeister or user.member_manager or user.director or user.is_superuser %}
+              <li><hr class="dropdown-divider"></li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_delinquents_detail' %}">
+                  <i class="fas fa-exclamation-triangle text-warning"></i> Duty Delinquents Report
+                </a>
+              </li>
+              {% endif %}
 
             </ul>
           </li>
