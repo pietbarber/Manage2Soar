@@ -241,7 +241,7 @@ def duty_calendar_view(request, year=None, month=None):
     # Add formatted month and date context
     month_name = calendar.month_name[month]
     formatted_date = f"{month_name} {year}"
-    
+
     # Get previous and next month names for navigation
     prev_month_name = calendar.month_name[prev_month]
     next_month_name = calendar.month_name[next_month]
