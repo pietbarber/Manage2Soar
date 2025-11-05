@@ -1,26 +1,96 @@
 <div id="calendar-body">
-    <div class="flex justify-between items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
       <button 
         hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
         hx-target="#calendar-body"
         hx-swap="innerHTML"
-        class="btn btn-sm btn-outline"
+        class="btn btn-sm btn-outline-primary"
+        title="Go to {{ prev_month_name }} {{ prev_year }}"
       >
-        « Prev
+        <i class="fas fa-chevron-left"></i> {{ prev_month_name }}
       </button>
   
-      <span class="font-semibold text-lg">📅 {{ year }} / {{ month }}</span>
+      <div class="text-center">
+        <h3 class="mb-2 text-primary fw-bold">📅 {{ formatted_date }}</h3>
+        
+        <!-- View Toggle -->
+        <div class="btn-group btn-group-sm" role="group" aria-label="Calendar View Toggle">
+          <input type="radio" class="btn-check" name="view-toggle" id="calendar-view" autocomplete="off" 
+                 onchange="toggleCalendarView('calendar')" checked>
+          <label class="btn btn-outline-secondary" for="calendar-view">
+            <i class="fas fa-calendar-alt"></i> Calendar
+          </label>
+          
+          <input type="radio" class="btn-check" name="view-toggle" id="agenda-view" autocomplete="off" 
+                 onchange="toggleCalendarView('agenda')">
+          <label class="btn btn-outline-secondary" for="agenda-view">
+            <i class="fas fa-list"></i> Agenda
+          </label>
+        </div>
+      </div>
   
       <button 
         hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
         hx-target="#calendar-body"
         hx-swap="innerHTML"
-        class="btn btn-sm btn-outline"
+        class="btn btn-sm btn-outline-primary"
+        title="Go to {{ next_month_name }} {{ next_year }}"
       >
-        Next »
+        {{ next_month_name }} <i class="fas fa-chevron-right"></i>
       </button>
     </div>
   
-    {% include "duty_roster/_calendar_table.html" %}
+    <!-- Calendar View -->
+    <div id="calendar-view-content">
+      {% include "duty_roster/_calendar_table.html" %}
+    </div>
+    
+    <!-- Agenda View -->
+    <div id="agenda-view-content" style="display: none;">
+      {% include "duty_roster/_calendar_agenda.html" %}
+    </div>
+    
+    <script>
+      function toggleCalendarView(view) {
+        const calendarView = document.getElementById('calendar-view-content');
+        const agendaView = document.getElementById('agenda-view-content');
+        
+        if (view === 'calendar') {
+          calendarView.style.display = 'block';
+          agendaView.style.display = 'none';
+        } else if (view === 'agenda') {
+          calendarView.style.display = 'none';
+          agendaView.style.display = 'block';
+        }
+        
+        // Store the current view preference
+        localStorage.setItem('duty-roster-view', view);
+      }
+      
+      // Restore view state after HTMX loads new content
+      function restoreViewState() {
+        const savedView = localStorage.getItem('duty-roster-view') || 'calendar';
+        const calendarRadio = document.getElementById('calendar-view');
+        const agendaRadio = document.getElementById('agenda-view');
+        
+        if (savedView === 'agenda') {
+          agendaRadio.checked = true;
+          calendarRadio.checked = false;
+          toggleCalendarView('agenda');
+        } else {
+          calendarRadio.checked = true;
+          agendaRadio.checked = false;
+          toggleCalendarView('calendar');
+        }
+      }
+      
+      // Restore state when page loads or HTMX updates content
+      document.addEventListener('DOMContentLoaded', restoreViewState);
+      document.addEventListener('htmx:afterSettle', function(event) {
+        if (event.detail.target.id === 'calendar-body') {
+          restoreViewState();
+        }
+      });
+    </script>
   </div>
   

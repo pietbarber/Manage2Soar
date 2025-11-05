@@ -1,0 +1,188 @@
+{% load duty_extras %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% if user.rostermeister %}
+  <div class="d-flex justify-content-center mb-4">
+    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+       class="btn btn-primary btn-lg shadow-sm">
+      <i class="fas fa-calendar-plus me-2"></i>Propose Duty Roster
+    </a>
+  </div>
+{% endif %}
+
+<div class="container-fluid my-4">
+  {% if assignments_by_date %}
+    {% for day, assignment in assignments_by_date.items %}
+      {% if day.month == month and day >= today %}
+        <div class="duty-agenda-item mb-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <i class="fas fa-calendar-day me-2"></i>
+                {{ day|date:"l, F j, Y" }}
+              </h5>
+              {% if day == today %}
+                <span class="badge bg-warning text-dark">TODAY</span>
+              {% else %}
+                <span class="badge bg-success">UPCOMING</span>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              {% if not assignment.confirmed and not assignment.is_confirmed %}
+                <div class="alert alert-warning d-flex align-items-center mb-3">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  <div>
+                    <strong>Not Confirmed</strong>
+                    {% get_siteconfig as config %}
+                    {% if not assignment.tow_pilot %}
+                      <br>Missing: {{ config.towpilot_title|default:'Tow Pilot' }}
+                    {% endif %}
+                    {% if not assignment.duty_officer %}
+                      <br>Missing: {{ config.duty_officer_title|default:'Duty Officer' }}
+                    {% endif %}
+                  </div>
+                </div>
+              {% endif %}
+
+              {% with surge=surge_needed_by_date|dict_get:day %}
+                {% if surge.instructor or surge.towpilot %}
+                  <div class="alert alert-danger d-flex align-items-center mb-3">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <div>
+                      <strong>High Demand Alert</strong>
+                      {% if surge.instructor %}
+                        <br>Exceptional instruction demand (4+ students)
+                      {% endif %}
+                      {% if surge.towpilot %}
+                        <br>High tow demand (6+ requests)
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+              {% endwith %}
+
+              <div class="row">
+                {% get_siteconfig as config %}
+                {% if assignment.instructor %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-primary bg-opacity-10 border border-primary rounded p-3">
+                      <h6 class="text-primary mb-2">
+                        <i class="fas fa-graduation-cap me-2"></i>
+                        {{ config.instructor_title|default:'Instructor' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.instructor.full_display_name }}</p>
+                      {% if assignment.instructor.phone %}
+                        <small class="text-muted">{{ assignment.instructor.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if assignment.tow_pilot %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
+                      <h6 class="text-success mb-2">
+                        <i class="fas fa-plane me-2"></i>
+                        {{ config.towpilot_title|default:'Tow Pilot' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.tow_pilot.full_display_name }}</p>
+                      {% if assignment.tow_pilot.phone %}
+                        <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if assignment.duty_officer %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-warning bg-opacity-10 border border-warning rounded p-3">
+                      <h6 class="text-warning mb-2">
+                        <i class="fas fa-clipboard-list me-2"></i>
+                        {{ config.duty_officer_title|default:'Duty Officer' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.duty_officer.full_display_name }}</p>
+                      {% if assignment.duty_officer.phone %}
+                        <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if assignment.assistant_duty_officer %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-info bg-opacity-10 border border-info rounded p-3">
+                      <h6 class="text-info mb-2">
+                        <i class="fas fa-hands-helping me-2"></i>
+                        {{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.assistant_duty_officer.full_display_name }}</p>
+                      {% if assignment.assistant_duty_officer.phone %}
+                        <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if assignment.surge_instructor %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-primary bg-opacity-10 border border-primary rounded p-3">
+                      <h6 class="text-primary mb-2">
+                        <i class="fas fa-graduation-cap me-2"></i>
+                        {{ config.surge_instructor_title|default:'Surge Instructor' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.surge_instructor.full_display_name }}</p>
+                      {% if assignment.surge_instructor.phone %}
+                        <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if assignment.surge_tow_pilot %}
+                  <div class="col-md-6 mb-3">
+                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
+                      <h6 class="text-success mb-2">
+                        <i class="fas fa-plane me-2"></i>
+                        {{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}
+                      </h6>
+                      <p class="mb-0 fw-bold">{{ assignment.surge_tow_pilot.full_display_name }}</p>
+                      {% if assignment.surge_tow_pilot.phone %}
+                        <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Quick Actions -->
+              <div class="mt-3">
+                <button class="btn btn-sm btn-outline-primary"
+                        hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
+                        hx-target="#modal-body"
+                        hx-swap="innerHTML"
+                        onclick="showModalWithLoading();">
+                  <i class="fas fa-info-circle me-1"></i>View Details
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5">
+      <div class="mb-4">
+        <i class="fas fa-calendar-times fa-4x text-muted"></i>
+      </div>
+      <h4 class="text-muted">No Duty Assignments</h4>
+      <p class="text-muted">There are no duty assignments scheduled for {{ formatted_date }}.</p>
+      {% if user.rostermeister %}
+        <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+           class="btn btn-primary">
+          <i class="fas fa-calendar-plus me-2"></i>Create Duty Roster
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
