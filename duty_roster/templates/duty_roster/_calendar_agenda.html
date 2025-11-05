@@ -24,8 +24,6 @@
               </h5>
               {% if day == today %}
                 <span class="badge bg-warning text-dark">TODAY</span>
-              {% elif day < today %}
-                <span class="badge bg-secondary">PAST</span>
               {% else %}
                 <span class="badge bg-success">UPCOMING</span>
               {% endif %}
@@ -163,7 +161,7 @@
                         hx-get="{% url 'duty_roster:calendar_day_detail' year=day.year month=day.month day=day.day %}"
                         hx-target="#modal-body"
                         hx-swap="innerHTML"
-                        onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();">
+                        onclick="showModalWithLoading();">
                   <i class="fas fa-info-circle me-1"></i>View Details
                 </button>
               </div>

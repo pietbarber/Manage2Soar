@@ -62,7 +62,35 @@
           calendarView.style.display = 'none';
           agendaView.style.display = 'block';
         }
+        
+        // Store the current view preference
+        localStorage.setItem('duty-roster-view', view);
       }
+      
+      // Restore view state after HTMX loads new content
+      function restoreViewState() {
+        const savedView = localStorage.getItem('duty-roster-view') || 'calendar';
+        const calendarRadio = document.getElementById('calendar-view');
+        const agendaRadio = document.getElementById('agenda-view');
+        
+        if (savedView === 'agenda') {
+          agendaRadio.checked = true;
+          calendarRadio.checked = false;
+          toggleCalendarView('agenda');
+        } else {
+          calendarRadio.checked = true;
+          agendaRadio.checked = false;
+          toggleCalendarView('calendar');
+        }
+      }
+      
+      // Restore state when page loads or HTMX updates content
+      document.addEventListener('DOMContentLoaded', restoreViewState);
+      document.addEventListener('htmx:afterSettle', function(event) {
+        if (event.detail.target.id === 'calendar-body') {
+          restoreViewState();
+        }
+      });
     </script>
   </div>
   
