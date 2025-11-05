@@ -8,7 +8,7 @@
     <p>Would you like to request ad-hoc operations?</p>
     <form method="post" 
       hx-post="{% url 'duty_roster:calendar_ad_hoc_confirm' year=date.year month=date.month day=date.day %}"
-      hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) location.reload();"
+      hx-on="htmx:afterRequest: bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();"
       >
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">Yes, request operations</button>

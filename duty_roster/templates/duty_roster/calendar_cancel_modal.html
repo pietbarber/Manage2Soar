@@ -4,7 +4,7 @@
   hx-trigger="submit"
   hx-swap="none"
   hx-post="{% url 'duty_roster:calendar_cancel_ops_day' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-  hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) { location.reload(); }"
+  hx-on="htmx:afterRequest: bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();"
 >
   {% csrf_token %}
   <div class="p-4">

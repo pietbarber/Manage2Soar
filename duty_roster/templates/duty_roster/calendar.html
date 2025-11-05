@@ -77,6 +77,33 @@
             }
           });
           
+          // Handle calendar refresh trigger - preserves current month context
+          document.body.addEventListener('refreshCalendar', function(event) {
+            let year, month;
+            
+            // Try to get year/month from event detail (passed from server)
+            if (event.detail && event.detail.year && event.detail.month) {
+              year = event.detail.year;
+              month = event.detail.month;
+            } else {
+              // Fallback: get from calendar body data attributes
+              const calendarBody = document.getElementById('calendar-body');
+              if (calendarBody) {
+                year = calendarBody.getAttribute('data-current-year');
+                month = calendarBody.getAttribute('data-current-month');
+              }
+            }
+            
+            if (year && month) {
+              // Refresh with the correct month context
+              const refreshUrl = `/duty_roster/calendar/${year}/${month}/`;
+              htmx.ajax('GET', refreshUrl, {target: '#calendar-body', swap: 'innerHTML'});
+            } else {
+              // Final fallback: refresh current URL
+              htmx.ajax('GET', window.location.pathname, {target: '#calendar-body', swap: 'innerHTML'});
+            }
+          });
+          
           // Mark listeners as added
           window.dutyRosterModalListenersAdded = true;
         }
