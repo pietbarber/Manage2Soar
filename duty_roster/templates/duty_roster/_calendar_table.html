@@ -3,13 +3,18 @@
 {% load static %}
 {% load siteconfig_tags %}
 {% if user.rostermeister %}
-  <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" class="btn btn-primary mb-3">Propose Duty Roster</a>
+  <div class="d-flex justify-content-center mb-4">
+    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+       class="btn btn-primary btn-lg shadow-sm">
+      <i class="fas fa-calendar-plus me-2"></i>Propose Duty Roster
+    </a>
+  </div>
 {% endif %}
 
-<div class="container my-3">
-  <div class="table-responsive">
-    <table class="table table-bordered mb-0" style="table-layout: fixed;">
-      <thead class="thead-light">
+<div class="container-fluid my-4">
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-bordered table-hover mb-0" style="table-layout: fixed; border-collapse: separate; border-spacing: 0;">
+      <thead class="table-light">
         <tr>
           <th class="text-center">Sun</th>
           <th class="text-center">Mon</th>
@@ -24,7 +29,7 @@
         {% for week in weeks %}
         <tr>
           {% for day in week %}
-          <td class="align-top text-start {% if day < today %}table-secondary{% elif day not in assignments_by_date and day.month == month %}future-no-ops{% elif day == today %}table-primary{% endif %}"
+          <td class="calendar-cell {% if day < today %}past{% elif day not in assignments_by_date and day.month == month %}no-ops{% elif day == today %}today{% endif %}"
               {% if day not in assignments_by_date and day > today %}
                 hx-get="{% url 'duty_roster:calendar_ad_hoc_start' year=day.year month=day.month day=day.day %}"
               {% else %}
@@ -32,35 +37,59 @@
               {% endif %}
               hx-target="#modal-body"
               hx-swap="innerHTML"
-              onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).show();">
-            <strong>{{ day.day }}</strong><br>
+              onclick="showModalWithLoading();">
+            <div class="calendar-day-number">{{ day.day }}</div>
 
-            {% if surge_needed_by_date|dict_get:day %}
-              {% with surge=surge_needed_by_date|dict_get:day %}
-                <div class="mt-1 text-danger small">
-                  {% if surge.instructor %}<span title="At least 4 students requesting instruction">🚨🎓</span>{% endif %}
-                  {% if surge.towpilot %}<span title="High demand for tows">🚨🛩️</span>{% endif %}
+            {% with surge=surge_needed_by_date|dict_get:day %}
+              {% if surge.instructor or surge.towpilot %}
+                <div class="surge-alert-container">
+                  {% if surge.instructor %}
+                    <span class="duty-badge badge-surge" title="At least 4 students requesting instruction">
+                      HIGH INSTRUCTION DEMAND
+                    </span>
+                  {% endif %}
+                  {% if surge.towpilot %}
+                    <span class="duty-badge badge-surge" title="High demand for tows">
+                      HIGH TOW DEMAND
+                    </span>
+                  {% endif %}
                 </div>
-              {% endwith %}
-            {% endif %}
+              {% endif %}
+            {% endwith %}
 
             {% if day in assignments_by_date %}
               {% with a=assignments_by_date|dict_get:day %}
                 {% if not a.confirmed and not a.is_confirmed %}
-                  <div class="text-warning font-weight-bold mb-1 small">
-                    🚧 Not Confirmed<br>
+                  <div class="mb-2">
+                    <span class="duty-badge badge-warning">NOT CONFIRMED</span><br>
                     {% get_siteconfig as config %}
-                    {% if not a.tow_pilot %}🛩️ {{ config.towpilot_title|default:'Tow Pilot' }} Missing<br>{% endif %}
-                    {% if not a.duty_officer %}📋 {{ config.duty_officer_title|default:'Duty Officer' }} Missing<br>{% endif %}
+                    {% if not a.tow_pilot %}
+                      <span class="duty-badge badge-warning">{{ config.towpilot_title|default:'Tow Pilot' }} MISSING</span><br>
+                    {% endif %}
+                    {% if not a.duty_officer %}
+                      <span class="duty-badge badge-warning">{{ config.duty_officer_title|default:'Duty Officer' }} MISSING</span><br>
+                    {% endif %}
                   </div>
                 {% endif %}
-                <div class="small">
-                  {% if a.instructor %}🎓 {{ a.instructor.last_name }}<br>{% endif %}
-                  {% if a.tow_pilot %}🛩️ {{ a.tow_pilot.last_name }}<br>{% endif %}
-                  {% if a.duty_officer %}📋 {{ a.duty_officer.last_name }}<br>{% endif %}
-                  {% if a.assistant_duty_officer %}💪 {{ a.assistant_duty_officer.last_name }}<br>{% endif %}
-                  {% if a.surge_instructor %}🎓 {{ a.surge_instructor.last_name }} (S)<br>{% endif %}
-                  {% if a.surge_tow_pilot %}🛩️ {{ a.surge_tow_pilot.last_name }} (S)<br>{% endif %}
+                <div class="duty-assignments">
+                  {% if a.instructor %}
+                    <span class="duty-badge badge-instructor">{{ a.instructor.last_name }}</span>
+                  {% endif %}
+                  {% if a.tow_pilot %}
+                    <span class="duty-badge badge-tow-pilot">{{ a.tow_pilot.last_name }}</span>
+                  {% endif %}
+                  {% if a.duty_officer %}
+                    <span class="duty-badge badge-duty-officer">{{ a.duty_officer.last_name }}</span>
+                  {% endif %}
+                  {% if a.assistant_duty_officer %}
+                    <span class="duty-badge badge-assistant-duty-officer">{{ a.assistant_duty_officer.last_name }}</span>
+                  {% endif %}
+                  {% if a.surge_instructor %}
+                    <span class="duty-badge badge-instructor">{{ a.surge_instructor.last_name }} (S)</span>
+                  {% endif %}
+                  {% if a.surge_tow_pilot %}
+                    <span class="duty-badge badge-tow-pilot">{{ a.surge_tow_pilot.last_name }} (S)</span>
+                  {% endif %}
                 </div>
               {% endwith %}
             {% endif %}

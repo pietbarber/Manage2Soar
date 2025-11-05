@@ -238,9 +238,21 @@ def duty_calendar_view(request, year=None, month=None):
             "towpilot": tow_count[day_date] >= 6,
         }
 
+    # Add formatted month and date context
+    month_name = calendar.month_name[month]
+    formatted_date = f"{month_name} {year}"
+    
+    # Get previous and next month names for navigation
+    prev_month_name = calendar.month_name[prev_month]
+    next_month_name = calendar.month_name[next_month]
+
     context = {
         "year": year,
         "month": month,
+        "month_name": month_name,
+        "formatted_date": formatted_date,
+        "prev_month_name": prev_month_name,
+        "next_month_name": next_month_name,
         "weeks": weeks,
         "assignments_by_date": assignments_by_date,
         "prev_year": prev_year,

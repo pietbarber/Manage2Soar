@@ -408,3 +408,213 @@ th {
 .card-inner {
   padding: 25px !important;
 }
+
+/* Duty Roster Calendar Enhancement - Professional Color-Coded Badges */
+.calendar-cell .duty-badge,
+.duty-assignments .duty-badge,
+table .duty-badge {
+  display: inline-block !important;
+  padding: 3px 8px !important;
+  border-radius: 12px !important;
+  font-size: 0.75em !important;
+  font-weight: 600 !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  margin: 1px 2px 2px 0 !important;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  transition: all 0.2s ease !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  line-height: normal !important;
+}
+
+.duty-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Role-specific badge colors */
+.calendar-cell .duty-badge.badge-instructor,
+.duty-assignments .duty-badge.badge-instructor,
+table .duty-badge.badge-instructor {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+  border: 1px solid #0056b3 !important;
+  color: white !important;
+}
+
+.calendar-cell .duty-badge.badge-tow-pilot,
+.duty-assignments .duty-badge.badge-tow-pilot,
+table .duty-badge.badge-tow-pilot {
+  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
+  border: 1px solid #1e7e34 !important;
+  color: white !important;
+}
+
+.calendar-cell .duty-badge.badge-duty-officer,
+.duty-assignments .duty-badge.badge-duty-officer,
+table .duty-badge.badge-duty-officer {
+  background: linear-gradient(135deg, #fd7e14 0%, #e55a00 100%) !important;
+  border: 1px solid #e55a00 !important;
+  color: white !important;
+}
+
+.calendar-cell .duty-badge.badge-assistant-duty-officer,
+.duty-assignments .duty-badge.badge-assistant-duty-officer,
+table .duty-badge.badge-assistant-duty-officer {
+  background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%) !important;
+  border: 1px solid #563d7c !important;
+  color: white !important;
+}
+
+.calendar-cell .duty-badge.badge-surge,
+.duty-assignments .duty-badge.badge-surge,
+table .duty-badge.badge-surge {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+  border: 1px solid #c82333 !important;
+  color: white !important;
+  animation: pulse-glow 2s infinite;
+}
+
+.calendar-cell .duty-badge.badge-warning,
+.duty-assignments .duty-badge.badge-warning,
+table .duty-badge.badge-warning {
+  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%) !important;
+  border: 1px solid #e0a800 !important;
+  color: #212529 !important;
+  text-shadow: none !important;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+  50% { box-shadow: 0 4px 12px rgba(220, 53, 69, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+  100% { box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+}
+
+/* Calendar table enhancements */
+.calendar-cell {
+  min-height: 120px;
+  vertical-align: top !important;
+  padding: 8px !important;
+  position: relative;
+}
+
+.calendar-cell.today {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+  border: 2px solid #2196f3;
+}
+
+.calendar-cell.past {
+  background-color: #f8f9fa !important;
+  color: #6c757d !important;
+  opacity: 0.7;
+}
+
+.calendar-cell.past .calendar-day-number {
+  color: #6c757d !important;
+}
+
+.calendar-cell.past .duty-badge {
+  opacity: 0.8;
+}
+
+.calendar-cell.no-ops {
+  background: repeating-linear-gradient(
+    45deg,
+    #ffffff,
+    #ffffff 10px,
+    #fafafa 10px,
+    #fafafa 20px
+  );
+}
+
+.calendar-day-number {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: #495057;
+  margin-bottom: 4px;
+}
+
+.duty-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.duty-assignments .duty-badge {
+  display: block;
+  width: fit-content;
+  margin: 0 0 2px 0;
+}
+
+.surge-alert-container {
+  margin: 4px 0;
+  padding: 3px;
+  background: rgba(220, 53, 69, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #dc3545;
+}
+
+/* Agenda View Styling */
+.duty-agenda-item {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.duty-agenda-item:hover {
+  transform: translateY(-2px);
+}
+
+.duty-agenda-item .card {
+  border: none;
+  border-left: 4px solid #007bff;
+}
+
+.duty-agenda-item .card-header {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+  border-bottom: none;
+}
+
+.duty-role-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.duty-role-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* View toggle styling */
+.btn-check:checked + .btn-outline-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
+/* Modal loading spinner styling */
+#modal-loading {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#modal-loading .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  border-width: 0.3em;
+}
+
+#modal-loading p {
+  font-size: 0.9em;
+  margin-top: 1rem;
+  color: #6c757d;
+}
