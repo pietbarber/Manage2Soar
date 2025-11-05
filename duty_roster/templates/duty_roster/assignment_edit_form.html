@@ -2,7 +2,7 @@
   method="post"
   hx-post="{% url 'duty_roster:assignment_save_form' year=day.year month=day.month day=day.day %}"
   hx-trigger="submit"
-  hx-on="htmx:afterRequest: if (JSON.parse(event.detail.xhr.responseText).reload) location.reload();"
+  hx-on="htmx:afterRequest: bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();"
 >
 
   {% csrf_token %}

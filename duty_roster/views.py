@@ -1,4 +1,5 @@
 import calendar
+import json
 from collections import defaultdict
 from datetime import date
 from datetime import date as dt_date
@@ -39,6 +40,21 @@ from .models import (
     OpsIntent,
 )
 from .roster_generator import generate_roster
+
+
+def calendar_refresh_response(year, month):
+    """Helper function to create HTMX response that refreshes calendar with month context"""
+    trigger_data = {
+        'refreshCalendar': {
+            'year': int(year),
+            'month': int(month)
+        }
+    }
+    return HttpResponse(
+        headers={
+            'HX-Trigger': json.dumps(trigger_data)
+        }
+    )
 
 
 def roster_home(request):
@@ -535,8 +551,9 @@ def assignment_save_form(request, year, month, day):
         assignment.save()
 
         form.save()
-        # Reload the full modal so crew updates show
-        return JsonResponse({"reload": True})
+
+        # Return HTMX response to refresh calendar body with specific month context
+        return calendar_refresh_response(year, month)
     else:
         return render(
             request,
@@ -582,7 +599,9 @@ def calendar_ad_hoc_confirm(request, year, month, day):
         },
     )
     notify_ops_status(assignment)
-    return JsonResponse({"reload": True})
+
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @require_POST
@@ -603,7 +622,8 @@ def calendar_tow_signup(request, year, month, day):
         assignment.save()
         notify_ops_status(assignment)
 
-    return JsonResponse({"reload": True})
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @require_POST
@@ -623,7 +643,8 @@ def calendar_dutyofficer_signup(request, year, month, day):
         assignment.save()
         notify_ops_status(assignment)
 
-    return JsonResponse({"reload": True})
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @require_POST
@@ -640,7 +661,8 @@ def calendar_instructor_signup(request, year, month, day):
         assignment.instructor = member
         assignment.save()
 
-    return HttpResponse(status=204)
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @require_POST
@@ -658,7 +680,8 @@ def calendar_ado_signup(request, year, month, day):
         assignment.assistant_duty_officer = member
         assignment.save()
 
-    return HttpResponse(status=204)
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @require_POST
@@ -699,7 +722,8 @@ def calendar_cancel_ops_day(request, year, month, day):
     # Delete the DutyAssignment entry
     assignment.delete()
 
-    return JsonResponse({"reload": True})
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
 
 
 @active_member_required
