@@ -660,6 +660,7 @@ def calendar_instructor_signup(request, year, month, day):
     if not assignment.instructor:
         assignment.instructor = member
         assignment.save()
+        notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -679,6 +680,7 @@ def calendar_ado_signup(request, year, month, day):
     if not assignment.assistant_duty_officer:
         assignment.assistant_duty_officer = member
         assignment.save()
+        notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)

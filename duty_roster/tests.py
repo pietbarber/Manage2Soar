@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from members.models import Member
 from logsheet.models import Logsheet, Glider, Flight, Airfield
 from duty_roster.models import DutySlot, DutyDay, MemberBlackout, DutyPreference
-from duty_roster.views import _has_performed_duty_detailed, _calculate_membership_duration
+from duty_roster.views import _has_performed_duty_detailed, _calculate_membership_duration, calendar_refresh_response
 
 User = get_user_model()
 
@@ -328,3 +328,56 @@ class HelperFunctionTests(TestCase):
 
         duration = _calculate_membership_duration(self.member, date.today())
         self.assertEqual(duration, "Unknown (no join date)")
+
+
+class CalendarRefreshResponseTests(TestCase):
+    """Test the calendar_refresh_response helper function"""
+
+    def test_calendar_refresh_response_headers(self):
+        """Test that calendar_refresh_response sets correct HX-Trigger header"""
+        year, month = 2024, 12
+        response = calendar_refresh_response(year, month)
+
+        # Check response status and headers
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('HX-Trigger', response.headers)
+
+        # Parse the HX-Trigger JSON
+        import json
+        trigger_data = json.loads(response.headers['HX-Trigger'])
+
+        # Verify structure and values
+        self.assertIn('refreshCalendar', trigger_data)
+        self.assertEqual(trigger_data['refreshCalendar']['year'], 2024)
+        self.assertEqual(trigger_data['refreshCalendar']['month'], 12)
+
+    def test_calendar_refresh_response_json_format(self):
+        """Test that the JSON structure is correct"""
+        year, month = 2025, 1
+        response = calendar_refresh_response(year, month)
+
+        import json
+        trigger_data = json.loads(response.headers['HX-Trigger'])
+
+        # Verify the exact expected structure
+        expected_structure = {
+            'refreshCalendar': {
+                'year': 2025,
+                'month': 1
+            }
+        }
+        self.assertEqual(trigger_data, expected_structure)
+
+    def test_calendar_refresh_response_type_conversion(self):
+        """Test that string year/month are converted to integers"""
+        year, month = "2023", "11"  # Pass as strings
+        response = calendar_refresh_response(year, month)
+
+        import json
+        trigger_data = json.loads(response.headers['HX-Trigger'])
+
+        # Should be converted to integers
+        self.assertEqual(trigger_data['refreshCalendar']['year'], 2023)
+        self.assertEqual(trigger_data['refreshCalendar']['month'], 11)
+        self.assertIsInstance(trigger_data['refreshCalendar']['year'], int)
+        self.assertIsInstance(trigger_data['refreshCalendar']['month'], int)
