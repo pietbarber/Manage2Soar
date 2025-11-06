@@ -35,6 +35,17 @@
         {{ form.non_field_errors }}
       </div>
     {% endif %}
+    
+    {% if form.warnings %}
+      <div class="alert alert-warning border-0 mb-4" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <ul class="mb-0">
+          {% for warning in form.warnings %}
+            <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
     {% csrf_token %}
     
   <!-- Aircraft & Crew Section -->
