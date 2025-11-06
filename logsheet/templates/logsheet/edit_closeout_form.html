@@ -2,6 +2,11 @@
 {% load humanize %}
 <!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
 
+{% block head_extra %}
+{{ form.media }}
+{{ formset.media }}
+{% endblock %}
+
 {% block content %}
 {% load member_extras %}
 <!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
@@ -24,20 +29,60 @@
 <form method="post" id="closeout-form">
   <div class="modal-body">
     {% csrf_token %}
-    {{ form.media }}
     {% if form.errors %}
   <div class="alert alert-danger">
-    {{ form.errors }}
+    <strong>Closeout Form Errors:</strong>
+    <ul>
+      {% for field, errors in form.errors.items %}
+        {% if field == '__all__' %}
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        {% else %}
+          <li><strong>{{ field|title }}:</strong> {{ errors|join:", " }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
   </div>
 {% endif %}
 {% if duty_form.errors %}
   <div class="alert alert-danger">
-    {{ duty_form.errors }}
+    <strong>Duty Crew Form Errors:</strong>
+    <ul>
+      {% for field, errors in duty_form.errors.items %}
+        {% if field == '__all__' %}
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        {% else %}
+          <li><strong>{{ field|title }}:</strong> {{ errors|join:", " }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
   </div>
 {% endif %}
-{% if formset.errors %}
+{% if formset.errors and formset.errors|length > 0 %}
+  {% for error_dict in formset.errors %}
+    {% if error_dict %}
+      <div class="alert alert-danger">
+        <strong>Towplane Closeout Errors:</strong>
+        <ul>
+          {% for field, messages in error_dict.items %}
+            <li><strong>{{ field|title }}:</strong> {{ messages|join:", " }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% if formset.non_form_errors %}
   <div class="alert alert-danger">
-    {{ formset.errors }}
+    <strong>General Towplane Errors:</strong>
+    <ul>
+      {% for error in formset.non_form_errors %}
+        <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
   </div>
 {% endif %}
     {{ form.non_field_errors }}
@@ -136,6 +181,16 @@
           {{ formset.management_form }}
 
           {% for towform in formset %}
+            {% if towform.non_field_errors %}
+              <tr>
+                <td colspan="2">
+                  <div class="alert alert-danger">
+                    <strong>Towplane Form Errors:</strong>
+                    {{ towform.non_field_errors }}
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
             <tr>
               <td colspan="2">
                 {% for hidden in towform.hidden_fields %}

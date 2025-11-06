@@ -394,6 +394,32 @@ def manage_logsheet(request, pk):
             )
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
+        # Check towplane closeout data if there were flights
+        if flights.exists():
+            towplane_closeouts = logsheet.towplane_closeouts.all()
+            missing_towplane_data = []
+
+            # Get unique towplanes used in flights
+            used_towplanes = set(flights.values_list('towplane', flat=True).distinct())
+            used_towplanes.discard(None)  # Remove None values
+
+            if used_towplanes:
+                for towplane_id in used_towplanes:
+                    towplane = Towplane.objects.get(pk=towplane_id)
+                    closeout = towplane_closeouts.filter(towplane=towplane).first()
+
+                    if not closeout:
+                        missing_towplane_data.append(
+                            f"Missing closeout data for {towplane.n_number}")
+                    elif (closeout.start_tach is None or closeout.end_tach is None) and closeout.fuel_added is None:
+                        missing_towplane_data.append(
+                            f"Missing tach times or fuel data for {towplane.n_number}")
+
+                if missing_towplane_data:
+                    for msg in missing_towplane_data:
+                        messages.error(request, f"Cannot finalize. {msg}")
+                    return redirect("logsheet:manage", pk=logsheet.pk)
+
         # Lock in cost values
         # That means take the temporary values we calculated for the costs
         # and place them in these other variables that get perma-written to the database.
