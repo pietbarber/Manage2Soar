@@ -337,9 +337,10 @@ handler403 = "members.views.custom_permission_denied_view"
 TINYMCE_JS_URL = "/static/tinymce/tinymce.min.js"
 
 TINYMCE_DEFAULT_CONFIG = {
-    "relative_urls": False,  # turn off relative URLs
-    "remove_script_host": False,  # strip protocol+host
-    "convert_urls": True,  # Ensure URLs are run through TinyMCE's converter
+    "relative_urls": False,  # prevent ugly ../../../ paths
+    "remove_script_host": True,  # strip protocol+host from URLs
+    # disable URL conversion to preserve user input (fixes issue #207)
+    "convert_urls": False,
     "height": 500,
     "menubar": "file edit view insert format tools table help",
     "plugins": "image link media code lists table",
