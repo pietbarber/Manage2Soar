@@ -131,6 +131,26 @@ class FlightForm(forms.ModelForm):
                     "Landing time cannot be earlier than launch time."
                 )
 
+        # Validate member role conflicts
+        pilot = cleaned_data.get("pilot")
+        instructor = cleaned_data.get("instructor")
+        passenger = cleaned_data.get("passenger")
+
+        if pilot and instructor and pilot == instructor:
+            raise forms.ValidationError(
+                "The same member cannot be both pilot and instructor on the same flight."
+            )
+
+        if pilot and passenger and pilot == passenger:
+            raise forms.ValidationError(
+                "The same member cannot be both pilot and passenger on the same flight."
+            )
+
+        if instructor and passenger and instructor == passenger:
+            raise forms.ValidationError(
+                "The same member cannot be both instructor and passenger on the same flight."
+            )
+
         # Validate glider availability using the utility function
         # Set the logsheet on the instance for the validation function
         if self.instance and not getattr(self.instance, 'logsheet', None) and logsheet:
