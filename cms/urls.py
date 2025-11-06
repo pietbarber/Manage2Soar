@@ -13,7 +13,9 @@ urlpatterns = [
     path("contact/", views.contact, name="contact"),
     path("contact/success/", views.contact_success, name="contact_success"),
     # /cms/<slug>/ or /cms/<parent>/<slug>/ (supports up to 3 levels for now)
-    re_path(r"^(?P<slug1>[-\w]+)/$", views.cms_page, name="cms_page"),
+    # Exclude common reserved paths (admin, debug, api, etc.) from CMS routing
+    re_path(
+        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt)/)(?P<slug1>[-\w]+)/$", views.cms_page, name="cms_page"),
     re_path(
         r"^(?P<slug1>[-\w]+)/(?P<slug2>[-\w]+)/$",
         views.cms_page,
