@@ -177,6 +177,12 @@ cython_debug/
 #.idea/
 
 # End of https://www.toptal.com/developers/gitignore/api/django
+
+# Copilot conversation saves - keep private!
+.github/conversations/
+*.copilot-chat
+
+# Local scripts and sensitive data
 scripts/reset_spr_data.py
 membership.json
 skyline-soaring-storage.json

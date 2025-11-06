@@ -5,6 +5,10 @@
 - Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
 - **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
 
+## Additional Context Resources
+- **Conversation Archives**: For complex issues requiring deep context, check `.github/conversations/` for saved debugging sessions and technical discussions. These contain valuable insights about system architecture, problem-solving approaches, data migration patterns, and testing strategies.
+- **IMPORTANT**: The `.github/conversations/` directory is gitignored - these files exist locally only and provide rich historical context for understanding technical decisions and debugging complex issues.
+
 ## GitHub Issue Lookup
 - **CRITICAL**: When user references an issue by number (e.g., "work on issue 70"), use this MCP pattern:
   - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"` to get all open issues, then filter for the specific number
