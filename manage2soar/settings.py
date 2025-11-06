@@ -259,6 +259,13 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# Enable serving static files via Django in production (temporary solution)
+# Note: In production, ideally static files should be served by a web server like Nginx
+if not DEBUG:
+    # Add whitenoise for serving static files in production
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
