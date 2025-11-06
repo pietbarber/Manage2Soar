@@ -55,11 +55,8 @@ class FlightForm(forms.ModelForm):
         glider = cleaned_data.get("glider")
         launch_time = cleaned_data.get("launch_time")
         landing_time = cleaned_data.get("landing_time")
-        logsheet = (
-            cleaned_data.get("logsheet")
-            if "logsheet" in cleaned_data
-            else getattr(self.instance, "logsheet", None)
-        )
+        # Use logsheet passed during form initialization, or fall back to instance
+        logsheet = self.logsheet or getattr(self.instance, "logsheet", None)
 
         # Prevent landing time earlier than launch time
         if launch_time and landing_time:
@@ -159,6 +156,8 @@ class FlightForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Extract logsheet parameter for validation
+        self.logsheet = kwargs.pop('logsheet', None)
         super().__init__(*args, **kwargs)
         # Ensure launch_time and landing_time are always formatted as HH:MM (no seconds)
         for field_name in ["launch_time", "landing_time"]:

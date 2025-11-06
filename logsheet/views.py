@@ -631,7 +631,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
 
     if request.method == "POST":
-        form = FlightForm(request.POST, instance=flight)
+        form = FlightForm(request.POST, instance=flight, logsheet=logsheet)
         if form.is_valid():
             form.save()
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -647,7 +647,9 @@ def edit_flight(request, logsheet_pk, flight_pk):
                     "form": form,
                     "flight": flight,
                     "logsheet": logsheet,
-                    "gliders_sorted": gliders_sorted,
+                    "club_gliders": club_gliders,
+                    "club_private": club_private,
+                    "inactive_gliders": inactive_gliders,
                 },
                 status=400,
             )
@@ -718,7 +720,7 @@ def add_flight(request, logsheet_pk):
     inactive_gliders = [g for g in gliders_sorted if not g.is_active]
 
     if request.method == "POST":
-        form = FlightForm(request.POST)
+        form = FlightForm(request.POST, logsheet=logsheet)
         if form.is_valid():
             flight = form.save(commit=False)
             flight.logsheet = logsheet
@@ -735,7 +737,9 @@ def add_flight(request, logsheet_pk):
                     "form": form,
                     "logsheet": logsheet,
                     "mode": "add",
-                    "gliders_sorted": gliders_sorted,
+                    "club_gliders": club_gliders,
+                    "club_private": club_private,
+                    "inactive_gliders": inactive_gliders,
                 },
                 status=400,
             )
