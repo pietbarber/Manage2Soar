@@ -704,7 +704,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
                 status=400,
             )
     else:
-        form = FlightForm(instance=flight)
+        form = FlightForm(instance=flight, logsheet=logsheet)
 
     return render(
         request,

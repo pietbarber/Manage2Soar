@@ -341,3 +341,117 @@ def test_form_warnings_with_blank_duty_officer(member_instructor, member_towpilo
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
     assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+
+
+# FlightForm business rule tests (Issue #110)
+@pytest.mark.django_db
+def test_flight_form_warns_unscheduled_tow_pilot(member_towpilot, member_towpilot2, glider, logsheet):
+    """Test that FlightForm warns when tow pilot is not on scheduled list"""
+    from logsheet.forms import FlightForm
+
+    # Set up logsheet with scheduled tow pilots
+    logsheet.tow_pilot = member_towpilot  # Only this member is scheduled
+    logsheet.save()
+
+    # Try to create flight with different tow pilot
+    form = FlightForm(
+        data={
+            "pilot": member_towpilot2.id,
+            "glider": glider.id,
+            "tow_pilot": member_towpilot2.id,  # Not on scheduled list
+            "launch_time": "14:00",
+            "release_altitude": 3000,
+        },
+        logsheet=logsheet
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    warning = form.warnings[0]
+    assert "is not on the scheduled tow pilot list" in warning
+    assert member_towpilot2.get_full_name() in warning
+    assert member_towpilot.get_full_name() in warning
+
+
+@pytest.mark.django_db
+def test_flight_form_no_warning_scheduled_tow_pilot(member_towpilot, glider, logsheet):
+    """Test that FlightForm does not warn when tow pilot is on scheduled list"""
+    from logsheet.forms import FlightForm
+
+    # Set up logsheet with scheduled tow pilot
+    logsheet.tow_pilot = member_towpilot
+    logsheet.save()
+
+    # Create flight with scheduled tow pilot
+    form = FlightForm(
+        data={
+            "pilot": member_towpilot.id,
+            "glider": glider.id,
+            "tow_pilot": member_towpilot.id,  # On scheduled list
+            "launch_time": "14:00",
+            "release_altitude": 3000,
+        },
+        logsheet=logsheet
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+
+
+@pytest.mark.django_db
+def test_flight_form_warns_unscheduled_with_surge_pilot(member_towpilot, member_towpilot2, member_instructor_towpilot, glider, logsheet):
+    """Test that FlightForm warns correctly when surge tow pilot is also scheduled"""
+    from logsheet.forms import FlightForm
+
+    # Set up logsheet with both regular and surge tow pilots
+    logsheet.tow_pilot = member_towpilot
+    logsheet.surge_tow_pilot = member_towpilot2
+    logsheet.save()
+
+    # Try to create flight with unscheduled tow pilot (different from both scheduled)
+    form = FlightForm(
+        data={
+            "pilot": member_instructor_towpilot.id,
+            "glider": glider.id,
+            "tow_pilot": member_instructor_towpilot.id,  # Not on either scheduled list
+            "launch_time": "14:00",
+            "release_altitude": 3000,
+        },
+        logsheet=logsheet
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert hasattr(form, 'warnings')
+    assert len(form.warnings) == 1
+    warning = form.warnings[0]
+    assert "is not on the scheduled tow pilot list" in warning
+    assert member_instructor_towpilot.get_full_name() in warning
+    # Both scheduled pilots should be mentioned
+    assert member_towpilot.get_full_name() in warning
+    assert member_towpilot2.get_full_name() in warning
+
+
+@pytest.mark.django_db
+def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, logsheet):
+    """Test that FlightForm does not warn when no tow pilots are scheduled"""
+    from logsheet.forms import FlightForm
+
+    # Logsheet with no scheduled tow pilots
+    assert logsheet.tow_pilot is None
+    assert logsheet.surge_tow_pilot is None
+
+    # Create flight with any tow pilot
+    form = FlightForm(
+        data={
+            "pilot": member_towpilot.id,
+            "glider": glider.id,
+            "tow_pilot": member_towpilot.id,
+            "launch_time": "14:00",
+            "release_altitude": 3000,
+        },
+        logsheet=logsheet
+    )
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert not hasattr(form, 'warnings') or len(form.warnings) == 0

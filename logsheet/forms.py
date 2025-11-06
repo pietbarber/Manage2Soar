@@ -157,6 +157,29 @@ class FlightForm(forms.ModelForm):
             self.instance.logsheet = logsheet
         validate_glider_availability(self.instance, glider, launch_time, landing_time)
 
+        # Business Rule: Check if tow pilot is scheduled for this day (Issue #110)
+        tow_pilot = cleaned_data.get("tow_pilot")
+        if tow_pilot and logsheet:
+            scheduled_tow_pilots = []
+            if logsheet.tow_pilot:
+                scheduled_tow_pilots.append(logsheet.tow_pilot)
+            if logsheet.surge_tow_pilot:
+                scheduled_tow_pilots.append(logsheet.surge_tow_pilot)
+
+            if scheduled_tow_pilots and tow_pilot not in scheduled_tow_pilots:
+                # Initialize warnings list if it doesn't exist
+                if not hasattr(self, 'warnings'):
+                    self.warnings = []
+
+                scheduled_names = ", ".join([pilot.get_full_name()
+                                            for pilot in scheduled_tow_pilots])
+                self.warnings.append(
+                    f"⚠️ {tow_pilot.get_full_name()} is not on the scheduled tow pilot list for this day. "
+                    f"Scheduled tow pilots: {scheduled_names}. "
+                    f"This may be intentional (e.g., emergency replacement, brief tow during break), "
+                    f"but please verify this is correct."
+                )
+
         return cleaned_data
 
     class Meta:
