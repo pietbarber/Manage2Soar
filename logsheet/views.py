@@ -82,6 +82,8 @@ def update_flight_split(request, flight_id):
 @active_member_required
 def land_flight_now(request, flight_id):
     import json
+    from django.core.exceptions import ValidationError
+    from .forms import validate_glider_availability
 
     try:
         flight = get_object_or_404(Flight, pk=flight_id)
@@ -104,6 +106,16 @@ def land_flight_now(request, flight_id):
             return JsonResponse(
                 {"success": False, "error": "Invalid time format."}, status=400
             )
+
+        # Validate glider availability before setting landing time
+        try:
+            validate_glider_availability(
+                flight, flight.glider, flight.launch_time, landing_time)
+        except ValidationError as e:
+            return JsonResponse(
+                {"success": False, "error": str(e)}, status=400
+            )
+
         flight.landing_time = landing_time
         flight.save(update_fields=["landing_time"])
         return JsonResponse({"success": True})
@@ -115,6 +127,8 @@ def land_flight_now(request, flight_id):
 @active_member_required
 def launch_flight_now(request, flight_id):
     import json
+    from django.core.exceptions import ValidationError
+    from .forms import validate_glider_availability
 
     try:
         flight = get_object_or_404(Flight, pk=flight_id)
@@ -133,6 +147,16 @@ def launch_flight_now(request, flight_id):
             return JsonResponse(
                 {"success": False, "error": "Invalid time format."}, status=400
             )
+
+        # Validate glider availability before setting launch time
+        try:
+            validate_glider_availability(
+                flight, flight.glider, launch_time, flight.landing_time)
+        except ValidationError as e:
+            return JsonResponse(
+                {"success": False, "error": str(e)}, status=400
+            )
+
         flight.launch_time = launch_time
         flight.save(update_fields=["launch_time"])
         return JsonResponse({"success": True})

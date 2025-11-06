@@ -21,6 +21,72 @@ from .models import (
 )
 
 
+def validate_glider_availability(flight, glider, launch_time, landing_time=None):
+    """
+    Validates that a glider is not double-booked for overlapping flight times.
+
+    Args:
+        flight: The Flight instance being validated (can be None for new flights)
+        glider: The Glider instance
+        launch_time: The proposed launch time
+        landing_time: The proposed landing time (can be None for open-ended flights)
+
+    Returns:
+        None if validation passes
+
+    Raises:
+        ValidationError: If glider is already scheduled for overlapping time
+    """
+    if not glider or not launch_time:
+        return
+
+    # Get the logsheet and date
+    logsheet = getattr(flight, 'logsheet', None) if flight else None
+    if not logsheet or not hasattr(logsheet, 'log_date') or logsheet.log_date is None:
+        return
+
+    # Find other flights with same glider on same date
+    flights_qs = Flight.objects.filter(
+        glider=glider, logsheet__log_date=logsheet.log_date
+    )
+    if flight and flight.pk:
+        flights_qs = flights_qs.exclude(pk=flight.pk)
+
+    # Check for overlaps with each existing flight
+    for other in flights_qs:
+        other_launch = other.launch_time
+        other_landing = other.landing_time
+
+        # Skip flights without launch times
+        if not other_launch:
+            continue
+
+        # If both have landing times, check for overlap
+        if landing_time and other_landing:
+            if launch_time < other_landing and landing_time > other_launch:
+                raise ValidationError(
+                    f"This glider is already scheduled for another flight (ID {other.pk}) from {other_launch} to {other_landing}."
+                )
+        # If this flight has no landing, check if launch is during another flight
+        elif not landing_time and other_landing:
+            if launch_time < other_landing and launch_time >= other_launch:
+                raise ValidationError(
+                    f"This glider is already airborne in another flight (ID {other.pk}) from {other_launch} to {other_landing}."
+                )
+        # If other flight has no landing, check for overlap
+        elif landing_time and not other_landing:
+            if landing_time > other_launch and launch_time <= other_launch:
+                raise ValidationError(
+                    f"This glider is already airborne in another flight (ID {other.pk}) starting at {other_launch}."
+                )
+        # If neither has landing time, both are open-ended
+        elif not landing_time and not other_landing:
+            if launch_time == other_launch:
+                raise ValidationError(
+                    f"This glider is already airborne in another open-ended flight (ID {other.pk}) at {other_launch}."
+                )
+
+
 def get_active_members_with_role(role_flag: Optional[str] = None):
     active_statuses = get_active_membership_statuses()
     qs = Member.objects.filter(membership_status__in=active_statuses)
@@ -65,54 +131,11 @@ class FlightForm(forms.ModelForm):
                     "Landing time cannot be earlier than launch time."
                 )
 
-        # Only check if a glider and launch_time are provided
-        if glider and launch_time:
-            # Defensive: ensure logsheet and log_date are present
-            if (
-                not logsheet
-                or not hasattr(logsheet, "log_date")
-                or logsheet.log_date is None
-            ):
-                # If missing, skip overlap check (or optionally raise a ValidationError)
-                return cleaned_data
-
-            flights_qs = Flight.objects.filter(
-                glider=glider, logsheet__log_date=logsheet.log_date
-            )
-            if self.instance.pk:
-                flights_qs = flights_qs.exclude(pk=self.instance.pk)
-
-            # Overlap logic: (A starts before B ends) and (A ends after B starts)
-            for other in flights_qs:
-                other_launch = other.launch_time
-                other_landing = other.landing_time
-                # If either flight has no landing time, treat as 'still airborne'
-                if not other_launch:
-                    continue
-                # If both have landing times, check for overlap
-                if landing_time and other_landing:
-                    if launch_time < other_landing and landing_time > other_launch:
-                        raise forms.ValidationError(
-                            f"This glider is already scheduled for another flight (ID {other.pk}) from {other_launch} to {other_landing}."
-                        )
-                # If this flight has no landing, check if launch is during another flight
-                elif not landing_time and other_landing:
-                    if launch_time < other_landing and launch_time >= other_launch:
-                        raise forms.ValidationError(
-                            f"This glider is already airborne in another flight (ID {other.pk}) from {other_launch} to {other_landing}."
-                        )
-                # If other flight has no landing, check for overlap
-                elif landing_time and not other_landing:
-                    if landing_time > other_launch and launch_time <= other_launch:
-                        raise forms.ValidationError(
-                            f"This glider is already airborne in another flight (ID {other.pk}) starting at {other_launch}."
-                        )
-                # If neither has landing time, both are open-ended
-                elif not landing_time and not other_landing:
-                    if launch_time == other_launch:
-                        raise forms.ValidationError(
-                            f"This glider is already airborne in another open-ended flight (ID {other.pk}) at {other_launch}."
-                        )
+        # Validate glider availability using the utility function
+        # Set the logsheet on the instance for the validation function
+        if self.instance and not getattr(self.instance, 'logsheet', None) and logsheet:
+            self.instance.logsheet = logsheet
+        validate_glider_availability(self.instance, glider, launch_time, landing_time)
 
         return cleaned_data
 
