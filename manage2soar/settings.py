@@ -49,7 +49,7 @@ if not SECRET_KEY:
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Application definition
@@ -294,9 +294,8 @@ ALLOWED_HOSTS = ["*"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
-DEBUG = True
-if DEBUG:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Always use console email backend for now (not ready for production email)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
 SITE_URL = "https://m2s.skylinesoaring.org"
