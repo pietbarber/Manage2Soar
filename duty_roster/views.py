@@ -573,6 +573,15 @@ def calendar_ad_hoc_start(request, year, month, day):
     if day_obj <= date.today():
         return HttpResponse(status=400)
 
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        html = render_to_string(
+            "duty_roster/calendar_ad_hoc_login_required.html",
+            {"date": day_obj},
+            request=request,
+        )
+        return HttpResponse(html)
+
     html = render_to_string(
         "duty_roster/calendar_ad_hoc_start.html",
         {"date": day_obj},
@@ -588,6 +597,11 @@ def calendar_ad_hoc_confirm(request, year, month, day):
     # Make sure it's still a valid future date
     if day_obj <= date.today():
         return HttpResponse(status=400)
+
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return HttpResponse("You must be signed in to propose and edit operations", status=403)
+
     default_airfield = Airfield.objects.get(identifier="KFRR")
 
     assignment, created = DutyAssignment.objects.get_or_create(
