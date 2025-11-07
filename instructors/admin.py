@@ -77,9 +77,10 @@ class SyllabusDocumentAdmin(AdminHelperMixin, VersionAdmin):
         HTMLField: {
             "widget": TinyMCE(
                 mce_attrs={
-                    "relative_urls": False,
+                    "relative_urls": False,  # prevent ugly ../../../ paths
                     "remove_script_host": True,
-                    "convert_urls": True,
+                    # disable URL conversion to preserve user input (fixes issue #207)
+                    "convert_urls": False,
                 }
             )
         },
