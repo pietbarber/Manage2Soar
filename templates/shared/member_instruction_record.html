@@ -219,6 +219,38 @@
         </tbody>
       </table>
 
+      {# Lesson Scores Grid - show heading once per day #}
+      {% for block in day.blocks %}
+        {% if block.report.lesson_scores.all %}
+          {% if forloop.first %}
+            <h5>📊 Syllabus Items Covered</h5>
+          {% endif %}
+          <div class="mb-3">
+            {% regroup block.report.lesson_scores.all by score as score_groups %}
+            {% for score_group in score_groups %}
+            <div class="mb-2">
+              <strong>
+                {% if score_group.grouper == '1' %}Introduced:
+                {% elif score_group.grouper == '2' %}Practiced:
+                {% elif score_group.grouper == '3' %}Solo Standard:
+                {% elif score_group.grouper == '4' %}Checkride Standard:
+                {% elif score_group.grouper == '!' %}Needs Attention:
+                {% else %}{{ score_group.grouper }}:
+                {% endif %}
+              </strong>
+              {% for lesson_score in score_group.list %}
+                <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}" 
+                   class="text-decoration-none me-1" 
+                   data-bs-toggle="tooltip" 
+                   data-bs-placement="top" 
+                   title="{{ lesson_score.lesson.title }}">{{ lesson_score.lesson.code }}</a>{% if not forloop.last %},{% endif %}
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
       {# Essays for all blocks that have them #}
       {% for block in day.blocks %}
       {% if block.report.report_text %}
