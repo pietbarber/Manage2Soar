@@ -139,9 +139,42 @@ class SiteConfiguration(models.Model):
         help_text="Dedupe window (minutes) for member redaction notifications."
     )
 
+    # Operational Calendar Configuration
+    operations_start_period = models.CharField(
+        max_length=100,
+        blank=True,
+        default="First weekend of May",
+        help_text="When club operations typically start each year. Examples: 'First weekend of May', '1st weekend of Apr', 'Second weekend in March', 'Last weekend Oct'. Supports: first/1st, second/2nd, third/3rd, fourth/4th, last + full month names or abbreviations (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec)"
+    )
+    operations_end_period = models.CharField(
+        max_length=100,
+        blank=True,
+        default="Last weekend of October",
+        help_text="When club operations typically end each year. Examples: 'Last weekend of October', '2nd weekend of Dec', 'Third weekend in November'. Leave both fields blank to include all dates year-round."
+    )
+
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
             raise ValidationError("Only one SiteConfiguration instance allowed.")
+
+        # Validate operational period formats
+        if self.operations_start_period:
+            try:
+                from duty_roster.operational_calendar import parse_operational_period
+                parse_operational_period(self.operations_start_period)
+            except ValueError as e:
+                raise ValidationError({
+                    'operations_start_period': f"Invalid format: {e}"
+                })
+
+        if self.operations_end_period:
+            try:
+                from duty_roster.operational_calendar import parse_operational_period
+                parse_operational_period(self.operations_end_period)
+            except ValueError as e:
+                raise ValidationError({
+                    'operations_end_period': f"Invalid format: {e}"
+                })
 
     def save(self, *args, **kwargs):
         self.full_clean()

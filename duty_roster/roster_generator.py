@@ -1,21 +1,56 @@
-import logging
-
-logger = logging.getLogger("duty_roster.generator")
-# duty_roster/roster_generator.py
-
-import calendar
-import random
-from collections import defaultdict
-from datetime import date
-
+from siteconfig.models import SiteConfiguration
+from members.models import Member
+from members.constants.membership import DEFAULT_ROLES
+from duty_roster.operational_calendar import get_operational_weekend
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
     MemberBlackout,
 )
-from members.constants.membership import DEFAULT_ROLES
-from members.models import Member
+from datetime import date
+from collections import defaultdict
+import random
+import calendar
+import logging
+
+logger = logging.getLogger("duty_roster.generator")
+# duty_roster/roster_generator.py
+
+
+def is_within_operational_season(check_date: date) -> bool:
+    """
+    Check if a given date falls within the club's operational season.
+
+    Args:
+        check_date: The date to check
+
+    Returns:
+        True if the date is within the operational season, False otherwise
+    """
+    try:
+        config = SiteConfiguration.objects.first()
+        if not config or not config.operations_start_period or not config.operations_end_period:
+            # If no configuration, assume all dates are operational
+            return True
+
+        year = check_date.year
+
+        # Get the start and end weekends for this year
+        start_sat, start_sun = get_operational_weekend(
+            year, config.operations_start_period)
+        end_sat, end_sun = get_operational_weekend(year, config.operations_end_period)
+
+        # Use the earlier date from start weekend and later date from end weekend
+        season_start = min(start_sat, start_sun)
+        season_end = max(end_sat, end_sun)
+
+        return season_start <= check_date <= season_end
+
+    except Exception as e:
+        logger.warning(f"Error checking operational season for {check_date}: {e}")
+        # If there's any error parsing, default to allowing the date
+        return True
 
 
 def generate_roster(year=None, month=None):
@@ -25,11 +60,23 @@ def generate_roster(year=None, month=None):
     year = year or today.year
     month = month or today.month
     cal = calendar.Calendar()
-    weekend_dates = [
+    all_weekend_dates = [
         d
         for d in cal.itermonthdates(year, month)
         if d.month == month and d.weekday() in (5, 6)
     ]
+
+    # Filter weekend dates to only include those within operational season
+    weekend_dates = [
+        d for d in all_weekend_dates
+        if is_within_operational_season(d)
+    ]
+
+    # Log what dates were filtered out for debugging
+    filtered_out = [d for d in all_weekend_dates if d not in weekend_dates]
+    if filtered_out:
+        logger.info(
+            f"Filtered out {len(filtered_out)} weekend dates outside operational season: {filtered_out}")
     members = list(Member.objects.filter(is_active=True))
     prefs = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()

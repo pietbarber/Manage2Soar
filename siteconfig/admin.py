@@ -83,6 +83,22 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Operational Calendar",
+            {
+                "fields": (
+                    "operations_start_period",
+                    "operations_end_period",
+                ),
+                "description": (
+                    "Configure when your club typically operates each year. This affects duty roster generation - "
+                    "only weekends within the operational season will be scheduled automatically. "
+                    "💡 Examples: 'First weekend of May', '1st weekend of Apr', '2nd weekend Dec', 'Last weekend in October'. "
+                    "Leave blank to include all dates year-round."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Advanced Options",
             {
                 "fields": (

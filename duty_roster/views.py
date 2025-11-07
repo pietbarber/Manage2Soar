@@ -39,7 +39,10 @@ from .models import (
     MemberBlackout,
     OpsIntent,
 )
-from .roster_generator import generate_roster
+from .roster_generator import generate_roster, is_within_operational_season
+
+import logging
+logger = logging.getLogger("duty_roster.views")
 
 
 def calendar_refresh_response(year, month):
@@ -800,10 +803,52 @@ def propose_roster(request):
             },
         )
 
+    # Get operational calendar information for display
+    operational_info = {}
+    filtered_dates = []
+    if siteconfig and (siteconfig.operations_start_period or siteconfig.operations_end_period):
+        from .operational_calendar import get_operational_weekend
+        try:
+            if siteconfig.operations_start_period:
+                start_sat, start_sun = get_operational_weekend(
+                    year, siteconfig.operations_start_period)
+                operational_info['season_start'] = min(start_sat, start_sun)
+            if siteconfig.operations_end_period:
+                end_sat, end_sun = get_operational_weekend(
+                    year, siteconfig.operations_end_period)
+                operational_info['season_end'] = max(end_sat, end_sun)
+
+            # Find which dates would be filtered out
+            cal = calendar.Calendar()
+            all_weekend_dates = [
+                d for d in cal.itermonthdates(year, month)
+                if d.month == month and d.weekday() in (5, 6)
+            ]
+            filtered_dates = [
+                d for d in all_weekend_dates
+                if not is_within_operational_season(d)
+            ]
+        except Exception as e:
+            logger.warning(f"Error calculating operational season info: {e}")
+
     if request.method == "POST":
         action = request.POST.get("action")
         draft = request.session.get("proposed_roster", [])
-        if action == "roll":
+
+        if action == "remove_dates":
+            # Handle removing specific dates from the roster
+            dates_to_remove = request.POST.getlist("remove_date")
+            if dates_to_remove:
+                dates_to_remove_set = set(dates_to_remove)
+                draft = [
+                    entry for entry in draft
+                    if entry["date"] not in dates_to_remove_set
+                ]
+                request.session["proposed_roster"] = draft
+                messages.success(
+                    request, f"Removed {len(dates_to_remove)} date(s) from the proposed roster.")
+
+        elif action == "roll":
             raw = generate_roster(year, month)
             if not raw:
                 cal = calendar.Calendar()
@@ -887,6 +932,9 @@ def propose_roster(request):
             "incomplete": incomplete,
             "enabled_roles": enabled_roles,
             "no_scheduling": False,
+            "operational_info": operational_info,
+            "filtered_dates": filtered_dates,
+            "siteconfig": siteconfig,
         },
     )
 
