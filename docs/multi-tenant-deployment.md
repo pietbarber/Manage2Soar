@@ -30,15 +30,18 @@ GCP Bucket: {GS_BUCKET_NAME}/
 ## Environment Configuration
 
 ### Skyline Soaring Club (.env)
+
+> **Note:** `.env` files do **not** support variable substitution (e.g., `${CLUB_PREFIX}`) by default. You must use literal values, or preprocess with a tool like `envsubst`. The example below uses literal values for clarity.
+
 ```bash
 # Club Configuration
 CLUB_PREFIX=ssc
 
 # Google Cloud Storage
 GS_BUCKET_NAME=your-bucket-name
-GS_MEDIA_LOCATION=${CLUB_PREFIX}/media
-GS_STATIC_LOCATION=${CLUB_PREFIX}/static
-STATIC_URL=https://storage.googleapis.com/${GS_BUCKET_NAME}/${CLUB_PREFIX}/static/
+GS_MEDIA_LOCATION=ssc/media
+GS_STATIC_LOCATION=ssc/static
+STATIC_URL=https://storage.googleapis.com/your-bucket-name/ssc/static/
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:port/ssc_manage2soar
@@ -53,9 +56,9 @@ CLUB_PREFIX=masa
 
 # Google Cloud Storage
 GS_BUCKET_NAME=your-bucket-name
-GS_MEDIA_LOCATION=${CLUB_PREFIX}/media
-GS_STATIC_LOCATION=${CLUB_PREFIX}/static
-STATIC_URL=https://storage.googleapis.com/${GS_BUCKET_NAME}/${CLUB_PREFIX}/static/
+GS_MEDIA_LOCATION=masa/media
+GS_STATIC_LOCATION=masa/static
+STATIC_URL=https://storage.googleapis.com/your-bucket-name/masa/static/
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:port/masa_manage2soar
@@ -70,9 +73,9 @@ CLUB_PREFIX=nfss
 
 # Google Cloud Storage
 GS_BUCKET_NAME=your-bucket-name
-GS_MEDIA_LOCATION=${CLUB_PREFIX}/media
-GS_STATIC_LOCATION=${CLUB_PREFIX}/static
-STATIC_URL=https://storage.googleapis.com/${GS_BUCKET_NAME}/${CLUB_PREFIX}/static/
+GS_MEDIA_LOCATION=nfss/media
+GS_STATIC_LOCATION=nfss/static
+STATIC_URL=https://storage.googleapis.com/your-bucket-name/nfss/static/
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:port/nfss_manage2soar

@@ -13,6 +13,7 @@
 #############################################################
 
 
+import re
 import logging
 import os
 from pathlib import Path
@@ -226,10 +227,25 @@ AUTH_PASSWORD_VALIDATORS = [
 # All GCS-related settings consolidated here for clarity
 #############################################################
 GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
+if not GS_BUCKET_NAME:
+    raise Exception(
+        "Missing required environment variable GS_BUCKET_NAME. "
+        "Set GS_BUCKET_NAME in your environment or .env file. "
+        "This is required for Google Cloud Storage integration."
+    )
+
 GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
 
 # Multi-tenant support: Club-specific storage paths
 CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")  # Default to Skyline Soaring Club
+
+# Validate CLUB_PREFIX to prevent path traversal attacks
+if not re.match(r'^[a-zA-Z0-9-]+$', CLUB_PREFIX):
+    raise Exception(
+        f"Invalid CLUB_PREFIX '{CLUB_PREFIX}'. "
+        "CLUB_PREFIX must contain only alphanumeric characters and hyphens. "
+        "This prevents path traversal security issues."
+    )
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
@@ -267,7 +283,7 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-# Note: Whitenoise removed - now using GCP for static files in production
+# Note: Whitenoise is no longer configured in STORAGES or MIDDLEWARE, but the dependency still exists in requirements.txt. Static files are now served via GCP in production.
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/

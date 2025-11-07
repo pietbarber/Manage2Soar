@@ -6,13 +6,14 @@ This script verifies that the GCP static files configuration is working correctl
 for the multi-tenant architecture.
 """
 
-from django.core.files.storage import storages
-from django.conf import settings
 import os
 import sys
+from pathlib import Path
+
 import django
 import requests
-from pathlib import Path
+from django.conf import settings
+from django.core.files.storage import storages
 
 # Add the project root to Python path
 project_root = Path(__file__).parent
@@ -53,9 +54,13 @@ def test_static_files():
         try:
             url = static_storage.url(file_path)
             print(f"   📁 {file_path}")
-            print(f"      URL: {url[:80]}...")
+            if len(url) > 80:
+                print(f"      URL: {url[:80]}...")
+            else:
+                print(f"      URL: {url}")
 
             # Try to access the file
+            # Note: This may fail for GCP signed URLs that require authentication
             try:
                 response = requests.head(url, timeout=10)
                 if response.status_code == 200:

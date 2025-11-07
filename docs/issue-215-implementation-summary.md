@@ -20,7 +20,7 @@
 - `manage2soar/settings.py` - Updated STORAGES configuration for GCP
 - `manage2soar/storage_backends.py` - Removed ManifestFilesMixin to fix GCP issues  
 - `.env` - Added multi-tenant GCP configuration
-- `requirements.txt` - Removed whitenoise dependency
+- `requirements.txt` - Whitenoise dependency still present
 
 #### Key Changes:
 ```python
