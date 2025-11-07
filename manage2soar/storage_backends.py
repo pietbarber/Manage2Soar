@@ -14,9 +14,10 @@ class MediaRootGCS(GoogleCloudStorage):
     object_parameters = {"cache_control": "public, max-age=3600"}
 
 
-class StaticRootGCS(ManifestFilesMixin, GoogleCloudStorage):
+class StaticRootGCS(GoogleCloudStorage):
     bucket_name = settings.GS_BUCKET_NAME
     location = getattr(settings, "GS_STATIC_LOCATION", "static")
     default_acl = None
     file_overwrite = True
+    # Skip ManifestFilesMixin to avoid post-processing issues on GCP
     object_parameters = {"cache_control": "public, max-age=31536000, immutable"}
