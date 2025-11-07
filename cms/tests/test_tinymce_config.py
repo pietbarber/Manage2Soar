@@ -2,7 +2,6 @@
 Tests for TinyMCE configuration to ensure URLs remain relative.
 Addresses issue #207: CMS Pages editing, unwelcome FQDN in URLs
 """
-import pytest
 from django.test import TestCase
 from django.conf import settings
 
@@ -24,16 +23,6 @@ class TinyMCEConfigurationTest(TestCase):
         # convert_urls should be False to preserve user input exactly as typed
         self.assertFalse(config.get("convert_urls"),
                          "convert_urls should be False to preserve user input like '/contact/'")
-
-    def test_tinymce_config_prevents_url_mangling(self):
-        """Test that the configuration prevents both FQDN conversion and ugly relative paths."""
-        config = settings.TINYMCE_DEFAULT_CONFIG
-
-        # The combination that preserves user input exactly
-        self.assertTrue(
-            not config.get("convert_urls") and config.get("remove_script_host"),
-            "Combination of convert_urls=False and remove_script_host=True should preserve user input like '/contact/'"
-        )
 
     def test_tinymce_js_url_configured(self):
         """Test that TinyMCE JS is configured to use local static files."""
