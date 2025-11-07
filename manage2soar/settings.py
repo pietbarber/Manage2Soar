@@ -13,6 +13,7 @@
 #############################################################
 
 
+import sys
 import re
 import logging
 import os
@@ -28,16 +29,16 @@ from google.oauth2 import service_account
 # This calculates the path to the directory containing 'manage.py'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Detect if we're running in a test environment to prevent test pollution
+TESTING = any(arg.startswith('test') for arg in sys.argv[1:2])
+
 # Load environment variables from the .env file located in the BASE_DIR.
 # This ensures that sensitive information and configuration can be managed
 # outside of the codebase, improving security and flexibility.
 dotenv_path = BASE_DIR / ".env"
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
-else:
-    # Log a warning or handle the case where .env is not found,
-    # especially in development environments.
-    # In production, environment variables are typically set directly.
+elif not TESTING:  # Only log if not in test environment
     logger = logging.getLogger(__name__)
     logger.warning(
         f".env file not found at {dotenv_path}. Relying on system environment variables."

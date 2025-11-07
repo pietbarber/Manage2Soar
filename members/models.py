@@ -311,11 +311,13 @@ class Member(AbstractUser):
 
         # 2) avatar generation (safe pre-save)
         if not self.profile_photo:
-            filename = f"profile_{self.username}.png"
-            file_path = os.path.join("generated_avatars", filename)
-            if not os.path.exists(os.path.join("media", file_path)):
-                generate_identicon(self.username, file_path)
-            self.profile_photo = file_path
+            # Skip avatar generation in test environments to prevent storage pollution
+            if not (hasattr(settings, 'TESTING') and settings.TESTING):
+                filename = f"profile_{self.username}.png"
+                file_path = os.path.join("generated_avatars", filename)
+                if not os.path.exists(os.path.join("media", file_path)):
+                    generate_identicon(self.username, file_path)
+                self.profile_photo = file_path
 
         # 3) persist first – get a PK
         super().save(*args, **kwargs)
