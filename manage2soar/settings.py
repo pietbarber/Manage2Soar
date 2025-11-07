@@ -13,6 +13,7 @@
 #############################################################
 
 
+import sys
 import re
 import logging
 import os
@@ -38,10 +39,10 @@ else:
     # Log a warning or handle the case where .env is not found,
     # especially in development environments.
     # In production, environment variables are typically set directly.
-    logger = logging.getLogger(__name__)
-    logger.warning(
-        f".env file not found at {dotenv_path}. Relying on system environment variables."
-    )
+    pass
+
+# Detect if we're running in a test environment to prevent test pollution
+TESTING = 'pytest' in sys.modules or 'test' in sys.argv
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
