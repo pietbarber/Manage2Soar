@@ -15,7 +15,9 @@
 {% if operational_info %}
 <div class="alert alert-info">
   <h5>📅 Operational Calendar Information</h5>
-  <p><strong>Club Operations Period:</strong> {{ siteconfig.operations_start_period }} through {{ siteconfig.operations_end_period }}</p>
+  {% if siteconfig %}
+    <p><strong>Club Operations Period:</strong> {{ siteconfig.operations_start_period }} through {{ siteconfig.operations_end_period }}</p>
+  {% endif %}
   {% if operational_info.season_start and operational_info.season_end %}
     <p><strong>{{ year }} Season:</strong> {{ operational_info.season_start }} through {{ operational_info.season_end }}</p>
   {% endif %}

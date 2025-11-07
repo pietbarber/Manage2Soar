@@ -2,7 +2,6 @@
 Tests for operational calendar functionality.
 """
 
-import pytest
 from datetime import date
 from django.test import TestCase
 from django.core.exceptions import ValidationError

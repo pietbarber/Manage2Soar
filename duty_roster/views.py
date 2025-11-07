@@ -1,5 +1,6 @@
 import calendar
 import json
+import logging
 from collections import defaultdict
 from datetime import date
 from datetime import date as dt_date
@@ -41,7 +42,6 @@ from .models import (
 )
 from .roster_generator import generate_roster, is_within_operational_season
 
-import logging
 logger = logging.getLogger("duty_roster.views")
 
 

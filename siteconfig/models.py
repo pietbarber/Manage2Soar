@@ -158,19 +158,23 @@ class SiteConfiguration(models.Model):
             raise ValidationError("Only one SiteConfiguration instance allowed.")
 
         # Validate operational period formats
-        if self.operations_start_period or self.operations_end_period:
-            try:
-                # Local import to avoid circular dependency
-                from duty_roster.operational_calendar import parse_operational_period
+        # Local import to avoid circular dependency
+        from duty_roster.operational_calendar import parse_operational_period
 
-                if self.operations_start_period:
-                    parse_operational_period(self.operations_start_period)
-                if self.operations_end_period:
-                    parse_operational_period(self.operations_end_period)
+        if self.operations_start_period:
+            try:
+                parse_operational_period(self.operations_start_period)
             except ValueError as e:
-                field_name = 'operations_start_period' if self.operations_start_period else 'operations_end_period'
                 raise ValidationError({
-                    field_name: f"Invalid format: {e}"
+                    'operations_start_period': f"Invalid format: {e}"
+                })
+
+        if self.operations_end_period:
+            try:
+                parse_operational_period(self.operations_end_period)
+            except ValueError as e:
+                raise ValidationError({
+                    'operations_end_period': f"Invalid format: {e}"
                 })
 
     def save(self, *args, **kwargs):

@@ -15,7 +15,6 @@ import calendar
 import logging
 
 logger = logging.getLogger("duty_roster.generator")
-# duty_roster/roster_generator.py
 
 
 # Cache for operational season boundaries
@@ -86,16 +85,17 @@ def is_within_operational_season(check_date: date) -> bool:
         if not season_start and not season_end:
             return True
         # If only start is set, restrict to dates on/after start
-        if season_start and not season_end:
+        elif season_start and not season_end:
             return check_date >= season_start
         # If only end is set, restrict to dates on/before end
-        if season_end and not season_start:
+        elif season_end and not season_start:
             return check_date <= season_end
         # If both are set, restrict to dates between start and end
-        if season_start and season_end:
+        elif season_start and season_end:
             return season_start <= check_date <= season_end
-        # This shouldn't happen but just in case
-        return True
+        # Fallback for any unexpected case
+        else:
+            return True
 
     except Exception as e:
         logger.warning(f"Error checking operational season for {check_date}: {e}")
