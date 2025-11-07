@@ -18,6 +18,57 @@ logger = logging.getLogger("duty_roster.generator")
 # duty_roster/roster_generator.py
 
 
+# Cache for operational season boundaries
+_operational_season_cache = {}
+
+
+def clear_operational_season_cache():
+    """Clear the operational season cache. Useful for testing."""
+    global _operational_season_cache
+    _operational_season_cache.clear()
+
+
+def _get_operational_season_bounds(year: int):
+    """
+    Get operational season boundaries for a given year with caching.
+
+    Returns:
+        Tuple of (season_start, season_end) or (None, None) if no config
+    """
+    cache_key = year
+    if cache_key in _operational_season_cache:
+        return _operational_season_cache[cache_key]
+
+    try:
+        config = SiteConfiguration.objects.first()
+        if not config:
+            result = (None, None)
+            _operational_season_cache[cache_key] = result
+            return result
+
+        # Determine start and end dates if configured
+        season_start = None
+        season_end = None
+        if config.operations_start_period:
+            start_sat, start_sun = get_operational_weekend(
+                year, config.operations_start_period)
+            season_start = min(start_sat, start_sun)
+        if config.operations_end_period:
+            end_sat, end_sun = get_operational_weekend(
+                year, config.operations_end_period)
+            season_end = max(end_sat, end_sun)
+
+        result = (season_start, season_end)
+        _operational_season_cache[cache_key] = result
+        return result
+
+    except Exception as e:
+        logger.warning(f"Error calculating operational season bounds for {year}: {e}")
+        result = (None, None)
+        _operational_season_cache[cache_key] = result
+        return result
+
+
 def is_within_operational_season(check_date: date) -> bool:
     """
     Check if a given date falls within the club's operational season.
@@ -29,23 +80,22 @@ def is_within_operational_season(check_date: date) -> bool:
         True if the date is within the operational season, False otherwise
     """
     try:
-        config = SiteConfiguration.objects.first()
-        if not config or not config.operations_start_period or not config.operations_end_period:
-            # If no configuration, assume all dates are operational
+        season_start, season_end = _get_operational_season_bounds(check_date.year)
+
+        # If neither is set, all dates are operational
+        if not season_start and not season_end:
             return True
-
-        year = check_date.year
-
-        # Get the start and end weekends for this year
-        start_sat, start_sun = get_operational_weekend(
-            year, config.operations_start_period)
-        end_sat, end_sun = get_operational_weekend(year, config.operations_end_period)
-
-        # Use the earlier date from start weekend and later date from end weekend
-        season_start = min(start_sat, start_sun)
-        season_end = max(end_sat, end_sun)
-
-        return season_start <= check_date <= season_end
+        # If only start is set, restrict to dates on/after start
+        if season_start and not season_end:
+            return check_date >= season_start
+        # If only end is set, restrict to dates on/before end
+        if season_end and not season_start:
+            return check_date <= season_end
+        # If both are set, restrict to dates between start and end
+        if season_start and season_end:
+            return season_start <= check_date <= season_end
+        # This shouldn't happen but just in case
+        return True
 
     except Exception as e:
         logger.warning(f"Error checking operational season for {check_date}: {e}")

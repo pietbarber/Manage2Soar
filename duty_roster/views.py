@@ -806,28 +806,28 @@ def propose_roster(request):
     # Get operational calendar information for display
     operational_info = {}
     filtered_dates = []
-    if siteconfig and (siteconfig.operations_start_period or siteconfig.operations_end_period):
-        from .operational_calendar import get_operational_weekend
+    if siteconfig:
+        from .roster_generator import _get_operational_season_bounds
         try:
-            if siteconfig.operations_start_period:
-                start_sat, start_sun = get_operational_weekend(
-                    year, siteconfig.operations_start_period)
-                operational_info['season_start'] = min(start_sat, start_sun)
-            if siteconfig.operations_end_period:
-                end_sat, end_sun = get_operational_weekend(
-                    year, siteconfig.operations_end_period)
-                operational_info['season_end'] = max(end_sat, end_sun)
+            season_start, season_end = _get_operational_season_bounds(year)
 
-            # Find which dates would be filtered out
-            cal = calendar.Calendar()
-            all_weekend_dates = [
-                d for d in cal.itermonthdates(year, month)
-                if d.month == month and d.weekday() in (5, 6)
-            ]
-            filtered_dates = [
-                d for d in all_weekend_dates
-                if not is_within_operational_season(d)
-            ]
+            # Only show operational info if we have filtering enabled
+            if season_start or season_end:
+                if season_start:
+                    operational_info['season_start'] = season_start
+                if season_end:
+                    operational_info['season_end'] = season_end
+
+                # Find which dates would be filtered out
+                cal = calendar.Calendar()
+                all_weekend_dates = [
+                    d for d in cal.itermonthdates(year, month)
+                    if d.month == month and d.weekday() in (5, 6)
+                ]
+                filtered_dates = [
+                    d for d in all_weekend_dates
+                    if not is_within_operational_season(d)
+                ]
         except Exception as e:
             logger.warning(f"Error calculating operational season info: {e}")
 
@@ -855,7 +855,7 @@ def propose_roster(request):
                 weekend = [
                     d
                     for d in cal.itermonthdates(year, month)
-                    if d.month == month and d.weekday() in (5, 6)
+                    if d.month == month and d.weekday() in (5, 6) and is_within_operational_season(d)
                 ]
                 raw = [
                     {"date": d, "slots": {r: None for r in enabled_roles}}

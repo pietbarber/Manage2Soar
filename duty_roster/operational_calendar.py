@@ -7,7 +7,7 @@ and calculating the actual weekend dates for any given year.
 
 import calendar
 from datetime import date, timedelta
-from typing import Tuple, List
+from typing import Tuple
 
 
 def find_weekend_for_week(year: int, month: int, week_ordinal: int) -> Tuple[date, date]:
@@ -97,10 +97,8 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
         'september': 9, 'october': 10, 'november': 11, 'december': 12,
         # Common abbreviations
         'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
-        'may': 5, 'jun': 6, 'jul': 7, 'aug': 8,
+        'jun': 6, 'jul': 7, 'aug': 8,
         'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
-        # Alternative abbreviations
-        'january': 1, 'february': 2, 'march': 3, 'april': 4,
     }
 
     # Require the word "weekend" to be present
@@ -171,10 +169,12 @@ def get_operational_weekend(year: int, period_text: str) -> Tuple[date, date]:
         last_date = date(year, month, last_day)
 
         # Find the last Saturday
-        days_back_to_saturday = (last_date.weekday() + 2) % 7  # weekday: Mon=0, Sat=5
+        # weekday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+        days_back_to_saturday = (last_date.weekday() + 2) % 7
         if days_back_to_saturday == 0:  # Last day is already Saturday
             saturday = last_date
         else:
+            # This handles all cases including when last day is Sunday (days_back = 1)
             saturday = last_date - timedelta(days=days_back_to_saturday)
 
         sunday = saturday + timedelta(days=1)
