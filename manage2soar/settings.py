@@ -13,6 +13,7 @@
 #############################################################
 
 
+import re
 import logging
 import os
 from pathlib import Path
@@ -226,8 +227,27 @@ AUTH_PASSWORD_VALIDATORS = [
 # All GCS-related settings consolidated here for clarity
 #############################################################
 GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
+if not GS_BUCKET_NAME:
+    raise Exception(
+        "Missing required environment variable GS_BUCKET_NAME. "
+        "Set GS_BUCKET_NAME in your environment or .env file. "
+        "This is required for Google Cloud Storage integration."
+    )
+
 GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
-GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", "media")
+
+# Multi-tenant support: Club-specific storage paths
+CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")  # Default to Skyline Soaring Club
+
+# Validate CLUB_PREFIX to prevent path traversal attacks
+if not re.match(r'^[a-zA-Z0-9-]+$', CLUB_PREFIX):
+    raise Exception(
+        f"Invalid CLUB_PREFIX '{CLUB_PREFIX}'. "
+        "CLUB_PREFIX must contain only alphanumeric characters and hyphens. "
+        "This prevents path traversal security issues."
+    )
+GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
+GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
 # Credentials for GCS
 cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -236,35 +256,34 @@ if cred_path:
 
 
 # Django 5.1+ storage backend configuration
-# Always define 'staticfiles' backend, even if not using GCS for static
+# Use GCP for both media and static files (multi-tenant ready)
 STORAGES = {
     "default": {
         "BACKEND": "manage2soar.storage_backends.MediaRootGCS",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
     },
 }
 
 GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
+
+# Multi-tenant GCP URLs
 MEDIA_URL = os.getenv(
     "MEDIA_URL",
     f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
 )
-# print(f"[DEBUG] MEDIA_URL at settings load: {MEDIA_URL}")
+STATIC_URL = os.getenv(
+    "STATIC_URL",
+    f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
+)
 
-# These static directories are not on Google Storage Platform.
-STATIC_URL = "/static/"
+# Local static files directory (source for collectstatic)
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-# Enable serving static files via Django in production (temporary solution)
-# Note: In production, ideally static files should be served by a web server like Nginx
-if not DEBUG:
-    # Add whitenoise for serving static files in production
-    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Note: Whitenoise completely removed - static files now served via GCP in production
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
