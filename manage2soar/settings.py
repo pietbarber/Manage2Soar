@@ -42,7 +42,7 @@ else:
     pass
 
 # Detect if we're running in a test environment to prevent test pollution
-TESTING = 'pytest' in sys.modules or 'test' in sys.argv
+TESTING = any(arg.startswith('test') for arg in sys.argv[1:2])
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
