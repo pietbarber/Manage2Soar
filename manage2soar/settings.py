@@ -283,7 +283,7 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-# Note: Whitenoise is no longer configured in STORAGES or MIDDLEWARE, but the dependency still exists in requirements.txt. Static files are now served via GCP in production.
+# Note: Whitenoise completely removed - static files now served via GCP in production
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
