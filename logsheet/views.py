@@ -1,4 +1,5 @@
 # AJAX endpoint to update split fields for a flight
+import logging
 from datetime import date, datetime, timedelta
 
 from django.contrib import messages
@@ -222,8 +223,8 @@ def api_duty_assignment(request):
                 result["surge_instructor"] = assignment.surge_instructor_id
                 result["tow_pilot"] = assignment.tow_pilot_id
                 result["surge_tow_pilot"] = assignment.surge_tow_pilot_id
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to fetch duty assignments for date: {e}")
     return JsonResponse(result)
 
 
@@ -608,7 +609,8 @@ def list_logsheets(request):
 
             parsed_date = datetime.strptime(log_date, "%Y-%m-%d").date()
             form = CreateLogsheetForm(duty_assignment_date=parsed_date)
-        except Exception:
+        except (ValueError, TypeError) as e:
+            logging.warning(f"Invalid date format provided: {log_date}, error: {e}")
             form = CreateLogsheetForm()
     else:
         form = CreateLogsheetForm()

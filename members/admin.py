@@ -1,4 +1,5 @@
 import csv
+import logging
 
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -25,14 +26,14 @@ try:
         try:
             if model in django_admin.site._registry:
                 django_admin.site.unregister(model)
-        except Exception:
+        except Exception as e:
             # If unregister fails for any reason, continue and attempt to register
-            pass
+            logging.warning(f"Failed to unregister model {model}: {e}")
         try:
             django_admin.site.register(model, admin_class)
-        except Exception:
+        except Exception as e:
             # If register fails, don't block app startup
-            pass
+            logging.warning(f"Failed to register admin for model {model}: {e}")
 
     class UserSocialAuthAdmin(AdminHelperMixin, django_admin.ModelAdmin):
         list_display = ("user", "provider", "uid")
@@ -51,8 +52,9 @@ try:
     register_or_replace(UserSocialAuth, UserSocialAuthAdmin)
     register_or_replace(Association, AssociationAdmin)
     register_or_replace(Nonce, NonceAdmin)
-except Exception:
+except ImportError as e:
     # social_django may not be available in some environments; skip registrations silently
+    logging.info(f"social_django not available, skipping OAuth admin registration: {e}")
     pass
 
 # Custom filter for Active/Not active status

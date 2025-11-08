@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from django import forms
@@ -557,8 +558,10 @@ class CreateLogsheetForm(forms.ModelForm):
                     self.fields["surge_tow_pilot"].initial = (
                         assignment.surge_tow_pilot_id
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logging.warning(
+                    f"Failed to set initial values from duty assignment: {e}"
+                )
 
         # Optional: set widget styles for dropdowns
         for name in [

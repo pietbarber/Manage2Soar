@@ -197,8 +197,8 @@ class CreateWrittenTestView(FormView):
                     message=f"You have been assigned a new written test: {tmpl.name}",
                     url=reverse("knowledgetest:quiz-pending"),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to create notification for test assignment: {e}")
         order = 1
         # 3. First, include forced questions
         for qnum in must:
@@ -316,8 +316,10 @@ class WrittenTestSubmitView(View):
                             Notification.objects.create(
                                 user=asn.instructor, message=notif_msg, url=notif_url
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logging.warning(
+                                f"Failed to notify instructor about test completion: {e}"
+                            )
 
                     # Also notify the proctor/creator if different
                     if tmpl.created_by and tmpl.created_by != asn.instructor:
@@ -325,11 +327,13 @@ class WrittenTestSubmitView(View):
                             Notification.objects.create(
                                 user=tmpl.created_by, message=notif_msg, url=notif_url
                             )
-                        except Exception:
-                            pass
-            except Exception:
-                # swallow notification errors to avoid breaking test submit
-                pass
+                        except Exception as e:
+                            logging.warning(
+                                f"Failed to notify test creator about completion: {e}"
+                            )
+            except Exception as e:
+                # Log notification errors but don't break test submission
+                logging.error(f"Failed to send test completion notifications: {e}")
         except WrittenTestAssignment.DoesNotExist:
             pass
 
