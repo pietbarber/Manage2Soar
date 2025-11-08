@@ -29,7 +29,9 @@ class TestOperationsAuthentication(TestCase):
             last_name="User",
             membership_status="Full Member",
         )
-        self.member = self.user  # They're the same object
+        self.member = (
+            self.user
+        )  # Member extends User via Django's custom user model, so self.user is already a Member instance
 
         # Create required airfield
         self.airfield = Airfield.objects.create(identifier="KFRR", name="Test Airfield")

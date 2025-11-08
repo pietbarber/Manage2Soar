@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import re
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db.models import F, Func, Prefetch
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -24,6 +25,7 @@ from members.utils.membership import get_active_membership_statuses
 from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
+from .utils.avatar_generator import generate_identicon
 from .utils.vcard_tools import generate_vcard_qr
 
 try:
@@ -478,12 +480,14 @@ def badge_board(request):
 
 
 def pydenticon_view(request, username):
-    """Serve generated identicon for users without profile photos."""
-    import os
+    """Serve generated identicon for users without profile photos.
 
-    from django.http import Http404, HttpResponse
-
-    from .utils.avatar_generator import generate_identicon
+    Note: In production, this endpoint should be served by nginx/Apache or CDN
+    rather than Django for better performance and proper handling of ranges/etags.
+    """
+    # Validate username to prevent path traversal attacks
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        raise Http404("Invalid username")
 
     # Generate the file path where the identicon should be
     filename = f"profile_{username}.png"
@@ -494,14 +498,15 @@ def pydenticon_view(request, username):
     if not os.path.exists(full_path):
         try:
             generate_identicon(username, file_path)
-        except Exception:
+        except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
 
-    # Serve the file
+    # Use FileResponse for better file serving (handles ranges, etags, etc.)
     try:
-        with open(full_path, "rb") as f:
-            response = HttpResponse(f.read(), content_type="image/png")
-            response["Cache-Control"] = "max-age=86400"  # Cache for 1 day
-            return response
+        return FileResponse(
+            open(full_path, "rb"),
+            content_type="image/png",
+            headers={"Cache-Control": "max-age=86400"},  # Cache for 1 day
+        )
     except (FileNotFoundError, IOError):
         raise Http404("Avatar not found")
