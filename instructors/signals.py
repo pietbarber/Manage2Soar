@@ -34,7 +34,14 @@ def notify_student_on_instruction_report(sender, instance, created, **kwargs):
     try:
         student = instance.student
         instructor = instance.instructor
-        date_str = instance.report_date.isoformat()
+        
+        # Handle date formatting safely
+        try:
+            date_str = instance.report_date.isoformat()
+        except AttributeError:
+            # Handle case where report_date might be a string already
+            date_str = str(instance.report_date)
+        
         message = f"{instructor.full_display_name} has added or updated the instruction record for {date_str}."
         # Build a link to the member's instruction-record page and anchor to
         # the recorded date (so the member sees the record inside the normal
