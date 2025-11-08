@@ -23,7 +23,7 @@ erDiagram
     Member ||--o{ GroundInstruction : instructor
     Member ||--o{ MemberQualification : member
     Member ||--o{ StudentProgressSnapshot : student
-    
+
     TrainingPhase {
         int id PK
         string name
@@ -32,7 +32,7 @@ erDiagram
         boolean is_solo_phase
         boolean active
     }
-    
+
     TrainingLesson {
         int id PK
         int student_id FK
@@ -49,7 +49,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     SyllabusDocument {
         int id PK
         string title
@@ -60,7 +60,7 @@ erDiagram
         int order
         boolean active
     }
-    
+
     InstructionReport {
         int id PK
         int student_id FK
@@ -75,7 +75,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     LessonScore {
         int id PK
         int instruction_report_id FK
@@ -83,7 +83,7 @@ erDiagram
         int score
         text notes
     }
-    
+
     GroundInstruction {
         int id PK
         int student_id FK
@@ -98,7 +98,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     GroundLessonScore {
         int id PK
         int ground_instruction_id FK
@@ -106,7 +106,7 @@ erDiagram
         int score
         text notes
     }
-    
+
     ClubQualificationType {
         int id PK
         string name
@@ -116,7 +116,7 @@ erDiagram
         int prerequisite_hours
         boolean active
     }
-    
+
     MemberQualification {
         int id PK
         int member_id FK
@@ -128,7 +128,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     StudentProgressSnapshot {
         int id PK
         int student_id FK
@@ -140,7 +140,7 @@ erDiagram
         boolean checkride_ready
         datetime created_at
     }
-    
+
     TrainingPhase ||--o{ SyllabusDocument : contains
     TrainingPhase ||--o{ TrainingLesson : organized_by
     SyllabusDocument ||--o{ TrainingLesson : lesson_plan

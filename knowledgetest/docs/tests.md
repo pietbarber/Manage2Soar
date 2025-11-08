@@ -121,7 +121,7 @@ The test suite was expanded to support new UX improvements for written test resu
 ### Administrative Deletion Features
 - **New Test Class**: `WrittenTestDeleteTests` (8 comprehensive tests)
 - **Purpose**: Complete coverage of the new deletion functionality for instructors and staff
-- **Security Model**: 
+- **Security Model**:
   - Staff can delete any attempt
   - Grading instructors can delete attempts they graded
   - Template creators can delete attempts from their tests

@@ -96,16 +96,16 @@
       console.error('Could not parse questions JSON:', script.textContent, e);
       return;
     }
-  
+
     // 2) Find the container
     const rootEl = document.getElementById('quiz-root');
     if (!rootEl) return;
-  
+
     // 3) Use React 18 createRoot API
     const root = ReactDOM.createRoot(rootEl);
     root.render(
       React.createElement(Quiz, { questions })
     );
   });
-   
+
 })();

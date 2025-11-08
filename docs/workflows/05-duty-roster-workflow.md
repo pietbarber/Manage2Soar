@@ -18,40 +18,40 @@ flowchart TD
     A[Rostermeister Planning] --> B[Set Schedule Period]
     B --> C[Define Duty Requirements]
     C --> D[Collect Member Availability]
-    
+
     D --> E[Member Blackout Submission]
     E --> F[Preference Collection]
     F --> G[Qualification Verification]
     G --> H[Generate Initial Roster]
-    
+
     H --> I[Automated Assignment Logic]
     I --> J[Conflict Detection]
     J --> K{Conflicts Found?}
-    
+
     K -->|Yes| L[Manual Conflict Resolution]
     K -->|No| M[Roster Review]
-    
+
     L --> N[Adjust Assignments]
     N --> O[Re-run Generation]
     O --> J
-    
+
     M --> P[Rostermeister Approval]
     P --> Q[Publish Roster]
     Q --> R[Member Notifications]
-    
+
     R --> S[Ongoing Operations]
     S --> T[Swap Requests]
     S --> U[Availability Changes]
     S --> V[Emergency Coverage]
-    
+
     T --> W[Process Swap Request]
     U --> X[Update Assignments]
     V --> Y[Find Emergency Coverage]
-    
+
     W --> Z[Notify Affected Members]
     X --> Z
     Y --> Z
-    
+
     style A fill:#e1f5fe
     style Q fill:#e8f5e8
     style V fill:#ffebee
@@ -85,24 +85,24 @@ sequenceDiagram
     participant Generator as Roster Generator
     participant Members as Club Members
     participant Notifications as Notification System
-    
+
     RM->>System: Initiate Roster Generation
     System->>Generator: Load Member Qualifications
     Generator->>Generator: Apply Blackout Dates
     Generator->>Generator: Consider Preferences
-    
+
     Generator->>Generator: Run Assignment Algorithm
     Generator->>System: Return Draft Assignments
     System->>RM: Present Draft Roster
-    
+
     RM->>System: Review and Adjust
     System->>RM: Show Conflicts/Gaps
     RM->>System: Manual Overrides
-    
+
     RM->>System: Approve Final Roster
     System->>Notifications: Send Member Notifications
     Notifications->>Members: Duty Assignment Alerts
-    
+
     Members->>System: Submit Swap Requests
     System->>RM: Notify of Swap Requests
 ```
@@ -115,34 +115,34 @@ flowchart TD
     B --> C[Apply Blackout Dates]
     C --> D[Calculate Member Workload]
     D --> E[Sort by Availability Score]
-    
+
     E --> F[For Each Duty Date]
     F --> G[For Each Role Required]
     G --> H[Find Best Candidate]
-    
+
     H --> I{Candidate Available?}
     I -->|Yes| J[Check Workload Balance]
     I -->|No| K[Try Next Candidate]
-    
+
     J --> L{Workload OK?}
     L -->|Yes| M[Assign Member]
     L -->|No| K
-    
+
     K --> N{More Candidates?}
     N -->|Yes| H
     N -->|No| O[Mark Unfilled Position]
-    
+
     M --> P[Update Member Workload]
     O --> Q[Continue to Next Role]
     P --> Q
-    
+
     Q --> R{More Roles?}
     R -->|Yes| G
     R -->|No| S{More Dates?}
-    
+
     S -->|Yes| F
     S -->|No| T[Generation Complete]
-    
+
     style T fill:#e8f5e8
     style O fill:#ffebee
 ```
@@ -158,7 +158,7 @@ flowchart LR
         D[Tow Pilot Certified]
         E[Assistant Duty Officer]
     end
-    
+
     subgraph "Duty Positions"
         F[Duty Officer]
         G[Assistant Duty Officer]
@@ -167,7 +167,7 @@ flowchart LR
         J[Tow Pilot]
         K[Surge Tow Pilot]
     end
-    
+
     A --> G
     B --> F
     B --> G
@@ -175,7 +175,7 @@ flowchart LR
     C --> I
     D --> J
     D --> K
-    
+
     style B fill:#e3f2fd
     style C fill:#f3e5f5
     style D fill:#e8f5e8
@@ -193,7 +193,7 @@ erDiagram
         boolean tow_pilot
         boolean is_active
     }
-    
+
     DutyDay {
         int id PK
         date duty_date UK
@@ -201,7 +201,7 @@ erDiagram
         boolean operations_expected
         text special_requirements
     }
-    
+
     DutyAssignment {
         int id PK
         date date UK
@@ -214,7 +214,7 @@ erDiagram
         text notes
         datetime created_at
     }
-    
+
     MemberBlackout {
         int id PK
         int member_id FK
@@ -223,7 +223,7 @@ erDiagram
         text reason
         datetime submitted_at
     }
-    
+
     DutyPreference {
         int id PK
         int member_id FK
@@ -231,7 +231,7 @@ erDiagram
         int preference_weight
         text notes
     }
-    
+
     DutySwapRequest {
         int id PK
         int requesting_member_id FK
@@ -242,7 +242,7 @@ erDiagram
         string status
         datetime created_at
     }
-    
+
     OpsIntent {
         int id PK
         date ops_date
@@ -251,7 +251,7 @@ erDiagram
         text special_notes
         datetime decision_time
     }
-    
+
     Member ||--o{ DutyAssignment : duty_officer
     Member ||--o{ DutyAssignment : instructor
     Member ||--o{ DutyAssignment : tow_pilot
@@ -285,7 +285,7 @@ flowchart TD
     B --> C[Update Duty Eligibility]
     C --> D[Regenerate Future Rosters]
     D --> E[Notify Rostering Team]
-    
+
     B --> F[Historical Assignment Review]
     F --> G[Validate Past Assignments]
     G --> H[Update Records if Needed]
@@ -300,7 +300,7 @@ flowchart LR
     B --> C[Calendar Integration]
     C --> D[Reminder Notifications]
     D --> E[Day-Before Reminders]
-    
+
     A --> F[Swap Request Notifications]
     F --> G[Approval Workflow]
     G --> H[Confirmation Notifications]
@@ -316,24 +316,24 @@ flowchart TD
     B --> C[Check Member Status Changes]
     C --> D[Update Qualifications]
     D --> E[Collect New Blackouts]
-    
+
     E --> F[Generate Draft Roster]
     F --> G[Review Coverage Gaps]
     G --> H[Manual Adjustments]
     H --> I[Validate Assignments]
-    
+
     I --> J{All Positions Filled?}
     J -->|No| K[Recruit Additional Members]
     J -->|Yes| L[Final Review]
-    
+
     K --> M[Contact Backup Members]
     M --> N[Update Availability]
     N --> F
-    
+
     L --> O[Publish Roster]
     O --> P[Send Notifications]
     P --> Q[Update Calendar Systems]
-    
+
     style A fill:#e1f5fe
     style Q fill:#e8f5e8
     style K fill:#fff3e0
@@ -345,27 +345,27 @@ flowchart TD
 flowchart TD
     A[Member Requests Swap] --> B[System Checks Eligibility]
     B --> C{Target Member Available?}
-    
+
     C -->|Yes| D[Send Swap Request]
     C -->|No| E[Suggest Alternatives]
-    
+
     D --> F[Await Response]
     F --> G{Request Accepted?}
-    
+
     G -->|Yes| H[Process Swap]
     G -->|No| I[Notify Requester]
-    
+
     E --> J[Member Selects Alternative]
     J --> D
-    
+
     H --> K[Update Assignments]
     K --> L[Notify Both Members]
     L --> M[Update Calendar Systems]
-    
+
     I --> N{Try Another Approach?}
     N -->|Yes| E
     N -->|No| O[Swap Request Closed]
-    
+
     style H fill:#e8f5e8
     style O fill:#ffebee
 ```
@@ -377,17 +377,17 @@ flowchart LR
     A[Emergency Absence] --> B[Check Backup List]
     B --> C[Contact Primary Backups]
     C --> D{Backup Found?}
-    
+
     D -->|Yes| E[Confirm Assignment]
     D -->|No| F[Escalate to Rostermeister]
-    
+
     E --> G[Update Assignment]
     G --> H[Notify All Parties]
-    
+
     F --> I[Manual Intervention]
     I --> J[Find Alternative Coverage]
     J --> K[Update Records]
-    
+
     H --> L[Operations Covered]
     K --> L
 ```

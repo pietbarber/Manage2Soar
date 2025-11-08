@@ -227,25 +227,25 @@ function initTowSched(d) {
     });
   }
 
-  //////////////////////////////////// 
-  // 
-  // function makeCDF 
-  // 
-  // Renders a cumulative distribution function (CDF) line chart using Chart.js. 
-  // The chart displays the percentage of flights with duration greater than or equal to x, 
-  // with the y-axis reversed so 0% is at the top. 
-  // 
-  // Arguments: 
-  //   canvasId (string): The ID of the canvas element to render the chart in. 
-  //   points (Array<{x: number, y: number}>): Array of data points for the CDF curve. 
-  //  
-  // options (object, optional): 
-  // - color (string): Line and fill color for the CDF (default: "#5dade2"). 
-  // - xTitle (string): Label for the x-axis (default: "Duration (hours)"). 
-  // 
-  // Returns: 
-  // Chart instance if rendering succeeds, or null if the canvas is not found. 
-  // 
+  ////////////////////////////////////
+  //
+  // function makeCDF
+  //
+  // Renders a cumulative distribution function (CDF) line chart using Chart.js.
+  // The chart displays the percentage of flights with duration greater than or equal to x,
+  // with the y-axis reversed so 0% is at the top.
+  //
+  // Arguments:
+  //   canvasId (string): The ID of the canvas element to render the chart in.
+  //   points (Array<{x: number, y: number}>): Array of data points for the CDF curve.
+  //
+  // options (object, optional):
+  // - color (string): Line and fill color for the CDF (default: "#5dade2").
+  // - xTitle (string): Label for the x-axis (default: "Duration (hours)").
+  //
+  // Returns:
+  // Chart instance if rendering succeeds, or null if the canvas is not found.
+  //
   ////////////////////////////////////
 
   function makeCDF(canvasId, points, { color = "#5dade2", xTitle = "Duration (hours)" } = {}) {

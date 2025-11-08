@@ -64,9 +64,9 @@ def delete_queryset(self, request, queryset):
             obj.delete()
         except ValidationError as e:
             failed_deletions.append(f"{obj.name}: {e}")
-    
+
     if failed_deletions:
-        messages.error(request, "Some items could not be deleted:\n" + 
+        messages.error(request, "Some items could not be deleted:\n" +
                       "\n".join(failed_deletions))
 ```
 

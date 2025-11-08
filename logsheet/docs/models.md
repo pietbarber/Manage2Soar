@@ -16,7 +16,7 @@ erDiagram
     Member ||--o{ LogsheetPayment : paid_by
     Member ||--o{ MaintenanceIssue : reported_by
     Member ||--o{ AircraftMeister : member
-    
+
     Logsheet {
         int id PK
         date log_date
@@ -28,7 +28,7 @@ erDiagram
         int assistant_duty_officer_id FK
         int duty_instructor_id FK
     }
-    
+
     Flight {
         int id PK
         int logsheet_id FK
@@ -50,7 +50,7 @@ erDiagram
         decimal rental_cost_override
         text remarks
     }
-    
+
     Glider {
         int id PK
         string registration
@@ -63,7 +63,7 @@ erDiagram
         image photo
         text description
     }
-    
+
     Towplane {
         int id PK
         string registration
@@ -74,7 +74,7 @@ erDiagram
         image photo
         text description
     }
-    
+
     Airfield {
         int id PK
         string name
@@ -82,7 +82,7 @@ erDiagram
         text description
         image photo
     }
-    
+
     TowRate {
         int id PK
         int altitude
@@ -90,7 +90,7 @@ erDiagram
         string aircraft_type
         boolean active
     }
-    
+
     LogsheetPayment {
         int id PK
         int logsheet_id FK
@@ -99,7 +99,7 @@ erDiagram
         string payment_method
         text notes
     }
-    
+
     LogsheetCloseout {
         int id PK
         int logsheet_id FK
@@ -109,7 +109,7 @@ erDiagram
         text safety_issues
         datetime created_at
     }
-    
+
     TowplaneCloseout {
         int id PK
         int logsheet_id FK
@@ -119,7 +119,7 @@ erDiagram
         decimal fuel_added
         text notes
     }
-    
+
     MaintenanceIssue {
         int id PK
         int aircraft_id
@@ -132,7 +132,7 @@ erDiagram
         datetime reported_at
         datetime resolved_at
     }
-    
+
     MaintenanceDeadline {
         int id PK
         int aircraft_id
@@ -143,14 +143,14 @@ erDiagram
         text description
         boolean active
     }
-    
+
     AircraftMeister {
         int id PK
         int member_id FK
         string aircraft_type
         int aircraft_id
     }
-    
+
     RevisionLog {
         int id PK
         string model_name
@@ -160,7 +160,7 @@ erDiagram
         int user_id FK
         datetime timestamp
     }
-    
+
     Logsheet ||--o{ Flight : contains
     Logsheet ||--o{ LogsheetPayment : payments
     Logsheet ||--o{ LogsheetCloseout : closeout

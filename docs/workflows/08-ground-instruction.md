@@ -16,24 +16,24 @@ The ground instruction workflow manages the logging and tracking of individual g
 flowchart TD
     A[Instructor Plans Session] --> B[Schedule with Student]
     B --> C[Conduct Ground Instruction]
-    
+
     C --> D{Session Type}
     D -->|Pre-Flight Brief| E[Flight Preparation Discussion]
     D -->|Post-Flight Debrief| F[Flight Review & Analysis]
     D -->|Theory Session| G[Aerodynamics/Procedures Study]
     D -->|Knowledge Review| H[Lesson-Specific Training]
-    
+
     E --> I[Document Session Details]
     F --> I
     G --> I
     H --> I
-    
+
     I --> J[Score Individual Lessons]
     J --> K[Save Session Record]
     K --> L[Update Student Progress]
     L --> M[Notify Student]
     M --> N[Session Complete]
-    
+
     style A fill:#e1f5fe
     style N fill:#e8f5e8
 ```
@@ -62,18 +62,18 @@ sequenceDiagram
     participant System as Manage2Soar
     participant Student as Student
     participant Progress as Progress Tracker
-    
+
     Instructor->>System: Access Ground Instruction Form
     System->>System: Load Training Lessons
     System->>Instructor: Display Session Form
-    
+
     Instructor->>System: Complete Session Details
     Instructor->>System: Score Individual Lessons
     Instructor->>System: Save Ground Session
-    
+
     System->>System: Create GroundInstruction Record
     System->>System: Save GroundLessonScore Records
-    
+
     System->>Progress: Update Student Progress
     System->>Student: Send Session Notification
     System->>Instructor: Confirm Session Saved
@@ -87,25 +87,25 @@ flowchart TD
     A --> C[Post-Flight Debrief]
     A --> D[Theory Discussion]
     A --> E[Lesson Review]
-    
+
     B --> F[Weather Analysis]
     B --> G[Flight Planning]
     B --> H[Aircraft Systems]
     B --> I[Safety Considerations]
-    
+
     C --> J[Flight Performance Review]
     C --> K[Learning Points Discussion]
     C --> L[Areas for Improvement]
     C --> M[Next Steps Planning]
-    
+
     D --> N[Aerodynamics Concepts]
     D --> O[Regulations & Procedures]
     D --> P[Emergency Procedures]
-    
+
     E --> Q[Lesson-Specific Scoring]
     E --> R[Progress Assessment]
     E --> S[Remedial Training]
-    
+
     style B fill:#e3f2fd
     style C fill:#f3e5f5
     style D fill:#fff3e0
@@ -129,12 +129,12 @@ stateDiagram-v2
     PhaseComplete --> Graduated: Ground School Complete
     NextPhase --> InProgress: Continue Training
     Graduated --> [*]: Training Complete
-    
+
     note right of Assessment
         Knowledge tests validate
         understanding of topics
     end note
-    
+
     note right of NeedsReview
         Additional study required
         before advancing
@@ -152,13 +152,13 @@ erDiagram
         string last_name
         boolean instructor
     }
-    
+
     TrainingPhase {
         int id PK
         int number
         string name
     }
-    
+
     TrainingLesson {
         int id PK
         string code
@@ -168,7 +168,7 @@ erDiagram
         string far_requirement
         string pts_reference
     }
-    
+
     GroundInstruction {
         int id PK
         int student_id FK
@@ -180,14 +180,14 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     GroundLessonScore {
         int id PK
         int session_id FK
         int lesson_id FK
         string score
     }
-    
+
     Member ||--o{ GroundInstruction : student
     Member ||--o{ GroundInstruction : instructor  
     TrainingPhase ||--o{ TrainingLesson : contains
@@ -207,7 +207,7 @@ flowchart LR
     C --> D[Flight Training]
     D --> E[Post-Flight Debrief]
     E --> F[Ground Knowledge Reinforcement]
-    
+
     A --> G[Knowledge Test Preparation]
     G --> H[Written Examination]
     H --> I[Flight Test Readiness]
@@ -246,15 +246,15 @@ flowchart TD
     A[Instructor Identifies Need] --> B[Schedule Session with Student]
     B --> C[Prepare Session Content]
     C --> D[Conduct Ground Instruction]
-    
+
     D --> E[Document Session Details]
     E --> F[Score Relevant Lessons]
     F --> G[Save Session to System]
     G --> H[Student Receives Notification]
-    
+
     H --> I[Review Session in Training Record]
     I --> J[Plan Follow-up Sessions]
-    
+
     style A fill:#e1f5fe
     style J fill:#e8f5e8
 ```
@@ -267,7 +267,7 @@ flowchart LR
     B --> C[Review Lesson Objectives]
     C --> D[Discuss Weather/Conditions]
     D --> E[Aircraft Systems Review]
-    
+
     E --> F[Flight Training Session]
     F --> G[Post-Flight Debrief]
     G --> H[Log Ground Session]
@@ -282,11 +282,11 @@ flowchart TD
     A[Student Has Questions] --> B[Schedule Theory Session]
     B --> C[Prepare Reference Materials]
     C --> D[Conduct Discussion]
-    
+
     D --> E[Cover Aerodynamics Concepts]
     D --> F[Review Regulations]
     D --> G[Discuss Procedures]
-    
+
     E --> H[Document Session]
     F --> H
     G --> H

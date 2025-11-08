@@ -192,7 +192,7 @@
               ⚠️ Missing data
             </span>
           {% endif %}
-          
+
       </td>
       <td class="d-none d-sm-table-cell">
         {% if not flight.landing_time %}
@@ -212,14 +212,14 @@
         {% if not logsheet.finalized %}
         <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
            class="btn btn-sm btn-outline-secondary me-1"
-           data-bs-toggle="modal" 
+           data-bs-toggle="modal"
            data-bs-target="#flightModal"
            data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
           Edit
         </a>
-        <form method="post" 
-              action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}" 
-              style="display:inline;" 
+        <form method="post"
+              action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
+              style="display:inline;"
               onsubmit="return confirm('Are you sure you want to delete this flight?');">
           {% csrf_token %}
           <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
@@ -254,13 +254,13 @@
     <tr>
       <td colspan="9" class="text-center">
         <button class="btn btn-success btn-lg rounded-pill landing-now-btn" data-flight-id="{{ flight.pk }}">
-          🛬 Record Landing for  
+          🛬 Record Landing for
           {% if flight.pilot or flight.instructor or flight.passenger %}
             {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
             {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
             {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
           {% else %}
-            them 
+            them
           {% endif %}
         </button>
       </td>
@@ -613,11 +613,11 @@
   document.addEventListener("DOMContentLoaded", function () {
     const clockEmojis = ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"];
     let emojiIndex = 0;
-  
+
     function pad(n) {
       return n < 10 ? '0' + n : n;
     }
-  
+
     function updateLiveDurations() {
       const now = new Date();
       document.querySelectorAll(".live-duration").forEach(el => {

@@ -21,11 +21,11 @@
                             <br><small><strong>Page:</strong> {{ referring_url }}</small>
                         {% endif %}
                     </p>
-                    
+
                     <form method="post">
                         {% csrf_token %}
                         {{ form.media }}
-                        
+
                         <div class="mb-3">
                             {{ form.feedback_type.label_tag }}
                             {{ form.feedback_type }}
@@ -34,7 +34,7 @@
                             {% endif %}
                             {{ form.feedback_type.errors }}
                         </div>
-                        
+
                         <div class="mb-3">
                             {{ form.subject.label_tag }}
                             {{ form.subject }}
@@ -43,7 +43,7 @@
                             {% endif %}
                             {{ form.subject.errors }}
                         </div>
-                        
+
                         <div class="mb-3">
                             {{ form.message.label_tag }}
                             {{ form.message }}
@@ -52,13 +52,13 @@
                             {% endif %}
                             {{ form.message.errors }}
                         </div>
-                        
+
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-paper-plane me-1"></i>
                                 Submit Feedback
                             </button>
-                            <a href="{% if referring_url %}{{ referring_url }}{% else %}{% url 'cms:home' %}{% endif %}" 
+                            <a href="{% if referring_url %}{{ referring_url }}{% else %}{% url 'cms:home' %}{% endif %}"
                                class="btn btn-secondary">
                                 Cancel
                             </a>
@@ -66,7 +66,7 @@
                     </form>
                 </div>
             </div>
-            
+
             <div class="alert alert-info mt-4">
                 <h6 class="alert-heading">
                     <i class="fas fa-info-circle me-1"></i>

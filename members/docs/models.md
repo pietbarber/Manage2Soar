@@ -44,7 +44,7 @@ erDiagram
         string pilot_certificate_number
         date private_glider_checkride_date
     }
-    
+
     Biography {
         int id PK
         int member_id FK
@@ -52,7 +52,7 @@ erDiagram
         image uploaded_image
         datetime updated_at
     }
-    
+
     Badge {
         int id PK
         string name UK
@@ -60,7 +60,7 @@ erDiagram
         text description
         int order
     }
-    
+
     MemberBadge {
         int id PK
         int member_id FK
@@ -68,7 +68,7 @@ erDiagram
         date date_awarded
         text notes
     }
-    
+
     Member ||--o| Biography : has_biography
     Member ||--o{ MemberBadge : earned_badges
     Badge ||--o{ MemberBadge : awarded_to_members

@@ -7,7 +7,7 @@ erDiagram
     User ||--o{ Document : uploads
     User ||--o{ SiteFeedback : submits
     User ||--o{ SiteFeedback : responds_to
-    
+
     Page {
         int id PK
         string title
@@ -18,7 +18,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     Document {
         int id PK
         int page_id FK
@@ -27,7 +27,7 @@ erDiagram
         int uploaded_by_id FK
         datetime uploaded_at
     }
-    
+
     HomePageContent {
         int id PK
         string title
@@ -36,7 +36,7 @@ erDiagram
         text content
         datetime updated_at
     }
-    
+
     HomePageImage {
         int id PK
         int page_id FK
@@ -44,7 +44,7 @@ erDiagram
         string caption
         int order
     }
-    
+
     SiteFeedback {
         int id PK
         int user_id FK
@@ -59,14 +59,14 @@ erDiagram
         datetime updated_at
         datetime resolved_at
     }
-    
+
     User {
         int id PK
         string username
         string email
         string full_display_name
     }
-    
+
     Page ||--o{ Page : parent_child
     Page ||--o{ Document : contains
     HomePageContent ||--o{ HomePageImage : has_images

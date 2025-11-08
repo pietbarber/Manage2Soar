@@ -123,10 +123,10 @@
           {% if val == preference.max_assignments_per_month %}selected{% endif %}
         >{{ label }}</option>
       {% endfor %}
-      
+
 
     </div>
-    
+
 
 
    <div class="form-check">
@@ -139,12 +139,12 @@
         I'm OK being scheduled both days of a weekend
       </label>
     </div>
-    
+
 
     {% if role_percent_choices|length > 1 %}
     <h5 class="mt-4">Duty Role Percentage Breakdown</h5>
     <p class="text-muted">Total must add up to 100% if you want to be scheduled.</p>
-  
+
     <div class="row">
       {% for role, label in role_percent_choices %}
         <div class="col-md-6 mb-3">
@@ -163,7 +163,7 @@
       {% endfor %}
     </div>
   {% endif %}
-  
+
 
     {# Hidden fields for unshown duty roles, to prevent NULLs in DB #}
     {% for role in all_possible_roles %}
@@ -171,7 +171,7 @@
         <input type="hidden" name="{{ role }}_percent" value="0">
       {% endif %}
     {% endfor %}
-  
+
     <hr class="my-4">
 
     <div class="row">

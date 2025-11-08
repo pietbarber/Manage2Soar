@@ -4,7 +4,7 @@
 <h2>Flight Details</h2>
 {% if is_modal %}
 <br><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-{% endif %} 
+{% endif %}
 </div>
 <div class="modal-body">
 {% get_siteconfig as config %}
@@ -18,7 +18,7 @@
 
 <h4>👨‍✈️ Pilot&nbsp;&&nbsp;{{ config.instructor_title|default:'Instructor' }}</h4>
 <ul>
-  <li><strong>Pilot:</strong> 
+  <li><strong>Pilot:</strong>
     {% if flight.pilot %}
       {{ flight.pilot.full_display_name }}
     {% else %}

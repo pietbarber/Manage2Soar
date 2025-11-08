@@ -58,13 +58,13 @@ Added a new section to the instruction record template to display lesson scores 
 
           {% endif %}    {% for lesson_score in score_group.list %}
 
-        </strong>      <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}" 
+        </strong>      <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}"
 
-        {% for lesson_score in score_group.list %}         class="text-decoration-none me-1" 
+        {% for lesson_score in score_group.list %}         class="text-decoration-none me-1"
 
-          <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}"          data-bs-toggle="tooltip" 
+          <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}"          data-bs-toggle="tooltip"
 
-             class="text-decoration-none me-1"          data-bs-placement="top" 
+             class="text-decoration-none me-1"          data-bs-placement="top"
 
              data-bs-toggle="tooltip"          title="{{ lesson_score.lesson.title }}">{{ lesson_score.lesson.code }}</a>{% if not forloop.last %},{% endif %}
 

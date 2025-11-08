@@ -45,17 +45,17 @@ graph TB
         CJ5[CronJob: send-maintenance-digest]
         CJ6[CronJob: expire-ad-hoc-days]
     end
-    
+
     subgraph "Django Pods"
         P1[Pod 1: django-app-xxx]
         P2[Pod 2: django-app-yyy]
     end
-    
+
     subgraph "Database"
         CJL[(CronJobLock Table)]
         DB[(PostgreSQL)]
     end
-    
+
     CJ1 --> P1
     CJ1 --> P2
     CJ2 --> P1
@@ -68,11 +68,11 @@ graph TB
     CJ5 --> P2
     CJ6 --> P1
     CJ6 --> P2
-    
+
     P1 --> CJL
     P2 --> CJL
     CJL --> DB
-    
+
     P1 --> DB
     P2 --> DB
 ```

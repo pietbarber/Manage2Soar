@@ -239,10 +239,10 @@
                 {% endif %}
               </strong>
               {% for lesson_score in score_group.list %}
-                <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}" 
-                   class="text-decoration-none me-1" 
-                   data-bs-toggle="tooltip" 
-                   data-bs-placement="top" 
+                <a href="{% url 'public_syllabus_detail' lesson_score.lesson.code %}"
+                   class="text-decoration-none me-1"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="top"
                    title="{{ lesson_score.lesson.title }}">{{ lesson_score.lesson.code }}</a>{% if not forloop.last %},{% endif %}
               {% endfor %}
             </div>
@@ -258,8 +258,8 @@
         <h5>📝 Instructor Essay</h5>
         {# Edit button - only show if current user is the instructor and report is within 7 days #}
         {% if request.user == block.report.instructor and block.days_ago <= 7 %}
-          <a href="{% url 'instructors:fill_instruction_report' member.id block.report.report_date|date:'Y-m-d' %}" 
-             class="btn btn-sm btn-outline-primary ms-2" 
+          <a href="{% url 'instructors:fill_instruction_report' member.id block.report.report_date|date:'Y-m-d' %}"
+             class="btn btn-sm btn-outline-primary ms-2"
              title="Edit this report (available for 7 days after creation)">
             <i class="fas fa-edit"></i> Edit
           </a>

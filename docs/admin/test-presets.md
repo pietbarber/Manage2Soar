@@ -67,11 +67,11 @@ Available category codes can be found in the QuestionCategory table.
 1. **Check for template references** using Django shell:
    ```python
    from knowledgetest.models import WrittenTestTemplate
-   
+
    # Check if any templates might reference the preset
    preset_name = "PRESET_TO_DELETE"
    templates = WrittenTestTemplate.objects.filter(name__icontains=preset_name)
-   
+
    for template in templates:
        print(f"Template: {template.name} (ID: {template.id})")
        print(f"Created: {template.created_at}")

@@ -12,7 +12,7 @@ erDiagram
     Member ||--o{ WrittenTestAttempt : student
     Member ||--o{ WrittenTestAssignment : assigned_to
     Member ||--o{ WrittenTestAssignment : created_by
-    
+
     TestPreset {
         int id PK
         string name UK
@@ -23,13 +23,13 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     QuestionCategory {
         int id PK
         string code UK
         text description
     }
-    
+
     Question {
         int id PK
         int category_id FK
@@ -43,7 +43,7 @@ erDiagram
         datetime lastupdated
         string updatedby
     }
-    
+
     WrittenTestTemplate {
         int id PK
         string name
@@ -54,14 +54,14 @@ erDiagram
         int time_limit_minutes
         decimal passing_score
     }
-    
+
     WrittenTestTemplateQuestion {
         int id PK
         int template_id FK
         int question_id FK
         int question_order
     }
-    
+
     WrittenTestAttempt {
         int id PK
         int template_id FK
@@ -72,7 +72,7 @@ erDiagram
         boolean passed
         string status
     }
-    
+
     WrittenTestAnswer {
         int id PK
         int attempt_id FK
@@ -81,7 +81,7 @@ erDiagram
         boolean correct
         datetime answered_at
     }
-    
+
     WrittenTestAssignment {
         int id PK
         int template_id FK
@@ -91,7 +91,7 @@ erDiagram
         boolean completed
         datetime created_at
     }
-    
+
     QuestionCategory ||--o{ Question : categorizes
     WrittenTestTemplate ||--o{ WrittenTestTemplateQuestion : contains
     Question ||--o{ WrittenTestTemplateQuestion : used_in

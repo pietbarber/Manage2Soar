@@ -13,7 +13,7 @@
 - **CRITICAL**: When user references an issue by number (e.g., "work on issue 70"), use this MCP pattern:
   - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"` to get all open issues, then filter for the specific number
   - **Method 2 (Fallback)**: `mcp_github_github_search_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `query="[issue_number]"` (simple number only, no GitHub syntax)
-- **DO NOT USE**: 
+- **DO NOT USE**:
   - `mcp_github_github_get_issue` (tool doesn't exist)
   - GitHub search syntax like `"number:70"` or `"is:issue 70"` (fails in search)
 - This eliminates the "three different attempts" pattern - use Method 1 first, then Method 2 if needed.
@@ -35,7 +35,7 @@
 
 ## CSS & Static Files Management
 - **CRITICAL**: Always run `python manage.py collectstatic` after making changes to CSS files in `static/` directories. Changes to CSS files are NOT visible until collected.
-- **CSS Architecture**: 
+- **CSS Architecture**:
   - Use external CSS files in `static/css/` instead of inline `<style>` tags in templates
   - Check existing CSS in `static/css/baseline.css` for conflicting rules before creating new styles
   - CSS specificity issues can cause "styling not working" problems - use browser dev tools to inspect actual applied styles

@@ -11,7 +11,7 @@ The **Analytics** app provides read-only, presentation-grade charts for club ope
 ## Quick Start
 
 1. Ensure static assets are available:
-    
+
     ```bash
     python manage.py collectstatic
     ```
@@ -123,7 +123,7 @@ All charts include **PNG | SVG | CSV** export:
   - **Data handoff:** one `analytics_data` JSON blob (`{% json_script %}`) consumed by `charts.js`
 
 ### The `analytics_data` blob (shape)
-    
+
 ```json
 {
   "cumulative": { "labels": [1,2,3], "years": [2011], "data": {"2011":[0,1,2]}, "totals": {"2011": 1234}, "instr": {"2011": 321}, "current_year": 2025 },

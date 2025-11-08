@@ -19,28 +19,28 @@ graph TB
         Member[Member Profiles]
         Roles[Role Management]
     end
-    
+
     subgraph "Flight Operations"
         Duty[Duty Roster]
         Logsheet[Flight Logging]
         Fleet[Glider Fleet]
         Maint[Maintenance]
     end
-    
+
     subgraph "Training & Education"
         Instruction[Flight Instruction]
         Ground[Ground School]
         Tests[Knowledge Tests]
         Progress[Progress Tracking]
     end
-    
+
     subgraph "Business Operations"
         Payments[Cost Calculation]
         Analytics[Reporting & Charts]
         Notifications[Communications]
         CMS[Content Management]
     end
-    
+
     Auth --> Member
     Member --> Roles
     Member --> Duty
@@ -66,7 +66,7 @@ flowchart LR
         Manual[Manual Entry]
         Import[Data Import]
     end
-    
+
     subgraph "Core Apps"
         Members[members]
         Logsheet[logsheet]
@@ -74,29 +74,29 @@ flowchart LR
         Instructors[instructors]
         Knowledge[knowledgetest]
     end
-    
+
     subgraph "Support Apps"
         Analytics[analytics]
         Notifications[notifications]
         CMS[cms]
         Config[siteconfig]
     end
-    
+
     OAuth --> Members
     Manual --> Members
     Import --> Members
-    
+
     Members --> Duty
     Members --> Instructors
     Members --> Knowledge
     Duty --> Logsheet
     Instructors --> Logsheet
-    
+
     Logsheet --> Analytics
     Logsheet --> Notifications
     Members --> Analytics
     Duty --> Analytics
-    
+
     CMS --> Members
     Config --> Members
 ```
@@ -133,10 +133,10 @@ erDiagram
     Member ||--o{ TrainingLesson : instructs
     Member ||--o{ TestSession : takes
     Member ||--o{ Notification : receives
-    
+
     Logsheet ||--o{ Flight : contains
     Glider ||--o{ Flight : flown
-    
+
     TrainingLesson ||--o{ Flight : validates
     SyllabusDocument ||--o{ TrainingLesson : guides
 ```
@@ -152,16 +152,16 @@ sequenceDiagram
     participant Member as Club Member
     participant Instructor as Instructor
     participant Analytics as Analytics
-    
+
     DO->>System: Create/Open Logsheet
     Member->>System: Request Flight
     DO->>System: Log Flight Details
-    
+
     alt Flight is Training
         System->>Instructor: Notify of Training Flight
         Instructor->>System: Complete Lesson Record
     end
-    
+
     System->>System: Calculate Costs
     System->>Member: Send Payment Notification
     DO->>System: Close Logsheet
@@ -181,7 +181,7 @@ flowchart TD
     E --> H[Payment Processing]
     F --> I[Progress Tracking]
     G --> J[Fleet Management]
-    
+
     style A fill:#e1f5fe
     style D fill:#f3e5f5
     style H fill:#e8f5e8
@@ -194,7 +194,7 @@ flowchart TD
 - Profile maintenance and roles
 - Badge tracking and certification
 
-### **2. Operations Planning** 
+### **2. Operations Planning**
 - Duty roster generation and management
 - Resource allocation and scheduling
 - Weather and operations coordination

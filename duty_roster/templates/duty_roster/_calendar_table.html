@@ -4,7 +4,7 @@
 {% load siteconfig_tags %}
 {% if user.rostermeister %}
   <div class="d-flex justify-content-center mb-4">
-    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
        class="btn btn-primary btn-lg shadow-sm">
       <i class="fas fa-calendar-plus me-2"></i>Propose Duty Roster
     </a>

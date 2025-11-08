@@ -13,7 +13,7 @@ erDiagram
         datetime locked_at
         datetime expires_at
     }
-    
+
     CronJobLock {
         string job_name "Unique identifier for the scheduled task"
         string locked_by "Pod identifier (hostname-pid)"
@@ -62,7 +62,7 @@ The `CronJobLock` model provides distributed locking functionality for scheduled
 
 #### String Representation
 
-Returns: `"{job_name} ({locked_by})"` 
+Returns: `"{job_name} ({locked_by})"`
 
 Example: `"notify_aging_logsheets (django-app-c7895b487-46wjx-1234)"`
 
@@ -94,7 +94,7 @@ The `CronJobLock` model is tightly integrated with the `BaseCronJobCommand` clas
 class MyScheduledCommand(BaseCronJobCommand):
     job_name = "my_unique_job"  # Maps to CronJobLock.job_name
     max_execution_time = timedelta(minutes=30)  # Sets expires_at
-    
+
     def execute_job(self, *args, **options):
         # Your job logic here - protected by distributed lock
         pass

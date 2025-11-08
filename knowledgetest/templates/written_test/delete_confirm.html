@@ -52,10 +52,10 @@
                         <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-2"></i>Cancel
                         </a>
-                        
+
                         <form method="post" class="d-inline">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-danger" 
+                            <button type="submit" class="btn btn-danger"
                                     onclick="return confirm('Are you absolutely sure? This written test attempt and all its data will be permanently deleted.');">
                                 <i class="fas fa-trash me-2"></i>Delete Permanently
                             </button>

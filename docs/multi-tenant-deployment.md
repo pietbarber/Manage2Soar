@@ -105,7 +105,7 @@ DATABASE_URL=postgresql://user:pass@host:port/nfss_manage2soar
    export DJANGO_SETTINGS_MODULE=manage2soar.settings
    # Load new environment
    source .env.masa  # or .env.nfss
-   
+
    # Run migrations
    python manage.py migrate
    ```
@@ -114,7 +114,7 @@ DATABASE_URL=postgresql://user:pass@host:port/nfss_manage2soar
    ```bash
    # Load basic groups and permissions
    python manage.py loaddata loaddata/groups_and_permissions.json
-   
+
    # Load other fixtures as needed
    python manage.py loaddata loaddata/members.Badge.json
    python manage.py loaddata loaddata/instructors.*.json

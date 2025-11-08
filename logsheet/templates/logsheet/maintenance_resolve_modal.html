@@ -1,10 +1,10 @@
-<form 
-  method="post" 
+<form
+  method="post"
   hx-post="{% url 'logsheet:maintenance_mark_resolved' issue.id %}"
   hx-target="body"
   hx-swap="none"
-  hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) { 
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).hide(); 
+  hx-on="htmx:afterRequest: if (event.detail.xhr.response.includes('reload')) {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('calendarModal')).hide();
     setTimeout(() => { location.reload(); }, 300);
   }"
 >

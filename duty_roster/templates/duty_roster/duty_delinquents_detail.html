@@ -12,12 +12,12 @@
     <div class="summary-header">
         <h1><i class="fas fa-exclamation-triangle"></i> Duty Delinquents Detail Report</h1>
         <p class="mb-2">
-            <strong>{{ total_count }}</strong> members have flown {{ min_flights }}+ times in the last {{ lookback_months }} months 
+            <strong>{{ total_count }}</strong> members have flown {{ min_flights }}+ times in the last {{ lookback_months }} months
             but haven't performed any duty since {{ duty_cutoff_date|date:"F j, Y" }}.
         </p>
         <p class="mb-0">
             <small>
-                Report generated: {{ report_date|date:"F j, Y" }} | 
+                Report generated: {{ report_date|date:"F j, Y" }} |
                 Minimum membership: {{ min_membership_months }} months |
                 Active only (Full/Student/Life members)
             </small>
@@ -36,7 +36,7 @@
                         <strong>{{ delinquent.member.last_name }}, {{ delinquent.member.first_name }}</strong>
                         <br>
                         <small class="text-muted">
-                            {{ delinquent.flight_count }} flights | 
+                            {{ delinquent.flight_count }} flights |
                             {% if delinquent.eligible_roles %}
                                 {{ delinquent.eligible_roles|join:", " }}
                             {% else %}
@@ -57,13 +57,13 @@
                         <div class="delinquent-header">
                             <div class="member-photo">
                                 {% if delinquent.member.profile_photo %}
-                                    <img src="{{ delinquent.member.profile_photo.url }}" 
-                                         alt="{{ delinquent.member.full_display_name }}" 
+                                    <img src="{{ delinquent.member.profile_photo.url }}"
+                                         alt="{{ delinquent.member.full_display_name }}"
                                          title="{{ delinquent.member.full_display_name }}"
                                          height="60" class="rounded-circle me-2">
                                 {% else %}
-                                    <img src="{% static 'images/default-avatar-100px.png' %}" 
-                                         alt="Default avatar" 
+                                    <img src="{% static 'images/default-avatar-100px.png' %}"
+                                         alt="Default avatar"
                                          title="{{ delinquent.member.full_display_name }}"
                                          height="60" class="rounded-circle me-2">
                                 {% endif %}
@@ -156,10 +156,10 @@
                                     {% if delinquent.most_recent_flight_logsheet %}
                                         <br>
                                         <small class="text-muted">
-                                            <a href="{% url 'logsheet:manage' delinquent.most_recent_flight_logsheet.id %}" 
-                                               target="_blank" 
+                                            <a href="{% url 'logsheet:manage' delinquent.most_recent_flight_logsheet.id %}"
+                                               target="_blank"
                                                class="text-decoration-none">
-                                                <i class="fas fa-external-link-alt"></i> 
+                                                <i class="fas fa-external-link-alt"></i>
                                                 Logsheet {{ delinquent.most_recent_flight_logsheet.id }}
                                             </a>
                                             ({{ delinquent.most_recent_flight_logsheet.airfield.name }})
@@ -184,7 +184,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            
+
                             {% if delinquent.recent_blackouts %}
                                 <div>
                                     <strong>Recent Blackouts:</strong>
@@ -198,7 +198,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            
+
                             {% if not delinquent.current_blackouts and not delinquent.recent_blackouts %}
                                 <div class="text-muted">
                                     <i class="fas fa-check-circle"></i> No recorded availability issues
@@ -221,7 +221,7 @@
             <hr>
             <p class="mb-0">
                 <small>
-                    Criteria: Members with {{ min_flights }}+ flights in {{ lookback_months }} months, 
+                    Criteria: Members with {{ min_flights }}+ flights in {{ lookback_months }} months,
                     {{ min_membership_months }}+ months membership, and no duty since {{ duty_cutoff_date|date:"F j, Y" }}.
                 </small>
             </p>

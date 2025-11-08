@@ -19,39 +19,39 @@ flowchart TD
     B --> C[Create/Open Daily Logsheet]
     C --> D[Aircraft Pre-flight Inspections]
     D --> E[Operations Begin]
-    
+
     E --> F[Member Requests Flight]
     F --> G[Check Aircraft Availability]
     G --> H[Assign Aircraft/Instructor]
     H --> I[Log Flight Start]
-    
+
     I --> J[Flight in Progress]
     J --> K[Flight Lands]
     K --> L[Log Flight End]
     L --> M[Calculate Costs]
-    
+
     M --> N{Training Flight?}
     N -->|Yes| O[Link to Training Record]
     N -->|No| P[Standard Flight Processing]
-    
+
     O --> Q[Update Training Progress]
     P --> R[Member Cost Notification]
     Q --> R
-    
+
     R --> S{More Flights?}
     S -->|Yes| F
     S -->|No| T[End of Operations]
-    
+
     T --> U[Aircraft Post-flight Checks]
     U --> V{Maintenance Issues?}
     V -->|Yes| W[Log Maintenance Item]
     V -->|No| X[Close Logsheet]
-    
+
     W --> Y[Notify Maintenance Team]
     Y --> X
     X --> Z[Generate Daily Reports]
     Z --> AA[Archive Logsheet]
-    
+
     style A fill:#e1f5fe
     style AA fill:#e8f5e8
     style W fill:#fff3e0
@@ -86,30 +86,30 @@ sequenceDiagram
     participant Instructor as Instructor
     participant Maintenance as Maintenance Team
     participant Analytics as Analytics
-    
+
     DO->>System: Create Daily Logsheet
     System->>System: Initialize Aircraft Status
     DO->>System: Record Weather Conditions
-    
+
     Member->>DO: Request Flight
     DO->>System: Check Aircraft Availability
     System->>DO: Show Available Aircraft
     DO->>System: Assign Aircraft & Log Flight Start
-    
+
     alt Training Flight
         System->>Instructor: Notify of Training Flight
         Instructor->>System: Acknowledge Assignment
     end
-    
+
     DO->>System: Log Flight Landing
     System->>System: Calculate Flight Costs
     System->>Member: Send Cost Notification
-    
+
     alt Maintenance Issue Found
         DO->>System: Log Maintenance Issue
         System->>Maintenance: Send Issue Notification
     end
-    
+
     DO->>System: Close Daily Operations
     System->>Analytics: Update Flight Statistics
     System->>System: Generate Daily Reports
@@ -122,19 +122,19 @@ flowchart LR
     A[Flight Data] --> B[Calculate Tow Cost]
     A --> C[Calculate Rental Cost]
     A --> D[Check Split Arrangements]
-    
+
     B --> E[Release Altitude × Rate]
     C --> F[Flight Time × Hourly Rate]
     D --> G[Apply Cost Splitting]
-    
+
     E --> H[Base Tow Cost]
     F --> I[Base Rental Cost]
     G --> J[Member Portions]
-    
+
     H --> K[Apply Member Discounts]
     I --> K
     J --> K
-    
+
     K --> L[Final Member Costs]
     L --> M[Generate Billing Records]
     M --> N[Send Payment Notifications]
@@ -155,12 +155,12 @@ stateDiagram-v2
     OutOfService --> Maintenance: Repair Started
     Available --> Hangar: End of Day
     Hangar --> [*]: Operations Closed
-    
+
     note right of Maintenance
         Tracked in MaintenanceIssue
         Notifications sent automatically
     end note
-    
+
     note right of OutOfService
         Aircraft unavailable
         Until repairs complete
@@ -184,7 +184,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     Flight {
         int id PK
         int logsheet_id FK
@@ -200,7 +200,7 @@ erDiagram
         decimal rental_cost_calculated
         text remarks
     }
-    
+
     Glider {
         int id PK
         string call_sign UK
@@ -210,7 +210,7 @@ erDiagram
         date last_inspection
         decimal total_flight_hours
     }
-    
+
     Towplane {
         int id PK
         string call_sign UK
@@ -218,7 +218,7 @@ erDiagram
         boolean available
         decimal total_flight_hours
     }
-    
+
     MaintenanceIssue {
         int id PK
         int glider_id FK
@@ -230,14 +230,14 @@ erDiagram
         decimal estimated_cost
         date resolved_date
     }
-    
+
     TowRate {
         int id PK
         int altitude_feet
         decimal rate_dollars
         date effective_date
     }
-    
+
     Airfield {
         int id PK
         string name UK
@@ -245,7 +245,7 @@ erDiagram
         text description
         decimal elevation_feet
     }
-    
+
     Logsheet ||--o{ Flight : contains
     Glider ||--o{ Flight : flown_in
     Towplane ||--o{ Flight : towed_by
@@ -282,7 +282,7 @@ flowchart TD
     C --> D[Payment Notification]
     D --> E[Member Payment]
     E --> F[Account Reconciliation]
-    
+
     B --> G[Split Cost Calculation]
     G --> H[Multiple Member Billing]
     H --> I[Individual Notifications]
@@ -298,7 +298,7 @@ flowchart LR
     C --> D[Repair Assignment]
     D --> E[Work Completion]
     E --> F[Aircraft Return to Service]
-    
+
     B --> G[Notification System]
     G --> H[Alert Maintenance Team]
     G --> I[Inform Duty Officers]
@@ -315,24 +315,24 @@ flowchart TD
     B --> C[0800: Aircraft Inspection]
     C --> D[0830: Create Daily Logsheet]
     D --> E[0900: Operations Begin]
-    
+
     E --> F[1000-1700: Flight Operations]
     F --> G[Flight Requests]
     G --> H[Aircraft Assignment]
     H --> I[Flight Logging]
     I --> J[Cost Calculation]
     J --> K[Member Notification]
-    
+
     K --> L{More Flights?}
     L -->|Yes| G
     L -->|No| M[1700: Operations End]
-    
+
     M --> N[Aircraft Secure]
     N --> O[Maintenance Check]
     O --> P[Logsheet Review]
     P --> Q[Daily Reports]
     Q --> R[Logsheet Archive]
-    
+
     style A fill:#e1f5fe
     style R fill:#e8f5e8
 ```
@@ -343,15 +343,15 @@ flowchart TD
 flowchart TD
     A[Multiple Members on Flight] --> B[Identify Cost Split Type]
     B --> C{Split Method}
-    
+
     C -->|Equal Split| D[Divide Costs Equally]
     C -->|Custom Split| E[Apply Custom Percentages]
     C -->|Pilot Pays All| F[Assign Full Cost to Pilot]
-    
+
     D --> G[Calculate Individual Portions]
     E --> G
     F --> G
-    
+
     G --> H[Update Member Accounts]
     H --> I[Send Individual Notifications]
     I --> J[Generate Split Summary]
@@ -364,22 +364,22 @@ flowchart TD
 flowchart LR
     A[Issue Reported] --> B[Priority Classification]
     B --> C{Severity Level}
-    
+
     C -->|Critical| D[Ground Aircraft Immediately]
     C -->|High| E[Schedule Urgent Repair]
     C -->|Medium| F[Plan Routine Maintenance]
     C -->|Low| G[Add to Maintenance List]
-    
+
     D --> H[Emergency Repair]
     E --> I[Priority Scheduling]
     F --> J[Regular Maintenance]
     G --> K[Future Planning]
-    
+
     H --> L[Return to Service]
     I --> L
     J --> L
     K --> M[Maintenance Backlog]
-    
+
     L --> N[Update Aircraft Status]
     M --> O[Schedule Future Work]
 ```

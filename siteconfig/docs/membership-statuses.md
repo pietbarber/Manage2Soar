@@ -119,7 +119,7 @@ If you need to modify the membership status system:
 # In a data migration
 def update_membership_statuses(apps, schema_editor):
     MembershipStatus = apps.get_model('siteconfig', 'MembershipStatus')
-    
+
     # Add a new status
     MembershipStatus.objects.get_or_create(
         name="Trial Member",
@@ -129,7 +129,7 @@ def update_membership_statuses(apps, schema_editor):
             'description': 'Members in trial period'
         }
     )
-    
+
     # Update existing status
     status = MembershipStatus.objects.get(name='Student Member')
     status.sort_order = 5

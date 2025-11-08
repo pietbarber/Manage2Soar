@@ -33,7 +33,7 @@ Created clear, tested patterns for GitHub issue management:
 ```markdown
 mcp_github_github_list_issues with:
 - owner="pietbarber"
-- repo="Manage2Soar" 
+- repo="Manage2Soar"
 - state="OPEN" (or "CLOSED" as needed)
 Then filter for specific issue number
 ```

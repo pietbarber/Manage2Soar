@@ -41,7 +41,7 @@ erDiagram
         boolean allow_two_seater_reservations
         int redaction_notification_dedupe_minutes
     }
-    
+
     MembershipStatus {
         int id PK
         string name UK
@@ -116,7 +116,7 @@ print(config.club_phone)
 # Check operational settings
 if config.schedule_instructors:
     print("This club schedules instructors ahead of time")
-    
+
 # Access customizable role titles
 print(f"Duty officers are called: {config.duty_officer_title}")
 print(f"Instructors are called: {config.instructor_title}")
