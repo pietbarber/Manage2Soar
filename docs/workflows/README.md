@@ -13,6 +13,7 @@ This directory contains comprehensive workflow documentation for the Manage2Soar
 7. **[Payment Workflow](07-payment-workflow.md)** - Flight cost calculation and payment processing
 8. **[Ground Instruction](08-ground-instruction.md)** - Ground school and knowledge transfer
 9. **[Knowledge Test Lifecycle](09-knowledge-test-lifecycle.md)** - Written test creation, administration, and cleanup
+10. **[Security Workflow](10-security-workflow.md)** - Code security scanning and quality assurance
 
 ## 🎯 **Target Audiences**
 
@@ -42,6 +43,7 @@ Each workflow document follows this consistent structure:
 
 ```mermaid
 graph TB
+    Security[Security Workflow] -.-> All[All Processes]
     Member[Member Lifecycle] --> Duty[Duty Roster]
     Member --> Instruction[Instruction Process]
     Duty --> Logsheet[Flight Operations]
@@ -56,6 +58,7 @@ graph TB
     style Logsheet fill:#f3e5f5
     style Instruction fill:#e8f5e8
     style Payment fill:#fff3e0
+    style Security fill:#ffebee
 ```
 
 **Quick Navigation:**
@@ -67,6 +70,7 @@ graph TB
 - 💰 [Payment Processing](07-payment-workflow.md) - Financial processing
 - 🏫 [Ground Instruction](08-ground-instruction.md) - Classroom training
 - 📝 [Knowledge Tests](09-knowledge-test-lifecycle.md) - Written test administration
+- 🔒 [Security Workflow](10-security-workflow.md) - Code security and quality assurance
 
 ## 📚 **Related Documentation**
 
@@ -88,6 +92,7 @@ graph TB
 | [💰 Payment Processing](07-payment-workflow.md) | Financial processing | Business operations |
 | [🏫 Ground Instruction](08-ground-instruction.md) | Classroom training | Knowledge transfer |
 | [📝 Knowledge Tests](09-knowledge-test-lifecycle.md) | Written test administration | Assessment & validation |
+| [🔒 Security Workflow](10-security-workflow.md) | Code security and quality assurance | Development process |
 
 ## �🚀 **Getting Started**
 
