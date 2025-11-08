@@ -5,6 +5,7 @@
 exclude_dirs:
   - .venv
   - staticfiles
+  - static/tinymce
   - generated_avatars
   - media
   - tinymce
@@ -15,6 +16,15 @@ exclude:
   - "*/tests/*"
   - "*/test_*.py"
   - "*conftest.py"
+  - "static/*"
+  - "staticfiles/*"
+  - "*.json"
+  - "*.js"
+  - "*.css"
+  - "*.md"
+  - "*.txt"
+  - "*.svg"
+  - "*.ico"
 
 skips:
   - B101 # assert_used - normal in Django tests
