@@ -6,7 +6,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
 
-from members.models import MemberBadge
 from notifications.models import Notification
 
 from .models import GroundInstruction, InstructionReport, MemberQualification
@@ -147,7 +146,7 @@ def notify_member_on_qualification(sender, instance, created, **kwargs):
         return
 
 
-@receiver(post_save, sender=MemberBadge)
+@receiver(post_save, sender="members.MemberBadge")
 def notify_member_on_badge(sender, instance, created, **kwargs):
     try:
         member = instance.member
