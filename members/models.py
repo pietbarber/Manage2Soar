@@ -309,7 +309,13 @@ class Member(AbstractUser):
                     or self.webmaster
                 )
 
-        # 2) avatar generation (safe pre-save)
+        # 2) Sync is_active with membership status
+        # Only activate Django User if member has an active membership status
+        # This ensures login access is automatically managed based on membership status
+        if not self.is_superuser:  # Don't override superuser active status
+            self.is_active = self.is_active_member()
+
+        # 3) avatar generation (safe pre-save)
         if not self.profile_photo:
             # Skip avatar generation in test environments to prevent storage pollution
             if not (hasattr(settings, 'TESTING') and settings.TESTING):
@@ -319,10 +325,10 @@ class Member(AbstractUser):
                     generate_identicon(self.username, file_path)
                 self.profile_photo = file_path
 
-        # 3) persist first – get a PK
+        # 4) persist first – get a PK
         super().save(*args, **kwargs)
 
-        # 4) now safe to touch M2M
+        # 5) now safe to touch M2M
         transaction.on_commit(self._sync_groups)
 
     ##################################
