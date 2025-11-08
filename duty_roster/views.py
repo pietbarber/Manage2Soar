@@ -839,10 +839,18 @@ def propose_roster(request):
             # Handle removing specific dates from the roster
             dates_to_remove = request.POST.getlist("remove_date")
             if dates_to_remove:
-                dates_to_remove_set = set(dates_to_remove)
+                # Convert Y-m-d strings to date objects for reliable comparison
+                dates_to_remove_set = set()
+                for date_str in dates_to_remove:
+                    try:
+                        dates_to_remove_set.add(dt_date.fromisoformat(date_str))
+                    except ValueError:
+                        # Handle any malformed dates gracefully
+                        continue
+
                 draft = [
                     entry for entry in draft
-                    if entry["date"] not in dates_to_remove_set
+                    if dt_date.fromisoformat(entry["date"]) not in dates_to_remove_set
                 ]
                 request.session["proposed_roster"] = draft
                 messages.success(
