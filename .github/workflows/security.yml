@@ -125,10 +125,5 @@ jobs:
         run: |
           echo "Running security gate..."
           # This will fail the build if high-severity issues are found
-          bandit --configfile bandit.yaml -r . --severity-level high --exit-zero
-          RESULT=$?
-          if [ $RESULT -ne 0 ]; then
-            echo "❌ High-severity security issues found! Please fix before merging."
-            exit 1
-          fi
-          echo "✅ No high-severity security issues found."
+          bandit --configfile bandit.yaml -r . --severity-level high
+          echo "✅ Security gate passed - no high-severity issues found."
