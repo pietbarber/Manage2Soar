@@ -1,3 +1,6 @@
+import logging
+from io import BytesIO
+import logging
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
@@ -193,9 +196,9 @@ class SiteConfiguration(models.Model):
                     outbuf.seek(0)
                     # Save to storage as 'favicon.ico' at root of MEDIA
                     default_storage.save("favicon.ico", outbuf)
-            except Exception:
-                # Log or handle error as needed
-                pass
+            except Exception as e:
+                # Log storage or favicon generation errors but don't break model save
+                logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"

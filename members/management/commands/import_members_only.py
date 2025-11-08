@@ -1,14 +1,14 @@
+import re
+from members.models import Member
+from django.utils.timezone import make_aware
+from django.core.management.base import BaseCommand
+from django.conf import settings
+import psycopg2
 import logging
 from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG)
 
-import psycopg2
-from django.conf import settings
-from django.core.management.base import BaseCommand
-from django.utils.timezone import make_aware
-
-from members.models import Member
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,8 @@ def parse_date(legacy_str):
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y", "%m/%Y"):
         try:
             return datetime.strptime(legacy_str.strip(), fmt)
-        except Exception:
+        except (ValueError, TypeError):
+            # Not a match for this fmt — try next format
             continue
     return None
 
@@ -112,9 +113,6 @@ def sanitize(text):
     except Exception as e:
         logger.warning(f"Failed to sanitize text: {e}")
         return ""
-
-
-import re
 
 
 def extract_nickname(first_name):
@@ -171,7 +169,8 @@ class Command(BaseCommand):
 
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM members")
-            columns = [desc.name for desc in cursor.description]
+            columns = [
+                desc.name for desc in cursor.description] if cursor.description else []
             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         imported = 0
@@ -203,7 +202,8 @@ class Command(BaseCommand):
             member.email = sanitize(row.get("email"))
             member.mobile_phone = sanitize(row.get("cell_phone"))
             member.phone = sanitize(row.get("phone1"))
-            member.address = f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}".strip()
+            member.address = f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}".strip(
+            )
             member.city = sanitize(row.get("city"))
             state_raw = sanitize(row.get("state")).upper()
             if state_raw in US_STATE_ABBREVIATIONS:
@@ -227,7 +227,7 @@ class Command(BaseCommand):
                 member.membership_status = "Deceased"
             else:
                 member.membership_status = STATUS_MAP.get(
-                    row.get("memberstatus"), "Non-Member"
+                    row.get("memberstatus") or "", "Non-Member"
                 )
 
             # Only activate if the member deserves it
@@ -245,7 +245,7 @@ class Command(BaseCommand):
             else:
                 member.is_active = False
 
-            member.glider_rating = RATING_MAP.get(row.get("rating"), "student")
+            member.glider_rating = RATING_MAP.get(row.get("rating") or "", "student")
             member.director = row.get("director")
             member.treasurer = row.get("treasurer")
             member.secretary = row.get("secretary")
@@ -264,13 +264,19 @@ class Command(BaseCommand):
             join_date = parse_date(row.get("joindate"))
             if not join_date:
                 try:
-                    join_date = datetime.fromtimestamp(int(row.get("lastupdated")))
-                except Exception:
+                    last_updated = row.get("lastupdated")
+                    if last_updated is not None:
+                        join_date = datetime.fromtimestamp(int(last_updated))
+                    else:
+                        join_date = datetime(2000, 1, 1)
+                except (ValueError, TypeError, OSError):
+                    # Invalid timestamp or None value, use default date
                     join_date = datetime(2000, 1, 1)
             member.joined_club = make_aware(join_date)
 
             deceased_keywords = ["deceased"]
-            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower()
+            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower(
+            )
 
             if any(word in death_note for word in deceased_keywords):
                 member.membership_status = "Deceased"

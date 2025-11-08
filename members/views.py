@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 from datetime import date, timedelta
 
@@ -240,7 +241,9 @@ def toggle_redaction(request, member_id):
                         cutoff = timezone.now() - timedelta(
                             minutes=int(sc.redaction_notification_dedupe_minutes)
                         )
-                except Exception:
+                except (ImportError, AttributeError, ValueError) as e:
+                    logging.warning(
+                        f"Failed to get redaction notification settings: {e}")
                     sc = None
 
                 if cutoff is None:
@@ -255,7 +258,9 @@ def toggle_redaction(request, member_id):
                                 settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1
                             )
                             cutoff = timezone.now() - timedelta(hours=float(hours))
-                    except Exception:
+                    except (AttributeError, ValueError, TypeError) as e:
+                        logging.warning(
+                            f"Failed to parse redaction notification timing: {e}")
                         cutoff = timezone.now() - timedelta(hours=1)
                 try:
                     # Avoid N+1 queries: fetch which member_manager user ids already
@@ -278,12 +283,13 @@ def toggle_redaction(request, member_id):
 
                     if to_create:
                         Notification.objects.bulk_create(to_create)
-                except Exception:
+                except Exception as e:
                     # Fail softly if notification logic fails for any reason
-                    pass
-        except Exception:
+                    logging.exception(f"Failed to create redaction notifications: {e}")
+        except Exception as e:
             # Defensive: don't let notification failures break the toggle flow
-            pass
+            logging.exception(
+                f"Notification system failed during redaction toggle: {e}")
         if member.redact_contact:
             messages.success(
                 request, "Your personal contact information is now redacted."
