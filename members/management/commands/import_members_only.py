@@ -1,11 +1,13 @@
-import re
-from members.models import Member
-from django.utils.timezone import make_aware
-from django.core.management.base import BaseCommand
-from django.conf import settings
-import psycopg2
 import logging
+import re
 from datetime import datetime
+
+import psycopg2
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.utils.timezone import make_aware
+
+from members.models import Member
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -169,8 +171,9 @@ class Command(BaseCommand):
 
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM members")
-            columns = [
-                desc.name for desc in cursor.description] if cursor.description else []
+            columns = (
+                [desc.name for desc in cursor.description] if cursor.description else []
+            )
             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         imported = 0
@@ -202,8 +205,7 @@ class Command(BaseCommand):
             member.email = sanitize(row.get("email"))
             member.mobile_phone = sanitize(row.get("cell_phone"))
             member.phone = sanitize(row.get("phone1"))
-            member.address = f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}".strip(
-            )
+            member.address = f"{sanitize(row.get('address1'))} {sanitize(row.get('address2'))}".strip()
             member.city = sanitize(row.get("city"))
             state_raw = sanitize(row.get("state")).upper()
             if state_raw in US_STATE_ABBREVIATIONS:
@@ -275,8 +277,7 @@ class Command(BaseCommand):
             member.joined_club = make_aware(join_date)
 
             deceased_keywords = ["deceased"]
-            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower(
-            )
+            death_note = f"{row.get('official_title') or ''}{row.get('private_notes') or ''}".lower()
 
             if any(word in death_note for word in deceased_keywords):
                 member.membership_status = "Deceased"

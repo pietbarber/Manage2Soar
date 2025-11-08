@@ -5,14 +5,14 @@ from django.db import migrations
 
 def populate_test_presets(apps, schema_editor):
     """Populate TestPreset with existing hardcoded presets from views.py"""
-    TestPreset = apps.get_model('knowledgetest', 'TestPreset')
+    TestPreset = apps.get_model("knowledgetest", "TestPreset")
 
     # Existing presets from the hardcoded get_presets() function
     presets_data = [
         {
-            'name': 'ASK21',
-            'description': 'ASK-21 glider type rating test - includes aircraft-specific questions plus fundamentals',
-            'category_weights': {
+            "name": "ASK21",
+            "description": "ASK-21 glider type rating test - includes aircraft-specific questions plus fundamentals",
+            "category_weights": {
                 "ACRO": 0,
                 "AIM": 5,
                 "AMF": 0,
@@ -28,13 +28,13 @@ def populate_test_presets(apps, schema_editor):
                 "ST": 5,
                 "WX": 4,
             },
-            'sort_order': 10,
-            'is_active': True,
+            "sort_order": 10,
+            "is_active": True,
         },
         {
-            'name': 'PW5',
-            'description': 'PW-5 glider type rating test - includes aircraft-specific questions plus fundamentals',
-            'category_weights': {
+            "name": "PW5",
+            "description": "PW-5 glider type rating test - includes aircraft-specific questions plus fundamentals",
+            "category_weights": {
                 "ACRO": 0,
                 "AIM": 5,
                 "AMF": 5,
@@ -50,13 +50,13 @@ def populate_test_presets(apps, schema_editor):
                 "ST": 5,
                 "WX": 4,
             },
-            'sort_order': 20,
-            'is_active': True,
+            "sort_order": 20,
+            "is_active": True,
         },
         {
-            'name': 'DISCUS',
-            'description': 'Discus glider type rating test - includes aircraft-specific questions',
-            'category_weights': {
+            "name": "DISCUS",
+            "description": "Discus glider type rating test - includes aircraft-specific questions",
+            "category_weights": {
                 "ACRO": 0,
                 "AIM": 0,
                 "AMF": 0,
@@ -72,24 +72,22 @@ def populate_test_presets(apps, schema_editor):
                 "ST": 5,
                 "WX": 0,
             },
-            'sort_order': 30,
-            'is_active': True,
+            "sort_order": 30,
+            "is_active": True,
         },
         {
-            'name': 'ACRO',
-            'description': 'Aerobatics test - focused on aerobatic maneuvers and safety',
-            'category_weights': {
-                "ACRO": 30
-            },
-            'sort_order': 40,
-            'is_active': True,
+            "name": "ACRO",
+            "description": "Aerobatics test - focused on aerobatic maneuvers and safety",
+            "category_weights": {"ACRO": 30},
+            "sort_order": 40,
+            "is_active": True,
         },
         {
-            'name': 'EMPTY',
-            'description': 'Empty template - no questions pre-selected, allows manual question selection',
-            'category_weights': {},
-            'sort_order': 100,
-            'is_active': True,
+            "name": "EMPTY",
+            "description": "Empty template - no questions pre-selected, allows manual question selection",
+            "category_weights": {},
+            "sort_order": 100,
+            "is_active": True,
         },
     ]
 
@@ -99,7 +97,7 @@ def populate_test_presets(apps, schema_editor):
 
 def reverse_populate_test_presets(apps, schema_editor):
     """Remove all test presets"""
-    TestPreset = apps.get_model('knowledgetest', 'TestPreset')
+    TestPreset = apps.get_model("knowledgetest", "TestPreset")
     TestPreset.objects.all().delete()
 
 

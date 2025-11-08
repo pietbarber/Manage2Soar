@@ -243,7 +243,8 @@ def toggle_redaction(request, member_id):
                         )
                 except (ImportError, AttributeError, ValueError) as e:
                     logging.warning(
-                        f"Failed to get redaction notification settings: {e}")
+                        f"Failed to get redaction notification settings: {e}"
+                    )
                     sc = None
 
                 if cutoff is None:
@@ -260,7 +261,8 @@ def toggle_redaction(request, member_id):
                             cutoff = timezone.now() - timedelta(hours=float(hours))
                     except (AttributeError, ValueError, TypeError) as e:
                         logging.warning(
-                            f"Failed to parse redaction notification timing: {e}")
+                            f"Failed to parse redaction notification timing: {e}"
+                        )
                         cutoff = timezone.now() - timedelta(hours=1)
                 try:
                     # Avoid N+1 queries: fetch which member_manager user ids already
@@ -289,7 +291,8 @@ def toggle_redaction(request, member_id):
         except Exception as e:
             # Defensive: don't let notification failures break the toggle flow
             logging.exception(
-                f"Notification system failed during redaction toggle: {e}")
+                f"Notification system failed during redaction toggle: {e}"
+            )
         if member.redact_contact:
             messages.success(
                 request, "Your personal contact information is now redacted."
@@ -472,3 +475,33 @@ def badge_board(request):
     ).order_by("order")
 
     return render(request, "members/badges.html", {"badges": badges})
+
+
+def pydenticon_view(request, username):
+    """Serve generated identicon for users without profile photos."""
+    import os
+
+    from django.http import Http404, HttpResponse
+
+    from .utils.avatar_generator import generate_identicon
+
+    # Generate the file path where the identicon should be
+    filename = f"profile_{username}.png"
+    file_path = os.path.join("generated_avatars", filename)
+    full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+
+    # If file doesn't exist, generate it
+    if not os.path.exists(full_path):
+        try:
+            generate_identicon(username, file_path)
+        except Exception:
+            raise Http404("Avatar could not be generated")
+
+    # Serve the file
+    try:
+        with open(full_path, "rb") as f:
+            response = HttpResponse(f.read(), content_type="image/png")
+            response["Cache-Control"] = "max-age=86400"  # Cache for 1 day
+            return response
+    except (FileNotFoundError, IOError):
+        raise Http404("Avatar not found")

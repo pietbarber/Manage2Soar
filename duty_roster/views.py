@@ -2,7 +2,9 @@ import calendar
 import json
 import logging
 from collections import defaultdict
-from datetime import date, date as dt_date, timedelta
+from datetime import date
+from datetime import date as dt_date
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
