@@ -154,7 +154,7 @@
     .syllabus-grid table {
         font-size: 0.85rem;
         width: 100%;
-        table-layout: fixed;
+        table-layout: auto;
     }
 
     /* Logsheet table optimization - use full width efficiently */
@@ -269,10 +269,7 @@
         word-wrap: break-word;
     }
 
-    /* Hide less critical columns on very small screens */
-    .logsheet-entry .hide-mobile {
-        display: none !important;
-    }
+    /* Bootstrap d-none classes handle column visibility */
 
     /* Stack form elements vertically */
     .logsheet-form .row {
@@ -331,7 +328,6 @@
 @media (max-width: 926px) {
 
     /* Remove container padding that wastes horizontal space */
-    body:has([data-logsheet-date]) .container-fluid,
     .logsheet-management .container-fluid {
         padding-left: 5px !important;
         padding-right: 5px !important;
@@ -340,7 +336,6 @@
     }
 
     /* Remove card max-width constraint on mobile */
-    body:has([data-logsheet-date]) .card,
     .logsheet-management .card {
         max-width: none !important;
         margin-left: 5px !important;
@@ -348,20 +343,17 @@
     }
 
     /* Tighter card padding */
-    body:has([data-logsheet-date]) .card-body,
     .logsheet-management .card-body {
         padding: 0.75rem !important;
     }
 
     /* Make button groups more compact */
-    body:has([data-logsheet-date]) .d-flex.gap-2,
     .logsheet-management .d-flex.gap-2 {
         gap: 0.5rem !important;
         margin-bottom: 1rem !important;
     }
 
     /* Compact buttons - specific to logsheet management only */
-    body:has([data-logsheet-date]) .btn:not(.navbar-toggler),
     .logsheet-management .btn:not(.navbar-toggler) {
         padding: 0.5rem 0.75rem !important;
         font-size: 0.9rem !important;
@@ -402,11 +394,17 @@
         margin-bottom: 0.5rem;
     }
 
-    /* Default button sizes for mobile - consolidate rules */
-    .btn:not(.navbar-toggler):not(.logsheet-management .btn):not(body:has([data-logsheet-date]) .btn) {
+    /* Default button sizes for mobile - using class-based approach for better performance */
+    .btn {
         font-size: 1.1rem !important;
         padding: 0.75rem 1.25rem !important;
         min-height: 44px;
+    }
+
+    /* Navbar toggler exception */
+    .navbar-toggler {
+        font-size: 1.5rem !important;
+        padding: 0.5rem 0.75rem !important;
     }
 
     .btn-sm {

@@ -124,8 +124,8 @@
         <th>Pilot</th>
         <th class="d-none d-md-table-cell">Instructor</th>
         <th>Glider</th>
-        <th class="hide-mobile d-none d-lg-table-cell">Towplane</th>
-        <th class="hide-mobile d-none d-lg-table-cell">Release Alt</th>
+        <th class="d-none d-lg-table-cell">Towplane</th>
+        <th class="d-none d-lg-table-cell">Release Alt</th>
         <th class="d-none d-sm-table-cell">Duration</th>
         <th>Actions</th>
       </tr>
@@ -175,7 +175,7 @@
           {% endif %}
         </div>
       </td>
-      <td class="hide-mobile d-none d-lg-table-cell">
+      <td class="d-none d-lg-table-cell">
           {% if flight.towplane %}
             {{ flight.towplane }}
           {% elif flight.is_incomplete %}
@@ -184,7 +184,7 @@
             </span>
           {% endif %}
       </td>
-      <td class="hide-mobile d-none d-lg-table-cell">
+      <td class="d-none d-lg-table-cell">
           {% if flight.release_altitude %}
             {{ flight.release_altitude }} ft
           {% elif flight.is_incomplete %}

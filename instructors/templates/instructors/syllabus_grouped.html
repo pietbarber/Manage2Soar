@@ -69,15 +69,15 @@
         {% for lesson in phase.lessons.all %}
           <tr>
             <td class="table-secondary">{{ lesson.code }}</td>
-            <td class="lesson-title">
+            <td class="lesson-title text-end">
             {% if public %}
               {# Public visitors get the TRAINING/Syllabus/... URL #}
               <a href="{% url 'public_syllabus_detail' lesson.code %}">
                 {{ lesson.title }}
               </a>
             {% else %}
-              {# Instructors still use the protected instructors/ URL #}
-              <a href="{% url 'instructors:syllabus_detail' lesson.code %}">
+              {# Instructors get the Instructors/Syllabus/... URL #}
+              <a href="{% url 'syllabus_detail' lesson.code %}">
                 {{ lesson.title }}
               </a>
             {% endif %}
