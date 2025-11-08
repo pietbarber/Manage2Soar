@@ -127,3 +127,5 @@ jobs:
           # This will fail the build if high-severity issues are found
           bandit --configfile bandit.yaml -r . --severity-level high
           echo "✅ Security gate passed - no high-severity issues found."
+
+# Workflow re-trigger to test if security gate issue was transient
