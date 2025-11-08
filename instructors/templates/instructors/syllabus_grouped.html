@@ -64,7 +64,7 @@
     <tbody>
       {% for phase in phases %}
         <tr class="table-primary">
-          <td colspan="6"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
+          <td colspan="{% if public %}5{% else %}5{% endif %}"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
         </tr>
         {% for lesson in phase.lessons.all %}
           <tr>

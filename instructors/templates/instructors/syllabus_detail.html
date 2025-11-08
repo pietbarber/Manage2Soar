@@ -3,11 +3,11 @@
 {% block content %}
 <div class="position-relative syllabus-view">
 
-  {# QR code in the top-right corner - hide on very small screens #}
-  <a href="{% url 'public_syllabus_detail' lesson.code %}" class="d-none d-sm-block">
+  {# QR code in the top-right corner - smaller on mobile #}
+  <a href="{% url 'public_syllabus_detail' lesson.code %}">
     <img src="{% url 'public_syllabus_qr' lesson.code %}"
          alt="QR code for {{ lesson.code }}"
-         class="position-absolute top-0 end-0 m-3"
+         class="position-absolute top-0 end-0 m-3 qr-code"
          style="width: 100px; height: auto;"/>
   </a>
 

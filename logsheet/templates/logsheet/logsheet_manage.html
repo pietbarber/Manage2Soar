@@ -155,7 +155,7 @@
         {{ flight.pilot|full_display_name }}
         <div class="d-md-none">
           {% if flight.instructor %}
-            <small class="text-muted">Instructor: {{ flight.instructor|full_display_name }}</small>
+            <small class="text-muted">{{ flight.instructor|full_display_name }}</small>
           {% endif %}
         </div>
       </td>

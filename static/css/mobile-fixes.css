@@ -70,8 +70,8 @@
 
     /* Dropdown menu items also larger */
     .navbar-nav .dropdown-menu {
-        margin-left: 1rem;
-        margin-right: 1rem;
+        margin-left: var(--bs-spacer-3, 1rem);
+        margin-right: var(--bs-spacer-3, 1rem);
         font-size: 1.2rem !important;
     }
 
@@ -245,6 +245,12 @@
         margin-bottom: 0.75rem !important;
         line-height: 1.5 !important;
     }
+
+    /* Make QR code smaller on mobile instead of hiding */
+    .qr-code {
+        width: 60px !important;
+        margin: 1rem !important;
+    }
 }
 
 /* Issue #216: Logsheet entry improvements */
@@ -354,9 +360,9 @@
         margin-bottom: 1rem !important;
     }
 
-    /* Compact buttons */
-    body:has([data-logsheet-date]) .btn,
-    .logsheet-management .btn {
+    /* Compact buttons - specific to logsheet management only */
+    body:has([data-logsheet-date]) .btn:not(.navbar-toggler),
+    .logsheet-management .btn:not(.navbar-toggler) {
         padding: 0.5rem 0.75rem !important;
         font-size: 0.9rem !important;
         margin-bottom: 0.5rem !important;
@@ -396,10 +402,11 @@
         margin-bottom: 0.5rem;
     }
 
-    /* Larger buttons for mobile */
-    .btn {
+    /* Default button sizes for mobile - consolidate rules */
+    .btn:not(.navbar-toggler):not(.logsheet-management .btn):not(body:has([data-logsheet-date]) .btn) {
         font-size: 1.1rem !important;
         padding: 0.75rem 1.25rem !important;
+        min-height: 44px;
     }
 
     .btn-sm {
@@ -452,12 +459,6 @@
 
 /* Accessibility improvements for mobile */
 @media (max-width: 768px) {
-
-    /* Larger touch targets */
-    .btn {
-        min-height: 44px;
-        padding: 0.5rem 1rem;
-    }
 
     .nav-link {
         min-height: 44px;
