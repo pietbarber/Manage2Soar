@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from members.models import Member
 from members.utils import can_view_personal_info
 
-
 User = get_user_model()
 
 
@@ -17,7 +16,8 @@ def test_redact_contact_default_false():
 @pytest.mark.django_db
 def test_can_view_personal_info_anonymous_and_normal_member():
     subject = Member.objects.create(
-        username="subj", email="subj@example.com", redact_contact=True)
+        username="subj", email="subj@example.com", redact_contact=True
+    )
     anon = None
     assert not can_view_personal_info(anon, subject)
 
@@ -28,7 +28,8 @@ def test_can_view_personal_info_anonymous_and_normal_member():
 @pytest.mark.django_db
 def test_can_view_personal_info_privileged_superuser():
     subject = Member.objects.create(
-        username="subj2", email="s2@example.com", redact_contact=True)
+        username="subj2", email="s2@example.com", redact_contact=True
+    )
     admin = User.objects.create(username="admin", is_superuser=True, is_staff=True)
     assert can_view_personal_info(admin, subject)
 
@@ -38,7 +39,8 @@ def test_can_view_personal_info_group_exempt(settings):
     # Ensure group exemption setting works
     settings.MEMBERS_REDACT_EXEMPT_GROUPS = ["Webmasters"]
     subj = Member.objects.create(
-        username="subj3", email="s3@example.com", redact_contact=True)
+        username="subj3", email="s3@example.com", redact_contact=True
+    )
     viewer = Member.objects.create(username="wm", email="wm@example.com")
     gp = viewer.groups.create(name="Webmasters")
     assert can_view_personal_info(viewer, subj)

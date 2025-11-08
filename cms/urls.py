@@ -2,7 +2,7 @@ from django.urls import path, re_path
 
 from . import views
 
-app_name = 'cms'
+app_name = "cms"
 
 urlpatterns = [
     path("", views.homepage, name="home"),
@@ -15,7 +15,10 @@ urlpatterns = [
     # /cms/<slug>/ or /cms/<parent>/<slug>/ (supports up to 3 levels for now)
     # Exclude common reserved paths (admin, debug, api, etc.) from CMS routing
     re_path(
-        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt)/)(?P<slug1>[-\w]+)/$", views.cms_page, name="cms_page"),
+        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt)/)(?P<slug1>[-\w]+)/$",
+        views.cms_page,
+        name="cms_page",
+    ),
     re_path(
         r"^(?P<slug1>[-\w]+)/(?P<slug2>[-\w]+)/$",
         views.cms_page,

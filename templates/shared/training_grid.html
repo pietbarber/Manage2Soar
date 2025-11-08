@@ -80,17 +80,17 @@ th.sticky-max, td.sticky-max {
         <th></th>
     </tr>
   </thead>
-  
+
   <tbody>
     {% regroup lesson_data by phase as phase_groups %}
-  
+
     {% for group in phase_groups %}
       <tr class="table-secondary">
   <th class="text-start sticky-col" colspan="1">{{ group.grouper }}</th>
   {% for _ in report_dates %}<td></td>{% endfor %}
   <th class="sticky-max"></th>
       </tr>
-  
+
         {% for row in group.list %}
           <tr>
             <td class="text-end pe-2 sticky-col">
@@ -118,8 +118,8 @@ th.sticky-max, td.sticky-max {
               {% endif %}
             </td>
           {% endfor %}
-           
-       
+
+
           <td class="text-center border border-2 border-primary fw-bold max_score sticky-max">
               {% if row.max_score == "1" %} <img src="{% static 'images/blob1.png' %}">
               {% elif row.max_score == "2" %} <img src="{% static 'images/blob2.png' %}">

@@ -17,14 +17,14 @@ class MyCommandTest(TestCase):
     def test_command_execution(self):
         out = StringIO()
         err = StringIO()
-        
+
         call_command(
-            'my_command', 
+            'my_command',
             '--verbosity=2',
-            stdout=out, 
+            stdout=out,
             stderr=err
         )
-        
+
         self.assertIn('Expected output', out.getvalue())
         self.assertEqual('', err.getvalue())  # No errors
 ```
@@ -50,12 +50,12 @@ from django.test import TestCase, TransactionTestCase
 
 class CronJobCommandTest(TransactionTestCase):
     """Use TransactionTestCase for database locking tests"""
-    
+
     @patch('django.core.mail.send_mail')
     def test_sends_email(self, mock_send_mail):
         call_command('my_cronjob_command')
         mock_send_mail.assert_called_once()
-        
+
     @patch('django.utils.timezone.now')
     def test_time_sensitive_logic(self, mock_now):
         from datetime import datetime
@@ -75,7 +75,7 @@ class DatabaseCommandTest(TransactionTestCase):
             first_name="Test",
             last_name="User"
         )
-        
+
     def test_command_modifies_data(self):
         initial_count = MyModel.objects.count()
         call_command('my_command')
@@ -89,7 +89,7 @@ class DatabaseCommandTest(TransactionTestCase):
 def test_command_output(self):
     out = StringIO()
     call_command('my_command', '--verbosity=2', stdout=out)
-    
+
     output = out.getvalue()
     self.assertIn('✅', output)  # Success messages
     self.assertIn('🚀', output)  # Start messages
@@ -103,7 +103,7 @@ def test_dry_run_option(self):
     with patch('myapp.models.MyModel.objects.create') as mock_create:
         call_command('my_command', '--dry-run')
         mock_create.assert_not_called()
-        
+
 def test_force_option(self):
     # Test that --force bypasses lock acquisition
     with patch('utils.models.CronJobLock.objects.create'):
@@ -125,23 +125,23 @@ class LockingTest(TransactionTestCase):
             locked_by="other-pod",
             expires_at=timezone.now() + timedelta(hours=1)
         )
-        
+
         out = StringIO()
         call_command('my_cronjob_command', stdout=out)
-        
+
         # Should exit without executing
         self.assertIn('already running', out.getvalue())
-        
+
     def test_expired_lock_is_replaced(self):
         # Create an expired lock
         CronJobLock.objects.create(
-            job_name="test_job", 
+            job_name="test_job",
             locked_by="old-pod",
             expires_at=timezone.now() - timedelta(hours=1)
         )
-        
+
         call_command('my_cronjob_command')
-        
+
         # Lock should be updated with new pod
         lock = CronJobLock.objects.get(job_name="test_job")
         self.assertNotEqual(lock.locked_by, "old-pod")
@@ -170,7 +170,7 @@ app/
 - `Test{Feature}` - for specific features
 
 ### Test Method Naming
-- `test_{command_name}_{scenario}` 
+- `test_{command_name}_{scenario}`
 - `test_lock_acquisition_success`
 - `test_dry_run_mode`
 - `test_email_sending`
@@ -182,7 +182,7 @@ app/
 @patch('django.core.mail.send_mail')
 def test_email_content(self, mock_send_mail):
     call_command('notify_command')
-    
+
     args, kwargs = mock_send_mail.call_args
     self.assertEqual(kwargs['subject'], 'Expected Subject')
     self.assertIn('Expected content', kwargs['message'])
@@ -195,7 +195,7 @@ def test_email_content(self, mock_send_mail):
 def test_time_based_logic(self, mock_now):
     test_date = datetime(2023, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
     mock_now.return_value = test_date
-    
+
     call_command('time_sensitive_command')
     # Test logic that depends on specific dates
 ```
@@ -205,10 +205,10 @@ def test_time_based_logic(self, mock_now):
 @patch('myapp.models.MyModel.objects.filter')
 def test_query_logic(self, mock_filter):
     mock_filter.return_value.count.return_value = 5
-    
+
     out = StringIO()
     call_command('my_command', stdout=out)
-    
+
     self.assertIn('Found 5 items', out.getvalue())
 ```
 
@@ -221,11 +221,11 @@ class IntegrationTest(TransactionTestCase):
         # Create realistic test data
         self.create_test_members()
         self.create_test_logsheets()
-        
+
     def test_full_command_execution(self):
         """Test command with real database operations"""
         call_command('aging_logsheet_command')
-        
+
         # Verify expected database changes
         # Verify emails were queued/sent
         # Verify logs were created

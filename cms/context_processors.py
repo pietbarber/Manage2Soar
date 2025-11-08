@@ -9,12 +9,11 @@ def footer_content(request):
     if request.user.is_authenticated:
         try:
             footer = HomePageContent.objects.filter(
-                slug='footer',
-                audience='member'
+                slug="footer", audience="member"
             ).first()
-            return {'footer_content': footer}
+            return {"footer_content": footer}
         except Exception:
             # If CMS is not available or footer doesn't exist, fail gracefully
-            return {'footer_content': None}
+            return {"footer_content": None}
     else:
-        return {'footer_content': None}
+        return {"footer_content": None}

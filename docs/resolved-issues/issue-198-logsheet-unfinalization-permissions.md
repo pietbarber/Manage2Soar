@@ -34,11 +34,11 @@ Issue #198 successfully implemented enhanced logsheet unfinalization permissions
 def can_unfinalize_logsheet(user: Optional[Union["AbstractUser", object]], logsheet: "Logsheet") -> bool:
     """
     Determine if a user has permission to unfinalize a logsheet.
-    
+
     Users who can unfinalize a logsheet:
     1. Superusers (always have permission)
     2. Treasurers (have treasurer=True role)
-    3. Webmasters (have webmaster=True role) 
+    3. Webmasters (have webmaster=True role)
     4. The duty officer who originally finalized the logsheet
     """
 ```
@@ -116,7 +116,7 @@ from logsheet.utils.permissions import can_edit_logsheet
 ### Testing Coverage (14 Test Cases)
 
 #### Permission Validation Tests:
-- ✅ **Unauthenticated users cannot unfinalize** 
+- ✅ **Unauthenticated users cannot unfinalize**
 - ✅ **Superusers can always unfinalize**
 - ✅ **Treasurers can unfinalize any logsheet**
 - ✅ **Webmasters can unfinalize any logsheet**  
@@ -124,7 +124,7 @@ from logsheet.utils.permissions import can_edit_logsheet
 
 #### Security Tests:
 - ✅ **Regular members cannot unfinalize** (blocks "random joe")
-- ✅ **Non-members cannot unfinalize** 
+- ✅ **Non-members cannot unfinalize**
 - ✅ **Wrong finalizers cannot unfinalize** (user who didn't finalize)
 - ✅ **Multiple finalization scenarios** (only most recent finalizer)
 
@@ -141,7 +141,7 @@ class TestLogsheetPermissions(TestCase):
     def setUp(self):
         # Create users with different roles
         self.superuser = Member.objects.create_user(is_superuser=True)
-        self.treasurer = Member.objects.create_user(treasurer=True) 
+        self.treasurer = Member.objects.create_user(treasurer=True)
         self.webmaster = Member.objects.create_user(webmaster=True)
         self.duty_officer = Member.objects.create_user(duty_officer=True)
         self.regular_member = Member.objects.create_user()

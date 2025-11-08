@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from siteconfig.models import SiteConfiguration, MembershipStatus
+from siteconfig.models import MembershipStatus, SiteConfiguration
 
 User = get_user_model()
 
@@ -34,7 +34,7 @@ def test_create_membership_status():
         name="Test Member",
         is_active=True,
         sort_order=100,
-        description="A test membership status"
+        description="A test membership status",
     )
     assert status.name == "Test Member"
     assert status.is_active is True
@@ -47,7 +47,9 @@ def test_membership_status_unique_name():
     """Test that membership status names must be unique."""
     MembershipStatus.objects.create(name="Unique Test Member", is_active=True)
 
-    with pytest.raises(Exception):  # Should raise IntegrityError due to unique constraint
+    with pytest.raises(
+        Exception
+    ):  # Should raise IntegrityError due to unique constraint
         MembershipStatus.objects.create(name="Unique Test Member", is_active=False)
 
 
@@ -152,10 +154,10 @@ def test_membership_status_deletion_protection():
 
     # Create a status and a member using it
     status = MembershipStatus.objects.create(
-        name="Test Protected Status", is_active=True)
+        name="Test Protected Status", is_active=True
+    )
     Member.objects.create(
-        username="test_member",
-        membership_status="Test Protected Status"
+        username="test_member", membership_status="Test Protected Status"
     )
 
     # Try to delete the status - should fail

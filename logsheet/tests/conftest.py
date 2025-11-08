@@ -12,7 +12,7 @@ from logsheet.models import (
     Towplane,
 )
 
-from .fixtures_finances import *
+from .test_fixtures_finances import *
 
 User = get_user_model()
 

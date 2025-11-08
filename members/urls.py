@@ -22,8 +22,11 @@ urlpatterns = [
         lambda req: redirect("instructors:member_training_grid", req.user.pk),
         name="training_progress",
     ),
-    path("<int:member_id>/toggle-redaction/",
-         views.toggle_redaction, name="toggle_redaction"),
+    path(
+        "<int:member_id>/toggle-redaction/",
+        views.toggle_redaction,
+        name="toggle_redaction",
+    ),
 ]
 
 

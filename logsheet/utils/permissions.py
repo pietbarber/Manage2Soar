@@ -9,17 +9,20 @@ from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+
     from logsheet.models import Logsheet
 
 
-def can_unfinalize_logsheet(user: Optional[Union["AbstractUser", object]], logsheet: "Logsheet") -> bool:
+def can_unfinalize_logsheet(
+    user: Optional[Union["AbstractUser", object]], logsheet: "Logsheet"
+) -> bool:
     """
     Determine if a user has permission to unfinalize a logsheet.
 
     Users who can unfinalize a logsheet:
     1. Superusers (always have permission)
     2. Treasurers (have treasurer=True role)
-    3. Webmasters (have webmaster=True role) 
+    3. Webmasters (have webmaster=True role)
     4. The duty officer who originally finalized the logsheet
 
     Args:
@@ -50,8 +53,7 @@ def can_unfinalize_logsheet(user: Optional[Union["AbstractUser", object]], logsh
     from logsheet.models import RevisionLog
 
     finalization_revision = (
-        RevisionLog.objects
-        .filter(logsheet=logsheet, note="Logsheet finalized")
+        RevisionLog.objects.filter(logsheet=logsheet, note="Logsheet finalized")
         .order_by("-revised_at")
         .first()
     )
@@ -63,7 +65,9 @@ def can_unfinalize_logsheet(user: Optional[Union["AbstractUser", object]], logsh
     return False
 
 
-def can_edit_logsheet(user: Optional[Union["AbstractUser", object]], logsheet: "Logsheet") -> bool:
+def can_edit_logsheet(
+    user: Optional[Union["AbstractUser", object]], logsheet: "Logsheet"
+) -> bool:
     """
     Determine if a user can edit a logsheet.
 

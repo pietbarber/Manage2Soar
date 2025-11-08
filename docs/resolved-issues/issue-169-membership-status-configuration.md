@@ -53,11 +53,11 @@ class MembershipStatus(models.Model):
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     @classmethod
     def get_active_statuses(cls):
         return cls.objects.filter(is_active=True).values_list('name', flat=True)
-    
+
     @classmethod
     def get_all_status_choices(cls):
         return [(status.name, status.name) for status in cls.objects.all().order_by('sort_order', 'name')]

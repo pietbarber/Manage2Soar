@@ -15,4 +15,3 @@ Quick checklist before editing a flight
 
 Where to edit instead
 - For day-level fixes, consider editing the `Logsheet` closeout or using the operations UI where available. Those higher-level interfaces run the same business logic and are safer for non-superuser staff.
-

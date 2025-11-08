@@ -6,4 +6,4 @@
 ./manage.py loaddata loaddata/instructors.TrainingLesson.json
 ./manage.py loaddata loaddata/instructors.SyllabusDocument.json
 ./manage.py loaddata loaddata/knowledgetest_dump.json
-tar xvfz loaddata/icons.tar.gz 
+tar xvfz loaddata/icons.tar.gz

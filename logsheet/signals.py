@@ -1,10 +1,12 @@
+import logging
+
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-
-from .models import MaintenanceIssue, Flight
-from notifications.models import Notification
 from django.urls import reverse
-import logging
+
+from notifications.models import Notification
+
+from .models import Flight, MaintenanceIssue
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,8 @@ def _create_notification_if_not_exists(user, message, url=None):
         return None
     try:
         existing = Notification.objects.filter(
-            user=user, dismissed=False, message=message)
+            user=user, dismissed=False, message=message
+        )
         if existing.exists():
             return None
         return Notification.objects.create(user=user, message=message, url=url)
@@ -35,19 +38,19 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
         if created:
             if instance.glider:
                 meisters = instance.glider.aircraftmeister_set.select_related(
-                    "member").all()
+                    "member"
+                ).all()
             elif instance.towplane:
                 meisters = instance.towplane.aircraftmeister_set.select_related(
-                    "member").all()
+                    "member"
+                ).all()
             else:
                 meisters = []
 
             if not meisters:
                 return
 
-            message = (
-                f"Maintenance issue reported for {instance.glider or instance.towplane}: {instance.description[:100]}"
-            )
+            message = f"Maintenance issue reported for {instance.glider or instance.towplane}: {instance.description[:100]}"
             # The maintenance view lists all issues; can't link to a PK-specific page per repo note
             try:
                 url = reverse("logsheet:maintenance_issues")
@@ -65,20 +68,24 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
             # Issue was just resolved
             if instance.glider:
                 meisters = instance.glider.aircraftmeister_set.select_related(
-                    "member").all()
+                    "member"
+                ).all()
             elif instance.towplane:
                 meisters = instance.towplane.aircraftmeister_set.select_related(
-                    "member").all()
+                    "member"
+                ).all()
             else:
                 meisters = []
 
             if not meisters:
                 return
 
-            resolver = instance.resolved_by.full_display_name if instance.resolved_by else "someone"
-            message = (
-                f"Maintenance issue resolved for {instance.glider or instance.towplane} by {resolver}: {instance.description[:100]}"
+            resolver = (
+                instance.resolved_by.full_display_name
+                if instance.resolved_by
+                else "someone"
             )
+            message = f"Maintenance issue resolved for {instance.glider or instance.towplane} by {resolver}: {instance.description[:100]}"
             try:
                 url = reverse("logsheet:maintenance_issues")
             except Exception:
@@ -166,9 +173,7 @@ def notify_instructor_on_flight_created(sender, instance, created, **kwargs):
     try:
         log_date = getattr(instance.logsheet, "log_date", None)
         date_str = log_date.isoformat() if log_date else "recent date"
-        notif_msg = (
-            f"You have an instruction flight to complete a report for {instance.pilot.full_display_name} on {date_str}."
-        )
+        notif_msg = f"You have an instruction flight to complete a report for {instance.pilot.full_display_name} on {date_str}."
         recipient = instance.instructor
 
         # Dedupe: only create one notification per instructor per exact log_date
@@ -192,7 +197,8 @@ def notify_instructor_on_flight_created(sender, instance, created, **kwargs):
             notif_url = None
 
         notif = Notification.objects.create(
-            user=recipient, message=notif_msg, url=notif_url)
+            user=recipient, message=notif_msg, url=notif_url
+        )
         logger.info(
             "notify_instructor_on_flight_created: created notification id=%s for user=%s flight=%s",
             notif.pk,

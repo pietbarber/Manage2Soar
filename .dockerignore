@@ -27,3 +27,4 @@ SECURITY.md
 k8s-deployment.yaml
 ingress.yaml
 membership.json
+setup-dev.sh

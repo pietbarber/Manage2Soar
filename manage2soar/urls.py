@@ -22,8 +22,8 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
-from instructors import views as instr_views
 from cms import views as cms_views
+from instructors import views as instr_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -86,7 +86,6 @@ urlpatterns = [
     # Expose notifications before the CMS root include so the CMS catch-all
     # patterns don't intercept other app URLs like /notifications/.
     path("notifications/", include("notifications.urls")),
-
     # CMS root include is last so other app URL patterns are matched first.
     path("", include("cms.urls")),
 ]

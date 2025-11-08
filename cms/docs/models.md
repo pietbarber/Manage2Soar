@@ -16,7 +16,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     Document {
         int id PK
         int page_id FK
@@ -25,7 +25,7 @@ erDiagram
         int uploaded_by_id FK
         datetime uploaded_at
     }
-    
+
     HomePageContent {
         int id PK
         string title
@@ -34,7 +34,7 @@ erDiagram
         text content
         datetime updated_at
     }
-    
+
     HomePageImage {
         int id PK
         int page_id FK
@@ -42,7 +42,7 @@ erDiagram
         string caption
         int order
     }
-    
+
     SiteFeedback {
         int id PK
         int user_id FK
@@ -57,7 +57,7 @@ erDiagram
         datetime updated_at
         datetime resolved_at
     }
-    
+
     VisitorContact {
         int id PK
         string name
@@ -71,7 +71,7 @@ erDiagram
         int handled_by_id FK
         text admin_notes
     }
-    
+
     Page ||--o{ Page : parent_child
     Page ||--o{ Document : contains_documents
     HomePageContent ||--o{ HomePageImage : has_images

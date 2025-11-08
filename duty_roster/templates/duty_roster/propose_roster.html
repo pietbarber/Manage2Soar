@@ -99,14 +99,14 @@
       {% endfor %}
     </tbody>
   </table>
-  
+
   {% if draft %}
   <div class="d-flex gap-2 mb-3">
     <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
     <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>
   </div>
   {% endif %}
-  
+
   <div class="d-flex gap-2">
     <button name="action" value="publish" class="btn btn-success">✅ Accept & Publish</button>
     <button name="action" value="cancel" class="btn btn-danger">❌ Cancel</button>

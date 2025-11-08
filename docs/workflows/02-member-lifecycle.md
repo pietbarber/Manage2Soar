@@ -19,34 +19,34 @@ flowchart TD
     B -->|No| C[Create Google Account]
     B -->|Yes| D[Click Login]
     C --> D
-    
+
     D --> E[Google OAuth2 Flow]
     E --> F[Django Social Auth Pipeline]
     F --> G[Create Member Record]
     G --> H[Set Default Status: 'Guest']
-    
+
     H --> I[User Completes Profile]
     I --> J[Upload Photo]
     I --> K[Add Bio/Contact Info]
     I --> L[Profile Review Complete]
-    
+
     L --> M{Admin Review}
     M -->|Approved| N[Set Membership Status]
     M -->|Needs More Info| O[Request Additional Info]
     M -->|Rejected| P[Set Inactive Status]
-    
+
     N --> Q[Assign Initial Roles]
     Q --> R[Send Welcome Notification]
     R --> S[Member Active]
-    
+
     O --> I
     P --> T[Account Suspended]
-    
+
     S --> U[Ongoing Profile Updates]
     U --> V[Role Changes]
     U --> W[Badge Awards]
     U --> X[Status Updates]
-    
+
     style A fill:#e1f5fe
     style S fill:#e8f5e8
     style T fill:#ffebee
@@ -75,22 +75,22 @@ sequenceDiagram
     participant Pipeline as Social Auth Pipeline
     participant DB as Database
     participant Admin as Club Admin
-    
+
     User->>Google: Initiate Login
     Google->>User: Request Permissions
     User->>Google: Grant Permissions
     Google->>Django: Return Auth Code
     Django->>Pipeline: Process User Data
-    
+
     Pipeline->>Pipeline: debug_pipeline_data()
     Pipeline->>Pipeline: create_username()
     Pipeline->>Pipeline: set_default_membership_status()
     Pipeline->>Pipeline: fetch_google_profile_picture()
-    
+
     Pipeline->>DB: Create Member Record
     DB->>Django: Return Member Instance
     Django->>User: Redirect to Profile
-    
+
     User->>Django: Complete Profile
     Django->>Admin: Notify of New Member
     Admin->>Django: Review and Approve
@@ -105,23 +105,23 @@ stateDiagram-v2
     Guest --> Applicant: Profile Completed
     Applicant --> Full_Member: Admin Approval
     Applicant --> Inactive: Application Rejected
-    
+
     Full_Member --> Student_Member: Learning to Fly
     Student_Member --> Full_Member: Solo/License
     Full_Member --> Family_Member: Family Plan
     Full_Member --> Service_Member: Military Status
     Full_Member --> Honorary_Member: Special Recognition
     Full_Member --> Emeritus_Member: Retirement
-    
+
     Full_Member --> Inactive: Non-payment/Violation
     Student_Member --> Inactive: Non-payment/Violation
     Inactive --> Full_Member: Reinstatement
-    
+
     note right of Full_Member
         Default active status
         Can fly, instruct, serve duty
     end note
-    
+
     note right of Inactive
         No system access
         Cannot participate
@@ -131,7 +131,7 @@ stateDiagram-v2
 ### **Database Schema**
 
 ```mermaid
-erDiagram    
+erDiagram  
     Member {
         int id PK
         string username UK
@@ -150,7 +150,7 @@ erDiagram
         date date_joined
         date last_login
     }
-    
+
     Badge {
         int id PK
         string name
@@ -158,7 +158,7 @@ erDiagram
         image badge_image
         int sequence
     }
-    
+
     MemberBadge {
         int id PK
         int member_id FK
@@ -166,7 +166,7 @@ erDiagram
         date date_earned
         string certificate_number
     }
-    
+
     Member ||--o{ MemberBadge : earns
     Badge ||--o{ MemberBadge : awarded
 ```
@@ -192,22 +192,22 @@ flowchart LR
     A -->|duty_officer=True| D[Logsheet Management]
     A -->|tow_pilot=True| E[Tow Operations]
     A -->|Default| F[Basic Member Access]
-    
+
     B --> G[Site Configuration]
     B --> H[User Management]
     B --> I[All Data Access]
-    
+
     C --> J[Lesson Planning]
     C --> K[Student Progress]
     C --> L[Training Records]
-    
+
     D --> M[Flight Logging]
     D --> N[Logsheet Closeout]
     D --> O[Maintenance Reports]
-    
+
     E --> P[Tow Logging]
     E --> Q[Tow Rate Management]
-    
+
     F --> R[Profile Management]
     F --> S[Flight History]
     F --> T[Badge Progress]
@@ -224,20 +224,20 @@ flowchart TD
     C --> D[Contact Information]
     D --> E[Emergency Contact]
     E --> F[Admin Review]
-    
+
     F --> G{Approval Status}
     G -->|Approved| H[Welcome Email]
     G -->|Rejected| I[Rejection Notice]
     G -->|Needs Info| J[Request Details]
-    
+
     H --> K[Membership Card Generated]
     K --> L[Role Assignment]
     L --> M[Training Assessment]
     M --> N[Duty Roster Eligible]
-    
+
     J --> C
     I --> O[Account Suspended]
-    
+
     style A fill:#e1f5fe
     style N fill:#e8f5e8
     style O fill:#ffebee
@@ -252,23 +252,23 @@ flowchart LR
     B -->|Demotion| D[Admin Action Only]
     B -->|Role Addition| E[Qualification Check]
     B -->|Role Removal| F[Admin Confirmation]
-    
+
     C --> G[Update Database]
     D --> G
     E --> H{Meets Requirements?}
     F --> G
-    
+
     H -->|Yes| G
     H -->|No| I[Deny Request]
-    
+
     G --> J[Send Notification]
     G --> K[Update Permissions]
     G --> L[Log Change]
-    
+
     I --> M[Explain Requirements]
 ```
 
-## Known Gaps & Improvements 
+## Known Gaps & Improvements
 
 ### **Current Strengths**
 - ✅ Seamless Google OAuth2 integration

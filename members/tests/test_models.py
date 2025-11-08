@@ -64,38 +64,29 @@ class MembershipStatusIntegrationTests(TestCase):
     def setUp(self):
         """Create test membership statuses."""
         self.active_status = MembershipStatus.objects.create(
-            name="Test Active Member",
-            is_active=True,
-            sort_order=10
+            name="Test Active Member", is_active=True, sort_order=10
         )
         self.inactive_status = MembershipStatus.objects.create(
-            name="Test Inactive Member",
-            is_active=False,
-            sort_order=20
+            name="Test Inactive Member", is_active=False, sort_order=20
         )
 
     def test_is_active_member_with_dynamic_status(self):
         """Test that Member.is_active_member() works with dynamic MembershipStatus."""
         # Create member with active status
         active_member = Member(
-            username="active_user",
-            membership_status="Test Active Member"
+            username="active_user", membership_status="Test Active Member"
         )
         self.assertTrue(active_member.is_active_member())
 
         # Create member with inactive status
         inactive_member = Member(
-            username="inactive_user",
-            membership_status="Test Inactive Member"
+            username="inactive_user", membership_status="Test Inactive Member"
         )
         self.assertFalse(inactive_member.is_active_member())
 
     def test_is_active_member_with_nonexistent_status(self):
         """Test Member.is_active_member() with a status not in database."""
-        member = Member(
-            username="test_user",
-            membership_status="Nonexistent Status"
-        )
+        member = Member(username="test_user", membership_status="Nonexistent Status")
         # Should return False for unknown status
         self.assertFalse(member.is_active_member())
 
@@ -115,10 +106,7 @@ class MembershipStatusIntegrationTests(TestCase):
 
     def test_member_with_updated_status_activity(self):
         """Test that changing a MembershipStatus affects Member.is_active_member()."""
-        member = Member(
-            username="test_user",
-            membership_status="Test Active Member"
-        )
+        member = Member(username="test_user", membership_status="Test Active Member")
 
         # Initially active
         self.assertTrue(member.is_active_member())

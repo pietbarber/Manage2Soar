@@ -1,4 +1,6 @@
-
+import logging
+from io import BytesIO
+import logging
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
@@ -24,12 +26,12 @@ class SiteConfiguration(models.Model):
     contact_welcome_text = models.TextField(
         blank=True,
         default="Interested in learning to fly gliders? Have questions about our club? We'd love to hear from you! Fill out the form below and one of our member managers will get back to you soon.",
-        help_text="Welcome text displayed on the contact form page"
+        help_text="Welcome text displayed on the contact form page",
     )
     contact_response_info = models.TextField(
         blank=True,
         default="Our member managers will receive your message immediately\nWe typically respond within 24-48 hours\nFor urgent questions, feel free to visit us at the airfield during operations\nAll contact information is kept private and not shared with third parties",
-        help_text="Information about what happens after contact form submission (one item per line)"
+        help_text="Information about what happens after contact form submission (one item per line)",
     )
 
     # Club location
@@ -39,12 +41,8 @@ class SiteConfiguration(models.Model):
     club_address_line2 = models.CharField(
         max_length=100, blank=True, help_text="Street address line 2 (optional)"
     )
-    club_city = models.CharField(
-        max_length=50, blank=True, help_text="City"
-    )
-    club_state = models.CharField(
-        max_length=50, blank=True, help_text="State/Province"
-    )
+    club_city = models.CharField(max_length=50, blank=True, help_text="City")
+    club_state = models.CharField(max_length=50, blank=True, help_text="State/Province")
     club_zip_code = models.CharField(
         max_length=20, blank=True, help_text="ZIP/Postal code"
     )
@@ -59,7 +57,7 @@ class SiteConfiguration(models.Model):
     operations_info = models.TextField(
         blank=True,
         default="We typically fly on weekends and some weekdays when weather permits. Check our calendar or contact us for current schedule information.",
-        help_text="Information about club operations schedule"
+        help_text="Information about club operations schedule",
     )
 
     # Scheduling options
@@ -136,7 +134,7 @@ class SiteConfiguration(models.Model):
     # application default.
     redaction_notification_dedupe_minutes = models.PositiveIntegerField(
         default=60,
-        help_text="Dedupe window (minutes) for member redaction notifications."
+        help_text="Dedupe window (minutes) for member redaction notifications.",
     )
 
     # Operational Calendar Configuration
@@ -144,13 +142,13 @@ class SiteConfiguration(models.Model):
         max_length=100,
         blank=True,
         default="First weekend of May",
-        help_text="When club operations typically start each year. Examples: 'First weekend of May', '1st weekend of Apr', 'Second weekend in March', 'Last weekend Oct'. Supports: first/1st, second/2nd, third/3rd, fourth/4th, last + full month names or abbreviations (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec)"
+        help_text="When club operations typically start each year. Examples: 'First weekend of May', '1st weekend of Apr', 'Second weekend in March', 'Last weekend Oct'. Supports: first/1st, second/2nd, third/3rd, fourth/4th, last + full month names or abbreviations (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec)",
     )
     operations_end_period = models.CharField(
         max_length=100,
         blank=True,
         default="Last weekend of October",
-        help_text="When club operations typically end each year. Examples: 'Last weekend of October', '2nd weekend of Dec', 'Third weekend in November'. Leave both fields blank to include all dates year-round."
+        help_text="When club operations typically end each year. Examples: 'Last weekend of October', '2nd weekend of Dec', 'Third weekend in November'. Leave both fields blank to include all dates year-round.",
     )
 
     def clean(self):
@@ -165,17 +163,15 @@ class SiteConfiguration(models.Model):
             try:
                 parse_operational_period(self.operations_start_period)
             except ValueError as e:
-                raise ValidationError({
-                    'operations_start_period': f"Invalid format: {e}"
-                })
+                raise ValidationError(
+                    {"operations_start_period": f"Invalid format: {e}"}
+                )
 
         if self.operations_end_period:
             try:
                 parse_operational_period(self.operations_end_period)
             except ValueError as e:
-                raise ValidationError({
-                    'operations_end_period': f"Invalid format: {e}"
-                })
+                raise ValidationError({"operations_end_period": f"Invalid format: {e}"})
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -200,9 +196,9 @@ class SiteConfiguration(models.Model):
                     outbuf.seek(0)
                     # Save to storage as 'favicon.ico' at root of MEDIA
                     default_storage.save("favicon.ico", outbuf)
-            except Exception:
-                # Log or handle error as needed
-                pass
+            except Exception as e:
+                # Log storage or favicon generation errors but don't break model save
+                logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"
@@ -213,22 +209,23 @@ class MembershipStatus(models.Model):
     Configurable membership statuses for the club.
     This replaces the hardcoded membership status lists in members.constants.
     """
+
     name = models.CharField(
         max_length=50,
         unique=True,
-        help_text="The display name for this membership status (e.g., 'Full Member')"
+        help_text="The display name for this membership status (e.g., 'Full Member')",
     )
     is_active = models.BooleanField(
         default=True,
-        help_text="Whether members with this status are considered 'active' and can access member features"
+        help_text="Whether members with this status are considered 'active' and can access member features",
     )
     sort_order = models.PositiveIntegerField(
         default=100,
-        help_text="Sort order for display in dropdowns and lists (lower numbers appear first)"
+        help_text="Sort order for display in dropdowns and lists (lower numbers appear first)",
     )
     description = models.TextField(
         blank=True,
-        help_text="Optional description of what this membership status means"
+        help_text="Optional description of what this membership status means",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -236,7 +233,7 @@ class MembershipStatus(models.Model):
     class Meta:
         verbose_name = "Membership Status"
         verbose_name_plural = "Membership Statuses"
-        ordering = ['sort_order', 'name']
+        ordering = ["sort_order", "name"]
 
     def __str__(self):
         return self.name
@@ -245,15 +242,16 @@ class MembershipStatus(models.Model):
         """Override delete to prevent deletion if members are using this status."""
         # Import here to avoid circular imports
         try:
-            from members.models import Member
             from django.core.exceptions import ValidationError
+
+            from members.models import Member
 
             member_count = Member.objects.filter(membership_status=self.name).count()
             if member_count > 0:
                 raise ValidationError(
                     f'Cannot delete membership status "{self.name}" - '
-                    f'{member_count} members currently have this status. '
-                    f'Change their status first, then delete this membership status.'
+                    f"{member_count} members currently have this status. "
+                    f"Change their status first, then delete this membership status."
                 )
         except ImportError:
             # During migrations, Member model might not be available
@@ -264,9 +262,12 @@ class MembershipStatus(models.Model):
     @classmethod
     def get_active_statuses(cls):
         """Get all membership statuses that are marked as active."""
-        return cls.objects.filter(is_active=True).values_list('name', flat=True)
+        return cls.objects.filter(is_active=True).values_list("name", flat=True)
 
     @classmethod
     def get_all_status_choices(cls):
         """Get all membership statuses as Django field choices."""
-        return [(status.name, status.name) for status in cls.objects.all().order_by('sort_order', 'name')]
+        return [
+            (status.name, status.name)
+            for status in cls.objects.all().order_by("sort_order", "name")
+        ]

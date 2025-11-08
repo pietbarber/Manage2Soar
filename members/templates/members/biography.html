@@ -7,7 +7,7 @@
 <div class="container py-5">
   <div class="row justify-content-center">
     <div class="col-lg-8">
-      
+
       <!-- Modern Card Layout -->
       <div class="card shadow-lg border-0">
         <div class="card-header bg-success text-white py-4">
@@ -19,7 +19,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="card-body p-4">
           {% if can_edit %}
             <!-- Current image display (if exists) -->
@@ -29,16 +29,16 @@
                   <i class="bi bi-image me-2 text-primary"></i>
                   <h6 class="mb-0">Current Biography Image</h6>
                 </div>
-                <img src="{{ form.instance.uploaded_image.url }}" 
-                     class="img-thumbnail rounded shadow-sm" 
+                <img src="{{ form.instance.uploaded_image.url }}"
+                     class="img-thumbnail rounded shadow-sm"
                      style="max-width: 300px; max-height: 200px;">
               </div>
             {% endif %}
-            
+
             <form method="post" enctype="multipart/form-data" novalidate>
               {% csrf_token %}
               {{ form.media }}
-              
+
               <!-- Biography content field -->
               <div class="mb-4">
                 <label for="{{ form.content.id_for_label }}" class="form-label fw-semibold fs-5 mb-3">
@@ -59,7 +59,7 @@
                   Share your soaring journey, achievements, and experiences with the club community.
                 </div>
               </div>
-              
+
               <!-- Non-field errors -->
               {% if form.non_field_errors %}
                 <div class="alert alert-danger border-0 mb-4">
@@ -67,7 +67,7 @@
                   {% for error in form.non_field_errors %}{{ error }}{% endfor %}
                 </div>
               {% endif %}
-              
+
               <!-- Action buttons -->
               <div class="d-flex gap-2 flex-wrap">
                 <button type="submit" class="btn btn-success btn-lg">
@@ -80,7 +80,7 @@
                 </a>
               </div>
             </form>
-            
+
           {% else %}
             <!-- Permission denied message -->
             <div class="alert alert-danger border-0 d-flex align-items-center">
@@ -92,7 +92,7 @@
             </div>
           {% endif %}
         </div>
-        
+
         {% if can_edit %}
         <div class="card-footer bg-light py-3">
           <div class="d-flex align-items-center text-muted">
@@ -104,7 +104,7 @@
         </div>
         {% endif %}
       </div>
-      
+
     </div>
   </div>
 </div>

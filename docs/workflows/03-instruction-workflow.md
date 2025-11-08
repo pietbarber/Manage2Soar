@@ -19,38 +19,38 @@ flowchart TD
     B --> C[Training Plan Creation]
     C --> D[Syllabus Assignment]
     D --> E[Lesson Scheduling]
-    
+
     E --> F[Pre-Flight Briefing]
     F --> G[Training Flight]
     G --> H[Post-Flight Debrief]
     H --> I[Lesson Documentation]
-    
+
     I --> J{Student Progress Check}
     J -->|Needs More Practice| K[Schedule Additional Lessons]
     J -->|Ready for Next Phase| L[Advance to Next Lesson]
     J -->|Assessment Required| M[Schedule Check Flight]
-    
+
     K --> E
     L --> N[Update Training Record]
     M --> O[Instructor Evaluation]
-    
+
     N --> P{Phase Complete?}
     P -->|No| E
     P -->|Yes| Q[Phase Sign-off]
-    
+
     O --> R{Check Flight Result}
     R -->|Pass| Q
     R -->|Needs Improvement| S[Remedial Training Plan]
-    
+
     Q --> T{Training Complete?}
     T -->|No| U[Next Training Phase]
     T -->|Yes| V[Final Certification]
-    
+
     S --> E
     U --> D
     V --> W[License Endorsement]
     W --> X[Training Complete]
-    
+
     style A fill:#e1f5fe
     style X fill:#e8f5e8
     style S fill:#fff3e0
@@ -82,28 +82,28 @@ sequenceDiagram
     participant System as Manage2Soar
     participant DO as Duty Officer
     participant Admin as Training Admin
-    
+
     Student->>System: Request Training
     System->>Instructor: Notify of Student Request
     Instructor->>System: Create Lesson Plan
-    
+
     System->>Student: Send Lesson Schedule
     System->>DO: Include in Flight Operations
-    
+
     Instructor->>System: Conduct Pre-Flight Brief
     DO->>System: Log Training Flight
     Instructor->>System: Complete Lesson Record
-    
+
     System->>System: Link Flight to Lesson
     System->>System: Update Progress Tracking
-    
+
     alt Lesson Complete
         System->>Student: Send Progress Update
         System->>Admin: Update Training Records
     else More Practice Needed
         System->>Instructor: Schedule Follow-up
     end
-    
+
     System->>System: Generate Training Reports
 ```
 
@@ -113,7 +113,7 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Assessment: Student Enrollment
     Assessment --> PreSolo: Training Plan Approved
-    
+
     state PreSolo {
         [*] --> BasicControls
         BasicControls --> Turns
@@ -122,25 +122,25 @@ stateDiagram-v2
         PatternWork --> LandingPractice
         LandingPractice --> [*]
     }
-    
+
     PreSolo --> SoloPrep: Phase 1 Complete
     SoloPrep --> FirstSolo: Instructor Sign-off
     FirstSolo --> PostSolo: Solo Achievement
-    
+
     state PostSolo {
         [*] --> CrossCountry
         CrossCountry --> AdvancedManeuvers
         AdvancedManeuvers --> WeatherDecision
         WeatherDecision --> [*]
     }
-    
+
     PostSolo --> CheckRide: Phase 2 Complete
     CheckRide --> Certified: Examiner Approval
     CheckRide --> Remedial: Additional Training Needed
     Remedial --> PostSolo: Weakness Addressed
-    
+
     Certified --> [*]: License Issued
-    
+
     note right of FirstSolo
         Major milestone
         Insurance requirements
@@ -158,7 +158,7 @@ erDiagram
         boolean instructor
         string membership_status
     }
-    
+
     TrainingPhase {
         int id PK
         string name
@@ -166,7 +166,7 @@ erDiagram
         int sequence_order
         boolean is_solo_phase
     }
-    
+
     SyllabusDocument {
         int id PK
         string title
@@ -175,7 +175,7 @@ erDiagram
         int lesson_number
         boolean required
     }
-    
+
     TrainingLesson {
         int id PK
         int student_id FK
@@ -190,7 +190,7 @@ erDiagram
         decimal grade_score
         boolean phase_complete
     }
-    
+
     Flight {
         int id PK
         int training_lesson_id FK
@@ -200,14 +200,14 @@ erDiagram
         datetime flight_end
         string flight_type
     }
-    
+
     ClubQualificationType {
         int id PK
         string name
         text requirements
         boolean requires_checkride
     }
-    
+
     Member ||--o{ TrainingLesson : student
     Member ||--o{ TrainingLesson : instructor
     TrainingPhase ||--o{ SyllabusDocument : contains
@@ -230,7 +230,7 @@ flowchart LR
     D --> E[Instructor Completes Lesson]
     E --> F[Progress Updated]
     F --> G[Reports Generated]
-    
+
     subgraph "Automatic Connections"
         H[Student → Pilot]
         I[Instructor → Instructor]
@@ -264,25 +264,25 @@ flowchart TD
     B --> C[Medical/Prerequisites Check]
     C --> D[Training Assessment Meeting]
     D --> E[Training Plan Development]
-    
+
     E --> F[Phase 1: Basic Controls]
     F --> G[Dual Instruction Flights]
     G --> H[Progress Evaluation]
-    
+
     H --> I{Ready for Solo?}
     I -->|No| J[Additional Dual Time]
     I -->|Yes| K[Solo Preparation]
-    
+
     J --> G
     K --> L[Pre-Solo Written Test]
     L --> M[Solo Skills Check]
     M --> N[First Solo Flight]
-    
+
     N --> O[Post-Solo Training]
     O --> P[Cross-Country Preparation]
     P --> Q[License Check Ride]
     Q --> R[Certification Complete]
-    
+
     style A fill:#e1f5fe
     style R fill:#e8f5e8
 ```
@@ -295,11 +295,11 @@ flowchart LR
     B --> C[Aircraft Inspection]
     C --> D[Training Flight]
     D --> E[Post-Flight Debrief]
-    
+
     E --> F[Lesson Record Creation]
     F --> G[Progress Assessment]
     G --> H[Next Lesson Planning]
-    
+
     subgraph "Documentation Requirements"
         I[Flight Time Logged]
         J[Skills Practiced]
@@ -308,7 +308,7 @@ flowchart LR
         M[Safety Issues]
         N[Weather Conditions]
     end
-    
+
     F --> I
     F --> J
     F --> K
@@ -325,23 +325,23 @@ flowchart TD
     B --> C[Match Experience Level]
     C --> D[Consider Student Preferences]
     D --> E[Assign Primary Instructor]
-    
+
     E --> F[Initial Training Meeting]
     F --> G[Training Plan Agreement]
     G --> H[Lesson Scheduling]
-    
+
     H --> I{Training Progressing?}
     I -->|Yes| J[Continue with Primary]
     I -->|Issues| K[Consider Instructor Change]
-    
+
     K --> L[Student-Instructor Meeting]
     L --> M{Resolution Possible?}
     M -->|Yes| J
     M -->|No| N[Assign New Instructor]
-    
+
     N --> O[Transition Meeting]
     O --> P[Continue Training]
-    
+
     J --> Q[Regular Progress Reviews]
     P --> Q
 ```

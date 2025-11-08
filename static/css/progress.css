@@ -4,14 +4,13 @@
 .progress .progress-bar.bg-success {
     background-color: rgb(35, 141, 35) !important;
   }
-  
+
   /* 2) Force the “remaining” slice to light grey */
   .progress .progress-bar.bg-secondary {
     background-color: #ccc !important;
   }
-  
+
   /* 3) (Optional) If you want a default height, you can set it here instead of inline */
   .progress {
     height: 1em;
   }
-  

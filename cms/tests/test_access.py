@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from django.urls import reverse
 
@@ -26,8 +28,8 @@ def test_public_page_and_document_accessible_anonymous(client, settings, tmp_pat
             return 123
 
         GoogleCloudStorage.size = _fake_size
-    except Exception:
-        pass
+    except (ImportError, AttributeError) as e:
+        logging.info(f"GoogleCloudStorage not available in test environment: {e}")
 
     # Visiting the page should be allowed without login
     url = reverse("cms:cms_page", kwargs={"slug1": page.slug})
@@ -62,8 +64,8 @@ def test_restricted_page_and_document_redirects_anonymous(client, settings, tmp_
             return 123
 
         GoogleCloudStorage.size = _fake_size
-    except Exception:
-        pass
+    except (ImportError, AttributeError) as e:
+        logging.info(f"GoogleCloudStorage not available in test environment: {e}")
 
     # Visiting the page should redirect to login for anonymous user
     url = reverse("cms:cms_page", kwargs={"slug1": page.slug})

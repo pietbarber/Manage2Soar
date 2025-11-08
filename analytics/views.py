@@ -65,7 +65,7 @@ def dashboard(request):
             return None
         try:
             return datetime.fromisoformat(s).date()
-        except Exception:
+        except (ValueError, TypeError):
             return None
 
     util_start = _parse_dt(request.GET.get("util_start"))

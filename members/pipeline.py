@@ -119,7 +119,8 @@ def fetch_google_profile_picture(backend, user, response, *args, **kwargs):
         picture_url = response.get("picture")
         if picture_url and not user.profile_photo:
             try:
-                result = requests.get(picture_url)
+                # Add timeout to prevent hanging requests
+                result = requests.get(picture_url, timeout=10)
                 result.raise_for_status()
                 filename = os.path.basename(urlparse(picture_url).path)
                 user.profile_photo.save(

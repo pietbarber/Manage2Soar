@@ -26,6 +26,7 @@ def get_membership_status_choices():
     """
     try:
         from siteconfig.models import MembershipStatus
+
         return MembershipStatus.get_all_status_choices()
     except (ImportError, Exception):
         # Fallback to hardcoded choices during migrations or if table doesn't exist
@@ -252,6 +253,7 @@ class Member(AbstractUser):
     def is_active_member(self):
         try:
             from siteconfig.models import MembershipStatus
+
             active_statuses = list(MembershipStatus.get_active_statuses())
             return self.membership_status in active_statuses
         except (ImportError, Exception):
@@ -286,6 +288,7 @@ class Member(AbstractUser):
         """Get dynamic membership status choices for forms."""
         try:
             from siteconfig.models import MembershipStatus
+
             return MembershipStatus.get_all_status_choices()
         except (ImportError, Exception):
             # Fallback during migrations or if table doesn't exist
@@ -318,7 +321,7 @@ class Member(AbstractUser):
         # 3) avatar generation (safe pre-save)
         if not self.profile_photo:
             # Skip avatar generation in test environments to prevent storage pollution
-            if not (hasattr(settings, 'TESTING') and settings.TESTING):
+            if not (hasattr(settings, "TESTING") and settings.TESTING):
                 filename = f"profile_{self.username}.png"
                 file_path = os.path.join("generated_avatars", filename)
                 if not os.path.exists(os.path.join("media", file_path)):

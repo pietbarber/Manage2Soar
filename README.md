@@ -84,65 +84,65 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 
 ## Source-of-truth Membership Management
  - All membership types, contact information
- - Membership profile photo, 
+ - Membership profile photo,
  - Flight ratings, club qualifications, SSA badges earned
- - Member Biographies including inline images and rich text formatting. 
+ - Member Biographies including inline images and rich text formatting.
 
 ## Full-Featured Flight Operations Logs
  - All operations are logged by a duty officer with a nice web interface
- -- include takeoff time, landing time, release height, glider, pilot, instructor. 
- -- Any errors or missing data are announced to the duty officer. 
- - Closeout including finances, who paid, who is on account, etc. 
- - Closeout including Tow Plane information, safety issues, Operation Essay. 
- -- Log maintenance issues, indicate a glider is grounded. 
- - Email sent to the duty crew the night before the operations reminding them of 
+ -- include takeoff time, landing time, release height, glider, pilot, instructor.
+ -- Any errors or missing data are announced to the duty officer.
+ - Closeout including finances, who paid, who is on account, etc.
+ - Closeout including Tow Plane information, safety issues, Operation Essay.
+ -- Log maintenance issues, indicate a glider is grounded.
+ - Email sent to the duty crew the night before the operations reminding them of
  -- offline equipment
  -- duty crew participants
  -- upcoming maintenance deadlines (transponder, parachutes, etc).
- - Review of past flight operations by any club member. 
+ - Review of past flight operations by any club member.
 
 ## Instruction Syllabus
- - Managed by any instructor in the club. 
+ - Managed by any instructor in the club.
  - Syllabus contains broad sections for phases of flight training
  - Each syllabus item has
  -- a rich HTML editor text field describing what is expected
- -- relevant sections of 14 CFR highlighted as required for solo or ratings 
+ -- relevant sections of 14 CFR highlighted as required for solo or ratings
 
 ## Instruction Reports Based on Student Flying
- - Instructors are given opportunity to log flight instruction 
- - Instructors can give members qualifications based on training 
- - Instructors report on recent flight instruction sessions with: 
- -- performance grading for all items in the training syllabus 
- -- opportunity for writing an essay to describe the lessons learned. 
+ - Instructors are given opportunity to log flight instruction
+ - Instructors can give members qualifications based on training
+ - Instructors report on recent flight instruction sessions with:
+ -- performance grading for all items in the training syllabus
+ -- opportunity for writing an essay to describe the lessons learned.
 
 ## Duty Roster and Operations Calendar Management
- - Roster manager manages the operations calendar. 
- - Duty_roster allows members to state their volunteer preferences. 
+ - Roster manager manages the operations calendar.
+ - Duty_roster allows members to state their volunteer preferences.
  -- Blackout dates (i have a conference, vaccation, etc)
- -- Members can mark themselves unavailable for any duty indefinitely. 
- - Operations Calendar is populated with random selection of capable members 
+ -- Members can mark themselves unavailable for any duty indefinitely.
+ - Operations Calendar is populated with random selection of capable members
  -- based on their blackout preferences
- -- based on the operational need 
- -- does not schedule members more than a certain number of times per month. 
+ -- based on the operational need
+ -- does not schedule members more than a certain number of times per month.
 
 ## Operations Calendar
- - Any member can summon members for an ad-hoc operations date 
- -- Email sent to club indicating ad-hoc operations on a certain date. 
- -- tow pilots can sign up to tow. 
- -- duty officers can sign up to be the operations officer. 
- -- if those two conditions are met, email is sent to members indicating operations are a go. 
+ - Any member can summon members for an ad-hoc operations date
+ -- Email sent to club indicating ad-hoc operations on a certain date.
+ -- tow pilots can sign up to tow.
+ -- duty officers can sign up to be the operations officer.
+ -- if those two conditions are met, email is sent to members indicating operations are a go.
 
 ## Charts and Analytics
  - Several varieties of charts and graphs can be displayed for your club's statistics
- -- Flights to date this year 
+ -- Flights to date this year
  -- Compare this year to previous years
- -- Show usage of each glider in the club 
+ -- Show usage of each glider in the club
  -- Show how many flights each user is getting
 
 ## Knowledge Tests
  - Maintain a test bank of your written test questions
- -- Useful for pre-solo written test 
- -- also useful for training wing runners or duty officers 
+ -- Useful for pre-solo written test
+ -- also useful for training wing runners or duty officers
 
 # 🛠️ Installation & Setup
 
@@ -152,6 +152,14 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
    cd manage2soar
    ```
 
+### Option A: Automated Setup (Recommended)
+2. **Run the setup script**:
+   ```bash
+   ./setup-dev.sh
+   ```
+   This automatically sets up virtual environment, dependencies, security tools, and database.
+
+### Option B: Manual Setup
 2. **Create a Virtual Environment**:
    ```bash
    python3 -m venv .venv
@@ -163,20 +171,61 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
    pip install -r requirements.txt
    ```
 
-4. **Apply Migrations**:
+4. **Set up Development Tools** (Required for contributors):
+   ```bash
+   # Install pre-commit hooks for security scanning
+   pip install pre-commit
+   pre-commit install
+
+   # Verify security tools are working
+   bandit --version
+   pre-commit run --all-files  # Optional: run all checks once
+   ```
+
+5. **Apply Migrations**:
    ```bash
    python manage.py migrate
    ```
 
-5. **Create a Superuser**:
+6. **Create a Superuser**:
    ```bash
    python manage.py createsuperuser
    ```
 
-6. **Run the Development Server**:
+7. **Run the Development Server**:
    ```bash
    python manage.py runserver
    ```
+
+## 🔒 **Security & Code Quality**
+
+This project includes comprehensive security scanning and code quality tools:
+
+- **Pre-commit Hooks**: Automatic security scans before every commit
+- **GitHub Actions**: CI/CD pipeline with security gates  
+- **Bandit**: Python security vulnerability scanning
+- **Safety & pip-audit**: Dependency vulnerability checking
+- **Code Formatting**: Black, isort, django-upgrade for consistent code style
+
+### **For Contributors**
+Pre-commit hooks are **required** for development. After cloning:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The hooks will automatically:
+- Scan for security vulnerabilities
+- Check for secrets in code
+- Format Python code consistently
+- Validate configuration files
+
+### **For Forkers**
+All security workflows are included and will work automatically:
+- ✅ GitHub Actions workflows enabled by default
+- ✅ No external services or secrets required  
+- ✅ All tools install from public PyPI packages
+- ⚠️ **Important**: Run `pre-commit install` after cloning to enable local security checks
 
 ## 📄 Documentation
 
@@ -188,7 +237,7 @@ Extensive technical documentation is available in each app's `docs/` folder (e.g
 
 ## 🤝 Contributing
 
-We welcome contributions! Please fork the repository and submit a pull request. For major changes, open an issue first to discuss proposed modifications. This code is being written with the possibility that other clubs can take the code and run with it. 
+We welcome contributions! Please fork the repository and submit a pull request. For major changes, open an issue first to discuss proposed modifications. This code is being written with the possibility that other clubs can take the code and run with it.
 
 ## 📧 Contact
 
@@ -196,4 +245,4 @@ For questions or support, please contact [Piet Barber](mailto:pb+GitHub@pietbarb
 
 ---
 
-Feel free to customize the contact information and any other sections to better fit your needs. Let me know if you'd like assistance with anything else! 
+Feel free to customize the contact information and any other sections to better fit your needs. Let me know if you'd like assistance with anything else!

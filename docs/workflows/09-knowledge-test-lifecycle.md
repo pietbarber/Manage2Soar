@@ -19,37 +19,37 @@ flowchart TD
     B --> C[Organize Questions by Topic]
     C --> D[Set Passing Criteria]
     D --> E[Review and Validate Test]
-    
+
     E --> F[Assign Test to Students]
     F --> G[Student Notification]
     G --> H[Schedule Test Session]
     H --> I[Prepare Test Environment]
-    
+
     I --> J[Student Begins Test]
     J --> K[Monitor Test Progress]
     K --> L[Student Submits Test]
     L --> M[Automatic Grading]
-    
+
     M --> N{Passing Score?}
     N -->|Yes| O[Generate Pass Certificate]
     N -->|No| P[Generate Failure Report]
-    
+
     O --> Q[Update Student Progress]
     P --> R[Identify Weak Areas]
-    
+
     Q --> S[Send Success Notification]
     R --> T[Recommend Additional Study]
-    
+
     S --> U[Record Achievement]
     T --> V[Schedule Retest]
-    
+
     U --> W[Test Cycle Complete]
     V --> X[Additional Preparation]
     X --> H
-    
+
     W --> Y[Archive Test Results]
     Y --> Z[Cleanup Test Data]
-    
+
     style A fill:#e1f5fe
     style W fill:#e8f5e8
     style P fill:#fff3e0
@@ -83,26 +83,26 @@ sequenceDiagram
     participant Student as Student
     participant TestEngine as Test Engine
     participant Results as Results System
-    
+
     Instructor->>System: Create/Assign Test
     System->>Student: Send Test Notification
     Student->>System: Request Test Session
     System->>TestEngine: Initialize Test Session
-    
+
     TestEngine->>Student: Present Question 1
     Student->>TestEngine: Submit Answer
     TestEngine->>TestEngine: Record Response
-    
+
     loop For Each Question
         TestEngine->>Student: Present Next Question
         Student->>TestEngine: Submit Answer
         TestEngine->>TestEngine: Record Response
     end
-    
+
     Student->>TestEngine: Submit Complete Test
     TestEngine->>Results: Calculate Score
     Results->>System: Store Test Results
-    
+
     alt Test Passed
         System->>Student: Send Pass Notification
         System->>Instructor: Report Success
@@ -110,7 +110,7 @@ sequenceDiagram
         System->>Student: Send Study Recommendations
         System->>Instructor: Report Failure Details
     end
-    
+
     System->>System: Schedule Test Cleanup
 ```
 
@@ -122,29 +122,29 @@ flowchart TD
     B --> C[Category Organization]
     C --> D[Difficulty Levels]
     D --> E[Topic Tags]
-    
+
     E --> F[Test Assembly]
     F --> G{Test Type}
-    
+
     G -->|Preset-Based| H[Configurable Presets]
     G -->|Random Selection| I[Algorithm Selection]
     G -->|Manual Selection| J[Instructor Choice]
     G -->|Adaptive| K[Performance-Based]
-    
+
     H --> L[Load Test Preset]
     L --> M[Apply Category Weights]
     I --> N[Balanced Topic Coverage]
     J --> O[Custom Test Design]
     K --> P[Dynamic Difficulty]
-    
+
     M --> Q[Generated Test]
     N --> Q
     O --> Q
     P --> Q
-    
+
     Q --> R[Test Validation]
     R --> S[Ready for Administration]
-    
+
     style B fill:#e3f2fd
     style H fill:#fff3e0
     style S fill:#e8f5e8
@@ -166,13 +166,13 @@ stateDiagram-v2
     Reviewed --> Finalized: Results Confirmed
     Finalized --> Archived: Results Stored
     Archived --> Deleted: Cleanup Period Expires
-    
+
     note right of Active
         Secure test environment
         Anti-cheating measures
         Time tracking
     end note
-    
+
     note right of Deleted
         Test data removed
         Privacy compliance
@@ -189,7 +189,7 @@ erDiagram
         string name
         boolean instructor
     }
-    
+
     TestPreset {
         int id PK
         string name UK
@@ -200,13 +200,13 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    
+
     QuestionCategory {
         int id PK
         string code UK
         text description
     }
-    
+
     Question {
         int id PK
         int category_id FK
@@ -220,7 +220,7 @@ erDiagram
         datetime lastupdated
         string updatedby
     }
-    
+
     WrittenTestTemplate {
         int id PK
         string name
@@ -230,14 +230,14 @@ erDiagram
         decimal pass_percentage
         duration time_limit
     }
-    
+
     WrittenTestTemplateQuestion {
         int id PK
         int template_id FK
         int question_id FK
         int order
     }
-    
+
     WrittenTestAttempt {
         int id PK
         int template_id FK
@@ -248,7 +248,7 @@ erDiagram
         boolean passed
         string status
     }
-    
+
     WrittenTestAnswer {
         int id PK
         int attempt_id FK
@@ -257,7 +257,7 @@ erDiagram
         boolean correct
         datetime answered_at
     }
-    
+
     WrittenTestAssignment {
         int id PK
         int template_id FK
@@ -267,7 +267,7 @@ erDiagram
         boolean completed
         datetime created_at
     }
-    
+
     Member ||--o{ WrittenTestTemplate : creates
     Member ||--o{ WrittenTestAttempt : takes
     Member ||--o{ WrittenTestAssignment : assigned_to
@@ -292,34 +292,34 @@ flowchart LR
     B --> C[Student Takes Test]
     C --> D[Results Analysis]
     D --> E{Knowledge Gaps?}
-    
+
     E -->|Yes| F[Additional Ground Study]
     E -->|No| G[Advance to Next Phase]
-    
+
     F --> H[Targeted Review]
     H --> I[Retest Available]
     I --> C
-    
+
     G --> J[Flight Training Authorization]
 ```
 
-### **Training Progress Integration** 
+### **Training Progress Integration**
 Test results directly impact training progression:
 
 ```mermaid
 flowchart TD
     A[Knowledge Test Result] --> B{Test Type}
-    
+
     B -->|Phase Completion| C[Training Phase Sign-off]
     B -->|Skill Assessment| D[Training Lesson Planning]
     B -->|Safety Check| E[Safety Knowledge Update]
     B -->|Certification Prep| F[Certification Readiness]
-    
+
     C --> G[Advance to Next Phase]
     D --> H[Customize Instruction]
     E --> I[Safety Compliance]
     F --> J[Schedule Check Ride]
-    
+
     G --> K[Training Progress Update]
     H --> K
     I --> L[Safety Record Update]
@@ -334,11 +334,11 @@ flowchart LR
     A[Test Results] --> B[Student Performance Analytics]
     A --> C[Question Effectiveness Analysis]
     A --> D[Instructor Performance Metrics]
-    
+
     B --> E[Learning Path Optimization]
     C --> F[Question Bank Improvement]
     D --> G[Instruction Quality Enhancement]
-    
+
     E --> H[Personalized Learning]
     F --> I[Better Assessments]
     G --> J[Training Program Improvement]
@@ -353,33 +353,33 @@ flowchart TD
     A[Administrator Access] --> B[Django Admin Interface]
     B --> C[Manage Test Presets]
     C --> D{Action Required}
-    
+
     D -->|Create New| E[Define Preset Name]
     D -->|Edit Existing| F[Select Existing Preset]
     D -->|Delete Unused| G[Remove Old Preset]
-    
+
     E --> H[Set Category Weights]
     F --> I[Modify Category Weights]
     G --> J[Confirm Deletion Protection]
-    
+
     H --> K[Configure Active Status]
     I --> L[Update Sort Order]
     J --> M{References Exist?}
-    
+
     K --> N[Save New Preset]
     L --> O[Save Changes]
     M -->|Yes| P[Deletion Blocked]
     M -->|No| Q[Preset Deleted]
-    
+
     N --> R[Preset Available for Use]
     O --> R
     P --> S[Error Message Shown]
     Q --> T[Preset Removed]
-    
+
     R --> U[Instructors Can Use Preset]
     U --> V[Test Creation with Preset]
     V --> W[Automatic Form Population]
-    
+
     style A fill:#e1f5fe
     style R fill:#e8f5e8
     style P fill:#ffebee
@@ -408,27 +408,27 @@ flowchart TD
     B --> C[System Generates Test Session]
     C --> D[Student Receives Notification]
     D --> E[Student Schedules Test Time]
-    
+
     E --> F[Test Environment Preparation]
     F --> G[Student Identity Verification]
     G --> H[Test Instructions Provided]
     H --> I[Test Session Begins]
-    
+
     I --> J[Student Completes Questions]
     J --> K[Automatic Time Monitoring]
     K --> L{Time Remaining?}
     L -->|Yes| J
     L -->|No| M[Auto-Submit Test]
-    
+
     J --> N[Student Submits Test]
     N --> O[Immediate Grading]
     M --> O
-    
+
     O --> P[Results Calculation]
     P --> Q[Feedback Generation]
     Q --> R[Student Notification]
     R --> S[Instructor Notification]
-    
+
     style A fill:#e1f5fe
     style S fill:#e8f5e8
 ```
@@ -440,18 +440,18 @@ flowchart LR
     A[Start Adaptive Test] --> B[Present Medium Difficulty Question]
     B --> C[Student Answers]
     C --> D{Answer Correct?}
-    
+
     D -->|Yes| E[Increase Difficulty]
     D -->|No| F[Decrease Difficulty]
-    
+
     E --> G[Select Harder Question]
     F --> H[Select Easier Question]
-    
+
     G --> I[Present Next Question]
     H --> I
     I --> J[Student Answers]
     J --> K{Confidence Level Reached?}
-    
+
     K -->|No| D
     K -->|Yes| L[Calculate Final Score]
     L --> M[Generate Results]
@@ -465,19 +465,19 @@ flowchart TD
     B --> C[Archive Essential Results Data]
     C --> D[Remove Detailed Question Responses]
     D --> E[Delete Personal Test Data]
-    
+
     E --> F[Preserve Aggregate Statistics]
     F --> G[Update Analytics Data]
     G --> H[Generate Cleanup Report]
     H --> I[Notify Administrators]
-    
+
     I --> J{Manual Review Required?}
     J -->|Yes| K[Administrative Review]
     J -->|No| L[Cleanup Complete]
-    
+
     K --> M[Approve Final Cleanup]
     M --> L
-    
+
     style A fill:#e1f5fe
     style L fill:#e8f5e8
 ```

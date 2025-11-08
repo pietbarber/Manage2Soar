@@ -97,7 +97,7 @@
                     {% endif %}
                   </td>
                   <td>
-                    <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}" 
+                    <a href="{% url 'knowledgetest:quiz-result' attempt.pk %}"
                        class="btn btn-sm btn-outline-primary">
                       📄 View Results
                     </a>
@@ -122,13 +122,13 @@
               <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
             </li>
           {% endif %}
-          
+
           <li class="page-item active">
             <span class="page-link">
               Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
             </span>
           </li>
-          
+
           {% if page_obj.has_next %}
             <li class="page-item">
               <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>

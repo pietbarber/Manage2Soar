@@ -29,11 +29,11 @@ class Command(BaseCronJobCommand):
         for assignment in assignments:
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
 
-            if not options.get('dry_run'):
+            if not options.get("dry_run"):
                 send_mail(
                     subject=f"Ad-Hoc Ops Cancelled - {ops_date}",
-                    message=f"""Ad-hoc ops on {ops_date} could not get sufficient interest to meet the minimum 
-duty crew of tow pilot and duty officer. The deadline has passed and the ops 
+                    message=f"""Ad-hoc ops on {ops_date} could not get sufficient interest to meet the minimum
+duty crew of tow pilot and duty officer. The deadline has passed and the ops
 have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/""",
                     from_email="noreply@default.manage2soar.com",
                     recipient_list=["members@default.manage2soar.com"],
@@ -41,11 +41,13 @@ have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/c
                 assignment.delete()
 
             self.log_warning(
-                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}")
+                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"
+            )
             cancelled_count += 1
 
         if cancelled_count > 0:
             self.log_success(
-                f"Cancelled {cancelled_count} unconfirmed ad-hoc ops day(s)")
+                f"Cancelled {cancelled_count} unconfirmed ad-hoc ops day(s)"
+            )
         else:
             self.log_info("No ad-hoc ops days required cancellation")

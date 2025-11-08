@@ -83,9 +83,7 @@ def test_dynamic_membership_status_changes():
 
     # Create a user with this status
     user = User.objects.create_user(
-        username="dynamic_user",
-        password="x",
-        membership_status="Dynamic Status"
+        username="dynamic_user", password="x", membership_status="Dynamic Status"
     )
 
     # Should be active initially
@@ -105,9 +103,7 @@ def test_membership_status_deletion_integration():
     # Create a status and member
     status = MembershipStatus.objects.create(name="Protected Status", is_active=True)
     member = User.objects.create_user(
-        username="protected_member",
-        password="x",
-        membership_status="Protected Status"
+        username="protected_member", password="x", membership_status="Protected Status"
     )
 
     # Member should be active initially

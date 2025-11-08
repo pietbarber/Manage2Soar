@@ -1,7 +1,11 @@
+from datetime import timedelta
+
 from django.contrib import admin
+from django.utils import timezone
 from django.utils.html import format_html
 
 from logsheet.models import AircraftMeister, MaintenanceDeadline, MaintenanceIssue
+from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
     Airfield,
@@ -15,9 +19,6 @@ from .models import (
     TowplaneCloseout,
     TowRate,
 )
-from utils.admin_helpers import AdminHelperMixin
-from django.utils import timezone
-from datetime import timedelta
 
 
 class RecentLogsheetFilter(admin.SimpleListFilter):
@@ -130,9 +131,7 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
         # Elsewhere (like in forms), only show club-owned gliders
         return qs.filter(club_owned=True)
 
-    admin_helper_message = (
-        "Gliders: record club and member gliders. Use club-owned filters when configuring rentals."
-    )
+    admin_helper_message = "Gliders: record club and member gliders. Use club-owned filters when configuring rentals."
 
 
 # The flight table is where most of the action for the logsheet lives.
@@ -172,8 +171,14 @@ class FlightAdmin(AdminHelperMixin, admin.ModelAdmin):
     date_hierarchy = "logsheet__log_date"
 
     # Use select_related for FK fields used in list_display to avoid extra queries
-    list_select_related = ("logsheet", "pilot", "instructor",
-                           "glider", "towplane", "tow_pilot")
+    list_select_related = (
+        "logsheet",
+        "pilot",
+        "instructor",
+        "glider",
+        "towplane",
+        "tow_pilot",
+    )
 
     # list_select_related is sufficient here; Django will apply the necessary
     # select_related on the changelist queryset. Keeping an explicit
@@ -225,6 +230,7 @@ class AirfieldAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ["is_active"]
     readonly_fields = ["airfield_image_preview"]
 
+    @admin.display(description="Current Photo")
     def airfield_image_preview(self, obj):
         if obj.photo:
             return format_html(
@@ -232,11 +238,7 @@ class AirfieldAdmin(AdminHelperMixin, admin.ModelAdmin):
             )
         return "(No photo uploaded)"
 
-    airfield_image_preview.short_description = "Current Photo"
-
-    admin_helper_message = (
-        "Airfields: add or update fields where ops take place. Upload a photo to preview here."
-    )
+    admin_helper_message = "Airfields: add or update fields where ops take place. Upload a photo to preview here."
 
 
 # The particulars of what day a logsheet happened, the airfield, who is on the duty roster for that day
@@ -330,9 +332,7 @@ class LogsheetPaymentAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     # list_select_related on this admin avoids the need for a custom get_queryset.
 
-    admin_helper_message = (
-        "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."
-    )
+    admin_helper_message = "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."
 
 
 # RecentLogsheetFilter is defined above so it can be referenced directly by LogsheetPaymentAdmin
@@ -367,23 +367,21 @@ class MaintenanceIssueAdmin(AdminHelperMixin, admin.ModelAdmin):
             kwargs["queryset"] = Glider.objects.filter(is_active=True, club_owned=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    @admin.display(description="Aircraft")
     def aircraft_display(self, obj):
         return obj.glider or obj.towplane
 
-    aircraft_display.short_description = "Aircraft"
-
+    @admin.display(
+        description="Glider?",
+        boolean=True,
+    )
     def is_glider(self, obj):
         return bool(obj.glider)
-
-    is_glider.boolean = True
-    is_glider.short_description = "Glider?"
 
     def description_short(self, obj):
         return obj.description[:50] + ("..." if len(obj.description) > 50 else "")
 
-    admin_helper_message = (
-        "Maintenance issues: record faults for aircraft. Use the grounded flag to block aircraft."
-    )
+    admin_helper_message = "Maintenance issues: record faults for aircraft. Use the grounded flag to block aircraft."
 
 
 # Admin configuration for MaintenanceDeadline objects
@@ -400,15 +398,13 @@ class MaintenanceDeadlineAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     autocomplete_fields = ("glider", "towplane")
 
+    @admin.display(description="N-Number")
     def aircraft_n_number(self, obj):
         return obj.glider.n_number if obj.glider else obj.towplane.n_number
 
-    aircraft_n_number.short_description = "N-Number"
-
+    @admin.display(description="Type")
     def aircraft_type(self, obj):
         return "Glider" if obj.glider else "Towplane"
-
-    aircraft_type.short_description = "Type"
 
     admin_helper_message = (
         "Maintenance deadlines: track inspections and important aircraft deadlines."
@@ -427,11 +423,8 @@ class AircraftMeisterAdmin(AdminHelperMixin, admin.ModelAdmin):
     search_fields = ("glider__n_number", "towplane__n_number", "member__username")
     autocomplete_fields = ("glider", "towplane", "member")
 
+    @admin.display(description="Aircraft")
     def aircraft_display(self, obj):
         return obj.glider or obj.towplane
 
-    aircraft_display.short_description = "Aircraft"
-
-    admin_helper_message = (
-        "Meisters: assign members as caretakers for aircraft. Use carefully; impacts maintenance workflows."
-    )
+    admin_helper_message = "Meisters: assign members as caretakers for aircraft. Use carefully; impacts maintenance workflows."

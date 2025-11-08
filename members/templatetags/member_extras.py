@@ -7,6 +7,7 @@
 import re
 
 from django import template
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 from siteconfig.models import SiteConfiguration
@@ -103,21 +104,25 @@ def pluck_ids(members):
 def duty_emoji_legend():
     # Get the first SiteConfiguration object, or use defaults if not found
     config = SiteConfiguration.objects.first()
-    instructor = (
+    # Escape dynamic content to prevent XSS
+    instructor = escape(
         getattr(config, "instructor_title", "Instructor") if config else "Instructor"
     )
-    towpilot = getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
-    duty_officer = (
+    towpilot = escape(
+        getattr(config, "towpilot_title", "Tow Pilot") if config else "Tow Pilot"
+    )
+    duty_officer = escape(
         getattr(config, "duty_officer_title", "Duty Officer")
         if config
         else "Duty Officer"
     )
-    assistant_duty_officer = (
+    assistant_duty_officer = escape(
         getattr(config, "assistant_duty_officer_title", "Assistant Duty Officer")
         if config
         else "Assistant Duty Officer"
     )
-    return mark_safe(
+    # Dynamic content is properly escaped above - safe to use mark_safe
+    return mark_safe(  # nosec B308,B703
         f"""
         <div class='accordion mb-4' id='emojiLegendAccordion'>
             <div class='accordion-item'>

@@ -1,7 +1,6 @@
-import pytest
-
 from datetime import date
 
+import pytest
 from django.urls import reverse
 
 from duty_roster.models import OpsIntent
@@ -32,10 +31,12 @@ def test_admin_helper_message_shown_in_changelist(client, django_user_model):
 @pytest.mark.django_db
 def test_ops_intent_admin_shows_labels_in_list_display(client, django_user_model):
     user = django_user_model.objects.create_user(
-        username="u1", email="u1@example.com", password="pass")
+        username="u1", email="u1@example.com", password="pass"
+    )
     # create an ops intent and ensure admin changelist doesn't error when rendering
-    OpsIntent.objects.create(member=user, date=date(
-        2025, 11, 8), available_as=["instruction", "private"])
+    OpsIntent.objects.create(
+        member=user, date=date(2025, 11, 8), available_as=["instruction", "private"]
+    )
 
     admin = django_user_model.objects.create_user(
         username="admin2", email="admin2@example.com", password="pass"

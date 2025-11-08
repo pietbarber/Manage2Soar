@@ -3,8 +3,8 @@
 from django.core.management.base import BaseCommand
 
 from instructors.utils import update_student_progress_snapshot
-from members.utils.membership import get_active_membership_statuses
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 
 
 class Command(BaseCommand):

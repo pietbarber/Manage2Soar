@@ -5,6 +5,36 @@
 - Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
 - **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
 
+## Terminal Environment Setup
+- **CRITICAL**: Every new terminal window requires virtual environment activation. The first command in any new terminal session MUST be:
+  ```bash
+  source .venv/bin/activate
+  ```
+- **Issue**: New terminal windows do not automatically source the virtual environment, causing Python/pytest/Django commands to fail with "command not found" errors.
+- **Solution**: Always run `source .venv/bin/activate` as the first command when starting any terminal operation.
+- **Commands that require venv**: `pytest`, `python manage.py`, `pip`, `django-admin`, `black`, `isort`, `bandit`, `safety`, and any Python-related tooling.
+
+## Terminal Window Management
+- **UNPREDICTABLE**: VS Code's `run_in_terminal` tool unpredictably creates new terminal windows vs reusing existing ones. This cannot be controlled or predicted.
+- **BEST PRACTICES**:
+  1. **Always prefix Python commands**: Use `source .venv/bin/activate && your_command` when uncertain
+  2. **Check environment first**: Run `which python` to verify virtual environment before Python operations
+  3. **Expect new terminals**: Background processes, long-running commands, and time gaps between commands often spawn new terminals
+- **WORKFLOW**: When you see "command not found" errors, immediately run `source .venv/bin/activate` and retry the command.
+
+## Django Development Server Management
+- **CHECK FIRST**: Before starting `manage.py runserver`, always check if it's already running on port 8000:
+  ```bash
+  lsof -i :8000 || echo "Port 8000 is free"
+  ```
+- **AUTO-RESTART**: Django's development server automatically restarts when you modify `.py` files (views.py, models.py, forms.py, etc.). You do NOT need to manually restart it.
+- **WHEN TO RESTART**: Only manually restart the server for:
+  - New dependencies/packages installed
+  - Settings changes (manage2soar/settings.py)
+  - Template/static file changes (sometimes)
+  - Migration changes that affect the database schema
+- **AVOID**: Don't use `pkill` or `lsof` commands to kill existing servers unless explicitly needed. VS Code will manage the auto-restart process.
+
 ## Additional Context Resources
 - **Conversation Archives**: For complex issues requiring deep context, check `.github/conversations/` for saved debugging sessions and technical discussions. These contain valuable insights about system architecture, problem-solving approaches, data migration patterns, and testing strategies.
 - **IMPORTANT**: The `.github/conversations/` directory is gitignored - these files exist locally only and provide rich historical context for understanding technical decisions and debugging complex issues.
@@ -13,7 +43,7 @@
 - **CRITICAL**: When user references an issue by number (e.g., "work on issue 70"), use this MCP pattern:
   - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"` to get all open issues, then filter for the specific number
   - **Method 2 (Fallback)**: `mcp_github_github_search_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `query="[issue_number]"` (simple number only, no GitHub syntax)
-- **DO NOT USE**: 
+- **DO NOT USE**:
   - `mcp_github_github_get_issue` (tool doesn't exist)
   - GitHub search syntax like `"number:70"` or `"is:issue 70"` (fails in search)
 - This eliminates the "three different attempts" pattern - use Method 1 first, then Method 2 if needed.
@@ -35,7 +65,7 @@
 
 ## CSS & Static Files Management
 - **CRITICAL**: Always run `python manage.py collectstatic` after making changes to CSS files in `static/` directories. Changes to CSS files are NOT visible until collected.
-- **CSS Architecture**: 
+- **CSS Architecture**:
   - Use external CSS files in `static/css/` instead of inline `<style>` tags in templates
   - Check existing CSS in `static/css/baseline.css` for conflicting rules before creating new styles
   - CSS specificity issues can cause "styling not working" problems - use browser dev tools to inspect actual applied styles

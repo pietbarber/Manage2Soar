@@ -188,29 +188,27 @@ class TestPreset(models.Model):
     name = models.CharField(
         max_length=100,
         unique=True,
-        help_text="Name of the test preset (e.g., 'ASK21', 'PW5', 'Duty Officer')"
+        help_text="Name of the test preset (e.g., 'ASK21', 'PW5', 'Duty Officer')",
     )
     description = models.TextField(
-        blank=True,
-        help_text="Optional description of what this preset is for"
+        blank=True, help_text="Optional description of what this preset is for"
     )
     category_weights = models.JSONField(
         default=dict,
-        help_text="Dictionary mapping question category codes to the number of questions to include"
+        help_text="Dictionary mapping question category codes to the number of questions to include",
     )
     is_active = models.BooleanField(
         default=True,
-        help_text="Whether this preset is available for creating new tests"
+        help_text="Whether this preset is available for creating new tests",
     )
     sort_order = models.PositiveIntegerField(
-        default=100,
-        help_text="Display order (lower numbers appear first)"
+        default=100, help_text="Display order (lower numbers appear first)"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['sort_order', 'name']
+        ordering = ["sort_order", "name"]
         verbose_name = "Test Preset"
         verbose_name_plural = "Test Presets"
 
@@ -228,7 +226,7 @@ class TestPreset(models.Model):
     @classmethod
     def get_active_presets(cls):
         """Get all test presets that are marked as active."""
-        return cls.objects.filter(is_active=True).order_by('sort_order', 'name')
+        return cls.objects.filter(is_active=True).order_by("sort_order", "name")
 
     @classmethod
     def get_presets_as_dict(cls):

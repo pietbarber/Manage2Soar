@@ -1,6 +1,5 @@
 from typing import Iterable, Optional
 
-
 from ..constants import ALLOWED_MEMBERSHIP_STATUSES
 
 
@@ -8,10 +7,12 @@ def get_active_membership_statuses():
     """Get active membership statuses from database or fallback to constants."""
     try:
         from siteconfig.models import MembershipStatus
+
         return list(MembershipStatus.get_active_statuses())
     except (ImportError, Exception):
         # Fallback to hardcoded list during migrations or if table/app doesn't exist
         from ..constants.membership import DEFAULT_ACTIVE_STATUSES
+
         return DEFAULT_ACTIVE_STATUSES
 
 

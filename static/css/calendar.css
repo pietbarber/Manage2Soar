@@ -5,12 +5,12 @@ td.past-day {
     background-color: #edeff3; /* light gray */
     color: #6b7280;
   }
-  
+
   td.future-no-ops {
     background-color: #f9fafb; /* slightly lighter gray */
     color: #4b5563;
   }
-  
+
   td.today {
     border: 2px solid #3b82f6; /* blue */
     font-weight: bold;

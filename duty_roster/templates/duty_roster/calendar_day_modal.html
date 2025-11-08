@@ -6,7 +6,7 @@
   {% if assignment and not assignment.is_scheduled and assignment.date >= today %}
     <div class="mt-4 p-2 border-t">
       <h3 class="text-md font-semibold mb-2">Admin Options</h3>
-      <button 
+      <button
         class="btn btn-danger w-full"
         hx-get="{% url 'duty_roster:calendar_cancel_ops_modal' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
         hx-target="#modal-body"
@@ -17,7 +17,7 @@
     </div>
   {% endif %}
 {% endif %}
- 
+
 {% if assignment %}
   {% get_siteconfig as config %}
   <p><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ assignment.instructor|default:"—" }}</p>
@@ -32,7 +32,7 @@
 
 {% if show_surge_alert %}
   <div class="alert alert-warning mb-3">
-    ⚠️ <strong>Surge Instructor Recommended:</strong> 
+    ⚠️ <strong>Surge Instructor Recommended:</strong>
     At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} of them want instruction.
   </div>
 {% endif %}
@@ -46,9 +46,9 @@
 {% if user.is_authenticated and user.rostermeister %}
   <hr>
   <div id="assignment-edit-slot">
-    <form 
-      hx-get="{% url 'duty_roster:assignment_edit_form' year=day.year month=day.month day=day.day %}" 
-      hx-target="#assignment-edit-slot" 
+    <form
+      hx-get="{% url 'duty_roster:assignment_edit_form' year=day.year month=day.month day=day.day %}"
+      hx-target="#assignment-edit-slot"
       hx-swap="innerHTML"
     >
       <button type="submit" class="btn btn-sm btn-outline-secondary">
@@ -62,15 +62,15 @@
   <div id="ops-intent-response">
     {% if intent_exists %}
       <p class="text-green-700">✅ You're already marked as planning to fly this day.</p>
-      <form 
-        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
-        hx-target="#ops-intent-response" 
+      <form
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}"
+        hx-target="#ops-intent-response"
         hx-swap="innerHTML"
       >
       {% csrf_token %}
-      <button 
-        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}" 
-        hx-target="#ops-intent-response" 
+      <button
+        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}"
+        hx-target="#ops-intent-response"
         hx-swap="innerHTML"
         class="btn btn-sm btn-danger"
       >
@@ -78,7 +78,7 @@
       </button>
       </form>
     {% else %}
-     
+
       {% if user.towpilot and not assignment.tow_pilot and not assignment.is_confirmed and not assignment.is_scheduled %}
       <form method="post"
             hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
@@ -98,8 +98,8 @@
           📋 I will serve as Duty Officer
         </button>
       </form>
-    {% endif %} 
-   
+    {% endif %}
+
     {% if user.instructor and not assignment.instructor and not assignment.is_scheduled %}
     <form method="post"
         hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
@@ -123,9 +123,9 @@
     {% endif %}
 
     {% if can_submit_intent %}
-    <form 
-      hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}" 
-      hx-target="#ops-intent-response" 
+    <form
+      hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}"
+      hx-target="#ops-intent-response"
       hx-swap="innerHTML"
     >
     <button type="submit" class="btn btn-sm btn-primary">

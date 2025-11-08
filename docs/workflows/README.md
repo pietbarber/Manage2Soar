@@ -51,7 +51,7 @@ graph TB
     Instruction --> Ground[Ground Instruction]
     Instruction --> Knowledge[Knowledge Tests]
     Member --> Knowledge
-    
+
     style Member fill:#e1f5fe
     style Logsheet fill:#f3e5f5
     style Instruction fill:#e8f5e8

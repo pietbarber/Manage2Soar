@@ -49,7 +49,7 @@ This app configures site-wide variables including:
 - Site-wide configuration like club name, URL, and logo
 - **Configurable membership statuses** (new feature) - allows clubs to customize their membership status types
 
-The app also includes the `MembershipStatus` model which allows clubs to define their own membership statuses instead of using hardcoded values. 
+The app also includes the `MembershipStatus` model which allows clubs to define their own membership statuses instead of using hardcoded values.
 
 ## Notable fields
 

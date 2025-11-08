@@ -62,7 +62,7 @@
         {% if user.is_authenticated %}
         <td>
           {% if issue|can_be_resolved_by:user %}
-          <button 
+          <button
             class="btn btn-success btn-sm"
             hx-get="{% url 'logsheet:maintenance_resolve_modal' issue.id %}"
             hx-target="#modal-body"

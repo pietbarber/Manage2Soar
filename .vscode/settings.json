@@ -8,6 +8,10 @@
     },
     "[html]": {
         "html.format.wrapLineLength": 0,
-        "editor.formatOnSave": false,
+        "editor.formatOnSave": false
+    },
+    "files.associations": {
+        ".bandit": "yaml",
+        "*.bandit": "yaml"
     }
 }

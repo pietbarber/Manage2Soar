@@ -60,15 +60,15 @@
         <div class="card-body p-3">
           <form method="post" enctype="multipart/form-data" class="mb-0">
             {% csrf_token %}
-            
+
             <!-- File input with Bootstrap styling -->
             <div class="mb-3">
               <label for="{{ form.profile_photo.id_for_label }}" class="form-label fw-semibold">
                 <i class="bi bi-image me-1"></i>Choose New Photo
               </label>
-              <input type="file" 
-                     class="form-control{% if form.profile_photo.errors %} is-invalid{% endif %}" 
-                     id="{{ form.profile_photo.id_for_label }}" 
+              <input type="file"
+                     class="form-control{% if form.profile_photo.errors %} is-invalid{% endif %}"
+                     id="{{ form.profile_photo.id_for_label }}"
                      name="{{ form.profile_photo.name }}"
                      accept="image/*">
               {% if form.profile_photo.errors %}
@@ -81,7 +81,7 @@
                 JPG, PNG, or GIF files accepted. Max size: 5MB
               </div>
             </div>
-            
+
             <!-- Error handling -->
             {% if form.non_field_errors %}
               <div class="alert alert-danger alert-sm border-0 mb-3">
@@ -89,7 +89,7 @@
                 {% for error in form.non_field_errors %}{{ error }}{% endfor %}
               </div>
             {% endif %}
-            
+
             <!-- Upload button -->
             <button type="submit" class="btn btn-primary btn-sm w-100">
               <i class="bi bi-upload me-2"></i>
@@ -232,7 +232,7 @@
         </a>
         {% endif %}
       {% endif %}
-      
+
 
       <div class="mt-3">
         <a href="{% if request.user.instructor %}

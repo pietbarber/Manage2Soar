@@ -4,7 +4,7 @@
 
 {% if user.rostermeister %}
   <div class="d-flex justify-content-center mb-4">
-    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+    <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
        class="btn btn-primary btn-lg shadow-sm">
       <i class="fas fa-calendar-plus me-2"></i>Propose Duty Roster
     </a>
@@ -178,7 +178,7 @@
       <h4 class="text-muted">No Duty Assignments</h4>
       <p class="text-muted">There are no duty assignments scheduled for {{ formatted_date }}.</p>
       {% if user.rostermeister %}
-        <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}" 
+        <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
            class="btn btn-primary">
           <i class="fas fa-calendar-plus me-2"></i>Create Duty Roster
         </a>

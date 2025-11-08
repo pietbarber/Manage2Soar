@@ -1,12 +1,7 @@
 import pytest
 from django.urls import reverse
 
-from logsheet.models import (
-    Airfield,
-    Logsheet,
-    Towplane,
-    TowplaneCloseout,
-)
+from logsheet.models import Airfield, Logsheet, Towplane, TowplaneCloseout
 
 
 @pytest.mark.django_db

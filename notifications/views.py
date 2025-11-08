@@ -21,4 +21,4 @@ def dismiss_notification(request, pk):
     notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.dismissed = True
     notification.save()
-    return redirect(request.META.get("HTTP_REFERER", "/"))
+    return redirect(request.headers.get("referer", "/"))

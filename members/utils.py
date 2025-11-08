@@ -6,6 +6,6 @@
 Keep this file minimal to avoid duplication of logic.
 """
 
-from .utils.permissions import is_privileged_viewer, can_view_personal_info
+from .utils.permissions import can_view_personal_info, is_privileged_viewer
 
 __all__ = ["is_privileged_viewer", "can_view_personal_info"]

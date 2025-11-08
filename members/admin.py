@@ -1,4 +1,5 @@
 import csv
+import logging
 
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -9,30 +10,30 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from import_export.admin import ImportExportModelAdmin
 from reversion.admin import VersionAdmin
-from utils.admin_helpers import AdminHelperMixin
 from tinymce.widgets import TinyMCE
+
+from utils.admin_helpers import AdminHelperMixin
 
 from .models import Badge, Biography, Member, MemberBadge
 
-
 # --- Register or replace social_django admin entries with helpful admin banners ---
 try:
-    from social_django.models import UserSocialAuth, Nonce, Association
     from django.contrib import admin as django_admin
+    from social_django.models import Association, Nonce, UserSocialAuth
 
     def register_or_replace(model, admin_class):
         """If model is already registered in admin, unregister it first, then register our admin_class."""
         try:
             if model in django_admin.site._registry:
                 django_admin.site.unregister(model)
-        except Exception:
+        except Exception as e:
             # If unregister fails for any reason, continue and attempt to register
-            pass
+            logging.warning(f"Failed to unregister model {model}: {e}")
         try:
             django_admin.site.register(model, admin_class)
-        except Exception:
+        except Exception as e:
             # If register fails, don't block app startup
-            pass
+            logging.warning(f"Failed to register admin for model {model}: {e}")
 
     class UserSocialAuthAdmin(AdminHelperMixin, django_admin.ModelAdmin):
         list_display = ("user", "provider", "uid")
@@ -51,8 +52,9 @@ try:
     register_or_replace(UserSocialAuth, UserSocialAuthAdmin)
     register_or_replace(Association, AssociationAdmin)
     register_or_replace(Nonce, NonceAdmin)
-except Exception:
+except ImportError as e:
     # social_django may not be available in some environments; skip registrations silently
+    logging.info(f"social_django not available, skipping OAuth admin registration: {e}")
     pass
 
 # Custom filter for Active/Not active status
@@ -115,6 +117,7 @@ class MemberBadgeAdmin(admin.ModelAdmin):
 # Fields typically include badge name, code, description, and any categorization fields.
 
 
+@admin.register(Badge)
 class BadgeAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.TextField: {"widget": TinyMCE(attrs={"cols": 80, "rows": 10})},
@@ -132,8 +135,6 @@ class BadgeAdmin(admin.ModelAdmin):
 
 # model: MemberBadge — the linking model between Member and Badge
 # extra: Set to 0 to avoid displaying extra empty rows by default
-
-admin.site.register(Badge, BadgeAdmin)
 
 
 class MemberBadgeInline(admin.TabularInline):
@@ -222,6 +223,7 @@ class CustomMemberCreationForm(UserCreationForm):
 class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAdmin):
     actions = ["export_members_csv", "mark_inactive"]
 
+    @admin.action(description="Export selected members to CSV")
     def export_members_csv(self, request, queryset):
         # Define fields to export (exclude password, profile_photo, legacy name, badges, biography)
         fields = [
@@ -273,15 +275,19 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             writer.writerow(row)
         return response
 
-    export_members_csv.short_description = "Export selected members to CSV"
     readonly_fields = ("profile_photo_preview",)
 
     add_form = CustomMemberCreationForm
     form = CustomMemberChangeForm
     inlines = [MemberBadgeInline]
 
-    list_display = ("last_name", "first_name", "email",
-                    "membership_status", "redact_contact")
+    list_display = (
+        "last_name",
+        "first_name",
+        "email",
+        "membership_status",
+        "redact_contact",
+    )
     search_fields = ("first_name", "last_name", "email", "username")
     list_filter = (
         "membership_status",
@@ -389,6 +395,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         ),
     )
 
+    @admin.display(description="Current Photo")
     def profile_photo_preview(self, obj):
         if obj.profile_photo:
             return format_html(
@@ -397,16 +404,17 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             )
         return ""
 
-    profile_photo_preview.short_description = "Current Photo"
-
     def get_search_results(self, request, queryset, search_term):
         # Show all members (active and inactive) in admin
         return super().get_search_results(request, queryset, search_term)
 
     # Short helper shown at top of member admin pages; full guidance lives in docs/admin/members_delete.md
-    admin_helper_message = "Members: manage member profiles and roles. <br>See member deletion guidance."
+    admin_helper_message = (
+        "Members: manage member profiles and roles. <br>See member deletion guidance."
+    )
     admin_helper_doc_url = "https://github.com/pietbarber/Manage2Soar/tree/main/members/docs/admin/members_delete.md"
 
+    @admin.action(description="Mark selected members inactive (safer than delete)")
     def mark_inactive(self, request, queryset):
         """Safe bulk action: mark selected members inactive instead of deleting.
 
@@ -415,5 +423,3 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         """
         updated = queryset.update(is_active=False)
         self.message_user(request, f"Marked {updated} members as inactive.")
-
-    mark_inactive.short_description = "Mark selected members inactive (safer than delete)"

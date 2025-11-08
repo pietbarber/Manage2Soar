@@ -49,7 +49,7 @@ Created comprehensive duty delinquents detail view with:
 ```python
 @active_member_required
 @user_passes_test(lambda u: (
-    u.rostermeister or u.member_manager or 
+    u.rostermeister or u.member_manager or
     u.director or u.is_superuser
 ))
 def duty_delinquents_detail(request):
@@ -58,7 +58,7 @@ def duty_delinquents_detail(request):
     """
     # Enhanced flight-based duty detection logic
     recent_duty_threshold = timezone.now().date() - timedelta(days=60)
-    
+
     # Get members with recent flights but no recent duty
     delinquent_members = []
     for member in active_members_with_flights:
@@ -69,7 +69,7 @@ def duty_delinquents_detail(request):
             models.Q(tow_pilot=member),
             date__gte=recent_duty_threshold
         ).exists()
-        
+
         if not recent_duty:
             # Enhanced member data collection
             member_data = {
@@ -110,7 +110,7 @@ def duty_delinquents_detail(request):
     <div class="delinquent-card" id="member-{{ member_data.member.id }}">
         <div class="member-header">
             <div class="member-photo">
-                <img src="{{ member_data.member.profile_photo.url }}" 
+                <img src="{{ member_data.member.profile_photo.url }}"
                      alt="{{ member_data.member.full_display_name }}">
             </div>
             <div class="member-info">
@@ -121,7 +121,7 @@ def duty_delinquents_detail(request):
                 </div>
             </div>
         </div>
-        
+
         <!-- Duty Status Information -->
         <div class="duty-status">
             {% if member_data.suspension_risk %}
@@ -140,7 +140,7 @@ def duty_delinquents_detail(request):
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border: 2px solid #e1e8ed;
     border-radius: 12px;
-    box-shadow: 
+    box-shadow:
         0 4px 6px rgba(0, 0, 0, 0.1),
         0 1px 3px rgba(0, 0, 0, 0.08);
     margin-bottom: 2rem;
@@ -152,7 +152,7 @@ def duty_delinquents_detail(request):
 
 .delinquent-card:hover {
     transform: translateY(-2px);
-    box-shadow: 
+    box-shadow:
         0 8px 25px rgba(0, 0, 0, 0.15),
         0 4px 10px rgba(0, 0, 0, 0.1);
     border-color: #4a90e2;
@@ -175,7 +175,7 @@ def duty_delinquents_detail(request):
 ```python
 def send_duty_delinquents_email(delinquent_members):
     """Enhanced email with detailed report link"""
-    
+
     # Build comprehensive member summary
     member_summary = []
     for member_data in delinquent_members:
@@ -183,25 +183,25 @@ def send_duty_delinquents_email(delinquent_members):
         if member_data['days_since_duty']:
             summary += f" ({member_data['days_since_duty']} days since last duty)"
         member_summary.append(summary)
-    
+
     # Create detailed report URL
     detail_url = request.build_absolute_uri(
         reverse('duty_roster:duty_delinquents_detail')
     )
-    
+
     email_content = f"""
     Duty Delinquents Report - {timezone.now().strftime('%B %d, %Y')}
-    
+
     The following members have recent flights but no recent duty assignments:
-    
+
     {chr(10).join(member_summary)}
-    
+
     📋 View Detailed Report: {detail_url}
-    
-    The detailed report includes member photos, contact information, 
+
+    The detailed report includes member photos, contact information,
     flight history, and recommended actions for follow-up.
     """
-    
+
     # Send to member managers with enhanced context
     send_notification_email(
         recipients=member_managers,
@@ -217,7 +217,7 @@ def send_duty_delinquents_email(delinquent_members):
 ```html
 <!-- Duty Roster Dropdown -->
 <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="dutyrosterDropdown" 
+    <a class="nav-link dropdown-toggle" href="#" id="dutyrosterDropdown"
        role="button" data-bs-toggle="dropdown" aria-expanded="false">
         Duty Roster
     </a>
@@ -237,7 +237,7 @@ def send_duty_delinquents_email(delinquent_members):
                 <li><hr class="dropdown-divider"></li>
                 <li class="nav-item">
                     <a class="dropdown-item" href="{% url 'duty_roster:duty_delinquents_detail' %}">
-                        <i class="fas fa-exclamation-triangle text-warning"></i> 
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
                         Duty Delinquents Report
                     </a>
                 </li>
@@ -254,8 +254,8 @@ def send_duty_delinquents_email(delinquent_members):
 urlpatterns = [
     # ... existing patterns
     path(
-        'delinquents/detail/', 
-        views.duty_delinquents_detail, 
+        'delinquents/detail/',
+        views.duty_delinquents_detail,
         name='duty_delinquents_detail'
     ),
 ]
@@ -276,34 +276,34 @@ urlpatterns = [
 class DutyDelinquentsDetailViewTests(TestCase):
     def test_permission_required_regular_member(self):
         """Regular members should not have access"""
-        
+
     def test_permission_allowed_rostermeister(self):
         """Rostermeister should have access"""
-        
+
     def test_permission_allowed_member_manager(self):
         """Member manager should have access"""
-        
+
     def test_permission_allowed_director(self):
         """Director should have access"""
-        
+
     def test_permission_allowed_superuser(self):
         """Superuser should have access"""
-        
+
     def test_delinquent_member_appears_in_report(self):
         """Delinquent member should appear in the report"""
-        
+
     def test_member_with_recent_duty_not_in_report(self):
         """Member who has done recent duty should not appear"""
-        
+
     def test_inactive_member_not_in_report(self):
         """Inactive members should be excluded"""
-        
+
     def test_suspended_member_indication(self):
         """Suspended members should show suspension status"""
-        
+
     def test_member_blackouts_display(self):
         """Member blackouts should be displayed"""
-        
+
     def test_no_delinquents_message(self):
         """Should show success message when no delinquents found"""
 ```
@@ -554,7 +554,7 @@ Issue #100 successfully transformed the basic duty delinquents notification syst
 
 The solution addresses the core business need of showing "who these people are" while providing a scalable foundation for future duty management enhancements. Club managers now have the visual tools and member context needed for effective follow-up and member engagement around duty compliance.
 
-**Business Impact**: 
+**Business Impact**:
 - Streamlined member management workflow
 - Enhanced club operational efficiency  
 - Professional administrative interface

@@ -1,7 +1,12 @@
-import pytest
 from datetime import date
 
-from logsheet.forms import MaintenanceIssueForm, CreateLogsheetForm, LogsheetDutyCrewForm
+import pytest
+
+from logsheet.forms import (
+    CreateLogsheetForm,
+    LogsheetDutyCrewForm,
+    MaintenanceIssueForm,
+)
 
 
 @pytest.mark.django_db
@@ -44,7 +49,9 @@ def test_maintenance_issue_form_error_message_without_aircraft():
 
 # CreateLogsheetForm validation tests
 @pytest.mark.django_db
-def test_create_logsheet_form_prevents_duplicate_instructor_surge_instructor(member_instructor, airfield):
+def test_create_logsheet_form_prevents_duplicate_instructor_surge_instructor(
+    member_instructor, airfield
+):
     """Test that instructor and surge instructor cannot be the same person"""
     form = CreateLogsheetForm(
         data={
@@ -57,12 +64,16 @@ def test_create_logsheet_form_prevents_duplicate_instructor_surge_instructor(mem
     assert not form.is_valid()
     assert "__all__" in form.errors
     error_messages = form.errors.get("__all__", [])
-    assert any("instructor and surge instructor cannot be the same person" in msg.lower()
-               for msg in error_messages)
+    assert any(
+        "instructor and surge instructor cannot be the same person" in msg.lower()
+        for msg in error_messages
+    )
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_prevents_duplicate_tow_pilot_surge_tow_pilot(member_towpilot, airfield):
+def test_create_logsheet_form_prevents_duplicate_tow_pilot_surge_tow_pilot(
+    member_towpilot, airfield
+):
     """Test that tow pilot and surge tow pilot cannot be the same person"""
     form = CreateLogsheetForm(
         data={
@@ -75,12 +86,16 @@ def test_create_logsheet_form_prevents_duplicate_tow_pilot_surge_tow_pilot(membe
     assert not form.is_valid()
     assert "__all__" in form.errors
     error_messages = form.errors.get("__all__", [])
-    assert any("tow pilot and surge tow pilot cannot be the same person" in msg.lower()
-               for msg in error_messages)
+    assert any(
+        "tow pilot and surge tow pilot cannot be the same person" in msg.lower()
+        for msg in error_messages
+    )
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_allows_different_instructors(member_instructor, member_instructor2, airfield):
+def test_create_logsheet_form_allows_different_instructors(
+    member_instructor, member_instructor2, airfield
+):
     """Test that different people can be instructor and surge instructor"""
     form = CreateLogsheetForm(
         data={
@@ -94,7 +109,9 @@ def test_create_logsheet_form_allows_different_instructors(member_instructor, me
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_allows_different_tow_pilots(member_towpilot, member_towpilot2, airfield):
+def test_create_logsheet_form_allows_different_tow_pilots(
+    member_towpilot, member_towpilot2, airfield
+):
     """Test that different people can be tow pilot and surge tow pilot"""
     form = CreateLogsheetForm(
         data={
@@ -108,7 +125,9 @@ def test_create_logsheet_form_allows_different_tow_pilots(member_towpilot, membe
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_allows_same_person_different_roles(member_instructor_towpilot, airfield):
+def test_create_logsheet_form_allows_same_person_different_roles(
+    member_instructor_towpilot, airfield
+):
     """Test that the same person can serve as both instructor and tow pilot (different role types)"""
     form = CreateLogsheetForm(
         data={
@@ -122,7 +141,9 @@ def test_create_logsheet_form_allows_same_person_different_roles(member_instruct
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_allows_blank_surge_roles(member_instructor, member_towpilot, airfield):
+def test_create_logsheet_form_allows_blank_surge_roles(
+    member_instructor, member_towpilot, airfield
+):
     """Test that surge roles can be blank without validation errors"""
     form = CreateLogsheetForm(
         data={
@@ -138,7 +159,9 @@ def test_create_logsheet_form_allows_blank_surge_roles(member_instructor, member
 
 # LogsheetDutyCrewForm validation tests
 @pytest.mark.django_db
-def test_duty_crew_form_prevents_duplicate_instructor_surge_instructor(member_instructor):
+def test_duty_crew_form_prevents_duplicate_instructor_surge_instructor(
+    member_instructor,
+):
     """Test that instructor and surge instructor cannot be the same person in duty crew form"""
     form = LogsheetDutyCrewForm(
         data={
@@ -149,8 +172,10 @@ def test_duty_crew_form_prevents_duplicate_instructor_surge_instructor(member_in
     assert not form.is_valid()
     assert "__all__" in form.errors
     error_messages = form.errors.get("__all__", [])
-    assert any("instructor and surge instructor cannot be the same person" in msg.lower()
-               for msg in error_messages)
+    assert any(
+        "instructor and surge instructor cannot be the same person" in msg.lower()
+        for msg in error_messages
+    )
 
 
 @pytest.mark.django_db
@@ -165,12 +190,16 @@ def test_duty_crew_form_prevents_duplicate_tow_pilot_surge_tow_pilot(member_towp
     assert not form.is_valid()
     assert "__all__" in form.errors
     error_messages = form.errors.get("__all__", [])
-    assert any("tow pilot and surge tow pilot cannot be the same person" in msg.lower()
-               for msg in error_messages)
+    assert any(
+        "tow pilot and surge tow pilot cannot be the same person" in msg.lower()
+        for msg in error_messages
+    )
 
 
 @pytest.mark.django_db
-def test_duty_crew_form_allows_different_instructors(member_instructor, member_instructor2):
+def test_duty_crew_form_allows_different_instructors(
+    member_instructor, member_instructor2
+):
     """Test that different people can be instructor and surge instructor in duty crew form"""
     form = LogsheetDutyCrewForm(
         data={
@@ -207,9 +236,12 @@ def test_duty_crew_form_allows_same_person_different_roles(member_instructor_tow
 
 # Tests for warning functionality (new dual-role warnings)
 @pytest.mark.django_db
-def test_create_logsheet_form_warns_duty_officer_instructor(member_duty_officer_instructor, airfield):
+def test_create_logsheet_form_warns_duty_officer_instructor(
+    member_duty_officer_instructor, airfield
+):
     """Test that duty officer = instructor generates a warning but allows form submission"""
     from datetime import timedelta
+
     future_date = date.today() + timedelta(days=45)  # Avoid conflicts
 
     form = CreateLogsheetForm(
@@ -221,16 +253,19 @@ def test_create_logsheet_form_warns_duty_officer_instructor(member_duty_officer_
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     assert "serving as both Duty Officer and Instructor" in form.warnings[0]
     assert "historical precedent" in form.warnings[0]
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_warns_duty_officer_towpilot(member_duty_officer_towpilot, airfield):
+def test_create_logsheet_form_warns_duty_officer_towpilot(
+    member_duty_officer_towpilot, airfield
+):
     """Test that duty officer = tow pilot generates a warning but allows form submission"""
     from datetime import timedelta
+
     future_date = date.today() + timedelta(days=46)  # Avoid conflicts
 
     form = CreateLogsheetForm(
@@ -242,16 +277,19 @@ def test_create_logsheet_form_warns_duty_officer_towpilot(member_duty_officer_to
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     assert "serving as both Duty Officer and Tow Pilot" in form.warnings[0]
     assert "adequate coverage" in form.warnings[0]
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_multiple_warnings(member_duty_officer_instructor, airfield):
+def test_create_logsheet_form_multiple_warnings(
+    member_duty_officer_instructor, airfield
+):
     """Test that multiple warnings can be generated simultaneously"""
     from datetime import timedelta
+
     future_date = date.today() + timedelta(days=47)  # Avoid conflicts
 
     # This member is both instructor and tow pilot, serving as duty officer for both
@@ -269,17 +307,20 @@ def test_create_logsheet_form_multiple_warnings(member_duty_officer_instructor, 
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 2
-    warning_text = ' '.join(form.warnings)
+    warning_text = " ".join(form.warnings)
     assert "serving as both Duty Officer and Instructor" in warning_text
     assert "serving as both Duty Officer and Tow Pilot" in warning_text
 
 
 @pytest.mark.django_db
-def test_create_logsheet_form_no_warning_duty_officer_assistant(member_duty_officer, airfield):
+def test_create_logsheet_form_no_warning_duty_officer_assistant(
+    member_duty_officer, airfield
+):
     """Test that duty officer = assistant duty officer does NOT generate a warning"""
     from datetime import timedelta
+
     future_date = date.today() + timedelta(days=48)  # Avoid conflicts
 
     form = CreateLogsheetForm(
@@ -291,7 +332,7 @@ def test_create_logsheet_form_no_warning_duty_officer_assistant(member_duty_offi
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+    assert not hasattr(form, "warnings") or len(form.warnings) == 0
 
 
 @pytest.mark.django_db
@@ -304,7 +345,7 @@ def test_duty_crew_form_warns_duty_officer_instructor(member_duty_officer_instru
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     assert "serving as both Duty Officer and Instructor" in form.warnings[0]
 
@@ -319,15 +360,18 @@ def test_duty_crew_form_warns_duty_officer_towpilot(member_duty_officer_towpilot
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     assert "serving as both Duty Officer and Tow Pilot" in form.warnings[0]
 
 
 @pytest.mark.django_db
-def test_form_warnings_with_blank_duty_officer(member_instructor, member_towpilot, airfield):
+def test_form_warnings_with_blank_duty_officer(
+    member_instructor, member_towpilot, airfield
+):
     """Test that no warnings are generated when duty officer is blank"""
     from datetime import timedelta
+
     future_date = date.today() + timedelta(days=49)  # Avoid conflicts
 
     form = CreateLogsheetForm(
@@ -340,12 +384,14 @@ def test_form_warnings_with_blank_duty_officer(member_instructor, member_towpilo
         }
     )
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+    assert not hasattr(form, "warnings") or len(form.warnings) == 0
 
 
 # FlightForm business rule tests (Issue #110)
 @pytest.mark.django_db
-def test_flight_form_warns_unscheduled_tow_pilot(member_towpilot, member_towpilot2, glider, logsheet):
+def test_flight_form_warns_unscheduled_tow_pilot(
+    member_towpilot, member_towpilot2, glider, logsheet
+):
     """Test that FlightForm warns when tow pilot is not on scheduled list"""
     from logsheet.forms import FlightForm
 
@@ -362,11 +408,11 @@ def test_flight_form_warns_unscheduled_tow_pilot(member_towpilot, member_towpilo
             "launch_time": "14:00",
             "release_altitude": 3000,
         },
-        logsheet=logsheet
+        logsheet=logsheet,
     )
 
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     warning = form.warnings[0]
     assert "is not on the scheduled tow pilot list" in warning
@@ -392,15 +438,17 @@ def test_flight_form_no_warning_scheduled_tow_pilot(member_towpilot, glider, log
             "launch_time": "14:00",
             "release_altitude": 3000,
         },
-        logsheet=logsheet
+        logsheet=logsheet,
     )
 
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+    assert not hasattr(form, "warnings") or len(form.warnings) == 0
 
 
 @pytest.mark.django_db
-def test_flight_form_warns_unscheduled_with_surge_pilot(member_towpilot, member_towpilot2, member_instructor_towpilot, glider, logsheet):
+def test_flight_form_warns_unscheduled_with_surge_pilot(
+    member_towpilot, member_towpilot2, member_instructor_towpilot, glider, logsheet
+):
     """Test that FlightForm warns correctly when surge tow pilot is also scheduled"""
     from logsheet.forms import FlightForm
 
@@ -418,11 +466,11 @@ def test_flight_form_warns_unscheduled_with_surge_pilot(member_towpilot, member_
             "launch_time": "14:00",
             "release_altitude": 3000,
         },
-        logsheet=logsheet
+        logsheet=logsheet,
     )
 
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert hasattr(form, 'warnings')
+    assert hasattr(form, "warnings")
     assert len(form.warnings) == 1
     warning = form.warnings[0]
     assert "is not on the scheduled tow pilot list" in warning
@@ -450,8 +498,8 @@ def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, log
             "launch_time": "14:00",
             "release_altitude": 3000,
         },
-        logsheet=logsheet
+        logsheet=logsheet,
     )
 
     assert form.is_valid(), f"Form errors: {form.errors}"
-    assert not hasattr(form, 'warnings') or len(form.warnings) == 0
+    assert not hasattr(form, "warnings") or len(form.warnings) == 0

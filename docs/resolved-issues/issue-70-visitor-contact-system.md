@@ -37,15 +37,15 @@ class VisitorContact(models.Model):
     phone = CharField(max_length=20, blank=True)
     subject = CharField(max_length=200)
     message = TextField()
-    
+
     # System Fields
     submitted_at = DateTimeField(auto_now_add=True)
     ip_address = GenericIPAddressField(blank=True, null=True)
-    
+
     # Status Management
     status = CharField(choices=[
         ('new', 'New'),
-        ('read', 'Read'), 
+        ('read', 'Read'),
         ('responded', 'Responded'),
         ('closed', 'Closed')
     ])

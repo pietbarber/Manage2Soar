@@ -902,7 +902,7 @@ class MaintenanceDeadline(models.Model):
     towplane = models.ForeignKey(
         Towplane, on_delete=models.CASCADE, blank=True, null=True
     )
-    description = models.CharField(max_length=32, choices=DeadlineType.choices)
+    description = models.CharField(max_length=32, choices=DeadlineType)
     due_date = models.DateField()
 
     @property
