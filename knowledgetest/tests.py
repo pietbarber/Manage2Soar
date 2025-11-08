@@ -263,15 +263,17 @@ class WrittenTestDeleteTests(TestCase):
 
     def test_staff_can_delete_any_attempt(self):
         """Staff users should be able to delete any attempt"""
-        staff_user = User.objects.create_user(username="staff", password="pass")
+        staff_user = User.objects.create_user(
+            username="staff", password="pass", membership_status="Full Member"
+        )
         staff_user.is_staff = True
         staff_user.is_superuser = True  # This ensures active_member_required passes
-        staff_user.membership_status = "Full Member"
         staff_user.save()
 
         self.client.login(username="staff", password="pass")
         url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
+
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
 

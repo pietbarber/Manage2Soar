@@ -1,6 +1,6 @@
 import logging
 from io import BytesIO
-import logging
+
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models

@@ -5,7 +5,7 @@ from django.db import migrations
 
 def populate_membership_statuses(apps, schema_editor):
     """Populate the MembershipStatus table with initial data from constants."""
-    MembershipStatus = apps.get_model('siteconfig', 'MembershipStatus')
+    MembershipStatus = apps.get_model("siteconfig", "MembershipStatus")
 
     # Define the initial membership statuses with their properties
     # These are based on the constants from members.constants.membership
@@ -26,7 +26,6 @@ def populate_membership_statuses(apps, schema_editor):
         {"name": "Founding Member", "is_active": True, "sort_order": 130},
         {"name": "SSEF Member", "is_active": True, "sort_order": 140},
         {"name": "Temporary Member", "is_active": True, "sort_order": 150},
-
         # Inactive statuses (is_active=False)
         {"name": "Inactive", "is_active": False, "sort_order": 200},
         {"name": "Non-Member", "is_active": False, "sort_order": 210},
@@ -40,14 +39,14 @@ def populate_membership_statuses(apps, schema_editor):
             defaults={
                 "is_active": status_data["is_active"],
                 "sort_order": status_data["sort_order"],
-                "description": ""
-            }
+                "description": "",
+            },
         )
 
 
 def reverse_populate_membership_statuses(apps, schema_editor):
     """Remove all membership statuses (reverse operation)."""
-    MembershipStatus = apps.get_model('siteconfig', 'MembershipStatus')
+    MembershipStatus = apps.get_model("siteconfig", "MembershipStatus")
     MembershipStatus.objects.all().delete()
 
 
@@ -59,7 +58,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(
-            populate_membership_statuses,
-            reverse_populate_membership_statuses
+            populate_membership_statuses, reverse_populate_membership_statuses
         ),
     ]

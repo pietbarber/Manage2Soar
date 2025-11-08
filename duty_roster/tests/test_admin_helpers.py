@@ -10,7 +10,10 @@ from duty_roster.models import OpsIntent
 def test_admin_helper_message_shown_in_changelist(client, django_user_model):
     # create staff user
     admin = django_user_model.objects.create_user(
-        username="adminuser", email="admin@example.com", password="pass"
+        username="adminuser",
+        email="admin@example.com",
+        password="pass",
+        membership_status="Full Member",
     )
     admin.is_staff = True
     admin.is_superuser = True
@@ -31,7 +34,10 @@ def test_admin_helper_message_shown_in_changelist(client, django_user_model):
 @pytest.mark.django_db
 def test_ops_intent_admin_shows_labels_in_list_display(client, django_user_model):
     user = django_user_model.objects.create_user(
-        username="u1", email="u1@example.com", password="pass"
+        username="u1",
+        email="u1@example.com",
+        password="pass",
+        membership_status="Full Member",
     )
     # create an ops intent and ensure admin changelist doesn't error when rendering
     OpsIntent.objects.create(
@@ -39,7 +45,10 @@ def test_ops_intent_admin_shows_labels_in_list_display(client, django_user_model
     )
 
     admin = django_user_model.objects.create_user(
-        username="admin2", email="admin2@example.com", password="pass"
+        username="admin2",
+        email="admin2@example.com",
+        password="pass",
+        membership_status="Full Member",
     )
     admin.is_staff = True
     admin.is_superuser = True

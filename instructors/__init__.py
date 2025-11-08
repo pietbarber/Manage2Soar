@@ -3,8 +3,4 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-try:
-    from . import signals  # noqa: F401
-except ImportError:
-    # Signals module may not exist in some test/migration contexts; skip safely
-    logger.debug("instructors.signals not available, skipping import")
+# Signal imports moved to apps.py ready() method to avoid circular imports

@@ -20,19 +20,18 @@ class TestOperationsAuthentication(TestCase):
         self.client = Client()
         self.tomorrow = date.today() + timedelta(days=1)
 
-        # Create test user
+        # Create test user (Member extends User, so this creates both)
         self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
-
-        # Create member profile
-        self.member = Member.objects.create(
-            user=self.user,
+            username="testuser",
+            email="test@example.com",
+            password="testpass123",
             first_name="Test",
             last_name="User",
-            email="test@example.com",
             membership_status="Full Member",
         )
+        self.member = (
+            self.user
+        )  # Member extends User via Django's custom user model, so self.user is already a Member instance
 
         # Create required airfield
         self.airfield = Airfield.objects.create(identifier="KFRR", name="Test Airfield")

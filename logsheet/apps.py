@@ -1,4 +1,5 @@
 import logging
+
 from django.apps import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -14,4 +15,5 @@ class LogsheetConfig(AppConfig):
         except ImportError:
             # Signals module may not exist during migrations/test collection
             logger.debug(
-                "logsheet.signals not available during migrations/test collection")
+                "logsheet.signals not available during migrations/test collection"
+            )

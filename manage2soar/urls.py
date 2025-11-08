@@ -24,6 +24,7 @@ from django.urls import include, path
 
 from cms import views as cms_views
 from instructors import views as instr_views
+from members import views as members_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -79,6 +80,7 @@ urlpatterns = [
         name="public_syllabus_qr",
     ),
     path("analytics/", include("analytics.urls")),
+    path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
     path("", include("knowledgetest.urls")),
     # Explicit root name for legacy code/tests that reverse('home') without
     # namespace. The CMS homepage is the canonical root view.

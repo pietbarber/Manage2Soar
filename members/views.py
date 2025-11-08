@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import re
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db.models import F, Func, Prefetch
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -24,6 +25,7 @@ from members.utils.membership import get_active_membership_statuses
 from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
+from .utils.avatar_generator import generate_identicon
 from .utils.vcard_tools import generate_vcard_qr
 
 try:
@@ -243,7 +245,8 @@ def toggle_redaction(request, member_id):
                         )
                 except (ImportError, AttributeError, ValueError) as e:
                     logging.warning(
-                        f"Failed to get redaction notification settings: {e}")
+                        f"Failed to get redaction notification settings: {e}"
+                    )
                     sc = None
 
                 if cutoff is None:
@@ -260,7 +263,8 @@ def toggle_redaction(request, member_id):
                             cutoff = timezone.now() - timedelta(hours=float(hours))
                     except (AttributeError, ValueError, TypeError) as e:
                         logging.warning(
-                            f"Failed to parse redaction notification timing: {e}")
+                            f"Failed to parse redaction notification timing: {e}"
+                        )
                         cutoff = timezone.now() - timedelta(hours=1)
                 try:
                     # Avoid N+1 queries: fetch which member_manager user ids already
@@ -289,7 +293,8 @@ def toggle_redaction(request, member_id):
         except Exception as e:
             # Defensive: don't let notification failures break the toggle flow
             logging.exception(
-                f"Notification system failed during redaction toggle: {e}")
+                f"Notification system failed during redaction toggle: {e}"
+            )
         if member.redact_contact:
             messages.success(
                 request, "Your personal contact information is now redacted."
@@ -472,3 +477,36 @@ def badge_board(request):
     ).order_by("order")
 
     return render(request, "members/badges.html", {"badges": badges})
+
+
+def pydenticon_view(request, username):
+    """Serve generated identicon for users without profile photos.
+
+    Note: In production, this endpoint should be served by nginx/Apache or CDN
+    rather than Django for better performance and proper handling of ranges/etags.
+    """
+    # Validate username to prevent path traversal attacks
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        raise Http404("Invalid username")
+
+    # Generate the file path where the identicon should be
+    filename = f"profile_{username}.png"
+    file_path = os.path.join("generated_avatars", filename)
+    full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+
+    # If file doesn't exist, generate it
+    if not os.path.exists(full_path):
+        try:
+            generate_identicon(username, file_path)
+        except (IOError, OSError, ValueError):
+            raise Http404("Avatar could not be generated")
+
+    # Use FileResponse for better file serving (handles ranges, etags, etc.)
+    try:
+        return FileResponse(
+            open(full_path, "rb"),
+            content_type="image/png",
+            headers={"Cache-Control": "max-age=86400"},  # Cache for 1 day
+        )
+    except (FileNotFoundError, IOError):
+        raise Http404("Avatar not found")

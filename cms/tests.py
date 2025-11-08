@@ -176,12 +176,13 @@ class VisitorContactViewTests(TestCase):
     def test_contact_form_submission_success(self, mock_send_mail):
         """Test successful contact form submission."""
         # Create a member manager to receive the email
-        User.objects.create_user(
+        manager = User.objects.create_user(
             username="manager",
             email="manager@skylinesoaring.org",
-            member_manager=True,
-            is_active=True,
+            membership_status="Full Member",
         )
+        manager.member_manager = True
+        manager.save()
 
         form_data = {
             "name": "John Doe",
@@ -259,18 +260,20 @@ class VisitorContactEmailTests(TestCase):
             email="manager1@skylinesoaring.org",
             first_name="Manager",
             last_name="One",
-            member_manager=True,
-            is_active=True,
+            membership_status="Full Member",
         )
+        self.member_manager.member_manager = True
+        self.member_manager.save()
 
         self.webmaster = User.objects.create_user(
             username="webmaster",
             email="webmaster@skylinesoaring.org",
             first_name="Web",
             last_name="Master",
-            webmaster=True,
-            is_active=True,
+            membership_status="Full Member",
         )
+        self.webmaster.webmaster = True
+        self.webmaster.save()
 
     def test_email_sent_to_member_managers(self):
         """Test that emails are sent to member managers."""
@@ -403,9 +406,10 @@ class VisitorContactIntegrationTests(TestCase):
             email="manager@skylinesoaring.org",
             first_name="Member",
             last_name="Manager",
-            member_manager=True,
-            is_active=True,
+            membership_status="Full Member",
         )
+        self.member_manager.member_manager = True
+        self.member_manager.save()
 
     def test_complete_contact_workflow(self):
         """Test the complete workflow from form submission to admin management."""
