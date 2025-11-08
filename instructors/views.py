@@ -55,9 +55,10 @@ from knowledgetest.models import (
 )
 from knowledgetest.views import get_presets
 from logsheet.models import Flight
-from members.utils.membership import get_active_membership_statuses
 from members.decorators import active_member_required
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
+
 try:
     from notifications.models import Notification
 except ImportError:
@@ -1526,7 +1527,7 @@ def member_logbook(request):
     }
 
     for idx in range(0, len(rows), 10):
-        chunk = rows[idx: idx + 10]
+        chunk = rows[idx : idx + 10]
         page_number = idx // 10
 
         # Always set year_start for every page

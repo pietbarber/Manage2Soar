@@ -1,4 +1,3 @@
-
 import pytest
 
 from logsheet.models import Airfield, MaintenanceIssue

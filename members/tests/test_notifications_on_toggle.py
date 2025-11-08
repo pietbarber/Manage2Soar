@@ -1,15 +1,16 @@
 import pytest
 from django.urls import reverse
 
-from notifications.models import Notification
 from members.models import Member
+from notifications.models import Notification
 
 
 @pytest.mark.django_db
 def test_toggle_creates_notification_for_rostermeister(client):
     # Create a rostermeister and a normal member (Member is the AUTH_USER_MODEL)
     rm_member = Member.objects.create(
-        username="rm_member", member_manager=True, membership_status="Full Member")
+        username="rm_member", member_manager=True, membership_status="Full Member"
+    )
     member = Member.objects.create(username="user1", membership_status="Full Member")
 
     # Login as the member and POST to toggle
@@ -26,7 +27,8 @@ def test_toggle_creates_notification_for_rostermeister(client):
 def test_toggle_dedupe_notifications(client):
     # Create rostermeister and member
     rm_member = Member.objects.create(
-        username="rm2", member_manager=True, membership_status="Full Member")
+        username="rm2", member_manager=True, membership_status="Full Member"
+    )
     member = Member.objects.create(username="user2", membership_status="Full Member")
 
     client.force_login(member)
@@ -41,5 +43,6 @@ def test_toggle_dedupe_notifications(client):
     assert resp2.status_code == 200
 
     notes = Notification.objects.filter(
-        user=rm_member, url__contains=f"members/{member.id}")
+        user=rm_member, url__contains=f"members/{member.id}"
+    )
     assert notes.count() == 1

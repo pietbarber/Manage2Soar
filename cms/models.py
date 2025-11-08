@@ -138,43 +138,37 @@ class HomePageImage(models.Model):
 # Site Feedback Model for Issue #117
 class SiteFeedback(models.Model):
     FEEDBACK_TYPE_CHOICES = [
-        ('bug', 'Bug Report'),
-        ('feature', 'Feature Request'),
-        ('help', 'Help Request'),
-        ('other', 'Other'),
+        ("bug", "Bug Report"),
+        ("feature", "Feature Request"),
+        ("help", "Help Request"),
+        ("other", "Other"),
     ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        help_text="User who submitted the feedback"
+        help_text="User who submitted the feedback",
     )
     feedback_type = models.CharField(
-        max_length=20,
-        choices=FEEDBACK_TYPE_CHOICES,
-        default='other'
+        max_length=20, choices=FEEDBACK_TYPE_CHOICES, default="other"
     )
     referring_url = models.URLField(
         max_length=500,
         blank=True,
         null=True,
-        help_text="URL of the page where feedback was submitted from"
+        help_text="URL of the page where feedback was submitted from",
     )
     subject = models.CharField(max_length=200)
     message = HTMLField(help_text="Detailed feedback message")
 
     # Status tracking
     STATUS_CHOICES = [
-        ('open', 'Open'),
-        ('in_progress', 'In Progress'),
-        ('resolved', 'Resolved'),
-        ('closed', 'Closed'),
+        ("open", "Open"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+        ("closed", "Closed"),
     ]
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='open'
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
 
     # Admin response
     admin_response = HTMLField(blank=True, null=True)
@@ -183,8 +177,8 @@ class SiteFeedback(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='feedback_responses',
-        help_text="Webmaster who responded to this feedback"
+        related_name="feedback_responses",
+        help_text="Webmaster who responded to this feedback",
     )
 
     # Timestamps
@@ -193,7 +187,7 @@ class SiteFeedback(models.Model):
     resolved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         verbose_name = "Site Feedback"
         verbose_name_plural = "Site Feedback"
 
@@ -202,8 +196,9 @@ class SiteFeedback(models.Model):
 
     def save(self, *args, **kwargs):
         # Auto-set resolved_at when status changes to resolved
-        if self.status == 'resolved' and not self.resolved_at:
+        if self.status == "resolved" and not self.resolved_at:
             from django.utils import timezone
+
             self.resolved_at = timezone.now()
         super().save(*args, **kwargs)
 
@@ -214,47 +209,31 @@ class VisitorContact(models.Model):
     Model to store contact form submissions from visitors (non-members).
     Replaces the need to expose welcome@skylinesoaring.org to spam.
     """
-    name = models.CharField(
-        max_length=100,
-        help_text="Visitor's full name"
-    )
-    email = models.EmailField(
-        help_text="Visitor's email address for follow-up"
-    )
+
+    name = models.CharField(max_length=100, help_text="Visitor's full name")
+    email = models.EmailField(help_text="Visitor's email address for follow-up")
     phone = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        help_text="Optional phone number"
+        max_length=20, blank=True, null=True, help_text="Optional phone number"
     )
     subject = models.CharField(
-        max_length=200,
-        help_text="Brief subject line for the inquiry"
+        max_length=200, help_text="Brief subject line for the inquiry"
     )
-    message = models.TextField(
-        help_text="Detailed message from the visitor"
-    )
+    message = models.TextField(help_text="Detailed message from the visitor")
 
     # Metadata
     ip_address = models.GenericIPAddressField(
-        null=True,
-        blank=True,
-        help_text="IP address for spam prevention"
+        null=True, blank=True, help_text="IP address for spam prevention"
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     # Status tracking
     STATUS_CHOICES = [
-        ('new', 'New'),
-        ('read', 'Read'),
-        ('responded', 'Responded'),
-        ('closed', 'Closed'),
+        ("new", "New"),
+        ("read", "Read"),
+        ("responded", "Responded"),
+        ("closed", "Closed"),
     ]
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='new'
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
 
     # Admin tracking
     handled_by = models.ForeignKey(
@@ -262,18 +241,18 @@ class VisitorContact(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        help_text="Member who handled this inquiry"
+        help_text="Member who handled this inquiry",
     )
     admin_notes = models.TextField(
-        blank=True,
-        null=True,
-        help_text="Internal notes for member managers"
+        blank=True, null=True, help_text="Internal notes for member managers"
     )
 
     class Meta:
-        ordering = ['-submitted_at']
+        ordering = ["-submitted_at"]
         verbose_name = "Visitor Contact"
         verbose_name_plural = "Visitor Contacts"
 
     def __str__(self):
-        return f"{self.name} - {self.subject} ({self.submitted_at.strftime('%Y-%m-%d')})"
+        return (
+            f"{self.name} - {self.subject} ({self.submitted_at.strftime('%Y-%m-%d')})"
+        )

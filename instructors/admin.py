@@ -2,6 +2,7 @@ from django.contrib import admin
 from reversion.admin import VersionAdmin
 from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
+
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -34,9 +35,7 @@ class TrainingLessonAdmin(AdminHelperMixin, VersionAdmin):
     search_fields = ("code", "title", "description")
     ordering = ("code",)
 
-    admin_helper_message = (
-        "Training lessons: syllabus content for instruction. Edit lesson HTML carefully; used in student progress reports."
-    )
+    admin_helper_message = "Training lessons: syllabus content for instruction. Edit lesson HTML carefully; used in student progress reports."
 
 
 ####################################################
@@ -53,9 +52,7 @@ class TrainingPhaseAdmin(AdminHelperMixin, VersionAdmin):
     list_display = ("number", "name")
     ordering = ("number",)
 
-    admin_helper_message = (
-        "Training phases: group lessons into phases; changing order affects syllabus structure."
-    )
+    admin_helper_message = "Training phases: group lessons into phases; changing order affects syllabus structure."
 
 
 ####################################################
@@ -86,9 +83,7 @@ class SyllabusDocumentAdmin(AdminHelperMixin, VersionAdmin):
         },
     }
 
-    admin_helper_message = (
-        "Syllabus docs: HTML documents used in training pages. Use TinyMCE for content edits."
-    )
+    admin_helper_message = "Syllabus docs: HTML documents used in training pages. Use TinyMCE for content edits."
 
 
 ####################################################
@@ -123,9 +118,7 @@ class InstructionReportAdmin(AdminHelperMixin, admin.ModelAdmin):
     search_fields = ("student__last_name", "instructor__last_name")
     inlines = [LessonScoreInline]
 
-    admin_helper_message = (
-        "Instruction reports: instructor evaluations for students. Reports are audited and used for qualifications."
-    )
+    admin_helper_message = "Instruction reports: instructor evaluations for students. Reports are audited and used for qualifications."
 
 
 ####################################################
@@ -142,9 +135,7 @@ class LessonScoreAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_display = ("report", "lesson", "score")
     list_filter = ("lesson", "score")
 
-    admin_helper_message = (
-        "Lesson scores: link training lessons to reports. Use inlines on reports for editing."
-    )
+    admin_helper_message = "Lesson scores: link training lessons to reports. Use inlines on reports for editing."
 
 
 ####################################################
@@ -184,9 +175,7 @@ class GroundInstructionAdmin(AdminHelperMixin, admin.ModelAdmin):
     )
     inlines = [GroundLessonScoreInline]
 
-    admin_helper_message = (
-        "Ground instruction: non-flight sessions such as briefings or simulator time. Records are used in progress calculations."
-    )
+    admin_helper_message = "Ground instruction: non-flight sessions such as briefings or simulator time. Records are used in progress calculations."
 
 
 ####################################################
@@ -207,9 +196,7 @@ class ClubQualificationTypeAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ("applies_to", "is_obsolete")
     ordering = ("code",)
 
-    admin_helper_message = (
-        "Qualification types: define club qualifications and tooltips. Updates affect member qualifications listings."
-    )
+    admin_helper_message = "Qualification types: define club qualifications and tooltips. Updates affect member qualifications listings."
 
 
 ####################################################
@@ -237,6 +224,4 @@ class MemberQualificationAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ("is_qualified", "imported", "qualification__code")
     autocomplete_fields = ("member", "qualification", "instructor")
 
-    admin_helper_message = (
-        "Member qualifications: assign or revoke qualifications for members. Prefer issuing via the training workflow."
-    )
+    admin_helper_message = "Member qualifications: assign or revoke qualifications for members. Prefer issuing via the training workflow."

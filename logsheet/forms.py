@@ -8,8 +8,8 @@ from django.forms import modelformset_factory
 from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue, Towplane
-from members.utils.membership import get_active_membership_statuses
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 
 from .models import (
     Airfield,
@@ -41,8 +41,8 @@ def validate_glider_availability(flight, glider, launch_time, landing_time=None)
         return
 
     # Get the logsheet and date
-    logsheet = getattr(flight, 'logsheet', None) if flight else None
-    if not logsheet or not hasattr(logsheet, 'log_date') or logsheet.log_date is None:
+    logsheet = getattr(flight, "logsheet", None) if flight else None
+    if not logsheet or not hasattr(logsheet, "log_date") or logsheet.log_date is None:
         return
 
     # Find other flights with same glider on same date
@@ -97,9 +97,9 @@ def get_active_members_with_role(role_flag: Optional[str] = None):
 
 def get_active_members():
     active_statuses = get_active_membership_statuses()
-    return Member.objects.filter(
-        membership_status__in=active_statuses
-    ).order_by("last_name", "first_name")
+    return Member.objects.filter(membership_status__in=active_statuses).order_by(
+        "last_name", "first_name"
+    )
 
 
 # FlightForm
@@ -153,7 +153,7 @@ class FlightForm(forms.ModelForm):
 
         # Validate glider availability using the utility function
         # Set the logsheet on the instance for the validation function
-        if self.instance and not getattr(self.instance, 'logsheet', None) and logsheet:
+        if self.instance and not getattr(self.instance, "logsheet", None) and logsheet:
             self.instance.logsheet = logsheet
         validate_glider_availability(self.instance, glider, launch_time, landing_time)
 
@@ -168,11 +168,12 @@ class FlightForm(forms.ModelForm):
 
             if scheduled_tow_pilots and tow_pilot not in scheduled_tow_pilots:
                 # Initialize warnings list if it doesn't exist
-                if not hasattr(self, 'warnings'):
+                if not hasattr(self, "warnings"):
                     self.warnings = []
 
-                scheduled_names = ", ".join([pilot.get_full_name()
-                                            for pilot in scheduled_tow_pilots])
+                scheduled_names = ", ".join(
+                    [pilot.get_full_name() for pilot in scheduled_tow_pilots]
+                )
                 self.warnings.append(
                     f"⚠️ {tow_pilot.get_full_name()} is not on the scheduled tow pilot list for this day. "
                     f"Scheduled tow pilots: {scheduled_names}. "
@@ -223,7 +224,7 @@ class FlightForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         # Extract logsheet parameter for validation
-        self.logsheet = kwargs.pop('logsheet', None)
+        self.logsheet = kwargs.pop("logsheet", None)
         super().__init__(*args, **kwargs)
         # Ensure launch_time and landing_time are always formatted as HH:MM (no seconds)
         for field_name in ["launch_time", "landing_time"]:
@@ -457,7 +458,7 @@ class CreateLogsheetForm(forms.ModelForm):
         surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
 
         # Initialize warnings list
-        if not hasattr(self, 'warnings'):
+        if not hasattr(self, "warnings"):
             self.warnings = []
 
         # Check if logsheet already exists for this date and airfield
@@ -654,7 +655,7 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         surge_tow_pilot = cleaned_data.get("surge_tow_pilot")
 
         # Initialize warnings list
-        if not hasattr(self, 'warnings'):
+        if not hasattr(self, "warnings"):
             self.warnings = []
 
         # PROHIBITIONS: Prevent instructor from being the same as surge instructor

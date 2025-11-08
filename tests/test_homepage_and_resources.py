@@ -24,7 +24,8 @@ def test_homepage_logged_in(client, django_user_model):
 def test_resources_link_for_logged_in_user(client, django_user_model):
     """When logged in, the nav contains the Resources link pointing to cms:home."""
     user = django_user_model.objects.create_user(
-        username="resource_user", password="pass")
+        username="resource_user", password="pass"
+    )
     client.login(username="resource_user", password="pass")
     # load base template via cms home and inspect the rendered HTML for the link
     resp = client.get(reverse("cms:home"))

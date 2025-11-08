@@ -4,21 +4,22 @@ Test suite for BaseCronJobCommand - the foundation of our CronJob system.
 Tests distributed locking, error handling, logging, and dry-run functionality.
 These tests ensure the core framework works reliably across multiple pods.
 """
-import pytest
-import socket
-import os
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
 
-from django.test import TestCase, TransactionTestCase
+import os
+import socket
+from datetime import datetime, timedelta
+from io import StringIO
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import transaction, connection
+from django.db import connection, transaction
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
-from utils.models import CronJobLock
 from utils.management.commands.base_cronjob import BaseCronJobCommand
+from utils.models import CronJobLock
 
 
 class TestCronJobLock(TestCase):
@@ -30,7 +31,7 @@ class TestCronJobLock(TestCase):
             job_name="test_job",
             locked_by="test-pod-123",
             locked_at=timezone.now(),
-            expires_at=timezone.now() + timedelta(hours=1)
+            expires_at=timezone.now() + timedelta(hours=1),
         )
 
         assert lock.job_name == "test_job"
@@ -47,7 +48,7 @@ class TestCronJobLock(TestCase):
             job_name="expired_job",
             locked_by="old-pod",
             locked_at=now - timedelta(hours=2),
-            expires_at=now - timedelta(hours=1)  # Expired 1 hour ago
+            expires_at=now - timedelta(hours=1),  # Expired 1 hour ago
         )
 
         assert expired_lock.is_expired()
@@ -57,7 +58,7 @@ class TestCronJobLock(TestCase):
             job_name="fresh_job",
             locked_by="new-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         assert not fresh_lock.is_expired()
@@ -69,7 +70,7 @@ class TestCronJobLock(TestCase):
             job_name="unique_test",
             locked_by="pod1",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         # Second lock with same job_name should fail
@@ -78,7 +79,7 @@ class TestCronJobLock(TestCase):
                 job_name="unique_test",
                 locked_by="pod2",
                 locked_at=now,
-                expires_at=now + timedelta(hours=1)
+                expires_at=now + timedelta(hours=1),
             )
 
     def test_string_representation(self):
@@ -88,7 +89,7 @@ class TestCronJobLock(TestCase):
             job_name="test_repr",
             locked_by="test-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         expected = "test_repr (test-pod)"
@@ -103,7 +104,7 @@ class TestCronJobLock(TestCase):
             job_name="expired1",
             locked_by="dead-pod",
             locked_at=now - timedelta(hours=2),
-            expires_at=now - timedelta(hours=1)
+            expires_at=now - timedelta(hours=1),
         )
 
         # Create fresh lock
@@ -111,7 +112,7 @@ class TestCronJobLock(TestCase):
             job_name="fresh1",
             locked_by="live-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         # Cleanup should remove expired locks
@@ -129,6 +130,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+
         # Create a concrete implementation for testing
         class TestCommand(BaseCronJobCommand):
             job_name = "test_command"
@@ -141,6 +143,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
 
     def test_job_name_required(self):
         """Test that job_name is required."""
+
         class NoNameCommand(BaseCronJobCommand):
             pass  # No job_name defined
 
@@ -180,7 +183,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
             job_name="test_command",
             locked_by="other-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         success = self.command.acquire_lock()
@@ -195,7 +198,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
             job_name="test_command",
             locked_by="dead-pod",
             locked_at=now - timedelta(hours=2),
-            expires_at=now - timedelta(hours=1)
+            expires_at=now - timedelta(hours=1),
         )
 
         # Should acquire lock successfully after replacing expired one
@@ -226,7 +229,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
             job_name="test_command",
             locked_by="different-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         # Should not be able to release (no error, but lock remains)
@@ -270,12 +273,13 @@ class TestBaseCronJobCommand(TransactionTestCase):
         from django.core.management.base import OutputWrapper
 
         mock_stdout = StringIO()
-        with patch.object(self.command, 'execute_job') as mock_execute:
+        with patch.object(self.command, "execute_job") as mock_execute:
             mock_execute.return_value = None
 
             # Pass the mock stdout directly to handle
-            self.command.handle(dry_run=True, verbosity=2,
-                                stdout=OutputWrapper(mock_stdout))
+            self.command.handle(
+                dry_run=True, verbosity=2, stdout=OutputWrapper(mock_stdout)
+            )
 
         output = mock_stdout.getvalue()
         assert "🔍" in output  # Dry run emoji
@@ -285,8 +289,8 @@ class TestBaseCronJobCommand(TransactionTestCase):
         mock_execute.assert_called_once()
         # Check that the right arguments were passed (ignoring stdout object identity)
         call_args = mock_execute.call_args[1]
-        assert call_args['dry_run'] is True
-        assert call_args['verbosity'] == 2
+        assert call_args["dry_run"] is True
+        assert call_args["verbosity"] == 2
 
         # No locks should be created in dry run
         assert not CronJobLock.objects.filter(job_name="test_command").exists()
@@ -296,7 +300,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
         from django.core.management.base import OutputWrapper
 
         mock_stdout = StringIO()
-        with patch.object(self.command, 'execute_job') as mock_execute:
+        with patch.object(self.command, "execute_job") as mock_execute:
             mock_execute.side_effect = Exception("Test error occurred")
 
             with pytest.raises(Exception):
@@ -318,7 +322,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
             job_name="test_command",
             locked_by="other-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
         mock_stdout = StringIO()
@@ -336,11 +340,11 @@ class TestBaseCronJobCommand(TransactionTestCase):
             job_name="test_command",
             locked_by="other-pod",
             locked_at=now,
-            expires_at=now + timedelta(hours=1)
+            expires_at=now + timedelta(hours=1),
         )
 
-        with patch.object(self.command, 'execute_job') as mock_execute:
-            with patch('sys.stdout', new_callable=StringIO):
+        with patch.object(self.command, "execute_job") as mock_execute:
+            with patch("sys.stdout", new_callable=StringIO):
                 mock_execute.return_value = "Test completed"
                 self.command.handle(force=True, verbosity=1)
 
@@ -354,16 +358,16 @@ class TestBaseCronJobCommand(TransactionTestCase):
 
         # Verify force argument was added
         parser.add_argument.assert_any_call(
-            '--force',
-            action='store_true',
-            help='Force execution even if lock exists (dangerous - use only for debugging)'
+            "--force",
+            action="store_true",
+            help="Force execution even if lock exists (dangerous - use only for debugging)",
         )
 
         # Verify dry-run argument was added
         parser.add_argument.assert_any_call(
-            '--dry-run',
-            action='store_true',
-            help='Show what would be done without actually executing'
+            "--dry-run",
+            action="store_true",
+            help="Show what would be done without actually executing",
         )
 
     def test_utility_logging_methods(self):
@@ -387,6 +391,7 @@ class TestBaseCronJobCommand(TransactionTestCase):
 
     def test_must_implement_execute_job(self):
         """Test that execute_job must be implemented."""
+
         class IncompleteCommand(BaseCronJobCommand):
             job_name = "incomplete"
             # No execute_job implementation
@@ -402,18 +407,19 @@ class TestCronJobCommandIntegration(TransactionTestCase):
 
     def setUp(self):
         """Set up integration test fixtures."""
+
         class IntegrationTestCommand(BaseCronJobCommand):
             job_name = "integration_test"
 
             def execute_job(self, *args, **options):
-                if options.get('should_fail'):
+                if options.get("should_fail"):
                     raise Exception("Intentional test failure")
                 return "Integration test completed"
 
         self.command_class = IntegrationTestCommand
 
-    @patch('socket.gethostname')
-    @patch('os.getpid')
+    @patch("socket.gethostname")
+    @patch("os.getpid")
     def test_concurrent_execution_prevention(self, mock_getpid, mock_hostname):
         """Test that concurrent executions are properly prevented."""
         # Set up different pod identities
@@ -446,7 +452,7 @@ class TestCronJobCommandIntegration(TransactionTestCase):
             job_name="integration_test",
             locked_by="dead-pod-123",
             locked_at=now - timedelta(hours=2),
-            expires_at=now - timedelta(hours=1)
+            expires_at=now - timedelta(hours=1),
         )
 
         command = self.command_class()
@@ -460,7 +466,7 @@ class TestCronJobCommandIntegration(TransactionTestCase):
         assert lock.locked_by == command.pod_id
         assert not lock.is_expired()
 
-    @patch('sys.stdout', new_callable=StringIO)
+    @patch("sys.stdout", new_callable=StringIO)
     def test_end_to_end_execution(self, mock_stdout):
         """Test complete end-to-end command execution."""
         command = self.command_class()
@@ -477,11 +483,9 @@ class TestCronJobCommandIntegration(TransactionTestCase):
         assert "Integration test completed" not in output  # Return value not printed
 
         # Verify no lock remains
-        assert not CronJobLock.objects.filter(
-            job_name="integration_test"
-        ).exists()
+        assert not CronJobLock.objects.filter(job_name="integration_test").exists()
 
-    @patch('sys.stdout', new_callable=StringIO)
+    @patch("sys.stdout", new_callable=StringIO)
     def test_error_handling_with_cleanup(self, mock_stdout):
         """Test that errors are handled gracefully with proper cleanup."""
         command = self.command_class()
@@ -496,6 +500,4 @@ class TestCronJobCommandIntegration(TransactionTestCase):
         assert "❌" in output  # Error emoji
 
         # Verify lock was cleaned up despite error
-        assert not CronJobLock.objects.filter(
-            job_name="integration_test"
-        ).exists()
+        assert not CronJobLock.objects.filter(job_name="integration_test").exists()

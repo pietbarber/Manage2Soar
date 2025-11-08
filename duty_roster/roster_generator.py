@@ -1,18 +1,19 @@
-from siteconfig.models import SiteConfiguration
-from members.models import Member
-from members.constants.membership import DEFAULT_ROLES
-from duty_roster.operational_calendar import get_operational_weekend
+import calendar
+import logging
+import random
+from collections import defaultdict
+from datetime import date
+
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
     MemberBlackout,
 )
-from datetime import date
-from collections import defaultdict
-import random
-import calendar
-import logging
+from duty_roster.operational_calendar import get_operational_weekend
+from members.constants.membership import DEFAULT_ROLES
+from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.generator")
 
@@ -50,11 +51,13 @@ def get_operational_season_bounds(year: int):
         season_end = None
         if config.operations_start_period:
             start_sat, start_sun = get_operational_weekend(
-                year, config.operations_start_period)
+                year, config.operations_start_period
+            )
             season_start = min(start_sat, start_sun)
         if config.operations_end_period:
             end_sat, end_sun = get_operational_weekend(
-                year, config.operations_end_period)
+                year, config.operations_end_period
+            )
             season_end = max(end_sat, end_sun)
 
         result = (season_start, season_end)
@@ -116,16 +119,14 @@ def generate_roster(year=None, month=None):
     ]
 
     # Filter weekend dates to only include those within operational season
-    weekend_dates = [
-        d for d in all_weekend_dates
-        if is_within_operational_season(d)
-    ]
+    weekend_dates = [d for d in all_weekend_dates if is_within_operational_season(d)]
 
     # Log what dates were filtered out for debugging
     filtered_out = [d for d in all_weekend_dates if d not in weekend_dates]
     if filtered_out:
         logger.info(
-            f"Filtered out {len(filtered_out)} weekend dates outside operational season: {filtered_out}")
+            f"Filtered out {len(filtered_out)} weekend dates outside operational season: {filtered_out}"
+        )
     members = list(Member.objects.filter(is_active=True))
     prefs = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()

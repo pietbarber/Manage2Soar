@@ -82,7 +82,9 @@ def update_flight_split(request, flight_id):
 @active_member_required
 def land_flight_now(request, flight_id):
     import json
+
     from django.core.exceptions import ValidationError
+
     from .forms import validate_glider_availability
 
     try:
@@ -110,11 +112,10 @@ def land_flight_now(request, flight_id):
         # Validate glider availability before setting landing time
         try:
             validate_glider_availability(
-                flight, flight.glider, flight.launch_time, landing_time)
-        except ValidationError as e:
-            return JsonResponse(
-                {"success": False, "error": str(e)}, status=400
+                flight, flight.glider, flight.launch_time, landing_time
             )
+        except ValidationError as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
 
         flight.landing_time = landing_time
         flight.save(update_fields=["landing_time"])
@@ -127,7 +128,9 @@ def land_flight_now(request, flight_id):
 @active_member_required
 def launch_flight_now(request, flight_id):
     import json
+
     from django.core.exceptions import ValidationError
+
     from .forms import validate_glider_availability
 
     try:
@@ -151,11 +154,10 @@ def launch_flight_now(request, flight_id):
         # Validate glider availability before setting launch time
         try:
             validate_glider_availability(
-                flight, flight.glider, launch_time, flight.landing_time)
-        except ValidationError as e:
-            return JsonResponse(
-                {"success": False, "error": str(e)}, status=400
+                flight, flight.glider, launch_time, flight.landing_time
             )
+        except ValidationError as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
 
         flight.launch_time = launch_time
         flight.save(update_fields=["launch_time"])
@@ -400,7 +402,7 @@ def manage_logsheet(request, pk):
             missing_towplane_data = []
 
             # Get unique towplanes used in flights
-            used_towplanes = set(flights.values_list('towplane', flat=True).distinct())
+            used_towplanes = set(flights.values_list("towplane", flat=True).distinct())
             used_towplanes.discard(None)  # Remove None values
 
             if used_towplanes:
@@ -410,10 +412,14 @@ def manage_logsheet(request, pk):
 
                     if not closeout:
                         missing_towplane_data.append(
-                            f"Missing closeout data for {towplane.n_number}")
-                    elif (closeout.start_tach is None or closeout.end_tach is None) and closeout.fuel_added is None:
+                            f"Missing closeout data for {towplane.n_number}"
+                        )
+                    elif (
+                        closeout.start_tach is None or closeout.end_tach is None
+                    ) and closeout.fuel_added is None:
                         missing_towplane_data.append(
-                            f"Missing tach times or fuel data for {towplane.n_number}")
+                            f"Missing tach times or fuel data for {towplane.n_number}"
+                        )
 
                 if missing_towplane_data:
                     for msg in missing_towplane_data:
@@ -647,6 +653,7 @@ def edit_flight(request, logsheet_pk, flight_pk):
 
     # Only allow edits if user has permission
     from logsheet.utils.permissions import can_edit_logsheet
+
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
@@ -1138,6 +1145,7 @@ def edit_logsheet_closeout(request, pk):
     ).select_related("reported_by", "glider", "towplane")
 
     from logsheet.utils.permissions import can_edit_logsheet
+
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 

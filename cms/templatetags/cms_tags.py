@@ -8,7 +8,7 @@ def split_lines(value):
     """Split text by newlines and return non-empty lines."""
     if not value:
         return []
-    return [line.strip() for line in value.split('\n') if line.strip()]
+    return [line.strip() for line in value.split("\n") if line.strip()]
 
 
 @register.filter
@@ -40,7 +40,7 @@ def format_address(site_config):
             address_parts.append(city_line)
 
         # Country (if not USA)
-        if site_config.club_country and site_config.club_country.upper() != 'USA':
+        if site_config.club_country and site_config.club_country.upper() != "USA":
             address_parts.append(site_config.club_country)
     else:
         return ["Contact us for location information"]
@@ -67,7 +67,7 @@ def google_maps_url(site_config):
         address_parts.append(site_config.club_state)
     if site_config.club_zip_code:
         address_parts.append(site_config.club_zip_code)
-    if site_config.club_country and site_config.club_country.upper() != 'USA':
+    if site_config.club_country and site_config.club_country.upper() != "USA":
         address_parts.append(site_config.club_country)
 
     # Join address parts and URL encode
@@ -75,6 +75,7 @@ def google_maps_url(site_config):
 
     # Use urllib.parse to properly encode the address
     from urllib.parse import quote_plus
+
     encoded_address = quote_plus(full_address)
 
     return f"https://www.google.com/maps/search/?api=1&query={encoded_address}"

@@ -4,16 +4,16 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from instructors.models import InstructionReport
 from knowledgetest.models import (
     Question,
     QuestionCategory,
     TestPreset,
     WrittenTestAnswer,
+    WrittenTestAssignment,
     WrittenTestAttempt,
     WrittenTestTemplate,
-    WrittenTestAssignment,
 )
-from instructors.models import InstructionReport
 
 User = get_user_model()
 
@@ -177,7 +177,8 @@ class WrittenTestDeleteTests(TestCase):
         self.student.save()
 
         self.instructor = User.objects.create_user(
-            username="instructor", password="pass")
+            username="instructor", password="pass"
+        )
         self.instructor.membership_status = "Full Member"
         self.instructor.is_staff = True
         self.instructor.save()
@@ -189,9 +190,14 @@ class WrittenTestDeleteTests(TestCase):
         # Create test data
         self.cat = QuestionCategory.objects.create(code="PRE", description="Pre-solo")
         self.q1 = Question.objects.create(
-            qnum=1, category=self.cat, question_text="Q1?",
-            option_a="A1", option_b="B1", option_c="C1", option_d="D1",
-            correct_answer="A"
+            qnum=1,
+            category=self.cat,
+            question_text="Q1?",
+            option_a="A1",
+            option_b="B1",
+            option_c="C1",
+            option_d="D1",
+            correct_answer="A",
         )
 
         self.tmpl = WrittenTestTemplate.objects.create(
@@ -205,7 +211,7 @@ class WrittenTestDeleteTests(TestCase):
             template=self.tmpl,
             instructor=self.instructor,
             score_percentage=80.0,
-            passed=True
+            passed=True,
         )
 
         self.assignment = WrittenTestAssignment.objects.create(
@@ -213,20 +219,20 @@ class WrittenTestDeleteTests(TestCase):
             student=self.student,
             instructor=self.instructor,
             completed=True,
-            attempt=self.attempt
+            attempt=self.attempt,
         )
 
         # Create instruction report
         self.instruction_report = InstructionReport.objects.create(
             student=self.student,
             instructor=self.instructor,
-            report_date='2024-01-01',
-            report_text="Test instruction"
+            report_date="2024-01-01",
+            report_text="Test instruction",
         )
 
     def test_anonymous_user_cannot_delete(self):
         """Anonymous users should be redirected to login"""
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
@@ -234,7 +240,7 @@ class WrittenTestDeleteTests(TestCase):
     def test_student_can_delete_own_attempt(self):
         """Students should be able to delete their own attempts"""
         self.client.login(username="student", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
@@ -242,7 +248,7 @@ class WrittenTestDeleteTests(TestCase):
     def test_instructor_can_delete_student_attempt(self):
         """Instructors should be able to delete their students' attempts"""
         self.client.login(username="instructor", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
@@ -250,7 +256,7 @@ class WrittenTestDeleteTests(TestCase):
     def test_other_student_cannot_delete(self):
         """Other students should not be able to delete attempts"""
         self.client.login(username="other", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
         self.assertTrue(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
@@ -264,7 +270,7 @@ class WrittenTestDeleteTests(TestCase):
         staff_user.save()
 
         self.client.login(username="staff", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
@@ -273,25 +279,23 @@ class WrittenTestDeleteTests(TestCase):
         """Deleting an attempt should cascade to delete related answers"""
         # Create an answer for the attempt
         WrittenTestAnswer.objects.create(
-            attempt=self.attempt,
-            question=self.q1,
-            selected_answer="A",
-            is_correct=True
+            attempt=self.attempt, question=self.q1, selected_answer="A", is_correct=True
         )
 
         self.client.login(username="student", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
-        self.assertFalse(WrittenTestAnswer.objects.filter(
-            attempt=self.attempt).exists())
+        self.assertFalse(
+            WrittenTestAnswer.objects.filter(attempt=self.attempt).exists()
+        )
 
     def test_instruction_report_persists_after_attempt_deletion(self):
         """InstructionReport should remain valid after attempt deletion (independent entities)"""
         self.client.login(username="student", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 302)
@@ -304,7 +308,7 @@ class WrittenTestDeleteTests(TestCase):
     def test_get_request_shows_confirmation_page(self):
         """GET request should show confirmation page"""
         self.client.login(username="student", password="pass")
-        url = reverse('knowledgetest:quiz-attempt-delete', args=[self.attempt.pk])
+        url = reverse("knowledgetest:quiz-attempt-delete", args=[self.attempt.pk])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -322,7 +326,7 @@ class WrittenTestDeleteTests(TestCase):
             template=self.tmpl,
             student=new_student,
             instructor=self.instructor,
-            completed=False
+            completed=False,
         )
 
         # Login as the new student
@@ -339,7 +343,7 @@ class WrittenTestDeleteTests(TestCase):
         self.assertTrue(attempt.passed)  # Should pass with 100% correct
 
         # Now delete the attempt and verify it's gone
-        delete_url = reverse('knowledgetest:quiz-attempt-delete', args=[attempt.pk])
+        delete_url = reverse("knowledgetest:quiz-attempt-delete", args=[attempt.pk])
         delete_response = self.client.post(delete_url)
         self.assertEqual(delete_response.status_code, 302)
 
@@ -356,9 +360,11 @@ class TestPresetTests(TestCase):
 
         # Create test categories
         self.cat_gf = QuestionCategory.objects.create(
-            code="GF", description="Ground Fundamentals")
+            code="GF", description="Ground Fundamentals"
+        )
         self.cat_st = QuestionCategory.objects.create(
-            code="ST", description="Soaring Technique")
+            code="ST", description="Soaring Technique"
+        )
         self.cat_wx = QuestionCategory.objects.create(code="WX", description="Weather")
 
     def test_create_test_preset(self):
@@ -368,7 +374,7 @@ class TestPresetTests(TestCase):
             description="A test preset for unit testing",
             category_weights={"GF": 5, "ST": 3, "WX": 2},
             is_active=True,
-            sort_order=50
+            sort_order=50,
         )
 
         self.assertEqual(preset.name, "Test Preset")
@@ -440,18 +446,16 @@ class TestPresetTests(TestCase):
             name="Dict Test 1",
             is_active=True,
             sort_order=10,
-            category_weights={"GF": 5, "ST": 3}
+            category_weights={"GF": 5, "ST": 3},
         )
         TestPreset.objects.create(
             name="Dict Test 2",
             is_active=True,
             sort_order=20,
-            category_weights={"WX": 2}
+            category_weights={"WX": 2},
         )
         TestPreset.objects.create(
-            name="Inactive Dict",
-            is_active=False,
-            category_weights={"GF": 10}
+            name="Inactive Dict", is_active=False, category_weights={"GF": 10}
         )
 
         presets_dict = TestPreset.get_presets_as_dict()
@@ -466,13 +470,9 @@ class TestPresetTests(TestCase):
     def test_get_total_questions(self):
         """Test the get_total_questions method"""
         preset_with_questions = TestPreset.objects.create(
-            name="Questions Test",
-            category_weights={"GF": 10, "ST": 5, "WX": 3}
+            name="Questions Test", category_weights={"GF": 10, "ST": 5, "WX": 3}
         )
-        preset_empty = TestPreset.objects.create(
-            name="Empty Test",
-            category_weights={}
-        )
+        preset_empty = TestPreset.objects.create(name="Empty Test", category_weights={})
 
         self.assertEqual(preset_with_questions.get_total_questions(), 18)
         self.assertEqual(preset_empty.get_total_questions(), 0)
@@ -482,8 +482,7 @@ class TestPresetTests(TestCase):
         # Create a preset and a template that might reference it
         preset = TestPreset.objects.create(name="Deletable Preset", is_active=True)
         WrittenTestTemplate.objects.create(
-            name="Test using Deletable Preset data",
-            pass_percentage=70
+            name="Test using Deletable Preset data", pass_percentage=70
         )
 
         # Deletion should succeed - no automatic protection
@@ -495,14 +494,16 @@ class TestPresetTests(TestCase):
     def test_preset_deletion_success(self):
         """Test that unused presets can be deleted successfully"""
         preset = TestPreset.objects.create(
-            name="Another Deletable Preset", is_active=True)
+            name="Another Deletable Preset", is_active=True
+        )
 
         # Should be able to delete without error
         preset.delete()
 
         # Preset should be gone
-        self.assertFalse(TestPreset.objects.filter(
-            name="Another Deletable Preset").exists())
+        self.assertFalse(
+            TestPreset.objects.filter(name="Another Deletable Preset").exists()
+        )
 
     def test_bulk_delete_optimization(self):
         """Test that bulk delete uses values_list for efficiency"""
@@ -511,18 +512,19 @@ class TestPresetTests(TestCase):
             TestPreset.objects.create(
                 name=f"Bulk Delete Test {i}",
                 description=f"Test preset {i} for bulk deletion",
-                is_active=True
+                is_active=True,
             )
 
         # Verify they exist
-        self.assertEqual(TestPreset.objects.filter(
-            name__startswith="Bulk Delete Test").count(), 3)
+        self.assertEqual(
+            TestPreset.objects.filter(name__startswith="Bulk Delete Test").count(), 3
+        )
 
         # Test that we can efficiently get names and delete
         queryset = TestPreset.objects.filter(name__startswith="Bulk Delete Test")
 
         # This is the optimized approach used in delete_queryset
-        deleted_names = list(queryset.values_list('name', flat=True))
+        deleted_names = list(queryset.values_list("name", flat=True))
         self.assertEqual(len(deleted_names), 3)
         self.assertIn("Bulk Delete Test 0", deleted_names)
         self.assertIn("Bulk Delete Test 1", deleted_names)
@@ -533,8 +535,9 @@ class TestPresetTests(TestCase):
         self.assertEqual(count_deleted, 3)
 
         # Verify all were deleted
-        self.assertEqual(TestPreset.objects.filter(
-            name__startswith="Bulk Delete Test").count(), 0)
+        self.assertEqual(
+            TestPreset.objects.filter(name__startswith="Bulk Delete Test").count(), 0
+        )
 
 
 class TestPresetViewIntegrationTests(TestCase):
@@ -551,9 +554,11 @@ class TestPresetViewIntegrationTests(TestCase):
 
         # Create test categories
         self.cat_gf = QuestionCategory.objects.create(
-            code="GF", description="Ground Fundamentals")
+            code="GF", description="Ground Fundamentals"
+        )
         self.cat_st = QuestionCategory.objects.create(
-            code="ST", description="Soaring Technique")
+            code="ST", description="Soaring Technique"
+        )
 
         # Create test presets
         self.preset_active = TestPreset.objects.create(
@@ -561,14 +566,14 @@ class TestPresetViewIntegrationTests(TestCase):
             description="Active preset for testing",
             category_weights={"GF": 5, "ST": 3},
             is_active=True,
-            sort_order=10
+            sort_order=10,
         )
         self.preset_inactive = TestPreset.objects.create(
             name="Inactive Test",
             description="Inactive preset for testing",
             category_weights={"GF": 2},
             is_active=False,
-            sort_order=20
+            sort_order=20,
         )
 
     def test_get_presets_function(self):

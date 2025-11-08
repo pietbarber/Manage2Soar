@@ -23,6 +23,7 @@ from knowledgetest.models import (
     WrittenTestTemplateQuestion,
 )
 from members.decorators import active_member_required
+
 try:
     from notifications.models import Notification
 except ImportError:
@@ -298,8 +299,13 @@ class WrittenTestSubmitView(View):
             try:
                 if Notification is not None:
                     student_name = getattr(
-                        request.user, "full_display_name", str(request.user))
-                    score_pct = f"{attempt.score_percentage:.0f}%" if attempt.score_percentage is not None else "N/A"
+                        request.user, "full_display_name", str(request.user)
+                    )
+                    score_pct = (
+                        f"{attempt.score_percentage:.0f}%"
+                        if attempt.score_percentage is not None
+                        else "N/A"
+                    )
                     status = "Passed" if attempt.passed else "Failed"
                     notif_msg = f"{student_name} has completed the written test '{tmpl.name}': {score_pct} ({status})."
                     # notif_url computed above
@@ -308,7 +314,8 @@ class WrittenTestSubmitView(View):
                         # Don't crash if creating notification fails
                         try:
                             Notification.objects.create(
-                                user=asn.instructor, message=notif_msg, url=notif_url)
+                                user=asn.instructor, message=notif_msg, url=notif_url
+                            )
                         except Exception:
                             pass
 
@@ -316,7 +323,8 @@ class WrittenTestSubmitView(View):
                     if tmpl.created_by and tmpl.created_by != asn.instructor:
                         try:
                             Notification.objects.create(
-                                user=tmpl.created_by, message=notif_msg, url=notif_url)
+                                user=tmpl.created_by, message=notif_msg, url=notif_url
+                            )
                         except Exception:
                             pass
             except Exception:
@@ -333,8 +341,9 @@ class WrittenTestSubmitView(View):
 
             # Include a persistent link to the attempt result in the report_text
             link_html = (
-                format_html(' <a href="{}">View written test result</a>',
-                            notif_url) if notif_url else ""
+                format_html(' <a href="{}">View written test result</a>', notif_url)
+                if notif_url
+                else ""
             )
             InstructionReport.objects.create(
                 student=request.user,
@@ -359,6 +368,7 @@ class WrittenTestResultView(DetailView):
 @method_decorator(active_member_required, name="dispatch")
 class WrittenTestAttemptDeleteView(View):
     """Allow staff, students (own attempts), or the grading instructor/template creator to delete an attempt."""
+
     template_name = "written_test/delete_confirm.html"
 
     def _check_permission(self, user, attempt):
@@ -381,7 +391,10 @@ class WrittenTestAttemptDeleteView(View):
         attempt = get_object_or_404(WrittenTestAttempt, pk=pk)
         # Student may view confirmation only when an assignment exists and is completed
         owns_completed_assignment = WrittenTestAssignment.objects.filter(
-            template=attempt.template, student=request.user, attempt=attempt, completed=True
+            template=attempt.template,
+            student=request.user,
+            attempt=attempt,
+            completed=True,
         ).exists()
         if request.user == attempt.student and owns_completed_assignment:
             return render(request, self.template_name, {"attempt": attempt})
@@ -394,7 +407,9 @@ class WrittenTestAttemptDeleteView(View):
         student_pk = attempt.student.pk
         attempt.delete()
         # Redirect to the student's instruction record where the report lived
-        return redirect(reverse("instructors:member_instruction_record", args=[student_pk]))
+        return redirect(
+            reverse("instructors:member_instruction_record", args=[student_pk])
+        )
 
 
 class PendingTestsView(ListView):
@@ -410,64 +425,72 @@ class PendingTestsView(ListView):
 @method_decorator(active_member_required, name="dispatch")
 class MemberWrittenTestHistoryView(ListView):
     """Shows all completed written tests for the current member."""
+
     template_name = "written_test/member_history.html"
     context_object_name = "attempts"
     paginate_by = 20
 
     def get_queryset(self):
-        return WrittenTestAttempt.objects.filter(
-            student=self.request.user
-        ).select_related(
-            "template", "instructor"
-        ).prefetch_related(
-            "answers__question"
-        ).order_by("-date_taken")
+        return (
+            WrittenTestAttempt.objects.filter(student=self.request.user)
+            .select_related("template", "instructor")
+            .prefetch_related("answers__question")
+            .order_by("-date_taken")
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Add summary stats
         attempts = self.get_queryset()
-        context.update({
-            "total_tests": attempts.count(),
-            "passed_tests": attempts.filter(passed=True).count(),
-            "failed_tests": attempts.filter(passed=False).count(),
-        })
+        context.update(
+            {
+                "total_tests": attempts.count(),
+                "passed_tests": attempts.filter(passed=True).count(),
+                "failed_tests": attempts.filter(passed=False).count(),
+            }
+        )
         return context
 
 
 @method_decorator(active_member_required, name="dispatch")
 class InstructorRecentTestsView(ListView):
     """Shows recently completed written tests for all students - instructor view."""
+
     template_name = "written_test/instructor_recent.html"
     context_object_name = "attempts"
     paginate_by = 50
 
     def dispatch(self, request, *args, **kwargs):
         # Check if user is an instructor (has given instruction reports or is staff)
-        if not (request.user.is_staff or
-                InstructionReport.objects.filter(instructor=request.user).exists()):
+        if not (
+            request.user.is_staff
+            or InstructionReport.objects.filter(instructor=request.user).exists()
+        ):
             return HttpResponseForbidden("Access restricted to instructors and staff")
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         # Show tests from the last 30 days, most recent first
         from datetime import timedelta
+
         cutoff_date = timezone.now() - timedelta(days=30)
 
-        return WrittenTestAttempt.objects.filter(
-            date_taken__gte=cutoff_date
-        ).select_related(
-            "student", "template", "instructor"
-        ).order_by("-date_taken")
+        return (
+            WrittenTestAttempt.objects.filter(date_taken__gte=cutoff_date)
+            .select_related("student", "template", "instructor")
+            .order_by("-date_taken")
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Add summary stats for the period
         attempts = self.get_queryset()
-        context.update({
-            "total_recent": attempts.count(),
-            "recent_passed": attempts.filter(passed=True).count(),
-            "recent_failed": attempts.filter(passed=False).count(),
-            "period_days": 30,
-        })
+        context.update(
+            {
+                "total_recent": attempts.count(),
+                "recent_passed": attempts.filter(passed=True).count(),
+                "recent_failed": attempts.filter(passed=False).count(),
+                "period_days": 30,
+            }
+        )
         return context

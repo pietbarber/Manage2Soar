@@ -13,10 +13,10 @@
 #############################################################
 
 
-import sys
-import re
 import logging
 import os
+import re
+import sys
 from pathlib import Path
 
 from django.contrib.messages import constants as messages
@@ -30,7 +30,7 @@ from google.oauth2 import service_account
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Detect if we're running in a test environment to prevent test pollution
-TESTING = any(arg.startswith('test') for arg in sys.argv[1:2])
+TESTING = any(arg.startswith("test") for arg in sys.argv[1:2])
 
 # Load environment variables from the .env file located in the BASE_DIR.
 # This ensures that sensitive information and configuration can be managed
@@ -241,7 +241,7 @@ GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
 CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")  # Default to Skyline Soaring Club
 
 # Validate CLUB_PREFIX to prevent path traversal attacks
-if not re.match(r'^[a-zA-Z0-9-]+$', CLUB_PREFIX):
+if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     raise Exception(
         f"Invalid CLUB_PREFIX '{CLUB_PREFIX}'. "
         "CLUB_PREFIX must contain only alphanumeric characters and hyphens. "

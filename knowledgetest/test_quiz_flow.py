@@ -1,9 +1,11 @@
 import json
+from typing import cast
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from instructors.models import InstructionReport
 from knowledgetest.models import (
     Question,
     QuestionCategory,
@@ -11,9 +13,7 @@ from knowledgetest.models import (
     WrittenTestAttempt,
     WrittenTestTemplate,
 )
-from instructors.models import InstructionReport
 from notifications.models import Notification
-from typing import cast
 
 User = get_user_model()
 
@@ -168,7 +168,8 @@ class QuizFlowTests(TestCase):
         from knowledgetest.models import WrittenTestAssignment
 
         asn = WrittenTestAssignment.objects.get(
-            template=self.tmpl, student=self.student)
+            template=self.tmpl, student=self.student
+        )
         asn.instructor = instructor
         asn.save(update_fields=["instructor"])
 
@@ -212,7 +213,8 @@ class QuizFlowTests(TestCase):
 
         # Check that an InstructionReport was created
         reports = InstructionReport.objects.filter(
-            student=self.student, instructor=instructor)
+            student=self.student, instructor=instructor
+        )
         self.assertTrue(reports.exists())
 
         report = reports.first()
@@ -241,12 +243,14 @@ class WrittenTestDeleteTests(TestCase):
         self.student.save()
 
         self.instructor = User.objects.create_user(
-            username="instructor", password="pass")
+            username="instructor", password="pass"
+        )
         self.instructor.membership_status = "Full Member"
         self.instructor.save()
 
         self.staff_user = User.objects.create_user(
-            username="staff", password="pass", is_staff=True)
+            username="staff", password="pass", is_staff=True
+        )
         self.staff_user.membership_status = "Full Member"
         self.staff_user.save()
 
@@ -256,7 +260,8 @@ class WrittenTestDeleteTests(TestCase):
 
         # Create test content
         self.cat = QuestionCategory.objects.create(
-            code="TEST", description="Test Category")
+            code="TEST", description="Test Category"
+        )
         self.q1 = Question.objects.create(
             qnum=1,
             category=self.cat,
@@ -269,9 +274,7 @@ class WrittenTestDeleteTests(TestCase):
         )
 
         self.tmpl = WrittenTestTemplate.objects.create(
-            name="Test Template",
-            pass_percentage=70,
-            created_by=self.instructor
+            name="Test Template", pass_percentage=70, created_by=self.instructor
         )
         self.tmpl.questions.add(self.q1, through_defaults={"order": 1})
 
@@ -281,28 +284,27 @@ class WrittenTestDeleteTests(TestCase):
             student=self.student,
             instructor=self.instructor,
             score_percentage=85.0,
-            passed=True
+            passed=True,
         )
 
         # Create answer
         WrittenTestAnswer.objects.create(
-            attempt=self.attempt,
-            question=self.q1,
-            selected_answer="A",
-            is_correct=True
+            attempt=self.attempt, question=self.q1, selected_answer="A", is_correct=True
         )
 
     def test_staff_can_delete_attempt(self):
         """Staff users should be able to delete any attempt."""
         self.client.login(username="staff", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         # Should redirect to the student's instruction record
         expected_redirect = reverse(
-            "instructors:member_instruction_record", args=[self.student.pk])
+            "instructors:member_instruction_record", args=[self.student.pk]
+        )
         self.assertRedirects(resp, expected_redirect)
 
         # Attempt should be deleted
@@ -312,12 +314,14 @@ class WrittenTestDeleteTests(TestCase):
         """The grading instructor should be able to delete attempts they graded."""
         self.client.login(username="instructor", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         expected_redirect = reverse(
-            "instructors:member_instruction_record", args=[self.student.pk])
+            "instructors:member_instruction_record", args=[self.student.pk]
+        )
         self.assertRedirects(resp, expected_redirect)
 
         # Attempt should be deleted
@@ -327,7 +331,8 @@ class WrittenTestDeleteTests(TestCase):
         """The creator/proctor of the test template should be able to delete attempts."""
         # Create a different instructor to be the grading instructor
         grading_instructor = User.objects.create_user(
-            username="grader", password="pass")
+            username="grader", password="pass"
+        )
         grading_instructor.membership_status = "Full Member"
         grading_instructor.save()
 
@@ -337,12 +342,14 @@ class WrittenTestDeleteTests(TestCase):
         # Template creator (self.instructor) should still be able to delete
         self.client.login(username="instructor", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         expected_redirect = reverse(
-            "instructors:member_instruction_record", args=[self.student.pk])
+            "instructors:member_instruction_record", args=[self.student.pk]
+        )
         self.assertRedirects(resp, expected_redirect)
 
         # Attempt should be deleted
@@ -352,8 +359,9 @@ class WrittenTestDeleteTests(TestCase):
         """Users who are not staff, grading instructor, or template creator should not be able to delete."""
         self.client.login(username="other", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         # Should return 403 Forbidden
@@ -366,8 +374,9 @@ class WrittenTestDeleteTests(TestCase):
         """Students should be able to delete their own attempts."""
         self.client.login(username="student", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         # Should redirect after successful deletion
@@ -380,8 +389,9 @@ class WrittenTestDeleteTests(TestCase):
         """Only POST requests should be allowed for deletion."""
         self.client.login(username="staff", password="pass")
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.get(delete_url)
 
         # Should return 405 Method Not Allowed
@@ -407,8 +417,9 @@ class WrittenTestDeleteTests(TestCase):
         # Verify answer exists before deletion
         self.assertTrue(WrittenTestAnswer.objects.filter(attempt=self.attempt).exists())
 
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         resp = self.client.post(delete_url)
 
         # Should redirect successfully
@@ -416,8 +427,9 @@ class WrittenTestDeleteTests(TestCase):
 
         # Both attempt and related answers should be deleted
         self.assertFalse(WrittenTestAttempt.objects.filter(pk=self.attempt.pk).exists())
-        self.assertFalse(WrittenTestAnswer.objects.filter(
-            attempt=self.attempt).exists())
+        self.assertFalse(
+            WrittenTestAnswer.objects.filter(attempt=self.attempt).exists()
+        )
 
     def test_result_page_shows_delete_button_with_confirmation(self):
         """The result page should show delete button with confirmation dialog for authorized users."""
@@ -436,8 +448,9 @@ class WrittenTestDeleteTests(TestCase):
         self.assertContains(resp, "This action cannot be undone")
 
         # Check that the form points to the correct delete URL
-        delete_url = reverse("knowledgetest:quiz-attempt-delete",
-                             args=[self.attempt.pk])
+        delete_url = reverse(
+            "knowledgetest:quiz-attempt-delete", args=[self.attempt.pk]
+        )
         self.assertContains(resp, f'action="{delete_url}"')
 
     def test_result_page_shows_pass_threshold(self):

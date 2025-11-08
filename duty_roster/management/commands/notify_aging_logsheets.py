@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.timezone import now
@@ -16,29 +17,28 @@ class Command(BaseCronJobCommand):
     def add_arguments(self, parser):
         super().add_arguments(parser)
         parser.add_argument(
-            '--days',
+            "--days",
             type=int,
             default=7,
-            help='Number of days after which logsheets are considered aging (default: 7)'
+            help="Number of days after which logsheets are considered aging (default: 7)",
         )
 
     def execute_job(self, *args, **options):
-        aging_days = options.get('days', 7)
+        aging_days = options.get("days", 7)
         cutoff_date = now() - timedelta(days=aging_days)
 
         self.log_info(
-            f"Checking for logsheets older than {aging_days} days (before {cutoff_date.date()})")
+            f"Checking for logsheets older than {aging_days} days (before {cutoff_date.date()})"
+        )
 
         # Find unfinalized logsheets older than the cutoff
-        aging_logsheets = Logsheet.objects.filter(
-            finalized=False,
-            log_date__lt=cutoff_date.date()
-        ).select_related(
-            'duty_officer',
-            'assistant_duty_officer',
-            'created_by',
-            'airfield'
-        ).order_by('created_at')
+        aging_logsheets = (
+            Logsheet.objects.filter(finalized=False, log_date__lt=cutoff_date.date())
+            .select_related(
+                "duty_officer", "assistant_duty_officer", "created_by", "airfield"
+            )
+            .order_by("created_at")
+        )
 
         if not aging_logsheets.exists():
             self.log_info("No aging logsheets found")
@@ -70,22 +70,25 @@ class Command(BaseCronJobCommand):
 
         if not duty_officer_logsheets:
             self.log_warning(
-                "No duty officers with email addresses found for aging logsheets")
+                "No duty officers with email addresses found for aging logsheets"
+            )
             return
 
         # Send notifications to each duty officer
         notifications_sent = 0
         for member, logsheet_data in duty_officer_logsheets.items():
-            if not options.get('dry_run'):
+            if not options.get("dry_run"):
                 self._send_notification(member, logsheet_data)
                 notifications_sent += 1
             else:
                 self.log_info(
-                    f"Would notify {member.full_display_name} about {len(logsheet_data)} aging logsheet(s)")
+                    f"Would notify {member.full_display_name} about {len(logsheet_data)} aging logsheet(s)"
+                )
 
         if notifications_sent > 0:
             self.log_success(
-                f"Sent aging logsheet notifications to {notifications_sent} duty officer(s)")
+                f"Sent aging logsheet notifications to {notifications_sent} duty officer(s)"
+            )
         else:
             self.log_info("No notifications sent (dry run mode)")
 
@@ -97,9 +100,12 @@ class Command(BaseCronJobCommand):
         for logsheet, days_old in logsheet_data:
             date_str = logsheet.created_at.strftime("%A, %B %d, %Y")
             logsheet_list.append(
-                f"- {date_str} at {logsheet.airfield} ({days_old} days old)")
+                f"- {date_str} at {logsheet.airfield} ({days_old} days old)"
+            )
 
-        subject = f"Aging Logsheet Reminder - {len(logsheet_data)} Unfinalized Logsheet(s)"
+        subject = (
+            f"Aging Logsheet Reminder - {len(logsheet_data)} Unfinalized Logsheet(s)"
+        )
 
         message = f"""Hello {member.full_display_name},
 
@@ -129,11 +135,12 @@ Thank you for your attention to this matter.
             Notification.objects.create(
                 user=member,
                 message=f"You have {len(logsheet_data)} aging logsheet(s) that need finalization",
-                url="/logsheet/"
+                url="/logsheet/",
             )
 
             self.log_success(
-                f"Notified {member.full_display_name} about {len(logsheet_data)} aging logsheet(s)")
+                f"Notified {member.full_display_name} about {len(logsheet_data)} aging logsheet(s)"
+            )
 
         except Exception as e:
             self.log_error(f"Failed to notify {member.full_display_name}: {str(e)}")

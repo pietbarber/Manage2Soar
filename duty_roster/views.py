@@ -2,9 +2,7 @@ import calendar
 import json
 import logging
 from collections import defaultdict
-from datetime import date
-from datetime import date as dt_date
-from datetime import timedelta
+from datetime import date, date as dt_date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -47,17 +45,8 @@ logger = logging.getLogger("duty_roster.views")
 
 def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
-    trigger_data = {
-        'refreshCalendar': {
-            'year': int(year),
-            'month': int(month)
-        }
-    }
-    return HttpResponse(
-        headers={
-            'HX-Trigger': json.dumps(trigger_data)
-        }
-    )
+    trigger_data = {"refreshCalendar": {"year": int(year), "month": int(month)}}
+    return HttpResponse(headers={"HX-Trigger": json.dumps(trigger_data)})
 
 
 def roster_home(request):
@@ -603,7 +592,9 @@ def calendar_ad_hoc_confirm(request, year, month, day):
 
     # Check if user is authenticated
     if not request.user.is_authenticated:
-        return HttpResponse("You must be signed in to propose and edit operations", status=403)
+        return HttpResponse(
+            "You must be signed in to propose and edit operations", status=403
+        )
 
     default_airfield = Airfield.objects.get(identifier="KFRR")
 
@@ -808,25 +799,26 @@ def propose_roster(request):
     filtered_dates = []
     if siteconfig:
         from .roster_generator import get_operational_season_bounds
+
         try:
             season_start, season_end = get_operational_season_bounds(year)
 
             # Only show operational info if we have filtering enabled
             if season_start or season_end:
                 if season_start:
-                    operational_info['season_start'] = season_start
+                    operational_info["season_start"] = season_start
                 if season_end:
-                    operational_info['season_end'] = season_end
+                    operational_info["season_end"] = season_end
 
                 # Find which dates would be filtered out
                 cal = calendar.Calendar()
                 all_weekend_dates = [
-                    d for d in cal.itermonthdates(year, month)
+                    d
+                    for d in cal.itermonthdates(year, month)
                     if d.month == month and d.weekday() in (5, 6)
                 ]
                 filtered_dates = [
-                    d for d in all_weekend_dates
-                    if not is_within_operational_season(d)
+                    d for d in all_weekend_dates if not is_within_operational_season(d)
                 ]
         except Exception as e:
             logger.warning(f"Error calculating operational season info: {e}")
@@ -849,12 +841,15 @@ def propose_roster(request):
                         continue
 
                 draft = [
-                    entry for entry in draft
+                    entry
+                    for entry in draft
                     if dt_date.fromisoformat(entry["date"]) not in dates_to_remove_set
                 ]
                 request.session["proposed_roster"] = draft
                 messages.success(
-                    request, f"Removed {len(dates_to_remove)} date(s) from the proposed roster.")
+                    request,
+                    f"Removed {len(dates_to_remove)} date(s) from the proposed roster.",
+                )
 
         elif action == "roll":
             raw = generate_roster(year, month)
@@ -863,7 +858,9 @@ def propose_roster(request):
                 weekend = [
                     d
                     for d in cal.itermonthdates(year, month)
-                    if d.month == month and d.weekday() in (5, 6) and is_within_operational_season(d)
+                    if d.month == month
+                    and d.weekday() in (5, 6)
+                    and is_within_operational_season(d)
                 ]
                 raw = [
                     {"date": d, "slots": {r: None for r in enabled_roles}}
@@ -978,20 +975,28 @@ def calendar_view(request, year=None, month=None):
     return render(request, "duty_roster/calendar.html", context)
 
 
-@user_passes_test(lambda u: u.is_authenticated and (
-    u.rostermeister or u.member_manager or u.director or u.is_superuser
-))
+@user_passes_test(
+    lambda u: u.is_authenticated
+    and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
+)
 def duty_delinquents_detail(request):
     """
     Detailed view of members who haven't been performing duty.
     Accessible only to rostermeister, member-meister, directors, and superusers.
     """
     from datetime import timedelta
-    from django.db.models import Q, Count
+
+    from django.db.models import Count, Q
     from django.utils.timezone import now
+
+    from duty_roster.models import (
+        DutyAssignment,
+        DutyPreference,
+        DutySlot,
+        MemberBlackout,
+    )
     from logsheet.models import Flight
     from members.models import Member
-    from duty_roster.models import DutySlot, DutyAssignment, MemberBlackout, DutyPreference
 
     # Parameters (could be made configurable via URL params)
     lookback_months = 12
@@ -1007,20 +1012,19 @@ def duty_delinquents_detail(request):
     # Step 1: Find all members who have been in the club for 3+ months
     eligible_members = Member.objects.filter(
         Q(joined_club__lt=membership_cutoff_date) | Q(joined_club__isnull=True),
-        membership_status__in=['Full Member', 'Student Member', 'Life Member']
-    ).exclude(
-        membership_status__in=['Inactive', 'Terminated', 'Suspended']
-    )
+        membership_status__in=["Full Member", "Student Member", "Life Member"],
+    ).exclude(membership_status__in=["Inactive", "Terminated", "Suspended"])
 
     # Step 2: Find members who have been actively flying
-    active_flyers = eligible_members.filter(
-        flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
-        flights_as_pilot__logsheet__finalized=True
-    ).annotate(
-        flight_count=Count('flights_as_pilot', distinct=True)
-    ).filter(
-        flight_count__gte=min_flights
-    ).distinct()
+    active_flyers = (
+        eligible_members.filter(
+            flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
+            flights_as_pilot__logsheet__finalized=True,
+        )
+        .annotate(flight_count=Count("flights_as_pilot", distinct=True))
+        .filter(flight_count__gte=min_flights)
+        .distinct()
+    )
 
     # Step 3: Build detailed report for each active flyer
     duty_delinquents = []
@@ -1029,44 +1033,48 @@ def duty_delinquents_detail(request):
         # Check if member has performed any duty in the lookback period
         duty_performed = _has_performed_duty_detailed(member, duty_cutoff_date)
 
-        if not duty_performed['has_duty']:
+        if not duty_performed["has_duty"]:
             # Get member's flight details
             flight_count = Flight.objects.filter(
                 pilot=member,
                 logsheet__log_date__gte=recent_flight_cutoff,
-                logsheet__finalized=True
+                logsheet__finalized=True,
             ).count()
 
             # Get most recent flight
-            recent_flight = Flight.objects.filter(
-                pilot=member,
-                logsheet__log_date__gte=recent_flight_cutoff,
-                logsheet__finalized=True
-            ).order_by('-logsheet__log_date').first()
+            recent_flight = (
+                Flight.objects.filter(
+                    pilot=member,
+                    logsheet__log_date__gte=recent_flight_cutoff,
+                    logsheet__finalized=True,
+                )
+                .order_by("-logsheet__log_date")
+                .first()
+            )
 
             # Get member's roles
             roles = []
             if member.duty_officer:
-                roles.append('Duty Officer')
+                roles.append("Duty Officer")
             if member.assistant_duty_officer:
-                roles.append('Assistant Duty Officer')
+                roles.append("Assistant Duty Officer")
             if member.instructor:
-                roles.append('Instructor')
+                roles.append("Instructor")
             if member.towpilot:
-                roles.append('Tow Pilot')
+                roles.append("Tow Pilot")
 
             # Get blackout information (current and recent)
             current_blackouts = MemberBlackout.objects.filter(
                 member=member,
                 date__gte=today,
-                date__lte=today + timedelta(days=90)  # Next 3 months
-            ).order_by('date')
+                date__lte=today + timedelta(days=90),  # Next 3 months
+            ).order_by("date")
 
             recent_blackouts = MemberBlackout.objects.filter(
-                member=member,
-                date__gte=duty_cutoff_date,
-                date__lt=today
-            ).order_by('-date')[:5]  # Last 5 blackouts in the period
+                member=member, date__gte=duty_cutoff_date, date__lt=today
+            ).order_by("-date")[
+                :5
+            ]  # Last 5 blackouts in the period
 
             # Get duty preferences and suspension info
             try:
@@ -1079,35 +1087,43 @@ def duty_delinquents_detail(request):
                 suspension_reason = None
                 dont_schedule = False
 
-            duty_delinquents.append({
-                'member': member,
-                'flight_count': flight_count,
-                'most_recent_flight': recent_flight.logsheet.log_date if recent_flight else None,
-                'most_recent_flight_logsheet': recent_flight.logsheet if recent_flight else None,
-                'membership_duration': _calculate_membership_duration(member, today),
-                'eligible_roles': roles,
-                'last_duty_info': duty_performed,
-                'current_blackouts': current_blackouts,
-                'recent_blackouts': recent_blackouts,
-                'is_suspended': is_suspended,
-                'suspension_reason': suspension_reason,
-                'dont_schedule': dont_schedule,
-            })
+            duty_delinquents.append(
+                {
+                    "member": member,
+                    "flight_count": flight_count,
+                    "most_recent_flight": (
+                        recent_flight.logsheet.log_date if recent_flight else None
+                    ),
+                    "most_recent_flight_logsheet": (
+                        recent_flight.logsheet if recent_flight else None
+                    ),
+                    "membership_duration": _calculate_membership_duration(
+                        member, today
+                    ),
+                    "eligible_roles": roles,
+                    "last_duty_info": duty_performed,
+                    "current_blackouts": current_blackouts,
+                    "recent_blackouts": recent_blackouts,
+                    "is_suspended": is_suspended,
+                    "suspension_reason": suspension_reason,
+                    "dont_schedule": dont_schedule,
+                }
+            )
 
     # Sort by last name for easy navigation
-    duty_delinquents.sort(key=lambda x: x['member'].last_name.lower())
+    duty_delinquents.sort(key=lambda x: x["member"].last_name.lower())
 
     context = {
-        'duty_delinquents': duty_delinquents,
-        'lookback_months': lookback_months,
-        'min_flights': min_flights,
-        'min_membership_months': min_membership_months,
-        'duty_cutoff_date': duty_cutoff_date,
-        'report_date': today,
-        'total_count': len(duty_delinquents),
+        "duty_delinquents": duty_delinquents,
+        "lookback_months": lookback_months,
+        "min_flights": min_flights,
+        "min_membership_months": min_membership_months,
+        "duty_cutoff_date": duty_cutoff_date,
+        "report_date": today,
+        "total_count": len(duty_delinquents),
     }
 
-    return render(request, 'duty_roster/duty_delinquents_detail.html', context)
+    return render(request, "duty_roster/duty_delinquents_detail.html", context)
 
 
 def _has_performed_duty_detailed(member, cutoff_date):
@@ -1117,44 +1133,40 @@ def _has_performed_duty_detailed(member, cutoff_date):
     For duty officers and assistant duty officers, checks scheduled assignments.
     """
     from django.db.models import Q
-    from duty_roster.models import DutySlot, DutyAssignment
+
+    from duty_roster.models import DutyAssignment, DutySlot
     from logsheet.models import Flight
 
     # Check actual flight participation for instructors and tow pilots
     # This is more important than just being scheduled
-
     # Check if they performed instruction (appeared as instructor in flights)
     instruction_flights = Flight.objects.filter(
-        instructor=member,
-        logsheet__log_date__gte=cutoff_date,
-        logsheet__finalized=True
-    ).order_by('-logsheet__log_date')
+        instructor=member, logsheet__log_date__gte=cutoff_date, logsheet__finalized=True
+    ).order_by("-logsheet__log_date")
 
     latest_instruction = instruction_flights.first()
     if latest_instruction is not None:
         return {
-            'has_duty': True,
-            'last_duty_date': latest_instruction.logsheet.log_date,
-            'last_duty_role': 'Instructor (Flight)',
-            'last_duty_type': 'Flight Activity',
-            'flight_count': instruction_flights.count()
+            "has_duty": True,
+            "last_duty_date": latest_instruction.logsheet.log_date,
+            "last_duty_role": "Instructor (Flight)",
+            "last_duty_type": "Flight Activity",
+            "flight_count": instruction_flights.count(),
         }
 
     # Check if they performed towing (appeared as tow pilot in flights)
     towing_flights = Flight.objects.filter(
-        tow_pilot=member,
-        logsheet__log_date__gte=cutoff_date,
-        logsheet__finalized=True
-    ).order_by('-logsheet__log_date')
+        tow_pilot=member, logsheet__log_date__gte=cutoff_date, logsheet__finalized=True
+    ).order_by("-logsheet__log_date")
 
     latest_towing = towing_flights.first()
     if latest_towing is not None:
         return {
-            'has_duty': True,
-            'last_duty_date': latest_towing.logsheet.log_date,
-            'last_duty_role': 'Tow Pilot (Flight)',
-            'last_duty_type': 'Flight Activity',
-            'flight_count': towing_flights.count()
+            "has_duty": True,
+            "last_duty_date": latest_towing.logsheet.log_date,
+            "last_duty_role": "Tow Pilot (Flight)",
+            "last_duty_type": "Flight Activity",
+            "flight_count": towing_flights.count(),
         }
 
     # For duty officers and assistant duty officers, check scheduled assignments
@@ -1164,67 +1176,70 @@ def _has_performed_duty_detailed(member, cutoff_date):
     duty_officer_slots = DutySlot.objects.filter(
         member=member,
         duty_day__date__gte=cutoff_date,
-        role__in=['duty_officer', 'assistant_duty_officer']
-    ).order_by('-duty_day__date')
+        role__in=["duty_officer", "assistant_duty_officer"],
+    ).order_by("-duty_day__date")
 
     latest_do_slot = duty_officer_slots.first()
     if latest_do_slot is not None:
-        role_display = 'Duty Officer' if latest_do_slot.role == 'duty_officer' else 'Assistant Duty Officer'
+        role_display = (
+            "Duty Officer"
+            if latest_do_slot.role == "duty_officer"
+            else "Assistant Duty Officer"
+        )
         return {
-            'has_duty': True,
-            'last_duty_date': latest_do_slot.duty_day.date,
-            'last_duty_role': f'{role_display} (Scheduled)',
-            'last_duty_type': 'DutySlot'
+            "has_duty": True,
+            "last_duty_date": latest_do_slot.duty_day.date,
+            "last_duty_role": f"{role_display} (Scheduled)",
+            "last_duty_type": "DutySlot",
         }
 
     # Check DutyAssignment assignments (older system) - only for DO/ADO
     duty_assignments = DutyAssignment.objects.filter(
-        Q(duty_officer=member) | Q(assistant_duty_officer=member),
-        date__gte=cutoff_date
-    ).order_by('-date')
+        Q(duty_officer=member) | Q(assistant_duty_officer=member), date__gte=cutoff_date
+    ).order_by("-date")
 
     latest_do_assignment = duty_assignments.first()
     if latest_do_assignment is not None:
         role = []
         if latest_do_assignment.duty_officer == member:
-            role.append('Duty Officer')
+            role.append("Duty Officer")
         if latest_do_assignment.assistant_duty_officer == member:
-            role.append('Assistant Duty Officer')
+            role.append("Assistant Duty Officer")
 
         return {
-            'has_duty': True,
-            'last_duty_date': latest_do_assignment.date,
-            'last_duty_role': f"{', '.join(role)} (Scheduled)",
-            'last_duty_type': 'DutyAssignment'
+            "has_duty": True,
+            "last_duty_date": latest_do_assignment.date,
+            "last_duty_role": f"{', '.join(role)} (Scheduled)",
+            "last_duty_type": "DutyAssignment",
         }
 
     # Also check if instructors/tow pilots were scheduled (less important but still relevant)
     scheduled_slots = DutySlot.objects.filter(
         member=member,
         duty_day__date__gte=cutoff_date,
-        role__in=['instructor', 'surge_instructor', 'tow_pilot', 'surge_tow_pilot']
-    ).order_by('-duty_day__date')
+        role__in=["instructor", "surge_instructor", "tow_pilot", "surge_tow_pilot"],
+    ).order_by("-duty_day__date")
 
     latest_scheduled = scheduled_slots.first()
     if latest_scheduled is not None:
         role_map = {
-            'instructor': 'Instructor',
-            'surge_instructor': 'Surge Instructor',
-            'tow_pilot': 'Tow Pilot',
-            'surge_tow_pilot': 'Surge Tow Pilot'
+            "instructor": "Instructor",
+            "surge_instructor": "Surge Instructor",
+            "tow_pilot": "Tow Pilot",
+            "surge_tow_pilot": "Surge Tow Pilot",
         }
         return {
-            'has_duty': True,
-            'last_duty_date': latest_scheduled.duty_day.date,
-            'last_duty_role': f"{role_map[latest_scheduled.role]} (Scheduled Only)",
-            'last_duty_type': 'DutySlot - Scheduled'
+            "has_duty": True,
+            "last_duty_date": latest_scheduled.duty_day.date,
+            "last_duty_role": f"{role_map[latest_scheduled.role]} (Scheduled Only)",
+            "last_duty_type": "DutySlot - Scheduled",
         }
 
     return {
-        'has_duty': False,
-        'last_duty_date': None,
-        'last_duty_role': None,
-        'last_duty_type': None
+        "has_duty": False,
+        "last_duty_date": None,
+        "last_duty_role": None,
+        "last_duty_type": None,
     }
 
 

@@ -1190,7 +1190,6 @@ def time_of_day_operations(
     """
     from collections import defaultdict
 
-
     from logsheet.models import Flight
 
     qs = Flight.objects.filter(LANDED_ONLY)

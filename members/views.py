@@ -1,7 +1,6 @@
 import base64
 import os
 from datetime import date, timedelta
-from django.utils import timezone
 
 from django.conf import settings
 from django.contrib import messages
@@ -11,19 +10,20 @@ from django.core.paginator import Paginator
 from django.db.models import F, Func, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
 from members.constants.membership import STATUS_ALIASES
+from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
 
 from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.vcard_tools import generate_vcard_qr
-from members.utils import can_view_personal_info as can_view_personal_info_fn
-from django.urls import reverse
 
 try:
     from notifications.models import Notification
@@ -139,7 +139,9 @@ def member_view(request, member_id):
     phone_display = member.phone if member.phone and can_view_personal else None
     phone_link = bool(phone_display)
 
-    mobile_display = member.mobile_phone if member.mobile_phone and can_view_personal else None
+    mobile_display = (
+        member.mobile_phone if member.mobile_phone and can_view_personal else None
+    )
     mobile_link = bool(mobile_display)
 
     qualifications = (
@@ -214,7 +216,8 @@ def toggle_redaction(request, member_id):
                     message = f"{actor_name} has {action} personal contact information for member {subject_name}."
 
                 url = request.build_absolute_uri(
-                    reverse("members:member_view", kwargs={"member_id": member.id}))
+                    reverse("members:member_view", kwargs={"member_id": member.id})
+                )
 
                 # Notify every user with member_manager privilege, but dedupe
                 # so we don't spam them if the same member toggles repeatedly.
@@ -231,20 +234,26 @@ def toggle_redaction(request, member_id):
                     from siteconfig.models import SiteConfiguration
 
                     sc = SiteConfiguration.objects.first()
-                    if sc and getattr(sc, "redaction_notification_dedupe_minutes", None):
-                        cutoff = timezone.now() - timedelta(minutes=int(sc.redaction_notification_dedupe_minutes))
+                    if sc and getattr(
+                        sc, "redaction_notification_dedupe_minutes", None
+                    ):
+                        cutoff = timezone.now() - timedelta(
+                            minutes=int(sc.redaction_notification_dedupe_minutes)
+                        )
                 except Exception:
                     sc = None
 
                 if cutoff is None:
                     try:
                         minutes = getattr(
-                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None)
+                            settings, "REDACTION_NOTIFICATION_DEDUPE_MINUTES", None
+                        )
                         if minutes is not None:
                             cutoff = timezone.now() - timedelta(minutes=int(minutes))
                         else:
                             hours = getattr(
-                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1)
+                                settings, "REDACTION_NOTIFICATION_DEDUPE_HOURS", 1
+                            )
                             cutoff = timezone.now() - timedelta(hours=float(hours))
                     except Exception:
                         cutoff = timezone.now() - timedelta(hours=1)
@@ -263,8 +272,9 @@ def toggle_redaction(request, member_id):
                     for rm in member_managers:
                         if rm.id in existing_user_ids:
                             continue
-                        to_create.append(Notification(
-                            user=rm, message=message, url=url))
+                        to_create.append(
+                            Notification(user=rm, message=message, url=url)
+                        )
 
                     if to_create:
                         Notification.objects.bulk_create(to_create)
@@ -276,10 +286,13 @@ def toggle_redaction(request, member_id):
             pass
         if member.redact_contact:
             messages.success(
-                request, "Your personal contact information is now redacted.")
+                request, "Your personal contact information is now redacted."
+            )
         else:
             messages.success(
-                request, "Your personal contact information is now visible to other members.")
+                request,
+                "Your personal contact information is now visible to other members.",
+            )
 
     return redirect("members:member_view", member_id=member.id)
 
@@ -440,9 +453,7 @@ def tinymce_image_upload(request):
 @active_member_required
 def badge_board(request):
     active_statuses = get_active_membership_statuses()
-    active_members = Member.objects.filter(
-        membership_status__in=active_statuses
-    )
+    active_members = Member.objects.filter(membership_status__in=active_statuses)
 
     badges = Badge.objects.prefetch_related(
         Prefetch(

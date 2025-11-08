@@ -1,6 +1,6 @@
 <div id="calendar-body" data-current-year="{{ year }}" data-current-month="{{ month }}">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <button 
+      <button
         hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
         hx-target="#calendar-body"
         hx-swap="innerHTML"
@@ -9,27 +9,27 @@
       >
         <i class="fas fa-chevron-left"></i> {{ prev_month_name }}
       </button>
-  
+
       <div class="text-center">
         <h3 class="mb-2 text-primary fw-bold">📅 {{ formatted_date }}</h3>
-        
+
         <!-- View Toggle -->
         <div class="btn-group btn-group-sm" role="group" aria-label="Calendar View Toggle">
-          <input type="radio" class="btn-check" name="view-toggle" id="calendar-view" autocomplete="off" 
+          <input type="radio" class="btn-check" name="view-toggle" id="calendar-view" autocomplete="off"
                  onchange="toggleCalendarView('calendar')" checked>
           <label class="btn btn-outline-secondary" for="calendar-view">
             <i class="fas fa-calendar-alt"></i> Calendar
           </label>
-          
-          <input type="radio" class="btn-check" name="view-toggle" id="agenda-view" autocomplete="off" 
+
+          <input type="radio" class="btn-check" name="view-toggle" id="agenda-view" autocomplete="off"
                  onchange="toggleCalendarView('agenda')">
           <label class="btn btn-outline-secondary" for="agenda-view">
             <i class="fas fa-list"></i> Agenda
           </label>
         </div>
       </div>
-  
-      <button 
+
+      <button
         hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
         hx-target="#calendar-body"
         hx-swap="innerHTML"
@@ -39,22 +39,22 @@
         {{ next_month_name }} <i class="fas fa-chevron-right"></i>
       </button>
     </div>
-  
+
     <!-- Calendar View -->
     <div id="calendar-view-content">
       {% include "duty_roster/_calendar_table.html" %}
     </div>
-    
+
     <!-- Agenda View -->
     <div id="agenda-view-content" style="display: none;">
       {% include "duty_roster/_calendar_agenda.html" %}
     </div>
-    
+
     <script>
       function toggleCalendarView(view) {
         const calendarView = document.getElementById('calendar-view-content');
         const agendaView = document.getElementById('agenda-view-content');
-        
+
         if (view === 'calendar') {
           calendarView.style.display = 'block';
           agendaView.style.display = 'none';
@@ -62,17 +62,17 @@
           calendarView.style.display = 'none';
           agendaView.style.display = 'block';
         }
-        
+
         // Store the current view preference
         localStorage.setItem('duty-roster-view', view);
       }
-      
+
       // Restore view state after HTMX loads new content
       function restoreViewState() {
         const savedView = localStorage.getItem('duty-roster-view') || 'calendar';
         const calendarRadio = document.getElementById('calendar-view');
         const agendaRadio = document.getElementById('agenda-view');
-        
+
         if (savedView === 'agenda') {
           agendaRadio.checked = true;
           calendarRadio.checked = false;
@@ -83,7 +83,7 @@
           toggleCalendarView('calendar');
         }
       }
-      
+
       // Restore state when page loads or HTMX updates content
       document.addEventListener('DOMContentLoaded', restoreViewState);
       document.addEventListener('htmx:afterSettle', function(event) {
@@ -93,4 +93,3 @@
       });
     </script>
   </div>
-  

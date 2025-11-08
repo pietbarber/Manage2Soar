@@ -20,6 +20,7 @@ class TestLogsheetPermissions(TestCase):
         """Set up test data for permission tests"""
         # Create test airfield and other required objects
         from logsheet.models import Airfield
+
         self.airfield = Airfield.objects.create(
             identifier="TEST", name="Test Airfield", is_active=True
         )
@@ -29,49 +30,50 @@ class TestLogsheetPermissions(TestCase):
             username="superuser",
             email="super@test.com",
             is_superuser=True,
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.treasurer = Member.objects.create_user(
             username="treasurer",
             email="treasurer@test.com",
             treasurer=True,
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.webmaster = Member.objects.create_user(
             username="webmaster",
             email="webmaster@test.com",
             webmaster=True,
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.duty_officer = Member.objects.create_user(
             username="dutyofficer",
             email="do@test.com",
             duty_officer=True,
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.regular_member = Member.objects.create_user(
             username="regular",
             email="regular@test.com",
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.non_member = Member.objects.create_user(
             username="nonmember",
             email="nonmember@test.com",
-            membership_status="Non-Member"
+            membership_status="Non-Member",
         )
 
         # Create test logsheet
         from datetime import date
+
         self.logsheet = Logsheet.objects.create(
             log_date=date.today(),
             airfield=self.airfield,
             created_by=self.duty_officer,
-            finalized=False
+            finalized=False,
         )
 
     def test_unauthenticated_user_cannot_unfinalize(self):
@@ -115,7 +117,7 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         self.assertTrue(can_unfinalize_logsheet(self.duty_officer, self.logsheet))
@@ -130,7 +132,7 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         self.assertFalse(can_unfinalize_logsheet(self.regular_member, self.logsheet))
@@ -151,7 +153,7 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         # Regular member who didn't finalize it cannot unfinalize
@@ -166,19 +168,17 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.regular_member,
-            note="Logsheet returned to revised state"
+            note="Logsheet returned to revised state",
         )
 
         RevisionLog.objects.create(
-            logsheet=self.logsheet,
-            revised_by=self.superuser,
-            note="Logsheet finalized"
+            logsheet=self.logsheet, revised_by=self.superuser, note="Logsheet finalized"
         )
 
         # Only the most recent finalizer (superuser) should be able to unfinalize
@@ -208,15 +208,16 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         # Authorized users should be able to edit finalized logsheets
         self.assertTrue(can_edit_logsheet(self.superuser, self.logsheet))
         self.assertTrue(can_edit_logsheet(self.treasurer, self.logsheet))
         self.assertTrue(can_edit_logsheet(self.webmaster, self.logsheet))
-        self.assertTrue(can_edit_logsheet(self.duty_officer,
-                        self.logsheet))  # original finalizer
+        self.assertTrue(
+            can_edit_logsheet(self.duty_officer, self.logsheet)
+        )  # original finalizer
 
     def test_cannot_edit_finalized_logsheet_without_permission(self):
         """Test that unauthorized users cannot edit finalized logsheets"""
@@ -227,7 +228,7 @@ class TestLogsheetPermissions(TestCase):
         RevisionLog.objects.create(
             logsheet=self.logsheet,
             revised_by=self.duty_officer,
-            note="Logsheet finalized"
+            note="Logsheet finalized",
         )
 
         # Unauthorized users should not be able to edit finalized logsheets
@@ -255,7 +256,7 @@ class TestLogsheetPermissions(TestCase):
             treasurer=True,
             webmaster=True,
             duty_officer=True,
-            membership_status="Full Member"
+            membership_status="Full Member",
         )
 
         self.logsheet.finalized = True

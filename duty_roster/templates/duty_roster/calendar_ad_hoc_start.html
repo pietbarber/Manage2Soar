@@ -2,11 +2,11 @@
     <h5 class="modal-title">Propose Operations for {{ date|date:"l, F j" }}</h5>
     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
   </div>
-  
+
   <div class="modal-body">
     <p>No operations are currently scheduled for this day.</p>
     <p>Would you like to request ad-hoc operations?</p>
-    <form method="post" 
+    <form method="post"
       hx-post="{% url 'duty_roster:calendar_ad_hoc_confirm' year=date.year month=date.month day=date.day %}"
       hx-on="htmx:afterRequest: bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();"
       >
@@ -16,4 +16,3 @@
     </form>
 
   </div>
-  

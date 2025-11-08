@@ -20,4 +20,3 @@ Welcome to the documentation for the `members` app. This app manages all aspects
 - [views.md](views.md): Member-facing and admin views
 - [management.md](management.md): Management commands and legacy data import
 - [tests.md](tests.md): Unit tests and coverage
-

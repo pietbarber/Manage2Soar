@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 
-from logsheet.models import MaintenanceIssue, Glider, AircraftMeister
+from logsheet.models import AircraftMeister, Glider, MaintenanceIssue
 from members.models import Member
 from notifications.models import Notification
 
@@ -15,7 +15,12 @@ def test_maintenance_issue_create_notifies_meisters():
 
     # Create an issue
     MaintenanceIssue.objects.create(
-        glider=glider, reported_by=meister, report_date="2025-10-22", description="wingtip damage", grounded=False)
+        glider=glider,
+        reported_by=meister,
+        report_date="2025-10-22",
+        description="wingtip damage",
+        grounded=False,
+    )
 
     # Expect a notification for the meister
     notes = Notification.objects.filter(user=meister, dismissed=False)
@@ -35,7 +40,12 @@ def test_maintenance_issue_resolve_notifies_meisters():
     AircraftMeister.objects.create(glider=glider, member=meister)
 
     issue = MaintenanceIssue.objects.create(
-        glider=glider, reported_by=resolver, report_date="2025-10-22", description="brake check", grounded=False)
+        glider=glider,
+        reported_by=resolver,
+        report_date="2025-10-22",
+        description="brake check",
+        grounded=False,
+    )
 
     # Resolve it
     issue.resolved = True
@@ -58,11 +68,22 @@ def test_maintenance_notification_dedupe():
 
     # Create the same issue twice (simulate duplicate saves)
     MaintenanceIssue.objects.create(
-        glider=glider, reported_by=meister, report_date="2025-10-22", description="battery low", grounded=False)
+        glider=glider,
+        reported_by=meister,
+        report_date="2025-10-22",
+        description="battery low",
+        grounded=False,
+    )
     MaintenanceIssue.objects.create(
-        glider=glider, reported_by=meister, report_date="2025-10-22", description="battery low", grounded=False)
+        glider=glider,
+        reported_by=meister,
+        report_date="2025-10-22",
+        description="battery low",
+        grounded=False,
+    )
 
     notes = Notification.objects.filter(
-        user=meister, dismissed=False, message__contains="battery low")
+        user=meister, dismissed=False, message__contains="battery low"
+    )
     # Dedupe should create at most one undismissed notification with identical message
     assert notes.count() <= 1

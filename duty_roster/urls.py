@@ -79,6 +79,9 @@ urlpatterns = [
         name="calendar_cancel_ops_day",
     ),
     path("propose-roster/", views.propose_roster, name="propose_roster"),
-    path("duty-delinquents/detail/", views.duty_delinquents_detail,
-         name="duty_delinquents_detail"),
+    path(
+        "duty-delinquents/detail/",
+        views.duty_delinquents_detail,
+        name="duty_delinquents_detail",
+    ),
 ]

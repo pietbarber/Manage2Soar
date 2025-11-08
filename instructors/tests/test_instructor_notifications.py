@@ -1,8 +1,13 @@
-import pytest
 from datetime import date
 
+import pytest
 
-from instructors.models import InstructionReport, GroundInstruction, MemberQualification, ClubQualificationType
+from instructors.models import (
+    ClubQualificationType,
+    GroundInstruction,
+    InstructionReport,
+    MemberQualification,
+)
 from members.models import Badge, MemberBadge
 from notifications.models import Notification
 
@@ -14,13 +19,19 @@ def test_instruction_report_creates_notification(django_user_model):
 
     # create report
     r = InstructionReport.objects.create(
-        student=student, instructor=instructor, report_date=date.today(), report_text="ok")
+        student=student,
+        instructor=instructor,
+        report_date=date.today(),
+        report_text="ok",
+    )
     # invoke the handler explicitly (unit test for the handler logic)
     import instructors.signals as sigmod
+
     sigmod.notify_student_on_instruction_report(None, r, True)
 
     qs = Notification.objects.filter(
-        user=student, message__contains=str(date.today().isoformat()))
+        user=student, message__contains=str(date.today().isoformat())
+    )
     assert qs.exists()
 
     # updating the report should also create (or be deduped if exact same message exists)
@@ -37,11 +48,14 @@ def test_ground_instruction_creates_notification(django_user_model):
     student = django_user_model.objects.create_user(username="stud2", password="pw")
 
     s = GroundInstruction.objects.create(
-        student=student, instructor=instructor, date=date.today(), notes="good")
+        student=student, instructor=instructor, date=date.today(), notes="good"
+    )
     import instructors.signals as sigmod
+
     sigmod.notify_student_on_ground_instruction(None, s, True)
     assert Notification.objects.filter(
-        user=student, message__contains=str(date.today().isoformat())).exists()
+        user=student, message__contains=str(date.today().isoformat())
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -51,11 +65,18 @@ def test_member_qualification_creates_notification(django_user_model):
     # create a qualification type so the FK constraint is satisfied
     qual_type = ClubQualificationType.objects.create(code="TESTQ", name="Test Qual")
     qual = MemberQualification.objects.create(
-        member=member, qualification=qual_type, is_qualified=True, instructor=instr, date_awarded=date.today())
+        member=member,
+        qualification=qual_type,
+        is_qualified=True,
+        instructor=instr,
+        date_awarded=date.today(),
+    )
     import instructors.signals as sigmod
+
     sigmod.notify_member_on_qualification(None, qual, True)
     assert Notification.objects.filter(
-        user=member, message__contains=str(date.today().isoformat())).exists()
+        user=member, message__contains=str(date.today().isoformat())
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -63,8 +84,11 @@ def test_member_badge_creates_notification(django_user_model):
     member = django_user_model.objects.create_user(username="mbadge", password="pw")
     badge = Badge.objects.create(name="Test Badge")
     mb = MemberBadge.objects.create(
-        member=member, badge=badge, date_awarded=date.today())
+        member=member, badge=badge, date_awarded=date.today()
+    )
     import instructors.signals as sigmod
+
     sigmod.notify_member_on_badge(None, mb, True)
     assert Notification.objects.filter(
-        user=member, message__contains=badge.name).exists()
+        user=member, message__contains=badge.name
+    ).exists()

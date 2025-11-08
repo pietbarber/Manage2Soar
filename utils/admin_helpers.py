@@ -26,7 +26,9 @@ class AdminHelperMixin:
         extra_context = self._inject_helper(request, extra_context)
         return super().changelist_view(request, extra_context=extra_context)
 
-    def change_view(self, request, object_id, form_url='', extra_context=None):
+    def change_view(self, request, object_id, form_url="", extra_context=None):
         # Reuse the helper injection logic to avoid duplication
         extra_context = self._inject_helper(request, extra_context)
-        return super().change_view(request, object_id, form_url, extra_context=extra_context)
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )

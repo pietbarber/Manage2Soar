@@ -20,7 +20,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 # Set up Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'manage2soar.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "manage2soar.settings")
 django.setup()
 
 
@@ -31,7 +31,8 @@ def test_configuration():
     print(f"   STATIC_URL: {settings.STATIC_URL}")
     print(f"   GS_BUCKET_NAME: {getattr(settings, 'GS_BUCKET_NAME', 'Not set')}")
     print(
-        f"   GS_STATIC_LOCATION: {getattr(settings, 'GS_STATIC_LOCATION', 'Not set')}")
+        f"   GS_STATIC_LOCATION: {getattr(settings, 'GS_STATIC_LOCATION', 'Not set')}"
+    )
     print(f"   Storage Backend: {settings.STORAGES['staticfiles']['BACKEND']}")
     print()
 
@@ -40,14 +41,14 @@ def test_static_files():
     """Test that static files can be accessed"""
     print("🔍 Testing Static File Access")
 
-    static_storage = storages['staticfiles']
+    static_storage = storages["staticfiles"]
 
     # Test files that should exist
     test_files = [
-        'admin/css/base.css',
-        'css/baseline.css',
-        'admin/js/core.js',
-        'js/bootstrap.bundle.min.js'
+        "admin/css/base.css",
+        "css/baseline.css",
+        "admin/js/core.js",
+        "js/bootstrap.bundle.min.js",
     ]
 
     for file_path in test_files:
@@ -79,7 +80,7 @@ def test_multi_tenant_paths():
     """Test that the multi-tenant paths are configured correctly"""
     print("🔍 Testing Multi-Tenant Path Structure")
 
-    club_prefix = getattr(settings, 'CLUB_PREFIX', None)
+    club_prefix = getattr(settings, "CLUB_PREFIX", None)
     if not club_prefix:
         print("   ❌ CLUB_PREFIX not set!")
         return
@@ -120,5 +121,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -2,9 +2,11 @@ import os
 import socket
 import sys
 from datetime import timedelta
+
 from django.core.management.base import BaseCommand
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
+
 from utils.models import CronJobLock
 
 
@@ -52,20 +54,20 @@ class BaseCronJobCommand(BaseCommand):
     def add_arguments(self, parser):
         """Add common arguments for all CronJob commands"""
         parser.add_argument(
-            '--force',
-            action='store_true',
-            help='Force execution even if lock exists (dangerous - use only for debugging)'
+            "--force",
+            action="store_true",
+            help="Force execution even if lock exists (dangerous - use only for debugging)",
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Show what would be done without actually executing'
+            "--dry-run",
+            action="store_true",
+            help="Show what would be done without actually executing",
         )
 
     def handle(self, *args, **options):
         """Main entry point - handles locking and delegates to execute_job"""
-        self.verbosity = options.get('verbosity', 1)
-        self.dry_run = options.get('dry_run', False)
+        self.verbosity = options.get("verbosity", 1)
+        self.dry_run = options.get("dry_run", False)
         # Rebind stdout at handle time so tests that patch sys.stdout or
         # pass a custom stdout to call_command will capture output.
         # Behavior rules:
@@ -74,13 +76,13 @@ class BaseCronJobCommand(BaseCommand):
         #   the caller (e.g. tests assigned a StringIO to `command.stdout`),
         #   do NOT clobber it.
         # - Otherwise, use the current sys.stdout (which may be patched by tests).
-        if options.get('stdout') is not None:
-            self.stdout = options.get('stdout')
-        elif not hasattr(self, 'stdout') or self.stdout is None:
+        if options.get("stdout") is not None:
+            self.stdout = options.get("stdout")
+        elif not hasattr(self, "stdout") or self.stdout is None:
             # If no stdout is set, use current sys.stdout (may be patched)
             self.stdout = sys.stdout
         # If self.stdout is already set (e.g., by a test), leave it alone
-        force = options.get('force', False)
+        force = options.get("force", False)
         # Always print dry-run header if requested
         if self.dry_run:
             self.stdout.write(
@@ -98,8 +100,7 @@ class BaseCronJobCommand(BaseCommand):
                 self.stdout.write(f"🧹 Cleaned up {expired_count} expired locks")
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(
-                    f"❌ Database unavailable for lock cleanup: {str(e)}")
+                self.style.ERROR(f"❌ Database unavailable for lock cleanup: {str(e)}")
             )
             return
 
@@ -154,9 +155,7 @@ class BaseCronJobCommand(BaseCommand):
             with transaction.atomic():
                 # Try to create a new lock record
                 CronJobLock.objects.create(
-                    job_name=self.job_name,
-                    locked_by=self.pod_id,
-                    expires_at=expires_at
+                    job_name=self.job_name, locked_by=self.pod_id, expires_at=expires_at
                 )
                 self.lock_acquired = True
 
@@ -169,9 +168,9 @@ class BaseCronJobCommand(BaseCommand):
             # Lock already exists - check if it's expired
             try:
                 with transaction.atomic():
-                    existing_lock = CronJobLock.objects.select_for_update(nowait=True).get(
-                        job_name=self.job_name
-                    )
+                    existing_lock = CronJobLock.objects.select_for_update(
+                        nowait=True
+                    ).get(job_name=self.job_name)
 
                 if existing_lock.is_expired():
                     # Lock is expired, try to replace it
@@ -184,7 +183,8 @@ class BaseCronJobCommand(BaseCommand):
 
                     if self.verbosity >= 2:
                         self.stdout.write(
-                            f"🔄 Replaced expired lock for {self.job_name}")
+                            f"🔄 Replaced expired lock for {self.job_name}"
+                        )
 
                     return True
                 else:
@@ -212,8 +212,7 @@ class BaseCronJobCommand(BaseCommand):
         """Release the distributed lock for this job"""
         try:
             deleted_count = CronJobLock.objects.filter(
-                job_name=self.job_name,
-                locked_by=self.pod_id
+                job_name=self.job_name, locked_by=self.pod_id
             ).delete()[0]
 
             if deleted_count > 0:
@@ -222,13 +221,12 @@ class BaseCronJobCommand(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"⚠️ Lock for {self.job_name} was not found during release")
+                        f"⚠️ Lock for {self.job_name} was not found during release"
+                    )
                 )
 
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"❌ Error releasing lock: {str(e)}")
-            )
+            self.stdout.write(self.style.ERROR(f"❌ Error releasing lock: {str(e)}"))
         finally:
             self.lock_acquired = False
 

@@ -3,15 +3,19 @@ Tests for operational calendar functionality.
 """
 
 from datetime import date
-from django.test import TestCase
+
 from django.core.exceptions import ValidationError
+from django.test import TestCase
 
 from duty_roster.operational_calendar import (
-    parse_operational_period,
+    find_weekend_for_week,
     get_operational_weekend,
-    find_weekend_for_week
+    parse_operational_period,
 )
-from duty_roster.roster_generator import is_within_operational_season, clear_operational_season_cache
+from duty_roster.roster_generator import (
+    clear_operational_season_cache,
+    is_within_operational_season,
+)
 from siteconfig.models import SiteConfiguration
 
 
@@ -22,8 +26,9 @@ class TestOperationalCalendar(TestCase):
         """Test parsing of basic operational period formats."""
         # Test word forms
         self.assertEqual(parse_operational_period("First weekend of May"), (1, 5))
-        self.assertEqual(parse_operational_period(
-            "Second weekend of December"), (2, 12))
+        self.assertEqual(
+            parse_operational_period("Second weekend of December"), (2, 12)
+        )
         self.assertEqual(parse_operational_period("Last weekend of October"), (-1, 10))
 
         # Test numeric forms
@@ -89,7 +94,7 @@ class TestOperationalSeason(TestCase):
             domain_name="test.example.com",
             club_abbreviation="TC",
             operations_start_period="First weekend of May",
-            operations_end_period="Last weekend of October"
+            operations_end_period="Last weekend of October",
         )
 
     def test_is_within_operational_season_both_configured(self):
@@ -104,10 +109,12 @@ class TestOperationalSeason(TestCase):
         self.assertFalse(is_within_operational_season(date(2023, 12, 15)))
 
         # Edge cases - exact start/end dates
-        self.assertTrue(is_within_operational_season(
-            date(2023, 5, 6)))  # First Saturday of May
-        self.assertTrue(is_within_operational_season(
-            date(2023, 10, 28)))  # Last Saturday of October
+        self.assertTrue(
+            is_within_operational_season(date(2023, 5, 6))
+        )  # First Saturday of May
+        self.assertTrue(
+            is_within_operational_season(date(2023, 10, 28))
+        )  # Last Saturday of October
 
     def test_is_within_operational_season_only_start(self):
         """Test season filtering when only start period is configured."""
@@ -168,7 +175,7 @@ class TestSiteConfigValidation(TestCase):
             domain_name="test.example.com",
             club_abbreviation="TC",
             operations_start_period="First weekend of May",
-            operations_end_period="Last weekend of October"
+            operations_end_period="Last weekend of October",
         )
         # Should not raise ValidationError
         config.full_clean()
@@ -180,13 +187,13 @@ class TestSiteConfigValidation(TestCase):
             domain_name="test.example.com",
             club_abbreviation="TC",
             operations_start_period="Invalid format",
-            operations_end_period="Last weekend of October"
+            operations_end_period="Last weekend of October",
         )
 
         with self.assertRaises(ValidationError) as cm:
             config.full_clean()
 
-        self.assertIn('operations_start_period', cm.exception.message_dict)
+        self.assertIn("operations_start_period", cm.exception.message_dict)
 
     def test_empty_operational_periods_allowed(self):
         """Test that empty operational periods are allowed."""
@@ -195,7 +202,7 @@ class TestSiteConfigValidation(TestCase):
             domain_name="test.example.com",
             club_abbreviation="TC",
             operations_start_period="",
-            operations_end_period=""
+            operations_end_period="",
         )
         # Should not raise ValidationError
         config.full_clean()

@@ -1,7 +1,7 @@
 """
 Operational Calendar utilities for duty roster generation.
 
-Handles parsing club operational periods like "First weekend of May" 
+Handles parsing club operational periods like "First weekend of May"
 and calculating the actual weekend dates for any given year.
 """
 
@@ -10,7 +10,9 @@ from datetime import date, timedelta
 from typing import Tuple
 
 
-def find_weekend_for_week(year: int, month: int, week_ordinal: int) -> Tuple[date, date]:
+def find_weekend_for_week(
+    year: int, month: int, week_ordinal: int
+) -> Tuple[date, date]:
     """
     Find the complete weekend (Saturday + Sunday) for the Nth week of a month.
 
@@ -24,7 +26,7 @@ def find_weekend_for_week(year: int, month: int, week_ordinal: int) -> Tuple[dat
 
     Rules:
         - "First week" = the week containing the 1st of the month
-        - Weekend = Saturday + Sunday pair  
+        - Weekend = Saturday + Sunday pair
         - If month starts on Sunday, include the previous Saturday
         - If month starts on Saturday, that Saturday starts the first weekend
 
@@ -33,7 +35,7 @@ def find_weekend_for_week(year: int, month: int, week_ordinal: int) -> Tuple[dat
         - First week = April 25-May 1
         - First weekend = April 30-May 1 (Sat-Sun)
 
-        May 2021 (May 1st = Saturday):  
+        May 2021 (May 1st = Saturday):
         - First week = May 1-7
         - First weekend = May 1-2 (Sat-Sun)
     """
@@ -56,7 +58,7 @@ def find_weekend_for_week(year: int, month: int, week_ordinal: int) -> Tuple[dat
     # Monday = 0, Tuesday = 1, ..., Saturday = 5, Sunday = 6
     # 5 days after Monday = Saturday
     saturday = start_of_target_week + timedelta(days=5)
-    sunday = start_of_target_week + timedelta(days=6)    # 6 days after Monday = Sunday
+    sunday = start_of_target_week + timedelta(days=6)  # 6 days after Monday = Sunday
 
     return saturday, sunday
 
@@ -66,7 +68,7 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
     Parse operational period text like "First weekend of May" into components.
 
     Args:
-        period_text: Text like "First weekend of May", "Second weekend of December", 
+        period_text: Text like "First weekend of May", "Second weekend of December",
                     "1st weekend of Sep", "2nd weekend in December", etc.
 
     Returns:
@@ -80,29 +82,60 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
     # Parse ordinal - support both word and numeric forms
     ordinal_map = {
         # Word forms
-        'first': 1, 'second': 2, 'third': 3, 'fourth': 4, 'last': -1,
+        "first": 1,
+        "second": 2,
+        "third": 3,
+        "fourth": 4,
+        "last": -1,
         # Numeric forms
-        '1st': 1, '2nd': 2, '3rd': 3, '4th': 4,
+        "1st": 1,
+        "2nd": 2,
+        "3rd": 3,
+        "4th": 4,
         # Alternative spellings
-        'one': 1, 'two': 2, 'three': 3, 'four': 4,
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
         # Common variations
-        '1': 1, '2': 2, '3': 3, '4': 4,
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
     }
 
     # Parse month - support full names and common abbreviations
     month_map = {
         # Full month names
-        'january': 1, 'february': 2, 'march': 3, 'april': 4,
-        'may': 5, 'june': 6, 'july': 7, 'august': 8,
-        'september': 9, 'october': 10, 'november': 11, 'december': 12,
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12,
         # Common abbreviations
-        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
-        'jun': 6, 'jul': 7, 'aug': 8,
-        'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "sept": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
     }
 
     # Require the word "weekend" to be present
-    if 'weekend' not in period_text:
+    if "weekend" not in period_text:
         raise ValueError(
             f"Cannot parse operational period: '{period_text}'\n"
             f"Text must contain the word 'weekend'.\n"
@@ -110,7 +143,7 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
         )
 
     # Clean up the text - remove common connecting words
-    cleaned_text = period_text.replace(' of ', ' ').replace(' in ', ' ')
+    cleaned_text = period_text.replace(" of ", " ").replace(" in ", " ")
     words = cleaned_text.split()
 
     ordinal = None
@@ -118,7 +151,7 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
 
     for word in words:
         # Remove punctuation for ordinal matching
-        clean_word = word.rstrip('.,!?:;')
+        clean_word = word.rstrip(".,!?:;")
 
         if clean_word in ordinal_map:
             ordinal = ordinal_map[clean_word]
@@ -128,9 +161,12 @@ def parse_operational_period(period_text: str) -> Tuple[int, int]:
     if ordinal is None or month is None:
         # Create a helpful error message with suggestions
         examples = [
-            "First weekend of May", "Second weekend of December",
-            "1st weekend of Sep", "Last weekend in October",
-            "Third weekend of April", "2nd weekend Dec"
+            "First weekend of May",
+            "Second weekend of December",
+            "1st weekend of Sep",
+            "Last weekend in October",
+            "Third weekend of April",
+            "2nd weekend Dec",
         ]
         raise ValueError(
             f"Cannot parse operational period: '{period_text}'\n"
@@ -154,7 +190,7 @@ def get_operational_weekend(year: int, period_text: str) -> Tuple[date, date]:
         Tuple of (saturday_date, sunday_date)
 
     Examples:
-        get_operational_weekend(2022, "First weekend of May") 
+        get_operational_weekend(2022, "First weekend of May")
         # Returns (date(2022, 4, 30), date(2022, 5, 1))
 
         get_operational_weekend(2021, "First weekend of May")

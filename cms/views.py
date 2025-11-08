@@ -1,15 +1,16 @@
 # Generic CMS Page view for arbitrary pages and directories
 import logging
+
 from django.conf import settings
-from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
+from django.contrib.auth.views import redirect_to_login
+from django.db.models import Count, Max
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from cms.models import HomePageContent
 from cms.forms import SiteFeedbackForm, VisitorContactForm
+from cms.models import HomePageContent
 from members.decorators import active_member_required
-from django.db.models import Count, Max
 from members.utils import is_active_member
 
 from .models import Page
@@ -48,24 +49,28 @@ def cms_page(request, **kwargs):
         user = request.user
         if not is_active_member(user):
             # Use Django's helper to redirect to login (handles encoding)
-            return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
+            return redirect_to_login(
+                request.get_full_path(), login_url=settings.LOGIN_URL
+            )
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1
     subpages = []
-    children = (
-        page.children.annotate(
-            doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
-        )
-        .order_by("title")
-    )
+    children = page.children.annotate(
+        doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
+    ).order_by("title")
     for child in children:
         # last updated is the later of the page's updated_at and latest document upload
         last_updated = child.updated_at
         if getattr(child, "doc_max", None) and child.doc_max > last_updated:
             last_updated = child.doc_max
-        subpages.append({"page": child, "doc_count": getattr(child, "doc_count", 0),
-                        "last_updated": last_updated})
+        subpages.append(
+            {
+                "page": child,
+                "doc_count": getattr(child, "doc_count", 0),
+                "last_updated": last_updated,
+            }
+        )
 
     # Build breadcrumbs: Resources -> (parents...) -> current page
     breadcrumbs = []
@@ -92,8 +97,12 @@ def cms_page(request, **kwargs):
     return render(
         request,
         "cms/page.html",
-        {"page": page, "subpages": subpages,
-            "breadcrumbs": breadcrumbs, "has_documents": has_documents},
+        {
+            "page": page,
+            "subpages": subpages,
+            "breadcrumbs": breadcrumbs,
+            "has_documents": has_documents,
+        },
     )
 
 
@@ -190,15 +199,16 @@ def homepage(request):
 
 # Site Feedback Views for Issue #117
 
+
 @active_member_required
 def submit_feedback(request):
     """
     View for submitting site feedback.
     Captures referring URL and notifies webmasters.
     """
-    referring_url = request.GET.get('from', request.META.get('HTTP_REFERER', ''))
+    referring_url = request.GET.get("from", request.headers.get("referer", ""))
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = SiteFeedbackForm(request.POST)
         if form.is_valid():
             feedback = form.save(commit=False)
@@ -211,22 +221,26 @@ def submit_feedback(request):
 
             messages.success(
                 request,
-                "Thank you for your feedback! Webmasters have been notified and will respond soon."
+                "Thank you for your feedback! Webmasters have been notified and will respond soon.",
             )
-            return redirect('cms:feedback_success')
+            return redirect("cms:feedback_success")
     else:
         form = SiteFeedbackForm()
 
-    return render(request, 'cms/feedback_form.html', {
-        'form': form,
-        'referring_url': referring_url,
-    })
+    return render(
+        request,
+        "cms/feedback_form.html",
+        {
+            "form": form,
+            "referring_url": referring_url,
+        },
+    )
 
 
 @active_member_required
 def feedback_success(request):
     """Simple success page after feedback submission."""
-    return render(request, 'cms/feedback_success.html')
+    return render(request, "cms/feedback_success.html")
 
 
 def _notify_webmasters_of_feedback(feedback):
@@ -234,8 +248,8 @@ def _notify_webmasters_of_feedback(feedback):
     Send notifications to all webmasters about new feedback.
     """
     try:
-        from notifications.models import Notification
         from members.models import Member
+        from notifications.models import Notification
 
         webmasters = Member.objects.filter(webmaster=True, is_active=True)
 
@@ -250,9 +264,7 @@ def _notify_webmasters_of_feedback(feedback):
                 notification_url = f"/admin/cms/sitefeedback/{feedback.pk}/change/"
 
                 Notification.objects.create(
-                    user=webmaster,
-                    message=notification_message,
-                    url=notification_url
+                    user=webmaster, message=notification_message, url=notification_url
                 )
             except Exception as e:
                 # Log but don't fail - feedback submission should still work
@@ -268,12 +280,13 @@ def _notify_webmasters_of_feedback(feedback):
 
 # Visitor Contact Views for Issue #70
 
+
 def contact(request):
     """
     Public contact form for visitors to reach the club.
     No authentication required - this replaces exposing welcome@skylinesoaring.org
     """
-    if request.method == 'POST':
+    if request.method == "POST":
         form = VisitorContactForm(request.POST)
         if form.is_valid():
             contact_submission = form.save(commit=False)
@@ -286,43 +299,52 @@ def contact(request):
             _notify_member_managers_of_contact(contact_submission)
 
             messages.success(
-                request,
-                "Thank you for contacting us! We'll get back to you soon."
+                request, "Thank you for contacting us! We'll get back to you soon."
             )
-            return redirect('cms:contact_success')
+            return redirect("cms:contact_success")
     else:
         form = VisitorContactForm()
 
     # Get site configuration for club-specific information
     from siteconfig.models import SiteConfiguration
+
     site_config = SiteConfiguration.objects.first()
 
-    return render(request, 'cms/contact.html', {
-        'form': form,
-        'site_config': site_config,
-        'page_title': f'Contact {site_config.club_name if site_config else "Our Club"}'
-    })
+    return render(
+        request,
+        "cms/contact.html",
+        {
+            "form": form,
+            "site_config": site_config,
+            "page_title": f'Contact {site_config.club_name if site_config else "Our Club"}',
+        },
+    )
 
 
 def contact_success(request):
     """Success page after visitor contact form submission."""
     # Get site configuration for club-specific information
     from siteconfig.models import SiteConfiguration
+
     site_config = SiteConfiguration.objects.first()
 
-    return render(request, 'cms/contact_success.html', {
-        'page_title': 'Message Sent Successfully',
-        'site_config': site_config,
-    })
+    return render(
+        request,
+        "cms/contact_success.html",
+        {
+            "page_title": "Message Sent Successfully",
+            "site_config": site_config,
+        },
+    )
 
 
 def _get_client_ip(request):
     """Get the visitor's IP address for logging purposes."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    x_forwarded_for = request.headers.get("x-forwarded-for")
     if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
+        ip = x_forwarded_for.split(",")[0]
     else:
-        ip = request.META.get('REMOTE_ADDR')
+        ip = request.META.get("REMOTE_ADDR")
     return ip
 
 
@@ -333,6 +355,7 @@ def _notify_member_managers_of_contact(contact_submission):
     """
     try:
         from django.core.mail import send_mail
+
         from members.models import Member
         from siteconfig.models import SiteConfiguration
 
@@ -340,32 +363,35 @@ def _notify_member_managers_of_contact(contact_submission):
         site_config = SiteConfiguration.objects.first()
 
         # Get all member managers
-        member_managers = Member.objects.filter(
-            member_manager=True,
-            is_active=True
-        )
+        member_managers = Member.objects.filter(member_manager=True, is_active=True)
 
         if not member_managers.exists():
             # Fallback to webmasters if no member managers
-            member_managers = Member.objects.filter(
-                webmaster=True,
-                is_active=True
-            )
+            member_managers = Member.objects.filter(webmaster=True, is_active=True)
 
         # Prepare email content with proper escaping to prevent email injection
         # Strip newlines and control characters from subject to prevent header injection
-        safe_subject = ''.join(
-            char for char in contact_submission.subject if char.isprintable() and char not in '\r\n')
+        safe_subject = "".join(
+            char
+            for char in contact_submission.subject
+            if char.isprintable() and char not in "\r\n"
+        )
         subject = f"New Visitor Contact: {safe_subject[:100]}"  # Limit subject length
 
         # Sanitize all user input in email body
-        safe_name = contact_submission.name.replace('\r', '').replace('\n', ' ')
-        safe_email = contact_submission.email.replace('\r', '').replace('\n', ' ')
-        safe_phone = (contact_submission.phone or 'Not provided').replace(
-            '\r', '').replace('\n', ' ')
-        safe_user_subject = contact_submission.subject.replace(
-            '\r', '').replace('\n', ' ')
-        safe_message = contact_submission.message  # Keep original formatting for message content
+        safe_name = contact_submission.name.replace("\r", "").replace("\n", " ")
+        safe_email = contact_submission.email.replace("\r", "").replace("\n", " ")
+        safe_phone = (
+            (contact_submission.phone or "Not provided")
+            .replace("\r", "")
+            .replace("\n", " ")
+        )
+        safe_user_subject = contact_submission.subject.replace("\r", "").replace(
+            "\n", " "
+        )
+        safe_message = (
+            contact_submission.message
+        )  # Keep original formatting for message content
 
         message = f"""
 A new visitor has contacted the club through the website.
@@ -391,7 +417,8 @@ This message was sent automatically by the club website contact form.
 
         # Send email to each member manager
         recipient_emails = [
-            manager.email for manager in member_managers if manager.email]
+            manager.email for manager in member_managers if manager.email
+        ]
 
         if recipient_emails:
             send_mail(
@@ -412,12 +439,12 @@ This message was sent automatically by the club website contact form.
                     f"{contact_submission.subject}"
                 )
 
-                notification_url = f"/admin/cms/visitorcontact/{contact_submission.pk}/change/"
+                notification_url = (
+                    f"/admin/cms/visitorcontact/{contact_submission.pk}/change/"
+                )
 
                 Notification.objects.create(
-                    user=manager,
-                    message=notification_message,
-                    url=notification_url
+                    user=manager, message=notification_message, url=notification_url
                 )
         except ImportError:
             # Notifications app not available
