@@ -152,6 +152,14 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
    cd manage2soar
    ```
 
+### Option A: Automated Setup (Recommended)
+2. **Run the setup script**:
+   ```bash
+   ./setup-dev.sh
+   ```
+   This automatically sets up virtual environment, dependencies, security tools, and database.
+
+### Option B: Manual Setup
 2. **Create a Virtual Environment**:
    ```bash
    python3 -m venv .venv
@@ -163,20 +171,61 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
    pip install -r requirements.txt
    ```
 
-4. **Apply Migrations**:
+4. **Set up Development Tools** (Required for contributors):
+   ```bash
+   # Install pre-commit hooks for security scanning
+   pip install pre-commit
+   pre-commit install
+
+   # Verify security tools are working
+   bandit --version
+   pre-commit run --all-files  # Optional: run all checks once
+   ```
+
+5. **Apply Migrations**:
    ```bash
    python manage.py migrate
    ```
 
-5. **Create a Superuser**:
+6. **Create a Superuser**:
    ```bash
    python manage.py createsuperuser
    ```
 
-6. **Run the Development Server**:
+7. **Run the Development Server**:
    ```bash
    python manage.py runserver
    ```
+
+## 🔒 **Security & Code Quality**
+
+This project includes comprehensive security scanning and code quality tools:
+
+- **Pre-commit Hooks**: Automatic security scans before every commit
+- **GitHub Actions**: CI/CD pipeline with security gates  
+- **Bandit**: Python security vulnerability scanning
+- **Safety & pip-audit**: Dependency vulnerability checking
+- **Code Formatting**: Black, isort, django-upgrade for consistent code style
+
+### **For Contributors**
+Pre-commit hooks are **required** for development. After cloning:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The hooks will automatically:
+- Scan for security vulnerabilities
+- Check for secrets in code
+- Format Python code consistently
+- Validate configuration files
+
+### **For Forkers**
+All security workflows are included and will work automatically:
+- ✅ GitHub Actions workflows enabled by default
+- ✅ No external services or secrets required  
+- ✅ All tools install from public PyPI packages
+- ⚠️ **Important**: Run `pre-commit install` after cloning to enable local security checks
 
 ## 📄 Documentation
 
