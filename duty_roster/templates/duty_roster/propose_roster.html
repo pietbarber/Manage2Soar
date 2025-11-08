@@ -8,9 +8,33 @@
 {% if incomplete %}
   <div class="alert alert-warning">
     ⚠️ Could not fully auto-generate a complete roster for {{ month }}/{{ year }}.
-    Showing weekend dates so you can review (or try “🔄 Roll Again”).
+    Showing weekend dates so you can review (or try "🔄 Roll Again").
   </div>
 {% endif %}
+
+{% if operational_info %}
+<div class="alert alert-info">
+  <h5>📅 Operational Calendar Information</h5>
+  {% if siteconfig %}
+    <p><strong>Club Operations Period:</strong> {{ siteconfig.operations_start_period }} through {{ siteconfig.operations_end_period }}</p>
+  {% endif %}
+  {% if operational_info.season_start and operational_info.season_end %}
+    <p><strong>{{ year }} Season:</strong> {{ operational_info.season_start }} through {{ operational_info.season_end }}</p>
+  {% endif %}
+  {% if filtered_dates %}
+    <div class="mt-2">
+      <strong>⚠️ Dates excluded from roster (outside operational season):</strong>
+      <ul class="mb-0">
+        {% for date in filtered_dates %}
+          <li>{{ date|date:"l, F j" }} ({{ date }})</li>
+        {% endfor %}
+      </ul>
+      <small class="text-muted">These dates were automatically filtered out based on your operational calendar configuration.</small>
+    </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
 {% if no_scheduling %}
   <div class="alert alert-info">
@@ -22,10 +46,17 @@
   <input type="hidden" name="year"  value="{{ year }}">
   <input type="hidden" name="month" value="{{ month }}">
 
-  {% get_siteconfig as siteconfig %}
+
+  {% if draft %}
+  <div class="alert alert-secondary">
+    <strong>💡 Easy Date Removal:</strong> If you want to remove specific dates from this roster (e.g., only want first 2 weekends of December), check the boxes below and click "Remove Selected Dates".
+  </div>
+  {% endif %}
+
   <table class="table">
     <thead>
       <tr>
+        <th>Remove?</th>
         <th>Date</th>
         {% for role in enabled_roles %}
           <th>
@@ -48,7 +79,13 @@
     <tbody>
       {% for entry in draft %}
         <tr>
-          <td>{{ entry.date }}</td>
+          <td>
+            <input type="checkbox" name="remove_date" value="{{ entry.date|date:'Y-m-d' }}" class="form-check-input">
+          </td>
+          <td>
+            <strong>{{ entry.date|date:"l, F j" }}</strong><br>
+            <small class="text-muted">{{ entry.date }}</small>
+          </td>
           {% for role in enabled_roles %}
             <td>
               {% if entry.slots|dict_get:role %}
@@ -62,9 +99,18 @@
       {% endfor %}
     </tbody>
   </table>
-  <button name="action" value="publish" class="btn btn-success">✅ Accept & Publish</button>
-  <button name="action" value="roll"    class="btn btn-secondary">🔄 Roll Again</button>
-  <button name="action" value="cancel"  class="btn btn-danger">❌ Cancel</button>
+  
+  {% if draft %}
+  <div class="d-flex gap-2 mb-3">
+    <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
+    <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>
+  </div>
+  {% endif %}
+  
+  <div class="d-flex gap-2">
+    <button name="action" value="publish" class="btn btn-success">✅ Accept & Publish</button>
+    <button name="action" value="cancel" class="btn btn-danger">❌ Cancel</button>
+  </div>
 </form>
 {% endif %}
 {% endblock %}

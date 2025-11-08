@@ -1,21 +1,105 @@
-import logging
-
-logger = logging.getLogger("duty_roster.generator")
-# duty_roster/roster_generator.py
-
-import calendar
-import random
-from collections import defaultdict
-from datetime import date
-
+from siteconfig.models import SiteConfiguration
+from members.models import Member
+from members.constants.membership import DEFAULT_ROLES
+from duty_roster.operational_calendar import get_operational_weekend
 from duty_roster.models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
     MemberBlackout,
 )
-from members.constants.membership import DEFAULT_ROLES
-from members.models import Member
+from datetime import date
+from collections import defaultdict
+import random
+import calendar
+import logging
+
+logger = logging.getLogger("duty_roster.generator")
+
+
+# Cache for operational season boundaries
+_operational_season_cache = {}
+
+
+def clear_operational_season_cache():
+    """Clear the operational season cache. Useful for testing."""
+    global _operational_season_cache
+    _operational_season_cache.clear()
+
+
+def get_operational_season_bounds(year: int):
+    """
+    Get operational season boundaries for a given year with caching.
+
+    Returns:
+        Tuple of (season_start, season_end) or (None, None) if no config
+    """
+    cache_key = year
+    if cache_key in _operational_season_cache:
+        return _operational_season_cache[cache_key]
+
+    try:
+        config = SiteConfiguration.objects.first()
+        if not config:
+            result = (None, None)
+            _operational_season_cache[cache_key] = result
+            return result
+
+        # Determine start and end dates if configured
+        season_start = None
+        season_end = None
+        if config.operations_start_period:
+            start_sat, start_sun = get_operational_weekend(
+                year, config.operations_start_period)
+            season_start = min(start_sat, start_sun)
+        if config.operations_end_period:
+            end_sat, end_sun = get_operational_weekend(
+                year, config.operations_end_period)
+            season_end = max(end_sat, end_sun)
+
+        result = (season_start, season_end)
+        _operational_season_cache[cache_key] = result
+        return result
+
+    except Exception as e:
+        logger.warning(f"Error calculating operational season bounds for {year}: {e}")
+        result = (None, None)
+        _operational_season_cache[cache_key] = result
+        return result
+
+
+def is_within_operational_season(check_date: date) -> bool:
+    """
+    Check if a given date falls within the club's operational season.
+
+    Args:
+        check_date: The date to check
+
+    Returns:
+        True if the date is within the operational season, False otherwise
+    """
+    try:
+        season_start, season_end = get_operational_season_bounds(check_date.year)
+
+        # If neither is set, all dates are operational
+        if not season_start and not season_end:
+            return True
+        # If only start is set, restrict to dates on/after start
+        elif season_start and not season_end:
+            return check_date >= season_start
+        # If only end is set, restrict to dates on/before end
+        elif season_end and not season_start:
+            return check_date <= season_end
+        # If both are set, restrict to dates between start and end
+        else:
+            # This must be the case where both are set (only remaining possibility)
+            assert season_start is not None and season_end is not None
+            return season_start <= check_date <= season_end
+
+    except Exception as e:
+        logger.warning(f"Error checking operational season for {check_date}: {e}")
+        # If there's any error parsing, default to allowing the date
+        return True
 
 
 def generate_roster(year=None, month=None):
@@ -25,11 +109,23 @@ def generate_roster(year=None, month=None):
     year = year or today.year
     month = month or today.month
     cal = calendar.Calendar()
-    weekend_dates = [
+    all_weekend_dates = [
         d
         for d in cal.itermonthdates(year, month)
         if d.month == month and d.weekday() in (5, 6)
     ]
+
+    # Filter weekend dates to only include those within operational season
+    weekend_dates = [
+        d for d in all_weekend_dates
+        if is_within_operational_season(d)
+    ]
+
+    # Log what dates were filtered out for debugging
+    filtered_out = [d for d in all_weekend_dates if d not in weekend_dates]
+    if filtered_out:
+        logger.info(
+            f"Filtered out {len(filtered_out)} weekend dates outside operational season: {filtered_out}")
     members = list(Member.objects.filter(is_active=True))
     prefs = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()
