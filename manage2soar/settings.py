@@ -76,7 +76,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "django_extensions",
     "instructors.apps.InstructorsConfig",
-    "knowledgetest",
+    "knowledgetest.apps.KnowledgetestConfig",
     "siteconfig",
     "storages",
     "notifications",

@@ -64,13 +64,35 @@ class QuestionAdmin(AdminHelperMixin, admin.ModelAdmin):
         "short_question",
         "correct_answer",
         "last_updated",
+        "updated_by",
     ]
-    list_filter = ["category"]
+    list_filter = ["category", "updated_by"]
     search_fields = ["question_text", "explanation"]
-    readonly_fields = ["media_preview"]
+    readonly_fields = ["media_preview", "updated_by", "last_updated"]
     formfield_overrides = {
         models.TextField: {"widget": TinyMCE(attrs={"cols": 80, "rows": 10})},
     }
+
+    def save_model(self, request, obj, form, change):
+        """Automatically set updated_by field when saving questions."""
+        from django.utils import timezone
+
+        if hasattr(request.user, "member"):
+            # If the user is a Member (most cases)
+            obj.updated_by = request.user
+        else:
+            # Fallback for superuser or other users without Member profile
+            try:
+                from members.models import Member
+
+                member = Member.objects.get(username=request.user.username)
+                obj.updated_by = member
+            except Member.DoesNotExist:
+                # If no matching Member found, leave updated_by as None
+                pass
+
+        obj.last_updated = timezone.now().date()
+        super().save_model(request, obj, form, change)
 
     @admin.display(description="Question")
     def short_question(self, obj):
