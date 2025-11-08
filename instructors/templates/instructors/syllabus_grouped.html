@@ -64,7 +64,7 @@
     <tbody>
       {% for phase in phases %}
         <tr class="table-primary">
-          <td colspan="{% if public %}5{% else %}5{% endif %}"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
+          <td colspan="5"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
         </tr>
         {% for lesson in phase.lessons.all %}
           <tr>
@@ -77,7 +77,7 @@
               </a>
             {% else %}
               {# Instructors get the Instructors/Syllabus/... URL #}
-              <a href="{% url 'syllabus_detail' lesson.code %}">
+              <a href="{% url 'instructors:syllabus_detail' lesson.code %}">
                 {{ lesson.title }}
               </a>
             {% endif %}
