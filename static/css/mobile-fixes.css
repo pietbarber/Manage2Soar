@@ -1,6 +1,14 @@
 /* 
  * Mobile View Fixes
  * Addresses issues #216-221: Mobile responsiveness improvements
+ * 
+ * Issue summary:
+ *   #216: Logsheet entry improvements for mobile
+ *   #217: Hamburger button improvements
+ *   #218: Mobile navigation spacing and sizing
+ *   #219: Responsive layout for logsheet and roster
+ *   #220: Improved mobile readability for forms
+ *   #221: Footer alignment and readability fixes
  */
 
 /* Issue #221: Footer alignment fix */
