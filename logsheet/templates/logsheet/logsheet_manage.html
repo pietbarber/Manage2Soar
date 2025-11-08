@@ -35,8 +35,8 @@
 </div>
 
 
-<div class="container-fluid">
-  <div class="card mb-3" style="max-width: 800px;">
+<div class="container-fluid logsheet-management">
+  <div class="card mb-3">
     <div class="card-body">
     <h5 class="card-title" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">Logsheet for {{ logsheet.log_date }}</h5>
     <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
@@ -115,20 +115,21 @@
 </a>
 
 {% if logsheet.flights.exists %}
-<table class="table table-bordered table-hover table-striped align-middle sort" id="flightsTable">
-  <thead class="table-light">
-    <tr>
-      <th>Status</th>
-      <th>Time</th>
-      <th>Pilot</th>
-      <th>Instructor</th>
-      <th>Glider</th>
-      <th>Towplane</th>
-      <th>Release Alt</th>
-      <th>Duration</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
+<div class="table-responsive">
+  <table class="table table-bordered table-hover table-striped align-middle sort logsheet-entry" id="flightsTable">
+    <thead class="table-light">
+      <tr>
+        <th>Status</th>
+        <th>Time</th>
+        <th>Pilot</th>
+        <th class="d-none d-md-table-cell">Instructor</th>
+        <th>Glider</th>
+        <th class="hide-mobile d-none d-lg-table-cell">Towplane</th>
+        <th class="hide-mobile d-none d-lg-table-cell">Release Alt</th>
+        <th class="d-none d-sm-table-cell">Duration</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
   <tbody>
     {% for flight in flights %}
     <tr>
@@ -150,14 +151,31 @@
           {{ flight.landing_time|time:"H:i" }}
         {% endif %}
       </td>
-      <td>{{ flight.pilot|full_display_name }}</td>
-       <td>
+      <td>
+        {{ flight.pilot|full_display_name }}
+        <div class="d-md-none">
+          {% if flight.instructor %}
+            <small class="text-muted">Instructor: {{ flight.instructor|full_display_name }}</small>
+          {% endif %}
+        </div>
+      </td>
+      <td class="d-none d-md-table-cell">
         {% if flight.instructor %}
           {{ flight.instructor|full_display_name }}
         {% endif %}
       </td>
-      <td>{{ flight.glider }}</td>
       <td>
+        {{ flight.glider }}
+        <div class="d-lg-none">
+          {% if flight.towplane %}
+            <small class="text-muted">{{ flight.towplane }}</small>
+          {% endif %}
+          {% if flight.release_altitude %}
+            <small class="text-muted">{{ flight.release_altitude }}ft</small>
+          {% endif %}
+        </div>
+      </td>
+      <td class="hide-mobile d-none d-lg-table-cell">
           {% if flight.towplane %}
             {{ flight.towplane }}
           {% elif flight.is_incomplete %}
@@ -166,7 +184,7 @@
             </span>
           {% endif %}
       </td>
-      <td>
+      <td class="hide-mobile d-none d-lg-table-cell">
           {% if flight.release_altitude %}
             {{ flight.release_altitude }} ft
           {% elif flight.is_incomplete %}
@@ -176,7 +194,7 @@
           {% endif %}
           
       </td>
-      <td>
+      <td class="d-none d-sm-table-cell">
         {% if not flight.landing_time %}
         <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
           🕒 —
@@ -256,7 +274,8 @@
     {% endfor %}
 
   </tbody>
-</table>
+  </table>
+</div>
 
   <script>
   // Handle "Launch them now" and "Landing now" button clicks

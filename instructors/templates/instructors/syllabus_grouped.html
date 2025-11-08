@@ -49,26 +49,27 @@
     {% endif %}
   </div>
 
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th class="table-secondary">Code</th>
-        <th>Title</th>
-        <th class="table-secondary">Required for Solo</th>
-        <th class="table-secondary">Required for Private</th>
-        {% if public %}<th style="width:25%">Instructor Sign-off and Date</th>{% endif %}
-        {% if not public %}<th style="width:25%">Admin</th>{% endif %}
-      </tr>
-    </thead>
+  <div class="table-responsive">
+    <table class="table table-bordered training-grid">
+      <thead>
+        <tr>
+          <th class="table-secondary">Code</th>
+          <th class="lesson-title">Title</th>
+          <th class="table-secondary d-none d-md-table-cell">Required for Solo</th>
+          <th class="table-secondary d-none d-md-table-cell">Required for Private</th>
+          {% if public %}<th style="width:25%" class="d-none d-lg-table-cell">Instructor Sign-off and Date</th>{% endif %}
+          {% if not public %}<th style="width:25%" class="d-none d-sm-table-cell">Admin</th>{% endif %}
+        </tr>
+      </thead>
     <tbody>
       {% for phase in phases %}
         <tr class="table-primary">
-          <td colspan="5"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
+          <td colspan="6"><strong>{{ phase.number }} - {{ phase.name }}</strong></td>
         </tr>
         {% for lesson in phase.lessons.all %}
           <tr>
             <td class="table-secondary">{{ lesson.code }}</td>
-            <td class="text-end">
+            <td class="lesson-title">
             {% if public %}
               {# Public visitors get the TRAINING/Syllabus/... URL #}
               <a href="{% url 'public_syllabus_detail' lesson.code %}">
@@ -82,18 +83,18 @@
             {% endif %}
             </td>
             {% if public %}
-            <td class="table-secondary"> {{ lesson.far_requirement }}</td>
-            <td class="table-secondary"> {{ lesson.pts_reference }}</td>
+            <td class="table-secondary d-none d-md-table-cell"> {{ lesson.far_requirement }}</td>
+            <td class="table-secondary d-none d-md-table-cell"> {{ lesson.pts_reference }}</td>
             {% else %}
-            <td class="table-secondary">{% if lesson.is_required_for_solo %}✅{% endif %}</td>
-            <td class="table-secondary">{% if lesson.is_required_for_private %}✅{% endif %}</td>
+            <td class="table-secondary d-none d-md-table-cell">{% if lesson.is_required_for_solo %}✅{% endif %}</td>
+            <td class="table-secondary d-none d-md-table-cell">{% if lesson.is_required_for_private %}✅{% endif %}</td>
             {% endif %}
             {% if public %}
-            <td>
+            <td class="d-none d-lg-table-cell">
               
             </td>
             {% else %}
-            <td>
+            <td class="d-none d-sm-table-cell">
               <a href="{% url 'admin:instructors_traininglesson_change' lesson.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
             </td>
             {% endif %}
@@ -102,4 +103,5 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% endblock %}

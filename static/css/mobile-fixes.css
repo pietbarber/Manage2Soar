@@ -1,0 +1,475 @@
+/* 
+ * Mobile View Fixes
+ * Addresses issues #216-221: Mobile responsiveness improvements
+ */
+
+/* Issue #221: Footer alignment fix */
+@media (max-width: 768px) {
+    .footer .container {
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .footer .row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .footer .col-md-6 {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    /* Make footer text larger and more readable */
+    .footer {
+        font-size: 1rem !important;
+        padding: 2rem 0 !important;
+    }
+
+    .footer small {
+        font-size: 0.95rem !important;
+    }
+
+    .footer a {
+        font-size: 1rem !important;
+        text-decoration: underline !important;
+    }
+}
+
+/* Issue #217: Hamburger button improvements */
+@media (max-width: 991.98px) {
+
+    /* Make hamburger button larger and more accessible */
+    .navbar-toggler {
+        font-size: 1.5rem !important;
+        padding: 0.5rem 0.75rem !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .navbar-toggler-icon {
+        width: 1.5em !important;
+        height: 1.5em !important;
+    }
+
+    /* Better positioning and spacing for collapsed menu */
+    .navbar-collapse {
+        margin-top: 1rem;
+    }
+
+    /* Make navigation links much larger for mobile */
+    .navbar-nav .nav-link {
+        padding: 1rem 1.5rem !important;
+        font-size: 1.3rem !important;
+        font-weight: 500 !important;
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Dropdown menu items also larger */
+    .navbar-nav .dropdown-menu {
+        margin-left: 1rem;
+        margin-right: 1rem;
+        font-size: 1.2rem !important;
+    }
+
+    .navbar-nav .dropdown-item {
+        padding: 0.75rem 1.5rem !important;
+        font-size: 1.2rem !important;
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Make navbar brand larger too */
+    .navbar-brand {
+        font-size: 1.4rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* User welcome text larger */
+    .navbar-text {
+        font-size: 1.1rem !important;
+    }
+}
+
+/* Issue #218: Instructor dashboard column stacking */
+@media (max-width: 991.98px) {
+
+    /* Force columns to stack on mobile - use Bootstrap's lg breakpoint */
+    .instructor-dashboard .col-md-6,
+    .dashboard-columns .col-md-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 1.5rem;
+        width: 100% !important;
+    }
+
+    /* Prevent column overlap */
+    .instructor-dashboard .row,
+    .dashboard-columns .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .instructor-dashboard .col-md-6>*,
+    .dashboard-columns .col-md-6>* {
+        margin-bottom: 1rem;
+    }
+
+    /* Ensure tables within columns are responsive */
+    .dashboard-columns .table-responsive {
+        font-size: 0.9rem;
+    }
+}
+
+/* Issue #220: Training grid proportions */
+@media (max-width: 991.98px) {
+
+    /* Training lesson titles - allow wrapping and better proportions */
+    .training-grid .lesson-title,
+    .syllabus-grid .lesson-title {
+        font-size: 0.9rem !important;
+        line-height: 1.3 !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        padding: 0.5rem 0.25rem !important;
+    }
+
+    /* Improve grid cell sizing */
+    .training-grid .grid-cell,
+    .syllabus-grid .grid-cell {
+        min-width: 30px !important;
+        padding: 0.25rem !important;
+        font-size: 0.8rem;
+    }
+
+    /* Table responsiveness for training grids */
+    .training-grid table,
+    .syllabus-grid table {
+        font-size: 0.85rem;
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    /* Logsheet table optimization - use full width efficiently */
+    .logsheet-entry .table-responsive {
+        margin-left: -5px !important;
+        margin-right: -5px !important;
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+    }
+
+    /* Code column - keep narrow */
+    .training-grid th:first-child,
+    .syllabus-grid th:first-child {
+        width: 10% !important;
+        max-width: 45px !important;
+    }
+
+    /* Title column - give it much more space */
+    .training-grid th:nth-child(2),
+    .syllabus-grid th:nth-child(2) {
+        width: 60% !important;
+        min-width: 180px !important;
+    }
+
+    /* Checkbox columns (Solo/Private) - make them really narrow */
+    .training-grid th:nth-child(3),
+    .training-grid th:nth-child(4),
+    .syllabus-grid th:nth-child(3),
+    .syllabus-grid th:nth-child(4) {
+        width: 8% !important;
+        max-width: 35px !important;
+        text-align: center !important;
+    }
+
+    /* Actions column - smaller */
+    .training-grid th:last-child,
+    .syllabus-grid th:last-child {
+        width: 14% !important;
+        min-width: 60px !important;
+    }
+
+    /* Center align checkbox content - very compact */
+    .training-grid td:nth-child(3),
+    .training-grid td:nth-child(4),
+    .syllabus-grid td:nth-child(3),
+    .syllabus-grid td:nth-child(4) {
+        text-align: center !important;
+        padding: 0.2rem 0.05rem !important;
+        font-size: 1rem !important;
+    }
+
+    /* Make the checkmarks smaller if needed */
+    .training-grid td:nth-child(3) *,
+    .training-grid td:nth-child(4) *,
+    .syllabus-grid td:nth-child(3) *,
+    .syllabus-grid td:nth-child(4) * {
+        font-size: 0.9rem !important;
+    }
+}
+
+/* Issue #219: Syllabus view layout improvements */
+@media (max-width: 768px) {
+
+    .syllabus-view .container,
+    .view-syllabus .container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    /* Remove excessive left margin/padding */
+    .syllabus-content,
+    .lesson-content {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+    }
+
+    /* Better text wrapping and line breaks */
+    .lesson-description,
+    .syllabus-description {
+        word-wrap: break-word !important;
+        white-space: normal !important;
+        line-height: 1.4 !important;
+    }
+
+    /* Improve spacing for wordy content */
+    .lesson-objectives,
+    .lesson-content p {
+        margin-bottom: 0.75rem !important;
+        line-height: 1.5 !important;
+    }
+}
+
+/* Issue #216: Logsheet entry improvements */
+@media (max-width: 768px) {
+
+    /* Portrait mode optimizations */
+    .logsheet-entry table {
+        font-size: 0.8rem !important;
+        width: 100% !important;
+    }
+
+    .logsheet-entry th,
+    .logsheet-entry td {
+        padding: 0.4rem 0.2rem !important;
+        vertical-align: top;
+        word-wrap: break-word;
+    }
+
+    /* Hide less critical columns on very small screens */
+    .logsheet-entry .hide-mobile {
+        display: none !important;
+    }
+
+    /* Stack form elements vertically */
+    .logsheet-form .row {
+        flex-direction: column;
+    }
+
+    .logsheet-form .col-auto,
+    .logsheet-form .col-md-auto {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Better input sizing */
+    .logsheet-form input,
+    .logsheet-form select {
+        width: 100% !important;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* Very small screens - even more aggressive stacking */
+    .logsheet-entry table {
+        font-size: 0.75rem !important;
+    }
+
+    .logsheet-entry th,
+    .logsheet-entry td {
+        padding: 0.3rem 0.1rem !important;
+    }
+}
+
+/* Landscape mode optimizations for logsheet management */
+@media (max-width: 926px) and (orientation: landscape) {
+    .logsheet-entry {
+        /* Remove excessive left spacing mentioned in the issue */
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+    }
+
+    .logsheet-entry .container {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+    }
+
+    /* Better use of horizontal space */
+    .logsheet-entry table {
+        width: 100%;
+        table-layout: auto;
+    }
+}
+
+/* Mobile logsheet management - eliminate wasted space */
+@media (max-width: 926px) {
+
+    /* Remove container padding that wastes horizontal space */
+    body:has([data-logsheet-date]) .container-fluid,
+    .logsheet-management .container-fluid {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Remove card max-width constraint on mobile */
+    body:has([data-logsheet-date]) .card,
+    .logsheet-management .card {
+        max-width: none !important;
+        margin-left: 5px !important;
+        margin-right: 5px !important;
+    }
+
+    /* Tighter card padding */
+    body:has([data-logsheet-date]) .card-body,
+    .logsheet-management .card-body {
+        padding: 0.75rem !important;
+    }
+
+    /* Make button groups more compact */
+    body:has([data-logsheet-date]) .d-flex.gap-2,
+    .logsheet-management .d-flex.gap-2 {
+        gap: 0.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    /* Compact buttons */
+    body:has([data-logsheet-date]) .btn,
+    .logsheet-management .btn {
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.9rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+}
+
+/* General mobile improvements */
+@media (max-width: 768px) {
+
+    /* Better container padding */
+    .container {
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+    }
+
+    /* Larger headers on mobile */
+    h1 {
+        font-size: 2rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 1rem !important;
+    }
+
+    h2 {
+        font-size: 1.6rem !important;
+        font-weight: 500 !important;
+        margin-bottom: 0.75rem !important;
+    }
+
+    h3 {
+        font-size: 1.3rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Improve button spacing and sizing */
+    .btn-group-vertical .btn,
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Larger buttons for mobile */
+    .btn {
+        font-size: 1.1rem !important;
+        padding: 0.75rem 1.25rem !important;
+    }
+
+    .btn-sm {
+        font-size: 1rem !important;
+        padding: 0.5rem 1rem !important;
+    }
+
+    /* Better form control sizing */
+    .form-control,
+    .form-select {
+        font-size: 1.1rem !important;
+        padding: 0.75rem 1rem !important;
+    }
+
+    /* Improve card spacing and text */
+    .card {
+        margin-bottom: 1rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+        font-size: 1rem !important;
+    }
+
+    .card-title {
+        font-size: 1.3rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Better table responsiveness */
+    .table-responsive {
+        font-size: 1rem !important;
+    }
+
+    .table-responsive table {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Larger body text */
+    body {
+        font-size: 1rem !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Alert text larger */
+    .alert {
+        font-size: 1rem !important;
+    }
+}
+
+/* Accessibility improvements for mobile */
+@media (max-width: 768px) {
+
+    /* Larger touch targets */
+    .btn {
+        min-height: 44px;
+        padding: 0.5rem 1rem;
+    }
+
+    .nav-link {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Better focus states for touch devices */
+    .btn:focus,
+    .form-control:focus,
+    .nav-link:focus {
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+        outline: none;
+    }
+}
