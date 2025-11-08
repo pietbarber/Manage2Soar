@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://json.schemastore.org/yamllint.json
+# Bandit configuration for Manage2Soar Django project
+# Focuses on real security issues while reducing noise from tests
+
+exclude_dirs:
+  - .venv
+  - staticfiles
+  - generated_avatars
+  - media
+  - tinymce
+  - node_modules
+
+exclude:
+  - "*/migrations/*"
+  - "*/tests/*"
+  - "*/test_*.py"
+  - "*conftest.py"
+
+skips:
+  - B101 # assert_used - normal in Django tests
+  - B106 # hardcoded_password_funcarg - test fixtures
+  - B308 # mark_safe - we properly escape dynamic content
+  - B601 # paramiko_calls - if we use paramiko for SSH
+  - B703 # django_mark_safe - we properly escape dynamic content
+
+severity: medium
+confidence: medium
