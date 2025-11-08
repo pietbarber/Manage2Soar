@@ -33,12 +33,12 @@
 {% endif %}
 
 
-<div class="row">
-  <div class="col-md-6">
+<div class="row dashboard-columns">
+  <div class="col-12 col-lg-6 mb-4">
     <h2>Active Students</h2>
     {% include "instructors/_progress_table.html" with data=students_data show_progress=True %}
   </div>
-  <div class="col-md-6">
+  <div class="col-12 col-lg-6 mb-4">
     <h2>Active Rated Pilots</h2>
     {% include "instructors/_progress_table.html" with data=rated_data show_progress=False %}
   </div>

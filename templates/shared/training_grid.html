@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Training Grid{% endblock %}
 {% block content %}
 <style>
@@ -108,11 +109,11 @@ th.sticky-max, td.sticky-max {
                 {% elif cell.score == '!' %}score-attn
                 {% endif %}
             " title="{{ cell.tooltip }}">
-              {% if cell.score == "1" %} <img src="/static/images/blob1.png">
-              {% elif cell.score == "2" %} <img src="/static/images/blob2.png">
-              {% elif cell.score == "3" %} <img src="/static/images/blob3.png">
-              {% elif cell.score == "4" %} <img src="/static/images/blob4.png">
-              {% elif cell.score == "!" %}️ <img src="/static/images/blob5.png">
+              {% if cell.score == "1" %} <img src="{% static 'images/blob1.png' %}">
+              {% elif cell.score == "2" %} <img src="{% static 'images/blob2.png' %}">
+              {% elif cell.score == "3" %} <img src="{% static 'images/blob3.png' %}">
+              {% elif cell.score == "4" %} <img src="{% static 'images/blob4.png' %}">
+              {% elif cell.score == "!" %}️ <img src="{% static 'images/blob5.png' %}">
               {% else %}&mdash;
               {% endif %}
             </td>
@@ -120,10 +121,10 @@ th.sticky-max, td.sticky-max {
            
        
           <td class="text-center border border-2 border-primary fw-bold max_score sticky-max">
-              {% if row.max_score == "1" %} <img src="/static/images/blob1.png">
-              {% elif row.max_score == "2" %} <img src="/static/images/blob2.png">
-              {% elif row.max_score == "3" %} <img src="/static/images/blob3.png">
-              {% elif row.max_score == "4" %} <img src="/static/images/blob4.png">
+              {% if row.max_score == "1" %} <img src="{% static 'images/blob1.png' %}">
+              {% elif row.max_score == "2" %} <img src="{% static 'images/blob2.png' %}">
+              {% elif row.max_score == "3" %} <img src="{% static 'images/blob3.png' %}">
+              {% elif row.max_score == "4" %} <img src="{% static 'images/blob4.png' %}">
             {% else %}&mdash;{% endif %}
           </td>
         </tr>

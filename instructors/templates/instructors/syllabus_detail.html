@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Syllabus Entry Detail{% endblock %}
 {% block content %}
-<div class="position-relative">
+<div class="position-relative syllabus-view">
 
-  {# QR code in the top-right corner #}
+  {# QR code in the top-right corner - smaller on mobile #}
   <a href="{% url 'public_syllabus_detail' lesson.code %}">
     <img src="{% url 'public_syllabus_qr' lesson.code %}"
          alt="QR code for {{ lesson.code }}"
-         class="position-absolute top-0 end-0 m-3"
+         class="position-absolute top-0 end-0 m-3 qr-code"
          style="width: 100px; height: auto;"/>
   </a>
 
 
-  <h1>{{ lesson.code }} - {{ lesson.title }}</h1>
+  <h1 class="lesson-title">{{ lesson.code }} - {{ lesson.title }}</h1>
 
 
   <div class="mb-4">
@@ -24,8 +24,10 @@
     {% endif %}
   </div>
 
-  <div class="border p-3 bg-light">
-    {{ lesson.description|safe }}
+  <div class="border p-3 bg-light lesson-content">
+    <div class="lesson-description">
+      {{ lesson.description|safe }}
+    </div>
   </div>
 
   <div class="mt-3 d-flex flex-wrap gap-2 no-print-nav">
