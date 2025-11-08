@@ -124,8 +124,26 @@ jobs:
       - name: Security Gate - Fail on High Severity
         run: |
           echo "Running security gate..."
-          # This will fail the build if high-severity issues are found
-          bandit --configfile bandit.yaml -r . --severity-level high
-          echo "✅ Security gate passed - no high-severity issues found."
+          # Run bandit and capture results in JSON format
+          bandit --configfile bandit.yaml -r . -f json -o security-gate-results.json || true
+
+          # Use Python to reliably count high-severity issues
+          python3 -c "
+          import json
+          try:
+              with open('security-gate-results.json', 'r') as f:
+                  data = json.load(f)
+              high_issues = [r for r in data.get('results', []) if r.get('issue_severity') == 'HIGH']
+              count = len(high_issues)
+              print(f'High-severity issues found: {count}')
+              if count > 0:
+                  print('❌ Security gate FAILED - {} high-severity issues found!'.format(count))
+                  exit(1)
+              else:
+                  print('✅ Security gate passed - no high-severity issues found.')
+          except Exception as e:
+              print(f'Error processing results: {e}')
+              exit(1)
+          "
 
 # Workflow re-trigger to test if security gate issue was transient
