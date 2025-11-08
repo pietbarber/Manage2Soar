@@ -807,9 +807,9 @@ def propose_roster(request):
     operational_info = {}
     filtered_dates = []
     if siteconfig:
-        from .roster_generator import _get_operational_season_bounds
+        from .roster_generator import get_operational_season_bounds
         try:
-            season_start, season_end = _get_operational_season_bounds(year)
+            season_start, season_end = get_operational_season_bounds(year)
 
             # Only show operational info if we have filtering enabled
             if season_start or season_end:

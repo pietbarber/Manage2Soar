@@ -27,7 +27,7 @@ def clear_operational_season_cache():
     _operational_season_cache.clear()
 
 
-def _get_operational_season_bounds(year: int):
+def get_operational_season_bounds(year: int):
     """
     Get operational season boundaries for a given year with caching.
 
@@ -79,7 +79,7 @@ def is_within_operational_season(check_date: date) -> bool:
         True if the date is within the operational season, False otherwise
     """
     try:
-        season_start, season_end = _get_operational_season_bounds(check_date.year)
+        season_start, season_end = get_operational_season_bounds(check_date.year)
 
         # If neither is set, all dates are operational
         if not season_start and not season_end:
@@ -91,11 +91,10 @@ def is_within_operational_season(check_date: date) -> bool:
         elif season_end and not season_start:
             return check_date <= season_end
         # If both are set, restrict to dates between start and end
-        elif season_start and season_end:
-            return season_start <= check_date <= season_end
-        # Fallback for any unexpected case
         else:
-            return True
+            # This must be the case where both are set (only remaining possibility)
+            assert season_start is not None and season_end is not None
+            return season_start <= check_date <= season_end
 
     except Exception as e:
         logger.warning(f"Error checking operational season for {check_date}: {e}")
