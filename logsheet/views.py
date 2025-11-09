@@ -454,6 +454,10 @@ def manage_logsheet(request, pk):
             logger.info(
                 f"Retired visiting pilot token for finalized logsheet {logsheet.pk}"
             )
+        elif config is None:
+            logger.warning(
+                f"SiteConfiguration row is missing. Could not retire visiting pilot token for finalized logsheet {logsheet.pk}."
+            )
 
         messages.success(
             request, "Logsheet has been finalized and all costs locked in."
