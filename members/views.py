@@ -529,11 +529,17 @@ def visiting_pilot_signup(request, token):
     """
     # Check if visiting pilot signup is enabled and token is valid
     config = SiteConfiguration.objects.first()
-    if not config or not config.visiting_pilot_enabled:
+    if not config:
+        logger.warning(
+            "SiteConfiguration row is missing. Visiting pilot signup is unavailable."
+        )
+        return render(request, "members/visiting_pilot_disabled.html")
+    if not config.visiting_pilot_enabled:
         return render(request, "members/visiting_pilot_disabled.html")
 
     # Validate token to prevent unauthorized access/spam
     if not config.visiting_pilot_token or token != config.visiting_pilot_token:
+        logger.warning(f"Invalid or expired visiting pilot signup token: {token}")
         raise Http404("Invalid or expired signup link")
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
@@ -552,6 +558,20 @@ def visiting_pilot_signup(request, token):
             try:
                 # Create the member account
 
+                # Ensure visiting_pilot_status is set and valid
+                if not getattr(config, "visiting_pilot_status", None):
+                    logger.error(
+                        "SiteConfiguration.visiting_pilot_status is missing. Cannot create visiting pilot account."
+                    )
+                    messages.error(
+                        request,
+                        "Visiting pilot status is not configured. Please contact the duty officer or administrator.",
+                    )
+                    return render(
+                        request,
+                        "members/visiting_pilot_signup.html",
+                        {"form": form, "config": config},
+                    )
                 member = Member.objects.create_user(
                     username=form.cleaned_data["email"],  # Use email as username
                     email=form.cleaned_data["email"],
@@ -633,7 +653,12 @@ def visiting_pilot_qr_code(request):
 
         # Get the site configuration and generate daily token
         config = SiteConfiguration.objects.first()
-        if not config or not config.visiting_pilot_enabled:
+        if not config:
+            logger.warning(
+                "SiteConfiguration row is missing. Cannot generate visiting pilot QR code."
+            )
+            raise Http404("Visiting pilot signup not configured")
+        if not config.visiting_pilot_enabled:
             raise Http404("Visiting pilot signup not configured")
 
         # Get or create today's token
@@ -685,7 +710,13 @@ def visiting_pilot_qr_display(request):
     Display page with QR code and instructions for duty officers.
     """
     config = SiteConfiguration.objects.first()
-    if not config or not config.visiting_pilot_enabled:
+    if not config:
+        logger.warning(
+            "SiteConfiguration row is missing. Visiting pilot QR display is unavailable."
+        )
+        messages.warning(request, "Visiting pilot signup is currently disabled.")
+        return redirect("cms:home")
+    if not config.visiting_pilot_enabled:
         messages.warning(request, "Visiting pilot signup is currently disabled.")
         return redirect("cms:home")
 
