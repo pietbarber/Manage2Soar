@@ -2,7 +2,6 @@
 Test visiting pilot integration with logsheet flight forms.
 """
 
-import pytest
 from django.test import TestCase
 
 from logsheet.forms import FlightForm
