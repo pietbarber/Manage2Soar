@@ -270,6 +270,12 @@ class SiteConfiguration(models.Model):
         else:
             is_new_logo = bool(self.club_logo)
         super().save(*args, **kwargs)
+
+        # Clear cache when configuration changes
+        from django.core.cache import cache
+
+        cache.delete("siteconfig_instance")
+
         # Generate favicon if logo was uploaded/changed
         if self.club_logo and is_new_logo:
             # Save favicon.ico at MEDIA_ROOT/favicon.ico using storage backend
@@ -286,6 +292,13 @@ class SiteConfiguration(models.Model):
             except Exception as e:
                 # Log storage or favicon generation errors but don't break model save
                 logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
+
+    def delete(self, *args, **kwargs):
+        """Override delete to clear cache."""
+        from django.core.cache import cache
+
+        cache.delete("siteconfig_instance")
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"Site Configuration for {self.club_name}"

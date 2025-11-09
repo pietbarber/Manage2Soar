@@ -534,8 +534,6 @@ def visiting_pilot_signup(request, token):
 
     # Validate token to prevent unauthorized access/spam
     if not config.visiting_pilot_token or token != config.visiting_pilot_token:
-        from django.http import Http404
-
         raise Http404("Invalid or expired signup link")
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
@@ -608,6 +606,11 @@ def visiting_pilot_signup(request, token):
                     request,
                     "An error occurred while creating your account. Please contact the duty officer for assistance.",
                 )
+                return render(
+                    request,
+                    "members/visiting_pilot_signup.html",
+                    {"form": form, "config": config},
+                )
     else:
         form = VisitingPilotSignupForm()
 
@@ -631,8 +634,6 @@ def visiting_pilot_qr_code(request):
         # Get the site configuration and generate daily token
         config = SiteConfiguration.objects.first()
         if not config or not config.visiting_pilot_enabled:
-            from django.http import Http404
-
             raise Http404("Visiting pilot signup not configured")
 
         # Get or create today's token
