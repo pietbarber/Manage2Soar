@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Already a Member{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Already a Club Member
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    <p>You're already logged in as a club member.</p>
+                    <p>This visiting pilot signup page is for pilots from other clubs who need temporary access.</p>
+
+                    <div class="mt-4">
+                        <a href="{% url 'cms:home' %}" class="btn btn-primary">
+                            <i class="fas fa-home"></i>
+                            Go to Homepage
+                        </a>
+                        {% if user.duty_officer or user.is_staff %}
+                            <a href="{% url 'members:visiting_pilot_qr_display' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-qrcode"></i>
+                                Show QR Code
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

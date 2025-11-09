@@ -104,19 +104,63 @@
 <script>
 function copyToClipboard(elementId) {
     const element = document.getElementById(elementId);
-    element.select();
-    element.setSelectionRange(0, 99999); // For mobile devices
-    navigator.clipboard.writeText(element.value).then(function() {
-        // Show a temporary success message
-        const button = element.nextElementSibling;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        button.classList.replace('btn-outline-secondary', 'btn-success');
-        setTimeout(function() {
-            button.innerHTML = originalText;
-            button.classList.replace('btn-success', 'btn-outline-secondary');
-        }, 2000);
-    });
+
+    // Focus and select the text
+    element.focus();
+    if (typeof element.select === 'function') {
+        element.select();
+    }
+    if (typeof element.setSelectionRange === 'function') {
+        element.setSelectionRange(0, element.value.length); // For mobile devices
+    }
+
+    // Try Clipboard API first
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(element.value).then(function() {
+            showCopySuccess(element);
+        }).catch(function() {
+            fallbackCopy(element);
+        });
+    } else {
+        fallbackCopy(element);
+    }
+}
+
+function fallbackCopy(element) {
+    let success = false;
+    try {
+        // execCommand works on input/textarea elements
+        success = document.execCommand('copy');
+    } catch (err) {
+        success = false;
+    }
+    if (success) {
+        showCopySuccess(element);
+    } else {
+        showCopyFailure(element);
+    }
+}
+
+function showCopySuccess(element) {
+    const button = element.nextElementSibling;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class=\"fas fa-check\"></i> Copied!';
+    button.classList.replace('btn-outline-secondary', 'btn-success');
+    setTimeout(function() {
+        button.innerHTML = originalText;
+        button.classList.replace('btn-success', 'btn-outline-secondary');
+    }, 2000);
+}
+
+function showCopyFailure(element) {
+    const button = element.nextElementSibling;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class=\"fas fa-exclamation-triangle\"></i> Copy failed';
+    button.classList.replace('btn-outline-secondary', 'btn-danger');
+    setTimeout(function() {
+        button.innerHTML = originalText;
+        button.classList.replace('btn-danger', 'btn-outline-secondary');
+    }, 2000);
 }
 </script>
 {% endblock %}

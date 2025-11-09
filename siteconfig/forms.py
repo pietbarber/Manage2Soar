@@ -144,7 +144,7 @@ class VisitingPilotSignupForm(forms.Form):
             ssa_number = cleaned_data.get("ssa_member_number")
 
             # First check if SSA number is already in use (most definitive check)
-            if ssa_number:
+            if ssa_number and ssa_number.strip():
                 existing_with_ssa = Member.objects.filter(
                     SSA_member_number=ssa_number
                 ).first()

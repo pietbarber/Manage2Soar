@@ -242,15 +242,20 @@ class FlightForm(forms.ModelForm):
         # Pilot dropdown: optgroups for Active Members, Visiting Pilots, and Inactive Members
         from siteconfig.models import SiteConfiguration
 
+        # Get configuration once to avoid multiple database queries
+        config = SiteConfiguration.objects.first()
         active_statuses = get_active_membership_statuses()
         pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses)
-            .exclude(membership_status="Affiliate Member")
+            .exclude(
+                membership_status=(
+                    config.visiting_pilot_status
+                    if config and config.visiting_pilot_status
+                    else "Affiliate Member"
+                )
+            )
             .order_by("last_name", "first_name")
         )
-
-        # Get visiting pilots (configured status, typically "Affiliate Member")
-        config = SiteConfiguration.objects.first()
         pilot_visiting = Member.objects.none()  # Default empty queryset
         if config and config.visiting_pilot_enabled and config.visiting_pilot_status:
             pilot_visiting = Member.objects.filter(
@@ -287,7 +292,13 @@ class FlightForm(forms.ModelForm):
             Member.objects.filter(
                 Q(membership_status__in=active_statuses) & Q(instructor=True)
             )
-            .exclude(membership_status="Affiliate Member")
+            .exclude(
+                membership_status=(
+                    config.visiting_pilot_status
+                    if config and config.visiting_pilot_status
+                    else "Affiliate Member"
+                )
+            )
             .order_by("last_name", "first_name")
         )
 
@@ -326,7 +337,13 @@ class FlightForm(forms.ModelForm):
         # Tow pilot dropdown: optgroups for Active Tow Pilots, Visiting Tow Pilots, and Inactive Tow Pilots
         tow_pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses, towpilot=True)
-            .exclude(membership_status="Affiliate Member")
+            .exclude(
+                membership_status=(
+                    config.visiting_pilot_status
+                    if config and config.visiting_pilot_status
+                    else "Affiliate Member"
+                )
+            )
             .order_by("last_name", "first_name")
         )
 
@@ -368,7 +385,13 @@ class FlightForm(forms.ModelForm):
             active_pass = (
                 Member.objects.filter(membership_status__in=active_statuses)
                 .exclude(membership_status__in=deceased_status)
-                .exclude(membership_status="Affiliate Member")
+                .exclude(
+                    membership_status=(
+                        config.visiting_pilot_status
+                        if config and config.visiting_pilot_status
+                        else "Affiliate Member"
+                    )
+                )
                 .order_by("last_name", "first_name")
             )
 

@@ -553,6 +553,7 @@ def visiting_pilot_signup(request, token):
         if form.is_valid():
             try:
                 # Create the member account
+                # Create the member account
                 member = Member.objects.create_user(
                     username=form.cleaned_data["email"],  # Use email as username
                     email=form.cleaned_data["email"],
@@ -565,6 +566,9 @@ def visiting_pilot_signup(request, token):
                     membership_status=config.visiting_pilot_status,
                     # No password set - account cannot be logged in via password until reset
                 )
+
+                # Mark account as unusable for password login
+                member.set_unusable_password()
 
                 # Mark account as unusable for password login
                 member.set_unusable_password()

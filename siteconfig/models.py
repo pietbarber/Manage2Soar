@@ -154,7 +154,7 @@ class SiteConfiguration(models.Model):
 
     # Visiting Pilot Configuration (Issue #209)
     visiting_pilot_enabled = models.BooleanField(
-        default=True,
+        default=False,
         help_text="Enable quick signup for visiting pilots via QR code",
     )
     visiting_pilot_status = models.CharField(
@@ -210,11 +210,9 @@ class SiteConfiguration(models.Model):
 
     def get_or_create_daily_token(self):
         """Get existing token if created today, otherwise generate a new one."""
-        from datetime import date
-
         from django.utils import timezone
 
-        today = date.today()
+        today = timezone.now().date()
         token_date = (
             self.visiting_pilot_token_created.date()
             if self.visiting_pilot_token_created

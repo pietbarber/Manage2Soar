@@ -417,14 +417,14 @@
         </div>
 
         <div class="text-muted">
-          <small>Direct URL: <code>{{ request.scheme }}://{{ request.get_host }}{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_daily_token %}</code></small>
+          <small>Direct URL: <code>{{ request.scheme }}://{{ request.get_host }}{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_token %}</code></small>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           Close
         </button>
-        <a href="{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_daily_token %}"
+        <a href="{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_token %}"
            target="_blank"
            class="btn btn-outline-primary">
           Open in New Tab
