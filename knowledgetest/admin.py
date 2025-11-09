@@ -64,13 +64,22 @@ class QuestionAdmin(AdminHelperMixin, admin.ModelAdmin):
         "short_question",
         "correct_answer",
         "last_updated",
+        "updated_by",
     ]
-    list_filter = ["category"]
+    list_filter = ["category", "updated_by"]
     search_fields = ["question_text", "explanation"]
-    readonly_fields = ["media_preview"]
+    readonly_fields = ["media_preview", "updated_by", "last_updated"]
     formfield_overrides = {
         models.TextField: {"widget": TinyMCE(attrs={"cols": 80, "rows": 10})},
     }
+
+    def save_model(self, request, obj, form, change):
+        """Automatically set updated_by field when saving questions."""
+        from django.utils import timezone
+
+        obj.updated_by = request.user
+        obj.last_updated = timezone.now().date()
+        super().save_model(request, obj, form, change)
 
     @admin.display(description="Question")
     def short_question(self, obj):
