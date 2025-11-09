@@ -245,25 +245,26 @@
     .training-grid th.sticky-col,
     .training-grid td.sticky-col,
     .training-grid .sticky-col {
-        max-width: 25vw !important;
-        width: 25vw !important;
-        min-width: 25vw !important;
+        max-width: 22vw !important;  /* Reduced from 25vw to 22vw */
+        width: 22vw !important;
+        min-width: 22vw !important;
 
         /* Force word wrapping - override all conflicting styles */
         white-space: normal !important;
         word-wrap: break-word !important;
-        word-break: break-word !important;
-        overflow-wrap: break-word !important;
+        word-break: break-all !important;  /* More aggressive breaking */
+        overflow-wrap: anywhere !important;  /* Most aggressive */
         hyphens: auto !important;
 
         /* Styling adjustments */
-        padding: 0.25rem 0.5rem !important;
-        font-size: 0.85rem !important;
-        line-height: 1.2 !important;
+        padding: 0.2rem 0.3rem !important;  /* Tighter padding */
+        font-size: 0.8rem !important;  /* Smaller font */
+        line-height: 1.1 !important;  /* Tighter line height */
 
         /* Ensure content doesn't overflow */
         overflow: visible !important;
         text-overflow: unset !important;
+        vertical-align: top !important;
     }
 
     /* Ensure links in lesson titles also wrap properly */
@@ -311,27 +312,38 @@
     .training-grid-scroll table.training-grid.table.table-bordered.table-sm.border-dark-subtle td.text-end.pe-2.sticky-col,
     .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col,
     div.training-grid-scroll table.training-grid td.sticky-col {
-        max-width: 25vw !important;
-        width: 25vw !important;
-        min-width: 25vw !important;
+        max-width: 22vw !important;  /* Even narrower - 22% instead of 25% */
+        width: 22vw !important;
+        min-width: 22vw !important;
         white-space: normal !important;
         word-wrap: break-word !important;
-        word-break: break-word !important;
-        overflow-wrap: break-word !important;
+        word-break: break-all !important;  /* More aggressive breaking */
+        overflow-wrap: anywhere !important;  /* Most aggressive overflow handling */
         text-align: left !important;
+        padding: 0.2rem 0.3rem !important;  /* Tighter padding */
+        font-size: 0.8rem !important;  /* Smaller font */
+        line-height: 1.1 !important;  /* Tighter line height */
+        vertical-align: top !important;  /* Align to top */
     }
     
-    /* Nuclear option for links within the lesson column */
+    /* Nuclear option for links within the lesson column - extremely aggressive word breaking */
     .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col a,
     .training-grid-scroll table.training-grid td.sticky-col a,
     div.training-grid-scroll table.training-grid td.sticky-col a {
         white-space: normal !important;
         word-wrap: break-word !important;
-        word-break: break-word !important;
-        overflow-wrap: break-word !important;
+        word-break: break-all !important;  /* Changed to break-all for very aggressive breaking */
+        overflow-wrap: anywhere !important;  /* More aggressive than break-word */
         display: inline-block !important;
         width: 100% !important;
         text-align: left !important;
+        line-height: 1.1 !important;
+        font-size: 0.8rem !important;  /* Smaller font to fit more text */
+        hyphens: auto !important;
+        
+        /* Additional aggressive breaking properties */
+        word-spacing: -0.1em !important;  /* Tighter word spacing */
+        letter-spacing: -0.02em !important;  /* Slightly tighter letter spacing */
     }
 }
 
