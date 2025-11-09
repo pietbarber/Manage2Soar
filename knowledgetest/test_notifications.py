@@ -4,7 +4,7 @@ Tests for knowledgetest signals and notifications.
 Tests the implementation of issue #212 - notification system for test bank updates.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 from django.test import TestCase
@@ -18,11 +18,9 @@ try:
 except ImportError:
     Notification = None
 
-# Type checking
+# Type checking imports (for Pylance compatibility)
 if TYPE_CHECKING and Notification is not None:
-    from notifications.models import Notification as NotificationType
-else:
-    NotificationType = Any
+    pass  # Type checking satisfied by Notification import above
 
 
 @pytest.mark.skipif(Notification is None, reason="Notifications app not available")
@@ -138,7 +136,7 @@ class TestQuestionUpdateNotifications(TestCase):
         Notification.objects.all().delete()
 
         # Create a new question (not update)
-        new_question = Question.objects.create(
+        Question.objects.create(
             qnum=1002,
             category=self.category,
             question_text="What is the new question?",
@@ -181,8 +179,9 @@ class TestQuestionUpdateNotifications(TestCase):
         second_count = Notification.objects.filter(dismissed=False).count()
 
         self.assertEqual(first_count, 2)  # 2 instructors notified for first update
-        # 2 instructors × 2 updates = 4 total    def test_inactive_instructors_not_notified(self):
-        self.assertEqual(second_count, 4)
+        self.assertEqual(second_count, 4)  # 2 instructors × 2 updates = 4 total
+
+    def test_inactive_instructors_not_notified(self):
         """Test that inactive instructors do not receive notifications."""
         assert Notification is not None  # Type guard for Pylance
 

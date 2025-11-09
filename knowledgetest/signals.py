@@ -99,7 +99,8 @@ def notify_instructors_on_question_update(sender, instance, created, **kwargs):
 
         message = (
             f"Knowledge test question updated: Q{instance.qnum} ({category_name}) "
-            f"has been modified by {updater_name} at {timestamp}. Review the updated test bank content."
+            f"has been modified by {updater_name} at {timestamp}. Review the updated test bank content. "
+            f"[{dedup_key}]"
         )
 
         # Try to create a URL to the admin page for the question

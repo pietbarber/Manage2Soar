@@ -16,8 +16,6 @@ class KnowledgetestConfig(AppConfig):
                 "migrate",
                 "collectstatic",
                 "loaddata",
-                "test",
-                "pytest",
             ]
         ):
             try:
