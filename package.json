@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "tinymce": "^8.1.2",
-    "tablesort": "^5.2.1"
+    "tablesort": "^5.2.1",
+    "tinymce": "^8.2.1"
   },
   "scripts": {
     "vendor:tablesort": "mkdir -p static/vendor && cp node_modules/tablesort/dist/tablesort.min.js static/vendor/tablesort.min.js"

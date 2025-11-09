@@ -247,6 +247,12 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
         "CLUB_PREFIX must contain only alphanumeric characters and hyphens. "
         "This prevents path traversal security issues."
     )
+
+# Google Cloud Storage configuration
+GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
+if not GS_BUCKET_NAME:
+    raise ValueError("GS_BUCKET_NAME must be set in environment variables!")
+
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
@@ -353,8 +359,8 @@ LOGGING = {
 
 handler403 = "members.views.custom_permission_denied_view"
 
-# Use locally hosted TinyMCE JS
-TINYMCE_JS_URL = "/static/tinymce/tinymce.min.js"
+# Use TinyMCE JS from configured static storage
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths
@@ -380,6 +386,7 @@ TINYMCE_DEFAULT_CONFIG = {
         "tableinsertcolbefore tableinsertcolafter tabledeletecol"
     ),
     "promotion": False,  # Disable TinyMCE 'Upgrade' button
+    "license_key": "gpl",  # Use GPL license for open source projects
 }
 
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
