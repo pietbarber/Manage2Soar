@@ -210,23 +210,35 @@ class SiteConfiguration(models.Model):
 
     def get_or_create_daily_token(self):
         """Get existing token if created today, otherwise generate a new one."""
+        from django.db import transaction
         from django.utils import timezone
 
-        today = timezone.now().date()
-        token_date = (
-            self.visiting_pilot_token_created.date()
-            if self.visiting_pilot_token_created
-            else None
-        )
+        # Use select_for_update to prevent race conditions in distributed environments
+        with transaction.atomic():
+            # Refresh from database with row-level lock to prevent concurrent token generation
+            config = SiteConfiguration.objects.select_for_update().get(id=self.id)
 
-        # If no token exists or token is from a previous day, generate new one
-        if not self.visiting_pilot_token or token_date != today:
-            self.generate_visiting_pilot_token()
-            self.save(
-                update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
+            today = timezone.now().date()
+            token_date = (
+                config.visiting_pilot_token_created.date()
+                if config.visiting_pilot_token_created
+                else None
             )
 
-        return self.visiting_pilot_token
+            # If no token exists or token is from a previous day, generate new one
+            if not config.visiting_pilot_token or token_date != today:
+                config.generate_visiting_pilot_token()
+                config.save(
+                    update_fields=[
+                        "visiting_pilot_token",
+                        "visiting_pilot_token_created",
+                    ]
+                )
+                # Update current instance to reflect the changes
+                self.visiting_pilot_token = config.visiting_pilot_token
+                self.visiting_pilot_token_created = config.visiting_pilot_token_created
+
+            return config.visiting_pilot_token
 
     def retire_visiting_pilot_token(self):
         """Retire the current visiting pilot token (usually called when logsheet finalized)."""
