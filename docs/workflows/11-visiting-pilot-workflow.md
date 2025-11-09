@@ -103,7 +103,7 @@ visiting_pilot_token_created = models.DateTimeField(null=True, blank=True)
 ```python
 # Added field for visiting pilots
 home_club = models.CharField(
-    max_length=200,
+    max_length=100,
     blank=True,
     help_text="Home soaring club (for visiting pilots)"
 )
@@ -152,8 +152,8 @@ visiting_pilot_auto_approve = True  # Auto-approve or require manual review
 
 ```python
 # Data requirements
-visiting_pilot_require_ssa_number = True  # Require SSA membership number
-visiting_pilot_require_home_club = False  # Require home club name
+visiting_pilot_require_ssa = True  # Require SSA membership
+visiting_pilot_require_rating = False  # Require pilot rating
 ```
 
 ## Duplicate Detection

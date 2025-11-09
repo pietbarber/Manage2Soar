@@ -165,12 +165,12 @@ The visiting pilot fields in `SiteConfiguration` (added in migrations 0010-0012)
 - `visiting_pilot_enabled`: Master toggle for the entire visiting pilot feature
 - `visiting_pilot_status`: Membership status assigned to visiting pilots (typically "Affiliate Member")
 - `visiting_pilot_auto_approve`: Whether to auto-approve visiting pilots or require manual review
-- `visiting_pilot_require_ssa_number`: Require SSA membership number during signup
-- `visiting_pilot_require_home_club`: Require home club name during signup
+- `visiting_pilot_require_ssa`: Require SSA membership during signup
+- `visiting_pilot_require_rating`: Require pilot rating during signup
 
 **Security Token Management:**
-- `visiting_pilot_token`: Daily security token for QR code access (32-character random string)
-- `visiting_pilot_token_date`: Date the current token was generated
+- `visiting_pilot_token`: Daily security token for QR code access (12-character random string)
+- `visiting_pilot_token_created`: Datetime the current token was generated
 
 **Key Methods:**
 - `get_or_create_daily_token()`: Generates new token if needed, returns current token

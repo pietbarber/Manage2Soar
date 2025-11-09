@@ -540,7 +540,13 @@ def visiting_pilot_signup(request, token):
 
     # Redirect logged-in users - they don't need to sign up as visiting pilots
     if request.user.is_authenticated:
-        return render(request, "members/visiting_pilot_member_redirect.html")
+        return render(
+            request,
+            "members/visiting_pilot_member_redirect.html",
+            {
+                "config": config,
+            },
+        )
 
     if request.method == "POST":
         form = VisitingPilotSignupForm(request.POST)
