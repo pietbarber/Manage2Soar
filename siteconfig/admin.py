@@ -22,7 +22,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             or request.user.groups.filter(name="Webmaster").exists()
         )
 
-    readonly_fields = ()
+    readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
+    actions = ["regenerate_visiting_pilot_token"]
     fieldsets = (
         (
             "Basic Information",
@@ -110,7 +111,42 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
+        (
+            "Visiting Pilot Management",
+            {
+                "fields": (
+                    "visiting_pilot_enabled",
+                    "visiting_pilot_status",
+                    "visiting_pilot_welcome_text",
+                    "visiting_pilot_require_ssa",
+                    "visiting_pilot_require_rating",
+                    "visiting_pilot_auto_approve",
+                    "visiting_pilot_token",
+                    "visiting_pilot_token_created",
+                ),
+                "description": (
+                    "Configure quick signup for visiting pilots. Enable to allow pilots from other clubs "
+                    "to register quickly via QR code. Set requirements and membership status assignment. "
+                    "The security token makes signup URLs unguessable to prevent spam/abuse."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
+
+    @admin.action(description="Regenerate visiting pilot security token")
+    def regenerate_visiting_pilot_token(self, request, queryset):
+        """Admin action to regenerate visiting pilot security tokens."""
+        from django.contrib import messages
+
+        for config in queryset:
+            old_token = config.visiting_pilot_token
+            new_token = config.refresh_visiting_pilot_token()
+            messages.success(
+                request,
+                f"Regenerated visiting pilot token: {old_token} → {new_token}. "
+                f"All existing QR codes and links need to be updated.",
+            )
 
     admin_helper_message = "Site configuration: central site settings. Only the Webmaster should edit these values."
 

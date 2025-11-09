@@ -104,15 +104,26 @@
 <hr>
 <h2>Flights</h2>
 {% if not logsheet.finalized %}
-<a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
-   class="btn btn-sm btn-primary mb-3"
-   data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
-   data-bs-toggle="modal"
-   data-bs-target="#flightModal"
-   data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
-  + Add Flight
+<div class="mb-3">
+  <a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
+     class="btn btn-sm btn-primary"
+     data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
+     data-bs-toggle="modal"
+     data-bs-target="#flightModal"
+     data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
+    + Add Flight
+  </a>
+
+  {% if visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
+  <button type="button"
+          class="btn btn-sm btn-outline-success ms-2"
+          data-bs-toggle="modal"
+          data-bs-target="#visitingPilotModal">
+    👤 Register Visiting Pilot
+  </button>
+  {% endif %}
+</div>
 {% endif %}
-</a>
 
 {% if logsheet.flights.exists %}
 <div class="table-responsive">
@@ -370,6 +381,59 @@
     </div>
   </div>
 </div>
+
+<!-- Visiting Pilot Registration Modal -->
+{% if visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
+<div class="modal fade" id="visitingPilotModal" tabindex="-1" aria-labelledby="visitingPilotModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="visitingPilotModalLabel">
+          👤 Register Visiting Pilot
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="mb-3">
+          <strong>For visiting pilots to register:</strong><br>
+          Have them scan this QR code with their phone camera
+        </p>
+
+        <div class="mb-3">
+          <img src="{% url 'members:visiting_pilot_qr_code' %}"
+               alt="QR Code for Visiting Pilot Registration"
+               class="img-fluid border rounded"
+               style="max-width: 300px;">
+        </div>
+
+        <div class="alert alert-info">
+          <small>
+            <strong>Instructions:</strong><br>
+            1. Point phone camera at QR code<br>
+            2. Tap the notification to open signup form<br>
+            3. Complete registration<br>
+            4. They'll appear in the pilot dropdown for logging flights
+          </small>
+        </div>
+
+        <div class="text-muted">
+          <small>Direct URL: <code>{{ request.scheme }}://{{ request.get_host }}{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_token %}</code></small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+        <a href="{% url 'members:visiting_pilot_signup' visiting_pilot_config.visiting_pilot_token %}"
+           target="_blank"
+           class="btn btn-outline-primary">
+          Open in New Tab
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 
 

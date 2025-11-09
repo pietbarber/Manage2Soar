@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -15,18 +16,23 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 
 from cms.models import HomePageContent
 from instructors.models import MemberQualification
 from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
+from siteconfig.forms import VisitingPilotSignupForm
+from siteconfig.models import SiteConfiguration
 
 from .decorators import active_member_required
 from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.avatar_generator import generate_identicon
 from .utils.vcard_tools import generate_vcard_qr
+
+logger = logging.getLogger(__name__)
 
 try:
     from notifications.models import Notification
@@ -510,3 +516,220 @@ def pydenticon_view(request, username):
         )
     except (FileNotFoundError, IOError):
         raise Http404("Avatar not found")
+
+
+# Visiting Pilot Views
+
+
+def visiting_pilot_signup(request, token):
+    """
+    Handle visiting pilot quick signup.
+    Public view accessible via QR code with security token.
+    Redirects logged-in users away since they're already members.
+    """
+    # Check if visiting pilot signup is enabled and token is valid
+    config = SiteConfiguration.objects.first()
+    if not config:
+        logger.warning(
+            "SiteConfiguration row is missing. Visiting pilot signup is unavailable."
+        )
+        return render(request, "members/visiting_pilot_disabled.html")
+    if not config.visiting_pilot_enabled:
+        return render(request, "members/visiting_pilot_disabled.html")
+
+    # Validate token to prevent unauthorized access/spam
+    if not config.visiting_pilot_token or token != config.visiting_pilot_token:
+        logger.warning(f"Invalid or expired visiting pilot signup token: {token}")
+        raise Http404("Invalid or expired signup link")
+
+    # Redirect logged-in users - they don't need to sign up as visiting pilots
+    if request.user.is_authenticated:
+        return render(
+            request,
+            "members/visiting_pilot_member_redirect.html",
+            {
+                "config": config,
+            },
+        )
+
+    if request.method == "POST":
+        form = VisitingPilotSignupForm(request.POST)
+        if form.is_valid():
+            try:
+                # Create the member account
+
+                # Ensure visiting_pilot_status is set and valid
+                if not getattr(config, "visiting_pilot_status", None):
+                    logger.error(
+                        "SiteConfiguration.visiting_pilot_status is missing. Cannot create visiting pilot account."
+                    )
+                    messages.error(
+                        request,
+                        "Visiting pilot status is not configured. Please contact the duty officer or administrator.",
+                    )
+                    return render(
+                        request,
+                        "members/visiting_pilot_signup.html",
+                        {"form": form, "config": config},
+                    )
+                member = Member.objects.create_user(
+                    username=form.cleaned_data["email"],  # Use email as username
+                    email=form.cleaned_data["email"],
+                    first_name=form.cleaned_data["first_name"],
+                    last_name=form.cleaned_data["last_name"],
+                    phone=form.cleaned_data.get("phone", ""),
+                    SSA_member_number=form.cleaned_data.get("ssa_member_number", ""),
+                    glider_rating=form.cleaned_data.get("glider_rating", ""),
+                    home_club=form.cleaned_data.get("home_club", ""),
+                    membership_status=config.visiting_pilot_status,
+                    # No password set - account cannot be logged in via password until reset
+                )
+
+                # Mark account as unusable for password login
+                member.set_unusable_password()
+
+                # Set additional fields
+                member.is_active = config.visiting_pilot_auto_approve
+                member.save()
+
+                logger.info(
+                    f"Visiting pilot registered: {member.email} ({member.first_name} {member.last_name})"
+                )
+
+                # Show success message with different content based on auto-approval
+                if config.visiting_pilot_auto_approve:
+                    messages.success(
+                        request,
+                        f"Welcome {member.first_name}! Your account has been created and activated. "
+                        f"You can now be added to flight logs. Please check in with the duty officer.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Thank you {member.first_name}! Your registration has been submitted for approval. "
+                        f"Please check in with the duty officer who will activate your account.",
+                    )
+
+                return render(
+                    request,
+                    "members/visiting_pilot_success.html",
+                    {
+                        "member": member,
+                        "config": config,
+                        "auto_approved": config.visiting_pilot_auto_approve,
+                    },
+                )
+
+            except Exception as e:
+                logger.error(f"Error creating visiting pilot account: {e}")
+                messages.error(
+                    request,
+                    "An error occurred while creating your account. Please contact the duty officer for assistance.",
+                )
+                return render(
+                    request,
+                    "members/visiting_pilot_signup.html",
+                    {"form": form, "config": config},
+                )
+    else:
+        form = VisitingPilotSignupForm()
+
+    return render(
+        request, "members/visiting_pilot_signup.html", {"form": form, "config": config}
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def visiting_pilot_qr_code(request):
+    """
+    Generate QR code for visiting pilot signup.
+    Only accessible to logged-in users (duty officers, etc.)
+    """
+    try:
+        from io import BytesIO
+
+        import qrcode
+
+        # Get the site configuration and generate daily token
+        config = SiteConfiguration.objects.first()
+        if not config:
+            logger.warning(
+                "SiteConfiguration row is missing. Cannot generate visiting pilot QR code."
+            )
+            raise Http404("Visiting pilot signup not configured")
+        if not config.visiting_pilot_enabled:
+            raise Http404("Visiting pilot signup not configured")
+
+        # Get or create today's token
+        token = config.get_or_create_daily_token()
+
+        # Build the full URL for the signup page with token
+        signup_url = request.build_absolute_uri(
+            reverse("members:visiting_pilot_signup", args=[token])
+        )
+
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(signup_url)
+        qr.make(fit=True)
+
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Save to BytesIO
+        buffer = BytesIO()
+        img.save(buffer, "PNG")
+        buffer.seek(0)
+
+        response = HttpResponse(buffer.getvalue(), content_type="image/png")
+        response["Content-Disposition"] = 'inline; filename="visiting_pilot_qr.png"'
+        return response
+
+    except ImportError:
+        # qrcode not installed
+        messages.error(
+            request,
+            "QR code generation is not available. Please install the qrcode package.",
+        )
+        return redirect("cms:home")
+    except Exception as e:
+        logger.error(f"Error generating QR code: {e}")
+        messages.error(request, "An error occurred generating the QR code.")
+        return redirect("cms:home")
+
+
+@login_required
+def visiting_pilot_qr_display(request):
+    """
+    Display page with QR code and instructions for duty officers.
+    """
+    config = SiteConfiguration.objects.first()
+    if not config:
+        logger.warning(
+            "SiteConfiguration row is missing. Visiting pilot QR display is unavailable."
+        )
+        messages.warning(request, "Visiting pilot signup is currently disabled.")
+        return redirect("cms:home")
+    if not config.visiting_pilot_enabled:
+        messages.warning(request, "Visiting pilot signup is currently disabled.")
+        return redirect("cms:home")
+
+    # Get or create today's token
+    token = config.get_or_create_daily_token()
+
+    qr_url = reverse("members:visiting_pilot_qr_code")
+    signup_url = request.build_absolute_uri(
+        reverse("members:visiting_pilot_signup", args=[token])
+    )
+
+    return render(
+        request,
+        "members/visiting_pilot_qr_display.html",
+        {"config": config, "qr_url": qr_url, "signup_url": signup_url},
+    )

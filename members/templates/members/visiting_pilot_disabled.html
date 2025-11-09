@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Visiting Pilot Signup Unavailable{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Service Unavailable
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    <p>Visiting pilot online registration is currently disabled.</p>
+                    <p>Please speak with the duty officer for assistance with registration.</p>
+
+                    <div class="mt-4">
+                        <a href="{% url 'cms:home' %}" class="btn btn-primary">
+                            <i class="fas fa-home"></i>
+                            Go to Homepage
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

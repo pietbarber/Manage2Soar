@@ -43,6 +43,7 @@ erDiagram
         int last_updated_by_id FK
         string pilot_certificate_number
         date private_glider_checkride_date
+        string home_club
     }
 
     Biography {
@@ -85,6 +86,7 @@ erDiagram
 - Extends Django's `AbstractUser`.
 - Stores all member profile data, authentication info, and group/role logic.
 - Methods for profile image, display name, group syncing, and status.
+- Includes `home_club` field for visiting pilots from other soaring clubs.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
 

@@ -14,6 +14,7 @@ This directory contains comprehensive workflow documentation for the Manage2Soar
 8. **[Ground Instruction](08-ground-instruction.md)** - Ground school and knowledge transfer
 9. **[Knowledge Test Lifecycle](09-knowledge-test-lifecycle.md)** - Written test creation, administration, and cleanup
 10. **[Security Workflow](10-security-workflow.md)** - Code security scanning and quality assurance
+11. **[Visiting Pilot Workflow](11-visiting-pilot-workflow.md)** - Quick signup system for visiting pilots from other clubs
 
 ## 🎯 **Target Audiences**
 
@@ -53,6 +54,8 @@ graph TB
     Instruction --> Ground[Ground Instruction]
     Instruction --> Knowledge[Knowledge Tests]
     Member --> Knowledge
+    Visiting[Visiting Pilot] --> Member
+    Duty --> Visiting
 
     style Member fill:#e1f5fe
     style Logsheet fill:#f3e5f5
@@ -71,6 +74,7 @@ graph TB
 - 🏫 [Ground Instruction](08-ground-instruction.md) - Classroom training
 - 📝 [Knowledge Tests](09-knowledge-test-lifecycle.md) - Written test administration
 - 🔒 [Security Workflow](10-security-workflow.md) - Code security and quality assurance
+- ✈️ [Visiting Pilot Workflow](11-visiting-pilot-workflow.md) - Quick signup for visiting pilots
 
 ## 📚 **Related Documentation**
 
@@ -93,6 +97,7 @@ graph TB
 | [🏫 Ground Instruction](08-ground-instruction.md) | Classroom training | Knowledge transfer |
 | [📝 Knowledge Tests](09-knowledge-test-lifecycle.md) | Written test administration | Assessment & validation |
 | [🔒 Security Workflow](10-security-workflow.md) | Code security and quality assurance | Development process |
+| [✈️ Visiting Pilot Workflow](11-visiting-pilot-workflow.md) | Quick signup for visiting pilots | Guest operations |
 
 ## �🚀 **Getting Started**
 

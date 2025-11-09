@@ -40,6 +40,13 @@ erDiagram
         boolean allow_glider_reservations
         boolean allow_two_seater_reservations
         int redaction_notification_dedupe_minutes
+        boolean visiting_pilot_enabled
+        string visiting_pilot_status
+        boolean visiting_pilot_auto_approve
+        boolean visiting_pilot_require_ssa
+        boolean visiting_pilot_require_rating
+        string visiting_pilot_token
+        datetime visiting_pilot_token_created
     }
 
     MembershipStatus {
@@ -54,11 +61,12 @@ erDiagram
 ```
 
 ## SiteConfiguration
-- **Purpose:** Stores site-wide configuration settings for multi-club support, including branding, contact information, and operational preferences.
-- **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management
+- **Purpose:** Stores site-wide configuration settings for multi-club support, including branding, contact information, operational preferences, and visiting pilot workflow.
+- **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle
 - **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
 - **Operational Settings:** Scheduling preferences, reservation controls, notification settings
+- **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 
 ## MembershipStatus
@@ -149,6 +157,26 @@ The contact-related fields in `SiteConfiguration` (added in migration 0008) powe
 - All fields support multi-club deployment by making previously hardcoded content configurable
 
 The CMS contact form (`/contact/`) automatically uses these fields via template context, eliminating the need for hardcoded club-specific information.
+
+### Issue #209 - Visiting Pilot Workflow
+The visiting pilot fields in `SiteConfiguration` (added in migrations 0010-0012) power the complete visiting pilot workflow system:
+
+**Configuration Fields:**
+- `visiting_pilot_enabled`: Master toggle for the entire visiting pilot feature
+- `visiting_pilot_status`: Membership status assigned to visiting pilots (typically "Affiliate Member")
+- `visiting_pilot_auto_approve`: Whether to auto-approve visiting pilots or require manual review
+- `visiting_pilot_require_ssa`: Require SSA membership during signup
+- `visiting_pilot_require_rating`: Require pilot rating during signup
+
+**Security Token Management:**
+- `visiting_pilot_token`: Daily security token for QR code access (12-character random string)
+- `visiting_pilot_token_created`: Datetime the current token was generated
+
+**Key Methods:**
+- `get_or_create_daily_token()`: Generates new token if needed, returns current token
+- `retire_visiting_pilot_token()`: Clears token and date (called on logsheet finalization)
+
+The system provides a secure, streamlined workflow for visiting pilots to register and participate in operations. Security tokens prevent bot abuse while maintaining ease of use. Integration with logsheet management and flight forms provides seamless operational workflow.
 
 ---
 
