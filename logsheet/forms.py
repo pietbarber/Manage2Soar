@@ -267,23 +267,27 @@ class FlightForm(forms.ModelForm):
         )
 
         pilot_optgroups = []
-        if pilot_active.exists():
+        # Evaluate querysets to lists to avoid double database queries
+        pilot_active_list = list(pilot_active)
+        if pilot_active_list:
             pilot_optgroups.append(
-                ("Active Members", [(m.pk, str(m)) for m in pilot_active])
+                ("Active Members", [(m.pk, str(m)) for m in pilot_active_list])
             )
-        if pilot_visiting.exists():
+        pilot_visiting_list = list(pilot_visiting)
+        if pilot_visiting_list:
             pilot_optgroups.append(
                 (
                     "Visiting Pilots",
                     [
                         (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-                        for m in pilot_visiting
+                        for m in pilot_visiting_list
                     ],
                 )
             )
-        if pilot_inactive.exists():
+        pilot_inactive_list = list(pilot_inactive)
+        if pilot_inactive_list:
             pilot_optgroups.append(
-                ("Inactive Members", [(m.pk, str(m)) for m in pilot_inactive])
+                ("Inactive Members", [(m.pk, str(m)) for m in pilot_inactive_list])
             )
         self.fields["pilot"].choices = [("", "-------")] + pilot_optgroups
 
@@ -314,23 +318,27 @@ class FlightForm(forms.ModelForm):
         ).order_by("last_name", "first_name")
 
         instructor_optgroups = []
-        if instructor_active.exists():
+        # Evaluate querysets to lists to avoid double database queries
+        instructor_active_list = list(instructor_active)
+        if instructor_active_list:
             instructor_optgroups.append(
-                ("Active Instructors", [(m.pk, str(m)) for m in instructor_active])
+                ("Active Instructors", [(m.pk, str(m)) for m in instructor_active_list])
             )
-        if instructor_visiting.exists():
+        instructor_visiting_list = list(instructor_visiting)
+        if instructor_visiting_list:
             instructor_optgroups.append(
                 (
                     "Visiting Instructors",
                     [
                         (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-                        for m in instructor_visiting
+                        for m in instructor_visiting_list
                     ],
                 )
             )
-        if instructor_instructors.exists():
+        instructor_instructors_list = list(instructor_instructors)
+        if instructor_instructors_list:
             instructor_optgroups.append(
-                ("Instructors", [(m.pk, str(m)) for m in instructor_instructors])
+                ("Instructors", [(m.pk, str(m)) for m in instructor_instructors_list])
             )
         self.fields["instructor"].choices = [("", "-------")] + instructor_optgroups
 
@@ -359,23 +367,30 @@ class FlightForm(forms.ModelForm):
         ).order_by("last_name", "first_name")
 
         tow_pilot_optgroups = []
-        if tow_pilot_active.exists():
+        # Evaluate querysets to lists to avoid double database queries
+        tow_pilot_active_list = list(tow_pilot_active)
+        if tow_pilot_active_list:
             tow_pilot_optgroups.append(
-                ("Active Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_active])
+                ("Active Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_active_list])
             )
-        if tow_pilot_visiting.exists():
+        tow_pilot_visiting_list = list(tow_pilot_visiting)
+        if tow_pilot_visiting_list:
             tow_pilot_optgroups.append(
                 (
                     "Visiting Tow Pilots",
                     [
                         (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-                        for m in tow_pilot_visiting
+                        for m in tow_pilot_visiting_list
                     ],
                 )
             )
-        if tow_pilot_inactive.exists():
+        tow_pilot_inactive_list = list(tow_pilot_inactive)
+        if tow_pilot_inactive_list:
             tow_pilot_optgroups.append(
-                ("Inactive Tow Pilots", [(m.pk, str(m)) for m in tow_pilot_inactive])
+                (
+                    "Inactive Tow Pilots",
+                    [(m.pk, str(m)) for m in tow_pilot_inactive_list],
+                )
             )
         self.fields["tow_pilot"].choices = [("", "-------")] + tow_pilot_optgroups
 
@@ -411,23 +426,27 @@ class FlightForm(forms.ModelForm):
             ).order_by("last_name", "first_name")
 
             optgroups = []
-            if active_pass.exists():
+            # Evaluate querysets to lists to avoid double database queries
+            active_pass_list = list(active_pass)
+            if active_pass_list:
                 optgroups.append(
-                    ("Active Members", [(m.pk, str(m)) for m in active_pass])
+                    ("Active Members", [(m.pk, str(m)) for m in active_pass_list])
                 )
-            if passenger_visiting.exists():
+            passenger_visiting_list = list(passenger_visiting)
+            if passenger_visiting_list:
                 optgroups.append(
                     (
                         "Visiting Pilots",
                         [
                             (m.pk, f"{m} ({m.home_club or 'Unknown Club'})")
-                            for m in passenger_visiting
+                            for m in passenger_visiting_list
                         ],
                     )
                 )
-            if inactive_pass.exists():
+            inactive_pass_list = list(inactive_pass)
+            if inactive_pass_list:
                 optgroups.append(
-                    ("Not Active Members", [(m.pk, str(m)) for m in inactive_pass])
+                    ("Not Active Members", [(m.pk, str(m)) for m in inactive_pass_list])
                 )
             self.fields["passenger"].choices = [("", "-------")] + optgroups
         tow_pilot_initial = self.initial.get("tow_pilot")
