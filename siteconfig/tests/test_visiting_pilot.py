@@ -360,8 +360,6 @@ def test_visiting_pilot_form_warns_about_same_name_no_ssa(visiting_pilot_config)
 @pytest.mark.django_db
 def test_visiting_pilot_signup_logic_for_authenticated_users(visiting_pilot_config):
     """Test the view logic for authenticated users using RequestFactory."""
-    from django.test import RequestFactory
-    from django.urls import reverse
 
     # Create a test user
     user = Member.objects.create_user(
@@ -393,7 +391,6 @@ def test_visiting_pilot_signup_logic_for_authenticated_users(visiting_pilot_conf
 def test_visiting_pilot_security_token_validation(visiting_pilot_config):
     """Test that invalid tokens are rejected with 404."""
     from django.http import Http404
-    from django.test import RequestFactory
 
     factory = RequestFactory()
 
