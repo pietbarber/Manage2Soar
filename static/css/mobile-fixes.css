@@ -245,21 +245,27 @@
     .training-grid th.sticky-col,
     .training-grid td.sticky-col,
     .training-grid .sticky-col {
-        max-width: 22vw !important;  /* Reduced from 25vw to 22vw */
+        max-width: 22vw !important;
+        /* Reduced from 25vw to 22vw */
         width: 22vw !important;
         min-width: 22vw !important;
 
         /* Force word wrapping - override all conflicting styles */
         white-space: normal !important;
         word-wrap: break-word !important;
-        word-break: break-all !important;  /* More aggressive breaking */
-        overflow-wrap: anywhere !important;  /* Most aggressive */
+        word-break: break-all !important;
+        /* More aggressive breaking */
+        overflow-wrap: anywhere !important;
+        /* Most aggressive */
         hyphens: auto !important;
 
         /* Styling adjustments */
-        padding: 0.2rem 0.3rem !important;  /* Tighter padding */
-        font-size: 0.8rem !important;  /* Smaller font */
-        line-height: 1.1 !important;  /* Tighter line height */
+        padding: 0.2rem 0.3rem !important;
+        /* Tighter padding */
+        font-size: 0.8rem !important;
+        /* Smaller font */
+        line-height: 1.1 !important;
+        /* Tighter line height */
 
         /* Ensure content doesn't overflow */
         overflow: visible !important;
@@ -307,43 +313,93 @@
         min-width: 60px !important;
         max-width: 60px !important;
     }
-    
+
     /* Nuclear option - extremely specific selectors to override everything */
     .training-grid-scroll table.training-grid.table.table-bordered.table-sm.border-dark-subtle td.text-end.pe-2.sticky-col,
     .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col,
     div.training-grid-scroll table.training-grid td.sticky-col {
-        max-width: 22vw !important;  /* Even narrower - 22% instead of 25% */
+        max-width: 22vw !important;
+        /* Even narrower - 22% instead of 25% */
         width: 22vw !important;
         min-width: 22vw !important;
         white-space: normal !important;
         word-wrap: break-word !important;
-        word-break: break-all !important;  /* More aggressive breaking */
-        overflow-wrap: anywhere !important;  /* Most aggressive overflow handling */
+        word-break: break-all !important;
+        /* More aggressive breaking */
+        overflow-wrap: anywhere !important;
+        /* Most aggressive overflow handling */
         text-align: left !important;
-        padding: 0.2rem 0.3rem !important;  /* Tighter padding */
-        font-size: 0.8rem !important;  /* Smaller font */
-        line-height: 1.1 !important;  /* Tighter line height */
-        vertical-align: top !important;  /* Align to top */
-    }
-    
-    /* Nuclear option for links within the lesson column - extremely aggressive word breaking */
-    .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col a,
-    .training-grid-scroll table.training-grid td.sticky-col a,
-    div.training-grid-scroll table.training-grid td.sticky-col a {
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        word-break: break-all !important;  /* Changed to break-all for very aggressive breaking */
-        overflow-wrap: anywhere !important;  /* More aggressive than break-word */
-        display: inline-block !important;
-        width: 100% !important;
-        text-align: left !important;
+        padding: 0.2rem 0.3rem !important;
+        /* Tighter padding */
+        font-size: 0.8rem !important;
+        /* Smaller font */
         line-height: 1.1 !important;
-        font-size: 0.8rem !important;  /* Smaller font to fit more text */
+        /* Tighter line height */
+        vertical-align: top !important;
+        /* Align to top */
+    }
+}
+
+/* FINAL WORKING SOLUTION - Mobile training grid fixes */
+@media (max-width: 991px) {
+    .training-grid-scroll {
+        overflow-x: auto !important;
+        width: 100% !important;
+    }
+
+    table.training-grid {
+        table-layout: fixed !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Lesson column - 25% width with aggressive text breaking */
+    table.training-grid th.sticky-col,
+    table.training-grid td.sticky-col {
+        width: 25% !important;
+        max-width: 25% !important;
+        min-width: 25% !important;
+
+        white-space: normal !important;
+        word-break: break-all !important;
+        overflow-wrap: anywhere !important;
         hyphens: auto !important;
-        
-        /* Additional aggressive breaking properties */
-        word-spacing: -0.1em !important;  /* Tighter word spacing */
-        letter-spacing: -0.02em !important;  /* Slightly tighter letter spacing */
+
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        padding: 0.25rem !important;
+        text-align: left !important;
+        vertical-align: top !important;
+    }
+
+    /* Links in lesson column */
+    table.training-grid td.sticky-col a {
+        white-space: normal !important;
+        word-break: break-all !important;
+        overflow-wrap: anywhere !important;
+        display: block !important;
+        width: 100% !important;
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        text-align: left !important;
+    }
+
+    /* Other columns - make them smaller to give more room */
+    table.training-grid th:not(.sticky-col):not(.sticky-max),
+    table.training-grid td:not(.sticky-col):not(.sticky-max) {
+        width: 45px !important;
+        max-width: 45px !important;
+        min-width: 35px !important;
+        font-size: 0.7rem !important;
+        padding: 0.2rem !important;
+    }
+
+    /* Max score column */
+    table.training-grid th.sticky-max,
+    table.training-grid td.sticky-max {
+        width: 55px !important;
+        max-width: 55px !important;
+        min-width: 55px !important;
     }
 }
 
