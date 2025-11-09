@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from members.decorators import active_member_required
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 from .forms import (
     CreateLogsheetForm,
@@ -37,6 +38,8 @@ from .models import (
     Towplane,
     TowplaneCloseout,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @require_POST
@@ -444,6 +447,14 @@ def manage_logsheet(request, pk):
             logsheet=logsheet, revised_by=request.user, note="Logsheet finalized"
         )
 
+        # Retire visiting pilot token when logsheet is finalized
+        config = SiteConfiguration.objects.first()
+        if config and config.visiting_pilot_enabled and config.visiting_pilot_token:
+            config.retire_visiting_pilot_token()
+            logger.info(
+                f"Retired visiting pilot token for finalized logsheet {logsheet.pk}"
+            )
+
         messages.success(
             request, "Logsheet has been finalized and all costs locked in."
         )
@@ -520,6 +531,12 @@ def manage_logsheet(request, pk):
     # Add them to your context
     context["previous_logsheet"] = previous_logsheet
     context["next_logsheet"] = next_logsheet
+
+    # Add visiting pilot configuration with daily token
+    config = SiteConfiguration.objects.first()
+    if config and config.visiting_pilot_enabled:
+        config.visiting_pilot_daily_token = config.get_or_create_daily_token()
+    context["visiting_pilot_config"] = config
 
     return render(request, "logsheet/logsheet_manage.html", context)
 

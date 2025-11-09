@@ -4,6 +4,7 @@ from io import BytesIO
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
+from django.utils.crypto import get_random_string
 
 from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
@@ -151,9 +152,97 @@ class SiteConfiguration(models.Model):
         help_text="When club operations typically end each year. Examples: 'Last weekend of October', '2nd weekend of Dec', 'Third weekend in November'. Leave both fields blank to include all dates year-round.",
     )
 
+    # Visiting Pilot Configuration (Issue #209)
+    visiting_pilot_enabled = models.BooleanField(
+        default=True,
+        help_text="Enable quick signup for visiting pilots via QR code",
+    )
+    visiting_pilot_status = models.CharField(
+        max_length=50,
+        default="Affiliate Member",
+        help_text="Membership status assigned to visiting pilots after quick signup",
+    )
+    visiting_pilot_welcome_text = models.TextField(
+        blank=True,
+        default="Welcome, visiting pilot! Complete this quick form to get added to our system so you can fly with us today.",
+        help_text="Welcome message displayed on visiting pilot signup page",
+    )
+    visiting_pilot_require_ssa = models.BooleanField(
+        default=True,
+        help_text="Require SSA membership number for visiting pilot signup",
+    )
+    visiting_pilot_require_rating = models.BooleanField(
+        default=True,
+        help_text="Require glider rating for visiting pilot signup",
+    )
+    visiting_pilot_auto_approve = models.BooleanField(
+        default=True,
+        help_text="Automatically approve visiting pilots (they can fly immediately after signup)",
+    )
+    visiting_pilot_token = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Security token for visiting pilot signup URLs (generated on-demand, expires when logsheet finalized)",
+    )
+    visiting_pilot_token_created = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the current visiting pilot token was created",
+    )
+
+    def generate_visiting_pilot_token(self):
+        """Generate a new secure token for visiting pilot URLs."""
+        from django.utils import timezone
+
+        self.visiting_pilot_token = get_random_string(
+            12, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        )
+        self.visiting_pilot_token_created = timezone.now()
+        return self.visiting_pilot_token
+
+    def refresh_visiting_pilot_token(self):
+        """Generate and save a new visiting pilot token."""
+        self.generate_visiting_pilot_token()
+        self.save(
+            update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
+        )
+        return self.visiting_pilot_token
+
+    def get_or_create_daily_token(self):
+        """Get existing token if created today, otherwise generate a new one."""
+        from datetime import date
+
+        from django.utils import timezone
+
+        today = date.today()
+        token_date = (
+            self.visiting_pilot_token_created.date()
+            if self.visiting_pilot_token_created
+            else None
+        )
+
+        # If no token exists or token is from a previous day, generate new one
+        if not self.visiting_pilot_token or token_date != today:
+            self.generate_visiting_pilot_token()
+            self.save(
+                update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
+            )
+
+        return self.visiting_pilot_token
+
+    def retire_visiting_pilot_token(self):
+        """Retire the current visiting pilot token (usually called when logsheet finalized)."""
+        self.visiting_pilot_token = ""
+        self.visiting_pilot_token_created = None
+        self.save(
+            update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
+        )
+
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
             raise ValidationError("Only one SiteConfiguration instance allowed.")
+
+        # Don't auto-generate tokens - they're created on-demand when duty officer needs them
 
         # Validate operational period formats
         # Local import to avoid circular dependency

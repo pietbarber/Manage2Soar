@@ -27,6 +27,22 @@ urlpatterns = [
         views.toggle_redaction,
         name="toggle_redaction",
     ),
+    # Visiting pilot URLs
+    path(
+        "visiting-pilot/signup/<str:token>/",
+        views.visiting_pilot_signup,
+        name="visiting_pilot_signup",
+    ),
+    path(
+        "visiting-pilot/qr/",
+        views.visiting_pilot_qr_code,
+        name="visiting_pilot_qr_code",
+    ),
+    path(
+        "visiting-pilot/qr-display/",
+        views.visiting_pilot_qr_display,
+        name="visiting_pilot_qr_display",
+    ),
 ]
 
 

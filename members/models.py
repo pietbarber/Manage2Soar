@@ -198,6 +198,12 @@ class Member(AbstractUser):
 
     joined_club = models.DateField(blank=True, null=True)
     emergency_contact = models.TextField(blank=True, null=True)
+    home_club = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Home soaring club or organization for visiting pilots",
+    )
 
     public_notes = HTMLField(blank=True, null=True)
     private_notes = HTMLField(blank=True, null=True)

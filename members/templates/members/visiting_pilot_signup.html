@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Visiting Pilot Signup - {{ config.club_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plane"></i>
+                        Visiting Pilot Signup
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if config.visiting_pilot_welcome_text %}
+                        <div class="alert alert-info">
+                            {{ config.visiting_pilot_welcome_text|linebreaks }}
+                        </div>
+                    {% endif %}
+
+                    <p class="text-muted">
+                        Welcome to {{ config.club_name }}! Please fill out this form to register as a visiting pilot.
+                        {% if not config.visiting_pilot_auto_approve %}
+                            Your registration will be reviewed and approved by our staff.
+                        {% endif %}
+                    </p>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.first_name.id_for_label }}" class="form-label">
+                                        First Name <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text"
+                                           class="form-control{% if form.first_name.errors %} is-invalid{% endif %}"
+                                           id="{{ form.first_name.id_for_label }}"
+                                           name="{{ form.first_name.name }}"
+                                           value="{{ form.first_name.value|default:'' }}"
+                                           placeholder="First Name"
+                                           required>
+                                    {% if form.first_name.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.first_name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.last_name.id_for_label }}" class="form-label">
+                                        Last Name <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text"
+                                           class="form-control{% if form.last_name.errors %} is-invalid{% endif %}"
+                                           id="{{ form.last_name.id_for_label }}"
+                                           name="{{ form.last_name.name }}"
+                                           value="{{ form.last_name.value|default:'' }}"
+                                           placeholder="Last Name"
+                                           required>
+                                    {% if form.last_name.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.last_name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">
+                                Email Address <span class="text-danger">*</span>
+                            </label>
+                            <input type="email"
+                                   class="form-control{% if form.email.errors %} is-invalid{% endif %}"
+                                   id="{{ form.email.id_for_label }}"
+                                   name="{{ form.email.name }}"
+                                   value="{{ form.email.value|default:'' }}"
+                                   placeholder="Email Address"
+                                   required>
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.email.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                Phone Number
+                            </label>
+                            <input type="tel"
+                                   class="form-control{% if form.phone.errors %} is-invalid{% endif %}"
+                                   id="{{ form.phone.id_for_label }}"
+                                   name="{{ form.phone.name }}"
+                                   value="{{ form.phone.value|default:'' }}"
+                                   placeholder="Phone Number (optional)">
+                            {% if form.phone.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.phone.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.ssa_member_number.id_for_label }}" class="form-label">
+                                        SSA Member Number
+                                        {% if config.visiting_pilot_require_ssa %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    <input type="text"
+                                           class="form-control{% if form.ssa_member_number.errors %} is-invalid{% endif %}"
+                                           id="{{ form.ssa_member_number.id_for_label }}"
+                                           name="{{ form.ssa_member_number.name }}"
+                                           value="{{ form.ssa_member_number.value|default:'' }}"
+                                           placeholder="SSA Member Number (if applicable)"
+                                           pattern="[0-9]*"
+                                           {% if config.visiting_pilot_require_ssa %}required{% endif %}>
+                                    {% if form.ssa_member_number.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.ssa_member_number.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.glider_rating.id_for_label }}" class="form-label">
+                                        Glider Rating
+                                        {% if config.visiting_pilot_require_rating %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    <select class="form-control{% if form.glider_rating.errors %} is-invalid{% endif %}"
+                                            id="{{ form.glider_rating.id_for_label }}"
+                                            name="{{ form.glider_rating.name }}"
+                                            {% if config.visiting_pilot_require_rating %}required{% endif %}>
+                                        <option value="">Select Rating (if applicable)</option>
+                                        <option value="none" {% if form.glider_rating.value == "none" %}selected{% endif %}>None</option>
+                                        <option value="student" {% if form.glider_rating.value == "student" %}selected{% endif %}>Student</option>
+                                        <option value="transition" {% if form.glider_rating.value == "transition" %}selected{% endif %}>Transition</option>
+                                        <option value="private" {% if form.glider_rating.value == "private" %}selected{% endif %}>Private</option>
+                                        <option value="commercial" {% if form.glider_rating.value == "commercial" %}selected{% endif %}>Commercial</option>
+                                    </select>
+                                    {% if form.glider_rating.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.glider_rating.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.home_club.id_for_label }}" class="form-label">
+                                Home Club/Organization
+                            </label>
+                            <input type="text"
+                                   class="form-control{% if form.home_club.errors %} is-invalid{% endif %}"
+                                   id="{{ form.home_club.id_for_label }}"
+                                   name="{{ form.home_club.name }}"
+                                   value="{{ form.home_club.value|default:'' }}"
+                                   placeholder="Home Club/Organization (optional)">
+                            {% if form.home_club.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.home_club.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-user-plus"></i>
+                                Register as Visiting Pilot
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-4 text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Questions? Please speak with the duty officer.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
