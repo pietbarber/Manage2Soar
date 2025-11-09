@@ -43,10 +43,10 @@ erDiagram
         boolean visiting_pilot_enabled
         string visiting_pilot_status
         boolean visiting_pilot_auto_approve
-        boolean visiting_pilot_require_ssa_number
-        boolean visiting_pilot_require_home_club
+        boolean visiting_pilot_require_ssa
+        boolean visiting_pilot_require_rating
         string visiting_pilot_token
-        date visiting_pilot_token_date
+        datetime visiting_pilot_token_created
     }
 
     MembershipStatus {

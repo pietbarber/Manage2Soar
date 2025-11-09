@@ -90,12 +90,12 @@ graph TD
 visiting_pilot_enabled = models.BooleanField(default=False)
 visiting_pilot_status = models.CharField(max_length=50, blank=True)
 visiting_pilot_auto_approve = models.BooleanField(default=False)
-visiting_pilot_require_ssa_number = models.BooleanField(default=True)
-visiting_pilot_require_home_club = models.BooleanField(default=False)
+visiting_pilot_require_ssa = models.BooleanField(default=True)
+visiting_pilot_require_rating = models.BooleanField(default=False)
 
 # Security Token Management  
-visiting_pilot_token = models.CharField(max_length=32, blank=True)
-visiting_pilot_token_date = models.DateField(null=True, blank=True)
+visiting_pilot_token = models.CharField(max_length=20, blank=True)
+visiting_pilot_token_created = models.DateTimeField(null=True, blank=True)
 ```
 
 ### Member Model Extensions

@@ -16,7 +16,6 @@ from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -559,9 +558,11 @@ def visiting_pilot_signup(request, token):
                     glider_rating=form.cleaned_data.get("glider_rating", ""),
                     home_club=form.cleaned_data.get("home_club", ""),
                     membership_status=config.visiting_pilot_status,
-                    # Random password - they'll need to reset if they want to log in
-                    password=get_random_string(20),
+                    # No password set - account cannot be logged in via password until reset
                 )
+
+                # Mark account as unusable for password login
+                member.set_unusable_password()
 
                 # Set additional fields
                 member.is_active = config.visiting_pilot_auto_approve

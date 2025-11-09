@@ -23,7 +23,7 @@
                             Go to Homepage
                         </a>
                         {% if user.duty_officer or user.is_staff %}
-                            <a href="{% url 'siteconfig:visiting_pilot_qr_display' %}" class="btn btn-outline-secondary">
+                            <a href="{% url 'members:visiting_pilot_qr_display' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-qrcode"></i>
                                 View QR Code
                             </a>
