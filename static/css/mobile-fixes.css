@@ -223,6 +223,36 @@
     }
 }
 
+/* Mobile responsive lesson column for training progress grid */
+@media (max-width: 768px) {
+    /* Lesson title column (sticky-col) - limit width and enable word wrapping */
+    .training-grid th.sticky-col, 
+    .training-grid td.sticky-col {
+        max-width: 25vw !important;
+        width: 25vw !important;
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        hyphens: auto !important;
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.85rem !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Ensure links in lesson titles also wrap properly */
+    .training-grid th.sticky-col a, 
+    .training-grid td.sticky-col a {
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        hyphens: auto !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
+    }
+}
+
 /* Issue #219: Syllabus view layout improvements */
 @media (max-width: 768px) {
 
