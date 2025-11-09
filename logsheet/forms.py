@@ -240,16 +240,11 @@ class FlightForm(forms.ModelForm):
                     self.initial[field_name] = value[:5]
 
         # Pilot dropdown: optgroups for Active Members, Visiting Pilots, and Inactive Members
-        from django.core.cache import cache
-
         from siteconfig.models import SiteConfiguration
 
-        # Cache configuration to avoid database queries on every form initialization
-        config = cache.get("siteconfig_instance")
-        if config is None:
-            config = SiteConfiguration.objects.first()
-            # Cache for 5 minutes - configuration doesn't change often
-            cache.set("siteconfig_instance", config, 300)
+        # Always fetch configuration from database for security-sensitive flags
+        # The visiting_pilot_enabled flag is security-critical and should not be cached
+        config = SiteConfiguration.objects.first()
         active_statuses = get_active_membership_statuses()
         pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses)
