@@ -245,6 +245,56 @@ class FlightForm(forms.ModelForm):
         # Always fetch configuration from database for security-sensitive flags
         # The visiting_pilot_enabled flag is security-critical and should not be cached
         config = SiteConfiguration.objects.first()
+        if config is None:
+            # Fail gracefully: no config row exists
+            import warnings
+
+            warnings.warn(
+                "SiteConfiguration row is missing. Visiting pilot and custom dropdowns will be unavailable.",
+                RuntimeWarning,
+            )
+            # Fallback: only show active members, no visiting/inactive groups
+            pilot_active = Member.objects.filter(
+                membership_status__in=get_active_membership_statuses()
+            ).order_by("last_name", "first_name")
+            pilot_optgroups = []
+            pilot_active_choices = [(m.pk, str(m)) for m in pilot_active]
+            if pilot_active_choices:
+                pilot_optgroups.append(("Active Members", pilot_active_choices))
+            self.fields["pilot"].choices = [("", "-------")] + pilot_optgroups
+            # Similar fallback for instructor, tow_pilot, passenger
+            instructor_active = Member.objects.filter(
+                Q(membership_status__in=get_active_membership_statuses())
+                & Q(instructor=True)
+            ).order_by("last_name", "first_name")
+            instructor_optgroups = []
+            instructor_active_choices = [(m.pk, str(m)) for m in instructor_active]
+            if instructor_active_choices:
+                instructor_optgroups.append(
+                    ("Active Instructors", instructor_active_choices)
+                )
+            self.fields["instructor"].choices = [("", "-------")] + instructor_optgroups
+            tow_pilot_active = Member.objects.filter(
+                membership_status__in=get_active_membership_statuses(), towpilot=True
+            ).order_by("last_name", "first_name")
+            tow_pilot_optgroups = []
+            tow_pilot_active_choices = [(m.pk, str(m)) for m in tow_pilot_active]
+            if tow_pilot_active_choices:
+                tow_pilot_optgroups.append(
+                    ("Active Tow Pilots", tow_pilot_active_choices)
+                )
+            self.fields["tow_pilot"].choices = [("", "-------")] + tow_pilot_optgroups
+            if "passenger" in self.fields:
+                active_pass = Member.objects.filter(
+                    membership_status__in=get_active_membership_statuses()
+                ).order_by("last_name", "first_name")
+                optgroups = []
+                active_pass_choices = [(m.pk, str(m)) for m in active_pass]
+                if active_pass_choices:
+                    optgroups.append(("Active Members", active_pass_choices))
+                self.fields["passenger"].choices = [("", "-------")] + optgroups
+            # Continue with rest of __init__ (do not attempt to use config below)
+            return
         active_statuses = get_active_membership_statuses()
         pilot_active = (
             Member.objects.filter(membership_status__in=active_statuses)
