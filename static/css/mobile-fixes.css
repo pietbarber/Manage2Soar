@@ -283,8 +283,11 @@
     }
 
     /* Override Bootstrap's text-end class that might interfere */
+    table.training-grid td.text-end.pe-2.sticky-col,
     table.training-grid td.text-end.sticky-col,
-    .training-grid td.text-end.sticky-col {
+    .training-grid td.text-end.pe-2.sticky-col,
+    .training-grid td.text-end.sticky-col,
+    .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col {
         text-align: left !important;
     }
 
@@ -302,6 +305,33 @@
         width: 60px !important;
         min-width: 60px !important;
         max-width: 60px !important;
+    }
+    
+    /* Nuclear option - extremely specific selectors to override everything */
+    .training-grid-scroll table.training-grid.table.table-bordered.table-sm.border-dark-subtle td.text-end.pe-2.sticky-col,
+    .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col,
+    div.training-grid-scroll table.training-grid td.sticky-col {
+        max-width: 25vw !important;
+        width: 25vw !important;
+        min-width: 25vw !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+    }
+    
+    /* Nuclear option for links within the lesson column */
+    .training-grid-scroll table.training-grid td.text-end.pe-2.sticky-col a,
+    .training-grid-scroll table.training-grid td.sticky-col a,
+    div.training-grid-scroll table.training-grid td.sticky-col a {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        display: inline-block !important;
+        width: 100% !important;
+        text-align: left !important;
     }
 }
 
