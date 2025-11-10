@@ -410,7 +410,7 @@
                         <i class="fas fa-thumbs-up me-2 text-success"></i>
                         Prefer to work with:
                       </label>
-                      <select name="pair_with" id="pairWith" class="form-select" multiple size="6">
+                      <select name="pair_with" id="pairWith" class="form-select multi-select-responsive" multiple>
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">
                             {% for m in members %}
@@ -432,7 +432,7 @@
                         <i class="fas fa-user-times me-2 text-warning"></i>
                         Please avoid scheduling me with:
                       </label>
-                      <select name="avoid_with" id="avoidWith" class="form-select" multiple size="6">
+                      <select name="avoid_with" id="avoidWith" class="form-select multi-select-responsive" multiple>
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">
                             {% for m in members %}
