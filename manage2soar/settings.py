@@ -247,6 +247,7 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
         "CLUB_PREFIX must contain only alphanumeric characters and hyphens. "
         "This prevents path traversal security issues."
     )
+
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
@@ -278,6 +279,9 @@ STATIC_URL = os.getenv(
     "STATIC_URL",
     f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
 )
+
+# Use TinyMCE JS from configured static storage
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 # Local static files directory (source for collectstatic)
 STATICFILES_DIRS = [
@@ -353,9 +357,6 @@ LOGGING = {
 
 handler403 = "members.views.custom_permission_denied_view"
 
-# Use locally hosted TinyMCE JS
-TINYMCE_JS_URL = "/static/tinymce/tinymce.min.js"
-
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths
     "remove_script_host": True,  # strip protocol+host from URLs
@@ -380,6 +381,7 @@ TINYMCE_DEFAULT_CONFIG = {
         "tableinsertcolbefore tableinsertcolafter tabledeletecol"
     ),
     "promotion": False,  # Disable TinyMCE 'Upgrade' button
+    "license_key": "gpl",  # Use GPL license for open source projects
 }
 
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
