@@ -25,8 +25,17 @@
   <!-- Messages Section -->
   {% if messages %}
     {% for message in messages %}
-      <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i>{{ message }}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+        {% if message.tags == "success" %}
+          <i class="fas fa-check-circle me-2"></i>
+        {% elif message.tags == "danger" or message.tags == "error" %}
+          <i class="fas fa-exclamation-circle me-2"></i>
+        {% elif message.tags == "warning" %}
+          <i class="fas fa-exclamation-triangle me-2"></i>
+        {% elif message.tags == "info" %}
+          <i class="fas fa-info-circle me-2"></i>
+        {% endif %}
+        {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endfor %}
@@ -439,13 +448,6 @@
       </div>
     </div>
 
-    {# Hidden fields for unshown duty roles, to prevent NULLs in DB #}
-    {% for role in all_possible_roles %}
-      {% if role not in shown_roles %}
-        <input type="hidden" name="{{ role }}_percent" value="0">
-      {% endif %}
-    {% endfor %}
-
     <!-- Submit Section -->
     <div class="row">
       <div class="col-12">
@@ -638,8 +640,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
     });
-
-    console.log(`Calendar initialized with ${checkedCount} existing blackouts`);
   }
 
   // Handle calendar checkbox interactions
@@ -653,17 +653,11 @@ document.addEventListener('DOMContentLoaded', function() {
           // Prevent double-toggle from label's default behavior
           e.preventDefault();
 
-          const wasChecked = checkbox.checked;
-          console.log('Before toggle - Date:', checkbox.value, 'Was checked:', wasChecked);
-
           // Toggle checkbox state
           checkbox.checked = !checkbox.checked;
 
-          console.log('After toggle - Date:', checkbox.value, 'Now checked:', checkbox.checked);
-
           // Get blackout icon AFTER potential DOM changes
           const blackoutIcon = this.querySelector('.blackout-icon');
-          console.log('Blackout icon exists?', !!blackoutIcon);
 
           // Update visual state to match checkbox state
           if (checkbox.checked) {
@@ -673,18 +667,12 @@ document.addEventListener('DOMContentLoaded', function() {
               const icon = document.createElement('i');
               icon.className = 'fas fa-times-circle blackout-icon position-absolute text-danger';
               this.appendChild(icon);
-              console.log('Added blackout icon for:', checkbox.value);
-            } else {
-              console.log('Blackout icon already exists for:', checkbox.value);
             }
           } else {
             // Checkbox is unchecked = date will NOT be blacked out
             dayCell.classList.remove('selected-blackout');
             if (blackoutIcon) {
               blackoutIcon.remove();
-              console.log('Removed blackout icon for:', checkbox.value);
-            } else {
-              console.log('No blackout icon to remove for:', checkbox.value);
             }
           }
         }
@@ -702,11 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     if (form) {
       form.addEventListener('submit', function(e) {
-        const blackoutDates = [];
-        document.querySelectorAll('input[name="blackout_dates"]:checked').forEach(checkbox => {
-          blackoutDates.push(checkbox.value);
-        });
-        console.log('Form submitting with blackout dates:', blackoutDates);
+        // Form submission handling can be added here if needed
       });
     }
   }

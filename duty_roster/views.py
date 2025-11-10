@@ -28,6 +28,7 @@ from logsheet.models import Airfield
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 
@@ -116,8 +117,6 @@ def blackout_manage(request):
     avoid_with = Member.objects.filter(avoid_target__member=member)
 
     # Create optgroups for member pairing fields (similar to logsheet forms)
-    from members.utils.membership import get_active_membership_statuses
-
     active_statuses = get_active_membership_statuses()
 
     # Active members (excluding current user)
@@ -146,36 +145,22 @@ def blackout_manage(request):
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
-        # Debug: Log form data
-        print(
-            f"DEBUG: POST data blackout_dates: {request.POST.getlist('blackout_dates')}"
-        )
-        print(
-            f"DEBUG: Existing dates before processing: {[str(d) for d in existing_dates]}"
-        )
-
         blackout_dates = set(
             date.fromisoformat(d) for d in request.POST.getlist("blackout_dates")
         )
-        print(f"DEBUG: Parsed blackout_dates: {[str(d) for d in blackout_dates]}")
 
         note = request.POST.get("default_note", "").strip()
 
-        # Debug: Show what will be added/removed
         to_add = blackout_dates - existing_dates
         to_remove = existing_dates - blackout_dates
-        print(f"DEBUG: Dates to add: {[str(d) for d in to_add]}")
-        print(f"DEBUG: Dates to remove: {[str(d) for d in to_remove]}")
 
         for d in to_add:
             MemberBlackout.objects.get_or_create(
                 member=member, date=d, defaults={"note": note}
             )
-            print(f"DEBUG: Added blackout for {d}")
 
         for d in to_remove:
             MemberBlackout.objects.filter(member=member, date=d).delete()
-            print(f"DEBUG: Removed blackout for {d}")
 
         # Always redirect after blackout processing, regardless of duty preference validation
         # This ensures blackout changes are immediately visible
@@ -183,9 +168,7 @@ def blackout_manage(request):
 
         # Try to process duty preferences, but don't let it block blackout updates
         form = DutyPreferenceForm(request.POST, member=member)
-        print(f"DEBUG: Form is valid: {form.is_valid()}")
         if not form.is_valid():
-            print(f"DEBUG: Form errors: {form.errors}")
             # Add form errors to messages so user can see them
             for field, errors in form.errors.items():
                 for error in errors:
@@ -217,11 +200,6 @@ def blackout_manage(request):
 
             messages.success(request, "Duty preferences saved successfully.")
 
-        # Debug: Log final state after all operations
-        final_blackouts = MemberBlackout.objects.filter(member=member)
-        final_dates = [str(b.date) for b in final_blackouts]
-        print(f"DEBUG: Final blackout dates in database: {final_dates}")
-
         # Always redirect after POST to prevent double-submission and ensure fresh page load
         return redirect("duty_roster:blackout_manage")
     else:
@@ -236,6 +214,7 @@ def blackout_manage(request):
             "towpilot_percent": preference.towpilot_percent,
             "max_assignments_per_month": preference.max_assignments_per_month,
             "allow_weekend_double": preference.allow_weekend_double,
+            "comment": preference.comment,
             "pair_with": pair_with,
             "avoid_with": avoid_with,
         }
@@ -260,11 +239,6 @@ def blackout_manage(request):
             "max_assignments_choices": max_choices,
         },
     )
-
-    # Add cache-busting headers to ensure fresh page loads
-    response["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-    response["Pragma"] = "no-cache"
-    response["Expires"] = "0"
 
     return response
 
