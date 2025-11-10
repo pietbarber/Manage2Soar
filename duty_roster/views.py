@@ -114,6 +114,35 @@ def blackout_manage(request):
 
     pair_with = Member.objects.filter(pairing_target__member=member)
     avoid_with = Member.objects.filter(avoid_target__member=member)
+
+    # Create optgroups for member pairing fields (similar to logsheet forms)
+    from members.utils.membership import get_active_membership_statuses
+
+    active_statuses = get_active_membership_statuses()
+
+    # Active members (excluding current user)
+    active_members = (
+        Member.objects.filter(membership_status__in=active_statuses)
+        .exclude(id=member.id)
+        .order_by("last_name", "first_name")
+    )
+
+    # Non-active members (excluding current user)
+    inactive_members = (
+        Member.objects.exclude(membership_status__in=active_statuses)
+        .exclude(id=member.id)
+        .filter(is_active=True)
+        .order_by("last_name", "first_name")
+    )
+
+    # Build optgroups for template
+    member_optgroups = []
+    if active_members.exists():
+        member_optgroups.append(("Active Members", active_members))
+    if inactive_members.exists():
+        member_optgroups.append(("Inactive Members", inactive_members))
+
+    # For backward compatibility, keep all_other for any legacy template usage
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
@@ -225,6 +254,7 @@ def blackout_manage(request):
             "pair_with": pair_with,
             "avoid_with": avoid_with,
             "all_other_members": all_other,
+            "member_optgroups": member_optgroups,
             "form": form,
             # pass the choices into the template:
             "max_assignments_choices": max_choices,

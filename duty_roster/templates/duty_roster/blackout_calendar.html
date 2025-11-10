@@ -395,8 +395,12 @@
                         Prefer to work with:
                       </label>
                       <select name="pair_with" id="pairWith" class="form-select" multiple size="6">
-                        {% for m in all_other_members %}
-                          <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                        {% for group_name, members in member_optgroups %}
+                          <optgroup label="{{ group_name }}">
+                            {% for m in members %}
+                              <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                            {% endfor %}
+                          </optgroup>
                         {% endfor %}
                       </select>
                       <div class="form-text">
@@ -413,8 +417,12 @@
                         Please avoid scheduling me with:
                       </label>
                       <select name="avoid_with" id="avoidWith" class="form-select" multiple size="6">
-                        {% for m in all_other_members %}
-                          <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                        {% for group_name, members in member_optgroups %}
+                          <optgroup label="{{ group_name }}">
+                            {% for m in members %}
+                              <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                            {% endfor %}
+                          </optgroup>
                         {% endfor %}
                       </select>
                       <div class="form-text">
