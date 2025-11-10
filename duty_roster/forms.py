@@ -72,6 +72,22 @@ class DutyPreferenceForm(forms.ModelForm):
             ]
         )
 
+    def _get_single_role_field(self, member):
+        """Get the percentage field name for a member's single role, or None if multiple/no roles."""
+        if not member or self._count_member_roles(member) != 1:
+            return None
+
+        if member.instructor:
+            return "instructor_percent"
+        elif member.duty_officer:
+            return "duty_officer_percent"
+        elif member.assistant_duty_officer:
+            return "ado_percent"
+        elif member.towpilot:
+            return "towpilot_percent"
+
+        return None
+
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
@@ -118,21 +134,20 @@ class DutyPreferenceForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Set default values for roles the member doesn't have
-        # and handle single-role members automatically
+        # Handle single-role members automatically
         if self.member:
-            role_count = self._count_member_roles(self.member)
+            single_role_field = self._get_single_role_field(self.member)
+            if single_role_field:
+                cleaned_data[single_role_field] = 100
 
-            # If member has only one role, automatically set it to 100%
-            if role_count == 1:
-                if self.member.instructor:
-                    cleaned_data["instructor_percent"] = 100
-                elif self.member.duty_officer:
-                    cleaned_data["duty_officer_percent"] = 100
-                elif self.member.assistant_duty_officer:
-                    cleaned_data["ado_percent"] = 100
-                elif self.member.towpilot:
-                    cleaned_data["towpilot_percent"] = 100
+        # Validate that dont_schedule requires a reason
+        suspended_reason = cleaned_data.get("suspended_reason") or ""
+        if cleaned_data.get("dont_schedule") and not suspended_reason.strip():
+            raise forms.ValidationError(
+                {
+                    "suspended_reason": "A reason is required when requesting not to be scheduled."
+                }
+            )
 
         total = (
             cleaned_data.get("instructor_percent", 0)

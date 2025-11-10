@@ -238,6 +238,7 @@
                              type="checkbox"
                              name="dont_schedule"
                              id="dontSchedule"
+                             {% if preference.dont_schedule %}checked{% endif %}
                              onchange="document.getElementById('suspendReason').disabled = !this.checked; document.getElementById('suspendReason').required = this.checked;">
                       <label class="form-check-label fw-semibold" for="dontSchedule">
                         Suspend all duty assignments
@@ -254,8 +255,10 @@
                              class="form-control"
                              name="suspended_reason"
                              id="suspendReason"
+                             value="{{ preference.suspended_reason|default:'' }}"
                              placeholder="e.g., Medical leave, extended travel, family obligations..."
-                             disabled>
+                             {% if not preference.dont_schedule %}disabled{% endif %}
+                             {% if preference.dont_schedule %}required{% endif %}>
                     </div>
                     <div class="form-text">Please provide a brief reason for suspension</div>
                   </div>
@@ -418,7 +421,7 @@
                       </select>
                       <div class="form-text">
                         <i class="fas fa-info-circle me-1"></i>
-                        Hold <kbd aria-label="Control key">Ctrl</kbd> (Windows) or <kbd aria-label="Command key">⌘</kbd> (Mac) to select multiple members
+                        Hold <kbd>Ctrl</kbd> (Windows) or <kbd>⌘</kbd> (Mac) to select multiple members
                       </div>
                     </div>
                   </div>
