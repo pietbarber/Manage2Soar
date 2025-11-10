@@ -101,3 +101,22 @@
     background-color: var(--bs-danger-bg-subtle);
     color: var(--bs-danger-text);
 }
+
+/* Responsive multi-select styling for accessibility */
+.multi-select-responsive {
+    min-height: 10rem; /* Approximately 6 options worth of height */
+}
+
+/* Adjust for smaller screens */
+@media (max-width: 768px) {
+    .multi-select-responsive {
+        min-height: 8rem;
+    }
+}
+
+/* Adjust for very small screens and high zoom levels */
+@media (max-width: 576px) {
+    .multi-select-responsive {
+        min-height: 6rem;
+    }
+}
