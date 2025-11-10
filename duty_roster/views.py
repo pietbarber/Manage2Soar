@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.timezone import now
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from duty_roster.utils.email import notify_ops_status
@@ -56,6 +57,7 @@ def roster_home(request):
 
 
 @active_member_required
+@never_cache
 def blackout_manage(request):
     member = request.user
     preference, _ = DutyPreference.objects.get_or_create(member=member)
@@ -115,29 +117,60 @@ def blackout_manage(request):
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
+        # Debug: Log form data
+        print(
+            f"DEBUG: POST data blackout_dates: {request.POST.getlist('blackout_dates')}"
+        )
+        print(
+            f"DEBUG: Existing dates before processing: {[str(d) for d in existing_dates]}"
+        )
+
         blackout_dates = set(
             date.fromisoformat(d) for d in request.POST.getlist("blackout_dates")
         )
+        print(f"DEBUG: Parsed blackout_dates: {[str(d) for d in blackout_dates]}")
+
         note = request.POST.get("default_note", "").strip()
-        for d in blackout_dates - existing_dates:
+
+        # Debug: Show what will be added/removed
+        to_add = blackout_dates - existing_dates
+        to_remove = existing_dates - blackout_dates
+        print(f"DEBUG: Dates to add: {[str(d) for d in to_add]}")
+        print(f"DEBUG: Dates to remove: {[str(d) for d in to_remove]}")
+
+        for d in to_add:
             MemberBlackout.objects.get_or_create(
                 member=member, date=d, defaults={"note": note}
             )
-        for d in existing_dates - blackout_dates:
-            MemberBlackout.objects.filter(member=member, date=d).delete()
+            print(f"DEBUG: Added blackout for {d}")
 
-        form = DutyPreferenceForm(request.POST)
+        for d in to_remove:
+            MemberBlackout.objects.filter(member=member, date=d).delete()
+            print(f"DEBUG: Removed blackout for {d}")
+
+        # Always redirect after blackout processing, regardless of duty preference validation
+        # This ensures blackout changes are immediately visible
+        messages.success(request, "Blackout dates updated successfully.")
+
+        # Try to process duty preferences, but don't let it block blackout updates
+        form = DutyPreferenceForm(request.POST, member=member)
+        print(f"DEBUG: Form is valid: {form.is_valid()}")
+        if not form.is_valid():
+            print(f"DEBUG: Form errors: {form.errors}")
+            # Add form errors to messages so user can see them
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
         if form.is_valid():
             data = form.cleaned_data
             DutyPreference.objects.update_or_create(
                 member=member,
                 defaults={
                     "preferred_day": data["preferred_day"],
-                    "comment": data["comment"],
                     "dont_schedule": data["dont_schedule"],
                     "scheduling_suspended": data["scheduling_suspended"],
                     "suspended_reason": data["suspended_reason"],
-                    "last_duty_date": data["last_duty_date"],
                     "instructor_percent": data["instructor_percent"],
                     "duty_officer_percent": data["duty_officer_percent"],
                     "ado_percent": data["ado_percent"],
@@ -153,16 +186,21 @@ def blackout_manage(request):
             for m in data.get("avoid_with", []):
                 DutyAvoidance.objects.create(member=member, avoid_with=m)
 
-            messages.success(request, "Preferences saved successfully.")
-            return redirect("duty_roster:blackout_manage")
+            messages.success(request, "Duty preferences saved successfully.")
+
+        # Debug: Log final state after all operations
+        final_blackouts = MemberBlackout.objects.filter(member=member)
+        final_dates = [str(b.date) for b in final_blackouts]
+        print(f"DEBUG: Final blackout dates in database: {final_dates}")
+
+        # Always redirect after POST to prevent double-submission and ensure fresh page load
+        return redirect("duty_roster:blackout_manage")
     else:
         initial = {
             "preferred_day": preference.preferred_day,
-            "comment": preference.comment,
             "dont_schedule": preference.dont_schedule,
             "scheduling_suspended": preference.scheduling_suspended,
             "suspended_reason": preference.suspended_reason,
-            "last_duty_date": preference.last_duty_date,
             "instructor_percent": preference.instructor_percent,
             "duty_officer_percent": preference.duty_officer_percent,
             "ado_percent": preference.ado_percent,
@@ -172,9 +210,9 @@ def blackout_manage(request):
             "pair_with": pair_with,
             "avoid_with": avoid_with,
         }
-        form = DutyPreferenceForm(initial=initial)
+        form = DutyPreferenceForm(initial=initial, member=member)
 
-    return render(
+    response = render(
         request,
         "duty_roster/blackout_calendar.html",
         {
@@ -192,6 +230,13 @@ def blackout_manage(request):
             "max_assignments_choices": max_choices,
         },
     )
+
+    # Add cache-busting headers to ensure fresh page loads
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+
+    return response
 
 
 def get_adjacent_months(year, month):

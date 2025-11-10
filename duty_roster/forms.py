@@ -59,8 +59,92 @@ class DutyPreferenceForm(forms.ModelForm):
             "suspended_reason": forms.TextInput(attrs={"placeholder": "Optional"}),
         }
 
+    def __init__(self, *args, member=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.member = member
+
+        # Make percentage fields not required if user doesn't have those roles
+        # and set appropriate defaults
+        if member:
+            # Count how many roles the member has
+            role_count = sum(
+                [
+                    member.instructor,
+                    member.duty_officer,
+                    member.assistant_duty_officer,
+                    member.towpilot,
+                ]
+            )
+
+            # If member has only one role, default it to 100%
+            if not member.instructor:
+                self.fields["instructor_percent"].required = False
+                self.fields["instructor_percent"].initial = 0
+            elif role_count == 1:
+                # Only an instructor, set to 100% and make not required since we'll auto-set it
+                self.fields["instructor_percent"].required = False
+                self.fields["instructor_percent"].initial = 100
+
+            if not member.duty_officer:
+                self.fields["duty_officer_percent"].required = False
+                self.fields["duty_officer_percent"].initial = 0
+            elif role_count == 1:
+                # Only a duty officer, set to 100% and make not required
+                self.fields["duty_officer_percent"].required = False
+                self.fields["duty_officer_percent"].initial = 100
+
+            if not member.assistant_duty_officer:
+                self.fields["ado_percent"].required = False
+                self.fields["ado_percent"].initial = 0
+            elif role_count == 1:
+                # Only an ADO, set to 100% and make not required
+                self.fields["ado_percent"].required = False
+                self.fields["ado_percent"].initial = 100
+
+            if not member.towpilot:
+                self.fields["towpilot_percent"].required = False
+                self.fields["towpilot_percent"].initial = 0
+            elif role_count == 1:
+                # Only a towpilot, set to 100% and make not required
+                self.fields["towpilot_percent"].required = False
+                self.fields["towpilot_percent"].initial = 100
+
     def clean(self):
         cleaned_data = super().clean()
+
+        # Set default values for roles the member doesn't have
+        # and handle single-role members automatically
+        if self.member:
+            role_count = sum(
+                [
+                    self.member.instructor,
+                    self.member.duty_officer,
+                    self.member.assistant_duty_officer,
+                    self.member.towpilot,
+                ]
+            )
+
+            # Set defaults for roles they don't have
+            if not self.member.instructor:
+                cleaned_data["instructor_percent"] = 0
+            if not self.member.duty_officer:
+                cleaned_data["duty_officer_percent"] = 0
+            if not self.member.assistant_duty_officer:
+                cleaned_data["ado_percent"] = 0
+            if not self.member.towpilot:
+                cleaned_data["towpilot_percent"] = 0
+
+            # If member has only one role, automatically set it to 100%
+            if role_count == 1:
+                if self.member.instructor:
+                    cleaned_data["instructor_percent"] = 100
+                elif self.member.duty_officer:
+                    cleaned_data["duty_officer_percent"] = 100
+                elif self.member.assistant_duty_officer:
+                    cleaned_data["ado_percent"] = 100
+                elif self.member.towpilot:
+                    cleaned_data["towpilot_percent"] = 100
+
         total = (
             cleaned_data.get("instructor_percent", 0)
             + cleaned_data.get("duty_officer_percent", 0)
