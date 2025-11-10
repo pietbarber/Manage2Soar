@@ -190,6 +190,7 @@ def blackout_manage(request):
                     "towpilot_percent": data["towpilot_percent"],
                     "max_assignments_per_month": data["max_assignments_per_month"],
                     "allow_weekend_double": data.get("allow_weekend_double", False),
+                    "comment": data["comment"],
                 },
             )
             DutyPairing.objects.filter(member=member).delete()
