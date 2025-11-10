@@ -135,10 +135,9 @@ class DutyPreferenceForm(forms.ModelForm):
         cleaned_data = super().clean()
 
         # Handle single-role members automatically
-        if self.member:
-            single_role_field = self._get_single_role_field(self.member)
-            if single_role_field:
-                cleaned_data[single_role_field] = 100
+        single_role_field = self._get_single_role_field(self.member) if self.member else None
+        if self.member and single_role_field:
+            cleaned_data[single_role_field] = 100
 
         # Validate that dont_schedule requires a reason
         suspended_reason = cleaned_data.get("suspended_reason") or ""
