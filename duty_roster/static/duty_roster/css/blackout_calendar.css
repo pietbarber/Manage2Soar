@@ -88,7 +88,8 @@
 
 .bg-gradient-primary {
   background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
-}/* Percentage calculator styling */
+}
+/* Percentage calculator styling */
 .alert#percentageAlert.alert-success {
     border-color: var(--bs-success);
     background-color: var(--bs-success-bg-subtle);
