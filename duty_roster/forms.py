@@ -4,6 +4,14 @@ from members.models import Member
 
 from .models import DutyAssignment, DutyPreference, MemberBlackout
 
+# Maps member role attributes to their corresponding form field names
+DUTY_ROLE_FIELDS = [
+    ("instructor", "instructor_percent"),
+    ("duty_officer", "duty_officer_percent"),
+    ("assistant_duty_officer", "ado_percent"),
+    ("towpilot", "towpilot_percent"),
+]
+
 
 class MemberBlackoutForm(forms.ModelForm):
     class Meta:
@@ -64,12 +72,7 @@ class DutyPreferenceForm(forms.ModelForm):
         if not member:
             return 0
         return sum(
-            [
-                member.instructor,
-                member.duty_officer,
-                member.assistant_duty_officer,
-                member.towpilot,
-            ]
+            getattr(member, role_attr, False) for role_attr, _ in DUTY_ROLE_FIELDS
         )
 
     def _get_single_role_field(self, member):
@@ -77,14 +80,9 @@ class DutyPreferenceForm(forms.ModelForm):
         if not member or self._count_member_roles(member) != 1:
             return None
 
-        if member.instructor:
-            return "instructor_percent"
-        elif member.duty_officer:
-            return "duty_officer_percent"
-        elif member.assistant_duty_officer:
-            return "ado_percent"
-        elif member.towpilot:
-            return "towpilot_percent"
+        for role_attr, field_name in DUTY_ROLE_FIELDS:
+            if getattr(member, role_attr, False):
+                return field_name
 
         return None
 
@@ -99,43 +97,23 @@ class DutyPreferenceForm(forms.ModelForm):
             role_count = self._count_member_roles(member)
 
             # If member has only one role, default it to 100%
-            if not member.instructor:
-                self.fields["instructor_percent"].required = False
-                self.fields["instructor_percent"].initial = 0
-            elif role_count == 1:
-                # Only an instructor, set to 100% and make not required since we'll auto-set it
-                self.fields["instructor_percent"].required = False
-                self.fields["instructor_percent"].initial = 100
-
-            if not member.duty_officer:
-                self.fields["duty_officer_percent"].required = False
-                self.fields["duty_officer_percent"].initial = 0
-            elif role_count == 1:
-                # Only a duty officer, set to 100% and make not required
-                self.fields["duty_officer_percent"].required = False
-                self.fields["duty_officer_percent"].initial = 100
-
-            if not member.assistant_duty_officer:
-                self.fields["ado_percent"].required = False
-                self.fields["ado_percent"].initial = 0
-            elif role_count == 1:
-                # Only an ADO, set to 100% and make not required
-                self.fields["ado_percent"].required = False
-                self.fields["ado_percent"].initial = 100
-
-            if not member.towpilot:
-                self.fields["towpilot_percent"].required = False
-                self.fields["towpilot_percent"].initial = 0
-            elif role_count == 1:
-                # Only a towpilot, set to 100% and make not required
-                self.fields["towpilot_percent"].required = False
-                self.fields["towpilot_percent"].initial = 100
+            for role_attr, field_name in DUTY_ROLE_FIELDS:
+                has_role = getattr(member, role_attr, False)
+                if not has_role:
+                    self.fields[field_name].required = False
+                    self.fields[field_name].initial = 0
+                elif role_count == 1:
+                    # Only this role, set to 100% and make not required since we'll auto-set it
+                    self.fields[field_name].required = False
+                    self.fields[field_name].initial = 100
 
     def clean(self):
         cleaned_data = super().clean()
 
         # Handle single-role members automatically
-        single_role_field = self._get_single_role_field(self.member) if self.member else None
+        single_role_field = (
+            self._get_single_role_field(self.member) if self.member else None
+        )
         if self.member and single_role_field:
             cleaned_data[single_role_field] = 100
 
