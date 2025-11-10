@@ -248,11 +248,6 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
         "This prevents path traversal security issues."
     )
 
-# Google Cloud Storage configuration
-GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
-if not GS_BUCKET_NAME:
-    raise ValueError("GS_BUCKET_NAME must be set in environment variables!")
-
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
