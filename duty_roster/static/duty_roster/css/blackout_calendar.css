@@ -38,7 +38,8 @@
 .calendar-day.selected-blackout .calendar-day-label {
   background-color: var(--bs-danger);
   color: white;
-}.calendar-day.weekend-day:not(.past-day):not(.selected-blackout) .calendar-day-label:hover {
+}
+.calendar-day.weekend-day:not(.past-day):not(.selected-blackout) .calendar-day-label:hover {
     background-color: rgba(13, 110, 253, 0.1);
     border: 2px solid var(--bs-primary);
 }
