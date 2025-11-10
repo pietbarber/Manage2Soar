@@ -59,6 +59,19 @@ class DutyPreferenceForm(forms.ModelForm):
             "suspended_reason": forms.TextInput(attrs={"placeholder": "Optional"}),
         }
 
+    def _count_member_roles(self, member):
+        """Count how many duty roles the member has."""
+        if not member:
+            return 0
+        return sum(
+            [
+                member.instructor,
+                member.duty_officer,
+                member.assistant_duty_officer,
+                member.towpilot,
+            ]
+        )
+
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
@@ -67,14 +80,7 @@ class DutyPreferenceForm(forms.ModelForm):
         # and set appropriate defaults
         if member:
             # Count how many roles the member has
-            role_count = sum(
-                [
-                    member.instructor,
-                    member.duty_officer,
-                    member.assistant_duty_officer,
-                    member.towpilot,
-                ]
-            )
+            role_count = self._count_member_roles(member)
 
             # If member has only one role, default it to 100%
             if not member.instructor:
@@ -115,24 +121,7 @@ class DutyPreferenceForm(forms.ModelForm):
         # Set default values for roles the member doesn't have
         # and handle single-role members automatically
         if self.member:
-            role_count = sum(
-                [
-                    self.member.instructor,
-                    self.member.duty_officer,
-                    self.member.assistant_duty_officer,
-                    self.member.towpilot,
-                ]
-            )
-
-            # Set defaults for roles they don't have
-            if not self.member.instructor:
-                cleaned_data["instructor_percent"] = 0
-            if not self.member.duty_officer:
-                cleaned_data["duty_officer_percent"] = 0
-            if not self.member.assistant_duty_officer:
-                cleaned_data["ado_percent"] = 0
-            if not self.member.towpilot:
-                cleaned_data["towpilot_percent"] = 0
+            role_count = self._count_member_roles(self.member)
 
             # If member has only one role, automatically set it to 100%
             if role_count == 1:

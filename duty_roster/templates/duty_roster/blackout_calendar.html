@@ -2,6 +2,10 @@
 {% load static %}
 {% block title %}Request Duty Blackouts{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'duty_roster/css/blackout_calendar.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
   <!-- Header Section -->
@@ -414,7 +418,7 @@
                       </select>
                       <div class="form-text">
                         <i class="fas fa-info-circle me-1"></i>
-                        Hold <kbd>Ctrl</kbd> (Windows) or <kbd>⌘</kbd> (Mac) to select multiple members
+                        Hold <kbd aria-label="Control key">Ctrl</kbd> (Windows) or <kbd aria-label="Command key">⌘</kbd> (Mac) to select multiple members
                       </div>
                     </div>
                   </div>
@@ -471,236 +475,8 @@
   </form>
 </div>
 
-<!-- Custom styles for blackout calendar -->
-<style>
-.blackout-calendar {
-  background: white;
-}
+{% endblock %}
 
-.blackout-calendar td {
-  height: 45px;
-  width: 45px;
-  vertical-align: middle;
-}
-
-.calendar-day-label {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  user-select: none;
-  position: relative;
-  display: block;
-}
-
-.calendar-checkbox {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-.calendar-day.weekend-day .calendar-day-label:hover {
-  background-color: var(--bs-primary-bg-subtle);
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.calendar-day.selected-blackout .calendar-day-label {
-  background-color: var(--bs-danger) !important;
-  color: white !important;
-}
-
-.calendar-day.weekend-day:not(.past-day):not(.selected-blackout) .calendar-day-label:hover {
-  background-color: rgba(13, 110, 253, 0.1);
-  border: 2px solid var(--bs-primary);
-}
-
-.calendar-day.past-day .calendar-day-label {
-  background-color: var(--bs-light);
-  color: var(--bs-secondary);
-  cursor: not-allowed;
-}
-
-.calendar-day.weekday-disabled {
-  background-color: var(--bs-light);
-  color: var(--bs-secondary);
-}
-
-.blackout-icon {
-  top: 2px;
-  right: 2px;
-  font-size: 0.7rem;
-}
-
-.legend-box {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid var(--bs-border-color);
-}
-
-.legend-box.weekend-sample {
-  background-color: white;
-  border: 2px solid var(--bs-primary);
-}
-
-.legend-box.selected-sample {
-  background-color: var(--bs-danger);
-}
-
-.legend-box.weekday-sample {
-  background-color: var(--bs-light);
-}
-
-.legend-box.past-sample {
-  background-color: var(--bs-light);
-  opacity: 0.6;
-}
-
-.bg-gradient-primary {
-  background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
-}
-
-/* Percentage calculator styling */
-.alert#percentageAlert.alert-success {
-  border-color: var(--bs-success);
-  background-color: var(--bs-success-bg-subtle);
-  color: var(--bs-success-text);
-}
-
-.alert#percentageAlert.alert-danger {
-  border-color: var(--bs-danger);
-  background-color: var(--bs-danger-bg-subtle);
-  color: var(--bs-danger-text);
-}
-</style>
-
-<!-- JavaScript for interactive features -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // Calculate percentage totals
-  function updatePercentageTotal() {
-    const selects = document.querySelectorAll('select[name$="_percent"]');
-    let total = 0;
-
-    selects.forEach(select => {
-      total += parseInt(select.value) || 0;
-    });
-
-    const totalElement = document.getElementById('percentageTotal');
-    const statusElement = document.getElementById('percentageStatus');
-    const alertElement = document.getElementById('percentageAlert');
-
-    if (totalElement) {
-      totalElement.innerHTML = `Current total: <strong>${total}%</strong>`;
-
-      // Update alert styling based on total
-      alertElement.className = 'alert mt-3 mb-0';
-      if (total === 100) {
-        alertElement.classList.add('alert-success');
-        statusElement.textContent = 'Perfect! You will be scheduled for duty.';
-      } else if (total === 0) {
-        alertElement.classList.add('alert-info');
-        statusElement.textContent = 'You will not be scheduled for any duty.';
-      } else {
-        alertElement.classList.add('alert-danger');
-        statusElement.textContent = 'Must equal 100% to be scheduled for duty.';
-      }
-    }
-  }
-
-  // Initialize visual state based on server data
-  function initializeCalendarState() {
-    let checkedCount = 0;
-
-    document.querySelectorAll('.calendar-checkbox').forEach(checkbox => {
-      const label = checkbox.closest('.calendar-day-label');
-      const dayCell = checkbox.closest('.calendar-day');
-
-      if (checkbox.checked) {
-        checkedCount++;
-        // Checkbox is checked on server - ensure visual state matches
-        dayCell.classList.add('selected-blackout');
-        if (!label.querySelector('.blackout-icon')) {
-          const icon = document.createElement('i');
-          icon.className = 'fas fa-times-circle blackout-icon position-absolute text-danger';
-          label.appendChild(icon);
-        }
-      } else {
-        // Checkbox is not checked - ensure visual state is clear
-        dayCell.classList.remove('selected-blackout');
-        const existingIcon = label.querySelector('.blackout-icon');
-        if (existingIcon) {
-          existingIcon.remove();
-        }
-      }
-    });
-  }
-
-  // Handle calendar checkbox interactions
-  function setupCalendarInteractions() {
-    document.querySelectorAll('.calendar-day-label').forEach(label => {
-      label.addEventListener('click', function(e) {
-        const checkbox = this.querySelector('.calendar-checkbox');
-        const dayCell = this.closest('.calendar-day');
-
-        if (checkbox && !checkbox.disabled) {
-          // Prevent double-toggle from label's default behavior
-          e.preventDefault();
-
-          // Toggle checkbox state
-          checkbox.checked = !checkbox.checked;
-
-          // Get blackout icon AFTER potential DOM changes
-          const blackoutIcon = this.querySelector('.blackout-icon');
-
-          // Update visual state to match checkbox state
-          if (checkbox.checked) {
-            // Checkbox is checked = date will be blacked out
-            dayCell.classList.add('selected-blackout');
-            if (!blackoutIcon) {
-              const icon = document.createElement('i');
-              icon.className = 'fas fa-times-circle blackout-icon position-absolute text-danger';
-              this.appendChild(icon);
-            }
-          } else {
-            // Checkbox is unchecked = date will NOT be blacked out
-            dayCell.classList.remove('selected-blackout');
-            if (blackoutIcon) {
-              blackoutIcon.remove();
-            }
-          }
-        }
-      });
-    });
-  }
-
-  // Add event listeners to percentage selects
-  document.querySelectorAll('select[name$="_percent"]').forEach(select => {
-    select.addEventListener('change', updatePercentageTotal);
-  });
-
-  // Add form submission debugging
-  function setupFormDebugging() {
-    const form = document.querySelector('form');
-    if (form) {
-      form.addEventListener('submit', function(e) {
-        // Form submission handling can be added here if needed
-      });
-    }
-  }
-
-  // Initial calculations and setup
-  updatePercentageTotal();
-  initializeCalendarState();
-  setupCalendarInteractions();
-  setupFormDebugging();
-});
-</script>
-
+{% block extra_scripts %}
+<script src="{% static 'duty_roster/js/blackout_calendar.js' %}"></script>
 {% endblock %}

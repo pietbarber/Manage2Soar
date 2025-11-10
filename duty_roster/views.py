@@ -164,7 +164,8 @@ def blackout_manage(request):
 
         # Always redirect after blackout processing, regardless of duty preference validation
         # This ensures blackout changes are immediately visible
-        messages.success(request, "Blackout dates updated successfully.")
+        if to_add or to_remove:
+            messages.success(request, "Blackout dates updated successfully.")
 
         # Try to process duty preferences, but don't let it block blackout updates
         form = DutyPreferenceForm(request.POST, member=member)
