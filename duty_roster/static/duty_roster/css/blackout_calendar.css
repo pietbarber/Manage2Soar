@@ -1,0 +1,122 @@
+.blackout-calendar {
+    background: white;
+}
+
+.blackout-calendar td {
+    height: 45px;
+    width: 45px;
+    vertical-align: middle;
+}
+
+.calendar-day-label {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    user-select: none;
+    position: relative;
+    display: block;
+}
+
+.calendar-checkbox {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.calendar-day.weekend-day .calendar-day-label:hover {
+    background-color: var(--bs-primary-bg-subtle);
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-day.selected-blackout .calendar-day-label {
+  background-color: var(--bs-danger);
+  color: white;
+}
+.calendar-day.weekend-day:not(.past-day):not(.selected-blackout) .calendar-day-label:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+    border: 2px solid var(--bs-primary);
+}
+
+.calendar-day.past-day .calendar-day-label {
+    background-color: var(--bs-light);
+    color: var(--bs-secondary);
+    cursor: not-allowed;
+}
+
+.calendar-day.weekday-disabled {
+    background-color: var(--bs-light);
+    color: var(--bs-secondary);
+}
+
+.blackout-icon {
+    top: 2px;
+    right: 2px;
+    font-size: 0.7rem;
+}
+
+.legend-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid var(--bs-border-color);
+}
+
+.legend-box.weekend-sample {
+    background-color: white;
+    border: 2px solid var(--bs-primary);
+}
+
+.legend-box.selected-sample {
+    background-color: var(--bs-danger);
+}
+
+.legend-box.weekday-sample {
+    background-color: var(--bs-light);
+}
+
+.legend-box.past-sample {
+    background-color: var(--bs-light);
+    opacity: 0.6;
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+}
+/* Percentage calculator styling */
+.alert#percentageAlert.alert-success {
+    border-color: var(--bs-success);
+    background-color: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text);
+}
+
+.alert#percentageAlert.alert-danger {
+    border-color: var(--bs-danger);
+    background-color: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text);
+}
+
+/* Responsive multi-select styling for accessibility */
+.multi-select-responsive {
+    min-height: 10rem; /* Approximately 6 options worth of height */
+}
+
+/* Adjust for smaller screens */
+@media (max-width: 768px) {
+    .multi-select-responsive {
+        min-height: 8rem;
+    }
+}
+
+/* Adjust for very small screens and high zoom levels */
+@media (max-width: 576px) {
+    .multi-select-responsive {
+        min-height: 6rem;
+    }
+}

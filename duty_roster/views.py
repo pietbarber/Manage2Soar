@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.timezone import now
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from duty_roster.utils.email import notify_ops_status
@@ -27,6 +28,7 @@ from logsheet.models import Airfield
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.decorators import active_member_required
 from members.models import Member
+from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 
@@ -56,6 +58,7 @@ def roster_home(request):
 
 
 @active_member_required
+@never_cache
 def blackout_manage(request):
     member = request.user
     preference, _ = DutyPreference.objects.get_or_create(member=member)
@@ -112,38 +115,82 @@ def blackout_manage(request):
 
     pair_with = Member.objects.filter(pairing_target__member=member)
     avoid_with = Member.objects.filter(avoid_target__member=member)
+
+    # Create optgroups for member pairing fields (similar to logsheet forms)
+    active_statuses = get_active_membership_statuses()
+
+    # Active members (excluding current user)
+    active_members = (
+        Member.objects.filter(membership_status__in=active_statuses)
+        .exclude(id=member.id)
+        .order_by("last_name", "first_name")
+    )
+
+    # Non-active members (excluding current user)
+    inactive_members = (
+        Member.objects.exclude(membership_status__in=active_statuses)
+        .exclude(id=member.id)
+        .filter(is_active=True)
+        .order_by("last_name", "first_name")
+    )
+
+    # Build optgroups for template
+    member_optgroups = []
+    if active_members.exists():
+        member_optgroups.append(("Active Members", active_members))
+    if inactive_members.exists():
+        member_optgroups.append(("Inactive Members", inactive_members))
+
+    # For backward compatibility, keep all_other for any legacy template usage
     all_other = Member.objects.exclude(id=member.id).filter(is_active=True)
 
     if request.method == "POST":
         blackout_dates = set(
             date.fromisoformat(d) for d in request.POST.getlist("blackout_dates")
         )
+
         note = request.POST.get("default_note", "").strip()
-        for d in blackout_dates - existing_dates:
+
+        to_add = blackout_dates - existing_dates
+        to_remove = existing_dates - blackout_dates
+
+        for d in to_add:
             MemberBlackout.objects.get_or_create(
                 member=member, date=d, defaults={"note": note}
             )
-        for d in existing_dates - blackout_dates:
+
+        for d in to_remove:
             MemberBlackout.objects.filter(member=member, date=d).delete()
 
-        form = DutyPreferenceForm(request.POST)
+        # Always redirect after blackout processing, regardless of duty preference validation
+        # This ensures blackout changes are immediately visible
+        if to_add or to_remove:
+            messages.success(request, "Blackout dates updated successfully.")
+
+        # Try to process duty preferences, but don't let it block blackout updates
+        form = DutyPreferenceForm(request.POST, member=member)
+        if not form.is_valid():
+            # Add form errors to messages so user can see them
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
         if form.is_valid():
             data = form.cleaned_data
             DutyPreference.objects.update_or_create(
                 member=member,
                 defaults={
                     "preferred_day": data["preferred_day"],
-                    "comment": data["comment"],
                     "dont_schedule": data["dont_schedule"],
                     "scheduling_suspended": data["scheduling_suspended"],
                     "suspended_reason": data["suspended_reason"],
-                    "last_duty_date": data["last_duty_date"],
                     "instructor_percent": data["instructor_percent"],
                     "duty_officer_percent": data["duty_officer_percent"],
                     "ado_percent": data["ado_percent"],
                     "towpilot_percent": data["towpilot_percent"],
                     "max_assignments_per_month": data["max_assignments_per_month"],
                     "allow_weekend_double": data.get("allow_weekend_double", False),
+                    "comment": data["comment"],
                 },
             )
             DutyPairing.objects.filter(member=member).delete()
@@ -153,28 +200,29 @@ def blackout_manage(request):
             for m in data.get("avoid_with", []):
                 DutyAvoidance.objects.create(member=member, avoid_with=m)
 
-            messages.success(request, "Preferences saved successfully.")
-            return redirect("duty_roster:blackout_manage")
+            messages.success(request, "Duty preferences saved successfully.")
+
+        # Always redirect after POST to prevent double-submission and ensure fresh page load
+        return redirect("duty_roster:blackout_manage")
     else:
         initial = {
             "preferred_day": preference.preferred_day,
-            "comment": preference.comment,
             "dont_schedule": preference.dont_schedule,
             "scheduling_suspended": preference.scheduling_suspended,
             "suspended_reason": preference.suspended_reason,
-            "last_duty_date": preference.last_duty_date,
             "instructor_percent": preference.instructor_percent,
             "duty_officer_percent": preference.duty_officer_percent,
             "ado_percent": preference.ado_percent,
             "towpilot_percent": preference.towpilot_percent,
             "max_assignments_per_month": preference.max_assignments_per_month,
             "allow_weekend_double": preference.allow_weekend_double,
+            "comment": preference.comment,
             "pair_with": pair_with,
             "avoid_with": avoid_with,
         }
-        form = DutyPreferenceForm(initial=initial)
+        form = DutyPreferenceForm(initial=initial, member=member)
 
-    return render(
+    response = render(
         request,
         "duty_roster/blackout_calendar.html",
         {
@@ -187,11 +235,14 @@ def blackout_manage(request):
             "pair_with": pair_with,
             "avoid_with": avoid_with,
             "all_other_members": all_other,
+            "member_optgroups": member_optgroups,
             "form": form,
             # pass the choices into the template:
             "max_assignments_choices": max_choices,
         },
     )
+
+    return response
 
 
 def get_adjacent_months(year, month):

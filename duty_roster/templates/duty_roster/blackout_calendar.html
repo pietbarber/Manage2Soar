@@ -2,167 +2,389 @@
 {% load static %}
 {% block title %}Request Duty Blackouts{% endblock %}
 
-{% block content %}
-<div class="container mt-4">
-  <h2>📅 Blackout Calendar</h2>
-  <p class="text-muted">Select any dates you are unavailable for duty. This view includes the next 3 months.</p>
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'duty_roster/css/blackout_calendar.css' %}">
+{% endblock %}
 
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Header Section -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 bg-primary text-white">
+        <div class="card-body py-3">
+          <h1 class="h3 mb-1 d-flex align-items-center">
+            <i class="fas fa-calendar-times me-3"></i>
+            Blackout Calendar & Duty Preferences
+          </h1>
+          <p class="mb-0 opacity-75">
+            <i class="fas fa-info-circle me-1"></i>
+            Select dates you're unavailable for duty and manage your scheduling preferences
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Messages Section -->
   {% if messages %}
     {% for message in messages %}
-      <div class="alert alert-success">{{ message }}</div>
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+        {% if message.tags == "success" %}
+          <i class="fas fa-check-circle me-2"></i>
+        {% elif message.tags == "danger" or message.tags == "error" %}
+          <i class="fas fa-exclamation-circle me-2"></i>
+        {% elif message.tags == "warning" %}
+          <i class="fas fa-exclamation-triangle me-2"></i>
+        {% elif message.tags == "info" %}
+          <i class="fas fa-info-circle me-2"></i>
+        {% endif %}
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
     {% endfor %}
   {% endif %}
-    {% comment %} Warning if all eligible role percents are zero {% endcomment %}
-    {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
-      {% if total_percent == 0 %}
-        <div class="alert alert-warning mt-3">
-          <strong>Warning:</strong> You have not set any duty role preferences. You will not be scheduled for any duty slots until you set at least one role percentage above 0%.
-        </div>
-      {% endif %}
-    {% endwith %}
+
+  <!-- Warning if all eligible role percents are zero -->
+  {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
+    {% if total_percent == 0 %}
+      <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Warning:</strong> You have not set any duty role preferences. You will not be scheduled for any duty slots until you set at least one role percentage above 0%.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endif %}
+  {% endwith %}
+
   {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
   {% endif %}
 
   <form method="post">
     {% csrf_token %}
     {% if form.non_field_errors %}
-      <div class="alert alert-danger">
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
         {% for error in form.non_field_errors %}
           <div>{{ error }}</div>
         {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endif %}
-    <div class="row">
-      {% for month in months %}
-      <div class="col-12 col-md-4 mb-4">
-        <h4>{{ month.label }}</h4>
-        <div class="table-responsive">
-          <table class="table table-bordered text-center">
-            <thead>
-              <tr>
-                <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for week in month.calendar %}
-              <tr>
-                {% for day in week %}
-                <td class="align-middle">
-                  {% if day %}
-                    {% if day.weekday == 6 or day.weekday == 0 %} {# Sunday or Saturday #}
-                      <label>
-                        <input type="checkbox" name="blackout_dates" value="{{ day|date:"Y-m-d" }}"
-                               {% if day in existing_dates %}checked{% endif %}
-                               {% if day < today %}disabled{% endif %}>
-                        <br><small>{{ day.day }}</small>
-                      </label>
-                    {% else %}
-                      <div class="text-muted small" style="opacity: 0.5;">
-                        {{ day.day }}
-                      </div>
-                    {% endif %}
-                  {% endif %}
-                </td>
-                {% endfor %}
-              </tr>
+
+    <!-- Blackout Calendar Section -->
+    <div class="row mb-5">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-header bg-light border-bottom-0">
+            <h4 class="card-title mb-1 d-flex align-items-center">
+              <i class="fas fa-calendar-check me-2 text-primary"></i>
+              Select Blackout Dates
+            </h4>
+            <p class="text-muted mb-0 small">
+              <i class="fas fa-lightbulb me-1"></i>
+              Click on weekend dates (Sat/Sun) to mark them as unavailable for duty assignments
+            </p>
+          </div>
+          <div class="card-body">
+            <div class="row g-4">
+              {% for month in months %}
+              <div class="col-12 col-lg-4">
+                <div class="calendar-month-container">
+                  <div class="month-header text-center mb-3">
+                    <h5 class="fw-bold text-primary mb-0">{{ month.label }}</h5>
+                    <small class="text-muted">Select unavailable dates</small>
+                  </div>
+
+                  <div class="calendar-table-wrapper">
+                    <table class="table table-sm table-bordered blackout-calendar mb-0">
+                      <thead class="table-primary">
+                        <tr class="text-center small fw-semibold">
+                          <th class="py-2">Sun</th>
+                          <th class="py-2">Mon</th>
+                          <th class="py-2">Tue</th>
+                          <th class="py-2">Wed</th>
+                          <th class="py-2">Thu</th>
+                          <th class="py-2">Fri</th>
+                          <th class="py-2">Sat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for week in month.calendar %}
+                        <tr>
+                          {% for day in week %}
+                          <td class="calendar-day text-center p-0 position-relative
+                                     {% if day %}
+                                       {% if day.weekday == 6 or day.weekday == 0 %}weekend-day{% else %}weekday-disabled{% endif %}
+                                       {% if day < today %}past-day{% endif %}
+                                     {% else %}
+                                       empty-day
+                                     {% endif %}">
+                            {% if day %}
+                              {% if day.weekday == 6 or day.weekday == 0 %} <!-- Sunday or Saturday -->
+                                <label class="calendar-day-label d-block p-2 m-0 h-100 w-100 position-relative cursor-pointer">
+                                  <input type="checkbox"
+                                         name="blackout_dates"
+                                         value="{{ day|date:"Y-m-d" }}"
+                                         class="calendar-checkbox position-absolute visually-hidden"
+                                         {% if day in existing_dates %}checked{% endif %}
+                                         {% if day < today %}disabled{% endif %}>
+                                  <span class="day-number fw-semibold">{{ day.day }}</span>
+                                </label>
+                              {% else %}
+                                <div class="non-weekend-day d-flex align-items-center justify-content-center p-2 text-muted">
+                                  <span class="day-number opacity-50">{{ day.day }}</span>
+                                </div>
+                              {% endif %}
+                            {% endif %}
+                          </td>
+                          {% endfor %}
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
               {% endfor %}
-            </tbody>
-          </table>
+            </div>
+
+            <!-- Legend -->
+            <div class="row mt-4">
+              <div class="col-12">
+                <div class="card bg-light border-0">
+                  <div class="card-body py-2">
+                    <div class="d-flex flex-wrap gap-3 align-items-center justify-content-center small">
+                      <div class="legend-item d-flex align-items-center">
+                        <div class="legend-box weekend-sample me-2"></div>
+                        <span>Available weekend days</span>
+                      </div>
+                      <div class="legend-item d-flex align-items-center">
+                        <div class="legend-box selected-sample me-2"></div>
+                        <span>Selected blackout dates</span>
+                      </div>
+                      <div class="legend-item d-flex align-items-center">
+                        <div class="legend-box weekday-sample me-2"></div>
+                        <span>Weekdays (duty not scheduled)</span>
+                      </div>
+                      <div class="legend-item d-flex align-items-center">
+                        <div class="legend-box past-sample me-2"></div>
+                        <span>Past dates (unavailable)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      {% endfor %}
     </div>
 
-    <div class="mb-3">
-      <label for="defaultNote" class="form-label">Optional note to apply to newly added blackout dates:</label>
-      <input type="text" class="form-control" name="default_note" id="defaultNote" placeholder="e.g., SchnitzelCon 2025">
-    </div>
-
-    <hr class="my-5">
-    <h3>🧭 Duty Assignment Preferences</h3>
-
-    <div class="row mb-3">
-      <div class="col-md-4">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="dont_schedule" id="dontSchedule" onchange="document.getElementById('suspendReason').disabled = !this.checked">
-          <label class="form-check-label" for="dontSchedule">
-            Please do not assign me to duty at all
-          </label>
+    <!-- Optional Note Section -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card border-info">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-3">
+                <label for="defaultNote" class="form-label fw-semibold mb-md-0">
+                  <i class="fas fa-sticky-note me-2 text-info"></i>
+                  Optional Note:
+                </label>
+              </div>
+              <div class="col-md-9">
+                <input type="text"
+                       class="form-control"
+                       name="default_note"
+                       id="defaultNote"
+                       placeholder="e.g., SchnitzelCon 2025, Family vacation, Work travel">
+                <div class="form-text">This note will be applied to all newly selected blackout dates</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="col-md-8">
-        <input type="text" class="form-control" name="suspended_reason" id="suspendReason" placeholder="e.g., Medical leave, travel abroad..." disabled>
-      </div>
     </div>
 
-    <div class="mb-3">
-      <label for="preferredDay" class="form-label">Preferred duty day:</label>
-      <select name="preferred_day" class="form-select" id="preferredDay">
-        <option value="">No preference</option>
-        <option value="sat">Saturday</option>
-        <option value="sun">Sunday</option>
-      </select>
-    </div>
+    <!-- Duty Assignment Preferences Section -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-header bg-gradient-primary text-white">
+            <h4 class="card-title mb-0 d-flex align-items-center">
+              <i class="fas fa-user-cog me-2"></i>
+              Duty Assignment Preferences
+            </h4>
+          </div>
+          <div class="card-body">
 
-    <div class="mb-3">
-      <label for="maxAssignments" class="form-label">
-        Maximum times you'd like to be assigned per month:
-      </label>
-      <select
-        name="max_assignments_per_month"
-        id="maxAssignments"
-        class="form-select"
-      >
-        <option value="" disabled
-          {% if not preference.max_assignments_per_month %}selected{% endif %}
-        >-- select --</option>
+            <!-- Scheduling Suspension Section -->
+            <div class="card border-warning mb-4">
+              <div class="card-header bg-warning-subtle">
+                <h6 class="card-title mb-0 d-flex align-items-center">
+                  <i class="fas fa-pause-circle me-2 text-warning"></i>
+                  Scheduling Status
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row align-items-center">
+                  <div class="col-md-4">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input"
+                             type="checkbox"
+                             name="dont_schedule"
+                             id="dontSchedule"
+                             {% if preference.dont_schedule %}checked{% endif %}
+                             onchange="document.getElementById('suspendReason').disabled = !this.checked; document.getElementById('suspendReason').required = this.checked;">
+                      <label class="form-check-label fw-semibold" for="dontSchedule">
+                        Suspend all duty assignments
+                      </label>
+                    </div>
+                    <small class="text-muted">Check this to temporarily opt out of all duty scheduling</small>
+                  </div>
+                  <div class="col-md-8">
+                    <div class="input-group">
+                      <span class="input-group-text">
+                        <i class="fas fa-comment-alt text-muted"></i>
+                      </span>
+                      <input type="text"
+                             class="form-control"
+                             name="suspended_reason"
+                             id="suspendReason"
+                             value="{{ preference.suspended_reason|default:'' }}"
+                             placeholder="e.g., Medical leave, extended travel, family obligations..."
+                             {% if not preference.dont_schedule %}disabled{% endif %}
+                             {% if preference.dont_schedule %}required{% endif %}>
+                    </div>
+                    <div class="form-text">Please provide a brief reason for suspension</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        {% for val,label in max_assignments_choices %}
-        <option value="{{ val }}"
-          {% if val == preference.max_assignments_per_month %}selected{% endif %}
-        >{{ label }}</option>
-      {% endfor %}
+            <!-- General Scheduling Preferences -->
+            <div class="row g-4 mb-4">
+              <div class="col-md-6">
+                <div class="card h-100 border-primary border-opacity-25">
+                  <div class="card-body">
+                    <h6 class="card-title d-flex align-items-center mb-3">
+                      <i class="fas fa-calendar-day me-2 text-primary"></i>
+                      Preferred Day
+                    </h6>
+                    <select name="preferred_day" class="form-select" id="preferredDay">
+                      <option value="">No preference</option>
+                      <option value="sat" {% if preference.preferred_day == 'sat' %}selected{% endif %}>Saturday</option>
+                      <option value="sun" {% if preference.preferred_day == 'sun' %}selected{% endif %}>Sunday</option>
+                    </select>
+                    <div class="form-text">Choose your preferred weekend day for duty assignments</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="card h-100 border-info border-opacity-25">
+                  <div class="card-body">
+                    <h6 class="card-title d-flex align-items-center mb-3">
+                      <i class="fas fa-hashtag me-2 text-info"></i>
+                      Monthly Limit
+                    </h6>
+                    <select name="max_assignments_per_month" id="maxAssignments" class="form-select">
+                      <option value="" disabled {% if not preference.max_assignments_per_month %}selected{% endif %}>
+                        -- Select maximum --
+                      </option>
+                      {% for val,label in max_assignments_choices %}
+                      <option value="{{ val }}" {% if val == preference.max_assignments_per_month %}selected{% endif %}>
+                        {{ label }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">Maximum times you'd like to be assigned per month</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Weekend Double Assignment -->
+            <div class="card border-success border-opacity-25 mb-4">
+              <div class="card-body">
+                <div class="form-check form-switch">
+                  <input type="checkbox"
+                         name="allow_weekend_double"
+                         id="id_allow_weekend_double"
+                         class="form-check-input"
+                         {% if preference.allow_weekend_double %}checked{% endif %}>
+                  <label for="id_allow_weekend_double" class="form-check-label fw-semibold">
+                    <i class="fas fa-calendar-plus me-2 text-success"></i>
+                    Allow weekend double assignments
+                  </label>
+                </div>
+                <div class="form-text ms-4">Check this if you're willing to be scheduled both Saturday and Sunday of the same weekend</div>
+              </div>
+            </div>
 
 
-    </div>
 
 
 
-   <div class="form-check">
-      <input type="checkbox"
-             name="allow_weekend_double"
-             id="id_allow_weekend_double"
-             class="form-check-input"
-             {% if pref.allow_weekend_double %}checked{% endif %}>
-      <label for="id_allow_weekend_double" class="form-check-label">
-        I'm OK being scheduled both days of a weekend
-      </label>
-    </div>
 
+            <!-- Duty Role Percentages -->
+            {% if role_percent_choices|length > 1 %}
+            <div class="card border-warning border-opacity-25">
+              <div class="card-header bg-warning-subtle">
+                <h6 class="card-title mb-1 d-flex align-items-center">
+                  <i class="fas fa-percentage me-2 text-warning"></i>
+                  Duty Role Distribution
+                </h6>
+                <small class="text-muted">Total must add up to 100% if you want to be scheduled</small>
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  {% for role, label in role_percent_choices %}
+                  <div class="col-md-6">
+                    <div class="border rounded p-3 bg-light">
+                      <label for="{{ role }}_percent" class="form-label fw-semibold mb-2">
+                        {% if role == 'instructor' %}
+                          <i class="fas fa-graduation-cap me-1 text-primary"></i>
+                        {% elif role == 'duty_officer' %}
+                          <i class="fas fa-clipboard-list me-1 text-orange"></i>
+                        {% elif role == 'ado' %}
+                          <i class="fas fa-user-check me-1 text-info"></i>
+                        {% elif role == 'towpilot' %}
+                          <i class="fas fa-plane me-1 text-success"></i>
+                        {% endif %}
+                        {{ label }}
+                      </label>
+                      <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
+                        {% for val in percent_options %}
+                          <option value="{{ val }}"
+                            {% if role == 'instructor' and preference.instructor_percent == val %}selected{% endif %}
+                            {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
+                            {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
+                            {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
+                          >{{ val }}%</option>
+                        {% endfor %}
+                      </select>
+                      <div class="form-text small">Percentage of duty assignments for this role</div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
 
-    {% if role_percent_choices|length > 1 %}
-    <h5 class="mt-4">Duty Role Percentage Breakdown</h5>
-    <p class="text-muted">Total must add up to 100% if you want to be scheduled.</p>
-
-    <div class="row">
-      {% for role, label in role_percent_choices %}
-        <div class="col-md-6 mb-3">
-          <label for="{{ role }}_percent" class="form-label">How often would you like to serve as {{ label }}?</label>
-          <select name="{{ role }}_percent" class="form-select" id="{{ role }}_percent">
-            {% for val in percent_options %}
-              <option value="{{ val }}"
-                {% if role == 'instructor' and preference.instructor_percent == val %}selected{% endif %}
-                {% if role == 'duty_officer' and preference.duty_officer_percent == val %}selected{% endif %}
-                {% if role == 'ado' and preference.ado_percent == val %}selected{% endif %}
-                {% if role == 'towpilot' and preference.towpilot_percent == val %}selected{% endif %}
-              >{{ val }}%</option>
-            {% endfor %}
-          </select>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+                <!-- Percentage Total Display -->
+                <div class="alert alert-info mt-3 mb-0" id="percentageAlert">
+                  <div class="d-flex align-items-center">
+                    <i class="fas fa-calculator me-2"></i>
+                    <span id="percentageTotal">Current total: <strong>0%</strong></span>
+                    <small class="ms-auto" id="percentageStatus">Must equal 100% to be scheduled</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
 
 
     {# Hidden fields for unshown duty roles, to prevent NULLs in DB #}
@@ -172,33 +394,92 @@
       {% endif %}
     {% endfor %}
 
-    <hr class="my-4">
+            <!-- Member Pairing Preferences -->
+            <div class="card border-secondary border-opacity-25">
+              <div class="card-header bg-secondary-subtle">
+                <h6 class="card-title mb-0 d-flex align-items-center">
+                  <i class="fas fa-users me-2 text-secondary"></i>
+                  Pairing Preferences
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row g-4">
+                  <div class="col-md-6">
+                    <div class="h-100">
+                      <label for="pairWith" class="form-label fw-semibold d-flex align-items-center mb-2">
+                        <i class="fas fa-thumbs-up me-2 text-success"></i>
+                        Prefer to work with:
+                      </label>
+                      <select name="pair_with" id="pairWith" class="form-select multi-select-responsive" multiple>
+                        {% for group_name, members in member_optgroups %}
+                          <optgroup label="{{ group_name }}">
+                            {% for m in members %}
+                              <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                            {% endfor %}
+                          </optgroup>
+                        {% endfor %}
+                      </select>
+                      <div class="form-text">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Hold <kbd aria-label="Control">Ctrl</kbd> (Windows) or <kbd aria-label="Command">⌘</kbd> (Mac) to select multiple members
+                      </div>
+                    </div>
+                  </div>
 
-    <div class="row">
-      <div class="col-md-6 mb-3">
-        <label for="pairWith" class="form-label">Prefer to work with:</label>
-        <select name="pair_with" id="pairWith" class="form-select" multiple>
-          {% for m in all_other_members %}
-            <option value="{{ m.id }}" {% if m in pair_with %}selected{% endif %}>{{ m.full_display_name }}</option>
-          {% endfor %}
-        </select>
-        <div class="form-text">Use Ctrl (Windows) or ⌘ (Mac) to select multiple members.</div>
-      </div>
-
-      <div class="col-md-6 mb-3">
-        <label for="avoidWith" class="form-label">Please avoid scheduling me with:</label>
-        <select name="avoid_with" id="avoidWith" class="form-select" multiple>
-          {% for m in all_other_members %}
-            <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
-          {% endfor %}
-        </select>
-        <div class="form-text">If there's someone you clash with or need to avoid, select them here.</div>
+                  <div class="col-md-6">
+                    <div class="h-100">
+                      <label for="avoidWith" class="form-label fw-semibold d-flex align-items-center mb-2">
+                        <i class="fas fa-user-times me-2 text-warning"></i>
+                        Please avoid scheduling me with:
+                      </label>
+                      <select name="avoid_with" id="avoidWith" class="form-select multi-select-responsive" multiple>
+                        {% for group_name, members in member_optgroups %}
+                          <optgroup label="{{ group_name }}">
+                            {% for m in members %}
+                              <option value="{{ m.id }}" {% if m in avoid_with %}selected{% endif %}>{{ m.full_display_name }}</option>
+                            {% endfor %}
+                          </optgroup>
+                        {% endfor %}
+                      </select>
+                      <div class="form-text">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        Select members you prefer not to be scheduled with
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="text-end">
-      <button type="submit" class="btn btn-primary">Save All Changes</button>
+    <!-- Submit Section -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card border-success">
+          <div class="card-body text-center py-4">
+            <h6 class="card-title mb-3 d-flex align-items-center justify-content-center">
+              <i class="fas fa-save me-2 text-success"></i>
+              Ready to Save Your Preferences?
+            </h6>
+            <button type="submit" class="btn btn-success btn-lg px-5">
+              <i class="fas fa-check-circle me-2"></i>
+              Save All Changes
+            </button>
+            <div class="form-text mt-2">
+              This will update your blackout dates and duty preferences
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </form>
 </div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'duty_roster/js/blackout_calendar.js' %}"></script>
 {% endblock %}
