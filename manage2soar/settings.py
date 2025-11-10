@@ -280,6 +280,9 @@ STATIC_URL = os.getenv(
     f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
 )
 
+# Use TinyMCE JS from configured static storage
+TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
+
 # Local static files directory (source for collectstatic)
 STATICFILES_DIRS = [
     BASE_DIR / "static",
@@ -353,9 +356,6 @@ LOGGING = {
 }
 
 handler403 = "members.views.custom_permission_denied_view"
-
-# Use TinyMCE JS from configured static storage
-TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
 
 TINYMCE_DEFAULT_CONFIG = {
     "relative_urls": False,  # prevent ugly ../../../ paths

@@ -17,7 +17,6 @@
   {% block head_extra %}{% endblock %}
 
   <meta charset="UTF-8">
-  {% get_siteconfig as siteconfig %}
   <title>
     {% block title %}{% endblock %}{% if block.title %} - {% endif %} {{ siteconfig.club_name|default:'Manage2Soar' }}
   </title>
