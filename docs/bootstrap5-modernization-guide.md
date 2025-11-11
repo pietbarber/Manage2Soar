@@ -79,7 +79,7 @@ Replace tables with responsive card grids:
 
 ### Accordion Sections (for detail pages)
 ```html
-<div class="accordion accordion-flush" id="contentAccordion">
+<div class="accordion accordion-modern" id="contentAccordion">
   <div class="accordion-item">
     <h2 class="accordion-header">
       <button class="accordion-button" type="button" data-bs-toggle="collapse"

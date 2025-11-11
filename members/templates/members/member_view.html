@@ -131,7 +131,7 @@
           <i class="bi bi-qr-code me-2"></i>Contact Card
         </h6>
         {% if not member.redact_contact or request.user == member or request.user.is_staff %}
-        <img src="data:image/png;base64,{{ qr_base64 }}" alt="vCard QR Code" class="img-fluid" style="max-width: 200px;">
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR code for {{ member.full_display_name }}'s contact information" class="img-fluid">
         <p class="small text-muted mt-2 mb-0">Scan to add contact info to your phone</p>
         {% else %}
         <div class="text-muted text-center">
@@ -216,7 +216,7 @@
                   {% if can_view_personal and member.address %}
                     <address class="mb-0">
                       {{ member.address }}<br>
-                      {{ member.city }}, {{ member.state_code }} {% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
+                      {{ member.city }}, {{ member.state_code }}{% if member.state_freeform %} {{ member.state_freeform }}{% endif %} {{ member.zip_code }}<br>
                       {{ member.country }}
                     </address>
                   {% else %}

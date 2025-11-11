@@ -32,7 +32,7 @@
         <span class="input-group-text bg-white border-end-0">
           <i class="bi bi-search text-muted"></i>
         </span>
-        <input type="text" class="form-control search-input border-start-0" placeholder="Search members by name, email, or role..." id="memberSearch">
+        <input type="text" class="form-control search-input border-start-0" placeholder="Search members by name, email, or role..." id="memberSearch" aria-label="Search members by name, email, or role">
       </div>
     </div>
   </div>
@@ -127,9 +127,9 @@
           <!-- Profile Photo -->
           <div class="flex-shrink-0 me-3">
             {% if member.profile_photo %}
-            <img src="{{ member.profile_photo.url }}" alt="Profile photo" width="80" height="80" class="rounded-circle member-avatar">
+            <img src="{{ member.profile_photo.url }}" alt="Profile photo" class="rounded-circle member-avatar">
             {% else %}
-            <img src="{% static 'images/default-avatar-100px.png' %}" width="80" height="80" class="rounded-circle member-avatar">
+            <img src="{% static 'images/default-avatar-100px.png' %}" class="rounded-circle member-avatar">
             {% endif %}
           </div>
 
@@ -305,7 +305,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-    }    // Auto-submit form on role filter changes only (not status filters)
+    }
+
+    // Auto-submit form on role filter changes only (not status filters)
     const roleCheckboxes = document.querySelectorAll('#filterForm input[name="role"]');
     let memberListFilterTimeout;
     roleCheckboxes.forEach(function(checkbox) {
