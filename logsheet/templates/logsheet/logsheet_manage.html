@@ -50,8 +50,25 @@
   transition: background-color 0.2s ease;
 }
 
-.flights-table tbody tr:hover {
+.flights-table tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+.flights-table tbody tr:nth-child(even) {
   background-color: #f8f9fa !important;
+}
+
+/* More specific selectors for td elements */
+.flights-table tbody tr:nth-child(odd) td {
+  background-color: #ffffff !important;
+}
+
+.flights-table tbody tr:nth-child(even) td {
+  background-color: #f8f9fa !important;
+}
+
+.flights-table tbody tr:hover {
+  background-color: #e3f2fd !important;
 }
 
 .flights-table tbody td {
