@@ -356,6 +356,59 @@
   opacity: 1 !important;
 }
 
+/* Copy button styling */
+.copy-flight-btn {
+  transition: all 0.2s ease;
+}
+
+.copy-flight-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+}
+
+/* Cloned flight modal styling */
+.cloned-flight-modal .modal-content {
+  background: linear-gradient(135deg, #f8fff8 0%, #ffffff 100%) !important;
+  border: 2px solid rgba(25, 135, 84, 0.2) !important;
+  box-shadow: 0 8px 25px rgba(25, 135, 84, 0.15) !important;
+  color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-header {
+  background: linear-gradient(135deg, rgba(25, 135, 84, 0.1) 0%, rgba(25, 135, 84, 0.05) 100%) !important;
+  border-bottom: 1px solid rgba(25, 135, 84, 0.2) !important;
+  color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-title {
+  color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-body {
+  color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-body label {
+  color: #495057 !important;
+}
+
+.cloned-flight-modal .modal-footer {
+  color: #212529 !important;
+}
+
+.clone-notice {
+  border-left: 4px solid #198754 !important;
+  background: rgba(25, 135, 84, 0.1) !important;
+  border-color: rgba(25, 135, 84, 0.3) !important;
+  color: #0f4229 !important;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem !important;
+}
+
+.clone-notice i {
+  color: #198754 !important;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .flights-table {
@@ -793,6 +846,20 @@
                         <span class="d-none d-md-inline ms-1">Edit</span>
                       </a>
 
+                      <button type="button"
+                              class="btn btn-outline-success btn-sm copy-flight-btn"
+                              data-flight-id="{{ flight.pk }}"
+                              data-pilot="{{ flight.pilot.pk }}"
+                              data-pilot-name="{{ flight.pilot|full_display_name }}"
+                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name }}"{% endif %}
+                              data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
+                              data-glider-name="{{ flight.glider }}"
+                              {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
+                              title="Copy flight details">
+                        <i class="bi bi-copy"></i>
+                        <span class="d-none d-md-inline ms-1">Copy</span>
+                      </button>
+
                       <form method="post"
                             action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
                             class="d-inline"
@@ -1013,6 +1080,96 @@ document.addEventListener("click", function(e) {
       }
     })
     .catch(() => alert("Could not mark landing. Please try again."));
+  }
+
+  // Handle copy flight button clicks
+  if (e.target && (e.target.classList.contains("copy-flight-btn") || e.target.closest(".copy-flight-btn"))) {
+    e.preventDefault();
+    const btn = e.target.classList.contains("copy-flight-btn") ? e.target : e.target.closest(".copy-flight-btn");
+
+    // Extract flight data from data attributes
+    const flightData = {
+      pilot: btn.getAttribute("data-pilot"),
+      pilot_name: btn.getAttribute("data-pilot-name"),
+      instructor: btn.getAttribute("data-instructor"),
+      instructor_name: btn.getAttribute("data-instructor-name"),
+      glider: btn.getAttribute("data-glider"),
+      glider_name: btn.getAttribute("data-glider-name"),
+      release_altitude: btn.getAttribute("data-release-altitude")
+    };
+
+    // Open the add flight modal with pre-filled data (no confirmation needed)
+    const addFlightUrl = "{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}";
+
+    // Fetch the add flight form
+    fetch(addFlightUrl)
+      .then(response => response.text())
+      .then(html => {
+        // Load the form into the modal
+        document.getElementById('flightModalContent').innerHTML = html;
+
+        // Add visual indication that this is a cloned flight
+        const modalElement = document.getElementById('flightModal');
+        modalElement.classList.add('cloned-flight-modal');
+
+        // Add a header notice for cloned flight
+        const modalContent = document.getElementById('flightModalContent');
+        const existingHeader = modalContent.querySelector('.modal-header');
+        if (existingHeader) {
+          const cloneNotice = document.createElement('div');
+          cloneNotice.className = 'alert alert-success clone-notice mb-0';
+          cloneNotice.innerHTML = `
+            <i class="bi bi-copy me-2"></i>
+            <strong>Cloned Flight:</strong> Pre-filled from ${flightData.pilot_name}${flightData.instructor_name ? ` & ${flightData.instructor_name}` : ''} in ${flightData.glider_name}
+          `;
+          existingHeader.insertAdjacentElement('afterend', cloneNotice);
+        }
+
+        // Pre-fill the form with copied data
+        setTimeout(() => { // Small delay to ensure form is rendered
+          const form = document.querySelector('#flightModalContent form');
+          if (form) {
+            // Set pilot
+            const pilotSelect = form.querySelector('select[name="pilot"]');
+            if (pilotSelect && flightData.pilot) {
+              pilotSelect.value = flightData.pilot;
+            }
+
+            // Set instructor
+            const instructorSelect = form.querySelector('select[name="instructor"]');
+            if (instructorSelect && flightData.instructor) {
+              instructorSelect.value = flightData.instructor;
+            }
+
+            // Set glider
+            const gliderSelect = form.querySelector('select[name="glider"]');
+            if (gliderSelect && flightData.glider) {
+              gliderSelect.value = flightData.glider;
+            }
+
+            // Set release altitude
+            const altitudeInput = form.querySelector('input[name="release_altitude"]');
+            if (altitudeInput && flightData.release_altitude) {
+              altitudeInput.value = flightData.release_altitude;
+            }
+
+            // Clear time fields (they should be empty by default, but just to be sure)
+            const launchTimeInput = form.querySelector('input[name="launch_time"]');
+            if (launchTimeInput) launchTimeInput.value = '';
+
+            const landingTimeInput = form.querySelector('input[name="landing_time"]');
+            if (landingTimeInput) landingTimeInput.value = '';
+          }
+        }, 100);
+
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+        modal.show();
+      })
+      .catch(error => {
+        console.error('Error loading add flight form:', error);
+        alert('Could not load the flight form. Please try again.');
+      });
   }
 });
 </script>
@@ -1450,6 +1607,8 @@ document.addEventListener("click", function(e) {
   document.getElementById('flightModal').addEventListener('hidden.bs.modal', function (event) {
     // Clear modal content to force reload next time
     document.getElementById('flightModalContent').innerHTML = '';
+    // Remove cloned flight styling
+    document.getElementById('flightModal').classList.remove('cloned-flight-modal');
   });
 </script>
 
