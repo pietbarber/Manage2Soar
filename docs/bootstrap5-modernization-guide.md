@@ -294,11 +294,12 @@ document.addEventListener('DOMContentLoaded', function() {
 ### Selective Auto-Submit for Filters
 ```javascript
 // Only auto-submit specific filter types (not all checkboxes)
-const autoSubmitCheckboxes = document.querySelectorAll('#filterForm input[name="specific_filter"]');
+let memberListFilterTimeout;
+const autoSubmitCheckboxes = document.querySelectorAll('#filterForm input[name=\"specific_filter\"]');
 autoSubmitCheckboxes.forEach(function(checkbox) {
     checkbox.addEventListener('change', function() {
-        clearTimeout(window.filterTimeout);
-        window.filterTimeout = setTimeout(function() {
+        clearTimeout(memberListFilterTimeout);
+        memberListFilterTimeout = setTimeout(function() {
             document.getElementById('filterForm').submit();
         }, 300);
     });

@@ -155,8 +155,14 @@ def member_roles(member):
 
 @register.simple_tag
 def duty_badge_legend():
-    # Get the first SiteConfiguration object, or use defaults if not found
-    config = SiteConfiguration.objects.first()
+    # Get the first SiteConfiguration object with caching, or use defaults if not found
+    from django.core.cache import cache
+
+    config = cache.get("site_configuration")
+    if config is None:
+        config = SiteConfiguration.objects.first()
+        # Cache for 1 hour since site configuration rarely changes
+        cache.set("site_configuration", config, 3600)
     # Escape dynamic content to prevent XSS
     instructor = escape(
         getattr(config, "instructor_title", "Instructor") if config else "Instructor"
