@@ -172,8 +172,8 @@ Create `static/css/[app_name].css` for each app with these patterns:
 /* Modern Button Styling */
 .btn-modern {
   border-radius: 8px;
-  font-weight: 500;
-  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
   transition: all 0.2s ease;
 }
 

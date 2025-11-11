@@ -116,8 +116,8 @@ def render_duties(member):
 @register.filter
 def pluck_ids(members):
     """Extract member IDs from a collection of members"""
-    # Check if it's a single member object (not iterable)
-    if hasattr(members, "pk") and not hasattr(members, "__len__"):
+    # Check if it's a single Django model instance
+    if hasattr(members, "_meta"):  # _meta is specific to Django model instances
         return [str(members.pk)]
     # Check if it's an iterable collection but not a string
     elif hasattr(members, "__iter__") and not isinstance(members, str):
@@ -239,7 +239,10 @@ def duty_badge_legend():
 # Keep the old function name for backward compatibility
 @register.simple_tag
 def duty_emoji_legend():
-    """Legacy function name - redirects to duty_badge_legend for backward compatibility"""
+    """
+    DEPRECATED: This is a backward compatibility wrapper for legacy templates.
+    Please migrate to `duty_badge_legend` in future template updates.
+    """
     return duty_badge_legend()
 
 

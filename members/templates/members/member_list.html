@@ -296,23 +296,23 @@ document.addEventListener('DOMContentLoaded', function() {
             memberItems.forEach(function(item) {
                 const name = item.dataset.name || '';
                 const email = item.dataset.email || '';
+                const roles = item.dataset.roles || '';
 
-                if (name.includes(searchTerm) || email.includes(searchTerm)) {
+                if (name.includes(searchTerm) || email.includes(searchTerm) || roles.includes(searchTerm)) {
                     item.style.display = '';
                 } else {
                     item.style.display = 'none';
                 }
             });
         });
-    }
-
-    // Auto-submit form on role filter changes only (not status filters)
+    }    // Auto-submit form on role filter changes only (not status filters)
     const roleCheckboxes = document.querySelectorAll('#filterForm input[name="role"]');
+    let memberListFilterTimeout;
     roleCheckboxes.forEach(function(checkbox) {
         checkbox.addEventListener('change', function() {
             // Add a small delay to allow multiple rapid changes
-            clearTimeout(window.filterTimeout);
-            window.filterTimeout = setTimeout(function() {
+            clearTimeout(memberListFilterTimeout);
+            memberListFilterTimeout = setTimeout(function() {
                 document.getElementById('filterForm').submit();
             }, 300);
         });

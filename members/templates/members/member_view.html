@@ -73,9 +73,9 @@
       <div class="card profile-photo-container">
         <div class="card-body text-center">
           {% if member.profile_photo %}
-          <img src="{{ member.profile_photo.url }}" class="profile-photo img-fluid" alt="Profile Photo" style="max-width: 250px; max-height: 250px;">
+          <img src="{{ member.profile_photo.url }}" class="profile-photo img-fluid" alt="Profile Photo">
           {% else %}
-          <img src="{% static 'images/default-avatar-large.png' %}" class="profile-photo img-fluid" alt="Default Avatar" style="max-width: 250px; max-height: 250px;">
+          <img src="{% static 'images/default-avatar-large.png' %}" class="profile-photo img-fluid" alt="Default Avatar">
           {% endif %}
 
           {% if is_self %}
@@ -508,7 +508,7 @@
                       <div class="card h-100 border-0 shadow-sm">
                         <div class="card-body p-3">
                           {% if badge.badge.image %}
-                          <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-fluid mb-2" style="max-width: 60px; max-height: 60px;">
+                          <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-fluid mb-2 badge-image">
                           {% endif %}
                           <h6 class="small fw-bold mb-1">{{ badge.badge.name }}</h6>
                           <small class="text-muted">{{ badge.date_awarded|date:"M j, Y" }}</small>
