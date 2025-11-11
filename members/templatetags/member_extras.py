@@ -70,23 +70,41 @@ def render_duties(member):
         else "Assistant Duty Officer"
     )
     if member.instructor:
-        duties.append(f'<span title="{instructor}" class="emoji">🎓</span>')
+        duties.append(
+            f'<span class="badge bg-primary me-1" title="{instructor}"><i class="bi bi-mortarboard"></i> {instructor}</span>'
+        )
     if member.towpilot:
-        duties.append(f'<span title="{towpilot}" class="emoji">🛩️</span>')
+        duties.append(
+            f'<span class="badge bg-success me-1" title="{towpilot}"><i class="bi bi-airplane"></i> {towpilot}</span>'
+        )
     if member.duty_officer:
-        duties.append(f'<span title="{duty_officer}" class="emoji">📋</span>')
+        duties.append(
+            f'<span class="badge bg-warning text-dark me-1" title="{duty_officer}"><i class="bi bi-clipboard-check"></i> {duty_officer}</span>'
+        )
     if member.assistant_duty_officer:
-        duties.append(f'<span title="{assistant_duty_officer}" class="emoji">💪</span>')
+        duties.append(
+            f'<span class="badge bg-info me-1" title="{assistant_duty_officer}"><i class="bi bi-person-check"></i> {assistant_duty_officer}</span>'
+        )
     if member.secretary:
-        duties.append('<span title="Secretary" class="emoji">✍️</span>')
+        duties.append(
+            '<span class="badge bg-secondary me-1" title="Secretary"><i class="bi bi-pen"></i> Secretary</span>'
+        )
     if member.treasurer:
-        duties.append('<span title="Treasurer" class="emoji">💰</span>')
+        duties.append(
+            '<span class="badge bg-success me-1" title="Treasurer"><i class="bi bi-cash-coin"></i> Treasurer</span>'
+        )
     if member.webmaster:
-        duties.append('<span title="Webmaster" class="emoji">🌐</span>')
+        duties.append(
+            '<span class="badge bg-dark me-1" title="Webmaster"><i class="bi bi-globe"></i> Webmaster</span>'
+        )
     if member.director:
-        duties.append('<span title="Director" class="emoji"️>🎩</span>')
+        duties.append(
+            '<span class="badge bg-danger me-1" title="Director"><i class="bi bi-person-badge"></i> Director</span>'
+        )
     if member.member_manager:
-        duties.append('<span title="Membership Manager" class="emoji">📇</span>')
+        duties.append(
+            '<span class="badge bg-purple me-1" title="Membership Manager"><i class="bi bi-person-rolodex"></i> Member Manager</span>'
+        )
 
     return (
         " ".join(duties)
@@ -97,11 +115,46 @@ def render_duties(member):
 
 @register.filter
 def pluck_ids(members):
-    return [str(member.pk) for member in members]
+    """Extract member IDs from a collection of members"""
+    # Check if it's a single member object (not iterable)
+    if hasattr(members, "pk") and not hasattr(members, "__len__"):
+        return [str(members.pk)]
+    # Check if it's an iterable collection but not a string
+    elif hasattr(members, "__iter__") and not isinstance(members, str):
+        try:
+            return [str(member.pk) for member in members]
+        except TypeError:
+            return []
+    return []
+
+
+@register.filter
+def member_roles(member):
+    """Extract role information from a single member for search/filtering"""
+    roles = []
+    if member.instructor:
+        roles.append("instructor")
+    if member.towpilot:
+        roles.append("towpilot")
+    if member.duty_officer:
+        roles.append("duty_officer")
+    if member.assistant_duty_officer:
+        roles.append("assistant_duty_officer")
+    if member.director:
+        roles.append("director")
+    if member.member_manager:
+        roles.append("member_manager")
+    if member.webmaster:
+        roles.append("webmaster")
+    if member.treasurer:
+        roles.append("treasurer")
+    if member.secretary:
+        roles.append("secretary")
+    return " ".join(roles)
 
 
 @register.simple_tag
-def duty_emoji_legend():
+def duty_badge_legend():
     # Get the first SiteConfiguration object, or use defaults if not found
     config = SiteConfiguration.objects.first()
     # Escape dynamic content to prevent XSS
@@ -124,32 +177,70 @@ def duty_emoji_legend():
     # Dynamic content is properly escaped above - safe to use mark_safe
     return mark_safe(  # nosec B308,B703
         f"""
-        <div class='accordion mb-4' id='emojiLegendAccordion'>
+        <div class='accordion mb-4' id='badgeLegendAccordion'>
             <div class='accordion-item'>
                 <h2 class='accordion-header' id='headingLegend'>
                     <button class='accordion-button collapsed' type='button' data-bs-toggle='collapse' data-bs-target='#collapseLegend' aria-expanded='false' aria-controls='collapseLegend'>
-                        📖 Expand to show Legend
+                        <i class="bi bi-info-circle me-2"></i> Role Badge Legend
                     </button>
                 </h2>
-                <div id='collapseLegend' class='accordion-collapse collapse' aria-labelledby='headingLegend' data-bs-parent='#emojiLegendAccordion'>
+                <div id='collapseLegend' class='accordion-collapse collapse' aria-labelledby='headingLegend' data-bs-parent='#badgeLegendAccordion'>
                     <div class='accordion-body'>
-                        <ul class='list-unstyled mb-0'>
-                            <li><span class='emoji'>🎓</span> – {instructor}</li>
-                            <li><span class='emoji'>🛩️</span> – {towpilot}</li>
-                            <li><span class='emoji'>📋</span> – {duty_officer}</li>
-                            <li><span class='emoji'>💪</span> – {assistant_duty_officer}</li>
-                            <li><span class='emoji'>✍️</span> – Secretary</li>
-                            <li><span class='emoji'>💰</span> – Treasurer</li>
-                            <li><span class='emoji'>🌐</span> – Webmaster</li>
-                            <li><span class='emoji'>🎩</span> – Director</li>
-                            <li><span class='emoji'>📇</span> – Membership Manager</li>
-                        </ul>
+                        <div class='row g-3'>
+                            <div class='col-md-6'>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-primary me-3'><i class='bi bi-mortarboard'></i> {instructor}</span>
+                                    <small class='text-muted'>Flight training</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-success me-3'><i class='bi bi-airplane'></i> {towpilot}</span>
+                                    <small class='text-muted'>Aircraft operations</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-warning text-dark me-3'><i class='bi bi-clipboard-check'></i> {duty_officer}</span>
+                                    <small class='text-muted'>Daily operations</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-info me-3'><i class='bi bi-person-check'></i> {assistant_duty_officer}</span>
+                                    <small class='text-muted'>Assistant operations</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-secondary me-3'><i class='bi bi-pen'></i> Secretary</span>
+                                    <small class='text-muted'>Club administration</small>
+                                </div>
+                            </div>
+                            <div class='col-md-6'>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-success me-3'><i class='bi bi-cash-coin'></i> Treasurer</span>
+                                    <small class='text-muted'>Financial management</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-dark me-3'><i class='bi bi-globe'></i> Webmaster</span>
+                                    <small class='text-muted'>Website management</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-danger me-3'><i class='bi bi-person-badge'></i> Director</span>
+                                    <small class='text-muted'>Board member</small>
+                                </div>
+                                <div class='d-flex align-items-center mb-2'>
+                                    <span class='badge bg-purple me-3'><i class='bi bi-person-rolodex'></i> Member Manager</span>
+                                    <small class='text-muted'>Membership management</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
         """
     )
+
+
+# Keep the old function name for backward compatibility
+@register.simple_tag
+def duty_emoji_legend():
+    """Legacy function name - redirects to duty_badge_legend for backward compatibility"""
+    return duty_badge_legend()
 
 
 @register.simple_tag(takes_context=True)

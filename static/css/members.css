@@ -1,0 +1,311 @@
+/* Members Module CSS - Bootstrap5 Enhanced Styling */
+
+/* Custom badge colors */
+.badge.bg-purple {
+    background-color: #6f42c1 !important;
+    color: white;
+}
+
+/* Member List Enhancements */
+.member-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.member-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-color: #007bff;
+}
+
+.member-avatar {
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.member-name {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.member-contact {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.member-duties {
+    margin: 0.75rem 0;
+}
+
+.member-duties .badge {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Member Profile Enhancements */
+.profile-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px 15px 0 0;
+    margin-bottom: 0;
+}
+
+.profile-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.profile-photo-container {
+    position: relative;
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.profile-photo {
+    border: 4px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease;
+}
+
+.profile-photo:hover {
+    transform: scale(1.05);
+}
+
+.contact-info {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.contact-info .list-group-item {
+    border: none;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.contact-info .list-group-item:last-child {
+    border-bottom: none;
+}
+
+.contact-info strong {
+    color: #495057;
+    display: inline-block;
+    min-width: 120px;
+}
+
+/* Modern accordion styling */
+.accordion-modern .accordion-item {
+    border: none;
+    border-radius: 12px !important;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.accordion-modern .accordion-header .accordion-button {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border-radius: 12px !important;
+    border: none;
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+}
+
+.accordion-modern .accordion-header .accordion-button:not(.collapsed) {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+    box-shadow: none;
+}
+
+.accordion-modern .accordion-header .accordion-button::after {
+    filter: brightness(0) invert(1);
+}
+
+.accordion-modern .accordion-body {
+    padding: 1.5rem;
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+}
+
+/* Filter section styling */
+.filter-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid #dee2e6;
+}
+
+.filter-section .form-check {
+    margin-bottom: 0.5rem;
+}
+
+.filter-section .form-check-input {
+    margin-top: 0.125rem;
+}
+
+.filter-section .form-check-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.filter-section .btn {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+}
+
+/* Search enhancements */
+.search-section {
+    margin-bottom: 2rem;
+}
+
+.search-input {
+    border-radius: 25px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Pagination styling */
+.pagination-modern {
+    justify-content: center;
+    margin-top: 3rem;
+}
+
+.pagination-modern .page-link {
+    border: none;
+    border-radius: 8px;
+    margin: 0 0.25rem;
+    padding: 0.75rem 1rem;
+    color: #007bff;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.pagination-modern .page-link:hover {
+    background-color: #007bff;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.pagination-modern .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Back to top button */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.back-to-top:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.5);
+    color: white;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .profile-header {
+        padding: 1.5rem;
+        text-align: center;
+    }
+
+    .contact-info strong {
+        min-width: auto;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    .member-card {
+        margin-bottom: 1rem;
+    }
+
+    .member-duties .badge {
+        display: block;
+        width: fit-content;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Modern button styling */
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* QR Code styling */
+.qr-container {
+    text-align: center;
+    padding: 1.5rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-top: 1.5rem;
+}
+
+.qr-container img {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Badge enhancements for qualifications */
+.qualification-badge {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.25rem;
+    display: inline-block;
+    box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.qualification-expired {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+}
+
+.qualification-expiring {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    box-shadow: 0 2px 6px rgba(255, 193, 7, 0.3);
+}
