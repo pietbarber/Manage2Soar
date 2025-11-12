@@ -1,377 +1,731 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
+{% endblock %}
 
 {% block content %}
 {% load member_extras %}
-<h1>View / Manage Logsheet</h1>
-{% if messages %}
-  <div class="container mt-3">
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+<!-- Header Section -->
+<div class="management-header">
+  <div class="header-content">
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <i class="bi bi-journal-text" style="font-size: 2rem; color: white;"></i>
+      <div>
+        <h1 class="mb-1" style="color: white;">Logsheet Management</h1>
+        <p class="mb-0" style="color: rgba(255, 255, 255, 0.9);">View and manage flight operations</p>
       </div>
-    {% endfor %}
-  </div>
-{% endif %}
+    </div>
 
-<div class="d-flex justify-content-start mb-3 gap-2">
-  {% if previous_logsheet %}
-    <a href="{% url 'logsheet:manage' previous_logsheet.id %}" class="btn btn-outline-secondary">
-      ← Show Previous ({{ previous_logsheet.log_date }})
-    </a>
-  {% else %}
-    <span></span>
-  {% endif %}
-
-  <a href="{% url 'logsheet:index' %}" class="btn btn-outline-primary">
-    📋 Return to Logsheet List
-  </a>
-
-  {% if next_logsheet %}
-    <a href="{% url 'logsheet:manage' next_logsheet.id %}" class="btn btn-outline-secondary">
-      Show Next ({{ next_logsheet.log_date }}) →
-    </a>
-  {% endif %}
-</div>
-
-
-<div class="container-fluid logsheet-management">
-  <div class="card mb-3">
-    <div class="card-body">
-    <h5 class="card-title" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">Logsheet for {{ logsheet.log_date }}</h5>
-    <p class="card-text">Airfield: {{ logsheet.airfield }}</p>
-    <p class="card-text"><small class="text-muted">Created by {{ logsheet.created_by }} on {{ logsheet.created_at }}</small></p>
-    {% if logsheet.revisions.exists %}
-    <details class="mb-3">
-      <summary>Revision History</summary>
-      <ul class="mb-0">
-        {% for rev in logsheet.revisions.all %}
-          <li>
-            {{ rev.revised_at|date:"Y-m-d H:i" }} — {{ rev.note }}{% if rev.revised_by %} by {{ rev.revised_by|full_display_name }}{% endif %}
-          </li>
-        {% empty %}
-          <li>No revisions logged.</li>
-        {% endfor %}
-      </ul>
-    </details>
-
+    <!-- Messages -->
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+          <i class="bi bi-info-circle me-2"></i>
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
     {% endif %}
-  </div>
-<!-- Three buttons for Duty Officer to manage logsheet-->
-<div class="d-flex flex-wrap gap-2 mb-3">
-  <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}" class="btn {% if logsheet.finalized %}btn-outline-success{% else %}btn-success{% endif %} me-2 mb-3">
-    📊 {% if logsheet.finalized %}View Finances{% else %}Edit Finances{% endif %}
-  </a>
 
-  {% if logsheet.finalized %}
-    <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-outline-warning me-2 mb-3">
-      📝 View Closeout
-    </a>
-  {% else %}
-    <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="btn btn-warning me-2 mb-3">
-      📝 Edit Closeout
-    </a>
-  {% endif %}
-
-  {% if not logsheet.finalized %}
-    <form method="post" class="d-inline me-2 mb-3" onsubmit="return confirmFinalize();">
-      {% csrf_token %}
-      <button type="submit" name="finalize" class="btn btn-danger">
-        🔒 Finalize Logsheet
-      </button>
-    </form>
-
-    <script>
-      function confirmFinalize() {
-        return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
-      }
-    </script>
-  {% endif %}
-
-  {% if logsheet.finalized and user.is_superuser %}
-    <form method="post" class="d-inline mb-3">
-      {% csrf_token %}
-      <button type="submit" name="revise" class="btn btn-outline-danger">
-        ✏️ Revise Logsheet
-      </button>
-    </form>
-  {% endif %}
-  </div>
-  </div>
-</div>
-
-
-<hr>
-<h2>Flights</h2>
-{% if not logsheet.finalized %}
-<div class="mb-3">
-  <a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
-     class="btn btn-sm btn-primary"
-     data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
-     data-bs-toggle="modal"
-     data-bs-target="#flightModal"
-     data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
-    + Add Flight
-  </a>
-
-  {% if visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
-  <button type="button"
-          class="btn btn-sm btn-outline-success ms-2"
-          data-bs-toggle="modal"
-          data-bs-target="#visitingPilotModal">
-    👤 Register Visiting Pilot
-  </button>
-  {% endif %}
-</div>
-{% endif %}
-
-{% if logsheet.flights.exists %}
-<div class="table-responsive">
-  <table class="table table-bordered table-hover table-striped align-middle sort logsheet-entry" id="flightsTable">
-    <thead class="table-light">
-      <tr>
-        <th>Status</th>
-        <th>Time</th>
-        <th>Pilot</th>
-        <th class="d-none d-md-table-cell">Instructor</th>
-        <th>Glider</th>
-        <th class="d-none d-lg-table-cell">Towplane</th>
-        <th class="d-none d-lg-table-cell">Release Alt</th>
-        <th class="d-none d-sm-table-cell">Duration</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-  <tbody>
-    {% for flight in flights %}
-    <tr>
-      <td>
-        {% if flight.launch_time and flight.landing_time %}
-          <span class="badge bg-success">landed</span>
-        {% elif flight.launch_time %}
-          <span class="badge bg-primary">flying</span>
-        {% else %}
-          <span class="badge bg-warning text-dark">pending</span>
+    <!-- Navigation Actions -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+      <div class="d-flex gap-2">
+        {% if previous_logsheet %}
+          <a href="{% url 'logsheet:manage' previous_logsheet.id %}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-left me-1"></i>
+            Previous ({{ previous_logsheet.log_date|date:"M j" }})
+          </a>
         {% endif %}
-      </td>
-      <td>
-        {% if flight.launch_time %}
-          {{ flight.launch_time|time:"H:i" }}
-        {% endif %}
-        —
-        {% if flight.landing_time %}
-          {{ flight.landing_time|time:"H:i" }}
-        {% endif %}
-      </td>
-      <td>
-        {{ flight.pilot|full_display_name }}
-        <div class="d-md-none">
-          {% if flight.instructor %}
-            <small class="text-muted">{{ flight.instructor|full_display_name }}</small>
-          {% endif %}
-        </div>
-      </td>
-      <td class="d-none d-md-table-cell">
-        {% if flight.instructor %}
-          {{ flight.instructor|full_display_name }}
-        {% endif %}
-      </td>
-      <td>
-        {{ flight.glider }}
-        <div class="d-lg-none">
-          {% if flight.towplane %}
-            <small class="text-muted">{{ flight.towplane }}</small>
-          {% endif %}
-          {% if flight.release_altitude %}
-            <small class="text-muted">{{ flight.release_altitude }}ft</small>
-          {% endif %}
-        </div>
-      </td>
-      <td class="d-none d-lg-table-cell">
-          {% if flight.towplane %}
-            {{ flight.towplane }}
-          {% elif flight.is_incomplete %}
-            <span class="badge bg-dark text-light" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
-              ⚠️ Missing data
-            </span>
-          {% endif %}
-      </td>
-      <td class="d-none d-lg-table-cell">
-          {% if flight.release_altitude %}
-            {{ flight.release_altitude }} ft
-          {% elif flight.is_incomplete %}
-            <span class="badge bg-dark text-light" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
-              ⚠️ Missing data
-            </span>
-          {% endif %}
 
-      </td>
-      <td class="d-none d-sm-table-cell">
-        {% if not flight.landing_time %}
-        <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
-          🕒 —
-        </span>
-        {% else %}
-          {{ flight.duration }}
-        {% endif %}
-      </td>
-
-      <td class="text-left align-left">
-        <a href="{% url 'logsheet:flight_view' flight.id %}" class="btn btn-sm btn-outline-secondary">
-          View
+        <a href="{% url 'logsheet:index' %}" class="btn btn-outline-primary">
+          <i class="bi bi-list-ul me-1"></i>
+          Back to List
         </a>
+
+        {% if next_logsheet %}
+          <a href="{% url 'logsheet:manage' next_logsheet.id %}" class="btn btn-outline-secondary">
+            Next ({{ next_logsheet.log_date|date:"M j" }})
+            <i class="bi bi-chevron-right ms-1"></i>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Management Card -->
+<div class="container-fluid">
+  <div class="management-card">
+    <div class="management-card-header">
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+          <div class="logsheet-date-badge">
+            <i class="bi bi-calendar3 me-2"></i>
+            {{ logsheet.log_date|date:"F j, Y" }}
+          </div>
+          <div class="logsheet-meta">
+            <div class="meta-item">
+              <i class="bi bi-geo-alt me-1" style="color: rgba(255, 255, 255, 0.8);"></i>
+              <span style="color: rgba(255, 255, 255, 0.9);">{{ logsheet.airfield }}</span>
+            </div>
+            <div class="meta-item">
+              <small style="color: rgba(255, 255, 255, 0.7);">
+                <i class="bi bi-person me-1" style="color: rgba(255, 255, 255, 0.8);"></i>
+                Created by {{ logsheet.created_by }} on {{ logsheet.created_at|date:"M j, Y" }}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        {% if logsheet.finalized %}
+          <span class="status-badge status-badge-finalized">
+            <i class="bi bi-lock-fill me-1"></i>
+            Finalized
+          </span>
+        {% else %}
+          <span class="status-badge status-active">
+            <i class="bi bi-unlock-fill me-1"></i>
+            Active
+          </span>
+        {% endif %}
+      </div>
+
+      <!-- Revision History -->
+      {% if logsheet.revisions.exists %}
+        <div class="revision-history mt-3">
+          <details>
+            <summary class="revision-summary">
+              <i class="bi bi-clock-history me-2"></i>
+              Revision History ({{ logsheet.revisions.count }} revision{{ logsheet.revisions.count|pluralize }})
+            </summary>
+            <div class="revision-list mt-2">
+              {% for rev in logsheet.revisions.all %}
+                <div class="revision-item">
+                  <div class="revision-date">{{ rev.revised_at|date:"M j, Y H:i" }}</div>
+                  <div class="revision-note">{{ rev.note }}</div>
+                  {% if rev.revised_by %}
+                    <div class="revision-author">by {{ rev.revised_by|full_display_name }}</div>
+                  {% endif %}
+                </div>
+              {% empty %}
+                <div class="text-muted">No revisions logged.</div>
+              {% endfor %}
+            </div>
+          </details>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Management Actions -->
+    <div class="management-actions">
+      <div class="actions-grid">
+        <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
+           class="action-card {% if logsheet.finalized %}action-card-view{% else %}action-card-edit{% endif %}">
+          <div class="action-icon">
+            <i class="bi bi-graph-up"></i>
+          </div>
+          <div class="action-content">
+            <h6 class="action-title">
+              {% if logsheet.finalized %}View Finances{% else %}Edit Finances{% endif %}
+            </h6>
+            <p class="action-description">Manage flight fees and payments</p>
+          </div>
+        </a>
+
+        {% if logsheet.finalized %}
+          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view">
+            <div class="action-icon">
+              <i class="bi bi-file-text"></i>
+            </div>
+            <div class="action-content">
+              <h6 class="action-title">View Closeout</h6>
+              <p class="action-description">Review day's summary</p>
+            </div>
+          </a>
+        {% else %}
+          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit">
+            <div class="action-icon">
+              <i class="bi bi-file-text"></i>
+            </div>
+            <div class="action-content">
+              <h6 class="action-title">Edit Closeout</h6>
+              <p class="action-description">Complete day's summary</p>
+            </div>
+          </a>
+        {% endif %}
 
         {% if not logsheet.finalized %}
-        <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
-           class="btn btn-sm btn-outline-secondary me-1"
-           data-bs-toggle="modal"
-           data-bs-target="#flightModal"
-           data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
-          Edit
-        </a>
-        <form method="post"
-              action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
-              style="display:inline;"
-              onsubmit="return confirm('Are you sure you want to delete this flight?');">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-            <i class="bi bi-trash"></i>
-          </button>
-        </form>
+          <form method="post" class="action-form" onsubmit="return confirmFinalize();">
+            {% csrf_token %}
+            <button type="submit" name="finalize" class="action-card action-card-danger">
+              <div class="action-icon">
+                <i class="bi bi-lock"></i>
+              </div>
+              <div class="action-content">
+                <h6 class="action-title">Finalize Logsheet</h6>
+                <p class="action-description">Lock and complete</p>
+              </div>
+            </button>
+          </form>
+
+          <script>
+            function confirmFinalize() {
+              return confirm("⚠️ Finalizing this logsheet will lock it and prevent further edits.\nAre you absolutely sure?");
+            }
+          </script>
         {% endif %}
-      </td>
 
-    </tr>
-    {# Insert Launch them now row for pending flights #}
-    {% if not flight.launch_time and not flight.landing_time %}
-    <tr>
-      <td colspan="9" class="text-center">
-        <button class="btn btn-success btn-lg rounded-pill launch-now-btn" data-flight-id="{{ flight.pk }}">
-          🛫 Launch
-          {% if flight.pilot or flight.instructor or flight.passenger %}
-            {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
-            {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
-            {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
-          {% else %}
-            them
-          {% endif %}
-          now
-        </button>
-      </td>
-    </tr>
-    {% endif %}
-
-    {# Insert Landing now row for flying flights #}
-    {% if flight.launch_time and not flight.landing_time %}
-    <tr>
-      <td colspan="9" class="text-center">
-        <button class="btn btn-success btn-lg rounded-pill landing-now-btn" data-flight-id="{{ flight.pk }}">
-          🛬 Record Landing for
-          {% if flight.pilot or flight.instructor or flight.passenger %}
-            {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
-            {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
-            {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
-          {% else %}
-            them
-          {% endif %}
-        </button>
-      </td>
-    </tr>
-    {% endif %}
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="9" class="text-center">No flights found.</td>
-    </tr>
-    {% endfor %}
-
-  </tbody>
-  </table>
+        {% if logsheet.finalized and user.is_superuser %}
+          <form method="post" class="action-form">
+            {% csrf_token %}
+            <button type="submit" name="revise" class="action-card action-card-warning">
+              <div class="action-icon">
+                <i class="bi bi-unlock"></i>
+              </div>
+              <div class="action-content">
+                <h6 class="action-title">Revise Logsheet</h6>
+                <p class="action-description">Unlock for changes</p>
+              </div>
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 </div>
 
-  <script>
-  // Handle "Launch them now" and "Landing now" button clicks
-  document.addEventListener("click", function(e) {
-    if (e.target && e.target.classList.contains("launch-now-btn")) {
-      e.preventDefault();
-      const btn = e.target;
-      const flightId = btn.getAttribute("data-flight-id");
-      // Get user's local time in HH:MM (24h)
-      const now = new Date();
-      const hh = now.getHours().toString().padStart(2, '0');
-      const mm = now.getMinutes().toString().padStart(2, '0');
-      const launchTime = `${hh}:${mm}`;
-      // POST to a new endpoint to set launch_time
-      fetch(`/logsheet/flight/${flightId}/launch_now/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        body: JSON.stringify({ launch_time: launchTime })
-      })
-      .then(resp => resp.json())
-      .then(data => {
-        if (data.success) {
-          location.reload();
-        } else {
-          alert(data.error || "Could not launch flight.");
-        }
-      })
-      .catch(() => alert("Could not launch flight. Please try again."));
-    }
-    if (e.target && e.target.classList.contains("landing-now-btn")) {
-      e.preventDefault();
-      const btn = e.target;
-      const flightId = btn.getAttribute("data-flight-id");
-      // Get user's local time in HH:MM (24h)
-      const now = new Date();
-      const hh = now.getHours().toString().padStart(2, '0');
-      const mm = now.getMinutes().toString().padStart(2, '0');
-      const landingTime = `${hh}:${mm}`;
-      // POST to a new endpoint to set landing_time
-      fetch(`/logsheet/flight/${flightId}/landing_now/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        body: JSON.stringify({ landing_time: landingTime })
-      })
-      .then(resp => resp.json())
-      .then(data => {
-        if (data.success) {
-          location.reload();
-        } else {
-          alert(data.error || "Could not mark landing.");
-        }
-      })
-      .catch(() => alert("Could not mark landing. Please try again."));
-    }
-  });
-  </script>
 
-{% if logsheet.flights.exists %}
-  <div class="mt-2 mb-4">
-    <strong>{{ flight_total }} flights total</strong>,
-    <span class="text-success">{{ flight_landed }} landed</span>,
-    <span class="text-primary">{{ flight_flying }} flying</span>,
-    <span class="text-warning">{{ flight_pending }} pending</span>
-  </div>
-{% endif %}
+<!-- Flights Section -->
+<div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">
+  <div class="flights-header">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-airplane text-primary" style="font-size: 1.5rem;"></i>
+      <div>
+        <h2 class="mb-1">Flight Operations</h2>
+        <p class="text-muted mb-0">Manage today's flights</p>
+      </div>
+    </div>
 
-{% else %}
-  <p>No flights recorded yet for this logsheet.</p>
-{% endif %}
-<form method="get" class="row mb-3">
-  <div class="col-md-4">
-    <input type="text" name="q" class="form-control" placeholder="Search by pilot or instructor" value="{{ query }}">
+    {% if not logsheet.finalized %}
+      <div class="d-flex gap-2">
+        <a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
+           class="btn btn-primary"
+           data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
+           data-bs-toggle="modal"
+           data-bs-target="#flightModal"
+           data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
+          <i class="bi bi-plus-circle me-2"></i>
+          Add Flight
+        </a>
+
+        {% if visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
+          <button type="button"
+                  class="btn btn-outline-success"
+                  data-bs-toggle="modal"
+                  data-bs-target="#visitingPilotModal">
+            <i class="bi bi-person-plus me-2"></i>
+            Register Visiting Pilot
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
-  <div class="col-md-2">
-    <button type="submit" class="btn btn-outline-primary">Filter</button>
-  </div>
-</form>
+
+  {% if logsheet.flights.exists %}
+    <!-- Modern Bootstrap5 Flights Table -->
+    <div class="flights-table-container">
+      <div class="table-responsive">
+        <table class="table flights-table align-middle" data-sort>
+          <thead>
+            <tr>
+              <th class="status-col" data-sort-method="status">Status</th>
+              <th class="time-col" data-sort-method="time">Time</th>
+              <th class="pilot-col" data-sort-method="string">Pilot</th>
+              <th class="instructor-col d-none d-md-table-cell" data-sort-method="string">Instructor</th>
+              <th class="glider-col" data-sort-method="string">Glider</th>
+              <th class="towplane-col d-none d-lg-table-cell" data-sort-method="string">Towplane</th>
+              <th class="altitude-col d-none d-lg-table-cell" data-sort-method="number">Release Alt</th>
+              <th class="duration-col d-none d-sm-table-cell" data-sort-method="duration">Duration</th>
+              <th class="actions-col no-sort">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for flight in flights %}
+              <tr class="flight-row">
+                <td class="status-col" data-sort="{% if flight.launch_time and flight.landing_time %}3{% elif flight.launch_time %}2{% else %}1{% endif %}">
+                  {% if flight.launch_time and flight.landing_time %}
+                    <span class="flight-badge flight-badge-landed">
+                      <i class="bi bi-check-circle-fill me-1"></i>
+                      Landed
+                    </span>
+                  {% elif flight.launch_time %}
+                    <span class="flight-badge flight-badge-flying">
+                      <i class="bi bi-airplane-fill me-1"></i>
+                      Flying
+                    </span>
+                  {% else %}
+                    <span class="flight-badge flight-badge-pending">
+                      <i class="bi bi-clock-fill me-1"></i>
+                      Pending
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td class="time-col" data-sort="{% if flight.launch_time %}{{ flight.launch_time|time:"Hi" }}{% else %}0000{% endif %}">
+                  <div class="time-display">
+                    {% if flight.launch_time %}
+                      <span class="launch-time">{{ flight.launch_time|time:"H:i" }}</span>
+                    {% else %}
+                      <span class="launch-time text-muted">--:--</span>
+                    {% endif %}
+                    <span class="time-separator">—</span>
+                    {% if flight.landing_time %}
+                      <span class="landing-time">{{ flight.landing_time|time:"H:i" }}</span>
+                    {% else %}
+                      <span class="landing-time text-muted">--:--</span>
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td class="pilot-col" data-sort="{{ flight.pilot|full_display_name }}">
+                  <div class="pilot-info">
+                    <strong>{{ flight.pilot|full_display_name }}</strong>
+                    <!-- Mobile-only instructor display -->
+                    <div class="d-md-none">
+                      {% if flight.instructor %}
+                        <small class="text-muted">
+                          <i class="bi bi-mortarboard-fill me-1"></i>
+                          {{ flight.instructor|full_display_name }}
+                        </small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+
+                <td class="instructor-col d-none d-md-table-cell" data-sort="{% if flight.instructor %}{{ flight.instructor|full_display_name }}{% else %}{% endif %}">
+                  {% if flight.instructor %}
+                    <span class="instructor-name">
+                      <i class="bi bi-mortarboard-fill text-success me-1"></i>
+                      {{ flight.instructor|full_display_name }}
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td class="glider-col" data-sort="{{ flight.glider }}">
+                  <div class="glider-info">
+                    <strong>{{ flight.glider }}</strong>
+                    <!-- Mobile-only additional info -->
+                    <div class="d-lg-none">
+                      {% if flight.towplane %}
+                        <small class="text-muted d-block">
+                          <i class="bi bi-airplane-engines me-1"></i>
+                          {{ flight.towplane }}
+                        </small>
+                      {% endif %}
+                      {% if flight.release_altitude %}
+                        <small class="text-muted d-block">
+                          <i class="bi bi-arrow-up me-1"></i>
+                          {{ flight.release_altitude }}ft
+                        </small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+
+                <td class="towplane-col d-none d-lg-table-cell" data-sort="{% if flight.towplane %}{{ flight.towplane }}{% else %}{% endif %}">
+                  {% if flight.towplane %}
+                    <span class="towplane-name">
+                      <i class="bi bi-airplane-engines text-warning me-1"></i>
+                      {{ flight.towplane }}
+                    </span>
+                  {% elif flight.is_incomplete %}
+                    <span class="missing-data-badge" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
+                      <i class="bi bi-exclamation-triangle text-warning"></i>
+                      Missing data
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td class="altitude-col d-none d-lg-table-cell" data-sort="{% if flight.release_altitude %}{{ flight.release_altitude }}{% else %}0{% endif %}">
+                  {% if flight.release_altitude %}
+                    <span class="altitude-value">
+                      <i class="bi bi-arrow-up text-info me-1"></i>
+                      {{ flight.release_altitude }} ft
+                    </span>
+                  {% elif flight.is_incomplete %}
+                    <span class="missing-data-badge" title="Missing: {{ flight.get_missing_fields|join:', ' }}">
+                      <i class="bi bi-exclamation-triangle text-warning"></i>
+                      Missing
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td class="duration-col d-none d-sm-table-cell" data-sort="{% if flight.duration %}{{ flight.duration|time:'Hi' }}{% elif flight.launch_time and not flight.landing_time %}9999{% else %}0{% endif %}">
+                  {% if not flight.landing_time and flight.launch_time %}
+                    <span class="live-duration" data-launch="{{ logsheet.log_date|date:'Y-m-d' }}T{{ flight.launch_time|time:'H:i:s' }}">
+                      <i class="bi bi-stopwatch text-primary me-1"></i>
+                      <span class="duration-text">--:--</span>
+                    </span>
+                  {% elif flight.duration %}
+                    <span class="flight-duration">
+                      <i class="bi bi-stopwatch text-muted me-1"></i>
+                      {{ flight.duration }}
+                    </span>
+                  {% else %}
+                    <span class="flight-duration text-muted">
+                      <i class="bi bi-stopwatch me-1"></i>
+                      --:--
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td class="actions-col" data-sort="">
+                  <div class="action-buttons">
+                    <a href="{% url 'logsheet:flight_view' flight.id %}" class="btn btn-outline-secondary btn-sm">
+                      <i class="bi bi-eye"></i>
+                      <span class="d-none d-md-inline ms-1">View</span>
+                    </a>
+
+                    {% if not logsheet.finalized %}
+                      <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
+                         class="btn btn-outline-primary btn-sm"
+                         data-bs-toggle="modal"
+                         data-bs-target="#flightModal"
+                         data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
+                        <i class="bi bi-pencil"></i>
+                        <span class="d-none d-md-inline ms-1">Edit</span>
+                      </a>
+
+                      <button type="button"
+                              class="btn btn-outline-success btn-sm copy-flight-btn"
+                              data-flight-id="{{ flight.pk }}"
+                              data-pilot="{{ flight.pilot.pk }}"
+                              data-pilot-name="{{ flight.pilot|full_display_name }}"
+                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name }}"{% endif %}
+                              data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
+                              data-glider-name="{{ flight.glider }}"
+                              {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
+                              title="Copy flight details">
+                        <i class="bi bi-copy"></i>
+                        <span class="d-none d-md-inline ms-1">Copy</span>
+                      </button>
+
+                      <form method="post"
+                            action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
+                            class="d-inline"
+                            onsubmit="return confirm('Are you sure you want to delete this flight?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Launch Action Row for Pending Flights -->
+              {% if not flight.launch_time and not flight.landing_time %}
+                <tr class="action-row launch-action-row">
+                  <td colspan="9" class="text-center py-2">
+                    <button class="btn btn-success btn-sm launch-now-btn" data-flight-id="{{ flight.pk }}">
+                      <i class="bi bi-rocket-takeoff me-2"></i>
+                      Launch
+                      {% if flight.pilot or flight.instructor or flight.passenger %}
+                        {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
+                        {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
+                        {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
+                      {% else %}
+                        Flight
+                      {% endif %}
+                      Now
+                    </button>
+                  </td>
+                </tr>
+              {% endif %}
+
+              <!-- Landing Action Row for Flying Flights -->
+              {% if flight.launch_time and not flight.landing_time %}
+                <tr class="action-row landing-action-row">
+                  <td colspan="9" class="text-center py-2">
+                    <button class="btn btn-warning btn-sm landing-now-btn" data-flight-id="{{ flight.pk }}">
+                      <i class="bi bi-arrow-down-circle me-2"></i>
+                      Record Landing for
+                      {% if flight.pilot or flight.instructor or flight.passenger %}
+                        {% if flight.pilot %}{{ flight.pilot.get_full_name|default:flight.pilot }}{% endif %}
+                        {% if flight.instructor %}{% if flight.pilot %} and {% endif %}{{ flight.instructor.get_full_name|default:flight.instructor }}{% endif %}
+                        {% if flight.passenger %}{% if flight.pilot or flight.instructor %} and {% endif %}{{ flight.passenger.get_full_name|default:flight.passenger }}{% endif %}
+                      {% else %}
+                        Flight
+                      {% endif %}
+                    </button>
+                  </td>
+                </tr>
+              {% endif %}
+            {% empty %}
+              <tr>
+                <td colspan="9" class="text-center py-4">
+                  <div class="empty-state">
+                    <i class="bi bi-airplane" style="font-size: 2rem; color: var(--bs-gray-400);"></i>
+                    <div class="mt-2 text-muted">No flights recorded</div>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Flight Summary Stats -->
+    {% if logsheet.flights.exists %}
+      <div class="flight-summary">
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="bi bi-list-ol text-primary"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">{{ flight_total }}</div>
+              <div class="summary-label">Total Flights</div>
+            </div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="bi bi-check-circle text-success"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">{{ flight_landed }}</div>
+              <div class="summary-label">Landed</div>
+            </div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="bi bi-airplane text-primary"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">{{ flight_flying }}</div>
+              <div class="summary-label">Flying</div>
+            </div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="bi bi-clock text-warning"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">{{ flight_pending }}</div>
+              <div class="summary-label">Pending</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search and Filter -->
+      <div class="flight-search">
+        <form method="get" class="search-form">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input type="text"
+                   name="q"
+                   class="form-control"
+                   placeholder="Search by pilot or instructor name..."
+                   value="{{ query }}"
+                   aria-label="Search flights">
+            <button type="submit" class="btn btn-outline-primary">
+              Filter
+            </button>
+            {% if query %}
+              <a href="?" class="btn btn-outline-secondary">
+                <i class="bi bi-x"></i>
+                Clear
+              </a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-airplane" style="font-size: 4rem; color: var(--bs-gray-300);"></i>
+      <h4 class="mt-3 text-muted">No flights recorded yet</h4>
+      <p class="text-muted mb-4">Start by adding the first flight for this logsheet.</p>
+      {% if not logsheet.finalized %}
+        <a href="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}"
+           class="btn btn-primary btn-lg"
+           data-tow-pilot-ids="{{ logsheet.tow_pilot.pk }},{{ logsheet.surge_tow_pilot.pk }}"
+           data-bs-toggle="modal"
+           data-bs-target="#flightModal"
+           data-url="{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}">
+          <i class="bi bi-plus-circle me-2"></i>
+          Add First Flight
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<script>
+// Handle "Launch them now" and "Landing now" button clicks
+document.addEventListener("click", function(e) {
+  if (e.target && e.target.classList.contains("launch-now-btn")) {
+    e.preventDefault();
+    const btn = e.target;
+    const flightId = btn.getAttribute("data-flight-id");
+    // Get user's local time in HH:MM (24h)
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    const launchTime = `${hh}:${mm}`;
+    // POST to a new endpoint to set launch_time
+    fetch(`/logsheet/flight/${flightId}/launch_now/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify({ launch_time: launchTime })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || "Could not launch flight.");
+      }
+    })
+    .catch(() => alert("Could not launch flight. Please try again."));
+  }
+  if (e.target && e.target.classList.contains("landing-now-btn")) {
+    e.preventDefault();
+    const btn = e.target;
+    const flightId = btn.getAttribute("data-flight-id");
+    // Get user's local time in HH:MM (24h)
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    const landingTime = `${hh}:${mm}`;
+    // POST to a new endpoint to set landing_time
+    fetch(`/logsheet/flight/${flightId}/landing_now/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify({ landing_time: landingTime })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || "Could not mark landing.");
+      }
+    })
+    .catch(() => alert("Could not mark landing. Please try again."));
+  }
+
+  // Handle copy flight button clicks
+  if (e.target && (e.target.classList.contains("copy-flight-btn") || e.target.closest(".copy-flight-btn"))) {
+    e.preventDefault();
+    const btn = e.target.classList.contains("copy-flight-btn") ? e.target : e.target.closest(".copy-flight-btn");
+
+    // Extract flight data from data attributes
+    const flightData = {
+      pilot: btn.getAttribute("data-pilot"),
+      pilot_name: btn.getAttribute("data-pilot-name"),
+      instructor: btn.getAttribute("data-instructor"),
+      instructor_name: btn.getAttribute("data-instructor-name"),
+      glider: btn.getAttribute("data-glider"),
+      glider_name: btn.getAttribute("data-glider-name"),
+      release_altitude: btn.getAttribute("data-release-altitude")
+    };
+
+    // Open the add flight modal with pre-filled data (no confirmation needed)
+    const addFlightUrl = "{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}";
+
+    // Fetch the add flight form
+    fetch(addFlightUrl)
+      .then(response => response.text())
+      .then(html => {
+        // Load the form into the modal
+        document.getElementById('flightModalContent').innerHTML = html;
+
+        // Add visual indication that this is a cloned flight
+        const modalElement = document.getElementById('flightModal');
+        modalElement.classList.add('cloned-flight-modal');
+
+        // Add a header notice for cloned flight
+        const modalContent = document.getElementById('flightModalContent');
+        const existingHeader = modalContent.querySelector('.modal-header');
+        if (existingHeader) {
+          const cloneNotice = document.createElement('div');
+          cloneNotice.className = 'alert alert-success clone-notice mb-0';
+          cloneNotice.innerHTML = `
+            <i class="bi bi-copy me-2"></i>
+            <strong>Cloned Flight:</strong> Pre-filled from ${flightData.pilot_name}${flightData.instructor_name ? ` & ${flightData.instructor_name}` : ''} in ${flightData.glider_name}
+          `;
+          existingHeader.insertAdjacentElement('afterend', cloneNotice);
+        }
+
+        // Pre-fill the form with copied data
+        setTimeout(() => { // Small delay to ensure form is rendered
+          const form = document.querySelector('#flightModalContent form');
+          if (form) {
+            // Set pilot
+            const pilotSelect = form.querySelector('select[name="pilot"]');
+            if (pilotSelect && flightData.pilot) {
+              pilotSelect.value = flightData.pilot;
+            }
+
+            // Set instructor
+            const instructorSelect = form.querySelector('select[name="instructor"]');
+            if (instructorSelect && flightData.instructor) {
+              instructorSelect.value = flightData.instructor;
+            }
+
+            // Set glider
+            const gliderSelect = form.querySelector('select[name="glider"]');
+            if (gliderSelect && flightData.glider) {
+              gliderSelect.value = flightData.glider;
+            }
+
+            // Set release altitude
+            const altitudeInput = form.querySelector('input[name="release_altitude"]');
+            if (altitudeInput && flightData.release_altitude) {
+              altitudeInput.value = flightData.release_altitude;
+            }
+
+            // Clear time fields (they should be empty by default, but just to be sure)
+            const launchTimeInput = form.querySelector('input[name="launch_time"]');
+            if (launchTimeInput) launchTimeInput.value = '';
+
+            const landingTimeInput = form.querySelector('input[name="landing_time"]');
+            if (landingTimeInput) landingTimeInput.value = '';
+          }
+        }, 100);
+
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+        modal.show();
+      })
+      .catch(error => {
+        console.error('Error loading add flight form:', error);
+        alert('Could not load the flight form. Please try again.');
+      });
+  }
+});
+</script>
 
 
 <div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -730,9 +1084,86 @@
   <!-- Tablesort: shared CDN + initializer included in base.html now -->
 
 <script>
+  // Custom tablesort methods
+  if (typeof Tablesort !== 'undefined') {
+    // Custom status sort
+    Tablesort.extend('status', function(item) {
+      return item.search(/data-sort="[123]"/) !== -1;
+    }, function(a, b) {
+      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
+      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
+      return aVal - bVal;
+    });
+
+    // Custom time sort
+    Tablesort.extend('time', function(item) {
+      return item.search(/data-sort="\d{4}"/) !== -1;
+    }, function(a, b) {
+      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
+      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
+      return aVal - bVal;
+    });
+
+    // Custom duration sort
+    Tablesort.extend('duration', function(item) {
+      return item.search(/duration-col/) !== -1;
+    }, function(a, b) {
+      const aVal = parseInt(a.getAttribute('data-sort')) || 0;
+      const bVal = parseInt(b.getAttribute('data-sort')) || 0;
+      return aVal - bVal;
+    });
+
+    // Initialize table sorting
+    document.addEventListener('DOMContentLoaded', function() {
+      const table = document.querySelector('[data-sort]');
+      if (table) {
+        new Tablesort(table);
+      }
+    });
+  }
+
+  // Live duration updates for flying aircraft - re-cache elements each update for dynamic flights
+  function updateLiveDurations() {
+    const now = new Date();
+    // Re-cache elements each time to handle dynamically added flights
+    const liveDurationElements = document.querySelectorAll('.live-duration');
+    liveDurationElements.forEach(el => {
+      const launchTimeStr = el.getAttribute('data-launch');
+      if (launchTimeStr) {
+        const launchTime = new Date(launchTimeStr);
+        const diffMs = now - launchTime;
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const durationText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+        const durationSpan = el.querySelector('.duration-text');
+        if (durationSpan) {
+          durationSpan.textContent = durationText;
+        } else {
+          // Handle cases where duration-text span doesn't exist yet
+          el.innerHTML = `<i class="bi bi-stopwatch text-primary me-1"></i> ${durationText}`;
+        }
+
+        // Update sort data for live durations
+        const cell = el.closest('td');
+        if (cell && hours >= 0 && minutes >= 0) {
+          const sortValue = hours * 100 + minutes + 10000; // Add offset to put live flights at top
+          cell.setAttribute('data-sort', sortValue.toString());
+        }
+      }
+    });
+  }
+
+  // Update durations every 30 seconds (elements are re-cached each time)
+  setInterval(updateLiveDurations, 30000);
+  // Initial update
+  updateLiveDurations();
+
   document.getElementById('flightModal').addEventListener('hidden.bs.modal', function (event) {
     // Clear modal content to force reload next time
     document.getElementById('flightModalContent').innerHTML = '';
+    // Remove cloned flight styling
+    document.getElementById('flightModal').classList.remove('cloned-flight-modal');
   });
 </script>
 

@@ -988,9 +988,15 @@ def manage_logsheet_finances(request, pk):
 
         if partner and split_type:
             if split_type == "even":
-                half = total / 2
-                member_charges[pilot]["total"] += half
-                member_charges[partner]["total"] += half
+                # For 50/50 splits, divide both tow and rental costs equally
+                # IMPORTANT: This logic is duplicated in manage_logsheet_finances.html (JavaScript)
+                # If this calculation changes, update BOTH locations!
+                half_tow = tow / 2
+                half_rental = rental / 2
+                member_charges[pilot]["tow"] += half_tow
+                member_charges[pilot]["rental"] += half_rental
+                member_charges[partner]["tow"] += half_tow
+                member_charges[partner]["rental"] += half_rental
             elif split_type == "tow":
                 member_charges[pilot]["rental"] += rental
                 member_charges[partner]["tow"] += tow

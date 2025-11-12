@@ -1,0 +1,2021 @@
+/* Logsheet Module CSS - Bootstrap5 Enhanced Styling */
+
+/* Logsheet Card Enhancements */
+.logsheet-card {
+    background: linear-gradient(145deg, var(--bs-white) 0%, var(--bs-gray-100) 100%);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.logsheet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-color: var(--bs-primary);
+}
+
+/* Status Badge Styling */
+.status-finalized {
+    background: linear-gradient(135deg, var(--bs-success) 0%, var(--bs-success-dark, #198754) 100%);
+}
+
+.status-open {
+    background: linear-gradient(135deg, var(--bs-warning) 0%, var(--bs-warning-dark, #ffc107) 100%);
+}
+
+/* Search Section Styling */
+.search-section {
+    background: linear-gradient(135deg, var(--bs-gray-50, #f8f9fa) 0%, var(--bs-gray-200, #e9ecef) 100%);
+    padding: 2rem 1rem;
+    margin: 2rem -1rem;
+    border-radius: 15px;
+}
+
+.search-input {
+    border-radius: 25px;
+    padding: 0.75rem 1rem;
+}
+
+/* Filter Section Styling */
+.filter-section {
+    background: var(--bs-white, #fff);
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+}
+
+/* Modern Button Styling */
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+}
+
+/* Logsheet Stats */
+.logsheet-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--bs-gray-600, #6c757d);
+}
+
+.stat-item i {
+    margin-right: 0.5rem;
+    color: var(--bs-primary);
+}
+
+/* Flight Count Styling */
+.flight-count {
+    background: var(--bs-primary);
+    color: white;
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+/* Back to Top Button */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 50px;
+    height: 50px;
+    background: var(--bs-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.back-to-top:hover {
+    background: var(--bs-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .search-section {
+        margin: 1rem -0.5rem;
+        padding: 1.5rem 1rem;
+    }
+
+    .filter-section {
+        margin: 1rem -0.5rem;
+        padding: 1rem;
+    }
+
+    .logsheet-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+/* Empty State Styling */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--bs-gray-600, #6c757d);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: var(--bs-gray-400, #ced4da);
+    margin-bottom: 1rem;
+}
+
+/* Pagination Modern Styling */
+.pagination-modern .page-link {
+    border-radius: 8px;
+    margin: 0 0.25rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--bs-border-color);
+    color: var(--bs-primary);
+    transition: all 0.2s ease;
+}
+
+.pagination-modern .page-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-modern .page-item.active .page-link {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* === LOGSHEET MANAGEMENT INTERFACE === */
+
+/* Management Header */
+.management-header {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
+    color: white !important;
+    padding: 2rem 1rem;
+    margin: -2rem -1rem 2rem -1rem;
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Override Bootstrap text colors within management header */
+.management-header .text-primary,
+.management-header .text-muted,
+.management-header h1,
+.management-header p,
+.management-header i {
+    color: white !important;
+}
+
+.management-header .text-muted {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Management Card */
+.management-card {
+    background: var(--bs-white);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+}
+
+.management-card-header {
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--bs-gray-100);
+    margin-bottom: 2rem;
+}
+
+.logsheet-date-badge {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.logsheet-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    color: var(--bs-gray-600);
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+}
+
+.status-badge-finalized {
+    background: linear-gradient(135deg, var(--bs-success) 0%, var(--bs-success-dark, #198754) 100%);
+    color: white;
+}
+
+.status-active {
+    background: linear-gradient(135deg, var(--bs-warning) 0%, var(--bs-warning-dark, #ffc107) 100%);
+    color: var(--bs-dark);
+}
+
+/* Revision History */
+.revision-summary {
+    color: var(--bs-info);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.revision-list {
+    background: var(--bs-gray-50);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.revision-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--bs-gray-200);
+}
+
+.revision-item:last-child {
+    border-bottom: none;
+}
+
+.revision-date {
+    font-weight: 600;
+    color: var(--bs-primary);
+    font-size: 0.9rem;
+}
+
+.revision-note {
+    color: var(--bs-gray-700);
+    flex: 1;
+}
+
+.revision-author {
+    color: var(--bs-gray-500);
+    font-size: 0.85rem;
+}
+
+/* Management Actions */
+.management-actions {
+    margin-top: 2rem;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.action-card {
+    background: var(--bs-white);
+    border: 2px solid var(--bs-gray-200);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+}
+
+.action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    text-decoration: none;
+    color: inherit;
+}
+
+.action-card-edit {
+    border-color: var(--bs-success);
+}
+
+.action-card-edit:hover {
+    border-color: var(--bs-success);
+    box-shadow: 0 12px 32px rgba(25, 135, 84, 0.15);
+}
+
+.action-card-view {
+    border-color: var(--bs-info);
+}
+
+.action-card-view:hover {
+    border-color: var(--bs-info);
+    box-shadow: 0 12px 32px rgba(13, 202, 240, 0.15);
+}
+
+.action-card-danger {
+    border-color: var(--bs-danger);
+    background: var(--bs-danger);
+    color: white;
+}
+
+.action-card-danger:hover {
+    border-color: var(--bs-danger);
+    background: var(--bs-danger-dark, #dc3545);
+    color: white;
+}
+
+.action-card-warning {
+    border-color: var(--bs-warning);
+    background: var(--bs-warning);
+    color: var(--bs-dark);
+}
+
+.action-card-warning:hover {
+    border-color: var(--bs-warning);
+    background: var(--bs-warning-dark, #ffc107);
+    color: var(--bs-dark);
+}
+
+.action-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    background: var(--bs-gray-100);
+    color: var(--bs-primary);
+    flex-shrink: 0;
+}
+
+.action-card-edit .action-icon {
+    background: var(--bs-success-subtle, #d1e7dd);
+    color: var(--bs-success);
+}
+
+.action-card-view .action-icon {
+    background: var(--bs-info-subtle, #cff4fc);
+    color: var(--bs-info);
+}
+
+.action-card-danger .action-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.action-card-warning .action-icon {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--bs-dark);
+}
+
+.action-content {
+    flex: 1;
+}
+
+.action-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.action-description {
+    margin: 0;
+    color: var(--bs-gray-600);
+    font-size: 0.9rem;
+}
+
+.action-form {
+    display: contents;
+}
+
+.action-form .action-card {
+    border: none;
+    width: 100%;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Flight Cards for Management Interface */
+.flights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.flight-card {
+    background: var(--bs-white);
+    border: 2px solid var(--bs-gray-200);
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.flight-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    border-color: var(--bs-primary);
+}
+
+.flight-card-header {
+    background: linear-gradient(135deg, var(--bs-gray-50) 0%, var(--bs-gray-100) 100%);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--bs-gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flight-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.flight-badge-landed {
+    background: var(--bs-success);
+    color: white;
+}
+
+.flight-badge-flying {
+    background: var(--bs-primary);
+    color: white;
+}
+
+.flight-badge-pending {
+    background: var(--bs-warning);
+    color: var(--bs-dark);
+}
+
+.flight-times {
+    text-align: right;
+}
+
+.time-display {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.time-separator {
+    margin: 0 0.5rem;
+    color: var(--bs-gray-400);
+}
+
+.duration-display {
+    font-size: 0.85rem;
+    color: var(--bs-gray-600);
+}
+
+.flight-card-body {
+    padding: 1.5rem;
+}
+
+.flight-participants,
+.flight-equipment {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.participant,
+.equipment-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.participant-label,
+.equipment-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--bs-gray-600);
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+}
+
+.participant-name,
+.equipment-name {
+    font-weight: 500;
+    color: var(--bs-gray-800);
+}
+
+.missing-data-badge {
+    color: var(--bs-warning);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.flight-card-actions {
+    padding: 1rem 1.5rem;
+    background: var(--bs-gray-50);
+    border-top: 1px solid var(--bs-gray-200);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.flight-quick-action {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.flight-quick-action .btn {
+    border-radius: 25px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+}
+
+/* Management Header Card */
+.logsheet-header-card {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
+    color: white;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.logsheet-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.info-item i {
+    margin-right: 0.75rem;
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+/* Navigation Buttons */
+.nav-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.nav-buttons .btn {
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.nav-buttons .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Management Action Buttons */
+.management-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
+
+.action-btn {
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn i {
+    font-size: 1.1rem;
+}
+
+/* Flights Table Enhancements */
+.flights-section {
+    background: var(--bs-white, #fff);
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-top: 2rem;
+}
+
+.flights-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--bs-gray-200, #e9ecef);
+}
+
+.flights-table {
+    background: var(--bs-white, #fff);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.flights-table th {
+    background: linear-gradient(135deg, var(--bs-gray-100, #f8f9fa) 0%, var(--bs-gray-150, #e9ecef) 100%);
+    border: none;
+    padding: 1rem 0.75rem;
+    font-weight: 600;
+    color: var(--bs-gray-700, #495057);
+    font-size: 0.9rem;
+}
+
+.flights-table td {
+    border: none;
+    padding: 1rem 0.75rem;
+    border-bottom: 1px solid var(--bs-gray-100, #f8f9fa);
+    vertical-align: middle;
+}
+
+.flights-table tbody tr:hover {
+    background: var(--bs-gray-50, #f8f9fa);
+    transform: scale(1.005);
+    transition: all 0.2s ease;
+}
+
+/* Flight Status Badges */
+.flight-status {
+    padding: 0.5rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-landed {
+    background: linear-gradient(135deg, var(--bs-success) 0%, var(--bs-success-dark, #198754) 100%);
+    color: white;
+}
+
+.status-airborne {
+    background: linear-gradient(135deg, var(--bs-warning) 0%, var(--bs-warning-dark, #ffc107) 100%);
+    color: var(--bs-dark, #212529);
+}
+
+.status-planned {
+    background: linear-gradient(135deg, var(--bs-info) 0%, var(--bs-info-dark, #0dcaf0) 100%);
+    color: white;
+}
+
+/* Flight Action Buttons */
+.flight-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.flight-actions .btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.flight-actions .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Quick Action Buttons */
+.quick-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.quick-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.quick-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Revision History Styling */
+.revision-history {
+    background: var(--bs-gray-50, #f8f9fa);
+    border-left: 4px solid var(--bs-info);
+    padding: 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+}
+
+.revision-history summary {
+    font-weight: 600;
+    color: var(--bs-info);
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+
+.revision-history ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.revision-history li {
+    margin-bottom: 0.5rem;
+    color: var(--bs-gray-700, #495057);
+}
+
+/* Responsive Design for Management */
+@media (max-width: 1200px) {
+    .logsheet-info-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .flights-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .management-actions {
+        flex-direction: column;
+    }
+
+    .nav-buttons {
+        flex-direction: column;
+    }
+
+    .flights-section {
+        padding: 1rem;
+    }
+}
+
+/* === CLOSEOUT EDIT FORM STYLING === */
+
+/* Closeout Edit Header */
+.closeout-edit-header {
+    background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+    color: white !important;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-edit-header .text-primary,
+.closeout-edit-header .text-muted {
+    color: white !important;
+}
+
+/* Breadcrumb styling */
+.closeout-breadcrumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.closeout-breadcrumb .breadcrumb {
+    margin-bottom: 0;
+}
+
+.closeout-breadcrumb .breadcrumb-item a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+}
+
+.closeout-breadcrumb .breadcrumb-item a:hover {
+    color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item.active {
+    color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item+.breadcrumb-item::before {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Form styling */
+.closeout-form-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.form-section {
+    padding: 2rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    color: #6610f2;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.form-section h4 i {
+    margin-right: 0.5rem;
+}
+
+/* Table styling for form layout */
+.closeout-form-table {
+    width: 100%;
+}
+
+.closeout-form-table th {
+    width: 200px;
+    text-align: right;
+    padding: 1rem 1rem 1rem 0;
+    vertical-align: top;
+    font-weight: 600;
+    color: #495057;
+}
+
+.closeout-form-table td {
+    padding: 1rem 0;
+    vertical-align: top;
+}
+
+/* Enhanced form controls */
+.form-control,
+.form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #6610f2;
+    box-shadow: 0 0 0 0.2rem rgba(102, 16, 242, 0.25);
+}
+
+/* Maintenance issues styling */
+.maintenance-table {
+    background: #f8f4ff;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.maintenance-item-edit {
+    background: white;
+    border: 1px solid #e9ecef;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+}
+
+/* Towplane form cards */
+.towplane-form-card {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: white;
+}
+
+.towplane-form-card .card-header {
+    background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.towplane-form-card .card-header h5 {
+    color: white !important;
+    margin: 0;
+}
+
+.towplane-form-card .card-body {
+    padding: 1.5rem;
+}
+
+/* Form labels styling */
+.form-section label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Action buttons */
+.action-buttons {
+    background: #f8f9fa;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-1px);
+}
+
+/* Maintenance Modal Styling */
+.maintenance-modal .modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.maintenance-modal-header {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+    padding: 1.5rem 2rem;
+    border-bottom: none;
+}
+
+.maintenance-modal-header .modal-title {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.maintenance-modal-body {
+    padding: 2rem;
+    background: #f8f9fa;
+}
+
+.maintenance-modal-footer {
+    background: white;
+    border-top: 1px solid #e9ecef;
+    border-radius: 0 0 12px 12px;
+    padding: 1.5rem 2rem;
+}
+
+.aircraft-selection-group {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 100%;
+}
+
+.issue-description-group {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 100%;
+}
+
+.maintenance-modal .form-select-lg {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.maintenance-modal .form-select-lg:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .form-control {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.maintenance-modal .form-control:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .form-check-input-lg {
+    width: 2rem;
+    height: 1rem;
+    margin-right: 0.75rem;
+}
+
+.maintenance-modal .form-check-input:checked {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.maintenance-modal .form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .alert-warning {
+    border: none;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left: 4px solid #ffc107;
+}
+
+.maintenance-modal .btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    border: none;
+    box-shadow: 0 4px 6px rgba(220, 53, 69, 0.3);
+    transition: all 0.2s ease;
+}
+
+.maintenance-modal .btn-danger:hover {
+    background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4);
+}
+
+/* === LOGSHEET MANAGEMENT PAGE STYLING === */
+
+/* Management Header */
+.management-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%) !important;
+    color: white !important;
+    padding: 2rem 1rem !important;
+    margin: -2rem -1rem 2rem -1rem !important;
+    border-radius: 0 0 20px 20px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+.management-header * {
+    color: white !important;
+}
+
+.management-header .text-primary,
+.management-header .text-muted {
+    color: white !important;
+}
+
+/* Modern Bootstrap5 Flight Table Styles */
+.flights-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    margin-top: 2rem;
+}
+
+.flights-table {
+    margin-bottom: 0 !important;
+    font-size: 0.9rem;
+}
+
+.flights-table thead th {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%) !important;
+    color: white !important;
+    font-weight: 600;
+    border: none !important;
+    padding: 1rem 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.flights-table tbody tr {
+    border-bottom: 1px solid #e9ecef !important;
+    transition: background-color 0.2s ease;
+}
+
+.flights-table tbody tr:nth-child(odd) {
+    background-color: #ffffff !important;
+}
+
+.flights-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+
+/* More specific selectors for td elements */
+.flights-table tbody tr:nth-child(odd) td {
+    background-color: #ffffff !important;
+}
+
+.flights-table tbody tr:nth-child(even) td {
+    background-color: #f8f9fa !important;
+}
+
+.flights-table tbody tr:hover {
+    background-color: #e3f2fd !important;
+}
+
+.flights-table tbody td {
+    padding: 0.75rem !important;
+    vertical-align: middle !important;
+    border-top: none !important;
+}
+
+/* Column-specific styling */
+.status-col {
+    width: 120px;
+}
+
+.time-col {
+    width: 140px;
+}
+
+.pilot-col {
+    min-width: 160px;
+}
+
+.instructor-col {
+    min-width: 160px;
+}
+
+.glider-col {
+    min-width: 120px;
+}
+
+.towplane-col {
+    min-width: 140px;
+}
+
+.altitude-col {
+    width: 120px;
+}
+
+.duration-col {
+    width: 100px;
+}
+
+.actions-col {
+    width: 180px;
+}
+
+/* Flight badges */
+.flight-badge {
+    display: inline-flex !important;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.flight-badge-pending {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+    border: 1px solid #ffeaa7;
+}
+
+.flight-badge-flying {
+    background-color: #d1ecf1 !important;
+    color: #0c5460 !important;
+    border: 1px solid #bee5eb;
+}
+
+.flight-badge-landed {
+    background-color: #d4edda !important;
+    color: #155724 !important;
+    border: 1px solid #c3e6cb;
+}
+
+/* Time display */
+.time-display {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem;
+}
+
+.time-separator {
+    color: #6c757d;
+    margin: 0 0.25rem;
+}
+
+/* Live duration */
+.live-duration {
+    color: #0d6efd !important;
+    font-weight: 600;
+}
+
+.live-duration .duration-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+/* Action buttons */
+.action-buttons {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.action-buttons .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Action rows for launch/landing buttons */
+.action-row {
+    background-color: #f8f9fa !important;
+    border-left: 3px solid #007bff;
+}
+
+.launch-action-row {
+    border-left-color: #28a745 !important;
+}
+
+.landing-action-row {
+    border-left-color: #ffc107 !important;
+}
+
+.action-row td {
+    padding: 0.5rem !important;
+}
+
+.launch-now-btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.launch-now-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+    color: white !important;
+}
+
+.landing-now-btn {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+    border: none !important;
+    color: #212529 !important;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.landing-now-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+    color: #212529 !important;
+}
+
+/* Missing data indicators */
+.missing-data-badge {
+    color: #dc3545 !important;
+    font-size: 0.8rem;
+}
+
+/* Empty state */
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+}
+
+/* Sortable table styles */
+.flights-table thead th[data-sort-method] {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+.flights-table thead th[data-sort-method]:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%) !important;
+}
+
+.flights-table thead th[data-sort-method]:after {
+    content: '\2195';
+    /* up-down arrow */
+    position: absolute;
+    right: 0.5rem;
+    opacity: 0.5;
+    font-size: 0.8rem;
+}
+
+.flights-table thead th[data-sort-method].sort-up:after {
+    content: '\2191';
+    /* up arrow */
+    opacity: 1;
+    color: #ffc107;
+}
+
+.flights-table thead th[data-sort-method].sort-down:after {
+    content: '\2193';
+    /* down arrow */
+    opacity: 1;
+    color: #ffc107;
+}
+
+.flights-table thead th.no-sort {
+    cursor: default;
+}
+
+.flights-table thead th.no-sort:after {
+    display: none;
+}
+
+/* Flight Summary Cards */
+.flight-summary {
+    margin: 2rem 0;
+}
+
+.summary-cards {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    min-width: 200px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.summary-icon {
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(13, 110, 253, 0.1);
+}
+
+.summary-content {
+    flex: 1;
+}
+
+.summary-number {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #2c3e50;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+/* Summary card icon colors */
+.summary-card:nth-child(1) .summary-icon {
+    background: rgba(13, 110, 253, 0.1);
+}
+
+.summary-card:nth-child(2) .summary-icon {
+    background: rgba(25, 135, 84, 0.1);
+}
+
+.summary-card:nth-child(3) .summary-icon {
+    background: rgba(13, 110, 253, 0.1);
+}
+
+.summary-card:nth-child(4) .summary-icon {
+    background: rgba(255, 193, 7, 0.1);
+}
+
+/* Management Actions Layout */
+.management-actions {
+    margin: 2rem 0;
+}
+
+.actions-grid {
+    display: flex !important;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.action-card {
+    flex: 1;
+    min-width: 250px;
+}
+
+/* Fix Finalize button text readability */
+.action-card-danger .action-description {
+    color: rgba(255, 255, 255, 0.9) !important;
+    opacity: 1 !important;
+}
+
+/* Copy button styling */
+.copy-flight-btn {
+    transition: all 0.2s ease;
+}
+
+.copy-flight-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+}
+
+/* Cloned flight modal styling */
+.cloned-flight-modal .modal-content {
+    background: linear-gradient(135deg, #f8fff8 0%, #ffffff 100%) !important;
+    border: 2px solid rgba(25, 135, 84, 0.2) !important;
+    box-shadow: 0 8px 25px rgba(25, 135, 84, 0.15) !important;
+    color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-header {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.1) 0%, rgba(25, 135, 84, 0.05) 100%) !important;
+    border-bottom: 1px solid rgba(25, 135, 84, 0.2) !important;
+    color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-title {
+    color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-body {
+    color: #212529 !important;
+}
+
+.cloned-flight-modal .modal-body label {
+    color: #495057 !important;
+}
+
+.cloned-flight-modal .modal-footer {
+    color: #212529 !important;
+}
+
+.clone-notice {
+    border-left: 4px solid #198754 !important;
+    background: rgba(25, 135, 84, 0.1) !important;
+    border-color: rgba(25, 135, 84, 0.3) !important;
+    color: #0f4229 !important;
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem !important;
+}
+
+.clone-notice i {
+    color: #198754 !important;
+}
+
+/* Enhanced Alert Styling for Better Contrast */
+.alert-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.alert-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%) !important;
+    border: none !important;
+    color: #212529 !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.alert .btn-close {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+
+.alert .btn-close:hover {
+    opacity: 1;
+}
+
+/* Responsive adjustments for management page */
+@media (max-width: 768px) {
+    .flights-table {
+        font-size: 0.8rem;
+    }
+
+    .flights-table thead th {
+        padding: 0.5rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .flights-table tbody td {
+        padding: 0.5rem !important;
+    }
+
+    .action-buttons .btn {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    /* Stack summary cards on mobile */
+    .summary-cards {
+        flex-direction: column;
+    }
+
+    .summary-card {
+        min-width: unset;
+        flex: none;
+    }
+
+    /* Stack action buttons on mobile */
+    .actions-grid {
+        flex-direction: column !important;
+    }
+
+    .action-card {
+        min-width: unset;
+        flex: none;
+    }
+}
+
+/* === FINANCIAL MANAGEMENT PAGE STYLING === */
+
+/* Financial Management Header */
+.financial-header {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%) !important;
+    color: white !important;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.financial-header .text-primary,
+.financial-header .text-muted {
+    color: white !important;
+}
+
+/* Breadcrumb styling */
+.financial-breadcrumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.financial-breadcrumb .breadcrumb {
+    margin-bottom: 0;
+}
+
+.financial-breadcrumb .breadcrumb-item a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+}
+
+.financial-breadcrumb .breadcrumb-item a:hover {
+    color: white;
+}
+
+.financial-breadcrumb .breadcrumb-item.active {
+    color: white;
+}
+
+.financial-breadcrumb .breadcrumb-item+.breadcrumb-item::before {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Status indicator */
+.logsheet-status {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.logsheet-status-finalized {
+    background: rgba(220, 53, 69, 0.2) !important;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.logsheet-status-editable {
+    background: rgba(25, 135, 84, 0.2) !important;
+    border: 1px solid rgba(25, 135, 84, 0.3);
+}
+
+/* Modern Finance Tables - matching flight operations style */
+.finance-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.finance-table {
+    margin-bottom: 0 !important;
+    font-size: 0.9rem;
+}
+
+.finance-table thead th {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%) !important;
+    color: white !important;
+    font-weight: 600;
+    border: none !important;
+    padding: 1rem 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+.finance-table thead th:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%) !important;
+}
+
+.finance-table thead th[data-sort-method]:after {
+    content: '\2195';
+    /* up-down arrow */
+    position: absolute;
+    right: 0.5rem;
+    opacity: 0.5;
+    font-size: 0.8rem;
+}
+
+.finance-table thead th[data-sort-method].sort-up:after {
+    content: '\2191';
+    /* up arrow */
+    opacity: 1;
+    color: #ffc107;
+}
+
+.finance-table thead th[data-sort-method].sort-down:after {
+    content: '\2193';
+    /* down arrow */
+    opacity: 1;
+    color: #ffc107;
+}
+
+.finance-table tbody tr {
+    border-bottom: 1px solid #e9ecef !important;
+    transition: background-color 0.2s ease;
+}
+
+.finance-table tbody tr:nth-child(odd) {
+    background-color: #ffffff !important;
+}
+
+.finance-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+
+/* More specific selectors for td elements */
+.finance-table tbody tr:nth-child(odd) td {
+    background-color: #ffffff !important;
+}
+
+.finance-table tbody tr:nth-child(even) td {
+    background-color: #f8f9fa !important;
+}
+
+.finance-table tbody tr:hover {
+    background-color: #e3f2fd !important;
+}
+
+.finance-table tbody td {
+    padding: 0.75rem !important;
+    vertical-align: middle !important;
+    border-top: none !important;
+}
+
+/* Special styling for totals rows */
+.finance-table tfoot tr {
+    background-color: #e8f4f8 !important;
+    font-weight: 600;
+    border-top: 2px solid #198754 !important;
+}
+
+.finance-table tfoot th {
+    background-color: #e8f4f8 !important;
+    color: #2c3e50 !important;
+    font-weight: 700;
+    padding: 1rem 0.75rem !important;
+}
+
+.finance-table tbody tr.total-row {
+    background-color: #f0f8ff !important;
+    font-weight: 600;
+    border-top: 2px solid #007bff !important;
+}
+
+.finance-table tbody tr.total-row:hover {
+    background-color: #e6f3ff !important;
+}
+
+/* Form elements in tables */
+.finance-table .form-select,
+.finance-table .form-control {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+.finance-table .form-select:focus,
+.finance-table .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Payment method styling */
+.payment-update-btn {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.payment-update-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+    color: white !important;
+}
+
+/* === VIEW CLOSEOUT PAGE STYLING === */
+
+/* Closeout Header */
+.closeout-header {
+    background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+    color: white !important;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-header .text-primary,
+.closeout-header .text-muted {
+    color: white !important;
+}
+
+/* Breadcrumb styling */
+.closeout-breadcrumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.closeout-breadcrumb .breadcrumb {
+    margin-bottom: 0;
+}
+
+.closeout-breadcrumb .breadcrumb-item a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+}
+
+.closeout-breadcrumb .breadcrumb-item a:hover {
+    color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item.active {
+    color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item+.breadcrumb-item::before {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Status badges */
+.closeout-status-finalized {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.closeout-status-editable {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+/* Tables */
+.closeout-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.closeout-table {
+    margin-bottom: 0 !important;
+    border-radius: 12px;
+}
+
+.closeout-table thead th {
+    background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+    color: white !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    border: none !important;
+    padding: 1rem 0.75rem !important;
+}
+
+.closeout-table tbody tr {
+    border-bottom: 1px solid #e9ecef !important;
+    transition: background-color 0.2s ease;
+}
+
+.closeout-table tbody tr:nth-child(odd) {
+    background-color: #ffffff !important;
+}
+
+.closeout-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+
+.closeout-table tbody tr:nth-child(odd) td {
+    background-color: #ffffff !important;
+}
+
+.closeout-table tbody tr:nth-child(even) td {
+    background-color: #f8f9fa !important;
+}
+
+.closeout-table tbody tr:hover {
+    background-color: #e3f2fd !important;
+}
+
+.closeout-table tbody td {
+    padding: 0.75rem !important;
+    vertical-align: middle !important;
+    border-top: none !important;
+}
+
+.closeout-table tfoot tr {
+    background-color: #f8f4ff !important;
+    font-weight: 600;
+    border-top: 2px solid #6610f2 !important;
+}
+
+.closeout-table tfoot th {
+    background-color: #f8f4ff !important;
+    color: #2c3e50 !important;
+    font-weight: 700;
+    padding: 1rem 0.75rem !important;
+}
+
+/* Content sections */
+.closeout-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-section h4 {
+    color: #6610f2;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.closeout-section h4 i {
+    margin-right: 0.5rem;
+}
+
+/* Duty crew list styling */
+.duty-crew-list {
+    background: #f8f4ff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 4px solid #6610f2;
+}
+
+.duty-crew-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(102, 16, 242, 0.1);
+}
+
+.duty-crew-list li:last-child {
+    border-bottom: none;
+}
+
+/* Maintenance issues styling */
+.maintenance-item {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.maintenance-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.badge-grounded {
+    background-color: #dc3545 !important;
+}
+
+.badge-resolved {
+    background-color: #28a745 !important;
+}
