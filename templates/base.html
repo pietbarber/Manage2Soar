@@ -10,7 +10,7 @@
   {% comment %}Favicon: use generated one from media if club logo exists, otherwise use static default{% endcomment %}
   {% get_siteconfig as siteconfig %}
   {% if siteconfig.club_logo %}
-    <link rel="icon" type="image/x-icon" href="{{ MEDIA_URL }}favicon.ico">
+    <link rel="icon" type="image/x-icon" href="{{ MEDIA_URL }}favicon.ico?v={{ siteconfig.club_logo.name|slice:'-12:' }}">
   {% else %}
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
   {% endif %}
