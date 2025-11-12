@@ -5,191 +5,7 @@
 {% load static %}
 
 {% block head_extra %}
-<style>
-/* Closeout Header */
-.closeout-header {
-  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
-  color: white !important;
-  padding: 2rem 0;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.closeout-header .text-primary,
-.closeout-header .text-muted {
-  color: white !important;
-}
-
-/* Breadcrumb styling */
-.closeout-breadcrumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  margin-bottom: 1rem;
-}
-
-.closeout-breadcrumb .breadcrumb {
-  margin-bottom: 0;
-}
-
-.closeout-breadcrumb .breadcrumb-item a {
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: none;
-}
-
-.closeout-breadcrumb .breadcrumb-item a:hover {
-  color: white;
-}
-
-.closeout-breadcrumb .breadcrumb-item.active {
-  color: white;
-}
-
-.closeout-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* Status badges */
-.status-finalized {
-  background-color: #dc3545 !important;
-  color: white !important;
-}
-
-.status-editable {
-  background-color: #28a745 !important;
-  color: white !important;
-}
-
-/* Tables */
-.closeout-table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  margin-bottom: 2rem;
-}
-
-.closeout-table {
-  margin-bottom: 0 !important;
-  border-radius: 12px;
-}
-
-.closeout-table thead th {
-  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
-  color: white !important;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
-  border: none !important;
-  padding: 1rem 0.75rem !important;
-}
-
-.closeout-table tbody tr {
-  border-bottom: 1px solid #e9ecef !important;
-  transition: background-color 0.2s ease;
-}
-
-.closeout-table tbody tr:nth-child(odd) {
-  background-color: #ffffff !important;
-}
-
-.closeout-table tbody tr:nth-child(even) {
-  background-color: #f8f9fa !important;
-}
-
-.closeout-table tbody tr:nth-child(odd) td {
-  background-color: #ffffff !important;
-}
-
-.closeout-table tbody tr:nth-child(even) td {
-  background-color: #f8f9fa !important;
-}
-
-.closeout-table tbody tr:hover {
-  background-color: #e3f2fd !important;
-}
-
-.closeout-table tbody td {
-  padding: 0.75rem !important;
-  vertical-align: middle !important;
-  border-top: none !important;
-}
-
-.closeout-table tfoot tr {
-  background-color: #f8f4ff !important;
-  font-weight: 600;
-  border-top: 2px solid #6610f2 !important;
-}
-
-.closeout-table tfoot th {
-  background-color: #f8f4ff !important;
-  color: #2c3e50 !important;
-  font-weight: 700;
-  padding: 1rem 0.75rem !important;
-}
-
-/* Content sections */
-.closeout-section {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.closeout-section h4 {
-  color: #6610f2;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-}
-
-.closeout-section h4 i {
-  margin-right: 0.5rem;
-}
-
-/* Duty crew list styling */
-.duty-crew-list {
-  background: #f8f4ff;
-  border-radius: 8px;
-  padding: 1.5rem;
-  border-left: 4px solid #6610f2;
-}
-
-.duty-crew-list li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(102, 16, 242, 0.1);
-}
-
-.duty-crew-list li:last-child {
-  border-bottom: none;
-}
-
-/* Maintenance issues styling */
-.maintenance-item {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  transition: all 0.2s ease;
-}
-
-.maintenance-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
-
-.badge-grounded {
-  background-color: #dc3545 !important;
-}
-
-.badge-resolved {
-  background-color: #28a745 !important;
-}
-</style>
+<link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -217,7 +33,7 @@
         <p class="mb-0 fs-5">{{ logsheet.log_date|date:"F j, Y" }} • {{ logsheet.airfield }}</p>
       </div>
       <div class="col-md-4 text-md-end">
-        <div class="logsheet-status {% if logsheet.finalized %}status-finalized{% else %}status-editable{% endif %}">
+        <div class="logsheet-status {% if logsheet.finalized %}logsheet-status-finalized{% else %}logsheet-status-editable{% endif %}">
           {% if logsheet.finalized %}
             <i class="bi bi-lock-fill me-1"></i>
             Finalized - View Only
@@ -231,7 +47,7 @@
   </div>
 </div>
 
-<div class="container")
+<div class="container">
 
 {% if closeout %}
   <div class="closeout-section">
