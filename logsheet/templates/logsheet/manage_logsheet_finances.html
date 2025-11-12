@@ -489,6 +489,8 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('view-split-type-display').textContent = splitTypeDisplay;
 
       // Calculate split amounts
+      // IMPORTANT: This logic must match the backend calculation in views.py lines 990-997
+      // If split calculation changes, update BOTH locations!
       var pilotTow = 0, pilotRental = 0, partnerTow = 0, partnerRental = 0;
 
       if (splitType === 'even') {

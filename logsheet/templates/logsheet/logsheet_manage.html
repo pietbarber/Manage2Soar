@@ -1122,15 +1122,11 @@ document.addEventListener("click", function(e) {
     });
   }
 
-  // Live duration updates for flying aircraft - cache elements for performance
-  let liveDurationElements = [];
-
-  function cacheLiveDurationElements() {
-    liveDurationElements = Array.from(document.querySelectorAll('.live-duration'));
-  }
-
+  // Live duration updates for flying aircraft - re-cache elements each update for dynamic flights
   function updateLiveDurations() {
     const now = new Date();
+    // Re-cache elements each time to handle dynamically added flights
+    const liveDurationElements = document.querySelectorAll('.live-duration');
     liveDurationElements.forEach(el => {
       const launchTimeStr = el.getAttribute('data-launch');
       if (launchTimeStr) {
@@ -1158,8 +1154,7 @@ document.addEventListener("click", function(e) {
     });
   }
 
-  // Cache elements on page load and update durations every 30 seconds
-  cacheLiveDurationElements();
+  // Update durations every 30 seconds (elements are re-cached each time)
   setInterval(updateLiveDurations, 30000);
   // Initial update
   updateLiveDurations();
