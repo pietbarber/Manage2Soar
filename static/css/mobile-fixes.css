@@ -223,11 +223,11 @@
     }
 }
 
-/* 
- * Mobile training grid responsive fixes
+/*
+ * Mobile training grid responsive fixes - Issue #254
  * Addresses mobile layout issues where lesson column was too wide and other columns were squished.
- * Uses table-layout: fixed with percentage-based widths for consistent responsive behavior.
- * Aggressive text wrapping ensures long lesson titles fit within constrained column width.
+ * Uses consistent column widths and proper mobile responsive behavior.
+ * Fixed overly wide first columns that caused horizontal scrolling issues.
  */
 @media (max-width: 991px) {
     .training-grid-scroll {
@@ -236,23 +236,22 @@
     }
 
     table.training-grid {
-        table-layout: fixed;
-        width: 100%;
-        min-width: 100%;
+        table-layout: auto;
+        width: auto;
+        min-width: 600px;
     }
 
-    /* Lesson title column: constrained to 25% width with aggressive text wrapping */
+    /* Lesson title column: reasonable fixed width with text wrapping */
     table.training-grid th.sticky-col,
     table.training-grid td.sticky-col {
-        width: 25%;
-        max-width: 25%;
-        min-width: 25%;
+        width: 120px;
+        max-width: 120px;
+        min-width: 100px;
         white-space: normal;
-        word-break: break-all;
-        overflow-wrap: anywhere;
-        hyphens: auto;
+        word-break: break-word;
+        overflow-wrap: break-word;
         font-size: 0.75rem;
-        line-height: 1.1;
+        line-height: 1.2;
         padding: 0.25rem;
         text-align: left;
         vertical-align: top;
@@ -261,31 +260,33 @@
     /* Links within lesson column inherit text wrapping */
     table.training-grid td.sticky-col a {
         white-space: normal;
-        word-break: break-all;
-        overflow-wrap: anywhere;
+        word-break: break-word;
+        overflow-wrap: break-word;
         display: block;
         width: 100%;
         font-size: 0.75rem;
-        line-height: 1.1;
+        line-height: 1.2;
         text-align: left;
     }
 
-    /* Data columns: compact sizing for mobile screens */
+    /* Data columns: consistent compact sizing for mobile screens */
     table.training-grid th:not(.sticky-col):not(.sticky-max),
     table.training-grid td:not(.sticky-col):not(.sticky-max) {
-        width: 45px;
-        max-width: 45px;
+        width: 40px;
+        max-width: 40px;
         min-width: 35px;
         font-size: 0.7rem;
         padding: 0.2rem;
+        text-align: center;
     }
 
-    /* Max score column: fixed narrow width */
+    /* Max score column: consistent with data columns */
     table.training-grid th.sticky-max,
     table.training-grid td.sticky-max {
-        width: 55px;
-        max-width: 55px;
-        min-width: 55px;
+        width: 45px;
+        max-width: 45px;
+        min-width: 40px;
+        text-align: center;
     }
 }
 
