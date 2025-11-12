@@ -60,7 +60,7 @@ th.sticky-max, td.sticky-max {
     </tr>
     <tr>
         {% for meta in column_metadata %}
-          <th class="small text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}">
+          <th class="small text-muted" data-bs-toggle="tooltip" data-bs-placement="top"{% if meta.instructor_name %} title="{{ meta.instructor_name }}{% if meta.days_ago %} — {{ meta.days_ago }} days ago{% endif %}"{% endif %}>
             {% if meta.initials %}
               {{ meta.initials }}<br>
             {% else %}
@@ -75,7 +75,7 @@ th.sticky-max, td.sticky-max {
         {% for meta in column_metadata %}
           <th>
             {% if meta.num_flights > 0 %}
-              <span class="badge bg-secondary text-light fs-6" style="min-width:2em;" title="{{ meta.flights_tooltip }}">{{ meta.num_flights }}</span>
+              <span class="badge bg-secondary text-light fs-6" style="min-width:2em;"{% if meta.flights_tooltip %} title="{{ meta.flights_tooltip }}"{% endif %}>{{ meta.num_flights }}</span>
             {% endif %}
           </th>
         {% endfor %}
