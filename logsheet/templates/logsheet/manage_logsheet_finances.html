@@ -492,11 +492,13 @@ document.addEventListener("DOMContentLoaded", function() {
       var pilotTow = 0, pilotRental = 0, partnerTow = 0, partnerRental = 0;
 
       if (splitType === 'even') {
-        var halfTotal = totalCost / 2;
-        pilotTow = halfTotal;
-        pilotRental = 0;
-        partnerTow = halfTotal;
-        partnerRental = 0;
+        // For 50/50 splits, divide both tow and rental costs equally
+        var halfTow = towCost / 2;
+        var halfRental = rentalCost / 2;
+        pilotTow = halfTow;
+        pilotRental = halfRental;
+        partnerTow = halfTow;
+        partnerRental = halfRental;
       } else if (splitType === 'tow') {
         pilotTow = 0;
         pilotRental = rentalCost;
