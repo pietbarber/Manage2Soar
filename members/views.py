@@ -445,10 +445,10 @@ def tinymce_image_upload(request):
         # Save to 'tinymce/<filename>' in the default storage (GCS or local)
         save_path = os.path.join("tinymce", f.name)
         saved_name = default_storage.save(save_path, ContentFile(f.read()))
-        # Always return the public GCS URL
-        from urllib.parse import urljoin
-
-        url = urljoin(settings.MEDIA_URL, saved_name)
+        # Return the full public URL using default_storage.url() method
+        # The club prefix is embedded in the GCS object path (e.g., 'ssc/media/tinymce/filename.jpg'),
+        # ensuring the returned URL includes the correct club-specific storage location
+        url = default_storage.url(saved_name)
         return JsonResponse({"location": url})
 
     # For any other request method or missing file, return an error
