@@ -1,50 +1,366 @@
 {% extends "base.html" %}
 {% load humanize %}
-<!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
+{% load member_extras %}
+{% load static %}
 
 {% block head_extra %}
 {{ form.media }}
 {{ formset.media }}
+<style>
+/* Closeout Edit Header */
+.closeout-edit-header {
+  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+  color: white !important;
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-edit-header .text-primary,
+.closeout-edit-header .text-muted {
+  color: white !important;
+}
+
+/* Breadcrumb styling */
+.closeout-breadcrumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.closeout-breadcrumb .breadcrumb {
+  margin-bottom: 0;
+}
+
+.closeout-breadcrumb .breadcrumb-item a {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+}
+
+.closeout-breadcrumb .breadcrumb-item a:hover {
+  color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item.active {
+  color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Form styling */
+.closeout-form-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.form-section {
+  padding: 2rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.form-section:last-child {
+  border-bottom: none;
+}
+
+.form-section h4 {
+  color: #6610f2;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.form-section h4 i {
+  margin-right: 0.5rem;
+}
+
+/* Table styling for form layout */
+.closeout-form-table {
+  width: 100%;
+}
+
+.closeout-form-table th {
+  width: 200px;
+  text-align: right;
+  padding: 1rem 1rem 1rem 0;
+  vertical-align: top;
+  font-weight: 600;
+  color: #495057;
+}
+
+.closeout-form-table td {
+  padding: 1rem 0;
+  vertical-align: top;
+}
+
+/* Enhanced form controls */
+.form-control, .form-select {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #6610f2;
+  box-shadow: 0 0 0 0.2rem rgba(102, 16, 242, 0.25);
+}
+
+/* Maintenance issues styling */
+.maintenance-table {
+  background: #f8f4ff;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.maintenance-item-edit {
+  background: white;
+  border: 1px solid #e9ecef;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+}
+
+/* Towplane form cards */
+.towplane-form-card {
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.towplane-form-card .card-header {
+  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.towplane-form-card .card-header h5 {
+  color: white !important;
+  margin: 0;
+}
+
+.towplane-form-card .card-body {
+  padding: 1.5rem;
+}
+
+/* Form labels styling */
+.form-section label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Action buttons */
+.action-buttons {
+  background: #f8f9fa;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  border: none;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-1px);
+}
+
+/* Maintenance Modal Styling */
+.maintenance-modal .modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.maintenance-modal-header {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  padding: 1.5rem 2rem;
+  border-bottom: none;
+}
+
+.maintenance-modal-header .modal-title {
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.maintenance-modal-body {
+  padding: 2rem;
+  background: #f8f9fa;
+}
+
+.maintenance-modal-footer {
+  background: white;
+  border-top: 1px solid #e9ecef;
+  border-radius: 0 0 12px 12px;
+  padding: 1.5rem 2rem;
+}
+
+.aircraft-selection-group {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 100%;
+}
+
+.issue-description-group {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 100%;
+}
+
+.maintenance-modal .form-select-lg {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.maintenance-modal .form-select-lg:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.maintenance-modal .form-control:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .form-check-input-lg {
+  width: 2rem;
+  height: 1rem;
+  margin-right: 0.75rem;
+}
+
+.maintenance-modal .form-check-input:checked {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.maintenance-modal .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.maintenance-modal .alert-warning {
+  border: none;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border-left: 4px solid #ffc107;
+}
+
+.maintenance-modal .btn-danger {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  border: none;
+  box-shadow: 0 4px 6px rgba(220, 53, 69, 0.3);
+  transition: all 0.2s ease;
+}
+
+.maintenance-modal .btn-danger:hover {
+  background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4);
+}
+</style>
 {% endblock %}
 
 {% block content %}
-{% load member_extras %}
-<!-- DEBUG: maintenance_issues = {{ maintenance_issues|length }} -->
+<div class="closeout-edit-header">
+  <div class="container">
+    <div class="closeout-breadcrumb">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href="{% url 'logsheet:manage' pk=logsheet.pk %}">
+              <i class="bi bi-journal-text me-1"></i>Flight Log
+            </a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">Edit Closeout</li>
+        </ol>
+      </nav>
+    </div>
 
-
-<div class="modal-header">
-  <h5 class="modal-title">Logsheet Closeout - {{ logsheet.log_date }} @ {{ logsheet.airfield }}</h5>
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h1 class="mb-2">
+          <i class="bi bi-pencil-square me-3"></i>
+          Edit Closeout
+        </h1>
+        <p class="mb-0 fs-5">{{ logsheet.log_date|date:"F j, Y" }} • {{ logsheet.airfield }}</p>
+      </div>
+    </div>
+  </div>
 </div>
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
+<div class="container">
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle me-2"></i>{{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
-<form method="post" id="closeout-form">
-  <div class="modal-body">
-    {% csrf_token %}
-    {% if form.errors %}
-  <div class="alert alert-danger">
-    <strong>Closeout Form Errors:</strong>
-    <ul>
-      {% for field, errors in form.errors.items %}
-        {% if field == '__all__' %}
-          {% for error in errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        {% else %}
-          <li><strong>{{ field|title }}:</strong> {{ errors|join:", " }}</li>
-        {% endif %}
-      {% endfor %}
-    </ul>
-  </div>
-{% endif %}
+  <div class="closeout-form-container">
+    <form method="post" id="closeout-form">
+      {% csrf_token %}
+
+      {% if form.errors %}
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>Closeout Form Errors:</strong>
+          <ul class="mb-0 mt-2">
+            {% for field, errors in form.errors.items %}
+              {% if field == '__all__' %}
+                {% for error in errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              {% else %}
+                <li><strong>{{ field|title }}:</strong> {{ errors|join:", " }}</li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
 {% if duty_form.errors %}
   <div class="alert alert-danger">
     <strong>Duty Crew Form Errors:</strong>
@@ -85,196 +401,281 @@
     </ul>
   </div>
 {% endif %}
-    {{ form.non_field_errors }}
+      {{ form.non_field_errors }}
 
-    <table class="table table-borderless align-middle text-start">
-      <tbody>
-        <tr>
-          <th scope="row" class="text-end">{{ form.safety_issues.label_tag }}</th>
-          <td class="text-start">{{ form.safety_issues }} {{ form.safety_issues.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ form.equipment_issues.label_tag }}</th>
-          <td class="text-start">{{ form.equipment_issues }} {{ form.equipment_issues.errors }}
+      <div class="form-section">
+        <h4><i class="bi bi-journal-check"></i>Closeout Report</h4>
+        <table class="closeout-form-table">
+          <tbody>
+            <tr>
+              <th scope="row">{{ form.safety_issues.label_tag }}</th>
+              <td>
+                {{ form.safety_issues }}
+                {{ form.safety_issues.errors }}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">{{ form.equipment_issues.label_tag }}</th>
+              <td>
+                {{ form.equipment_issues }}
+                {{ form.equipment_issues.errors }}
 
-        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addIssueModal">
-          ➕ Add Maintenance Issue
-        </button>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addIssueModal">
+                    <i class="bi bi-plus-circle me-1"></i>Add Maintenance Issue
+                  </button>
+                </div>
 
-        {% if maintenance_issues %}
-          <div class="mt-4">
-            <h5 class="mb-3 text-start">🛠️ Maintenance Issues Reported for This Day</h5>
-            <table class="table table-bordered w-100">
-              <tbody>
-                {% for issue in maintenance_issues %}
-                  <tr>
-                    <td>
-                      <div class="text-start">
-                        <strong>
-                          {% if issue.glider %}Glider: {{ issue.glider }}{% elif issue.towplane %}Towplane: {{ issue.towplane }}{% endif %}
-                        </strong>
-                        {% if issue.grounded %}
-                          <span class="badge bg-danger ms-2">Grounded</span>
-                        {% endif %}
-                        <div class="text-muted small mt-1">
-                          Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date }}
-                        </div>
-                        <div class="mt-2">{{ issue.description|linebreaks }}</div>
-                        {% if issue.resolved %}
-                          <div class="mt-2">
-                            <span class="badge bg-success">Resolved</span>
-                            <div class="text-muted small">Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date }}</div>
-                            <div class="mt-1">{{ issue.resolution_notes|linebreaks }}</div>
+                {% if maintenance_issues %}
+                  <div class="maintenance-table mt-4">
+                    <div class="p-3">
+                      <h6 class="mb-3"><i class="bi bi-wrench me-2"></i>Maintenance Issues Reported for This Day</h6>
+                      {% for issue in maintenance_issues %}
+                        <div class="maintenance-item-edit">
+                          <div class="d-flex justify-content-between align-items-start mb-2">
+                            <strong class="text-primary">
+                              {% if issue.glider %}
+                                <i class="bi bi-airplane me-1"></i>Glider: {{ issue.glider }}
+                              {% elif issue.towplane %}
+                                <i class="bi bi-airplane-engines me-1"></i>Towplane: {{ issue.towplane }}
+                              {% endif %}
+                            </strong>
+                            {% if issue.grounded %}
+                              <span class="badge bg-danger">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Grounded
+                              </span>
+                            {% endif %}
+                            {% if issue.resolved %}
+                              <span class="badge bg-success ms-2">
+                                <i class="bi bi-check-circle me-1"></i>Resolved
+                              </span>
+                            {% endif %}
                           </div>
-                        {% endif %}
-                      </div>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+                          <div class="text-muted small mb-2">
+                            <i class="bi bi-person me-1"></i>Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date|date:"M j, Y" }}
+                          </div>
+                          <div class="mb-2">{{ issue.description|linebreaks }}</div>
+                          {% if issue.resolved %}
+                            <div class="bg-light p-2 rounded">
+                              <div class="text-muted small mb-1">
+                                <i class="bi bi-person-check me-1"></i>Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date|date:"M j, Y" }}
+                              </div>
+                              <div>{{ issue.resolution_notes|linebreaks }}</div>
+                            </div>
+                          {% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">{{ form.operations_summary.label_tag }}</th>
+              <td>
+                {{ form.operations_summary }}
+                {{ form.operations_summary.errors }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-section">
+        <h4><i class="bi bi-people-fill"></i>Duty Crew</h4>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="mb-3">
+              {{ duty_form.duty_officer.label_tag }}
+              {{ duty_form.duty_officer }}
+              {{ duty_form.duty_officer.errors }}
+            </div>
+            <div class="mb-3">
+              {{ duty_form.assistant_duty_officer.label_tag }}
+              {{ duty_form.assistant_duty_officer }}
+              {{ duty_form.assistant_duty_officer.errors }}
+            </div>
+            <div class="mb-3">
+              {{ duty_form.duty_instructor.label_tag }}
+              {{ duty_form.duty_instructor }}
+              {{ duty_form.duty_instructor.errors }}
+            </div>
           </div>
-        {% endif %}
+          <div class="col-md-6">
+            <div class="mb-3">
+              {{ duty_form.surge_instructor.label_tag }}
+              {{ duty_form.surge_instructor }}
+              {{ duty_form.surge_instructor.errors }}
+            </div>
+            <div class="mb-3">
+              {{ duty_form.tow_pilot.label_tag }}
+              {{ duty_form.tow_pilot }}
+              {{ duty_form.tow_pilot.errors }}
+            </div>
+            <div class="mb-3">
+              {{ duty_form.surge_tow_pilot.label_tag }}
+              {{ duty_form.surge_tow_pilot }}
+              {{ duty_form.surge_tow_pilot.errors }}
+            </div>
+          </div>
+        </div>
+      </div>
 
-
-        </td>
-        </tr>
-
-
-        <tr>
-          <th scope="row" class="text-end">{{ form.operations_summary.label_tag }}</th>
-          <td class="text-start">{{ form.operations_summary }} {{ form.operations_summary.errors }}</td>
-        </tr>
-
-        <tr><td colspan="2"><hr class="my-3"></td></tr>
-        <tr><th colspan="2">Duty Crew</th></tr>
-
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.duty_officer.label_tag }}</th>
-          <td class="text-start">{{ duty_form.duty_officer }} {{ duty_form.duty_officer.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.assistant_duty_officer.label_tag }}</th>
-          <td class="text-start">{{ duty_form.assistant_duty_officer }} {{ duty_form.assistant_duty_officer.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.duty_instructor.label_tag }}</th>
-          <td class="text-start">{{ duty_form.duty_instructor }} {{ duty_form.duty_instructor.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.surge_instructor.label_tag }}</th>
-          <td class="text-start">{{ duty_form.surge_instructor }} {{ duty_form.surge_instructor.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.tow_pilot.label_tag }}</th>
-          <td class="text-start">{{ duty_form.tow_pilot }} {{ duty_form.tow_pilot.errors }}</td>
-        </tr>
-        <tr>
-          <th scope="row" class="text-end">{{ duty_form.surge_tow_pilot.label_tag }}</th>
-          <td class="text-start">{{ duty_form.surge_tow_pilot }} {{ duty_form.surge_tow_pilot.errors }}</td>
-        </tr>
-
-        {% if formset %}
-          <tr><td colspan="2"><hr class="my-3"></td></tr>
-          <tr><th colspan="2">Towplane Closeout</th></tr>
+      {% if formset %}
+        <div class="form-section">
+          <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>
           {% csrf_token %}
           {{ formset.management_form }}
 
           {% for towform in formset %}
-            {% if towform.non_field_errors %}
-              <tr>
-                <td colspan="2">
-                  <div class="alert alert-danger">
-                    <strong>Towplane Form Errors:</strong>
-                    {{ towform.non_field_errors }}
-                  </div>
-                </td>
-              </tr>
-            {% endif %}
-            <tr>
-              <td colspan="2">
+            <div class="towplane-form-card mb-4">
+              {% if towform.non_field_errors %}
+                <div class="alert alert-danger">
+                  <i class="bi bi-exclamation-triangle me-2"></i>
+                  <strong>Towplane Form Errors:</strong>
+                  {{ towform.non_field_errors }}
+                </div>
+              {% endif %}
+
+              <div class="card-header bg-light">
                 {% for hidden in towform.hidden_fields %}
                   {{ hidden }}
                 {% endfor %}
-                <strong>{{ towform.instance.towplane }}</strong>
-              </td>
-            </tr>
+                <h5 class="mb-0"><i class="bi bi-airplane-engines me-2"></i>{{ towform.instance.towplane }}</h5>
+              </div>
 
-          <tr>
-            <th class="text-end">Towplane</th>
-            <td class="text-start">{{ towform.towplane }} {{ towform.towplane.errors }}</td>
-          </tr>
-          <tr>
-            <th class="text-end">Start Tach</th>
-            <td class="text-start">{{ towform.start_tach }} {{ towform.start_tach.errors }}</td>
-          </tr>
-          <tr>
-            <th class="text-end">End Tach</th>
-            <td class="text-start">{{ towform.end_tach }} {{ towform.end_tach.errors }}</td>
-          </tr>
-          <tr>
-            <th class="text-end">Fuel Added</th>
-            <td class="text-start">{{ towform.fuel_added }} {{ towform.fuel_added.errors }} US gal</td>
-          </tr>
-          <tr>
-            <th class="text-end">Notes</th>
-            <td class="text-start">{{ towform.notes }} {{ towform.notes.errors }}</td>
-          </tr>
-          <tr><td colspan="2"><hr></td></tr>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      {{ towform.towplane.label_tag }}
+                      {{ towform.towplane }}
+                      {{ towform.towplane.errors }}
+                    </div>
+                    <div class="mb-3">
+                      {{ towform.start_tach.label_tag }}
+                      {{ towform.start_tach }}
+                      {{ towform.start_tach.errors }}
+                    </div>
+                    <div class="mb-3">
+                      {{ towform.end_tach.label_tag }}
+                      {{ towform.end_tach }}
+                      {{ towform.end_tach.errors }}
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      {{ towform.fuel_added.label_tag }}
+                      <div class="input-group">
+                        {{ towform.fuel_added }}
+                        <span class="input-group-text">US gal</span>
+                      </div>
+                      {{ towform.fuel_added.errors }}
+                    </div>
+                    <div class="mb-3">
+                      {{ towform.notes.label_tag }}
+                      {{ towform.notes }}
+                      {{ towform.notes.errors }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           {% endfor %}
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
+        </div>
+      {% endif %}
 
-  <div class="modal-footer justify-content-start">
-    <button type="submit" class="btn btn-success me-2">Save Closeout</button>
-    <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">Cancel</a>
+    <div class="action-buttons">
+      <button type="submit" class="btn btn-success me-3">
+        <i class="bi bi-check-circle me-2"></i>Save Closeout
+      </button>
+      <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">
+        <i class="bi bi-x-circle me-2"></i>Cancel
+      </a>
+    </div>
   </div>
 </form>
 
 <!-- Add Maintenance Issue Modal -->
 <div class="modal fade" id="addIssueModal" tabindex="-1" aria-labelledby="addIssueModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content">
+    <div class="modal-content maintenance-modal">
       <form method="post" action="{% url 'logsheet:add_maintenance_issue' logsheet.id %}">
         {% csrf_token %}
-        <div class="modal-header">
-          <h5 class="modal-title" id="addIssueModalLabel">Report New Maintenance Issue</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header maintenance-modal-header">
+          <h5 class="modal-title" id="addIssueModalLabel">
+            <i class="bi bi-wrench me-2"></i>Report New Maintenance Issue
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-          <!-- Fields here -->
-          <div class="mb-3">
-            <label for="glider" class="form-label">Glider</label>
-            <select name="glider" id="glider" class="form-select">
-              <option value="">----------</option>
-              {% for g in gliders %}
-                <option value="{{ g.id }}">{{ g }}</option>
-              {% endfor %}
-            </select>
+        <div class="modal-body maintenance-modal-body">
+          <div class="alert alert-warning mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Important:</strong> Please provide detailed information about the maintenance issue.
+            Check "Ground Aircraft" if the aircraft should not be used until the issue is resolved.
           </div>
-          <div class="mb-3">
-            <label for="towplane" class="form-label">Towplane</label>
-            <select name="towplane" id="towplane" class="form-select">
-              <option value="">----------</option>
-              {% for t in towplanes %}
-                <option value="{{ t.id }}">{{ t }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="grounded" id="grounded">
-            <label class="form-check-label" for="grounded">Ground Aircraft</label>
-          </div>
-          <div class="mb-3">
-            <label for="description" class="form-label">Issue Description</label>
-            <textarea name="description" id="description" rows="5" class="form-control"></textarea>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="aircraft-selection-group">
+                <h6 class="text-muted mb-3">
+                  <i class="bi bi-airplane me-1"></i>Select Aircraft
+                </h6>
+                <div class="mb-4">
+                  <label for="glider" class="form-label">
+                    <i class="bi bi-airplane me-1"></i>Glider
+                  </label>
+                  <select name="glider" id="glider" class="form-select form-select-lg">
+                    <option value="">Select a glider...</option>
+                    {% for g in gliders %}
+                      <option value="{{ g.id }}">{{ g }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="towplane" class="form-label">
+                    <i class="bi bi-airplane-engines me-1"></i>Towplane
+                  </label>
+                  <select name="towplane" id="towplane" class="form-select form-select-lg">
+                    <option value="">Select a towplane...</option>
+                    {% for t in towplanes %}
+                      <option value="{{ t.id }}">{{ t }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input form-check-input-lg" type="checkbox" name="grounded" id="grounded" role="switch">
+                  <label class="form-check-label fw-bold text-danger" for="grounded">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Ground Aircraft
+                  </label>
+                  <div class="form-text">Check this if the aircraft should not be used until the issue is resolved</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="issue-description-group">
+                <h6 class="text-muted mb-3">
+                  <i class="bi bi-chat-text me-1"></i>Issue Details
+                </h6>
+                <div class="mb-3">
+                  <label for="description" class="form-label">
+                    <i class="bi bi-journal-text me-1"></i>Issue Description
+                  </label>
+                  <textarea name="description" id="description" rows="8" class="form-control"
+                    placeholder="Please describe the maintenance issue in detail. Include:&#10;• What was observed&#10;• When it occurred&#10;• Any relevant circumstances&#10;• Potential safety concerns"></textarea>
+                  <div class="form-text">Be as specific as possible to help maintenance crews address the issue quickly</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-danger">Submit Issue</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <div class="modal-footer maintenance-modal-footer">
+          <button type="submit" class="btn btn-danger btn-lg me-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>Submit Maintenance Issue
+          </button>
+          <button type="button" class="btn btn-secondary btn-lg" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-2"></i>Cancel
+          </button>
         </div>
       </form>
     </div>

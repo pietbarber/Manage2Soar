@@ -2,100 +2,369 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% load siteconfig_tags %}
+{% load static %}
+
+{% block head_extra %}
+<style>
+/* Closeout Header */
+.closeout-header {
+  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+  color: white !important;
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-header .text-primary,
+.closeout-header .text-muted {
+  color: white !important;
+}
+
+/* Breadcrumb styling */
+.closeout-breadcrumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.closeout-breadcrumb .breadcrumb {
+  margin-bottom: 0;
+}
+
+.closeout-breadcrumb .breadcrumb-item a {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+}
+
+.closeout-breadcrumb .breadcrumb-item a:hover {
+  color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item.active {
+  color: white;
+}
+
+.closeout-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Status badges */
+.status-finalized {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.status-editable {
+  background-color: #28a745 !important;
+  color: white !important;
+}
+
+/* Tables */
+.closeout-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.closeout-table {
+  margin-bottom: 0 !important;
+  border-radius: 12px;
+}
+
+.closeout-table thead th {
+  background: linear-gradient(135deg, #6610f2 0%, #6f42c1 100%) !important;
+  color: white !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  border: none !important;
+  padding: 1rem 0.75rem !important;
+}
+
+.closeout-table tbody tr {
+  border-bottom: 1px solid #e9ecef !important;
+  transition: background-color 0.2s ease;
+}
+
+.closeout-table tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+.closeout-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa !important;
+}
+
+.closeout-table tbody tr:nth-child(odd) td {
+  background-color: #ffffff !important;
+}
+
+.closeout-table tbody tr:nth-child(even) td {
+  background-color: #f8f9fa !important;
+}
+
+.closeout-table tbody tr:hover {
+  background-color: #e3f2fd !important;
+}
+
+.closeout-table tbody td {
+  padding: 0.75rem !important;
+  vertical-align: middle !important;
+  border-top: none !important;
+}
+
+.closeout-table tfoot tr {
+  background-color: #f8f4ff !important;
+  font-weight: 600;
+  border-top: 2px solid #6610f2 !important;
+}
+
+.closeout-table tfoot th {
+  background-color: #f8f4ff !important;
+  color: #2c3e50 !important;
+  font-weight: 700;
+  padding: 1rem 0.75rem !important;
+}
+
+/* Content sections */
+.closeout-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.closeout-section h4 {
+  color: #6610f2;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.closeout-section h4 i {
+  margin-right: 0.5rem;
+}
+
+/* Duty crew list styling */
+.duty-crew-list {
+  background: #f8f4ff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #6610f2;
+}
+
+.duty-crew-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(102, 16, 242, 0.1);
+}
+
+.duty-crew-list li:last-child {
+  border-bottom: none;
+}
+
+/* Maintenance issues styling */
+.maintenance-item {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.maintenance-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.badge-grounded {
+  background-color: #dc3545 !important;
+}
+
+.badge-resolved {
+  background-color: #28a745 !important;
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<h2>📝 Closeout Summary – {{ logsheet.log_date }}</h2>
-<hr>
+<div class="closeout-header">
+  <div class="container">
+    <div class="closeout-breadcrumb">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href="{% url 'logsheet:manage' pk=logsheet.pk %}">
+              <i class="bi bi-journal-text me-1"></i>Flight Log
+            </a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">Closeout Summary</li>
+        </ol>
+      </nav>
+    </div>
+
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h1 class="mb-2">
+          <i class="bi bi-journal-check me-3"></i>
+          Closeout Summary
+        </h1>
+        <p class="mb-0 fs-5">{{ logsheet.log_date|date:"F j, Y" }} • {{ logsheet.airfield }}</p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <div class="logsheet-status {% if logsheet.finalized %}status-finalized{% else %}status-editable{% endif %}">
+          {% if logsheet.finalized %}
+            <i class="bi bi-lock-fill me-1"></i>
+            Finalized - View Only
+          {% else %}
+            <i class="bi bi-pencil-square me-1"></i>
+            Editable
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container")
 
 {% if closeout %}
-<h4>Safety Issues</h4>
-<div class="mb-4">{{ closeout.safety_issues|safe }}</div>
+  <div class="closeout-section">
+    <h4><i class="bi bi-shield-exclamation"></i>Safety Issues</h4>
+    <div class="content-display">{{ closeout.safety_issues|safe }}</div>
+  </div>
 
-<h4>Equipment Issues</h4>
-<div class="mb-4">{{ closeout.equipment_issues|safe }}</div>
+  <div class="closeout-section">
+    <h4><i class="bi bi-tools"></i>Equipment Issues</h4>
+    <div class="content-display">{{ closeout.equipment_issues|safe }}</div>
+  </div>
 
-<h4>Operations Summary</h4>
-<div class="mb-4">{{ closeout.operations_summary|safe }}</div>
+  <div class="closeout-section">
+    <h4><i class="bi bi-clipboard-data"></i>Operations Summary</h4>
+    <div class="content-display">{{ closeout.operations_summary|safe }}</div>
+  </div>
 
 {% else %}
-<div class="alert alert-info">No closeout report was submitted for this day.</div>
+  <div class="closeout-section">
+    <div class="alert alert-info mb-0">
+      <i class="bi bi-info-circle me-2"></i>
+      No closeout report was submitted for this day.
+    </div>
+  </div>
 {% endif %}
 
 {% get_siteconfig as config %}
-<h3>Duty Crew</h3>
-<ul class="list-unstyled">
-  {% if logsheet.duty_officer %}
-    <li><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ logsheet.duty_officer.full_display_name }}</li>
-  {% endif %}
-  {% if logsheet.assistant_duty_officer %}
-    <li><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ logsheet.assistant_duty_officer.full_display_name }}</li>
-  {% endif %}
-  {% if logsheet.duty_instructor %}
-    <li><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ logsheet.duty_instructor.full_display_name }}</li>
-  {% endif %}
-  {% if logsheet.surge_instructor %}
-    <li><strong>{{ config.surge_instructor_title|default:'Surge Instructor' }}:</strong> {{ logsheet.surge_instructor.full_display_name }}</li>
-  {% endif %}
-  {% if logsheet.tow_pilot %}
-    <li><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong> {{ logsheet.tow_pilot.full_display_name }}</li>
-  {% endif %}
-  {% if logsheet.surge_tow_pilot %}
-    <li><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ logsheet.surge_tow_pilot.full_display_name }}</li>
-  {% endif %}
-</ul>
+<div class="closeout-section">
+  <h4><i class="bi bi-people-fill"></i>Duty Crew</h4>
+  <div class="duty-crew-list">
+    <ul class="list-unstyled mb-0">
+      {% if logsheet.duty_officer %}
+        <li><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ logsheet.duty_officer.full_display_name }}</li>
+      {% endif %}
+      {% if logsheet.assistant_duty_officer %}
+        <li><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ logsheet.assistant_duty_officer.full_display_name }}</li>
+      {% endif %}
+      {% if logsheet.duty_instructor %}
+        <li><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ logsheet.duty_instructor.full_display_name }}</li>
+      {% endif %}
+      {% if logsheet.surge_instructor %}
+        <li><strong>{{ config.surge_instructor_title|default:'Surge Instructor' }}:</strong> {{ logsheet.surge_instructor.full_display_name }}</li>
+      {% endif %}
+      {% if logsheet.tow_pilot %}
+        <li><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong> {{ logsheet.tow_pilot.full_display_name }}</li>
+      {% endif %}
+      {% if logsheet.surge_tow_pilot %}
+        <li><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ logsheet.surge_tow_pilot.full_display_name }}</li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
 
 {% if maintenance_issues %}
-  <hr>
-  <h4 class="mt-4">🛠️ Maintenance Issues Reported</h4>
-  <ul class="list-group mb-4">
+  <div class="closeout-section">
+    <h4><i class="bi bi-wrench"></i>Maintenance Issues Reported</h4>
     {% for issue in maintenance_issues %}
-      <li class="list-group-item">
-        <strong>
-          {% if issue.glider %}Glider: {{ issue.glider }}{% elif issue.towplane %}Towplane: {{ issue.towplane }}{% endif %}
-        </strong>
-        {% if issue.grounded %}
-          <span class="badge bg-danger ms-2">Grounded</span>
-        {% endif %}
-        <div class="text-muted small">Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date }}</div>
-        <div class="mt-2">{{ issue.description|linebreaks }}</div>
+      <div class="maintenance-item">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <strong class="text-primary">
+              {% if issue.glider %}
+                <i class="bi bi-airplane me-1"></i>Glider: {{ issue.glider }}
+              {% elif issue.towplane %}
+                <i class="bi bi-airplane-engines me-1"></i>Towplane: {{ issue.towplane }}
+              {% endif %}
+            </strong>
+            {% if issue.grounded %}
+              <span class="badge badge-grounded ms-2">
+                <i class="bi bi-exclamation-triangle me-1"></i>Grounded
+              </span>
+            {% endif %}
+            {% if issue.resolved %}
+              <span class="badge badge-resolved ms-2">
+                <i class="bi bi-check-circle me-1"></i>Resolved
+              </span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-muted small mb-2">
+          <i class="bi bi-person me-1"></i>Reported by {{ issue.reported_by.full_display_name }} on {{ issue.report_date|date:"M j, Y" }}
+        </div>
+        <div class="mb-2">{{ issue.description|linebreaks }}</div>
         {% if issue.resolved %}
-          <div class="mt-2">
-            <span class="badge bg-success">Resolved</span>
-            <div class="text-muted small">Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date }}</div>
-            <div class="mt-1">{{ issue.resolution_notes|linebreaks }}</div>
+          <div class="bg-light p-2 rounded">
+            <div class="text-muted small mb-1">
+              <i class="bi bi-person-check me-1"></i>Resolved by {{ issue.resolved_by.full_display_name }} on {{ issue.resolved_date|date:"M j, Y" }}
+            </div>
+            <div>{{ issue.resolution_notes|linebreaks }}</div>
           </div>
         {% endif %}
-      </li>
+      </div>
     {% endfor %}
-  </ul>
+  </div>
 {% endif %}
 
 
 {% if towplanes %}
-<h4 class="mt-4">Towplane Summary</h4>
-<table class="table table-bordered w-auto">
-  <thead>
-    <tr>
-      <th>Towplane</th>
-      <th>Start Tach</th>
-      <th>End Tach</th>
-      <th>Fuel Added</th>
-      <th>Notes</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for tow in towplanes %}
-    <tr>
-      <td>{{ tow.towplane }}</td>
-      <td>{{ tow.start_tach }}</td>
-      <td>{{ tow.end_tach }}</td>
-      <td>{{ tow.fuel_added }} gal</td>
-      <td>{{ tow.notes|default:"—"|safe }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <div class="closeout-section">
+    <h4><i class="bi bi-airplane-engines"></i>Towplane Summary</h4>
+    <div class="closeout-table-container">
+      <table class="table closeout-table align-middle">
+        <thead>
+          <tr>
+            <th><i class="bi bi-airplane-engines me-1"></i>Towplane</th>
+            <th><i class="bi bi-speedometer me-1"></i>Start Tach</th>
+            <th><i class="bi bi-speedometer2 me-1"></i>End Tach</th>
+            <th><i class="bi bi-fuel-pump me-1"></i>Fuel Added</th>
+            <th><i class="bi bi-chat-text me-1"></i>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tow in towplanes %}
+          <tr>
+            <td><strong>{{ tow.towplane }}</strong></td>
+            <td>{{ tow.start_tach }}</td>
+            <td>{{ tow.end_tach }}</td>
+            <td>{{ tow.fuel_added }} gal</td>
+            <td>{{ tow.notes|default:"—"|safe }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 {% endif %}
 
-<a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary mt-3">← Back to Logsheet</a>
+  <div class="text-center mt-4">
+    <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary btn-lg">
+      <i class="bi bi-arrow-left me-2"></i>Back to Flight Log
+    </a>
+  </div>
+
+</div> <!-- Close main content container -->
+
 {% endblock %}
