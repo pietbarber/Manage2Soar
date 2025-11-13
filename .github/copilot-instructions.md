@@ -105,6 +105,17 @@
 - **Static files:**
   - **ALWAYS** collect with `python manage.py collectstatic --noinput` after CSS/JS changes.
   - CSS changes are NOT visible until collected - this is the number one cause of "styling not working" issues.
+- **Git commits:**
+  - **CRITICAL**: Always run code formatting tools before `git add` to prevent pre-commit hook failures:
+    ```bash
+    isort .
+    black .
+    git add .
+    git commit -m "Your commit message"
+    ```
+  - **Tool order matters**: Run `isort` first, then `black` - wrong order causes cascading file changes and commit failures.
+  - Pre-commit hooks will automatically run bandit, trailing whitespace fixes, and other checks.
+  - If pre-commit hooks modify files, re-add and commit again after the fixes are applied.
 - **Database documentation:**
   - Database schemas are documented using Mermaid diagrams in each app's `docs/models.md` files.
   - Mermaid visualizations available as PNG exports (e.g., `erd.png` in project root).

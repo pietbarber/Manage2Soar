@@ -403,9 +403,7 @@
             </div>
             <div class="col-lg-4">
               <button type="button" class="btn btn-outline-info btn-modern w-100"
-                      data-bs-toggle="modal" data-bs-target="#qualification-modal"
-                      hx-get="{% url 'instructors:assign_qualification_modal' member.id %}"
-                      hx-target="#qualification-modal-content">
+                      onclick="loadQualificationModal('{% url 'instructors:assign_qualification_modal' member.id %}')">
                 <i class="bi bi-plus-circle me-2"></i>Assign Qualification
               </button>
             </div>
@@ -711,5 +709,30 @@
         setTimeout(function () { showRedactionModal(retries - 1); }, 100);
       }
     })(20);
+
+    // Load qualification modal content via HTMX and show modal
+    function loadQualificationModal(url) {
+      const modalContent = document.getElementById('qualification-modal-content');
+      const modal = document.getElementById('qualification-modal');
+
+      // Show loading spinner
+      modalContent.innerHTML = `
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      `;
+
+      // Load content via HTMX
+      htmx.ajax('GET', url, {
+        target: '#qualification-modal-content',
+        swap: 'innerHTML'
+      }).then(() => {
+        // Show modal after content is loaded
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+      });
+    }
   </script>
 {% endblock %}
