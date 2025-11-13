@@ -249,6 +249,118 @@
           </div>
         </div>
 
+        <!-- Student Qualifications Management Card -->
+        {% if student %}
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-award me-2"></i>Student Qualifications
+            </h5>
+          </div>
+          <div class="card-body">
+            <!-- Existing Qualifications -->
+            <div class="row mb-3">
+              <div class="col-md-12">
+                <h6 class="fw-bold text-primary mb-3">
+                  <i class="bi bi-check-circle me-2"></i>Current Qualifications
+                </h6>
+                {% if existing_qualifications %}
+                  <div class="row g-2">
+                    {% for qual in existing_qualifications %}
+                      <div class="col-md-6 col-lg-4">
+                        <div class="card border-start border-3 {% if qual.is_qualified %}border-success{% else %}border-warning{% endif %} h-100">
+                          <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                              <div>
+                                <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
+                                <small class="text-muted">
+                                  {% if qual.date_awarded %}
+                                    Awarded: {{ qual.date_awarded|date:"M j, Y" }}
+                                  {% endif %}
+                                  {% if qual.expiration_date %}
+                                    <br>Expires: {{ qual.expiration_date|date:"M j, Y" }}
+                                  {% endif %}
+                                </small>
+                              </div>
+                              <div>
+                                {% if qual.is_qualified %}
+                                  <span class="badge bg-success">Active</span>
+                                {% else %}
+                                  <span class="badge bg-warning text-dark">Inactive</span>
+                                {% endif %}
+                              </div>
+                            </div>
+                            {% if qual.notes %}
+                              <small class="text-muted d-block mt-1">{{ qual.notes }}</small>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="text-center py-3 text-muted">
+                    <i class="bi bi-info-circle fs-4 mb-2 d-block"></i>
+                    <p class="mb-0">No qualifications assigned yet.</p>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Add New Qualification -->
+            <div class="border-top pt-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-plus-circle me-2"></i>Assign New Qualification
+              </h6>
+              <form method="post" id="qualificationForm">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="qualification">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
+                      <strong>Qualification</strong>
+                    </label>
+                    {{ qualification_form.qualification|add_class:"form-select" }}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label"><strong>Status</strong></label>
+                    <div class="form-check">
+                      {{ qualification_form.is_qualified|add_class:"form-check-input" }}
+                      <label class="form-check-label" for="{{ qualification_form.is_qualified.id_for_label }}">
+                        {{ qualification_form.is_qualified.label }}
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="{{ qualification_form.date_awarded.id_for_label }}" class="form-label">
+                      <strong>{{ qualification_form.date_awarded.label }}</strong>
+                    </label>
+                    {{ qualification_form.date_awarded|add_class:"form-control" }}
+                  </div>
+                  <div class="col-md-3">
+                    <label for="{{ qualification_form.expiration_date.id_for_label }}" class="form-label">
+                      <strong>{{ qualification_form.expiration_date.label }}</strong>
+                    </label>
+                    {{ qualification_form.expiration_date|add_class:"form-control" }}
+                  </div>
+                  <div class="col-12">
+                    <label for="{{ qualification_form.notes.id_for_label }}" class="form-label">
+                      <strong>Notes (optional)</strong>
+                    </label>
+                    {{ qualification_form.notes|add_class:"form-control" }}
+                  </div>
+                  <div class="col-12">
+                    <button type="submit" class="btn btn-info btn-modern">
+                      <i class="bi bi-award me-2"></i>Assign Qualification
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Action Buttons following guide pattern -->
         <div class="d-flex justify-content-between align-items-center">
           <div>

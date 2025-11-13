@@ -35,10 +35,12 @@ from instructors.forms import (
     SyllabusDocumentForm,
 )
 from instructors.models import (
+    ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
     InstructionReport,
     LessonScore,
+    MemberQualification,
     StudentProgressSnapshot,
     SyllabusDocument,
     TrainingLesson,
@@ -610,34 +612,60 @@ def log_ground_instruction(request):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
-        form = GroundInstructionForm(request.POST)
-        formset = GroundLessonScoreFormSet(request.POST)
-        formset.total_form_count()  # ensures management form counts
+        form_type = request.POST.get("form_type")
 
-        if form.is_valid() and formset.is_valid():
-            session = form.save(commit=False)
-            session.instructor = request.user
-            session.student = student
-            session.save()
-            # Create scores for each submitted lesson
-            for entry in formset.cleaned_data:
-                lid = entry.get("lesson")
-                sc = entry.get("score")
-                if lid and sc:
-                    lesson = TrainingLesson.objects.get(pk=lid)
-                    GroundLessonScore.objects.create(
-                        session=session, lesson=lesson, score=sc
-                    )
-            messages.success(request, "Ground instruction session logged successfully.")
-            if student is not None:
-                return redirect(
-                    "instructors:member_instruction_record", member_id=student.id
-                )
+        if form_type == "qualification" and student:
+            # Handle qualification assignment
+            qualification_form = QualificationAssignForm(
+                request.POST, instructor=request.user, student=student
+            )
+            if qualification_form.is_valid():
+                qualification_form.save()
+                messages.success(request, "Qualification assigned successfully.")
+                return redirect(f"{request.path}?student={student.id}")
             else:
-                messages.error(request, "No student selected.")
-                return redirect("instructors:log_ground_instruction")
+                messages.error(request, "Please correct the qualification form errors.")
+            # Initialize ground instruction forms for re-rendering
+            form = GroundInstructionForm()
+            initial = [{"lesson": l.id} for l in lessons]
+            formset = GroundLessonScoreFormSet(initial=initial)
         else:
-            messages.error(request, "Please correct the errors below.")
+            # Handle ground instruction logging
+            form = GroundInstructionForm(request.POST)
+            formset = GroundLessonScoreFormSet(request.POST)
+            formset.total_form_count()  # ensures management form counts
+            qualification_form = (
+                QualificationAssignForm(instructor=request.user, student=student)
+                if student
+                else None
+            )
+
+            if form.is_valid() and formset.is_valid():
+                session = form.save(commit=False)
+                session.instructor = request.user
+                session.student = student
+                session.save()
+                # Create scores for each submitted lesson
+                for entry in formset.cleaned_data:
+                    lid = entry.get("lesson")
+                    sc = entry.get("score")
+                    if lid and sc:
+                        lesson = TrainingLesson.objects.get(pk=lid)
+                        GroundLessonScore.objects.create(
+                            session=session, lesson=lesson, score=sc
+                        )
+                messages.success(
+                    request, "Ground instruction session logged successfully."
+                )
+                if student is not None:
+                    return redirect(
+                        "instructors:member_instruction_record", member_id=student.id
+                    )
+                else:
+                    messages.error(request, "No student selected.")
+                    return redirect("instructors:log_ground_instruction")
+            else:
+                messages.error(request, "Please correct the errors below.")
     else:
         form = GroundInstructionForm()
         initial = [{"lesson": l.id} for l in lessons]
@@ -669,6 +697,19 @@ def log_ground_instruction(request):
     else:
         max_scores = [""] * len(lessons)
 
+    # Get existing qualifications and create qualification form
+    existing_qualifications = []
+    qualification_form = None
+    if student:
+        existing_qualifications = (
+            MemberQualification.objects.filter(member=student)
+            .select_related("qualification")
+            .order_by("-date_awarded")
+        )
+        qualification_form = QualificationAssignForm(
+            instructor=request.user, student=student
+        )
+
     form_rows = list(zip(formset.forms, lessons, max_scores))
     return render(
         request,
@@ -678,6 +719,8 @@ def log_ground_instruction(request):
             "formset": formset,
             "form_rows": form_rows,
             "student": student,
+            "existing_qualifications": existing_qualifications,
+            "qualification_form": qualification_form,
         },
     )
 
