@@ -302,7 +302,31 @@ def fill_instruction_report(request, student_id, report_date):
             initial_data.append({"lesson": lesson.id, "score": val})
 
         formset = LessonScoreSimpleFormSet(initial=initial_data)
-        form_rows = list(zip(formset.forms, lessons))
+
+    # Calculate max scores for each lesson for this student
+    max_scores = []
+    for lesson in lessons:
+        # Get all scores for this lesson and student (both ground and flight)
+        ground_scores = GroundLessonScore.objects.filter(
+            session__student=student, lesson=lesson
+        ).values_list("score", flat=True)
+
+        flight_scores = LessonScore.objects.filter(
+            report__student=student, lesson=lesson
+        ).values_list("score", flat=True)
+
+        all_scores = list(ground_scores) + list(flight_scores)
+
+        # Convert scores to integers for comparison (skip "!" scores)
+        numeric_scores = []
+        for score in all_scores:
+            if score and score != "!" and score.isdigit():
+                numeric_scores.append(int(score))
+
+        max_score = str(max(numeric_scores)) if numeric_scores else ""
+        max_scores.append(max_score)
+
+    form_rows = list(zip(formset.forms, lessons, max_scores))
 
     return render(
         request,
@@ -619,7 +643,33 @@ def log_ground_instruction(request):
         initial = [{"lesson": l.id} for l in lessons]
         formset = GroundLessonScoreFormSet(initial=initial)
 
-    form_rows = list(zip(formset.forms, lessons))
+    # Calculate max scores for each lesson if we have a student
+    max_scores = []
+    if student:
+        for lesson in lessons:
+            # Get all scores for this lesson and student (both ground and flight)
+            ground_scores = GroundLessonScore.objects.filter(
+                session__student=student, lesson=lesson
+            ).values_list("score", flat=True)
+
+            flight_scores = LessonScore.objects.filter(
+                report__student=student, lesson=lesson
+            ).values_list("score", flat=True)
+
+            all_scores = list(ground_scores) + list(flight_scores)
+
+            # Convert scores to integers for comparison (skip "!" scores)
+            numeric_scores = []
+            for score in all_scores:
+                if score and score != "!" and score.isdigit():
+                    numeric_scores.append(int(score))
+
+            max_score = str(max(numeric_scores)) if numeric_scores else ""
+            max_scores.append(max_score)
+    else:
+        max_scores = [""] * len(lessons)
+
+    form_rows = list(zip(formset.forms, lessons, max_scores))
     return render(
         request,
         "instructors/log_ground_instruction.html",

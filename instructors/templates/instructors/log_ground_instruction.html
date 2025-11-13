@@ -168,10 +168,22 @@
 
         <!-- Lesson Scores Card following guide pattern -->
         <div class="card contact-info mb-4">
-          <div class="card-header bg-primary text-white">
+          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
               <i class="bi bi-clipboard-check me-2"></i>Lesson Scores
             </h5>
+            <!-- Quick Score Selector -->
+            <div class="d-flex align-items-center text-white">
+              <label class="form-label mb-0 me-2 small">Set first click to:</label>
+              <select id="defaultScore" class="form-select form-select-sm" style="width: auto; color: #000;">
+                <option value="">-</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="!">!</option>
+              </select>
+            </div>
           </div>
           <div class="card-body">
             {% if form_rows %}
@@ -188,10 +200,13 @@
                       <th scope="col" class="text-center" style="width: 120px;">
                         <i class="bi bi-star me-1"></i>Score
                       </th>
+                      <th scope="col" class="text-center" style="width: 80px;">
+                        <i class="bi bi-trophy me-1"></i>⭐ MAX
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for form, lesson in form_rows %}
+                    {% for form, lesson, max_score in form_rows %}
                       <tr>
                         <td class="text-center fw-bold">
                           <span class="badge bg-primary">{{ lesson.code }}</span>
@@ -200,8 +215,25 @@
                           <div class="fw-medium">{{ lesson.title }}</div>
                         </td>
                         <td class="text-center">
-                          {{ form.score|add_class:"form-select form-select-sm" }}
+                          {{ form.score|add_class:"form-select form-select-sm score-select" }}
                           {{ form.lesson.as_hidden }}
+                        </td>
+                        <td class="text-center">
+                          {% if max_score %}
+                            {% if max_score == "1" %}
+                              <img src="{% static 'images/blob1.png' %}" alt="Score 1" title="Max: {{ max_score }} - Introduced">
+                            {% elif max_score == "2" %}
+                              <img src="{% static 'images/blob2.png' %}" alt="Score 2" title="Max: {{ max_score }} - Practiced">
+                            {% elif max_score == "3" %}
+                              <img src="{% static 'images/blob3.png' %}" alt="Score 3" title="Max: {{ max_score }} - Solo Standard">
+                            {% elif max_score == "4" %}
+                              <img src="{% static 'images/blob4.png' %}" alt="Score 4" title="Max: {{ max_score }} - Checkride Standard">
+                            {% elif max_score == "!" %}
+                              <img src="{% static 'images/blob5.png' %}" alt="Score !" title="Max: {{ max_score }} - Needs Attention">
+                            {% endif %}
+                          {% else %}
+                            <span class="text-muted">—</span>
+                          {% endif %}
                         </td>
                       </tr>
                     {% endfor %}
@@ -253,6 +285,35 @@ window.addEventListener('scroll', function() {
   } else {
     backToTop.style.display = 'none';
   }
+});
+
+// Set first click to functionality
+document.addEventListener('DOMContentLoaded', function() {
+  const defaultScoreSelect = document.getElementById('defaultScore');
+  const scoreSelects = document.querySelectorAll('.score-select');
+
+  // Track which selects have been clicked
+  const clickedSelects = new Set();
+
+  scoreSelects.forEach(function(select) {
+    select.addEventListener('focus', function() {
+      // Only auto-fill if this select hasn't been clicked before and has no value
+      if (!clickedSelects.has(select) && !select.value && defaultScoreSelect.value) {
+        select.value = defaultScoreSelect.value;
+        clickedSelects.add(select);
+      }
+    });
+
+    select.addEventListener('change', function() {
+      // Mark as clicked when manually changed
+      clickedSelects.add(select);
+    });
+  });
+
+  // Reset clicked tracking when default score changes
+  defaultScoreSelect.addEventListener('change', function() {
+    clickedSelects.clear();
+  });
 });
 </script>
 {% endblock %}

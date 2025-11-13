@@ -5,160 +5,161 @@
 
 /* Modern Card Styling */
 .instructors-card {
-  border: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .instructors-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
 }
 
 /* Modern Button Styling */
 .btn-modern {
-  border-radius: 8px;
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  transition: all 0.2s ease;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
 }
 
 .btn-modern:hover {
-  transform: translateY(-1px);
+    transform: translateY(-1px);
 }
 
 /* Contact Information Cards */
 .contact-info {
-  border-left: 4px solid var(--bs-primary);
+    border-left: 4px solid var(--bs-primary);
 }
 
 .contact-item {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f1f3f4;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
 }
 
 .contact-item:last-child {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 .contact-label {
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
 }
 
 .contact-value {
-  font-size: 1rem;
+    font-size: 1rem;
 }
 
 /* Form Styling Enhancements */
 .form-control:focus,
 .form-select:focus {
-  border-color: #86b7fe;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 /* Table Enhancements */
 .table td {
-  vertical-align: middle;
+    vertical-align: middle;
 }
 
 .table-hover tbody tr:hover {
-  background-color: rgba(13, 110, 253, 0.05);
+    background-color: rgba(13, 110, 253, 0.05);
 }
 
 /* Badge Styling */
 .badge {
-  font-size: 0.8rem;
-  font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 500;
 }
 
 /* Instruction Form Specific Styles */
 .instruction-form-section {
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 2rem;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
 }
 
 /* Lesson Score Table */
 .lesson-score-table {
-  background: white;
+    background: white;
 }
 
 .lesson-score-table .badge {
-  font-weight: 600;
-  padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
 }
 
 /* Back to Top Button */
 .back-to-top {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  width: 50px;
-  height: 50px;
-  background: var(--bs-primary);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  font-size: 1.2rem;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
-  z-index: 1000;
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 50px;
+    height: 50px;
+    background: var(--bs-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 1000;
 }
 
 .back-to-top:hover {
-  background: var(--bs-primary);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    background: var(--bs-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .contact-item {
-    padding: 0.5rem 0;
-  }
+    .contact-item {
+        padding: 0.5rem 0;
+    }
 
-  .contact-label,
-  .contact-value {
-    font-size: 0.9rem;
-  }
+    .contact-label,
+    .contact-value {
+        font-size: 0.9rem;
+    }
 
-  .btn-modern {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-  }
+    .btn-modern {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
 
-  .back-to-top {
-    bottom: 1rem;
-    right: 1rem;
-    width: 45px;
-    height: 45px;
-    font-size: 1rem;
-  }
+    .back-to-top {
+        bottom: 1rem;
+        right: 1rem;
+        width: 45px;
+        height: 45px;
+        font-size: 1rem;
+    }
 }
 
 /* Animation for smooth interactions */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 /* Focus states for accessibility */
 .btn:focus-visible,
 .form-control:focus-visible,
 .form-select:focus-visible {
-  outline: 2px solid var(--bs-primary);
-  outline-offset: 2px;
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
 }
