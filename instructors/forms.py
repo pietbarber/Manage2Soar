@@ -9,6 +9,7 @@ from members.models import Member
 
 from .models import (
     SCORE_CHOICES,
+    ClubQualificationType,
     GroundInstruction,
     InstructionReport,
     MemberQualification,
@@ -222,6 +223,11 @@ class QualificationAssignForm(forms.ModelForm):
         self.student = student
         self.fields["date_awarded"].label = "Date Awarded (optional)"
         self.fields["expiration_date"].label = "Expiration Date (optional)"
+
+        # Filter out obsolete qualifications from the dropdown
+        self.fields["qualification"].queryset = ClubQualificationType.objects.filter(
+            is_obsolete=False
+        ).order_by("name")
 
     from datetime import date  # at the top of forms.py
 
