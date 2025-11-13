@@ -9,7 +9,42 @@ from utils.upload_entropy import upload_homepage_gallery
 # --- CMS Arbitrary Page and Document Models ---
 
 
-# --- CMS Arbitrary Page and Document Models ---
+class PageRolePermission(models.Model):
+    """
+    Defines which member roles can access a CMS page.
+    Only applies to private pages (is_public=False).
+    """
+
+    # Role choices based on Member model boolean fields
+    ROLE_CHOICES = [
+        ("instructor", "Instructor"),
+        ("towpilot", "Towpilot"),
+        ("duty_officer", "Duty Officer"),
+        ("assistant_duty_officer", "Assistant Duty Officer"),
+        ("secretary", "Secretary"),
+        ("treasurer", "Treasurer"),
+        ("webmaster", "Webmaster"),
+        ("director", "Director"),
+        ("member_manager", "Member Manager"),
+        ("rostermeister", "Rostermeister"),
+    ]
+
+    page = models.ForeignKey(
+        "Page", on_delete=models.CASCADE, related_name="role_permissions"
+    )
+    role_name = models.CharField(
+        max_length=30,
+        choices=ROLE_CHOICES,
+        help_text="Member role required to access this page",
+    )
+
+    class Meta:
+        unique_together = ("page", "role_name")
+        verbose_name = "Page Role Permission"
+        verbose_name_plural = "Page Role Permissions"
+
+    def __str__(self):
+        return f"{self.page.title} - {self.get_role_name_display()}"
 
 
 class Page(models.Model):
@@ -45,10 +80,55 @@ class Page(models.Model):
             return f"/cms/{self.parent.slug}/{self.slug}/"
         return f"/cms/{self.slug}/"
 
+    def clean(self):
+        """Validate that public pages cannot have role restrictions."""
+        from django.core.exceptions import ValidationError
+
+        # Only check if this is an update (has pk) since M2M relations don't exist on create
+        if self.pk and self.is_public and self.role_permissions.exists():
+            raise ValidationError(
+                "Public pages cannot have role restrictions. "
+                "Set 'is_public' to False to enable role-based access control."
+            )
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.title)
+        self.clean()
         super().save(*args, **kwargs)
+
+    def has_role_restrictions(self):
+        """Return True if this page has any role restrictions."""
+        return self.role_permissions.exists()
+
+    def get_required_roles(self):
+        """Return list of required role names for this page."""
+        return list(self.role_permissions.values_list("role_name", flat=True))
+
+    def can_user_access(self, user):
+        """
+        Check if a user can access this page based on role restrictions.
+        Returns True if:
+        - Page is public, OR
+        - User is active member and no role restrictions, OR
+        - User has at least one of the required roles
+        """
+        if self.is_public:
+            return True
+
+        # Check if user is an active member
+        from members.utils import is_active_member
+
+        if not is_active_member(user):
+            return False
+
+        # If no role restrictions, any active member can access
+        if not self.has_role_restrictions():
+            return True
+
+        # Check if user has any of the required roles
+        required_roles = self.get_required_roles()
+        return any(getattr(user, role, False) for role in required_roles)
 
 
 def upload_document_to(instance, filename):

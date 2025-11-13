@@ -41,17 +41,11 @@ def cms_page(request, **kwargs):
         parent = page
     debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
-    # Access control: if the page is not public, require the same membership
-    # checks we use for the homepage logic. If the user is not authorized,
-    # redirect them to the login page.
+    # Access control: check if user can access this page based on role restrictions
     assert page is not None
-    if not page.is_public:
-        user = request.user
-        if not is_active_member(user):
-            # Use Django's helper to redirect to login (handles encoding)
-            return redirect_to_login(
-                request.get_full_path(), login_url=settings.LOGIN_URL
-            )
+    if not page.can_user_access(request.user):
+        # Use Django's helper to redirect to login (handles encoding)
+        return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1
@@ -117,16 +111,11 @@ def homepage(request):
         top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
         pages = []
         for p in top_pages_qs:
-            # Determine whether the current user may view links in this directory
-            can_view = True
-            if not p.is_public:
-                from members.utils import is_active_member
+            # Use the page's built-in access control method
+            can_view = p.can_user_access(request.user)
 
-                can_view = is_active_member(request.user)
-
-            # Only include non-public pages in the listing if the user may view them;
-            # otherwise, skip showing restricted directories to anonymous visitors.
-            if not p.is_public and not can_view:
+            # Only include pages the user can access
+            if not can_view:
                 continue
 
             pages.append(
@@ -176,13 +165,10 @@ def homepage(request):
     top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
     pages = []
     for p in top_pages_qs:
-        can_view = True
-        if not p.is_public:
-            from members.utils import is_active_member
+        # Use the page's built-in access control method
+        can_view = p.can_user_access(request.user)
 
-            can_view = is_active_member(request.user)
-
-        if not p.is_public and not can_view:
+        if not can_view:
             continue
 
         pages.append(

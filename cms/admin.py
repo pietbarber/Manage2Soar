@@ -6,6 +6,7 @@ from .models import (
     HomePageContent,
     HomePageImage,
     Page,
+    PageRolePermission,
     SiteFeedback,
     VisitorContact,
 )
@@ -34,6 +35,27 @@ class DocumentInline(admin.TabularInline):
         return formset
 
 
+class PageRolePermissionInline(admin.TabularInline):
+    model = PageRolePermission
+    extra = 3  # Show 3 empty forms to make it more visible
+    fields = ("role_name",)
+    verbose_name = "Role Permission"
+    verbose_name_plural = "🔒 Role Permissions (For Private Pages Only)"
+
+    # Remove the get_queryset override that might be causing issues
+    def has_add_permission(self, request, obj):
+        """Always show the inline so users can add permissions"""
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        """Always allow changes"""
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        """Always allow deletion"""
+        return True
+
+
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
@@ -41,16 +63,78 @@ class PageAdmin(admin.ModelAdmin):
         extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
 
-    list_display = ("title", "slug", "parent", "is_public", "updated_at")
+    list_display = (
+        "title",
+        "slug",
+        "parent",
+        "is_public",
+        "role_summary",
+        "updated_at",
+    )
     search_fields = ("title", "slug")
     list_filter = ("is_public", "parent")
     prepopulated_fields = {"slug": ("title",)}
-    inlines = [DocumentInline]
+    inlines = [PageRolePermissionInline, DocumentInline]  # Move role permissions first
+
+    # Custom fieldsets to organize the form
+    fieldsets = (
+        (None, {"fields": ("title", "slug", "parent", "content")}),
+        (
+            "Access Control",
+            {
+                "fields": ("is_public",),
+                "description": (
+                    "Public pages are accessible to everyone. Private pages are accessible to active members only. "
+                    '<br><strong>For private pages:</strong> Use the "Role Permissions" section below to restrict access to specific member roles. '
+                    "If no roles are selected, all active members can access this page."
+                ),
+            },
+        ),
+    )
 
     admin_helper_message = (
-        "<b>CMS Pages:</b> Use this to create arbitrary pages and directories under /cms/. Attach documents below. "
+        "<b>CMS Pages:</b> Use this to create arbitrary pages and directories under /cms/. "
+        "Set access control: Public (everyone), Private (active members), or Role-based (specific positions). "
         "Leave 'Parent' blank for top-level pages."
     )
+
+    @admin.display(description="Role Restrictions")
+    def role_summary(self, obj):
+        """Display summary of role restrictions in list view"""
+        if obj.is_public:
+            return "Public"
+        elif not obj.has_role_restrictions():
+            return "Members Only"
+        else:
+            roles = obj.get_required_roles()
+            if len(roles) <= 2:
+                return ", ".join(roles).title()
+            else:
+                return f"{len(roles)} roles required"
+
+    def save_model(self, request, obj, form, change):
+        """Add validation when saving"""
+        try:
+            super().save_model(request, obj, form, change)
+        except Exception as e:
+            from django.contrib import messages
+
+            messages.error(request, str(e))
+
+
+@admin.register(PageRolePermission)
+class PageRolePermissionAdmin(admin.ModelAdmin):
+    list_display = ("page", "role_name", "page_is_public")
+    list_filter = ("role_name", "page__is_public")
+    search_fields = ("page__title", "page__slug")
+
+    @admin.display(description="Page is Public", boolean=True)
+    def page_is_public(self, obj):
+        """Show if the associated page is public (which would be invalid)"""
+        return obj.page.is_public
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("page")
 
 
 @admin.register(Document)
