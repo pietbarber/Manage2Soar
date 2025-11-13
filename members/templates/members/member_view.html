@@ -403,7 +403,8 @@
             </div>
             <div class="col-lg-4">
               <button type="button" class="btn btn-outline-info btn-modern w-100"
-                      onclick="loadQualificationModal('{% url 'instructors:assign_qualification_modal' member.id %}')">
+                      data-qualification-url="{% url 'instructors:assign_qualification_modal' member.id %}"
+                      onclick="loadQualificationModal(this.dataset.qualificationUrl)">
                 <i class="bi bi-plus-circle me-2"></i>Assign Qualification
               </button>
             </div>
@@ -665,7 +666,9 @@
   </div>
 </div>
 
-<!-- Qualification Assignment Modal -->
+{% endif %}
+
+<!-- Qualification Assignment Modal (available to all instructors) -->
 <div class="modal fade" id="qualification-modal" tabindex="-1" aria-labelledby="qualification-modal-label" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -686,8 +689,6 @@
     </div>
   </div>
 </div>
-
-{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
