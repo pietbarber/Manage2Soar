@@ -654,9 +654,64 @@ def log_ground_instruction(request):
                         GroundLessonScore.objects.create(
                             session=session, lesson=lesson, score=sc
                         )
-                messages.success(
-                    request, "Ground instruction session logged successfully."
-                )
+
+                # Check if qualification data was included and process it
+                qual_qualification_id = request.POST.get("qual_qualification")
+                if qual_qualification_id and student:
+                    try:
+                        qualification = ClubQualificationType.objects.get(
+                            pk=qual_qualification_id
+                        )
+                        is_qualified = request.POST.get("qual_is_qualified") == "on"
+                        date_awarded = request.POST.get("qual_date_awarded") or None
+                        expiration_date = (
+                            request.POST.get("qual_expiration_date") or None
+                        )
+                        notes = request.POST.get("qual_notes", "")
+
+                        # Parse dates if provided
+                        from datetime import datetime
+
+                        if date_awarded:
+                            try:
+                                date_awarded = datetime.strptime(
+                                    date_awarded, "%Y-%m-%d"
+                                ).date()
+                            except ValueError:
+                                date_awarded = None
+                        if expiration_date:
+                            try:
+                                expiration_date = datetime.strptime(
+                                    expiration_date, "%Y-%m-%d"
+                                ).date()
+                            except ValueError:
+                                expiration_date = None
+
+                        # Create or update qualification
+                        MemberQualification.objects.update_or_create(
+                            member=student,
+                            qualification=qualification,
+                            defaults={
+                                "is_qualified": is_qualified,
+                                "instructor": request.user,
+                                "date_awarded": date_awarded,
+                                "expiration_date": expiration_date,
+                                "notes": notes,
+                            },
+                        )
+                        messages.success(
+                            request,
+                            "Ground instruction session and qualification saved successfully.",
+                        )
+                    except ClubQualificationType.DoesNotExist:
+                        messages.warning(
+                            request,
+                            "Ground instruction saved, but qualification assignment failed.",
+                        )
+                else:
+                    messages.success(
+                        request, "Ground instruction session logged successfully."
+                    )
                 if student is not None:
                     return redirect(
                         "instructors:member_instruction_record", member_id=student.id
@@ -710,6 +765,11 @@ def log_ground_instruction(request):
             instructor=request.user, student=student
         )
 
+    # Get all qualifications for the dropdown
+    all_qualifications = ClubQualificationType.objects.filter(
+        is_obsolete=False
+    ).order_by("name")
+
     form_rows = list(zip(formset.forms, lessons, max_scores))
     return render(
         request,
@@ -721,6 +781,7 @@ def log_ground_instruction(request):
             "student": student,
             "existing_qualifications": existing_qualifications,
             "qualification_form": qualification_form,
+            "all_qualifications": all_qualifications,
         },
     )
 

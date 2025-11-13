@@ -271,8 +271,15 @@
                         <div class="card border-start border-3 {% if qual.is_qualified %}border-success{% else %}border-warning{% endif %} h-100">
                           <div class="card-body py-2 px-3">
                             <div class="d-flex align-items-center justify-content-between">
-                              <div>
-                                <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
+                              <div class="d-flex align-items-center">
+                                {% if qual.qualification.icon %}
+                                  <img src="{{ qual.qualification.icon.url }}" alt="{{ qual.qualification.code }}"
+                                       class="qualification-icon me-2" width="24" height="24">
+                                {% else %}
+                                  <i class="bi bi-award text-muted me-2" style="font-size: 1.2rem;"></i>
+                                {% endif %}
+                                <div>
+                                  <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
                                 <small class="text-muted">
                                   {% if qual.date_awarded %}
                                     Awarded: {{ qual.date_awarded|date:"M j, Y" }}
@@ -281,6 +288,7 @@
                                     <br>Expires: {{ qual.expiration_date|date:"M j, Y" }}
                                   {% endif %}
                                 </small>
+                                </div>
                               </div>
                               <div>
                                 {% if qual.is_qualified %}
@@ -320,7 +328,14 @@
                     <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
                       <strong>Qualification</strong>
                     </label>
-                    {{ qualification_form.qualification|add_class:"form-select" }}
+                    <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
+                      <option value="">Select a qualification...</option>
+                      {% for qual in all_qualifications %}
+                        <option value="{{ qual.pk }}" data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}">
+                          {{ qual.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
                   </div>
                   <div class="col-md-2">
                     <label class="form-label"><strong>Status</strong></label>
@@ -349,11 +364,6 @@
                     </label>
                     {{ qualification_form.notes|add_class:"form-control" }}
                   </div>
-                  <div class="col-12">
-                    <button type="submit" class="btn btn-info btn-modern">
-                      <i class="bi bi-award me-2"></i>Assign Qualification
-                    </button>
-                  </div>
                 </div>
               </form>
             </div>
@@ -374,9 +384,16 @@
               </a>
             {% endif %}
           </div>
-          <button type="submit" class="btn btn-primary btn-modern">
-            <i class="bi bi-check-circle me-2"></i>Save Ground Instruction
-          </button>
+          <div class="d-flex gap-2">
+            {% if student and qualification_form %}
+              <button type="button" class="btn btn-info btn-modern" onclick="submitQualificationOnly()">
+                <i class="bi bi-award me-2"></i>Add Qualification Only
+              </button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-modern" onclick="return submitInstructionSession()">
+              <i class="bi bi-check-circle me-2"></i>Save Complete Session
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -407,25 +424,108 @@ document.addEventListener('DOMContentLoaded', function() {
   // Track which selects have been clicked
   const clickedSelects = new Set();
 
-  scoreSelects.forEach(function(select) {
-    select.addEventListener('focus', function() {
-      // Only auto-fill if this select hasn't been clicked before and has no value
-      if (!clickedSelects.has(select) && !select.value && defaultScoreSelect.value) {
-        select.value = defaultScoreSelect.value;
+  if (defaultScoreSelect) {
+    scoreSelects.forEach(function(select) {
+      select.addEventListener('focus', function() {
+        // Only auto-fill if this select hasn't been clicked before and has no value
+        if (!clickedSelects.has(select) && !select.value && defaultScoreSelect.value) {
+          select.value = defaultScoreSelect.value;
+          clickedSelects.add(select);
+        }
+      });
+
+      select.addEventListener('change', function() {
+        // Mark as clicked when manually changed
         clickedSelects.add(select);
+      });
+    });
+
+    // Reset clicked tracking when default score changes
+    defaultScoreSelect.addEventListener('change', function() {
+      clickedSelects.clear();
+    });
+  }
+});
+
+// Form submission handlers
+function submitQualificationOnly() {
+  const qualForm = document.getElementById('qualificationForm');
+  if (qualForm) {
+    qualForm.submit();
+  }
+  return false;
+}
+
+function submitInstructionSession() {
+  // Check if there's qualification data to include
+  const mainForm = document.querySelector('form.needs-validation');
+  const qualForm = document.getElementById('qualificationForm');
+
+  if (qualForm && qualForm.querySelector('select[name="qualification"]').value) {
+    // Copy qualification data to main form as hidden fields
+    const qualificationSelect = qualForm.querySelector('select[name="qualification"]');
+    const isQualifiedCheck = qualForm.querySelector('input[name="is_qualified"]');
+    const dateAwarded = qualForm.querySelector('input[name="date_awarded"]');
+    const expirationDate = qualForm.querySelector('input[name="expiration_date"]');
+    const notes = qualForm.querySelector('textarea[name="notes"]');
+
+    // Remove any existing qualification fields
+    mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
+
+    // Add qualification data as hidden fields
+    const hiddenFields = [
+      {name: 'qual_qualification', value: qualificationSelect.value},
+      {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
+      {name: 'qual_date_awarded', value: dateAwarded.value},
+      {name: 'qual_expiration_date', value: expirationDate.value},
+      {name: 'qual_notes', value: notes.value}
+    ];
+
+    hiddenFields.forEach(field => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = field.name;
+      input.value = field.value;
+      mainForm.appendChild(input);
+    });
+  }
+
+  return true; // Allow form submission
+}
+
+// Enhanced qualification dropdown with icons
+document.addEventListener('DOMContentLoaded', function() {
+  const qualSelect = document.querySelector('.qualification-select');
+  if (qualSelect) {
+    // Update display when selection changes
+    qualSelect.addEventListener('change', function() {
+      const selectedOption = this.options[this.selectedIndex];
+      const iconUrl = selectedOption.getAttribute('data-icon');
+
+      if (iconUrl && this.value) {
+        // Show icon next to the dropdown when selection is made
+        let iconPreview = document.getElementById('qualification-icon-preview');
+        if (!iconPreview) {
+          iconPreview = document.createElement('img');
+          iconPreview.id = 'qualification-icon-preview';
+          iconPreview.className = 'qualification-icon ms-2';
+          iconPreview.width = 24;
+          iconPreview.height = 24;
+          iconPreview.style.verticalAlign = 'middle';
+          this.parentNode.appendChild(iconPreview);
+        }
+        iconPreview.src = iconUrl;
+        iconPreview.alt = selectedOption.text;
+        iconPreview.style.display = 'inline-block';
+        iconPreview.title = selectedOption.text;
+      } else {
+        const iconPreview = document.getElementById('qualification-icon-preview');
+        if (iconPreview) {
+          iconPreview.style.display = 'none';
+        }
       }
     });
-
-    select.addEventListener('change', function() {
-      // Mark as clicked when manually changed
-      clickedSelects.add(select);
-    });
-  });
-
-  // Reset clicked tracking when default score changes
-  defaultScoreSelect.addEventListener('change', function() {
-    clickedSelects.clear();
-  });
+  }
 });
 </script>
 {% endblock %}

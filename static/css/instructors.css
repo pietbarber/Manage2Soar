@@ -163,3 +163,40 @@
     outline: 2px solid var(--bs-primary);
     outline-offset: 2px;
 }
+
+/* Qualification icons and enhanced dropdown styles */
+.qualification-icon {
+    border-radius: 4px;
+    object-fit: cover;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced qualification dropdown with icon support */
+.qualification-select {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+/* Custom dropdown styling for qualifications */
+.qualification-option {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+}
+
+.qualification-option img {
+    width: 20px;
+    height: 20px;
+    margin-right: 0.5rem;
+    border-radius: 3px;
+}
+
+/* Enhanced qualification cards */
+.qualification-card {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+}
+
+.qualification-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
