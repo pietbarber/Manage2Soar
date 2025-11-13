@@ -1,13 +1,36 @@
 {% extends "base.html" %}
+{% load dict_extras %}
+{% load static %}
 {% block title %}Log Ground Instruction{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/instructors.css' %}">
+{% endblock %}
+
 {% block content %}
-<h2>
-  {% if student %}
-    Log Ground Instruction for {{ student.full_display_name }}
-  {% else %}
-    Log Ground Instruction
-  {% endif %}
-</h2>
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+      <!-- Page Header following guide pattern -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="display-6 fw-bold text-primary mb-1">
+            <i class="bi bi-journal-text me-2"></i>Log Ground Instruction
+          </h1>
+          {% if student %}
+            <p class="text-muted mb-0">Student: <strong>{{ student.full_display_name }}</strong></p>
+          {% else %}
+            <p class="text-muted mb-0">Record ground instruction session</p>
+          {% endif %}
+        </div>
+        <div class="text-end">
+          {% if student %}
+            <a href="{% url 'members:member_view' student.id %}" class="btn btn-outline-secondary btn-modern">
+              <i class="bi bi-arrow-left me-2"></i>Back to Profile
+            </a>
+          {% endif %}
+        </div>
+      </div>
 
 {% if messages %}
   {% for message in messages %}
@@ -66,54 +89,443 @@
 {% endfor %}
 
 
-{{ form.media }}
-<form method="post">
-  {% csrf_token %}
-  {{ formset.management_form }}
+      {{ form.media }}
+      <form method="post" class="needs-validation" novalidate>
+        {% csrf_token %}
+        {{ formset.management_form }}
 
-  <div class="mb-3">
-    {{ form.date.label_tag }}
-    {{ form.date }}
-  </div>
-  <div class="mb-3">
-    {{ form.location.label_tag }}
-    {{ form.location }}
-  </div>
-  <div class="mb-3">
-    {{ form.duration.label_tag }}
-    {{ form.duration }}
-  </div>
+        <!-- Session Details Card following guide pattern -->
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-calendar-event me-2"></i>Session Details
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="contact-item">
+                  <div class="contact-label">
+                    <i class="bi bi-calendar3 text-primary me-2"></i>
+                    <strong>{{ form.date.label }}</strong>
+                  </div>
+                  <div class="contact-value">
+                    {{ form.date|add_class:"form-control" }}
+                    {% if form.date.help_text %}
+                      <div class="form-text">{{ form.date.help_text }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="contact-item">
+                  <div class="contact-label">
+                    <i class="bi bi-geo-alt text-primary me-2"></i>
+                    <strong>{{ form.location.label }}</strong>
+                  </div>
+                  <div class="contact-value">
+                    {{ form.location|add_class:"form-control" }}
+                    {% if form.location.help_text %}
+                      <div class="form-text">{{ form.location.help_text }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="contact-item">
+                  <div class="contact-label">
+                    <i class="bi bi-clock text-primary me-2"></i>
+                    <strong>{{ form.duration.label }}</strong>
+                  </div>
+                  <div class="contact-value">
+                    {{ form.duration|add_class:"form-control" }}
+                    {% if form.duration.help_text %}
+                      <div class="form-text">{{ form.duration.help_text }}</div>
+                    {% else %}
+                      <div class="form-text">Format: HH:MM or HH:MM:SS</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-  <div class="mb-4">
-    {{ form.notes.label_tag }}
-    {{ form.notes }}
+            <div class="contact-item">
+              <div class="contact-label">
+                <i class="bi bi-journal-text text-primary me-2"></i>
+                <strong>{{ form.notes.label }}</strong>
+              </div>
+              <div class="contact-value">
+                {{ form.notes|add_class:"form-control" }}
+                {% if form.notes.help_text %}
+                  <div class="form-text">{{ form.notes.help_text }}</div>
+                {% else %}
+                  <div class="form-text">Detailed notes about the ground instruction session</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lesson Scores Card following guide pattern -->
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-clipboard-check me-2"></i>Lesson Scores
+            </h5>
+            <!-- Quick Score Selector -->
+            <div class="d-flex align-items-center text-white">
+              <label class="form-label mb-0 me-2 small">Set first click to:</label>
+              <select id="defaultScore" class="form-select form-select-sm" style="width: auto; color: #000;">
+                <option value="">-</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="!">!</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if form_rows %}
+              <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col" class="text-center" style="width: 80px;">
+                        <i class="bi bi-hash me-1"></i>Code
+                      </th>
+                      <th scope="col">
+                        <i class="bi bi-book me-1"></i>Lesson Title
+                      </th>
+                      <th scope="col" class="text-center" style="width: 120px;">
+                        <i class="bi bi-star me-1"></i>Score
+                      </th>
+                      <th scope="col" class="text-center" style="width: 80px;">
+                        <i class="bi bi-trophy me-1"></i>⭐ MAX
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for form, lesson, max_score in form_rows %}
+                      <tr>
+                        <td class="text-center fw-bold">
+                          <span class="badge bg-primary">{{ lesson.code }}</span>
+                        </td>
+                        <td>
+                          <div class="fw-medium">{{ lesson.title }}</div>
+                        </td>
+                        <td class="text-center">
+                          {{ form.score|add_class:"form-select form-select-sm score-select" }}
+                          {{ form.lesson.as_hidden }}
+                        </td>
+                        <td class="text-center">
+                          {% if max_score %}
+                            {% if max_score == "1" %}
+                              <img src="{% static 'images/blob1.png' %}" alt="Score 1" title="Max: {{ max_score }} - Introduced">
+                            {% elif max_score == "2" %}
+                              <img src="{% static 'images/blob2.png' %}" alt="Score 2" title="Max: {{ max_score }} - Practiced">
+                            {% elif max_score == "3" %}
+                              <img src="{% static 'images/blob3.png' %}" alt="Score 3" title="Max: {{ max_score }} - Solo Standard">
+                            {% elif max_score == "4" %}
+                              <img src="{% static 'images/blob4.png' %}" alt="Score 4" title="Max: {{ max_score }} - Checkride Standard">
+                            {% elif max_score == "!" %}
+                              <img src="{% static 'images/blob5.png' %}" alt="Score !" title="Max: {{ max_score }} - Needs Attention">
+                            {% endif %}
+                          {% else %}
+                            <span class="text-muted">—</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-info-circle fa-2x mb-2"></i>
+                <p class="mb-0">No lessons available to score for this session.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Student Qualifications Management Card -->
+        {% if student %}
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-award me-2"></i>Student Qualifications
+            </h5>
+          </div>
+          <div class="card-body">
+            <!-- Existing Qualifications -->
+            <div class="row mb-3">
+              <div class="col-md-12">
+                <h6 class="fw-bold text-primary mb-3">
+                  <i class="bi bi-check-circle me-2"></i>Current Qualifications
+                </h6>
+                {% if existing_qualifications %}
+                  <div class="row g-2">
+                    {% for qual in existing_qualifications %}
+                      <div class="col-md-6 col-lg-4">
+                        <div class="card border-start border-3 {% if qual.is_qualified %}border-success{% else %}border-warning{% endif %} h-100">
+                          <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                              <div class="d-flex align-items-center">
+                                {% if qual.qualification.icon %}
+                                  <img src="{{ qual.qualification.icon.url }}" alt="{{ qual.qualification.code }}"
+                                       class="qualification-icon me-2" width="24" height="24">
+                                {% else %}
+                                  <i class="bi bi-award text-muted me-2" style="font-size: 1.2rem;"></i>
+                                {% endif %}
+                                <div>
+                                  <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
+                                <small class="text-muted">
+                                  {% if qual.date_awarded %}
+                                    Awarded: {{ qual.date_awarded|date:"M j, Y" }}
+                                  {% endif %}
+                                  {% if qual.expiration_date %}
+                                    <br>Expires: {{ qual.expiration_date|date:"M j, Y" }}
+                                  {% endif %}
+                                </small>
+                                </div>
+                              </div>
+                              <div>
+                                {% if qual.is_qualified %}
+                                  <span class="badge bg-success">Active</span>
+                                {% else %}
+                                  <span class="badge bg-warning text-dark">Inactive</span>
+                                {% endif %}
+                              </div>
+                            </div>
+                            {% if qual.notes %}
+                              <small class="text-muted d-block mt-1">{{ qual.notes }}</small>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="text-center py-3 text-muted">
+                    <i class="bi bi-info-circle fs-4 mb-2 d-block"></i>
+                    <p class="mb-0">No qualifications assigned yet.</p>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Add New Qualification -->
+            <div class="border-top pt-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-plus-circle me-2"></i>Assign New Qualification
+              </h6>
+              <form method="post" id="qualificationForm">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="qualification">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
+                      <strong>Qualification</strong>
+                    </label>
+                    <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
+                      <option value="">Select a qualification...</option>
+                      {% for qual in all_qualifications %}
+                        <option value="{{ qual.pk }}" data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}">
+                          {{ qual.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label"><strong>Status</strong></label>
+                    <div class="form-check">
+                      {{ qualification_form.is_qualified|add_class:"form-check-input" }}
+                      <label class="form-check-label" for="{{ qualification_form.is_qualified.id_for_label }}">
+                        {{ qualification_form.is_qualified.label }}
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="{{ qualification_form.date_awarded.id_for_label }}" class="form-label">
+                      <strong>{{ qualification_form.date_awarded.label }}</strong>
+                    </label>
+                    {{ qualification_form.date_awarded|add_class:"form-control" }}
+                  </div>
+                  <div class="col-md-3">
+                    <label for="{{ qualification_form.expiration_date.id_for_label }}" class="form-label">
+                      <strong>{{ qualification_form.expiration_date.label }}</strong>
+                    </label>
+                    {{ qualification_form.expiration_date|add_class:"form-control" }}
+                  </div>
+                  <div class="col-12">
+                    <label for="{{ qualification_form.notes.id_for_label }}" class="form-label">
+                      <strong>Notes (optional)</strong>
+                    </label>
+                    {{ qualification_form.notes|add_class:"form-control" }}
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons following guide pattern -->
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            {% if student %}
+              <a href="{% url 'members:member_view' student.id %}" class="btn btn-outline-secondary btn-modern">
+                <i class="bi bi-x-circle me-2"></i>Cancel
+              </a>
+            {% else %}
+              <a href="{% url 'instructors:log_ground_instruction' %}" class="btn btn-outline-secondary btn-modern">
+                <i class="bi bi-x-circle me-2"></i>Cancel
+              </a>
+            {% endif %}
+          </div>
+          <div class="d-flex gap-2">
+            {% if student and qualification_form %}
+              <button type="button" class="btn btn-info btn-modern" onclick="submitQualificationOnly()">
+                <i class="bi bi-award me-2"></i>Add Qualification Only
+              </button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-modern" onclick="return submitInstructionSession()">
+              <i class="bi bi-check-circle me-2"></i>Save Complete Session
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
+</div>
 
+<!-- Back to top button following guide pattern -->
+<button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="display: none;" id="backToTop">
+  <i class="bi bi-chevron-up"></i>
+</button>
 
-  <h4 class="mt-4">Lesson Scores</h4>
-  <table class="table table-bordered table-striped table-sm w-auto">
-    <thead>
-      <tr>
-        <th class="text-end">Code</th>
-        <th class="text-end">Title</th>
-        <th>Score</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for form, lesson in form_rows %}
-        <tr>
-          <td class="text-end">{{ lesson.code }}</td>
-          <td class="text-end">{{ lesson.title }}</td>
-          <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <button type="submit" class="btn btn-success">Save Ground Instruction</button>
-  {% if student %}
-    <a href="{% url 'members:member_view' student.id %}" class="btn btn-secondary">Cancel</a>
-  {% else %}
-    <a href="{% url 'instructors:log_ground_instruction' %}" class="btn btn-secondary">Cancel</a>
-  {% endif %}
-</form>
+<script>
+// Show/hide back to top button
+window.addEventListener('scroll', function() {
+  const backToTop = document.getElementById('backToTop');
+  if (window.pageYOffset > 300) {
+    backToTop.style.display = 'block';
+  } else {
+    backToTop.style.display = 'none';
+  }
+});
+
+// Set first click to functionality
+document.addEventListener('DOMContentLoaded', function() {
+  const defaultScoreSelect = document.getElementById('defaultScore');
+  const scoreSelects = document.querySelectorAll('.score-select');
+
+  // Track which selects have been clicked
+  const clickedSelects = new Set();
+
+  if (defaultScoreSelect) {
+    scoreSelects.forEach(function(select) {
+      select.addEventListener('focus', function() {
+        // Only auto-fill if this select hasn't been clicked before and has no value
+        if (!clickedSelects.has(select) && !select.value && defaultScoreSelect.value) {
+          select.value = defaultScoreSelect.value;
+          clickedSelects.add(select);
+        }
+      });
+
+      select.addEventListener('change', function() {
+        // Mark as clicked when manually changed
+        clickedSelects.add(select);
+      });
+    });
+
+    // Reset clicked tracking when default score changes
+    defaultScoreSelect.addEventListener('change', function() {
+      clickedSelects.clear();
+    });
+  }
+});
+
+// Form submission handlers
+function submitQualificationOnly() {
+  const qualForm = document.getElementById('qualificationForm');
+  if (qualForm) {
+    qualForm.submit();
+  }
+  return false;
+}
+
+function submitInstructionSession() {
+  // Check if there's qualification data to include
+  const mainForm = document.querySelector('form.needs-validation');
+  const qualForm = document.getElementById('qualificationForm');
+
+  if (qualForm && qualForm.querySelector('select[name="qualification"]').value) {
+    // Copy qualification data to main form as hidden fields
+    const qualificationSelect = qualForm.querySelector('select[name="qualification"]');
+    const isQualifiedCheck = qualForm.querySelector('input[name="is_qualified"]');
+    const dateAwarded = qualForm.querySelector('input[name="date_awarded"]');
+    const expirationDate = qualForm.querySelector('input[name="expiration_date"]');
+    const notes = qualForm.querySelector('textarea[name="notes"]');
+
+    // Remove any existing qualification fields
+    mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
+
+    // Add qualification data as hidden fields
+    const hiddenFields = [
+      {name: 'qual_qualification', value: qualificationSelect.value},
+      {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
+      {name: 'qual_date_awarded', value: dateAwarded.value},
+      {name: 'qual_expiration_date', value: expirationDate.value},
+      {name: 'qual_notes', value: notes.value}
+    ];
+
+    hiddenFields.forEach(field => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = field.name;
+      input.value = field.value;
+      mainForm.appendChild(input);
+    });
+  }
+
+  return true; // Allow form submission
+}
+
+// Enhanced qualification dropdown with icons
+document.addEventListener('DOMContentLoaded', function() {
+  const qualSelect = document.querySelector('.qualification-select');
+  if (qualSelect) {
+    // Update display when selection changes
+    qualSelect.addEventListener('change', function() {
+      const selectedOption = this.options[this.selectedIndex];
+      const iconUrl = selectedOption.getAttribute('data-icon');
+
+      if (iconUrl && this.value) {
+        // Show icon next to the dropdown when selection is made
+        let iconPreview = document.getElementById('qualification-icon-preview');
+        if (!iconPreview) {
+          iconPreview = document.createElement('img');
+          iconPreview.id = 'qualification-icon-preview';
+          iconPreview.className = 'qualification-icon ms-2';
+          iconPreview.width = 24;
+          iconPreview.height = 24;
+          iconPreview.style.verticalAlign = 'middle';
+          this.parentNode.appendChild(iconPreview);
+        }
+        iconPreview.src = iconUrl;
+        iconPreview.alt = selectedOption.text;
+        iconPreview.style.display = 'inline-block';
+        iconPreview.title = selectedOption.text;
+      } else {
+        const iconPreview = document.getElementById('qualification-icon-preview');
+        if (iconPreview) {
+          iconPreview.style.display = 'none';
+        }
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

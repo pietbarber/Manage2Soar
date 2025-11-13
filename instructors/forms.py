@@ -9,6 +9,7 @@ from members.models import Member
 
 from .models import (
     SCORE_CHOICES,
+    ClubQualificationType,
     GroundInstruction,
     InstructionReport,
     MemberQualification,
@@ -47,7 +48,10 @@ class InstructionReportForm(forms.ModelForm):
         model = InstructionReport
         fields = ["report_text", "simulator"]
         widgets = {
-            "report_text": TinyMCE(attrs={"cols": 80, "rows": 10}),
+            "report_text": TinyMCE(
+                attrs={"cols": 80, "rows": 10, "class": "form-control"}
+            ),
+            "simulator": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
 
@@ -99,9 +103,17 @@ class GroundInstructionForm(forms.ModelForm):
         model = GroundInstruction
         fields = ["date", "location", "duration", "notes"]
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
-            "duration": forms.TextInput(attrs={"placeholder": "HH:MM or HH:MM:SS"}),
-            "notes": TinyMCE(attrs={"rows": 6}),
+            "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "location": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Location of instruction",
+                }
+            ),
+            "duration": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "HH:MM or HH:MM:SS"}
+            ),
+            "notes": TinyMCE(attrs={"rows": 6, "class": "form-control"}),
         }
 
     def clean_duration(self):
@@ -211,6 +223,11 @@ class QualificationAssignForm(forms.ModelForm):
         self.student = student
         self.fields["date_awarded"].label = "Date Awarded (optional)"
         self.fields["expiration_date"].label = "Expiration Date (optional)"
+
+        # Filter out obsolete qualifications from the dropdown
+        self.fields["qualification"].queryset = ClubQualificationType.objects.filter(
+            is_obsolete=False
+        ).order_by("name")
 
     from datetime import date  # at the top of forms.py
 

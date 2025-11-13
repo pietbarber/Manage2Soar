@@ -35,10 +35,12 @@ from instructors.forms import (
     SyllabusDocumentForm,
 )
 from instructors.models import (
+    ClubQualificationType,
     GroundInstruction,
     GroundLessonScore,
     InstructionReport,
     LessonScore,
+    MemberQualification,
     StudentProgressSnapshot,
     SyllabusDocument,
     TrainingLesson,
@@ -278,7 +280,58 @@ def fill_instruction_report(request, student_id, report_date):
                         report=report, lesson=lesson, score=score
                     )
 
-            messages.success(request, "Flight instruction logged successfully.")
+            # Check if qualification data was included and process it
+            qual_qualification_id = request.POST.get("qual_qualification")
+            if qual_qualification_id and student:
+                try:
+                    qualification = ClubQualificationType.objects.get(
+                        pk=qual_qualification_id
+                    )
+                    is_qualified = request.POST.get("qual_is_qualified") == "on"
+                    date_awarded = request.POST.get("qual_date_awarded") or None
+                    expiration_date = request.POST.get("qual_expiration_date") or None
+                    notes = request.POST.get("qual_notes", "")
+
+                    # Parse dates if provided
+                    if date_awarded:
+                        try:
+                            date_awarded = datetime.strptime(
+                                date_awarded, "%Y-%m-%d"
+                            ).date()
+                        except ValueError:
+                            date_awarded = None
+                    if expiration_date:
+                        try:
+                            expiration_date = datetime.strptime(
+                                expiration_date, "%Y-%m-%d"
+                            ).date()
+                        except ValueError:
+                            expiration_date = None
+
+                    # Create or update qualification
+                    MemberQualification.objects.update_or_create(
+                        member=student,
+                        qualification=qualification,
+                        defaults={
+                            "is_qualified": is_qualified,
+                            "instructor": request.user,
+                            "date_awarded": date_awarded,
+                            "expiration_date": expiration_date,
+                            "notes": notes,
+                        },
+                    )
+                    messages.success(
+                        request,
+                        "Flight instruction and qualification saved successfully.",
+                    )
+                except ClubQualificationType.DoesNotExist:
+                    messages.warning(
+                        request,
+                        "Flight instruction saved, but qualification assignment failed.",
+                    )
+            else:
+                messages.success(request, "Flight instruction logged successfully.")
+
             return redirect(
                 "instructors:member_instruction_record", member_id=student.id
             )
@@ -302,7 +355,46 @@ def fill_instruction_report(request, student_id, report_date):
             initial_data.append({"lesson": lesson.id, "score": val})
 
         formset = LessonScoreSimpleFormSet(initial=initial_data)
-        form_rows = list(zip(formset.forms, lessons))
+
+    # Calculate max scores for each lesson for this student
+    max_scores = []
+    for lesson in lessons:
+        # Get all scores for this lesson and student (both ground and flight)
+        ground_scores = GroundLessonScore.objects.filter(
+            session__student=student, lesson=lesson
+        ).values_list("score", flat=True)
+
+        flight_scores = LessonScore.objects.filter(
+            report__student=student, lesson=lesson
+        ).values_list("score", flat=True)
+
+        all_scores = list(ground_scores) + list(flight_scores)
+
+        # Convert scores to integers for comparison (skip "!" scores)
+        numeric_scores = []
+        for score in all_scores:
+            if score and score != "!" and score.isdigit():
+                numeric_scores.append(int(score))
+
+        max_score = str(max(numeric_scores)) if numeric_scores else ""
+        max_scores.append(max_score)
+
+    form_rows = list(zip(formset.forms, lessons, max_scores))
+
+    # Get existing qualifications and create qualification form
+    existing_qualifications = (
+        MemberQualification.objects.filter(member=student)
+        .select_related("qualification")
+        .order_by("-date_awarded")
+    )
+    qualification_form = QualificationAssignForm(
+        instructor=request.user, student=student
+    )
+
+    # Get all qualifications for the dropdown
+    all_qualifications = ClubQualificationType.objects.filter(
+        is_obsolete=False
+    ).order_by("name")
 
     return render(
         request,
@@ -313,6 +405,9 @@ def fill_instruction_report(request, student_id, report_date):
             "formset": formset,
             "form_rows": form_rows,
             "report_date": report_date,
+            "existing_qualifications": existing_qualifications,
+            "qualification_form": qualification_form,
+            "all_qualifications": all_qualifications,
         },
     )
 
@@ -586,40 +681,165 @@ def log_ground_instruction(request):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
-        form = GroundInstructionForm(request.POST)
-        formset = GroundLessonScoreFormSet(request.POST)
-        formset.total_form_count()  # ensures management form counts
+        form_type = request.POST.get("form_type")
 
-        if form.is_valid() and formset.is_valid():
-            session = form.save(commit=False)
-            session.instructor = request.user
-            session.student = student
-            session.save()
-            # Create scores for each submitted lesson
-            for entry in formset.cleaned_data:
-                lid = entry.get("lesson")
-                sc = entry.get("score")
-                if lid and sc:
-                    lesson = TrainingLesson.objects.get(pk=lid)
-                    GroundLessonScore.objects.create(
-                        session=session, lesson=lesson, score=sc
-                    )
-            messages.success(request, "Ground instruction session logged successfully.")
-            if student is not None:
-                return redirect(
-                    "instructors:member_instruction_record", member_id=student.id
-                )
+        if form_type == "qualification" and student:
+            # Handle qualification assignment
+            qualification_form = QualificationAssignForm(
+                request.POST, instructor=request.user, student=student
+            )
+            if qualification_form.is_valid():
+                qualification_form.save()
+                messages.success(request, "Qualification assigned successfully.")
+                return redirect(f"{request.path}?student={student.id}")
             else:
-                messages.error(request, "No student selected.")
-                return redirect("instructors:log_ground_instruction")
+                messages.error(request, "Please correct the qualification form errors.")
+            # Initialize ground instruction forms for re-rendering
+            form = GroundInstructionForm()
+            initial = [{"lesson": l.id} for l in lessons]
+            formset = GroundLessonScoreFormSet(initial=initial)
         else:
-            messages.error(request, "Please correct the errors below.")
+            # Handle ground instruction logging
+            form = GroundInstructionForm(request.POST)
+            formset = GroundLessonScoreFormSet(request.POST)
+            formset.total_form_count()  # ensures management form counts
+            qualification_form = (
+                QualificationAssignForm(instructor=request.user, student=student)
+                if student
+                else None
+            )
+
+            if form.is_valid() and formset.is_valid():
+                session = form.save(commit=False)
+                session.instructor = request.user
+                session.student = student
+                session.save()
+                # Create scores for each submitted lesson
+                for entry in formset.cleaned_data:
+                    lid = entry.get("lesson")
+                    sc = entry.get("score")
+                    if lid and sc:
+                        lesson = TrainingLesson.objects.get(pk=lid)
+                        GroundLessonScore.objects.create(
+                            session=session, lesson=lesson, score=sc
+                        )
+
+                # Check if qualification data was included and process it
+                qual_qualification_id = request.POST.get("qual_qualification")
+                if qual_qualification_id and student:
+                    try:
+                        qualification = ClubQualificationType.objects.get(
+                            pk=qual_qualification_id
+                        )
+                        is_qualified = request.POST.get("qual_is_qualified") == "on"
+                        date_awarded = request.POST.get("qual_date_awarded") or None
+                        expiration_date = (
+                            request.POST.get("qual_expiration_date") or None
+                        )
+                        notes = request.POST.get("qual_notes", "")
+
+                        # Parse dates if provided
+                        from datetime import datetime
+
+                        if date_awarded:
+                            try:
+                                date_awarded = datetime.strptime(
+                                    date_awarded, "%Y-%m-%d"
+                                ).date()
+                            except ValueError:
+                                date_awarded = None
+                        if expiration_date:
+                            try:
+                                expiration_date = datetime.strptime(
+                                    expiration_date, "%Y-%m-%d"
+                                ).date()
+                            except ValueError:
+                                expiration_date = None
+
+                        # Create or update qualification
+                        MemberQualification.objects.update_or_create(
+                            member=student,
+                            qualification=qualification,
+                            defaults={
+                                "is_qualified": is_qualified,
+                                "instructor": request.user,
+                                "date_awarded": date_awarded,
+                                "expiration_date": expiration_date,
+                                "notes": notes,
+                            },
+                        )
+                        messages.success(
+                            request,
+                            "Ground instruction session and qualification saved successfully.",
+                        )
+                    except ClubQualificationType.DoesNotExist:
+                        messages.warning(
+                            request,
+                            "Ground instruction saved, but qualification assignment failed.",
+                        )
+                else:
+                    messages.success(
+                        request, "Ground instruction session logged successfully."
+                    )
+                if student is not None:
+                    return redirect(
+                        "instructors:member_instruction_record", member_id=student.id
+                    )
+                else:
+                    messages.error(request, "No student selected.")
+                    return redirect("instructors:log_ground_instruction")
+            else:
+                messages.error(request, "Please correct the errors below.")
     else:
         form = GroundInstructionForm()
         initial = [{"lesson": l.id} for l in lessons]
         formset = GroundLessonScoreFormSet(initial=initial)
 
-    form_rows = list(zip(formset.forms, lessons))
+    # Calculate max scores for each lesson if we have a student
+    max_scores = []
+    if student:
+        for lesson in lessons:
+            # Get all scores for this lesson and student (both ground and flight)
+            ground_scores = GroundLessonScore.objects.filter(
+                session__student=student, lesson=lesson
+            ).values_list("score", flat=True)
+
+            flight_scores = LessonScore.objects.filter(
+                report__student=student, lesson=lesson
+            ).values_list("score", flat=True)
+
+            all_scores = list(ground_scores) + list(flight_scores)
+
+            # Convert scores to integers for comparison (skip "!" scores)
+            numeric_scores = []
+            for score in all_scores:
+                if score and score != "!" and score.isdigit():
+                    numeric_scores.append(int(score))
+
+            max_score = str(max(numeric_scores)) if numeric_scores else ""
+            max_scores.append(max_score)
+    else:
+        max_scores = [""] * len(lessons)
+
+    # Get existing qualifications and create qualification form
+    existing_qualifications = []
+    qualification_form = None
+    if student:
+        existing_qualifications = (
+            MemberQualification.objects.filter(member=student)
+            .select_related("qualification")
+            .order_by("-date_awarded")
+        )
+        qualification_form = QualificationAssignForm(
+            instructor=request.user, student=student
+        )
+
+    # Get all qualifications for the dropdown
+    all_qualifications = ClubQualificationType.objects.filter(
+        is_obsolete=False
+    ).order_by("name")
+
+    form_rows = list(zip(formset.forms, lessons, max_scores))
     return render(
         request,
         "instructors/log_ground_instruction.html",
@@ -628,6 +848,9 @@ def log_ground_instruction(request):
             "formset": formset,
             "form_rows": form_rows,
             "student": student,
+            "existing_qualifications": existing_qualifications,
+            "qualification_form": qualification_form,
+            "all_qualifications": all_qualifications,
         },
     )
 
