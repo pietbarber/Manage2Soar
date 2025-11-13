@@ -17,6 +17,12 @@ erDiagram
         datetime updated_at
     }
 
+    PageRolePermission {
+        int id PK
+        int page_id FK
+        string role_name
+    }
+
     Document {
         int id PK
         int page_id FK
@@ -74,6 +80,7 @@ erDiagram
 
     Page ||--o{ Page : parent_child
     Page ||--o{ Document : contains_documents
+    Page ||--o{ PageRolePermission : role_restrictions
     HomePageContent ||--o{ HomePageImage : has_images
     Member ||--o{ Document : uploaded_by
     Member ||--o{ SiteFeedback : submitted_by
@@ -85,9 +92,18 @@ erDiagram
 
 ### `Page`
 - Hierarchical CMS pages with parent-child relationships
-- Supports both public and member-only content
+- **Role-based access control**: Three access levels - public, member-only, and role-restricted
 - Auto-generates slugs from titles
 - Contains rich HTML content via TinyMCE
+- Access control methods: `can_user_access()`, `has_role_restrictions()`, `get_required_roles()`
+- Validation prevents public pages from having role restrictions
+
+### `PageRolePermission` (Issue #239)
+- Many-to-Many relationship for role-based page access control
+- Restricts private pages to specific member roles (director, treasurer, instructor, etc.)
+- Unique constraint prevents duplicate role assignments per page
+- OR logic: users need ANY of the assigned roles to access the page
+- Only applies to private pages (`is_public=False`)
 
 ### `Document`
 - File attachments linked to CMS pages
@@ -132,9 +148,17 @@ erDiagram
 
 ### Content Management
 - Hierarchical page structure with parent-child relationships
-- Public/private content segregation
+- **Three-tier access control**: Public (everyone) → Private (active members) → Role-restricted (specific positions)
 - File upload with intelligent path management
 - Rich text editing via TinyMCE integration
+
+### Role-Based Access Control (Issue #239)
+- **Page Access Levels**: Public pages, member-only pages, and role-restricted pages
+- **Role Integration**: Uses Member model boolean fields (director, treasurer, instructor, etc.)
+- **OR Logic Access**: Users with ANY required role gain access (not ALL roles needed)
+- **Admin Interface**: Intuitive TabularInline for managing role permissions with visual indicators
+- **Template Integration**: Role badges and indicators for easy identification of access restrictions
+- **Validation**: Prevents invalid configurations (public pages can't have role restrictions)
 
 ### Workflow Management
 - Both `SiteFeedback` and `VisitorContact` include status tracking
