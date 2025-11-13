@@ -1,46 +1,160 @@
 {% extends "base.html" %}
+{% load dict_extras %}
+{% load static %}
 {% block title %}Log Flight Instruction{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/instructors.css' %}">
+{% endblock %}
+
 {% block content %}
-<h2>Log Flight Instruction for {{ student.full_display_name }} – {{ report_date|date:"F j, Y" }}</h2>
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+      <!-- Page Header following guide pattern -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="display-6 fw-bold text-primary mb-1">
+            <i class="bi bi-airplane me-2"></i>Log Flight Instruction
+          </h1>
+          <p class="text-muted mb-0">
+            Student: <strong>{{ student.full_display_name }}</strong> •
+            Date: <strong>{{ report_date|date:"F j, Y" }}</strong>
+          </p>
+        </div>
+        <div class="text-end">
+          <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-secondary btn-modern">
+            <i class="bi bi-arrow-left me-2"></i>Back to Overview
+          </a>
+        </div>
+      </div>
 
-<form method="post">
-  {% csrf_token %}
-  {{ report_form.media }}
-  {{ formset.management_form }}
-  {% for form in formset %}
-  {{ form.non_field_errors }}
-  {{ form.errors }}
-  {% endfor %}
+      {{ report_form.media }}
+      <form method="post" class="needs-validation" novalidate>
+        {% csrf_token %}
+        {{ formset.management_form }}
+        {% for form in formset %}
+          {{ form.non_field_errors }}
+          {{ form.errors }}
+        {% endfor %}
 
-  <h4>Session Summary</h4>
-  {{ report_form.report_text.label_tag }}
-  {{ report_form.report_text }}
+        <!-- Session Summary Card following guide pattern -->
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-file-text me-2"></i>Session Summary
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="contact-item">
+              <div class="contact-label">
+                <i class="bi bi-journal-text text-primary me-2"></i>
+                <strong>{{ report_form.report_text.label }}</strong>
+              </div>
+              <div class="contact-value">
+                {{ report_form.report_text|add_class:"form-control" }}
+                <div class="form-text">Detailed summary of the flight instruction session</div>
+              </div>
+            </div>
 
-  <div class="form-check mt-3 mb-4">
-    {{ report_form.simulator }} {{ report_form.simulator.label_tag }}
+            <div class="contact-item">
+              <div class="contact-label">
+                <i class="bi bi-display text-primary me-2"></i>
+                <strong>Session Type</strong>
+              </div>
+              <div class="contact-value">
+                <div class="form-check">
+                  {{ report_form.simulator|add_class:"form-check-input" }}
+                  <label class="form-check-label" for="{{ report_form.simulator.id_for_label }}">
+                    {{ report_form.simulator.label }}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lesson Scores Card following guide pattern -->
+        <div class="card contact-info mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-clipboard-check me-2"></i>Lesson Scores
+            </h5>
+          </div>
+          <div class="card-body">
+            {% if form_rows %}
+              <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0 lesson-score-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col" class="text-center" style="width: 80px;">
+                        <i class="bi bi-hash me-1"></i>Code
+                      </th>
+                      <th scope="col">
+                        <i class="bi bi-book me-1"></i>Lesson Title
+                      </th>
+                      <th scope="col" class="text-center" style="width: 120px;">
+                        <i class="bi bi-star me-1"></i>Score
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for form, lesson in form_rows %}
+                      <tr>
+                        <td class="text-center fw-bold">
+                          <span class="badge bg-primary">{{ lesson.code }}</span>
+                        </td>
+                        <td>
+                          <div class="fw-medium">{{ lesson.title }}</div>
+                        </td>
+                        <td class="text-center">
+                          {{ form.score|add_class:"form-select form-select-sm" }}
+                          {{ form.lesson.as_hidden }}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-info-circle fa-2x mb-2"></i>
+                <p class="mb-0">No lessons available to score for this session.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Action Buttons following guide pattern -->
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-outline-secondary btn-modern">
+              <i class="bi bi-x-circle me-2"></i>Cancel
+            </a>
+          </div>
+          <button type="submit" class="btn btn-primary btn-modern">
+            <i class="bi bi-check-circle me-2"></i>Save Flight Instruction
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
+</div>
 
-  <h4 class="mt-5">Lesson Scores</h4>
-  <table class="table table-bordered w-auto table-striped table-hover">
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>Title</th>
-        <th>Score</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for form, lesson in form_rows %}
-        <tr>
-          <td class="text-end">{{ lesson.code }}</td>
-          <td class="text-end">{{ lesson.title }}</td>
-          <td>{{ form.score }} {{ form.lesson.as_hidden }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- Back to top button following guide pattern -->
+<button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="display: none;" id="backToTop">
+  <i class="bi bi-chevron-up"></i>
+</button>
 
-  <button type="submit" class="btn btn-success">Save Flight Instruction</button>
-  <a href="{% url 'instructors:syllabus_overview' %}" class="btn btn-secondary">Cancel</a>
-</form>
+<script>
+// Show/hide back to top button
+window.addEventListener('scroll', function() {
+  const backToTop = document.getElementById('backToTop');
+  if (window.pageYOffset > 300) {
+    backToTop.style.display = 'block';
+  } else {
+    backToTop.style.display = 'none';
+  }
+});
+</script>
 {% endblock %}
