@@ -874,9 +874,9 @@ def is_instructor(user):
 
 
 ####################################################
-# assign_qualification
+# assign_qualification_modal
 #
-# Assigns or revokes a club qualification for a given member.
+# HTMX endpoint for qualification assignment modal.
 # Accessible only to active members who are instructors.
 #
 # URL Parameters:
@@ -884,21 +884,28 @@ def is_instructor(user):
 #
 # POST Behavior:
 # - Validates QualificationAssignForm with instructor and student context
-# - Saves form and redirects to member view on success
+# - Returns success template with updated qualifications on success
+# - Returns form template with errors on validation failure
 #
 # GET Behavior:
 # - Instantiates empty form prepopulated with instructor and student
-# - Renders 'assign_qualification.html'
+# - Returns form partial template for modal content
 #
-# Context:
-# - form: QualificationAssignForm instance
-# - student: Member instance being qualified
+# Templates:
+# - GET: instructors/_qualification_form_partial.html
+# - POST success: instructors/_qualification_success.html
+# - POST error: instructors/_qualification_form_partial.html (with errors)
 ####################################################
 
 
 @active_member_required
 @user_passes_test(is_instructor)
-def assign_qualification(request, member_id):
+def assign_qualification_modal(request, member_id):
+    """
+    HTMX endpoint for qualification assignment modal.
+    GET: Returns form partial for modal content
+    POST: Processes form and returns success/error content
+    """
     student = get_object_or_404(Member, pk=member_id)
 
     if request.method == "POST":
@@ -906,17 +913,38 @@ def assign_qualification(request, member_id):
             request.POST, instructor=request.user, student=student
         )
         if form.is_valid():
-            form.save()
-            return redirect("members:member_view", member_id=member_id)
+            qualification = form.save()
+            # Return success content with updated qualifications list
+            updated_qualifications = (
+                MemberQualification.objects.filter(member=student)
+                .select_related("qualification")
+                .order_by("-date_awarded")
+            )
+            return render(
+                request,
+                "instructors/_qualification_success.html",
+                {
+                    "member": student,
+                    "qualification": qualification,
+                    "updated_qualifications": updated_qualifications,
+                },
+            )
+        # If form has errors, fall through to return form with errors
     else:
         form = QualificationAssignForm(instructor=request.user, student=student)
 
+    # Get all qualifications for the dropdown
+    all_qualifications = ClubQualificationType.objects.filter(
+        is_obsolete=False
+    ).order_by("name")
+
     return render(
         request,
-        "instructors/assign_qualification.html",
+        "instructors/_qualification_form_partial.html",
         {
             "form": form,
-            "student": student,
+            "member": student,
+            "all_qualifications": all_qualifications,
         },
     )
 

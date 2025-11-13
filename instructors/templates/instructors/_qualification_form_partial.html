@@ -1,0 +1,125 @@
+{% load dict_extras %}
+
+<!-- Qualification Assignment Form Partial -->
+<form method="post" hx-post="{% url 'instructors:assign_qualification_modal' member.id %}" hx-target="#qualification-modal-content" hx-swap="innerHTML">
+  {% csrf_token %}
+
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      <strong>Please correct the following errors:</strong>
+      <ul class="mb-0 mt-2">
+        {% for field, errors in form.errors.items %}
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-12">
+      <label for="{{ form.qualification.id_for_label }}" class="form-label">
+        <strong>
+          <i class="bi bi-award me-2"></i>Qualification
+        </strong>
+      </label>
+      <select name="qualification" id="{{ form.qualification.id_for_label }}" class="form-select qualification-select">
+        <option value="">Select a qualification...</option>
+        {% for qual in all_qualifications %}
+          <option value="{{ qual.pk }}"
+                  data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}"
+                  {% if form.qualification.value == qual.pk %}selected{% endif %}>
+            {{ qual.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">
+        <strong>
+          <i class="bi bi-check-circle me-2"></i>Status
+        </strong>
+      </label>
+      <div class="form-check">
+        {{ form.is_qualified|add_class:"form-check-input" }}
+        <label class="form-check-label" for="{{ form.is_qualified.id_for_label }}">
+          {{ form.is_qualified.label }}
+        </label>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <label for="{{ form.date_awarded.id_for_label }}" class="form-label">
+        <strong>
+          <i class="bi bi-calendar-event me-2"></i>{{ form.date_awarded.label }}
+        </strong>
+      </label>
+      {{ form.date_awarded|add_class:"form-control" }}
+    </div>
+
+    <div class="col-12">
+      <label for="{{ form.expiration_date.id_for_label }}" class="form-label">
+        <strong>
+          <i class="bi bi-calendar-x me-2"></i>{{ form.expiration_date.label }}
+        </strong>
+      </label>
+      {{ form.expiration_date|add_class:"form-control" }}
+    </div>
+
+    <div class="col-12">
+      <label for="{{ form.notes.id_for_label }}" class="form-label">
+        <strong>
+          <i class="bi bi-journal-text me-2"></i>Notes
+        </strong>
+      </label>
+      {{ form.notes|add_class:"form-control" }}
+      <div class="form-text">Optional additional information about this qualification</div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-4">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+      <i class="bi bi-x-circle me-2"></i>Cancel
+    </button>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check-circle me-2"></i>Assign Qualification
+    </button>
+  </div>
+</form>
+
+<script>
+// Enhanced qualification dropdown with icons for modal
+document.addEventListener('DOMContentLoaded', function() {
+  const qualSelect = document.querySelector('#qualification-modal .qualification-select');
+  if (qualSelect) {
+    qualSelect.addEventListener('change', function() {
+      const selectedOption = this.options[this.selectedIndex];
+      const iconUrl = selectedOption.getAttribute('data-icon');
+
+      if (iconUrl && this.value) {
+        let iconPreview = document.getElementById('modal-qualification-icon-preview');
+        if (!iconPreview) {
+          iconPreview = document.createElement('img');
+          iconPreview.id = 'modal-qualification-icon-preview';
+          iconPreview.className = 'qualification-icon ms-2';
+          iconPreview.width = 24;
+          iconPreview.height = 24;
+          iconPreview.style.verticalAlign = 'middle';
+          this.parentNode.appendChild(iconPreview);
+        }
+        iconPreview.src = iconUrl;
+        iconPreview.alt = selectedOption.text;
+        iconPreview.style.display = 'inline-block';
+        iconPreview.title = selectedOption.text;
+      } else {
+        const iconPreview = document.getElementById('modal-qualification-icon-preview');
+        if (iconPreview) {
+          iconPreview.style.display = 'none';
+        }
+      }
+    });
+  }
+});
+</script>
