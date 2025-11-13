@@ -26,12 +26,12 @@
     <div class="alert alert-info mb-3">
       <i class="bi bi-shield-lock me-2"></i>
       <strong>Access Restricted:</strong>
-      {% if not page.has_role_restrictions %}
+      {% if not page_has_role_restrictions %}
         This page is available to all active club members.
       {% else %}
         This page is restricted to members with the following roles:
-        {% for role in page.get_required_roles %}
-          <span class="badge bg-primary ms-1">{{ role|title }}</span>
+        {% for role in page_required_roles %}
+          <span class="badge bg-primary ms-1">{{ role }}</span>
         {% endfor %}
       {% endif %}
     </div>
@@ -66,12 +66,12 @@
             <td>
               {% if item.page.is_public %}
                 <span class="badge bg-success">Public</span>
-              {% elif not item.page.has_role_restrictions %}
+              {% elif not item.has_role_restrictions %}
                 <span class="badge bg-info">Members</span>
               {% else %}
                 <span class="badge bg-warning text-dark">Roles</span>
-                {% for role in item.page.get_required_roles %}
-                  <br><small class="text-muted">{{ role|title }}</small>
+                {% for role in item.required_roles %}
+                  <br><small class="text-muted">{{ role }}</small>
                 {% endfor %}
               {% endif %}
             </td>

@@ -11,8 +11,25 @@ from utils.upload_entropy import upload_homepage_gallery
 
 class PageRolePermission(models.Model):
     """
-    Defines which member roles can access a CMS page.
-    Only applies to private pages (is_public=False).
+    Defines role-based access control for CMS pages.
+
+    This model creates a Many-to-Many relationship between Pages and member roles,
+    allowing fine-grained access control for sensitive content.
+
+    Business Rules:
+    - Only applies to private pages (is_public=False)
+    - Uses OR logic: users need ANY of the assigned roles (not ALL)
+    - Role choices map to Member model boolean fields
+    - Public pages cannot have role restrictions (enforced by validation)
+
+    Examples:
+    - Board meeting minutes: directors only
+    - Financial reports: directors AND treasurers (separate permissions)
+    - Instructor resources: instructors, duty_officers, directors
+
+    Attributes:
+        page: Foreign key to the Page this permission applies to
+        role_name: The specific member role required (from ROLE_CHOICES)
     """
 
     # Role choices based on Member model boolean fields
@@ -43,11 +60,66 @@ class PageRolePermission(models.Model):
         verbose_name = "Page Role Permission"
         verbose_name_plural = "Page Role Permissions"
 
+    def clean(self):
+        """
+        Validate business rules for role permissions.
+
+        Ensures that role permissions can only be added to private pages,
+        preventing invalid configurations where public pages have role restrictions.
+
+        Raises:
+            ValidationError: If attempting to add role permissions to a public page
+
+        Note:
+            This validation is called automatically during save() and in Django admin
+            when full_clean() is invoked.
+        """
+        from django.core.exceptions import ValidationError
+
+        if self.page_id and self.page.is_public:
+            raise ValidationError(
+                "Role permissions cannot be added to public pages. "
+                "Set the page to private (uncheck 'is_public') first."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.page.title} - {self.get_role_name_display()}"
 
 
 class Page(models.Model):
+    """
+    CMS Page model supporting hierarchical content with role-based access control.
+
+    Provides a flexible content management system with three levels of access control:
+    1. Public pages - accessible to everyone
+    2. Private pages - accessible to active members only
+    3. Role-restricted pages - accessible to members with specific roles
+
+    Features:
+    - Hierarchical page structure with parent-child relationships
+    - Rich HTML content via TinyMCE integration
+    - Automatic slug generation from titles
+    - Role-based access control via PageRolePermission
+    - File attachments via Document model
+
+    Access Control Logic:
+    - Public pages (is_public=True): No restrictions
+    - Private pages (is_public=False, no roles): Active members only
+    - Role-restricted pages (is_public=False, with roles): Specific roles only
+
+    Attributes:
+        title: Display name for the page
+        slug: URL-friendly identifier (auto-generated if not provided)
+        parent: Optional parent page for hierarchical structure
+        content: Rich HTML content (TinyMCE field)
+        is_public: Controls base access level (public vs. private)
+        role_permissions: Related PageRolePermission objects for fine-grained access
+    """
+
     title = models.CharField(max_length=200)
     slug = models.SlugField(
         max_length=100,
@@ -76,12 +148,33 @@ class Page(models.Model):
         return self.title
 
     def get_absolute_url(self):
+        """
+        Return the absolute URL path for this CMS page.
+
+        For top-level pages: /cms/{slug}/
+        For nested pages: /cms/{parent_slug}/{slug}/
+
+        Returns:
+            str: The URL path for accessing this page
+        """
         if self.parent:
             return f"/cms/{self.parent.slug}/{self.slug}/"
         return f"/cms/{self.slug}/"
 
     def clean(self):
-        """Validate that public pages cannot have role restrictions."""
+        """
+        Validate business rules for CMS pages.
+
+        Ensures that pages with role restrictions cannot be made public,
+        maintaining security by preventing accidental exposure of restricted content.
+
+        Raises:
+            ValidationError: If attempting to make a page with role restrictions public
+
+        Note:
+            Only validates existing pages (with pk) since Many-to-Many relationships
+            don't exist during initial creation.
+        """
         from django.core.exceptions import ValidationError
 
         # Only check if this is an update (has pk) since M2M relations don't exist on create
@@ -92,26 +185,75 @@ class Page(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        """
+        Save the page with automatic slug generation and validation.
+
+        Automatically generates a URL-friendly slug from the title if none provided,
+        and runs model validation before saving to ensure data integrity.
+
+        Args:
+            *args, **kwargs: Standard Django save() parameters
+        """
         if not self.slug:
             self.slug = slugify(self.title)
         self.clean()
         super().save(*args, **kwargs)
 
     def has_role_restrictions(self):
-        """Return True if this page has any role restrictions."""
+        """
+        Check if this page has any role-based access restrictions.
+
+        Returns:
+            bool: True if the page has role restrictions, False otherwise.
+                 Public pages and pages without role permissions return False.
+        """
         return self.role_permissions.exists()
 
     def get_required_roles(self):
-        """Return list of required role names for this page."""
+        """
+        Get the list of member roles required to access this page.
+
+        Returns:
+            list[str]: List of role names (e.g., ['director', 'treasurer'])
+                      required for access. Empty list if no role restrictions.
+
+        Note:
+            This method can cause database queries. For performance-sensitive
+            code, use prefetch_related('role_permissions') on the queryset.
+        """
         return list(self.role_permissions.values_list("role_name", flat=True))
 
     def can_user_access(self, user):
         """
-        Check if a user can access this page based on role restrictions.
-        Returns True if:
-        - Page is public, OR
-        - User is active member and no role restrictions, OR
-        - User has at least one of the required roles
+        Check if a user can access this page based on role-based access control.
+
+        Access is granted using a three-tier system:
+        1. Public pages: Accessible to everyone (including anonymous users)
+        2. Private pages without roles: Accessible to all active members
+        3. Role-restricted pages: Only accessible to members with required roles
+
+        Args:
+            user: Django User instance (can be anonymous)
+
+        Returns:
+            bool: True if the user can access this page, False otherwise
+
+        Access Logic:
+            - Public pages (is_public=True): Always accessible
+            - Private pages: Requires active membership status
+            - Role restrictions: Uses OR logic - user needs ANY of the required roles
+
+        Examples:
+            >>> page.is_public = True
+            >>> page.can_user_access(anonymous_user)  # True
+
+            >>> page.is_public = False  # No role restrictions
+            >>> page.can_user_access(active_member)  # True
+
+            >>> page.is_public = False
+            >>> page.role_permissions.add(director_role)
+            >>> page.can_user_access(director)  # True
+            >>> page.can_user_access(regular_member)  # False
         """
         if self.is_public:
             return True

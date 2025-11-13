@@ -49,20 +49,41 @@ def cms_page(request, **kwargs):
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1
+    # Also prefetch role permissions to avoid N+1 queries in template
     subpages = []
-    children = page.children.annotate(
-        doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
-    ).order_by("title")
+    children = (
+        page.children.annotate(
+            doc_count=Count("documents"), doc_max=Max("documents__uploaded_at")
+        )
+        .prefetch_related("role_permissions")
+        .order_by("title")
+    )
     for child in children:
         # last updated is the later of the page's updated_at and latest document upload
         last_updated = child.updated_at
         if getattr(child, "doc_max", None) and child.doc_max > last_updated:
             last_updated = child.doc_max
+
+        # Get role information for display (avoiding template database queries)
+        required_roles = []
+        if not child.is_public and child.has_role_restrictions():
+            # Get role display names from the cached prefetch
+            role_names = [rp.role_name for rp in child.role_permissions.all()]
+            # Convert to display names using the model choices
+            from .models import PageRolePermission
+
+            role_choices_dict = dict(PageRolePermission.ROLE_CHOICES)
+            required_roles = [
+                role_choices_dict.get(role, role.title()) for role in role_names
+            ]
+
         subpages.append(
             {
                 "page": child,
                 "doc_count": getattr(child, "doc_count", 0),
                 "last_updated": last_updated,
+                "has_role_restrictions": child.has_role_restrictions(),
+                "required_roles": required_roles,
             }
         )
 
@@ -88,6 +109,18 @@ def cms_page(request, **kwargs):
     # Whether the current page has documents (avoid calling .exists in template)
     has_documents = page.documents.exists()
 
+    # Get role information for the current page (avoiding template database queries)
+    page_required_roles = []
+    if not page.is_public and page.has_role_restrictions():
+        # Get role display names - we need to fetch them since page wasn't prefetched
+        from .models import PageRolePermission
+
+        role_names = list(page.role_permissions.values_list("role_name", flat=True))
+        role_choices_dict = dict(PageRolePermission.ROLE_CHOICES)
+        page_required_roles = [
+            role_choices_dict.get(role, role.title()) for role in role_names
+        ]
+
     return render(
         request,
         "cms/page.html",
@@ -96,6 +129,8 @@ def cms_page(request, **kwargs):
             "subpages": subpages,
             "breadcrumbs": breadcrumbs,
             "has_documents": has_documents,
+            "page_has_role_restrictions": page.has_role_restrictions(),
+            "page_required_roles": page_required_roles,
         },
     )
 
@@ -108,7 +143,12 @@ def homepage(request):
     if request.path.startswith("/cms"):
         from .models import Page
 
-        top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
+        # Use select_related and prefetch_related to avoid N+1 queries
+        top_pages_qs = (
+            Page.objects.filter(parent__isnull=True)
+            .prefetch_related("role_permissions")
+            .order_by("title")
+        )
         pages = []
         for p in top_pages_qs:
             # Use the page's built-in access control method
@@ -118,6 +158,19 @@ def homepage(request):
             if not can_view:
                 continue
 
+            # Get role information for display (avoiding template database queries)
+            required_roles = []
+            if not p.is_public and p.has_role_restrictions():
+                # Get role display names from the cached prefetch
+                role_names = [rp.role_name for rp in p.role_permissions.all()]
+                # Convert to display names using the model choices
+                from .models import PageRolePermission
+
+                role_choices_dict = dict(PageRolePermission.ROLE_CHOICES)
+                required_roles = [
+                    role_choices_dict.get(role, role.title()) for role in role_names
+                ]
+
             pages.append(
                 {
                     "page": p,
@@ -125,6 +178,8 @@ def homepage(request):
                     "doc_count": p.documents.count() + p.children.count(),
                     "is_public": p.is_public,
                     "can_view": can_view,
+                    "has_role_restrictions": p.has_role_restrictions(),
+                    "required_roles": required_roles,
                 }
             )
         return render(request, "cms/index.html", {"pages": pages})
@@ -162,7 +217,12 @@ def homepage(request):
     # Fallback: show CMS index of top-level pages
     from .models import Page
 
-    top_pages_qs = Page.objects.filter(parent__isnull=True).order_by("title")
+    # Use select_related and prefetch_related to avoid N+1 queries
+    top_pages_qs = (
+        Page.objects.filter(parent__isnull=True)
+        .prefetch_related("role_permissions")
+        .order_by("title")
+    )
     pages = []
     for p in top_pages_qs:
         # Use the page's built-in access control method
@@ -171,6 +231,19 @@ def homepage(request):
         if not can_view:
             continue
 
+        # Get role information for display (avoiding template database queries)
+        required_roles = []
+        if not p.is_public and p.has_role_restrictions():
+            # Get role display names from the cached prefetch
+            role_names = [rp.role_name for rp in p.role_permissions.all()]
+            # Convert to display names using the model choices
+            from .models import PageRolePermission
+
+            role_choices_dict = dict(PageRolePermission.ROLE_CHOICES)
+            required_roles = [
+                role_choices_dict.get(role, role.title()) for role in role_names
+            ]
+
         pages.append(
             {
                 "page": p,
@@ -178,6 +251,8 @@ def homepage(request):
                 "doc_count": p.documents.count() + p.children.count(),
                 "is_public": p.is_public,
                 "can_view": can_view,
+                "has_role_restrictions": p.has_role_restrictions(),
+                "required_roles": required_roles,
             }
         )
     return render(request, "cms/index.html", {"pages": pages})

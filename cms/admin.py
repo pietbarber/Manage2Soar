@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 
 from .models import (
@@ -115,11 +116,24 @@ class PageAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """Add validation when saving"""
         try:
+            # Call model's clean method to run custom validation
+            obj.full_clean()
             super().save_model(request, obj, form, change)
-        except Exception as e:
+        except ValidationError as e:
             from django.contrib import messages
 
-            messages.error(request, str(e))
+            # Handle validation errors specifically
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        messages.error(request, f"{field}: {error}")
+            elif hasattr(e, "messages"):
+                for error in e.messages:
+                    messages.error(request, error)
+            else:
+                messages.error(request, str(e))
+            # Re-raise the exception so the save operation fails properly
+            raise
 
 
 @admin.register(PageRolePermission)

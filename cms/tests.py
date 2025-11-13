@@ -706,14 +706,31 @@ class PageAccessControlTests(TestCase):
         """Test that public pages cannot have role restrictions."""
         from django.core.exceptions import ValidationError
 
-        from .models import PageRolePermission
+        from .models import Page, PageRolePermission
 
-        # Create a role permission for public page (should be invalid)
-        PageRolePermission.objects.create(page=self.public_page, role_name="director")
-
-        # Validation should fail
+        # Test that creating a role permission for public page fails at model level
         with self.assertRaises(ValidationError):
-            self.public_page.clean()
+            PageRolePermission.objects.create(
+                page=self.public_page, role_name="director"
+            )
+
+        # Test that adding role permission to existing public page also fails at page level
+        # First create a private page with role permissions, then make it public
+        private_page = Page.objects.create(
+            title="Test Private",
+            slug="test-private",
+            content="Test content",
+            is_public=False,
+        )
+        PageRolePermission.objects.create(page=private_page, role_name="director")
+
+        # Now try to make it public (should fail validation)
+        private_page.is_public = True
+        with self.assertRaises(ValidationError):
+            private_page.clean()
+
+        # Clean up
+        private_page.delete()
 
     def test_page_helper_methods(self):
         """Test the helper methods on Page model."""

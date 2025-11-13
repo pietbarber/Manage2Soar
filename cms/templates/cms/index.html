@@ -30,12 +30,12 @@
           <td>
             {% if item.page.is_public %}
               <span class="badge bg-success">Public</span>
-            {% elif not item.page.has_role_restrictions %}
+            {% elif not item.has_role_restrictions %}
               <span class="badge bg-info">Members Only</span>
             {% else %}
               <span class="badge bg-warning text-dark">Role Restricted</span>
-              {% for role in item.page.get_required_roles %}
-                <span class="badge bg-secondary ms-1">{{ role|title }}</span>
+              {% for role in item.required_roles %}
+                <span class="badge bg-secondary ms-1">{{ role }}</span>
               {% endfor %}
             {% endif %}
           </td>
