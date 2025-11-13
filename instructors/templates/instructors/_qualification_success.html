@@ -1,0 +1,26 @@
+<!-- Success message and qualification refresh -->
+<div class="alert alert-success">
+  <i class="bi bi-check-circle me-2"></i>
+  <strong>Success!</strong> Qualification "{{ qualification.qualification.name }}" has been assigned to {{ member.full_display_name }}.
+</div>
+
+<div class="d-flex justify-content-end">
+  <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
+          hx-get="{% url 'members:member_view' member.id %}"
+          hx-target="body"
+          hx-push-url="true">
+    <i class="bi bi-check-circle me-2"></i>Close & Refresh
+  </button>
+</div>
+
+<script>
+// Auto-close modal after 2 seconds and refresh the page
+setTimeout(function() {
+  var modal = bootstrap.Modal.getInstance(document.getElementById('qualification-modal'));
+  if (modal) {
+    modal.hide();
+  }
+  // Refresh the qualifications section
+  window.location.reload();
+}, 1500);
+</script>

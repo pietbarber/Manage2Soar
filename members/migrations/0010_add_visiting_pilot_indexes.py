@@ -13,12 +13,11 @@ class Migration(migrations.Migration):
         # Add index on SSA_member_number for efficient duplicate detection
         migrations.RunSQL(
             'CREATE INDEX IF NOT EXISTS members_member_ssa_member_number_idx ON members_member ("SSA_member_number");',
-            reverse_sql="DROP INDEX IF EXISTS members_member_ssa_member_number_idx;"
+            reverse_sql="DROP INDEX IF EXISTS members_member_ssa_member_number_idx;",
         ),
-
         # Add composite index on (first_name, last_name) for efficient name-based duplicate detection
         migrations.RunSQL(
             'CREATE INDEX IF NOT EXISTS members_member_first_last_name_idx ON members_member ("first_name", "last_name");',
-            reverse_sql="DROP INDEX IF EXISTS members_member_first_last_name_idx;"
+            reverse_sql="DROP INDEX IF EXISTS members_member_first_last_name_idx;",
         ),
     ]

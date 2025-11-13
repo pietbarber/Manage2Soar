@@ -402,9 +402,12 @@
               </a>
             </div>
             <div class="col-lg-4">
-              <a href="{% url 'instructors:assign_qualification' member.id %}" class="btn btn-outline-info btn-modern w-100">
+              <button type="button" class="btn btn-outline-info btn-modern w-100"
+                      data-bs-toggle="modal" data-bs-target="#qualification-modal"
+                      hx-get="{% url 'instructors:assign_qualification_modal' member.id %}"
+                      hx-target="#qualification-modal-content">
                 <i class="bi bi-plus-circle me-2"></i>Assign Qualification
-              </a>
+              </button>
             </div>
           </div>
           {% endif %}
@@ -663,6 +666,29 @@
     </div>
   </div>
 </div>
+
+<!-- Qualification Assignment Modal -->
+<div class="modal fade" id="qualification-modal" tabindex="-1" aria-labelledby="qualification-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="qualification-modal-label">
+          <i class="bi bi-award me-2"></i>Assign Qualification to {{ member.full_display_name }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="qualification-modal-content">
+        <!-- Content loaded via HTMX -->
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endif %}
 {% endblock %}
 

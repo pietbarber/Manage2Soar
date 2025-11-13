@@ -40,9 +40,9 @@ urlpatterns = [
         name="log_ground_instruction",
     ),
     path(
-        "assign-qualification/<int:member_id>/",
-        views.assign_qualification,
-        name="assign_qualification",
+        "assign-qualification-modal/<int:member_id>/",
+        views.assign_qualification_modal,
+        name="assign_qualification_modal",
     ),
     path("logbook/", views.member_logbook, name="member_logbook"),
     path("logbook/loading/", views.logbook_loading, name="logbook_loading"),
