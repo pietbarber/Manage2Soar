@@ -200,7 +200,11 @@ class Page(models.Model):
         """
         if not self.slug:
             self.slug = slugify(self.title)
-        self.clean()
+
+        # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
+        if self.pk:
+            self.clean()
+
         super().save(*args, **kwargs)
 
     def has_role_restrictions(self):

@@ -43,8 +43,6 @@ class PageRolePermissionInline(admin.TabularInline):
     verbose_name = "Role Permission"
     verbose_name_plural = "🔒 Role Permissions (For Private Pages Only)"
 
-    # Removed unnecessary permission methods - Django defaults are sufficient
-
 
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
@@ -97,14 +95,16 @@ class PageAdmin(admin.ModelAdmin):
         """Display summary of role restrictions in list view"""
         if obj.is_public:
             return "Public"
-        elif not obj.has_role_restrictions():
+
+        # Get roles once to avoid multiple queries
+        roles = obj.get_required_roles()
+        if not roles:
             return "Members Only"
+
+        if len(roles) <= 2:
+            return ", ".join(roles).title()
         else:
-            roles = obj.get_required_roles()
-            if len(roles) <= 2:
-                return ", ".join(roles).title()
-            else:
-                return f"{len(roles)} roles required"
+            return f"{len(roles)} roles required"
 
     def save_model(self, request, obj, form, change):
         """Add validation when saving"""
@@ -125,8 +125,7 @@ class PageAdmin(admin.ModelAdmin):
                     messages.error(request, error)
             else:
                 messages.error(request, str(e))
-            # Re-raise the exception so the save operation fails properly
-            raise
+            # Don't re-raise; save won't happen but user won't see double errors
 
 
 @admin.register(PageRolePermission)

@@ -34,7 +34,16 @@ def get_role_display_names(page):
 
     from .models import PageRolePermission
 
-    role_names = [rp.role_name for rp in page.role_permissions.all()]
+    # Try to use prefetched data to avoid extra queries
+    if (
+        hasattr(page, "_prefetched_objects_cache")
+        and "role_permissions" in page._prefetched_objects_cache
+    ):
+        role_names = [rp.role_name for rp in page.role_permissions.all()]
+    else:
+        # Fallback to values_list which is more efficient than fetching full objects
+        role_names = list(page.role_permissions.values_list("role_name", flat=True))
+
     role_choices_dict = dict(PageRolePermission.ROLE_CHOICES)
     return [role_choices_dict.get(role, role.title()) for role in role_names]
 
@@ -124,9 +133,14 @@ def cms_page(request, **kwargs):
     has_documents = page.documents.exists()
 
     # Get role information for the current page (avoiding template database queries)
-    # Note: Need to prefetch role_permissions first for the helper to work efficiently
+    # Note: Only refetch if role_permissions aren't already prefetched
     if not page.is_public and page.has_role_restrictions():
-        page = Page.objects.prefetch_related("role_permissions").get(pk=page.pk)
+        # Only refetch if role_permissions aren't already prefetched
+        if (
+            not hasattr(page, "_prefetched_objects_cache")
+            or "role_permissions" not in page._prefetched_objects_cache
+        ):
+            page = Page.objects.prefetch_related("role_permissions").get(pk=page.pk)
     page_required_roles = get_role_display_names(page) if not page.is_public else []
 
     return render(
