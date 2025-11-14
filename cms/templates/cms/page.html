@@ -21,15 +21,32 @@
     </nav>
   {% endif %}
 
+  <!-- Access Control Information -->
+  {% if not page.is_public %}
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-shield-lock me-2"></i>
+      <strong>Access Restricted:</strong>
+      {% if not page_has_role_restrictions %}
+        This page is available to all active club members.
+      {% else %}
+        This page is restricted to members with the following roles:
+        {% for role in page_required_roles %}
+          <span class="badge bg-primary ms-1">{{ role }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+  {% endif %}
+
   <div>{{ page.content|safe }}</div>
   {% if subpages %}
     <h3>Subpages</h3>
-    <table id="subpagesTable" class="table table-sm table-bordered table-striped" style="max-width:800px;">
+    <table id="subpagesTable" class="table table-sm table-bordered table-striped" style="max-width:1000px;">
       <thead>
         <tr>
           <th data-sort="text" data-key="title" style="cursor:pointer">Title &#x25B2;&#x25BC;</th>
           <th data-sort="number" data-key="items" style="cursor:pointer">Items &#x25B2;&#x25BC;</th>
           <th data-sort="datetime" data-key="updated" style="cursor:pointer">Last updated &#x25B2;&#x25BC;</th>
+          <th>Access</th>
         </tr>
       </thead>
       <tbody>
@@ -44,6 +61,18 @@
                 <small class="text-muted">({{ item.last_updated|timesince }} ago)</small>
               {% else %}
                 <small class="text-muted">No updates</small>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.page.is_public %}
+                <span class="badge bg-success">Public</span>
+              {% elif not item.has_role_restrictions %}
+                <span class="badge bg-info">Members</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Roles</span>
+                {% for role in item.required_roles %}
+                  <br><small class="text-muted">{{ role }}</small>
+                {% endfor %}
               {% endif %}
             </td>
           </tr>

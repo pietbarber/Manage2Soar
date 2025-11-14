@@ -13,7 +13,7 @@
   </div>
   <table class="table table-sm table-striped">
     <thead>
-      <tr><th>Directory</th><th>Resources</th><th>Visibility</th></tr>
+      <tr><th>Directory</th><th>Resources</th><th>Access Control</th></tr>
     </thead>
     <tbody>
       {% if pages %}
@@ -27,7 +27,18 @@
             {% endif %}
           </td>
           <td>{{ item.doc_count }}</td>
-          <td>{{ item.is_public|yesno:"Public,Restricted" }}</td>
+          <td>
+            {% if item.page.is_public %}
+              <span class="badge bg-success">Public</span>
+            {% elif not item.has_role_restrictions %}
+              <span class="badge bg-info">Members Only</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Role Restricted</span>
+              {% for role in item.required_roles %}
+                <span class="badge bg-secondary ms-1">{{ role }}</span>
+              {% endfor %}
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       {% else %}

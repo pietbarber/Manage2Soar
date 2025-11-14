@@ -557,3 +557,292 @@ class VisitorContactAdminSecurityTests(TestCase):
         # Should be current user, NOT the manually set deceased user
         self.assertEqual(self.contact.handled_by, self.active_admin)
         self.assertNotEqual(self.contact.handled_by, self.deceased_user)
+
+
+# Role-based Access Control Tests for Issue #239
+
+
+class PageRolePermissionModelTests(TestCase):
+    """Test the PageRolePermission model functionality."""
+
+    def setUp(self):
+        from .models import Page, PageRolePermission
+
+        self.page = Page.objects.create(
+            title="Board Documents", slug="board-docs", is_public=False
+        )
+
+    def test_create_role_permission(self):
+        """Test creating a role permission."""
+        from .models import PageRolePermission
+
+        perm = PageRolePermission.objects.create(page=self.page, role_name="director")
+
+        self.assertEqual(perm.page, self.page)
+        self.assertEqual(perm.role_name, "director")
+        self.assertEqual(str(perm), "Board Documents - Director")
+
+    def test_unique_constraint(self):
+        """Test that the same role cannot be added twice to the same page."""
+        from django.db import IntegrityError
+
+        from .models import PageRolePermission
+
+        PageRolePermission.objects.create(page=self.page, role_name="director")
+
+        with self.assertRaises(IntegrityError):
+            PageRolePermission.objects.create(page=self.page, role_name="director")
+
+    def test_role_choices(self):
+        """Test that all expected roles are available."""
+        from .models import PageRolePermission
+
+        expected_roles = [
+            "instructor",
+            "towpilot",
+            "duty_officer",
+            "assistant_duty_officer",
+            "secretary",
+            "treasurer",
+            "webmaster",
+            "director",
+            "member_manager",
+            "rostermeister",
+        ]
+
+        role_choices = [choice[0] for choice in PageRolePermission.ROLE_CHOICES]
+        for role in expected_roles:
+            self.assertIn(role, role_choices)
+
+
+class PageAccessControlTests(TestCase):
+    """Test the Page model access control functionality."""
+
+    def setUp(self):
+        from .models import Page
+
+        self.public_page = Page.objects.create(
+            title="Public Info", slug="public", is_public=True
+        )
+        self.private_page = Page.objects.create(
+            title="Member Info", slug="member", is_public=False
+        )
+        self.role_restricted_page = Page.objects.create(
+            title="Board Info", slug="board", is_public=False
+        )
+
+        # Set up users
+        self.anonymous_user = User()  # Not authenticated
+        self.member = User.objects.create_user(
+            username="member", email="member@test.com", membership_status="Full Member"
+        )
+        self.director = User.objects.create_user(
+            username="director",
+            email="director@test.com",
+            membership_status="Full Member",
+        )
+        self.director.director = True
+        self.director.save()
+
+        self.instructor = User.objects.create_user(
+            username="instructor",
+            email="instructor@test.com",
+            membership_status="Full Member",
+        )
+        self.instructor.instructor = True
+        self.instructor.save()
+
+    def test_public_page_access(self):
+        """Test that public pages are accessible to everyone."""
+        self.assertTrue(self.public_page.can_user_access(self.anonymous_user))
+        self.assertTrue(self.public_page.can_user_access(self.member))
+        self.assertTrue(self.public_page.can_user_access(self.director))
+
+    def test_private_page_no_roles_access(self):
+        """Test private page access without role restrictions."""
+        # Anonymous user cannot access
+        self.assertFalse(self.private_page.can_user_access(self.anonymous_user))
+        # Active members can access
+        self.assertTrue(self.private_page.can_user_access(self.member))
+        self.assertTrue(self.private_page.can_user_access(self.director))
+
+    def test_role_restricted_page_access(self):
+        """Test access to role-restricted pages."""
+        from .models import PageRolePermission
+
+        # Add director role requirement
+        PageRolePermission.objects.create(
+            page=self.role_restricted_page, role_name="director"
+        )
+
+        # Anonymous user cannot access
+        self.assertFalse(self.role_restricted_page.can_user_access(self.anonymous_user))
+        # Regular member cannot access
+        self.assertFalse(self.role_restricted_page.can_user_access(self.member))
+        # Director can access
+        self.assertTrue(self.role_restricted_page.can_user_access(self.director))
+        # Instructor cannot access (not a director)
+        self.assertFalse(self.role_restricted_page.can_user_access(self.instructor))
+
+    def test_multiple_role_access(self):
+        """Test access when multiple roles are allowed (OR logic)."""
+        from .models import PageRolePermission
+
+        # Allow both directors and instructors
+        PageRolePermission.objects.create(
+            page=self.role_restricted_page, role_name="director"
+        )
+        PageRolePermission.objects.create(
+            page=self.role_restricted_page, role_name="instructor"
+        )
+
+        # Regular member still cannot access
+        self.assertFalse(self.role_restricted_page.can_user_access(self.member))
+        # Both director and instructor can access
+        self.assertTrue(self.role_restricted_page.can_user_access(self.director))
+        self.assertTrue(self.role_restricted_page.can_user_access(self.instructor))
+
+    def test_page_validation_public_with_roles(self):
+        """Test that public pages cannot have role restrictions."""
+        from django.core.exceptions import ValidationError
+
+        from .models import Page, PageRolePermission
+
+        # Test that creating a role permission for public page fails at model level
+        with self.assertRaises(ValidationError):
+            PageRolePermission.objects.create(
+                page=self.public_page, role_name="director"
+            )
+
+        # Test that adding role permission to existing public page also fails at page level
+        # First create a private page with role permissions, then make it public
+        private_page = Page.objects.create(
+            title="Test Private",
+            slug="test-private",
+            content="Test content",
+            is_public=False,
+        )
+        PageRolePermission.objects.create(page=private_page, role_name="director")
+
+        # Now try to make it public (should fail validation)
+        private_page.is_public = True
+        with self.assertRaises(ValidationError):
+            private_page.clean()
+
+        # Clean up
+        private_page.delete()
+
+    def test_page_helper_methods(self):
+        """Test the helper methods on Page model."""
+        from .models import PageRolePermission
+
+        # Test has_role_restrictions
+        self.assertFalse(self.private_page.has_role_restrictions())
+        PageRolePermission.objects.create(page=self.private_page, role_name="director")
+        self.assertTrue(self.private_page.has_role_restrictions())
+
+        # Test get_required_roles
+        roles = self.private_page.get_required_roles()
+        self.assertEqual(roles, ["director"])
+
+        # Add another role
+        PageRolePermission.objects.create(page=self.private_page, role_name="treasurer")
+        roles = self.private_page.get_required_roles()
+        self.assertIn("director", roles)
+        self.assertIn("treasurer", roles)
+        self.assertEqual(len(roles), 2)
+
+
+class CMSRoleBasedViewTests(TestCase):
+    """Test CMS views with role-based access control."""
+
+    def setUp(self):
+        from .models import Page, PageRolePermission
+
+        # Create test pages
+        self.public_page = Page.objects.create(
+            title="Public Info", slug="public", is_public=True, content="Public content"
+        )
+        self.member_page = Page.objects.create(
+            title="Member Info",
+            slug="member",
+            is_public=False,
+            content="Member content",
+        )
+        self.board_page = Page.objects.create(
+            title="Board Info", slug="board", is_public=False, content="Board content"
+        )
+
+        # Add role restrictions to board page
+        PageRolePermission.objects.create(page=self.board_page, role_name="director")
+        PageRolePermission.objects.create(page=self.board_page, role_name="treasurer")
+
+        # Create test users
+        self.member = User.objects.create_user(
+            username="member", email="member@test.com", membership_status="Full Member"
+        )
+        self.director = User.objects.create_user(
+            username="director",
+            email="director@test.com",
+            membership_status="Full Member",
+        )
+        self.director.director = True
+        self.director.save()
+
+        self.client = Client()
+
+    def test_public_page_access(self):
+        """Test that public pages are accessible to anonymous users."""
+        response = self.client.get("/cms/public/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Public content")
+
+    def test_member_page_requires_login(self):
+        """Test that member-only pages redirect to login for anonymous users."""
+        response = self.client.get("/cms/member/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_member_page_access_for_members(self):
+        """Test that active members can access member-only pages."""
+        self.client.force_login(self.member)
+        response = self.client.get("/cms/member/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Member content")
+
+    def test_role_restricted_page_denies_regular_members(self):
+        """Test that role-restricted pages deny access to regular members."""
+        self.client.force_login(self.member)
+        response = self.client.get("/cms/board/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_role_restricted_page_allows_authorized_roles(self):
+        """Test that users with required roles can access restricted pages."""
+        self.client.force_login(self.director)
+        response = self.client.get("/cms/board/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Board content")
+
+    def test_cms_index_filters_inaccessible_pages(self):
+        """Test that CMS index only shows pages user can access."""
+        # Anonymous user should only see public page
+        response = self.client.get("/cms/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Public Info")
+        self.assertNotContains(response, "Member Info")
+        self.assertNotContains(response, "Board Info")
+
+        # Regular member should see public and member pages
+        self.client.force_login(self.member)
+        response = self.client.get("/cms/")
+        self.assertContains(response, "Public Info")
+        self.assertContains(response, "Member Info")
+        self.assertNotContains(response, "Board Info")
+
+        # Director should see all pages
+        self.client.force_login(self.director)
+        response = self.client.get("/cms/")
+        self.assertContains(response, "Public Info")
+        self.assertContains(response, "Member Info")
+        self.assertContains(response, "Board Info")
