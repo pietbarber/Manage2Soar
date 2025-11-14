@@ -48,6 +48,55 @@ def get_role_display_names(page):
     return [role_choices_dict.get(role, role.title()) for role in role_names]
 
 
+def get_accessible_top_level_pages(user):
+    """
+    Get accessible top-level CMS pages for a user with optimized queries.
+
+    Args:
+        user: The user to check access for
+
+    Returns:
+        list: List of page dictionaries with metadata
+    """
+    from django.db.models import Count
+
+    from .models import Page
+
+    # Use annotate to compute counts in a single query, avoiding N+1 queries
+    top_pages_qs = (
+        Page.objects.filter(parent__isnull=True)
+        .prefetch_related("role_permissions")
+        .annotate(doc_count=Count("documents"), child_count=Count("children"))
+        .order_by("title")
+    )
+
+    pages = []
+    for p in top_pages_qs:
+        # Use the page's built-in access control method
+        can_view = p.can_user_access(user)
+
+        # Only include pages the user can access
+        if not can_view:
+            continue
+
+        # Get role information for display (avoiding template database queries)
+        required_roles = get_role_display_names(p) if not p.is_public else []
+
+        pages.append(
+            {
+                "page": p,
+                # Use annotated counts to avoid N+1 queries
+                "doc_count": getattr(p, "doc_count", 0) + getattr(p, "child_count", 0),
+                "is_public": p.is_public,
+                "can_view": can_view,
+                "has_role_restrictions": p.has_role_restrictions(),
+                "required_roles": required_roles,
+            }
+        )
+
+    return pages
+
+
 def cms_page(request, **kwargs):
     # Accepts named kwargs: slug1, slug2, slug3 from urls.py
     debug_logger = logging.getLogger("cms.debug")
@@ -66,7 +115,10 @@ def cms_page(request, **kwargs):
         debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
-        page = get_object_or_404(Page, slug=slug, parent=parent)
+        # Prefetch role_permissions to avoid N+1 queries later
+        page = get_object_or_404(
+            Page.objects.prefetch_related("role_permissions"), slug=slug, parent=parent
+        )
         parent = page
     debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
@@ -133,14 +185,7 @@ def cms_page(request, **kwargs):
     has_documents = page.documents.exists()
 
     # Get role information for the current page (avoiding template database queries)
-    # Note: Only refetch if role_permissions aren't already prefetched
-    if not page.is_public and page.has_role_restrictions():
-        # Only refetch if role_permissions aren't already prefetched
-        if (
-            not hasattr(page, "_prefetched_objects_cache")
-            or "role_permissions" not in page._prefetched_objects_cache
-        ):
-            page = Page.objects.prefetch_related("role_permissions").get(pk=page.pk)
+    # role_permissions are already prefetched from the page traversal loop
     page_required_roles = get_role_display_names(page) if not page.is_public else []
 
     return render(
@@ -163,37 +208,8 @@ def homepage(request):
     # keeps the site root (/) behavior unchanged while making
     # /cms/ act as a navigable directory index.
     if request.path.startswith("/cms"):
-        from .models import Page
-
-        # Use select_related and prefetch_related to avoid N+1 queries
-        top_pages_qs = (
-            Page.objects.filter(parent__isnull=True)
-            .prefetch_related("role_permissions")
-            .order_by("title")
-        )
-        pages = []
-        for p in top_pages_qs:
-            # Use the page's built-in access control method
-            can_view = p.can_user_access(request.user)
-
-            # Only include pages the user can access
-            if not can_view:
-                continue
-
-            # Get role information for display (avoiding template database queries)
-            required_roles = get_role_display_names(p) if not p.is_public else []
-
-            pages.append(
-                {
-                    "page": p,
-                    # Count documents plus child directories as resources
-                    "doc_count": p.documents.count() + p.children.count(),
-                    "is_public": p.is_public,
-                    "can_view": can_view,
-                    "has_role_restrictions": p.has_role_restrictions(),
-                    "required_roles": required_roles,
-                }
-            )
+        # Use helper function to get accessible pages with optimized queries
+        pages = get_accessible_top_level_pages(request.user)
         return render(request, "cms/index.html", {"pages": pages})
 
     user = request.user
@@ -226,37 +242,8 @@ def homepage(request):
     if page:
         return render(request, "cms/homepage.html", {"page": page})
 
-    # Fallback: show CMS index of top-level pages
-    from .models import Page
-
-    # Use select_related and prefetch_related to avoid N+1 queries
-    top_pages_qs = (
-        Page.objects.filter(parent__isnull=True)
-        .prefetch_related("role_permissions")
-        .order_by("title")
-    )
-    pages = []
-    for p in top_pages_qs:
-        # Use the page's built-in access control method
-        can_view = p.can_user_access(request.user)
-
-        if not can_view:
-            continue
-
-        # Get role information for display (avoiding template database queries)
-        required_roles = get_role_display_names(p) if not p.is_public else []
-
-        pages.append(
-            {
-                "page": p,
-                # Include directories in the resource count so directories show up as resources
-                "doc_count": p.documents.count() + p.children.count(),
-                "is_public": p.is_public,
-                "can_view": can_view,
-                "has_role_restrictions": p.has_role_restrictions(),
-                "required_roles": required_roles,
-            }
-        )
+    # Fallback: show CMS index of top-level pages using optimized helper function
+    pages = get_accessible_top_level_pages(request.user)
     return render(request, "cms/index.html", {"pages": pages})
 
 
