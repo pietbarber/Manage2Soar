@@ -36,22 +36,25 @@ flowchart TD
     B2 -->|General Questions| B6[Direct Response]
     B4 --> B7[Add to Waiting List if Interested]
 
-    C --> C1[Unknown User Review]
-    C1 --> C2[Welcome & Invitation to Apply]
-    C2 --> C3{Waiting List Status?}
-    C3 -->|Full Capacity| C4[Inform of Waiting List]
-    C3 -->|Space Available| C5[Direct Application Invitation]
-    C4 --> C6[Provide Application Option]
-    C5 --> C7[Application Form Completion]
-    C6 --> C7
-    C7 --> C8{Profile Complete?}
-    C8 -->|No| C9[Request Additional Info]
-    C8 -->|Yes| C10[Begin Approval Process]
-    C9 --> C8
-    C10 --> C11[Background Verification]
-    C11 --> C12{Approve?}
-    C12 -->|Yes| C13[Activate Membership]
-    C12 -->|No| C14[Send Rejection Notice]
+    C --> C1[OAuth2 User Assessment]
+    C1 --> C2{User Type}
+    C2 -->|Legitimate Interest| C3[Welcome & Invitation to Apply]
+    C2 -->|Unwelcome/Spam| C4[DELETE Account]
+    C2 -->|Returning Member| C5[Status Review]
+    C3 --> C6{Waiting List Status?}
+    C6 -->|Full Capacity| C7[Inform of Waiting List]
+    C6 -->|Space Available| C8[Direct Application Invitation]
+    C7 --> C9[Provide Application Option]
+    C8 --> C10[Application Form Completion]
+    C9 --> C10
+    C10 --> C11{Profile Complete?}
+    C11 -->|No| C12[Request Additional Info]
+    C11 -->|Yes| C13[Begin Approval Process]
+    C12 --> C11
+    C13 --> C14[Background Verification]
+    C14 --> C15{Approve?}
+    C15 -->|Yes| C16[Activate Membership]
+    C15 -->|No| C17[Send Rejection Notice]
 
     D --> D1[Application Review]
     D1 --> D2[Reference Checks]
@@ -62,13 +65,14 @@ flowchart TD
     E1 --> E2[Update Priority Status]
     E2 --> E3[Process New Openings]
 
-    C13 --> F[Send Welcome Package]
+    C16 --> F[Send Welcome Package]
     F --> G[Schedule Orientation]
     G --> H[Monitor Integration]
 
     style A fill:#e1f5fe
     style F fill:#e8f5e8
-    style C13 fill:#e8f5e8
+    style C16 fill:#e8f5e8
+    style C4 fill:#ffcdd2
 ```
 
 ## Detailed Workflows
@@ -126,47 +130,111 @@ sequenceDiagram
 
 ### 2. New Member Application Process
 
-**Purpose**: Guide unknown OAuth2 users through membership application and process completed applications.
+**Purpose**: Process membership applications from multiple sources and handle various registration scenarios.
 
 ```mermaid
 flowchart TD
-    A[OAuth2 Registration - Unknown User] --> B[Send Welcome Email]
-    B --> C[Explain Membership Process]
-    C --> D{Club at Capacity?}
-    D -->|Yes| E[Explain Waiting List]
-    D -->|No| F[Invite Direct Application]
-    E --> G[Offer Application with Wait Notice]
-    F --> H[Provide Application Form]
-    G --> H
+    %% Multiple Entry Points
+    A1[OAuth2 Registration] --> A2{User Assessment}
+    A2 -->|Unknown User| A3[Welcome Email Process]
+    A2 -->|Unwelcome/Spam| A4[DELETE Account]
+    A2 -->|Returning Member| A5[Status Review]
 
-    H --> I[User Completes Application]
-    I --> J{Profile Complete?}
-    J -->|No| K[Request Missing Information]
-    K --> L[Follow-up Communication]
-    L --> J
-    J -->|Yes| M[Background Verification]
+    B1[Visitor Contact Form] --> B2[Information Package]
+    B2 --> B3[Application Invitation]
 
-    M --> N[Reference Checks]
-    M --> O[Experience Verification]
-    M --> P[Club Fit Assessment]
+    C1[Direct Application] --> C2[Manual Entry Process]
+    C2 --> C3[Create User Account]
 
-    N --> Q[Final Review Meeting]
-    O --> Q
-    P --> Q
+    D1[Referral/Recommendation] --> D2[Contact & Invite]
+    D2 --> D3[Expedited Review]
 
-    Q --> R{Approval Decision}
-    R -->|Approved| S[Set Initial Status]
-    R -->|Conditional| T[Set Probationary Status]
-    R -->|Rejected| U[Send Rejection Notice]
+    %% Common Application Flow
+    A3 --> E[Explain Membership Process]
+    B3 --> E
+    C3 --> E
+    D3 --> E
 
-    S --> V[Send Welcome Package]
-    T --> W[Monitor Progress]
-    V --> X[Schedule Orientation]
+    E --> F{Club at Capacity?}
+    F -->|Yes| G[Explain Waiting List]
+    F -->|No| H[Direct Application Path]
+    G --> I[Offer Wait List Application]
+    H --> J[Provide Application Form]
+    I --> J
 
-    style S fill:#e8f5e8
-    style U fill:#ffebee
-    style T fill:#fff3e0
-```**Application Review Checklist:**
+    J --> K[User Completes Application]
+    K --> L{Profile Complete?}
+    L -->|No| M[Request Missing Information]
+    M --> N[Follow-up Communication]
+    N --> L
+    L -->|Yes| O[Background Verification]
+
+    O --> P[Reference Checks]
+    O --> Q[Experience Verification]
+    O --> R[Club Fit Assessment]
+
+    P --> S[Final Review Meeting]
+    Q --> S
+    R --> S
+
+    S --> T{Approval Decision}
+    T -->|Approved| U[Set Initial Status]
+    T -->|Conditional| V[Set Probationary Status]
+    T -->|Rejected| W[Send Rejection Notice]
+
+    U --> X[Send Welcome Package]
+    V --> Y[Monitor Progress]
+    X --> Z[Schedule Orientation]
+
+    %% Deletion Path
+    A4 --> A6[Document Reason]
+    A6 --> A7[Remove All Data]
+
+    style U fill:#e8f5e8
+    style W fill:#ffebee
+    style V fill:#fff3e0
+    style A4 fill:#ffcdd2
+    style A7 fill:#ffcdd2
+```
+
+#### Multiple Pathways to Membership
+
+**1. OAuth2 Registration (Most Common)**
+- Unknown users register via Google/OAuth2
+- Membership Manager receives notification
+- Assessment required: legitimate interest vs. unwelcome registration
+- **DELETE Option**: For spam, inappropriate users, or obvious bad actors
+
+**2. Visitor Contact Form**
+- Prospective members inquire via `/contact/` form
+- Information package sent with application invitation
+- Often higher conversion rate due to demonstrated interest
+
+**3. Direct Application**
+- Walk-ins, phone calls, or in-person meetings
+- Membership Manager manually creates user account if needed
+- Direct entry into application process
+
+**4. Referrals and Recommendations**
+- Current members refer friends/family
+- May warrant expedited review process
+- Strong recommendation can influence approval
+
+#### Handling Unwelcome Registrations
+
+**Assessment Criteria:**
+- Profile completeness and authenticity
+- Email domain (spam indicators)
+- Behavioral red flags in initial communications
+- Previous negative history with club
+
+**Deletion Process:**
+1. Document reason for deletion
+2. Remove user account and all associated data
+3. Block email/domain if necessary
+4. Report to other club managers if safety concern
+
+**Application Review Checklist:**
 
 #### Profile Completeness
 - [ ] Full name and contact information
