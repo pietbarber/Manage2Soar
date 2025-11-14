@@ -32,17 +32,26 @@ flowchart TD
     B1 --> B2{Contact Type}
     B2 -->|Trial Flight| B3[Forward to CFI]
     B2 -->|Membership Info| B4[Send Info Package]
-    B2 -->|General Questions| B5[Direct Response]
-    B4 --> B6[Add to Waiting List if Interested]
+    B2 -->|Technical Questions| B5[Forward to Webmaster Group]
+    B2 -->|General Questions| B6[Direct Response]
+    B4 --> B7[Add to Waiting List if Interested]
 
     C --> C1[Unknown User Review]
-    C1 --> C2{Profile Complete?}
-    C2 -->|No| C3[Request Additional Info]
-    C2 -->|Yes| C4[Begin Approval Process]
-    C4 --> C5[Background Verification]
-    C5 --> C6{Approve?}
-    C6 -->|Yes| C7[Activate Membership]
-    C6 -->|No| C8[Send Rejection Notice]
+    C1 --> C2[Welcome & Invitation to Apply]
+    C2 --> C3{Waiting List Status?}
+    C3 -->|Full Capacity| C4[Inform of Waiting List]
+    C3 -->|Space Available| C5[Direct Application Invitation]
+    C4 --> C6[Provide Application Option]
+    C5 --> C7[Application Form Completion]
+    C6 --> C7
+    C7 --> C8{Profile Complete?}
+    C8 -->|No| C9[Request Additional Info]
+    C8 -->|Yes| C10[Begin Approval Process]
+    C9 --> C8
+    C10 --> C11[Background Verification]
+    C11 --> C12{Approve?}
+    C12 -->|Yes| C13[Activate Membership]
+    C12 -->|No| C14[Send Rejection Notice]
 
     D --> D1[Application Review]
     D1 --> D2[Reference Checks]
@@ -53,13 +62,13 @@ flowchart TD
     E1 --> E2[Update Priority Status]
     E2 --> E3[Process New Openings]
 
-    C7 --> F[Send Welcome Package]
+    C13 --> F[Send Welcome Package]
     F --> G[Schedule Orientation]
     G --> H[Monitor Integration]
 
     style A fill:#e1f5fe
     style F fill:#e8f5e8
-    style C7 fill:#e8f5e8
+    style C13 fill:#e8f5e8
 ```
 
 ## Detailed Workflows
@@ -109,47 +118,55 @@ sequenceDiagram
 | Category | Description | Response Protocol |
 |----------|-------------|-------------------|
 | **Trial Flights** | First-time visitors interested in flying | Forward to CFI, provide scheduling info |
-| **Membership Applications** | Serious about joining the club | Send application package, add to waiting list |
+| **Membership Applications** | Serious about joining the club | Send application package, inform of waiting list status |
+| **Technical Questions** | Website issues, system problems, IT support | Forward to webmaster group |
 | **General Information** | Questions about club activities | Direct response with club information |
-| **Aircraft/Equipment** | Technical questions about fleet | Forward to maintenance officer |
+| **Aircraft/Equipment** | Questions about fleet and maintenance | Forward to maintenance officer |
 | **Events/Activities** | Club events and competitions | Forward to appropriate organizer |
 
 ### 2. New Member Application Process
 
-**Purpose**: Review and process applications from prospective members who have completed the initial registration.
+**Purpose**: Guide unknown OAuth2 users through membership application and process completed applications.
 
 ```mermaid
-flowchart LR
-    A[OAuth2 Registration] --> B[Initial Profile Review]
-    B --> C{Profile Complete?}
-    C -->|No| D[Request Missing Information]
-    D --> E[Follow-up Communication]
-    E --> C
-    C -->|Yes| F[Background Verification]
+flowchart TD
+    A[OAuth2 Registration - Unknown User] --> B[Send Welcome Email]
+    B --> C[Explain Membership Process]
+    C --> D{Club at Capacity?}
+    D -->|Yes| E[Explain Waiting List]
+    D -->|No| F[Invite Direct Application]
+    E --> G[Offer Application with Wait Notice]
+    F --> H[Provide Application Form]
+    G --> H
 
-    F --> G[Reference Checks]
-    F --> H[Experience Verification]
-    F --> I[Club Fit Assessment]
+    H --> I[User Completes Application]
+    I --> J{Profile Complete?}
+    J -->|No| K[Request Missing Information]
+    K --> L[Follow-up Communication]
+    L --> J
+    J -->|Yes| M[Background Verification]
 
-    G --> J[Final Review Meeting]
-    H --> J
-    I --> J
+    M --> N[Reference Checks]
+    M --> O[Experience Verification]
+    M --> P[Club Fit Assessment]
 
-    J --> K{Approval Decision}
-    K -->|Approved| L[Activate Membership]
-    K -->|Conditional| M[Set Probationary Status]
-    K -->|Rejected| N[Send Rejection Notice]
+    N --> Q[Final Review Meeting]
+    O --> Q
+    P --> Q
 
-    L --> O[Welcome Package]
-    M --> P[Monitor Progress]
-    O --> Q[Schedule Orientation]
+    Q --> R{Approval Decision}
+    R -->|Approved| S[Set Initial Status]
+    R -->|Conditional| T[Set Probationary Status]
+    R -->|Rejected| U[Send Rejection Notice]
 
-    style L fill:#e8f5e8
-    style N fill:#ffebee
-    style M fill:#fff3e0
-```
+    S --> V[Send Welcome Package]
+    T --> W[Monitor Progress]
+    V --> X[Schedule Orientation]
 
-**Application Review Checklist:**
+    style S fill:#e8f5e8
+    style U fill:#ffebee
+    style T fill:#fff3e0
+```**Application Review Checklist:**
 
 #### Profile Completeness
 - [ ] Full name and contact information
@@ -176,20 +193,27 @@ flowchart LR
 
 **Purpose**: Handle ongoing membership administration including renewals, status changes, and transitions.
 
-**Common Status Transitions:**
+**Status Transitions (Club-Configurable):**
 
+> **Note**: Each club may implement different membership progressions. The system supports flexible status management to accommodate various club structures. The example below shows Skyline Soaring Club's progression model.
+
+**Skyline Soaring Club Model:**
 ```mermaid
 stateDiagram-v2
     [*] --> Guest
     Guest --> PendingApproval : Application Submitted
-    PendingApproval --> FullMember : Approved
+    PendingApproval --> IntroductoryMember : Initial Approval
     PendingApproval --> Rejected : Not Approved
-    PendingApproval --> StudentMember : Limited Approval
+
+    IntroductoryMember --> ProbationaryMember : Orientation Complete
+    ProbationaryMember --> FullMember : Probation Successful
+    ProbationaryMember --> Inactive : Probation Failed
+
+    Guest --> StudentMember : Academic Student Status
+    StudentMember --> FullMember : Graduation/Age Change
+    StudentMember --> Inactive : No Longer Student
 
     FullMember --> Inactive : Non-renewal/Issues
-    StudentMember --> FullMember : Completed Requirements
-    StudentMember --> Inactive : Dropped Out
-
     Inactive --> FullMember : Reactivation
     Inactive --> [*] : Permanent Departure
 
@@ -197,7 +221,16 @@ stateDiagram-v2
     FullMember --> EmeritusMember : Retirement Status
 ```
 
-**Annual Renewal Process:**
+**Status Definitions (Skyline Soaring Club):**
+- **Guest**: Temporary access, trial flights only
+- **Pending Approval**: Application under review
+- **Introductory Member**: Newly approved, completing orientation
+- **Probationary Member**: Full privileges under observation period
+- **Student Member**: Reserved for high school/university students (not student pilots)
+- **Full Member**: Standard active membership with all privileges
+- **Honorary Member**: Special recognition status
+- **Emeritus Member**: Retired member with limited privileges
+- **Inactive**: Suspended or lapsed membership**Annual Renewal Process:**
 1. **Pre-Renewal Communication** (60 days before expiration)
    - Send renewal notices via email
    - Include dues information and deadlines
@@ -408,6 +441,30 @@ Sincerely,
 - Annual renewal processing
 - Waiting list maintenance and updates
 - Planning for next season's growth
+
+## Club Capacity Management
+
+### Capacity Assessment
+The Membership Manager should regularly assess club capacity based on:
+- **Facility Resources**: Hangar space, meeting room capacity
+- **Equipment Availability**: Aircraft fleet utilization
+- **Instructor Bandwidth**: Training capacity for new members
+- **Safety Considerations**: Maintaining manageable group sizes
+
+### Waiting List Management
+When club approaches or reaches capacity:
+
+1. **Transparent Communication**: Clearly explain capacity limitations
+2. **Regular Updates**: Keep waiting list members informed of status
+3. **Fair Processing**: First-come, first-served unless special circumstances
+4. **Engagement Maintenance**: Invite to public events to maintain interest
+5. **Capacity Monitoring**: Regular review of member activity levels
+
+### Capacity Decision Framework
+- **Hard Limits**: Insurance/regulatory requirements (non-negotiable)
+- **Soft Limits**: Quality of experience considerations (flexible)
+- **Seasonal Adjustments**: Consider weather impacts on activity levels
+- **Growth Planning**: Balance current capacity with future expansion
 
 ## Quality Assurance and Metrics
 
