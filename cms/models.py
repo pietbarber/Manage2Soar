@@ -153,13 +153,17 @@ class Page(models.Model):
 
         For top-level pages: /cms/{slug}/
         For nested pages: /cms/{parent_slug}/{slug}/
+        For multi-level nested pages: /cms/{grandparent_slug}/{parent_slug}/{slug}/
 
         Returns:
             str: The URL path for accessing this page
         """
-        if self.parent:
-            return f"/cms/{self.parent.slug}/{self.slug}/"
-        return f"/cms/{self.slug}/"
+        path_parts = [self.slug]
+        current = self.parent
+        while current:
+            path_parts.insert(0, current.slug)
+            current = current.parent
+        return f"/cms/{'/'.join(path_parts)}/"
 
     def clean(self):
         """
@@ -207,6 +211,12 @@ class Page(models.Model):
             bool: True if the page has role restrictions, False otherwise.
                  Public pages and pages without role permissions return False.
         """
+        # Try to use prefetched data first to avoid extra queries
+        if (
+            hasattr(self, "_prefetched_objects_cache")
+            and "role_permissions" in self._prefetched_objects_cache
+        ):
+            return len(self.role_permissions.all()) > 0
         return self.role_permissions.exists()
 
     def get_required_roles(self):

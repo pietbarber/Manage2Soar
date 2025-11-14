@@ -43,18 +43,7 @@ class PageRolePermissionInline(admin.TabularInline):
     verbose_name = "Role Permission"
     verbose_name_plural = "🔒 Role Permissions (For Private Pages Only)"
 
-    # Remove the get_queryset override that might be causing issues
-    def has_add_permission(self, request, obj):
-        """Always show the inline so users can add permissions"""
-        return True
-
-    def has_change_permission(self, request, obj=None):
-        """Always allow changes"""
-        return True
-
-    def has_delete_permission(self, request, obj=None):
-        """Always allow deletion"""
-        return True
+    # Removed unnecessary permission methods - Django defaults are sufficient
 
 
 @admin.register(Page)
@@ -63,6 +52,10 @@ class PageAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context["admin_helper_message"] = self.admin_helper_message
         return super().changelist_view(request, extra_context=extra_context)
+
+    def get_queryset(self, request):
+        """Prefetch role permissions to prevent N+1 queries in list view"""
+        return super().get_queryset(request).prefetch_related("role_permissions")
 
     list_display = (
         "title",
