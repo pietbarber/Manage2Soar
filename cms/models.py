@@ -34,6 +34,8 @@ class PageRolePermission(models.Model):
 
     # Role choices based on Member model boolean fields
     ROLE_CHOICES = [
+        # Special case for any logged-in active member
+        ("active_member", "Any Active Member"),
         ("instructor", "Instructor"),
         ("towpilot", "Towpilot"),
         ("duty_officer", "Duty Officer"),
@@ -284,6 +286,11 @@ class Page(models.Model):
 
         # Check if user has any of the required roles
         required_roles = self.get_required_roles()
+
+        # Special case: if "active_member" is in required roles, any active member can access
+        if "active_member" in required_roles:
+            return True  # User already passed is_active_member check above
+
         return any(getattr(user, role, False) for role in required_roles)
 
 
