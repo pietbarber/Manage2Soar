@@ -81,15 +81,14 @@ urlpatterns = [
     ),
     path("analytics/", include("analytics.urls")),
     path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
+    # Public contact form for visitors (no authentication required)
+    path("contact/", cms_views.contact, name="contact"),
+    path("contact/success/", cms_views.contact_success, name="contact_success"),
     path("", include("knowledgetest.urls")),
-    # Explicit root name for legacy code/tests that reverse('home') without
-    # namespace. The CMS homepage is the canonical root view.
+    # Homepage at root level - separate from CMS resources
     path("", cms_views.homepage, name="home"),
-    # Expose notifications before the CMS root include so the CMS catch-all
-    # patterns don't intercept other app URLs like /notifications/.
+    # Notifications app
     path("notifications/", include("notifications.urls")),
-    # CMS root include is last so other app URL patterns are matched first.
-    path("", include("cms.urls")),
 ]
 
 # Serve media files in development only

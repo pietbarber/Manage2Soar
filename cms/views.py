@@ -107,8 +107,8 @@ def cms_page(request, **kwargs):
             slugs.append(slug)
     debug_logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
-        debug_logger.debug("cms_page: No slugs, redirecting to cms:home")
-        return redirect("cms:home")
+        debug_logger.debug("cms_page: No slugs, redirecting to cms:resources")
+        return redirect("cms:resources")
     parent = None
     page = None
     for slug in slugs:
@@ -166,7 +166,7 @@ def cms_page(request, **kwargs):
     breadcrumbs = []
     # Top-level 'Resources' link
     try:
-        resources_url = reverse("cms:home")
+        resources_url = reverse("cms:resources")
     except Exception:
         resources_url = "/cms/"
     breadcrumbs.append({"title": "Resources", "url": resources_url})
@@ -203,15 +203,10 @@ def cms_page(request, **kwargs):
 
 
 def homepage(request):
-    # If this request came in under the /cms/ path, show the CMS index
-    # of top-level pages rather than any legacy HomePageContent. This
-    # keeps the site root (/) behavior unchanged while making
-    # /cms/ act as a navigable directory index.
-    if request.path.startswith("/cms"):
-        # Use helper function to get accessible pages with optimized queries
-        pages = get_accessible_top_level_pages(request.user)
-        return render(request, "cms/index.html", {"pages": pages})
-
+    """
+    Homepage view for root URL ("/") only.
+    Shows HomePageContent based on user authentication status.
+    """
     user = request.user
     allowed_statuses = [
         "Full Member",
@@ -225,9 +220,8 @@ def homepage(request):
         "Temporary Member",
         "Introductory Member",
     ]
-    # First, try to render legacy HomePageContent if it exists for the
-    # appropriate audience. If not found, fall back to a navigable index
-    # of top-level CMS Pages (directories).
+
+    # Try to render legacy HomePageContent for the appropriate audience
     page = None
     if user.is_authenticated and (
         user.is_superuser
@@ -243,6 +237,16 @@ def homepage(request):
         return render(request, "cms/homepage.html", {"page": page})
 
     # Fallback: show CMS index of top-level pages using optimized helper function
+    pages = get_accessible_top_level_pages(request.user)
+    return render(request, "cms/index.html", {"pages": pages})
+
+
+def cms_resources_index(request):
+    """
+    CMS Resources index view for /cms/ path.
+    Always shows the navigable directory index of CMS pages/resources.
+    """
+    # Use helper function to get accessible pages with optimized queries
     pages = get_accessible_top_level_pages(request.user)
     return render(request, "cms/index.html", {"pages": pages})
 
@@ -351,7 +355,7 @@ def contact(request):
             messages.success(
                 request, "Thank you for contacting us! We'll get back to you soon."
             )
-            return redirect("cms:contact_success")
+            return redirect("contact_success")
     else:
         form = VisitorContactForm()
 

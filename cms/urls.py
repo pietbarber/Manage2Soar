@@ -5,7 +5,8 @@ from . import views
 app_name = "cms"
 
 urlpatterns = [
-    path("", views.homepage, name="home"),
+    # CMS Resources index page at /cms/
+    path("", views.cms_resources_index, name="resources"),
     # Site feedback URLs (Issue #117)
     path("feedback/", views.submit_feedback, name="feedback"),
     path("feedback/success/", views.feedback_success, name="feedback_success"),
@@ -15,7 +16,7 @@ urlpatterns = [
     # /cms/<slug>/ or /cms/<parent>/<slug>/ (supports up to 3 levels for now)
     # Exclude common reserved paths (admin, debug, api, etc.) from CMS routing
     re_path(
-        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt)/)(?P<slug1>[-\w]+)/$",
+        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt|feedback|contact)/)(?P<slug1>[-\w]+)/$",
         views.cms_page,
         name="cms_page",
     ),

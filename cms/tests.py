@@ -161,7 +161,7 @@ class VisitorContactViewTests(TestCase):
 
     def test_contact_page_get(self):
         """Test that the contact page loads successfully."""
-        response = self.client.get(reverse("cms:contact"))
+        response = self.client.get(reverse("contact"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Contact Test Soaring Club")
         self.assertContains(response, "form")
@@ -169,7 +169,7 @@ class VisitorContactViewTests(TestCase):
     def test_contact_page_no_auth_required(self):
         """Test that the contact page doesn't require authentication."""
         # Ensure no user is logged in
-        response = self.client.get(reverse("cms:contact"))
+        response = self.client.get(reverse("contact"))
         self.assertEqual(response.status_code, 200)
 
     @patch("django.core.mail.send_mail")
@@ -192,11 +192,11 @@ class VisitorContactViewTests(TestCase):
             "message": "I would like to learn more about your gliding programs.",
         }
 
-        response = self.client.post(reverse("cms:contact"), data=form_data)
+        response = self.client.post(reverse("contact"), data=form_data)
 
         # Should redirect to success page
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse("cms:contact_success"))
+        self.assertRedirects(response, reverse("contact_success"))
 
         # Check that contact was created
         self.assertEqual(VisitorContact.objects.count(), 1)
@@ -216,7 +216,7 @@ class VisitorContactViewTests(TestCase):
             "message": "Short",
         }
 
-        response = self.client.post(reverse("cms:contact"), data=form_data)
+        response = self.client.post(reverse("contact"), data=form_data)
 
         # Should stay on the same page with errors
         self.assertEqual(response.status_code, 200)
@@ -227,7 +227,7 @@ class VisitorContactViewTests(TestCase):
 
     def test_contact_success_page(self):
         """Test that the contact success page loads."""
-        response = self.client.get(reverse("cms:contact_success"))
+        response = self.client.get(reverse("contact_success"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Message Sent Successfully")
 
@@ -243,7 +243,7 @@ class VisitorContactViewTests(TestCase):
             "message": "This is a test message with sufficient length.",
         }
 
-        self.client.post(reverse("cms:contact"), data=form_data)
+        self.client.post(reverse("contact"), data=form_data)
 
         contact = VisitorContact.objects.get(email="john@example.com")
         self.assertEqual(contact.ip_address, "192.168.1.100")
@@ -285,7 +285,7 @@ class VisitorContactEmailTests(TestCase):
             "message": "This is a test message with sufficient length.",
         }
 
-        self.client.post(reverse("cms:contact"), data=form_data)
+        self.client.post(reverse("contact"), data=form_data)
 
         # Check that email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -309,7 +309,7 @@ class VisitorContactEmailTests(TestCase):
             "message": "This is another test message with sufficient length.",
         }
 
-        self.client.post(reverse("cms:contact"), data=form_data)
+        self.client.post(reverse("contact"), data=form_data)
 
         # Should send to webmaster instead
         self.assertEqual(len(mail.outbox), 1)
@@ -422,7 +422,7 @@ class VisitorContactIntegrationTests(TestCase):
             "message": "I would like to schedule a trial flight to experience gliding.",
         }
 
-        response = self.client.post(reverse("cms:contact"), data=form_data)
+        response = self.client.post(reverse("contact"), data=form_data)
 
         # 2. Verify successful submission
         self.assertEqual(response.status_code, 302)
