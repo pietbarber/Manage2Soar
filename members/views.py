@@ -697,11 +697,11 @@ def visiting_pilot_qr_code(request):
             request,
             "QR code generation is not available. Please install the qrcode package.",
         )
-        return redirect("cms:home")
+        return redirect("home")
     except Exception as e:
         logger.error(f"Error generating QR code: {e}")
         messages.error(request, "An error occurred generating the QR code.")
-        return redirect("cms:home")
+        return redirect("home")
 
 
 @login_required
@@ -715,10 +715,10 @@ def visiting_pilot_qr_display(request):
             "SiteConfiguration row is missing. Visiting pilot QR display is unavailable."
         )
         messages.warning(request, "Visiting pilot signup is currently disabled.")
-        return redirect("cms:home")
+        return redirect("home")
     if not config.visiting_pilot_enabled:
         messages.warning(request, "Visiting pilot signup is currently disabled.")
-        return redirect("cms:home")
+        return redirect("home")
 
     # Get or create today's token
     token = config.get_or_create_daily_token()
