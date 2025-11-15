@@ -23,7 +23,7 @@ def test_homepage_logged_in(client, django_user_model):
 @pytest.mark.django_db
 def test_cms_resources_page(client, django_user_model):
     """Test that CMS resources page loads correctly at /cms/."""
-    user = django_user_model.objects.create_user(username="testuser", password="pass")
+    django_user_model.objects.create_user(username="testuser", password="pass")
     client.login(username="testuser", password="pass")
     url = reverse("cms:resources")
     resp = client.get(url)
