@@ -334,6 +334,43 @@ SITE_URL = "https://m2s.skylinesoaring.org"
 DEFAULT_FROM_EMAIL = "noreply@default.manage2soar.org"
 EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
 
+#############################################################
+# Security Settings for Production Deployment
+# These can be overridden via environment variables
+#############################################################
+
+# HTTP Strict Transport Security (HSTS)
+# Only enable in production with HTTPS - prevents man-in-the-middle attacks
+# WARNING: Once enabled, this cannot be easily reversed!
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+if SECURE_HSTS_SECONDS > 0:
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# Force HTTPS redirect - only enable in production
+# Set SECURE_SSL_REDIRECT=True in production environment
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# Secure cookies - only sent over HTTPS
+# Set SESSION_COOKIE_SECURE=True in production environment
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# Secure CSRF cookies - only sent over HTTPS
+# Set CSRF_COOKIE_SECURE=True in production environment
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
 
 LOGGING = {
     "version": 1,
