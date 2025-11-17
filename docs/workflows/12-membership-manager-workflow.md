@@ -57,7 +57,7 @@ flowchart TD
     C15 -->|No| C17[Send Rejection Notice]
 
     D --> D1[Application Review]
-    D1 --> D2[Reference Checks]
+    D1 --> D2[Background Verification]
     D2 --> D3[Club Integration Assessment]
     D3 --> D4[Final Approval Decision]
 
@@ -82,6 +82,15 @@ flowchart TD
 **Purpose**: Process and respond to inquiries submitted through the club's `/contact/` form.
 
 **Access Method**: Django Admin → CMS → Visitor Contacts
+
+**Contact System Usage Model**:
+The visitor contact system is primarily designed for **initial contact and triage**. After the first response, correspondence typically transitions to direct email communication for several reasons:
+- Reduces administrative overhead for ongoing conversations
+- Allows for more flexible communication (attachments, scheduling, etc.)
+- Maintains personal connection with prospective members
+- Visitor contact system serves as permanent record of initial inquiry
+
+The system remains available for follow-up if needed, but most clubs find direct email more efficient for continued correspondence.
 
 ```mermaid
 sequenceDiagram
@@ -169,12 +178,10 @@ flowchart TD
     N --> L
     L -->|Yes| O[Background Verification]
 
-    O --> P[Reference Checks]
     O --> Q[Experience Verification]
     O --> R[Club Fit Assessment]
 
-    P --> S[Final Review Meeting]
-    Q --> S
+    Q --> S[Final Review Meeting]
     R --> S
 
     S --> T{Approval Decision}
@@ -242,12 +249,11 @@ flowchart TD
 - [ ] Biography/background completed
 - [ ] Emergency contact information
 - [ ] Aviation experience documented
-- [ ] References provided (minimum 2)
 
 #### Background Verification
 - [ ] Previous club memberships verified
 - [ ] Aviation credentials checked (if applicable)
-- [ ] References contacted and verified
+- [ ] Member referral information (if provided)
 - [ ] No significant safety concerns identified
 - [ ] Financial capability assessment (if required)
 
@@ -271,34 +277,38 @@ stateDiagram-v2
     [*] --> Guest
     Guest --> PendingApproval : Application Submitted
     PendingApproval --> IntroductoryMember : Initial Approval
-    PendingApproval --> Rejected : Not Approved
+    PendingApproval --> NotAMember : Rejected/Withdrawn
 
     IntroductoryMember --> ProbationaryMember : Orientation Complete
     ProbationaryMember --> FullMember : Probation Successful
-    ProbationaryMember --> Inactive : Probation Failed
+    ProbationaryMember --> NotAMember : Probation Failed/Pause
 
     Guest --> StudentMember : Academic Student Status
     StudentMember --> FullMember : Graduation/Age Change
-    StudentMember --> Inactive : No Longer Student
+    StudentMember --> NotAMember : No Longer Student/Pause
 
-    FullMember --> Inactive : Non-renewal/Issues
+    FullMember --> Inactive : Non-renewal/Issues (Full Members Only)
     Inactive --> FullMember : Reactivation
-    Inactive --> [*] : Permanent Departure
+    Inactive --> NotAMember : Permanent Status Change
+    NotAMember --> [*] : Permanent Departure
 
     FullMember --> HonoraryMember : Special Recognition
     FullMember --> EmeritusMember : Retirement Status
 ```
 
 **Status Definitions (Skyline Soaring Club):**
-- **Guest**: Temporary access, trial flights only
+- **Guest**: Temporary access, trial flights only (when available)
 - **Pending Approval**: Application under review
 - **Introductory Member**: Newly approved, completing orientation
 - **Probationary Member**: Full privileges under observation period
 - **Student Member**: Reserved for high school/university students (not student pilots)
 - **Full Member**: Standard active membership with all privileges
+- **Not a Member**: For paused or terminated memberships that don't qualify for Inactive status
+- **Inactive**: Suspended or lapsed membership (**Full Members only** per By-Laws)
 - **Honorary Member**: Special recognition status
 - **Emeritus Member**: Retired member with limited privileges
-- **Inactive**: Suspended or lapsed membership**Annual Renewal Process:**
+
+**Important By-Laws Note**: Under current By-Laws, only Full Members are eligible for Inactive status. Probationary Members and Student Members who pause their membership must be placed in "Not a Member" status as they do not qualify for Inactive membership.**Annual Renewal Process:**
 1. **Pre-Renewal Communication** (60 days before expiration)
    - Send renewal notices via email
    - Include dues information and deadlines
@@ -485,7 +495,7 @@ Sincerely,
 
 **For Each New Member:**
 - [ ] Completed application with all required fields
-- [ ] Reference verification records
+- [ ] Member referral documentation (if applicable)
 - [ ] Background check documentation (if required)
 - [ ] Welcome package delivery confirmation
 - [ ] Orientation completion record
