@@ -192,6 +192,7 @@ flowchart TD
     U --> X[Send Welcome Package]
     V --> Y[Monitor Progress]
     X --> Z[Schedule Orientation]
+    Y --> Z
 
     %% Deletion Path
     A4 --> A6[Document Reason]
@@ -203,6 +204,29 @@ flowchart TD
     style A4 fill:#ffcdd2
     style A7 fill:#ffcdd2
 ```
+
+#### Approval Decision Outcomes (Club-Configurable)
+
+The **Approval Decision** step offers three possible outcomes, but clubs implement these differently based on their membership philosophy:
+
+**Skyline Soaring Club Model** (More Demanding):
+- **Approved → Probationary Status**: **Everyone starts as probationary** regardless of experience
+- **Conditional → Probationary Status**: Same outcome, with additional monitoring requirements
+- **Rejected**: Application denied, user account may be deleted or marked "Not a Member"
+
+*SSC Philosophy*: "Everybody is provisional" - all new members must prove themselves through a probationary period before gaining full membership privileges.
+
+**Alternative Club Models** (Less Demanding):
+- **Approved → Full Member**: Experienced pilots or strong candidates get immediate full membership
+- **Conditional → Probationary Status**: Newer pilots or those needing observation period
+- **Rejected**: Application denied
+
+**"Pulse and Checkbook" Club Model**:
+- **Approved → Full Member**: Most applicants with dues payment get immediate full membership
+- **Conditional → Full Member**: Rare, perhaps for special circumstances
+- **Rejected**: Very rare, only for serious red flags
+
+> **Configuration Note**: The system supports all these models through flexible status assignment. Clubs should document their specific approval criteria and outcomes in their local procedures.
 
 #### Multiple Pathways to Membership
 
@@ -300,15 +324,26 @@ stateDiagram-v2
 - **Guest**: Temporary access, trial flights only (when available)
 - **Pending Approval**: Application under review
 - **Introductory Member**: Newly approved, completing orientation
-- **Probationary Member**: Full privileges under observation period
+- **Probationary Member**: **ALL new SSC members start here** - Full privileges under observation period
 - **Student Member**: Reserved for high school/university students (not student pilots)
-- **Full Member**: Standard active membership with all privileges
+- **Full Member**: Standard active membership with all privileges (earned after probationary period)
 - **Not a Member**: For paused or terminated memberships that don't qualify for Inactive status
 - **Inactive**: Suspended or lapsed membership (**Full Members only** per By-Laws)
 - **Honorary Member**: Special recognition status
 - **Emeritus Member**: Retired member with limited privileges
 
-**Important By-Laws Note**: Under current By-Laws, only Full Members are eligible for Inactive status. Probationary Members and Student Members who pause their membership must be placed in "Not a Member" status as they do not qualify for Inactive membership.**Annual Renewal Process:**
+**Important By-Laws Note**: Under current By-Laws, only Full Members are eligible for Inactive status. Probationary Members and Student Members who pause their membership must be placed in "Not a Member" status as they do not qualify for Inactive membership.
+
+**SSC Probationary Member Requirements:**
+At Skyline Soaring Club, **everyone is provisional** - all new members begin as Probationary Members regardless of their aviation experience or background. This approach ensures:
+- Consistent evaluation of club fit and culture alignment
+- Opportunity to assess operational competency and safety practices
+- Equal treatment for all new members (no "fast track" to Full Member status)
+- Clear probationary period expectations and milestones
+
+*Other clubs may choose to grant immediate Full Member status to experienced pilots or under other criteria. The system accommodates both approaches.*
+
+**Annual Renewal Process:**
 1. **Pre-Renewal Communication** (60 days before expiration)
    - Send renewal notices via email
    - Include dues information and deadlines
