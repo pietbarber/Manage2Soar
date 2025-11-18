@@ -164,28 +164,33 @@ class MembershipApplicationForm(forms.ModelForm):
             "address_line1": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Street Address",
+                    "placeholder": "Street Address (e.g., 123 Main St or 1-2-3 Ginza)",
                     "required": True,
                 }
             ),
             "address_line2": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Apartment, Suite, etc."}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Apartment, Suite, Ward, District, etc.",
+                }
             ),
             "city": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "City", "required": True}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "City, Town, or Prefecture",
+                    "required": True,
+                }
             ),
             "state": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "State/Province",
-                    "required": True,
+                    "placeholder": "State/Province (required for US addresses)",
                 }
             ),
             "zip_code": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "ZIP Code",
-                    "required": True,
+                    "placeholder": "ZIP/Postal Code (required for US addresses)",
                 }
             ),
             "country": forms.Select(attrs={"class": "form-select"}),
@@ -215,7 +220,7 @@ class MembershipApplicationForm(forms.ModelForm):
             "pilot_certificate_number": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "FAA Certificate Number (if applicable)",
+                    "placeholder": "FAA Certificate Number (US pilots only)",
                 }
             ),
             "glider_rating": forms.Select(attrs={"class": "form-select"}),
@@ -438,7 +443,20 @@ class MembershipApplicationForm(forms.ModelForm):
                 }
             )
 
-        # If they have pilot certificates, validate certificate number
+        # Validate address fields based on country
+        country = cleaned_data.get("country") or "USA"
+        if country == "USA":
+            # For US addresses, state and zip are required
+            if not cleaned_data.get("state"):
+                self.add_error("state", "State is required for US addresses.")
+            if not cleaned_data.get("zip_code"):
+                self.add_error("zip_code", "ZIP code is required for US addresses.")
+        else:
+            # For non-US addresses, state and zip are optional
+            # Update field labels to be more generic
+            pass
+
+        # If they have pilot certificates, validate certificate number (except foreign pilots)
         glider_rating = cleaned_data.get("glider_rating") or "none"
         if not cleaned_data.get("glider_rating"):
             cleaned_data["glider_rating"] = "none"
@@ -450,11 +468,17 @@ class MembershipApplicationForm(forms.ModelForm):
                 glider_rating not in ["none", ""],
             ]
         )
+        is_foreign_pilot = glider_rating == "foreign"
 
-        if has_any_rating and not cleaned_data.get("pilot_certificate_number"):
+        # Only require FAA certificate number for US pilots with ratings
+        if (
+            has_any_rating
+            and not is_foreign_pilot
+            and not cleaned_data.get("pilot_certificate_number")
+        ):
             self.add_error(
                 "pilot_certificate_number",
-                "Please provide your FAA pilot certificate number since you indicated you have pilot ratings.",
+                "Please provide your FAA pilot certificate number since you indicated you have US pilot ratings.",
             )
 
         # Validate flight hours make sense (provide defaults for missing values)

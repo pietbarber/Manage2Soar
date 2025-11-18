@@ -109,49 +109,87 @@
                 <div class="info-section">
                     <h5><i class="fas fa-plane"></i> Aviation Experience</h5>
                     <div class="experience-badges">
-                        {% if application.pilot_ratings %}
+                        {% if application.has_private_pilot or application.has_commercial_pilot or application.has_cfi or application.glider_rating != 'none' %}
                             <span class="badge bg-info text-dark">Current Pilot</span>
                         {% else %}
                             <span class="badge bg-light text-dark">Not Currently a Pilot</span>
                         {% endif %}
-                        {% if application.previous_soaring_experience %}
+                        {% if application.glider_flight_hours and application.glider_flight_hours > 0 %}
                             <span class="badge bg-success">Has Soaring Experience</span>
                         {% else %}
                             <span class="badge bg-light text-dark">No Soaring Experience</span>
                         {% endif %}
-                        {% if application.interested_in_learning_to_fly %}
-                            <span class="badge bg-primary">Wants to Learn</span>
+                        {% if application.glider_rating == 'student' %}
+                            <span class="badge bg-primary">Student Pilot</span>
+                        {% elif application.glider_rating == 'foreign' %}
+                            <span class="badge bg-warning text-dark">Foreign Pilot</span>
                         {% endif %}
                     </div>
 
-                    {% if application.pilot_ratings %}
-                    {% if application.certificates_licenses %}
+                    <!-- Pilot Certificates -->
+                    {% if application.pilot_certificate_number %}
                     <div class="info-row">
-                        <div class="info-label">Certificates & Ratings:</div>
-                        <div class="info-value">{{ application.certificates_licenses }}</div>
+                        <div class="info-label">FAA Certificate Number:</div>
+                        <div class="info-value">{{ application.pilot_certificate_number }}</div>
                     </div>
                     {% endif %}
+
+                    <!-- Glider Rating -->
+                    {% if application.glider_rating and application.glider_rating != 'none' %}
+                    <div class="info-row">
+                        <div class="info-label">Glider Rating:</div>
+                        <div class="info-value">{{ application.get_glider_rating_display }}</div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Other Pilot Certificates -->
+                    {% if application.has_private_pilot or application.has_commercial_pilot or application.has_cfi %}
+                    <div class="info-row">
+                        <div class="info-label">Other Certificates:</div>
+                        <div class="info-value">
+                            {% if application.has_private_pilot %}Private Pilot {% endif %}
+                            {% if application.has_commercial_pilot %}Commercial Pilot {% endif %}
+                            {% if application.has_cfi %}CFI-G {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Flight Hours -->
                     {% if application.total_flight_hours %}
                     <div class="info-row">
                         <div class="info-label">Total Flight Hours:</div>
                         <div class="info-value">{{ application.total_flight_hours }}</div>
                     </div>
                     {% endif %}
+
+                    {% if application.glider_flight_hours %}
+                    <div class="info-row">
+                        <div class="info-label">Glider Flight Hours:</div>
+                        <div class="info-value">{{ application.glider_flight_hours }}</div>
+                    </div>
                     {% endif %}
 
-                    {% if application.previous_soaring_experience %}
-                    {% if application.soaring_hours %}
+                    {% if application.recent_flight_hours %}
                     <div class="info-row">
-                        <div class="info-label">Soaring Hours:</div>
-                        <div class="info-value">{{ application.soaring_hours }}</div>
+                        <div class="info-label">Recent Flight Hours (24 months):</div>
+                        <div class="info-value">{{ application.recent_flight_hours }}</div>
                     </div>
                     {% endif %}
-                    {% if application.previous_clubs_experience %}
+
+                    <!-- SSA Membership -->
+                    {% if application.ssa_member_number %}
                     <div class="info-row">
-                        <div class="info-label">Previous Clubs/Experience:</div>
-                        <div class="info-value">{{ application.previous_clubs_experience|linebreaks }}</div>
+                        <div class="info-label">SSA Member Number:</div>
+                        <div class="info-value">{{ application.ssa_member_number }}</div>
                     </div>
                     {% endif %}
+
+                    <!-- Previous Club Memberships -->
+                    {% if application.previous_club_memberships %}
+                    <div class="info-row">
+                        <div class="info-label">Previous Club Memberships:</div>
+                        <div class="info-value">{{ application.previous_club_memberships|linebreaks }}</div>
+                    </div>
                     {% endif %}
 
                     {% if application.glider_ownership %}

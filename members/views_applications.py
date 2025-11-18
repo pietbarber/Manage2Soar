@@ -442,15 +442,43 @@ def membership_waitlist(request):
     )
 
 
+@require_http_methods(["GET", "POST"])
 def membership_application_status(request, application_id):
     """
     Public status check for membership applications.
     Allows applicants to check their application status without logging in.
+    Also allows withdrawal of pending applications via POST.
     """
 
     application = get_object_or_404(
         MembershipApplication, application_id=application_id
     )
+
+    # Handle withdrawal request
+    if request.method == "POST" and request.POST.get("action") == "withdraw":
+        # Only allow withdrawal if application is still pending or under review
+        if application.status in ["pending", "under_review", "additional_info_needed"]:
+            application.status = "withdrawn"
+            application.reviewed_at = timezone.now()
+            application.save()
+
+            logger.info(
+                f"Application withdrawn by applicant: {application.email} "
+                f"({application.first_name} {application.last_name}) - ID: {application.application_id}"
+            )
+
+            messages.success(
+                request,
+                "Your application has been withdrawn successfully. "
+                "Thank you for your interest in our club.",
+            )
+        else:
+            messages.error(
+                request, "This application cannot be withdrawn at this time."
+            )
+
+        # Redirect back to status page to prevent re-submission
+        return HttpResponseRedirect(request.path)
 
     # Basic security - only show limited information
     context = {
@@ -458,6 +486,8 @@ def membership_application_status(request, application_id):
         "status_display": application.get_status_display(),
         "submitted_date": application.submitted_at,
         "applicant_name": application.first_name,  # Only show first name for privacy
+        "can_withdraw": application.status
+        in ["pending", "under_review", "additional_info_needed"],
     }
 
     return render(request, "members/membership_application_status.html", context)

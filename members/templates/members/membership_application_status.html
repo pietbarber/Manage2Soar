@@ -14,6 +14,16 @@
         <h1>Application Status</h1>
         <h2 class="h4 text-muted">Hello {{ applicant_name }},</h2>
 
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
         <!-- Status Display -->
         <div class="status-icon">
             {% if application.status == 'pending' %}
@@ -28,6 +38,8 @@
                 <i class="bi bi-x-circle text-danger"></i>
             {% elif application.status == 'waitlisted' %}
                 <i class="bi bi-list-ol text-secondary"></i>
+            {% elif application.status == 'withdrawn' %}
+                <i class="bi bi-arrow-left-circle text-muted"></i>
             {% endif %}
         </div>
 
@@ -69,11 +81,40 @@
                 {% if application.waitlist_position %}
                     <p><strong>Your position:</strong> #{{ application.waitlist_position }} in line</p>
                 {% endif %}
+
+            {% elif application.status == 'withdrawn' %}
+                <h5>Application Withdrawn</h5>
+                <p>You have withdrawn your membership application. Thank you for your interest in our club. You're welcome to submit a new application in the future if you'd like to reconsider membership.</p>
             {% endif %}
         </div>
 
+        <!-- Withdrawal Option -->
+        {% if can_withdraw %}
+        <div class="mt-4">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="card-title text-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Withdraw Application
+                    </h6>
+                    <p class="card-text small">
+                        If you no longer wish to pursue membership, you can withdraw your application.
+                        <strong>This action cannot be undone.</strong>
+                    </p>
+                    <form method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="withdraw">
+                        <button type="submit" class="btn btn-sm btn-outline-warning"
+                                onclick="return confirm('Are you sure you want to withdraw your application? This cannot be undone.')">
+                            <i class="fas fa-times"></i> Withdraw Application
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Next Steps -->
-        {% if application.status != 'rejected' %}
+        {% if application.status != 'rejected' and application.status != 'withdrawn' %}
         <div class="next-steps">
             <h6><i class="fas fa-arrow-right"></i> What's Next?</h6>
             {% if application.status == 'pending' or application.status == 'under_review' %}

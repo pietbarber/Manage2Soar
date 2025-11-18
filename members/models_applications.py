@@ -160,6 +160,7 @@ class MembershipApplication(models.Model):
         ("transition", "Transition"),
         ("private", "Private Glider"),
         ("commercial", "Commercial Glider"),
+        ("foreign", "Foreign Pilot"),
     ]
     glider_rating = models.CharField(
         max_length=15,

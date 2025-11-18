@@ -184,8 +184,14 @@
                         </div>
                     </div>
 
+                    <div class="alert alert-info mb-3" id="address-format-help" style="display: none;">
+                        <small><strong>Address Format Help:</strong>
+                        <div id="address-examples"></div>
+                        </small>
+                    </div>
+
                     <div class="form-group">
-                        <label for="{{ form.address_line1.id_for_label }}" class="form-label required-field">Street Address</label>
+                        <label for="{{ form.address_line1.id_for_label }}" class="form-label required-field" id="address1-label">Street Address</label>
                         {{ form.address_line1|add_class:"form-control" }}
                         {% if form.address_line1.errors %}
                             <div class="invalid-feedback d-block">{{ form.address_line1.errors.0 }}</div>
@@ -193,7 +199,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="{{ form.address_line2.id_for_label }}" class="form-label">Address Line 2</label>
+                        <label for="{{ form.address_line2.id_for_label }}" class="form-label" id="address2-label">Address Line 2</label>
                         {{ form.address_line2|add_class:"form-control" }}
                         {% if form.address_line2.errors %}
                             <div class="invalid-feedback d-block">{{ form.address_line2.errors.0 }}</div>
@@ -202,21 +208,21 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="{{ form.city.id_for_label }}" class="form-label required-field">City</label>
+                            <label for="{{ form.city.id_for_label }}" class="form-label required-field" id="city-label">City</label>
                             {{ form.city|add_class:"form-control" }}
                             {% if form.city.errors %}
                                 <div class="invalid-feedback d-block">{{ form.city.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="{{ form.state.id_for_label }}" class="form-label required-field">State</label>
+                            <label for="{{ form.state.id_for_label }}" class="form-label required-field" id="state-label">State</label>
                             {{ form.state|add_class:"form-control" }}
                             {% if form.state.errors %}
                                 <div class="invalid-feedback d-block">{{ form.state.errors.0 }}</div>
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="{{ form.zip_code.id_for_label }}" class="form-label required-field">ZIP Code</label>
+                            <label for="{{ form.zip_code.id_for_label }}" class="form-label required-field" id="zip-label">ZIP Code</label>
                             {{ form.zip_code|add_class:"form-control" }}
                             {% if form.zip_code.errors %}
                                 <div class="invalid-feedback d-block">{{ form.zip_code.errors.0 }}</div>
@@ -586,6 +592,114 @@ document.addEventListener('DOMContentLoaded', function() {
         previousMemberCheckbox.addEventListener('change', togglePreviousMemberFields);
         togglePreviousMemberFields(); // Initial state
     }
+
+    // Handle country-specific field requirements
+    const countryField = document.getElementById('{{ form.country.id_for_label }}');
+    const stateField = document.getElementById('{{ form.state.id_for_label }}');
+    const zipField = document.getElementById('{{ form.zip_code.id_for_label }}');
+    const gliderRatingField = document.getElementById('{{ form.glider_rating.id_for_label }}');
+    const pilotCertField = document.getElementById('{{ form.pilot_certificate_number.id_for_label }}');
+
+    function updateFieldRequirements() {
+        const country = countryField ? countryField.value : 'USA';
+        const isUSA = country === 'USA';
+        const isForeignPilot = gliderRatingField && gliderRatingField.value === 'foreign';
+
+        // Address format help
+        const addressHelp = document.getElementById('address-format-help');
+        const addressExamples = document.getElementById('address-examples');
+        const address1Label = document.getElementById('address1-label');
+        const address2Label = document.getElementById('address2-label');
+        const cityLabel = document.getElementById('city-label');
+        const stateLabel = document.getElementById('state-label');
+        const zipLabel = document.getElementById('zip-label');
+
+        // Show country-specific address guidance
+        let addressExample = '';
+        let labels = {
+            address1: 'Street Address',
+            address2: 'Address Line 2',
+            city: 'City',
+            state: 'State/Province',
+            zip: 'ZIP/Postal Code'
+        };
+
+        if (country === 'JPN') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "1-2-3 Ginza", Address Line 2: "Chuo-ku", City: "Tokyo", State: "Tokyo-to", ZIP: "104-0061"';
+            labels = {
+                address1: 'Street/District Address',
+                address2: 'Ward/Area (ku/shi)',
+                city: 'City/Prefecture',
+                state: 'Prefecture/Region',
+                zip: 'Postal Code'
+            };
+        } else if (country === 'GBR') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "10 Downing Street", City: "London", State: "England", ZIP: "SW1A 2AA"';
+            labels.zip = 'Postcode';
+        } else if (country === 'CAN') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "123 Main Street", City: "Toronto", State: "Ontario", ZIP: "M5V 3A8"';
+            labels.zip = 'Postal Code';
+        } else if (country === 'DEU') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "Musterstraße 123", City: "Berlin", State: "Berlin", ZIP: "10115"';
+            labels.zip = 'Postleitzahl';
+        } else if (isUSA) {
+            addressExample = '<strong>Example:</strong> Address Line 1: "123 Main Street", City: "Anytown", State: "CA", ZIP: "12345"';
+        } else {
+            addressExample = '<strong>Tip:</strong> Use Address Line 1 for street/building, Address Line 2 for district/area, adapt other fields as needed for your country.';
+        }
+
+        if (addressHelp && addressExamples) {
+            if (!isUSA && country !== '') {
+                addressHelp.style.display = 'block';
+                addressExamples.innerHTML = addressExample;
+            } else {
+                addressHelp.style.display = 'none';
+            }
+        }
+
+        // Update field labels
+        if (address1Label) address1Label.innerHTML = labels.address1 + ' <span class="text-danger">*</span>';
+        if (address2Label) address2Label.innerHTML = labels.address2;
+        if (cityLabel) cityLabel.innerHTML = labels.city + ' <span class="text-danger">*</span>';
+
+        // Update state and zip requirements based on country
+        if (stateField) {
+            stateField.required = isUSA;
+            if (stateLabel) {
+                stateLabel.innerHTML = labels.state + (isUSA ? ' <span class="text-danger">*</span>' : '');
+            }
+        }
+
+        if (zipField) {
+            zipField.required = isUSA;
+            if (zipLabel) {
+                zipLabel.innerHTML = labels.zip + (isUSA ? ' <span class="text-danger">*</span>' : '');
+            }
+        }
+
+        // Update pilot certificate field visibility/requirements based on pilot type
+        if (pilotCertField) {
+            const pilotCertContainer = pilotCertField.closest('.mb-3');
+            if (pilotCertContainer) {
+                if (isForeignPilot) {
+                    pilotCertContainer.style.display = 'none';
+                    pilotCertField.required = false;
+                } else {
+                    pilotCertContainer.style.display = 'block';
+                }
+            }
+        }
+    }
+
+    if (countryField) {
+        countryField.addEventListener('change', updateFieldRequirements);
+    }
+    if (gliderRatingField) {
+        gliderRatingField.addEventListener('change', updateFieldRequirements);
+    }
+
+    // Initial state
+    updateFieldRequirements();
 
     // Form validation feedback
     const form = document.querySelector('form');
