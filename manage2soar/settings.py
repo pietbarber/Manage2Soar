@@ -186,12 +186,14 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.associate_by_email",
     # 🛠️ Custom steps — insert after association
     "members.pipeline.debug_pipeline_data",  # Log details
-    # Create proper username format
+    # 🚫 Issue #164: Redirect unknown users to membership application
+    "members.pipeline.redirect_unknown_users_to_application",
+    # Create proper username format (only for existing users)
     "members.pipeline.create_username",
     # Default username getter
     "social_core.pipeline.user.get_username",
-    # Create user if not found
-    "social_core.pipeline.user.create_user",
+    # 🚫 REMOVED: No longer create users automatically
+    # "social_core.pipeline.user.create_user",  # Issue #164
     "members.pipeline.set_default_membership_status",  # Set membership status
     # Fetch profile picture from Google
     "members.pipeline.fetch_google_profile_picture",

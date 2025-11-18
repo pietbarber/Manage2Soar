@@ -18,6 +18,7 @@ Issue #245 successfully implemented a comprehensive membership application syste
 - **Administrative Management**: Complete review interface with status tracking and member account creation
 - **Automated Workflow**: Email notifications, status management, and cleanup systems
 - **Data Integrity**: Comprehensive validation, audit trails, and 365-day retention policies
+- **Issue #164 Integration**: OAuth2 users without accounts redirected to membership application instead of automatic account creation
 
 ### ✅ Technical Requirements
 - Django 5.2.8 compatibility with PostgreSQL database
@@ -257,7 +258,79 @@ class Command(BaseCronJobCommand):
 - **Retention Policy**: 365-day retention ensures adequate administrative review time
 - **Logging**: Comprehensive audit trail for cleanup operations
 
-### 6. User Experience Enhancements
+### 6. Issue #164 Implementation - OAuth2 Integration
+
+#### Problem Statement
+Previously, unknown users who attempted to log in via OAuth2 (Google) would have accounts automatically created with "Pending" status. This bypassed the membership application process and created accounts for unauthorized users.
+
+#### Solution Implementation
+```python
+def redirect_unknown_users_to_application(strategy, user, is_new, details, *args, **kwargs):
+    if user is None or is_new:
+        # Store OAuth2 info for pre-filling application form
+        email = details.get('email', '')
+        first_name = details.get('first_name', '')
+        last_name = details.get('last_name', '')
+
+        request = strategy.request
+        request.session['oauth2_prefill'] = {
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'from_oauth2': True
+        }
+
+        messages.info(request,
+            f"Hello {first_name}! We don't have a membership account for {email}. "
+            f"Please complete our membership application to join the club."
+        )
+
+        return redirect('members:membership_application')
+
+    return None  # Continue with normal login for existing users
+```
+
+#### OAuth2 Pipeline Changes
+- **Removed**: `"social_core.pipeline.user.create_user"` step
+- **Added**: `"members.pipeline.redirect_unknown_users_to_application"` step
+- **Enhanced**: Application form pre-fills OAuth2 data and shows contextual messaging
+
+#### User Experience Flow
+1. **Unknown User Attempts OAuth2 Login**: User tries to log in with Google account
+2. **Pipeline Intercepts**: New pipeline step detects unknown user
+3. **Session Storage**: OAuth2 data stored for form pre-filling
+4. **Friendly Redirect**: User redirected to membership application with helpful message
+5. **Pre-filled Form**: Application form automatically populated with name and email
+6. **Enhanced Messaging**: Special UI acknowledges they might be existing members with different emails
+7. **Action Options**: "Try Different Login" and "Back to Home" buttons for better navigation
+
+#### OAuth2 Multiple Email Enhancement
+
+**Problem Addressed**: Members often have multiple OAuth2-enabled email accounts (e.g., `pietbarber@gmail.com` and `pb@pietbarber.com`) and may attempt login with a different email than their registered membership account.
+
+**Enhanced Solution**:
+- **Acknowledges Existing Members**: Instead of assuming unknown OAuth2 users aren't members, the system now suggests they might be existing members using different emails
+- **Provides Clear Pathways**:
+  - Existing members: "Try logging in with a different email address"
+  - New members: "Complete our membership application"
+- **Action Buttons**: "Try Different Login" and "Back to Home" for easy navigation
+- **Contextual UI**: Enhanced messaging explains both scenarios clearly
+
+**User Experience Flow**:
+```
+Unknown OAuth2 Email → Friendly Message → Multiple Options:
+├── Try Different Login (for existing members)
+├── Back to Home (if they change their mind)  
+└── Complete Application (if truly new, with pre-filled form)
+```
+
+**Benefits**:
+- **Reduced Friction**: Existing members aren't forced through application process
+- **Better Communication**: Clear explanation of why account wasn't found
+- **Flexible Navigation**: Multiple options instead of single forced path
+- **Maintained Convenience**: New users still get pre-filled application form
+
+### 8. User Experience Enhancements
 
 #### Form Improvements Throughout Development
 - **Enhanced Error Messages**: Clear, actionable validation feedback
@@ -265,6 +338,8 @@ class Command(BaseCronJobCommand):
 - **Dynamic Field Requirements**: Country-specific validation with visual indicators
 - **Mobile-Responsive Design**: Bootstrap 5 implementation with touch-friendly interface
 - **Progress Indicators**: Clear application status tracking for users
+- **OAuth2 User Guidance**: Contextual messaging that acknowledges existing members might use different emails
+- **Navigation Options**: "Try Different Login" and "Back to Home" buttons for better user flow
 
 #### Template Optimization
 ```html
@@ -348,6 +423,10 @@ class MembershipApplicationTests(TestCase):
 - **`members/models.py`**: Updated Member model for application integration
 - **`templates/base.html`**: Added membership applications navbar link
 - **`members/migrations/0013_add_foreign_pilot_choice.py`**: Database schema updates
+- **`members/pipeline.py`**: Added OAuth2 redirect logic for Issue #164
+- **`manage2soar/settings.py`**: Updated OAuth2 pipeline configuration for Issue #164
+- **`members/views_applications.py`**: Added OAuth2 prefill functionality for Issue #164
+- **`members/templates/members/membership_application.html`**: Added OAuth2 user messaging
 
 ### Documentation Updates:
 - **`members/docs/README.md`**: Enhanced overview with application system features
@@ -488,6 +567,7 @@ graph TD
 - ✅ **International Support**: Foreign pilots can successfully submit applications
 - ✅ **Administrative Workflow**: Complete review process from submission to member creation
 - ✅ **Automated Systems**: Cleanup and notification systems functioning properly
+- ✅ **Issue #164 OAuth2 Integration**: Unknown OAuth2 users properly redirected to membership application
 - ✅ **Documentation**: Comprehensive documentation updated across all affected areas
 
 ### User Adoption Metrics (Expected)
@@ -528,13 +608,14 @@ graph TD
 
 ## Conclusion
 
-Issue #245 successfully transformed the membership application process from a manual, PDF-based system to a comprehensive, modern web application that supports international users, provides complete administrative management, and includes automated workflow systems. The implementation delivers significant operational efficiency improvements while providing a professional, accessible experience for prospective members.
+Issue #245 successfully transformed the membership application process from a manual, PDF-based system to a comprehensive, modern web application that supports international users, provides complete administrative management, and includes automated workflow systems. The implementation also integrates Issue #164 OAuth2 improvements with enhanced user experience that gracefully handles multiple email scenarios, ensuring both existing and new users are properly guided through appropriate pathways.
 
 **Key Success Factors:**
 - ✅ **Complete International Support**: Foreign pilots and non-US addresses fully supported
 - ✅ **Comprehensive Administrative Tools**: Complete workflow from application to member account creation
 - ✅ **Modern User Experience**: Professional interface with mobile responsiveness
 - ✅ **Automated Systems**: Notifications and cleanup reduce manual administrative overhead
+- ✅ **Enhanced OAuth2 Integration (Issue #164)**: Secure authentication flow with multiple-email-aware messaging that provides clear pathways for both existing members and new applicants
 - ✅ **Security & Privacy**: Proper data protection and access control throughout
 - ✅ **Extensive Documentation**: Complete documentation ensures long-term maintainability
 

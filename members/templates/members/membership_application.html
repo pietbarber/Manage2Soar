@@ -32,6 +32,41 @@
             <h5 class="fw-bold text-primary mb-3">
                 <i class="bi bi-info-circle me-2"></i>Welcome to Our Membership Application
             </h5>
+
+            {% if from_oauth2 %}
+                <div class="alert alert-info border-0 mb-3">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-person-check me-2"></i>Account Not Found
+                    </h6>
+                    <p class="mb-2">We don't have a membership account associated with the email address you just used for Google login.</p>
+
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>Already a member?</strong></p>
+                        <ul class="small mb-2">
+                            <li>Try logging in with a different Google account or email address</li>
+                            <li>You may have registered with a different email than the one you're using now</li>
+                            <li>Contact our membership managers if you need help accessing your account</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-2">
+                        <p class="mb-1"><strong>New to {{ config.club_name|default:"our club" }}?</strong></p>
+                        <p class="small mb-0">Complete this membership application. We've pre-filled some information from your Google account to get you started.</p>
+                    </div>
+
+                    <p class="mb-0"><small class="text-muted">Once your application is approved, you'll be able to log in with the Google account you just used.</small></p>
+                </div>
+
+                <div class="d-flex gap-2 mb-3">
+                    <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i>Try Different Login
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-house me-1"></i>Back to Home
+                    </a>
+                </div>
+            {% endif %}
+
             <p class="mb-2">Thank you for your interest in joining {{ config.club_name|default:"our club" }}! This application will help us understand your background and interests in soaring.</p>
             <p class="mb-0"><strong>Note:</strong> Fields marked with <span class="text-danger">*</span> are required.</p>
         </div>

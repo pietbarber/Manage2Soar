@@ -99,7 +99,24 @@ def membership_application(request):
                 "Please correct the errors below and submit your application again.",
             )
     else:
-        form = MembershipApplicationForm()
+        # Check for OAuth2 prefill data (Issue #164)
+        initial_data = {}
+        oauth2_prefill = request.session.get("oauth2_prefill")
+        if oauth2_prefill:
+            initial_data = {
+                "email": oauth2_prefill.get("email", ""),
+                "first_name": oauth2_prefill.get("first_name", ""),
+                "last_name": oauth2_prefill.get("last_name", ""),
+            }
+
+        form = MembershipApplicationForm(initial=initial_data)
+
+    # Check if user came from OAuth2 redirect and clear session data
+    from_oauth2 = False
+    if "oauth2_prefill" in request.session:
+        from_oauth2 = request.session["oauth2_prefill"].get("from_oauth2", False)
+        # Clear the session data after use
+        del request.session["oauth2_prefill"]
 
     return render(
         request,
@@ -107,6 +124,7 @@ def membership_application(request):
         {
             "form": form,
             "config": config,
+            "from_oauth2": from_oauth2,
             "page_title": (
                 f"Membership Application - {config.club_name}"
                 if config
