@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Membership Applications{% endblock %}
+
+{% block head_extra %}
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+<link href="{% static 'css/membership_applications.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="display-6 fw-bold text-primary mb-1">
+                    <i class="bi bi-person-plus me-2"></i>Membership Applications
+                </h1>
+                <div>
+                    <a href="{% url 'members:membership_waitlist' %}" class="btn btn-outline-secondary btn-modern">
+                        <i class="bi bi-list-ol me-2"></i>Manage Waitlist
+                    </a>
+                </div>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Status Summary -->
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Application Status Summary</h5>
+                        <div class="status-counts">
+                            <div class="status-count-item">
+                                <span class="status-count-number">{{ status_counts.pending|default:0 }}</span>
+                                <span class="status-count-label">Pending</span>
+                            </div>
+                            <div class="status-count-item">
+                                <span class="status-count-number">{{ status_counts.under_review|default:0 }}</span>
+                                <span class="status-count-label">Under Review</span>
+                            </div>
+                            <div class="status-count-item">
+                                <span class="status-count-number">{{ status_counts.waitlisted|default:0 }}</span>
+                                <span class="status-count-label">Waitlisted</span>
+                            </div>
+                            <div class="status-count-item">
+                                <span class="status-count-number">{{ status_counts.approved|default:0 }}</span>
+                                <span class="status-count-label">Approved</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <!-- Filters -->
+                        <form method="get" class="d-flex gap-2 align-items-end">
+                            <div class="flex-grow-1">
+                                <label for="status-filter" class="form-label">Filter by Status:</label>
+                                <select name="status" id="status-filter" class="form-select">
+                                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Applications (Need Attention)</option>
+                                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Applications</option>
+                                    {% for value, label in status_choices %}
+                                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="flex-grow-1">
+                                <label for="search" class="form-label">Search:</label>
+                                <input type="text" name="q" id="search" class="form-control"
+                                       placeholder="Name or email..." value="{{ search_query }}">
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filter
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Applications Table -->
+            <div class="card">
+                <div class="card-body">
+                    {% if applications %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Applicant</th>
+                                        <th>Contact</th>
+                                        <th>Experience</th>
+                                        <th>Status</th>
+                                        <th>Submitted</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for app in applications %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ app.first_name }} {{ app.last_name }}</strong><br>
+                                            {% if app.city and app.state %}
+                                                <small class="text-muted">{{ app.city }}, {{ app.state }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <i class="fas fa-envelope"></i>
+                                                <a href="mailto:{{ app.email }}">{{ app.email }}</a>
+                                            </div>
+                                            {% if app.phone %}
+                                                <div class="mt-1">
+                                                    <i class="fas fa-phone"></i> {{ app.phone }}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="small">
+                                                {% if app.pilot_ratings %}
+                                                    <span class="badge bg-info text-dark">Pilot</span>
+                                                {% endif %}
+                                                {% if app.previous_soaring_experience %}
+                                                    <span class="badge bg-success">Soaring Exp.</span>
+                                                {% endif %}
+                                                {% if app.interested_in_learning_to_fly %}
+                                                    <span class="badge bg-primary">Learning</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if app.total_flight_hours %}
+                                                <div class="small text-muted">{{ app.total_flight_hours }} hrs</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge status-badge status-{{ app.status }}">
+                                                {{ app.get_status_display }}
+                                            </span>
+                                            {% if app.status == 'waitlisted' and app.waitlist_position %}
+                                                <div class="small text-muted">#{{ app.waitlist_position }} in line</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div>{{ app.submitted_at|date:"M j, Y" }}</div>
+                                            <small class="text-muted">{{ app.submitted_at|date:"g:i A" }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'members:membership_application_detail' app.application_id %}"
+                                                   class="btn btn-sm btn-outline-primary" title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if app.status == 'pending' or app.status == 'under_review' %}
+                                                    <a href="{% url 'members:membership_application_detail' app.application_id %}"
+                                                       class="btn btn-sm btn-outline-success" title="Review">
+                                                        <i class="fas fa-check"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h4>No applications found</h4>
+                            {% if status_filter != 'all' or search_query %}
+                                <p class="text-muted">Try adjusting your filters or search terms.</p>
+                                <a href="{% url 'members:membership_applications_list' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-refresh"></i> Clear Filters
+                                </a>
+                            {% else %}
+                                <p class="text-muted">No membership applications have been submitted yet.</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-question-circle"></i> Application Management Guide</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Status Meanings:</h6>
+                                <ul class="small">
+                                    <li><strong>Pending:</strong> New application awaiting initial review</li>
+                                    <li><strong>Under Review:</strong> Currently being evaluated</li>
+                                    <li><strong>Additional Info Needed:</strong> Requires follow-up with applicant</li>
+                                    <li><strong>Waitlisted:</strong> Application approved but waiting for membership availability</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Quick Actions:</h6>
+                                <ul class="small">
+                                    <li>Click <i class="fas fa-eye"></i> to view full application details</li>
+                                    <li>Click <i class="fas fa-check"></i> to review and approve/reject</li>
+                                    <li>Use email links to contact applicants directly</li>
+                                    <li>Manage waitlist order from the waitlist page</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

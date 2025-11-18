@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Membership Waitlist Management{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+<link href="{% static 'css/membership_applications.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-list-ol"></i> Membership Waitlist</h1>
+                <a href="{% url 'members:membership_applications_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Applications
+                </a>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if applications %}
+                <div class="waitlist-header">
+                    <h4>Current Waitlist</h4>
+                    <p class="mb-0 text-muted">
+                        {{ applications|length }} applicant{{ applications|length|pluralize }} currently waiting for membership.
+                        Use the arrow buttons to reorder the list as needed.
+                    </p>
+                </div>
+
+                <div class="waitlist-container">
+                    {% for app in applications %}
+                        <div class="waitlist-item">
+                            <div class="position-number">
+                                {{ app.waitlist_position }}
+                            </div>
+
+                            <div class="applicant-info">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ app.first_name }} {{ app.last_name }}</h6>
+                                        <div class="small text-muted">
+                                            <i class="fas fa-envelope"></i> {{ app.email }}
+                                            {% if app.city and app.state %}
+                                                • {{ app.city }}, {{ app.state }}
+                                            {% endif %}
+                                        </div>
+                                        <div class="small text-muted">
+                                            Applied: {{ app.submitted_at|date:"M j, Y" }}
+                                            • Added to waitlist: {{ app.reviewed_at|date:"M j, Y" }}
+                                        </div>
+                                    </div>
+
+                                    <div class="text-end">
+                                        <div class="small">
+                                            {% if app.pilot_ratings %}
+                                                <span class="badge bg-info text-dark">Pilot</span>
+                                            {% endif %}
+                                            {% if app.previous_soaring_experience %}
+                                                <span class="badge bg-success">Soaring Exp.</span>
+                                            {% endif %}
+                                            {% if app.interested_in_learning_to_fly %}
+                                                <span class="badge bg-primary">Learning</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="waitlist-actions">
+                                <a href="{% url 'members:membership_application_detail' app.application_id %}"
+                                   class="btn btn-sm btn-outline-primary" title="View Application">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+
+                                {% if app.waitlist_position > 1 %}
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="move_up">
+                                    <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-success"
+                                            title="Move Up in Line">
+                                        <i class="fas fa-arrow-up"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+
+                                {% if not forloop.last %}
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="move_down">
+                                    <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                            title="Move Down in Line">
+                                        <i class="fas fa-arrow-down"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Waitlist Management Help -->
+                <div class="mt-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-question-circle"></i> Waitlist Management</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Managing the Waitlist:</h6>
+                                    <ul class="small">
+                                        <li>Use <i class="fas fa-arrow-up"></i> to move an applicant up in priority</li>
+                                        <li>Use <i class="fas fa-arrow-down"></i> to move an applicant down in priority</li>
+                                        <li>Click <i class="fas fa-eye"></i> to view full application details</li>
+                                        <li>Applicants are automatically notified of position changes</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>When Membership Opens:</h6>
+                                    <ul class="small">
+                                        <li>Contact the #1 applicant to offer membership</li>
+                                        <li>If accepted, approve their application (creates member account)</li>
+                                        <li>If declined, move to next person in line</li>
+                                        <li>Waitlist positions automatically update when someone is approved</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            {% else %}
+                <div class="empty-waitlist">
+                    <i class="fas fa-list-ol fa-3x mb-3"></i>
+                    <h4>No Applications on Waitlist</h4>
+                    <p class="text-muted">
+                        The membership waitlist is currently empty. Applications that are approved
+                        when membership is at capacity will appear here.
+                    </p>
+                    <a href="{% url 'members:membership_applications_list' %}" class="btn btn-primary">
+                        <i class="fas fa-list"></i> View All Applications
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

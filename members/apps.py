@@ -18,3 +18,12 @@ from django.apps import AppConfig
 class MembersConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "members"
+
+    def ready(self):
+        """Import signal handlers when Django starts up."""
+        try:
+            import members.signals  # noqa
+        except ImportError:
+            # Signals module may not be present in some environments (e.g., during migrations or testing).
+            # Safe to ignore if signals are not required.
+            pass

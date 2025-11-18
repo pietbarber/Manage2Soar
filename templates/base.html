@@ -84,6 +84,11 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="membersDropdown">
               <li><a class="dropdown-item" href="{% url 'members:member_list' %}">Member List</a></li>
+              {% if user.is_authenticated %}
+                {% if user.member_manager or user.webmaster or user.is_superuser %}
+              <li><a class="dropdown-item" href="{% url 'members:membership_applications_list' %}"><i class="fas fa-user-plus"></i> Membership Applications</a></li>
+                {% endif %}
+              {% endif %}
               <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">Badge Board</a></li>
               <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
               <li><hr class="dropdown-divider"></li>

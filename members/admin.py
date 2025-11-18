@@ -15,6 +15,7 @@ from tinymce.widgets import TinyMCE
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import Badge, Biography, Member, MemberBadge
+from .models_applications import MembershipApplication
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
 try:
@@ -423,3 +424,271 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         """
         updated = queryset.update(is_active=False)
         self.message_user(request, f"Marked {updated} members as inactive.")
+
+
+# --- MembershipApplication Admin ---
+
+
+class ApplicationStatusFilter(SimpleListFilter):
+    """Custom filter for membership application status with better grouping."""
+
+    title = "application status"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("active", "Active (Pending/Under Review/Need Info)"),
+            ("pending", "Pending"),
+            ("under_review", "Under Review"),
+            ("additional_info_needed", "Additional Info Needed"),
+            ("waitlisted", "Waitlisted"),
+            ("approved", "Approved"),
+            ("rejected", "Rejected"),
+            ("withdrawn", "Withdrawn"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "active":
+            return queryset.filter(
+                status__in=["pending", "under_review", "additional_info_needed"]
+            )
+        elif self.value():
+            return queryset.filter(status=self.value())
+        return queryset
+
+
+@admin.register(MembershipApplication)
+class MembershipApplicationAdmin(AdminHelperMixin, VersionAdmin, admin.ModelAdmin):
+    """
+    Django admin interface for membership applications.
+    Provides comprehensive view and search for all applications including withdrawn ones.
+    """
+
+    list_display = [
+        "full_name",
+        "email",
+        "status_badge",
+        "glider_rating",
+        "submitted_at",
+        "reviewed_at",
+        "reviewed_by",
+        "days_since_submission",
+    ]
+
+    list_filter = [
+        ApplicationStatusFilter,
+        "glider_rating",
+        "has_private_pilot",
+        "has_commercial_pilot",
+        "has_cfi",
+        "country",
+        "submitted_at",
+        "reviewed_at",
+        "reviewed_by",
+    ]
+
+    search_fields = [
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "city",
+        "state",
+        "application_id",
+    ]
+
+    readonly_fields = [
+        "application_id",
+        "submitted_at",
+        "full_name",
+        "address_display",
+        "aviation_summary",
+        "days_since_submission",
+    ]
+
+    fieldsets = (
+        (
+            "Application Info",
+            {
+                "fields": (
+                    "application_id",
+                    "status",
+                    "submitted_at",
+                    "reviewed_at",
+                    "reviewed_by",
+                    "days_since_submission",
+                )
+            },
+        ),
+        (
+            "Personal Information",
+            {
+                "fields": (
+                    ("first_name", "middle_initial", "last_name", "name_suffix"),
+                    "email",
+                    ("phone", "mobile_phone"),
+                    "address_display",
+                    "country",
+                )
+            },
+        ),
+        (
+            "Emergency Contact",
+            {
+                "fields": (
+                    "emergency_contact_name",
+                    "emergency_contact_relationship",
+                    "emergency_contact_phone",
+                )
+            },
+        ),
+        (
+            "Aviation Experience",
+            {
+                "fields": (
+                    "aviation_summary",
+                    "pilot_certificate_number",
+                    "glider_rating",
+                    ("has_private_pilot", "has_commercial_pilot", "has_cfi"),
+                    (
+                        "total_flight_hours",
+                        "glider_flight_hours",
+                        "recent_flight_hours",
+                    ),
+                    "ssa_member_number",
+                )
+            },
+        ),
+        (
+            "History & Background",
+            {
+                "fields": (
+                    "previous_club_memberships",
+                    ("previous_member_at_this_club", "previous_membership_details"),
+                    ("insurance_rejection_history", "insurance_rejection_details"),
+                    ("club_rejection_history", "club_rejection_details"),
+                    ("aviation_incidents", "aviation_incident_details"),
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Goals & Comments",
+            {
+                "fields": (
+                    "soaring_goals",
+                    "availability",
+                    "additional_comments",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Management",
+            {
+                "fields": (
+                    "admin_notes",
+                    "waitlist_position",
+                    "member_account",
+                )
+            },
+        ),
+    )
+
+    date_hierarchy = "submitted_at"
+    ordering = ["-submitted_at"]
+
+    @admin.display(description="Name")
+    def full_name(self, obj):
+        """Display full name with suffix."""
+        name_parts = [obj.first_name]
+        if obj.middle_initial:
+            name_parts.append(obj.middle_initial)
+        name_parts.append(obj.last_name)
+        if obj.name_suffix:
+            name_parts.append(obj.name_suffix)
+        return " ".join(name_parts)
+
+    @admin.display(description="Status")
+    def status_badge(self, obj):
+        """Display status with color-coded badge."""
+        colors = {
+            "pending": "orange",
+            "under_review": "blue",
+            "additional_info_needed": "purple",
+            "waitlisted": "gray",
+            "approved": "green",
+            "rejected": "red",
+            "withdrawn": "darkgray",
+        }
+        color = colors.get(obj.status, "black")
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.get_status_display(),
+        )
+
+    @admin.display(description="Address")
+    def address_display(self, obj):
+        """Display formatted address."""
+        parts = []
+        if obj.address_line1:
+            parts.append(obj.address_line1)
+        if obj.address_line2:
+            parts.append(obj.address_line2)
+        city_state = []
+        if obj.city:
+            city_state.append(obj.city)
+        if obj.state:
+            city_state.append(obj.state)
+        if city_state:
+            parts.append(", ".join(city_state))
+        if obj.zip_code:
+            parts.append(obj.zip_code)
+        if obj.country and obj.country != "USA":
+            parts.append(obj.country)
+        return "\n".join(parts)
+
+    @admin.display(description="Aviation Experience")
+    def aviation_summary(self, obj):
+        """Display aviation experience summary."""
+        summary = []
+        if obj.glider_rating and obj.glider_rating != "none":
+            summary.append(f"Glider: {obj.get_glider_rating_display()}")
+        if obj.has_private_pilot:
+            summary.append("Private Pilot")
+        if obj.has_commercial_pilot:
+            summary.append("Commercial Pilot")
+        if obj.has_cfi:
+            summary.append("CFI-G")
+        if obj.total_flight_hours:
+            summary.append(f"Total Hours: {obj.total_flight_hours}")
+        if obj.glider_flight_hours:
+            summary.append(f"Glider Hours: {obj.glider_flight_hours}")
+        return "\n".join(summary) if summary else "No aviation experience"
+
+    @admin.display(description="Submitted")
+    def days_since_submission(self, obj):
+        """Calculate days since application submission."""
+        from django.utils import timezone
+
+        days = (timezone.now() - obj.submitted_at).days
+        return f"{days} days ago"
+
+    def has_delete_permission(self, request, obj=None):
+        """Restrict deletion - applications should be retained for records."""
+        return False  # Never allow deletion of applications
+
+    def get_actions(self, request):
+        """Remove delete action since applications should never be deleted."""
+        actions = super().get_actions(request)
+        if "delete_selected" in actions:
+            del actions["delete_selected"]
+        return actions
+
+    # Admin helper guidance
+    admin_helper_message = (
+        "Membership Applications: View and manage all membership applications including withdrawn ones. "
+        "Applications are never deleted to preserve club records. Use the web interface at "
+        "/members/applications/ for application review workflow."
+    )

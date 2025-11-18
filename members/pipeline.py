@@ -93,6 +93,74 @@ def set_default_membership_status(strategy, user, *args, **kwargs):
 
 
 #########################
+# redirect_unknown_users_to_application() Pipeline Function
+
+# Issue #164: Instead of automatically creating accounts for unknown OAuth2 users,
+# redirect them to the membership application page with a helpful message.
+
+# This prevents unauthorized account creation and ensures all members go through
+# the proper application process, while allowing existing members to continue
+# using OAuth2 login seamlessly.
+
+# Parameters:
+# - strategy: the current pipeline strategy object
+# - user: Django User object (None if no matching user found)
+# - is_new: Boolean indicating if this would be a new user
+# - details: OAuth2 user details (email, name, etc.)
+
+# Returns:
+# - None if user exists (continue pipeline)
+# - HttpResponseRedirect to membership application if user doesn't exist
+
+
+def redirect_unknown_users_to_application(
+    strategy, user, is_new, details, *args, **kwargs
+):
+    """
+    Issue #164: Redirect unknown OAuth2 users to membership application.
+
+    Instead of automatically creating accounts for unknown OAuth2 users,
+    redirect them to the membership application page with helpful messaging
+    that acknowledges they might be existing members using a different email.
+    """
+    if user is None or is_new:
+        # User doesn't exist - redirect to membership application
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        email = details.get("email", "")
+        first_name = details.get("first_name", "")
+        last_name = details.get("last_name", "")
+
+        # Store OAuth2 info in session for pre-filling application form
+        request = strategy.request
+        request.session["oauth2_prefill"] = {
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "from_oauth2": True,
+        }
+
+        # Add helpful message if middleware is available
+        try:
+            messages.info(
+                request,
+                f"Hello {first_name}! We don't have a membership account for {email}. "
+                f"If you're already a member, please try logging in with a different email address. "
+                f"Otherwise, please complete our membership application to join the club.",
+            )
+        except Exception:
+            # Messages middleware not available (e.g., in tests)
+            pass
+
+        return redirect("members:membership_application")
+
+    # User exists, continue with normal login
+    return None
+
+
+#########################
 # fetch_google_profile_picture() Pipeline Function
 
 # Downloads and stores the user's Google profile photo the first time they log in

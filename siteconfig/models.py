@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
 from django.utils.crypto import get_random_string
+from tinymce.models import HTMLField
 
 from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
@@ -188,6 +189,20 @@ class SiteConfiguration(models.Model):
         blank=True,
         null=True,
         help_text="When the current visiting pilot token was created",
+    )
+
+    # Membership Application Settings
+    membership_application_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable the membership application form for new members",
+    )
+    membership_application_terms = HTMLField(
+        blank=True,
+        help_text="Terms and conditions text shown on membership application form",
+    )
+    membership_auto_approve = models.BooleanField(
+        default=False,
+        help_text="Automatically approve new membership applications (bypass manual review)",
     )
 
     def generate_visiting_pilot_token(self):

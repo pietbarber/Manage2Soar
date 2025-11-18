@@ -23,10 +23,13 @@
 - **WORKFLOW**: When you see "command not found" errors, immediately run `source .venv/bin/activate` and retry the command.
 
 ## Django Development Server Management
-- **CHECK FIRST**: Before starting `manage.py runserver`, always check if it's already running on port 8000:
+- **CRITICAL PORT REQUIREMENT**: Development server MUST run on port 8001 due to HSTS cache issues on port 8000. NEVER use port 8001 in production.
+- **DEVELOPMENT SERVER COMMAND**: Always use `python manage.py runserver 127.0.0.1:8001` for local development
+- **CHECK FIRST**: Before starting `manage.py runserver`, always check if it's already running on port 8001:
   ```bash
-  lsof -i :8000 || echo "Port 8000 is free"
+  lsof -i :8001 || echo "Port 8001 is free"
   ```
+- **HSTS ISSUE**: Port 8000 has persistent HSTS cache (365 days) that forces HTTPS, breaking local development. Port 8001 avoids this issue.
 - **AUTO-RESTART**: Django's development server automatically restarts when you modify `.py` files (views.py, models.py, forms.py, etc.). You do NOT need to manually restart it.
 - **WHEN TO RESTART**: Only manually restart the server for:
   - New dependencies/packages installed
@@ -97,7 +100,7 @@
   python3 -m venv env && source env/bin/activate
   pip install -r requirements.txt
   python manage.py migrate
-  python manage.py runserver
+  python manage.py runserver 127.0.0.1:8001
   ```
 - **Tests:**
   - Use `pytest` (preferred) or `python manage.py test`.

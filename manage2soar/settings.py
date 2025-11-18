@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "storages",
     "notifications",
     "utils",
+    "widget_tweaks",
 ]
 
 
@@ -130,6 +131,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
+                "django.template.context_processors.static",
                 "django.template.context_processors.media",
             ],
         },
@@ -184,12 +186,14 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.associate_by_email",
     # 🛠️ Custom steps — insert after association
     "members.pipeline.debug_pipeline_data",  # Log details
-    # Create proper username format
+    # 🚫 Issue #164: Redirect unknown users to membership application
+    "members.pipeline.redirect_unknown_users_to_application",
+    # Create proper username format (only for existing users)
     "members.pipeline.create_username",
     # Default username getter
     "social_core.pipeline.user.get_username",
-    # Create user if not found
-    "social_core.pipeline.user.create_user",
+    # 🚫 REMOVED: No longer create users automatically
+    # "social_core.pipeline.user.create_user",  # Issue #164
     "members.pipeline.set_default_membership_status",  # Set membership status
     # Fetch profile picture from Google
     "members.pipeline.fetch_google_profile_picture",
@@ -271,14 +275,21 @@ STORAGES = {
 GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
 
 # Multi-tenant GCP URLs
-MEDIA_URL = os.getenv(
-    "MEDIA_URL",
-    f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
-)
-STATIC_URL = os.getenv(
-    "STATIC_URL",
-    f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
-)
+# Development vs Production Static/Media URLs
+if DEBUG:
+    # Development: Serve static files locally
+    STATIC_URL = f"/{CLUB_PREFIX}/static/"
+    MEDIA_URL = f"/{CLUB_PREFIX}/media/"
+else:
+    # Production: Serve static files from Google Cloud Storage
+    MEDIA_URL = os.getenv(
+        "MEDIA_URL",
+        f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
+    )
+    STATIC_URL = os.getenv(
+        "STATIC_URL",
+        f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
+    )
 
 # Use TinyMCE JS from configured static storage
 TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
@@ -322,14 +333,21 @@ AUTHENTICATION_BACKENDS = (
 ALLOWED_HOSTS = ["*"]
 
 # Trust X-Forwarded-Proto header for HTTPS detection (required for OAuth2 redirect URI to use https)
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Only enable in production behind a reverse proxy (causes issues in development)
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # Always use console email backend for now (not ready for production email)
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
-SITE_URL = "https://m2s.skylinesoaring.org"
+# Development vs Production URLs
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
+    SITE_URL = "http://127.0.0.1:8000"
+else:
+    CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
+    SITE_URL = "https://m2s.skylinesoaring.org"
 
 DEFAULT_FROM_EMAIL = "noreply@default.manage2soar.org"
 EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
@@ -339,37 +357,42 @@ EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
 # These can be overridden via environment variables
 #############################################################
 
-# HTTP Strict Transport Security (HSTS)
-# Only enable in production with HTTPS - prevents man-in-the-middle attacks
-# WARNING: Once enabled, this cannot be easily reversed!
-SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
-if SECURE_HSTS_SECONDS > 0:
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+# HTTPS Security Settings - Only enable in production
+if not DEBUG:
+    # HTTP Strict Transport Security (HSTS)
+    # Only enable in production with HTTPS - prevents man-in-the-middle attacks
+    # WARNING: Once enabled, this cannot be easily reversed!
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
+    if SECURE_HSTS_SECONDS > 0:
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
 
-# Force HTTPS redirect - only enable in production
-# Set SECURE_SSL_REDIRECT=True in production environment
-SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+    # Force HTTPS redirect - only enable in production
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
-# Secure cookies - only sent over HTTPS
-# Set SESSION_COOKIE_SECURE=True in production environment
-SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+    # Secure cookies - only sent over HTTPS
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
-# Secure CSRF cookies - only sent over HTTPS
-# Set CSRF_COOKIE_SECURE=True in production environment
-CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+    # Secure CSRF cookies - only sent over HTTPS
+    CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+else:
+    # Development settings - disable all HTTPS enforcement
+    SECURE_HSTS_SECONDS = 0
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 
 LOGGING = {

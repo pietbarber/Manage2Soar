@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Membership Application - {{ config.club_name|default:"Skyline Soaring Club" }}{% endblock %}
+
+{% block head_extra %}
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+<link href="{% static 'css/membership_applications.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="application-container">
+        <div class="application-header">
+            <h1 class="display-6 fw-bold text-primary mb-1">
+                <i class="bi bi-person-plus me-2"></i>Membership Application
+            </h1>
+            <p class="text-muted mb-0">{{ config.club_name|default:"Skyline Soaring Club" }}</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="welcome-section">
+            <h5 class="fw-bold text-primary mb-3">
+                <i class="bi bi-info-circle me-2"></i>Welcome to Our Membership Application
+            </h5>
+
+            {% if from_oauth2 %}
+                <div class="alert alert-info border-0 mb-3">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-person-check me-2"></i>Account Not Found
+                    </h6>
+                    <p class="mb-2">We don't have a membership account associated with the email address you just used for Google login.</p>
+
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>Already a member?</strong></p>
+                        <ul class="small mb-2">
+                            <li>Try logging in with a different Google account or email address</li>
+                            <li>You may have registered with a different email than the one you're using now</li>
+                            <li>Contact our membership managers if you need help accessing your account</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-2">
+                        <p class="mb-1"><strong>New to {{ config.club_name|default:"our club" }}?</strong></p>
+                        <p class="small mb-0">Complete this membership application. We've pre-filled some information from your Google account to get you started.</p>
+                    </div>
+
+                    <p class="mb-0"><small class="text-muted">Once your application is approved, you'll be able to log in with the Google account you just used.</small></p>
+                </div>
+
+                <div class="d-flex gap-2 mb-3">
+                    <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i>Try Different Login
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-house me-1"></i>Back to Home
+                    </a>
+                </div>
+            {% endif %}
+
+            <p class="mb-2">Thank you for your interest in joining {{ config.club_name|default:"our club" }}! This application will help us understand your background and interests in soaring.</p>
+            <p class="mb-0"><strong>Note:</strong> Fields marked with <span class="text-danger">*</span> are required.</p>
+        </div>
+
+        <!-- Form Errors Display -->
+        {% if form.errors or form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                <h6 class="alert-heading mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Please correct the following errors to submit your application:
+                </h6>
+
+                {% if form.non_field_errors %}
+                    <div class="mb-3">
+                        {% for error in form.non_field_errors %}
+                            <div class="mb-1"><i class="bi bi-x-circle me-2"></i>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if form.errors %}
+                    <ul class="mb-0 ps-3">
+                        {% for field_name, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <li class="mb-1">
+                                    <strong>{% for field in form %}{% if field.name == field_name %}{{ field.label }}{% endif %}{% endfor %}:</strong>
+                                    {{ error|striptags }}
+                                </li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if config.membership_application_terms %}
+        <div class="terms-section">
+            <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-file-text me-2"></i>Membership Information
+            </h6>
+            {{ config.membership_application_terms|safe }}
+        </div>
+        {% endif %}
+
+        <!-- Previous Membership Check - MOVED TO TOP -->
+        <div class="section-card">
+            <div class="section-header">
+                <h3><i class="bi bi-person-check me-2"></i>Before You Begin</h3>
+            </div>
+            <div class="section-body">
+                <div class="alert alert-info border-start border-primary border-5 mb-4">
+                    <h6 class="fw-bold text-primary mb-2">
+                        <i class="bi bi-info-circle me-2"></i>Important: Previous Membership Check
+                    </h6>
+                    <p class="mb-0">Before proceeding with a new application, please let us know if you've been a member of this club before to avoid duplicate records.</p>
+                </div>
+
+                <div class="form-check">
+                    {{ form.previous_member_at_this_club|add_class:"form-check-input" }}
+                    <label for="{{ form.previous_member_at_this_club.id_for_label }}" class="form-check-label">
+                        Have you ever been a member of this club before?
+                    </label>
+                </div>
+                <div class="form-group" id="previous-member-details" style="display: none;">
+                    <label for="{{ form.previous_membership_details.id_for_label }}" class="form-label">Previous Membership Details</label>
+                    {{ form.previous_membership_details|add_class:"form-control" }}
+                    <div class="help-text">Please provide details about your previous membership (years active, reason for leaving, etc.)</div>
+                    {% if form.previous_membership_details.errors %}
+                        <div class="invalid-feedback d-block">{{ form.previous_membership_details.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Alert for previous members -->
+                <div class="alert alert-warning border-start border-warning border-5 mb-0" id="previous-member-alert" style="display: none;">
+                    <h6 class="fw-bold text-warning mb-2">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Returning Member Process
+                    </h6>
+                    <p class="mb-2">If you were previously a member of this club, you may not need to complete this full application.</p>
+                    <p class="mb-0">
+                        <strong>We recommend contacting our membership managers directly</strong> to discuss reactivating your membership rather than submitting a new application.
+                    </p>
+                    <hr>
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="{% url 'contact' %}" class="btn btn-warning btn-sm">
+                            <i class="bi bi-envelope me-2"></i>Contact Membership Managers
+                        </a>
+                        <small class="text-muted align-self-center ms-2">or continue with this application if preferred</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <!-- Personal Information Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-person me-2"></i>Personal Information</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label required-field">First Name</label>
+                            {{ form.first_name|add_class:"form-control" }}
+                            {% if form.first_name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.first_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.middle_initial.id_for_label }}" class="form-label">Middle Initial</label>
+                            {{ form.middle_initial|add_class:"form-control" }}
+                            {% if form.middle_initial.errors %}
+                                <div class="invalid-feedback d-block">{{ form.middle_initial.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label required-field">Last Name</label>
+                            {{ form.last_name|add_class:"form-control" }}
+                            {% if form.last_name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.last_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.email.id_for_label }}" class="form-label required-field">Email Address</label>
+                        {{ form.email|add_class:"form-control" }}
+                        <div class="help-text">We'll use this to contact you about your application and membership updates.</div>
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback d-block">{{ form.email.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label required-field">Primary Phone</label>
+                            {{ form.phone|add_class:"form-control" }}
+                            {% if form.phone.errors %}
+                                <div class="invalid-feedback d-block">{{ form.phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.mobile_phone.id_for_label }}" class="form-label">Mobile Phone</label>
+                            {{ form.mobile_phone|add_class:"form-control" }}
+                            {% if form.mobile_phone.errors %}
+                                <div class="invalid-feedback d-block">{{ form.mobile_phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mb-3" id="address-format-help" style="display: none;">
+                        <small><strong>Address Format Help:</strong>
+                        <div id="address-examples"></div>
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.address_line1.id_for_label }}" class="form-label required-field" id="address1-label">Street Address</label>
+                        {{ form.address_line1|add_class:"form-control" }}
+                        {% if form.address_line1.errors %}
+                            <div class="invalid-feedback d-block">{{ form.address_line1.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.address_line2.id_for_label }}" class="form-label" id="address2-label">Address Line 2</label>
+                        {{ form.address_line2|add_class:"form-control" }}
+                        {% if form.address_line2.errors %}
+                            <div class="invalid-feedback d-block">{{ form.address_line2.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.city.id_for_label }}" class="form-label required-field" id="city-label">City</label>
+                            {{ form.city|add_class:"form-control" }}
+                            {% if form.city.errors %}
+                                <div class="invalid-feedback d-block">{{ form.city.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.state.id_for_label }}" class="form-label required-field" id="state-label">State</label>
+                            {{ form.state|add_class:"form-control" }}
+                            {% if form.state.errors %}
+                                <div class="invalid-feedback d-block">{{ form.state.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.zip_code.id_for_label }}" class="form-label required-field" id="zip-label">ZIP Code</label>
+                            {{ form.zip_code|add_class:"form-control" }}
+                            {% if form.zip_code.errors %}
+                                <div class="invalid-feedback d-block">{{ form.zip_code.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.country.id_for_label }}" class="form-label">Country</label>
+                            {{ form.country|add_class:"form-select" }}
+                            {% if form.country.errors %}
+                                <div class="invalid-feedback d-block">{{ form.country.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-person-exclamation me-2"></i>Emergency Contact</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-group">
+                        <label for="{{ form.emergency_contact_name.id_for_label }}" class="form-label required-field">Emergency Contact Name</label>
+                        {{ form.emergency_contact_name|add_class:"form-control" }}
+                        {% if form.emergency_contact_name.errors %}
+                            <div class="invalid-feedback d-block">{{ form.emergency_contact_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="{{ form.emergency_contact_relationship.id_for_label }}" class="form-label required-field">Relationship</label>
+                            {{ form.emergency_contact_relationship|add_class:"form-control" }}
+                            {% if form.emergency_contact_relationship.errors %}
+                                <div class="invalid-feedback d-block">{{ form.emergency_contact_relationship.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.emergency_contact_phone.id_for_label }}" class="form-label required-field">Emergency Contact Phone</label>
+                            {{ form.emergency_contact_phone|add_class:"form-control" }}
+                            {% if form.emergency_contact_phone.errors %}
+                                <div class="invalid-feedback d-block">{{ form.emergency_contact_phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aviation Experience Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-airplane me-2"></i>Aviation Experience</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-group">
+                        <label for="{{ form.pilot_certificate_number.id_for_label }}" class="form-label">FAA Pilot Certificate Number</label>
+                        {{ form.pilot_certificate_number|add_class:"form-control" }}
+                        <div class="help-text">If you hold pilot certificates, please provide your FAA certificate number</div>
+                        {% if form.pilot_certificate_number.errors %}
+                            <div class="invalid-feedback d-block">{{ form.pilot_certificate_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.glider_rating.id_for_label }}" class="form-label">Current Glider Rating</label>
+                        {{ form.glider_rating|add_class:"form-select" }}
+                        {% if form.glider_rating.errors %}
+                            <div class="invalid-feedback d-block">{{ form.glider_rating.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-primary mb-3">Pilot Certificates</h6>
+                            <div class="form-check">
+                                {{ form.has_private_pilot|add_class:"form-check-input" }}
+                                <label for="{{ form.has_private_pilot.id_for_label }}" class="form-check-label">Private Pilot Certificate</label>
+                            </div>
+                            <div class="form-check">
+                                {{ form.has_commercial_pilot|add_class:"form-check-input" }}
+                                <label for="{{ form.has_commercial_pilot.id_for_label }}" class="form-check-label">Commercial Pilot Certificate</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-primary mb-3">Instructor Certificates</h6>
+                            <div class="form-check">
+                                {{ form.has_cfi|add_class:"form-check-input" }}
+                                <label for="{{ form.has_cfi.id_for_label }}" class="form-check-label">Certified Flight Instructor - Glider (CFI-G)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row mt-3">
+                        <div class="form-group">
+                            <label for="{{ form.total_flight_hours.id_for_label }}" class="form-label">Total Flight Hours</label>
+                            {{ form.total_flight_hours|add_class:"form-control" }}
+                            {% if form.total_flight_hours.errors %}
+                                <div class="invalid-feedback d-block">{{ form.total_flight_hours.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.glider_flight_hours.id_for_label }}" class="form-label">Glider Flight Hours</label>
+                            {{ form.glider_flight_hours|add_class:"form-control" }}
+                            {% if form.glider_flight_hours.errors %}
+                                <div class="invalid-feedback d-block">{{ form.glider_flight_hours.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ form.recent_flight_hours.id_for_label }}" class="form-label">Recent Flight Hours</label>
+                            {{ form.recent_flight_hours|add_class:"form-control" }}
+                            <div class="help-text">Hours in last 24 months</div>
+                            {% if form.recent_flight_hours.errors %}
+                                <div class="invalid-feedback d-block">{{ form.recent_flight_hours.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.ssa_member_number.id_for_label }}" class="form-label">SSA Member Number</label>
+                        {{ form.ssa_member_number|add_class:"form-control" }}
+                        <div class="help-text">Soaring Society of America membership number, if applicable</div>
+                        {% if form.ssa_member_number.errors %}
+                            <div class="invalid-feedback d-block">{{ form.ssa_member_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-clock-history me-2"></i>Aviation History</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-group">
+                        <label for="{{ form.previous_club_memberships.id_for_label }}" class="form-label">Previous Club Memberships</label>
+                        {{ form.previous_club_memberships|add_class:"form-control" }}
+                        <div class="help-text">List any previous soaring club memberships, including club names and years</div>
+                        {% if form.previous_club_memberships.errors %}
+                            <div class="invalid-feedback d-block">{{ form.previous_club_memberships.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.insurance_rejection_history|add_class:"form-check-input" }}
+                        <label for="{{ form.insurance_rejection_history.id_for_label }}" class="form-check-label">
+                            Have you ever been rejected for aviation insurance?
+                        </label>
+                    </div>
+                    <div class="form-group" id="insurance-details" style="display: none;">
+                        <label for="{{ form.insurance_rejection_details.id_for_label }}" class="form-label">Insurance Rejection Details</label>
+                        {{ form.insurance_rejection_details|add_class:"form-control" }}
+                        {% if form.insurance_rejection_details.errors %}
+                            <div class="invalid-feedback d-block">{{ form.insurance_rejection_details.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.club_rejection_history|add_class:"form-check-input" }}
+                        <label for="{{ form.club_rejection_history.id_for_label }}" class="form-check-label">
+                            Have you ever been rejected for club membership?
+                        </label>
+                    </div>
+                    <div class="form-group" id="club-details" style="display: none;">
+                        <label for="{{ form.club_rejection_details.id_for_label }}" class="form-label">Club Rejection Details</label>
+                        {{ form.club_rejection_details|add_class:"form-control" }}
+                        {% if form.club_rejection_details.errors %}
+                            <div class="invalid-feedback d-block">{{ form.club_rejection_details.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.aviation_incidents|add_class:"form-check-input" }}
+                        <label for="{{ form.aviation_incidents.id_for_label }}" class="form-check-label">
+                            Have you been involved in aviation incidents or accidents?
+                        </label>
+                    </div>
+                    <div class="form-group" id="incident-details" style="display: none;">
+                        <label for="{{ form.aviation_incident_details.id_for_label }}" class="form-label">Aviation Incident Details</label>
+                        {{ form.aviation_incident_details|add_class:"form-control" }}
+                        {% if form.aviation_incident_details.errors %}
+                            <div class="invalid-feedback d-block">{{ form.aviation_incident_details.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goals and Interests Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-target me-2"></i>Goals and Interests</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-group">
+                        <label for="{{ form.soaring_goals.id_for_label }}" class="form-label required-field">Your Soaring Goals</label>
+                        {{ form.soaring_goals|add_class:"form-control" }}
+                        <div class="help-text">What are your goals with soaring? What interests you about our club?</div>
+                        {% if form.soaring_goals.errors %}
+                            <div class="invalid-feedback d-block">{{ form.soaring_goals.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.availability.id_for_label }}" class="form-label">Availability</label>
+                        {{ form.availability|add_class:"form-control" }}
+                        <div class="help-text">When are you typically available for club activities?</div>
+                        {% if form.availability.errors %}
+                            <div class="invalid-feedback d-block">{{ form.availability.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Additional Comments Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-chat-text me-2"></i>Additional Information</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-group">
+                        <label for="{{ form.additional_comments.id_for_label }}" class="form-label">Additional Comments</label>
+                        {{ form.additional_comments|add_class:"form-control" }}
+                        <div class="help-text">Any additional information you'd like to share with us</div>
+                        {% if form.additional_comments.errors %}
+                            <div class="invalid-feedback d-block">{{ form.additional_comments.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agreement Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="bi bi-check-square me-2"></i>Agreement</h3>
+                </div>
+
+                <div class="section-body">
+                    <div class="form-check">
+                        {{ form.agrees_to_terms|add_class:"form-check-input" }}
+                        <label for="{{ form.agrees_to_terms.id_for_label }}" class="form-check-label required-field">
+                            I agree to abide by all club rules and regulations
+                        </label>
+                        <div class="help-text">By checking this box, you agree to follow all club rules, policies, and procedures.</div>
+                        {% if form.agrees_to_terms.errors %}
+                            <div class="invalid-feedback d-block">{{ form.agrees_to_terms.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.agrees_to_safety_rules|add_class:"form-check-input" }}
+                        <label for="{{ form.agrees_to_safety_rules.id_for_label }}" class="form-check-label required-field">
+                            I agree to follow all club safety procedures
+                        </label>
+                        <div class="help-text">Safety is our top priority. You must agree to follow all safety guidelines.</div>
+                        {% if form.agrees_to_safety_rules.errors %}
+                            <div class="invalid-feedback d-block">{{ form.agrees_to_safety_rules.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check">
+                        {{ form.agrees_to_financial_obligations|add_class:"form-check-input" }}
+                        <label for="{{ form.agrees_to_financial_obligations.id_for_label }}" class="form-check-label required-field">
+                            I agree to meet all financial obligations as a club member
+                        </label>
+                        <div class="help-text">This includes membership dues, flight fees, and any other club-related charges.</div>
+                        {% if form.agrees_to_financial_obligations.errors %}
+                            <div class="invalid-feedback d-block">{{ form.agrees_to_financial_obligations.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Section -->
+            <div class="submit-section">
+                <button type="submit" class="btn btn-primary btn-modern btn-lg">
+                    <i class="bi bi-send me-2"></i>Submit Application
+                </button>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        After submitting, our membership managers will review your application and contact you within 1-2 business days.
+                    </small>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle insurance rejection history
+    const insuranceCheckbox = document.getElementById('{{ form.insurance_rejection_history.id_for_label }}');
+    const insuranceDetails = document.getElementById('insurance-details');
+
+    function toggleInsuranceFields() {
+        if (insuranceCheckbox && insuranceCheckbox.checked) {
+            insuranceDetails.style.display = 'block';
+        } else if (insuranceDetails) {
+            insuranceDetails.style.display = 'none';
+        }
+    }
+
+    if (insuranceCheckbox) {
+        insuranceCheckbox.addEventListener('change', toggleInsuranceFields);
+        toggleInsuranceFields(); // Initial state
+    }
+
+    // Handle club rejection history
+    const clubCheckbox = document.getElementById('{{ form.club_rejection_history.id_for_label }}');
+    const clubDetails = document.getElementById('club-details');
+
+    function toggleClubFields() {
+        if (clubCheckbox && clubCheckbox.checked) {
+            clubDetails.style.display = 'block';
+        } else if (clubDetails) {
+            clubDetails.style.display = 'none';
+        }
+    }
+
+    if (clubCheckbox) {
+        clubCheckbox.addEventListener('change', toggleClubFields);
+        toggleClubFields(); // Initial state
+    }
+
+    // Handle aviation incidents
+    const incidentCheckbox = document.getElementById('{{ form.aviation_incidents.id_for_label }}');
+    const incidentDetails = document.getElementById('incident-details');
+
+    function toggleIncidentFields() {
+        if (incidentCheckbox && incidentCheckbox.checked) {
+            incidentDetails.style.display = 'block';
+        } else if (incidentDetails) {
+            incidentDetails.style.display = 'none';
+        }
+    }
+
+    if (incidentCheckbox) {
+        incidentCheckbox.addEventListener('change', toggleIncidentFields);
+        toggleIncidentFields(); // Initial state
+    }
+
+    // Handle previous membership at this club
+    const previousMemberCheckbox = document.getElementById('{{ form.previous_member_at_this_club.id_for_label }}');
+    const previousMemberDetails = document.getElementById('previous-member-details');
+    const previousMemberAlert = document.getElementById('previous-member-alert');
+
+    function togglePreviousMemberFields() {
+        if (previousMemberCheckbox && previousMemberCheckbox.checked) {
+            previousMemberDetails.style.display = 'block';
+            previousMemberAlert.style.display = 'block';
+        } else {
+            if (previousMemberDetails) previousMemberDetails.style.display = 'none';
+            if (previousMemberAlert) previousMemberAlert.style.display = 'none';
+        }
+    }
+
+    if (previousMemberCheckbox) {
+        previousMemberCheckbox.addEventListener('change', togglePreviousMemberFields);
+        togglePreviousMemberFields(); // Initial state
+    }
+
+    // Handle country-specific field requirements
+    const countryField = document.getElementById('{{ form.country.id_for_label }}');
+    const stateField = document.getElementById('{{ form.state.id_for_label }}');
+    const zipField = document.getElementById('{{ form.zip_code.id_for_label }}');
+    const gliderRatingField = document.getElementById('{{ form.glider_rating.id_for_label }}');
+    const pilotCertField = document.getElementById('{{ form.pilot_certificate_number.id_for_label }}');
+
+    function updateFieldRequirements() {
+        const country = countryField ? countryField.value : 'USA';
+        const isUSA = country === 'USA';
+        const isForeignPilot = gliderRatingField && gliderRatingField.value === 'foreign';
+
+        // Address format help
+        const addressHelp = document.getElementById('address-format-help');
+        const addressExamples = document.getElementById('address-examples');
+        const address1Label = document.getElementById('address1-label');
+        const address2Label = document.getElementById('address2-label');
+        const cityLabel = document.getElementById('city-label');
+        const stateLabel = document.getElementById('state-label');
+        const zipLabel = document.getElementById('zip-label');
+
+        // Show country-specific address guidance
+        let addressExample = '';
+        let labels = {
+            address1: 'Street Address',
+            address2: 'Address Line 2',
+            city: 'City',
+            state: 'State/Province',
+            zip: 'ZIP/Postal Code'
+        };
+
+        if (country === 'JPN') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "1-2-3 Ginza", Address Line 2: "Chuo-ku", City: "Tokyo", State: "Tokyo-to", ZIP: "104-0061"';
+            labels = {
+                address1: 'Street/District Address',
+                address2: 'Ward/Area (ku/shi)',
+                city: 'City/Prefecture',
+                state: 'Prefecture/Region',
+                zip: 'Postal Code'
+            };
+        } else if (country === 'GBR') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "10 Downing Street", City: "London", State: "England", ZIP: "SW1A 2AA"';
+            labels.zip = 'Postcode';
+        } else if (country === 'CAN') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "123 Main Street", City: "Toronto", State: "Ontario", ZIP: "M5V 3A8"';
+            labels.zip = 'Postal Code';
+        } else if (country === 'DEU') {
+            addressExample = '<strong>Example:</strong> Address Line 1: "Musterstraße 123", City: "Berlin", State: "Berlin", ZIP: "10115"';
+            labels.zip = 'Postleitzahl';
+        } else if (isUSA) {
+            addressExample = '<strong>Example:</strong> Address Line 1: "123 Main Street", City: "Anytown", State: "CA", ZIP: "12345"';
+        } else {
+            addressExample = '<strong>Tip:</strong> Use Address Line 1 for street/building, Address Line 2 for district/area, adapt other fields as needed for your country.';
+        }
+
+        if (addressHelp && addressExamples) {
+            if (!isUSA && country !== '') {
+                addressHelp.style.display = 'block';
+                addressExamples.innerHTML = addressExample;
+            } else {
+                addressHelp.style.display = 'none';
+            }
+        }
+
+        // Update field labels
+        if (address1Label) address1Label.innerHTML = labels.address1 + ' <span class="text-danger">*</span>';
+        if (address2Label) address2Label.innerHTML = labels.address2;
+        if (cityLabel) cityLabel.innerHTML = labels.city + ' <span class="text-danger">*</span>';
+
+        // Update state and zip requirements based on country
+        if (stateField) {
+            stateField.required = isUSA;
+            if (stateLabel) {
+                stateLabel.innerHTML = labels.state + (isUSA ? ' <span class="text-danger">*</span>' : '');
+            }
+        }
+
+        if (zipField) {
+            zipField.required = isUSA;
+            if (zipLabel) {
+                zipLabel.innerHTML = labels.zip + (isUSA ? ' <span class="text-danger">*</span>' : '');
+            }
+        }
+
+        // Update pilot certificate field visibility/requirements based on pilot type
+        if (pilotCertField) {
+            const pilotCertContainer = pilotCertField.closest('.mb-3');
+            if (pilotCertContainer) {
+                if (isForeignPilot) {
+                    pilotCertContainer.style.display = 'none';
+                    pilotCertField.required = false;
+                } else {
+                    pilotCertContainer.style.display = 'block';
+                }
+            }
+        }
+    }
+
+    if (countryField) {
+        countryField.addEventListener('change', updateFieldRequirements);
+    }
+    if (gliderRatingField) {
+        gliderRatingField.addEventListener('change', updateFieldRequirements);
+    }
+
+    // Initial state
+    updateFieldRequirements();
+
+    // Form validation feedback
+    const form = document.querySelector('form');
+    const requiredFields = form.querySelectorAll('[required]');
+
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+
+        // Check required agreement checkboxes
+        const agreementCheckboxes = [
+            document.getElementById('{{ form.agrees_to_terms.id_for_label }}'),
+            document.getElementById('{{ form.agrees_to_safety_rules.id_for_label }}'),
+            document.getElementById('{{ form.agrees_to_financial_obligations.id_for_label }}')
+        ];
+
+        agreementCheckboxes.forEach(function(checkbox) {
+            if (checkbox && !checkbox.checked) {
+                isValid = false;
+                checkbox.classList.add('is-invalid');
+            } else if (checkbox) {
+                checkbox.classList.remove('is-invalid');
+            }
+        });
+
+        if (!isValid) {
+            e.preventDefault();
+            // Scroll to first error
+            const firstError = form.querySelector('.is-invalid');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

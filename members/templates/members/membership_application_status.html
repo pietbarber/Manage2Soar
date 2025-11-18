@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Application Status - {{ applicant_name }}{% endblock %}
+
+{% block head_extra %}
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+<link href="{% static 'css/membership_applications.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="status-page">
+        <h1>Application Status</h1>
+        <h2 class="h4 text-muted">Hello {{ applicant_name }},</h2>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Status Display -->
+        <div class="status-icon">
+            {% if application.status == 'pending' %}
+                <i class="bi bi-clock text-warning"></i>
+            {% elif application.status == 'under_review' %}
+                <i class="bi bi-search text-info"></i>
+            {% elif application.status == 'additional_info_needed' %}
+                <i class="bi bi-question-circle text-warning"></i>
+            {% elif application.status == 'approved' %}
+                <i class="bi bi-check-circle text-success"></i>
+            {% elif application.status == 'rejected' %}
+                <i class="bi bi-x-circle text-danger"></i>
+            {% elif application.status == 'waitlisted' %}
+                <i class="bi bi-list-ol text-secondary"></i>
+            {% elif application.status == 'withdrawn' %}
+                <i class="bi bi-arrow-left-circle text-muted"></i>
+            {% endif %}
+        </div>
+
+        <div class="status-display-badge status-{{ application.status }}">
+            {{ status_display }}
+        </div>
+
+        {% if application.status == 'waitlisted' and application.waitlist_position %}
+            <div class="mt-2">
+                <strong>Position #{{ application.waitlist_position }} in line</strong>
+            </div>
+        {% endif %}
+
+        <!-- Status Description -->
+        <div class="status-description">
+            {% if application.status == 'pending' %}
+                <h5>Your Application is Under Initial Review</h5>
+                <p>Thank you for submitting your membership application! We have received it and it's currently in our review queue. Our membership managers typically review new applications within 1-2 business days.</p>
+
+            {% elif application.status == 'under_review' %}
+                <h5>Application Currently Being Reviewed</h5>
+                <p>Your application is now being actively reviewed by our membership committee. We're carefully considering your background and how you'll fit with our club community.</p>
+
+            {% elif application.status == 'additional_info_needed' %}
+                <h5>Additional Information Needed</h5>
+                <p>Our membership committee has reviewed your application and needs some additional information before making a final decision. You should receive an email or phone call from one of our membership managers soon.</p>
+
+            {% elif application.status == 'approved' %}
+                <h5>Congratulations! Your Application Has Been Approved</h5>
+                <p>Welcome to the club! Your membership application has been approved and your member account has been created. You should receive welcome information and next steps via email soon.</p>
+
+            {% elif application.status == 'rejected' %}
+                <h5>Application Not Approved</h5>
+                <p>Unfortunately, we're not able to approve your membership application at this time. If you have questions about this decision, please feel free to contact our membership managers.</p>
+
+            {% elif application.status == 'waitlisted' %}
+                <h5>You're on Our Membership Waiting List</h5>
+                <p>Your application has been approved, but we currently have reached our membership capacity. You've been added to our waiting list and will be notified as soon as a membership spot becomes available.</p>
+                {% if application.waitlist_position %}
+                    <p><strong>Your position:</strong> #{{ application.waitlist_position }} in line</p>
+                {% endif %}
+
+            {% elif application.status == 'withdrawn' %}
+                <h5>Application Withdrawn</h5>
+                <p>You have withdrawn your membership application. Thank you for your interest in our club. You're welcome to submit a new application in the future if you'd like to reconsider membership.</p>
+            {% endif %}
+        </div>
+
+        <!-- Withdrawal Option -->
+        {% if can_withdraw %}
+        <div class="mt-4">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="card-title text-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Withdraw Application
+                    </h6>
+                    <p class="card-text small">
+                        If you no longer wish to pursue membership, you can withdraw your application.
+                        <strong>This action cannot be undone.</strong>
+                    </p>
+                    <form method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="withdraw">
+                        <button type="submit" class="btn btn-sm btn-outline-warning"
+                                onclick="return confirm('Are you sure you want to withdraw your application? This cannot be undone.')">
+                            <i class="fas fa-times"></i> Withdraw Application
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Next Steps -->
+        {% if application.status != 'rejected' and application.status != 'withdrawn' %}
+        <div class="next-steps">
+            <h6><i class="fas fa-arrow-right"></i> What's Next?</h6>
+            {% if application.status == 'pending' or application.status == 'under_review' %}
+                <ul class="text-start">
+                    <li>Our membership committee will complete their review</li>
+                    <li>You'll receive an email with the decision and next steps</li>
+                    <li>If approved, you'll get welcome information and club orientation details</li>
+                </ul>
+                <p><strong>Questions?</strong> Feel free to contact our membership managers if you need any clarification about the process.</p>
+
+            {% elif application.status == 'additional_info_needed' %}
+                <ul class="text-start">
+                    <li>Wait for contact from our membership managers</li>
+                    <li>Provide any requested additional information promptly</li>
+                    <li>Your application will continue through the review process</li>
+                </ul>
+
+            {% elif application.status == 'approved' %}
+                <ul class="text-start">
+                    <li>Watch for welcome email with member handbook and orientation information</li>
+                    <li>Complete any required safety briefings or training</li>
+                    <li>Start participating in club activities and operations!</li>
+                </ul>
+
+            {% elif application.status == 'waitlisted' %}
+                <ul class="text-start">
+                    <li>You'll be automatically notified when a membership spot opens</li>
+                    <li>No further action needed from you at this time</li>
+                    <li>Feel free to visit the club as a guest in the meantime</li>
+                </ul>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Application Info -->
+        <div class="mt-4">
+            <small class="text-muted">
+                Application submitted on {{ submitted_date|date:"F j, Y" }}<br>
+                Application ID: {{ application.application_id }}
+            </small>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="mt-4">
+            <hr>
+            <h6>Need Help?</h6>
+            <p class="small text-muted">
+                If you have questions about your application status, please contact our membership managers
+                or visit our club website for more information.
+            </p>
+            <a href="/" class="btn btn-outline-primary">
+                <i class="fas fa-home"></i> Return to Club Website
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
