@@ -10,6 +10,7 @@ from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils import timezone
 
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
@@ -495,3 +496,126 @@ def notify_membership_managers_of_application(application):
     except Exception as e:
         # Log the error but don't fail the application submission
         logger.error(f"Failed to notify member managers of membership application: {e}")
+
+
+def notify_membership_managers_of_withdrawal(application):
+    """
+    Send notifications to membership managers when an applicant withdraws their application.
+
+    Args:
+        application (MembershipApplication): The application that was withdrawn
+    """
+    try:
+        # Get site configuration
+        config = SiteConfiguration.objects.first()
+        if not config:
+            logger.error(
+                "SiteConfiguration not found - cannot send withdrawal notifications"
+            )
+            return
+
+        # Get all member managers
+        member_managers = Member.objects.filter(member_manager=True, is_active=True)
+
+        if not member_managers.exists():
+            # Fallback to webmasters if no member managers
+            member_managers = Member.objects.filter(webmaster=True, is_active=True)
+
+        if not member_managers.exists():
+            logger.warning(
+                "No member managers or webmasters found for application withdrawal notification"
+            )
+            return
+
+        # Email notification (if email is configured)
+        if hasattr(settings, "DEFAULT_FROM_EMAIL") and settings.DEFAULT_FROM_EMAIL:
+            try:
+                # Sanitize all user input for email content
+                safe_name = f"{application.first_name} {application.last_name}".replace(
+                    "\r", ""
+                ).replace("\n", " ")
+                safe_email = application.email.replace("\r", "").replace("\n", " ")
+
+                subject = f"Membership Application Withdrawn: {safe_name[:50]}"
+
+                # Calculate days since submission
+                days_since_submission = (timezone.now() - application.submitted_at).days
+
+                message_lines = [
+                    f"A membership application has been withdrawn by the applicant.",
+                    "",
+                    "Application Details:",
+                    f"- Name: {safe_name}",
+                    f"- Email: {safe_email}",
+                    f"- Phone: {application.phone or 'Not provided'}",
+                    f"- City, State: {application.city}, {application.state}",
+                    f"- Application ID: {application.application_id}",
+                    f"- Originally submitted: {application.submitted_at.strftime('%B %d, %Y at %I:%M %p')}",
+                    f"- Days since submission: {days_since_submission}",
+                    "",
+                    "The application record has been marked as withdrawn and is retained for record-keeping purposes.",
+                    "",
+                    f"Review application details: {config.site_url}/members/applications/{application.application_id}/",
+                    "",
+                    f"Regards,",
+                    f"{config.club_name} Membership System",
+                ]
+
+                message = "\n".join(message_lines)
+
+                # Send email to all member managers
+                for manager in member_managers:
+                    if manager.email:
+                        try:
+                            send_mail(
+                                subject=subject,
+                                message=message,
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[manager.email],
+                                fail_silently=False,
+                            )
+                            logger.info(
+                                f"Sent withdrawal notification to {manager.email} for application {application.application_id}"
+                            )
+                        except Exception as email_error:
+                            logger.error(
+                                f"Failed to send withdrawal notification email to {manager.email}: {email_error}"
+                            )
+
+                logger.info(
+                    f"Processed withdrawal notifications for application {application.application_id}"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to send withdrawal notification emails: {e}")
+
+        # In-app notification
+        try:
+            from notifications.models import Notification
+
+            notification_message = (
+                f"Membership application withdrawn: {safe_name} ({safe_email})"
+            )
+
+            for manager in member_managers:
+                Notification.objects.create(
+                    recipient=manager,
+                    notification_type="membership_application_withdrawn",
+                    title="Membership Application Withdrawn",
+                    message=notification_message,
+                    related_object_type="membership_application",
+                    related_object_id=str(application.application_id),
+                    priority="medium",
+                )
+
+            logger.info(
+                f"Created in-app withdrawal notifications for application {application.application_id}"
+            )
+
+        except Exception as e:
+            # Log but don't fail
+            logger.error(f"Failed to create withdrawal notifications: {e}")
+
+    except Exception as e:
+        # Log the error but don't fail the withdrawal process
+        logger.error(f"Failed to notify member managers of application withdrawal: {e}")

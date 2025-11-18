@@ -467,6 +467,11 @@ def membership_application_status(request, application_id):
                 f"({application.first_name} {application.last_name}) - ID: {application.application_id}"
             )
 
+            # Notify membership managers about the withdrawal
+            from .signals import notify_membership_managers_of_withdrawal
+
+            notify_membership_managers_of_withdrawal(application)
+
             messages.success(
                 request,
                 "Your application has been withdrawn successfully. "
