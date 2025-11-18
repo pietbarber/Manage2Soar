@@ -81,7 +81,11 @@ def membership_application(request):
                         f"Your application ID is: {application.application_id}",
                     )
 
-                    return redirect("home")
+                    # Redirect to confirmation page with application ID
+                    return redirect(
+                        "members:membership_application_status",
+                        application_id=application.application_id,
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to save membership application: {e}")
