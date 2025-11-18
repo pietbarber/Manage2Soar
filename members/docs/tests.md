@@ -13,6 +13,13 @@ This document describes the unit tests for the `members` app.
 - Biography editing and upload
 - Group/role assignment and permissions
 - Decorator logic (e.g., `active_member_required`)
+- **Membership Application System (Issue #245):**
+  - Application form submission and validation
+  - International address and foreign pilot support
+  - Status transitions and workflow management
+  - Administrative review interface functionality
+  - User-initiated withdrawal with notifications
+  - Management command cleanup operations
 
 ## Redaction tests
 - The redaction feature (toggle visibility and notification creation) is covered by tests in `members/tests/` including `test_toggle_redaction.py` and `test_notifications_on_toggle.py`.

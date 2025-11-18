@@ -6,7 +6,12 @@ Welcome to the documentation for the `members` app. This app manages all aspects
 - **Purpose:** Central hub for all member-related data and logic.
 - **Key Features:**
   - Member profiles and authentication (Google OAuth2, fallback to Django login)
-  - Membership application processing (Issue #245) for non-logged-in users
+  - **Membership application processing (Issue #245)** - Complete system for non-logged-in users including:
+    - International address support with country-specific validation
+    - Foreign pilot support with conditional field requirements
+    - User-initiated withdrawal functionality with notifications
+    - Administrative review interface with Django admin integration
+    - Automated cleanup system with 365-day retention
   - Biographies and profile images
   - Badge tracking and display
   - Role/group management
