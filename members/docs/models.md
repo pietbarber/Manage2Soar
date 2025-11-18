@@ -38,12 +38,66 @@ erDiagram
         boolean secretary
         boolean webmaster
         boolean member_manager
+        boolean rostermeister
         string legacy_username
         datetime date_joined
         int last_updated_by_id FK
         string pilot_certificate_number
         date private_glider_checkride_date
         string home_club
+    }
+
+    MembershipApplication {
+        int id PK
+        uuid application_id UK
+        string status
+        datetime submitted_at
+        datetime last_updated
+        int reviewed_by_id FK
+        datetime reviewed_at
+        string first_name
+        string middle_initial
+        string last_name
+        string name_suffix
+        string email
+        string phone
+        string mobile_phone
+        string address_line1
+        string address_line2
+        string city
+        string state
+        string zip_code
+        string country
+        string emergency_contact_name
+        string emergency_contact_relationship
+        string emergency_contact_phone
+        string pilot_certificate_number
+        boolean has_private_pilot
+        boolean has_commercial_pilot
+        boolean has_cfi
+        string glider_rating
+        int total_flight_hours
+        int glider_flight_hours
+        int recent_flight_hours
+        string ssa_member_number
+        text previous_club_memberships
+        boolean previous_member_at_this_club
+        text previous_membership_details
+        boolean insurance_rejection_history
+        text insurance_rejection_details
+        boolean club_rejection_history
+        text club_rejection_details
+        boolean aviation_incidents
+        text aviation_incident_details
+        text soaring_goals
+        text availability
+        boolean agrees_to_terms
+        boolean agrees_to_safety_rules
+        boolean agrees_to_financial_obligations
+        text additional_comments
+        text admin_notes
+        int waitlist_position
+        int member_account_id FK
     }
 
     Biography {
@@ -74,21 +128,32 @@ erDiagram
     Member ||--o{ MemberBadge : earned_badges
     Badge ||--o{ MemberBadge : awarded_to_members
     Member ||--o{ Member : last_updated_by
+    Member ||--o| MembershipApplication : created_from_application
+    Member ||--o{ MembershipApplication : reviewed_applications
 ```
 
 ## Models
-
-### `Biography`
-- Stores member biographies, including rich text and upload path logic.
-- Linked to `Member` via a foreign key.
 
 ### `Member`
 - Extends Django's `AbstractUser`.
 - Stores all member profile data, authentication info, and group/role logic.
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
+- Can be linked to a `MembershipApplication` that created the account.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
+
+### `MembershipApplication`
+- Stores membership applications from non-logged-in users (Issue #245).
+- Comprehensive application form with personal info, aviation experience, and club history.
+- Status tracking: pending, under review, waitlisted, approved, rejected, withdrawn.
+- Links to `Member` account upon approval via `member_account` field.
+- Includes waitlist management with position tracking.
+- Administrative notes and review tracking for membership managers.
+
+### `Biography`
+- Stores member biographies, including rich text and upload path logic.
+- Linked to `Member` via a foreign key.
 
 ### `Badge`
 - Represents a badge that can be earned by a member.

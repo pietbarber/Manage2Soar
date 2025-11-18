@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Application Review - {{ application.first_name }} {{ application.last_name }}{% endblock %}
+
+{% block head_extra %}
+<link href="/ssc/static/css/baseline.css" rel="stylesheet">
+<link href="/ssc/static/css/membership_applications.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="application-detail">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div>
+                <h1>Application Review</h1>
+                <h2 class="h4 text-muted">{{ application.first_name }} {{ application.last_name }}</h2>
+            </div>
+            <div class="text-end">
+                <span class="badge status-badge status-{{ application.status }}">
+                    {{ application.get_status_display }}
+                </span>
+                {% if application.status == 'waitlisted' and application.waitlist_position %}
+                    <div class="small text-muted mt-1">#{{ application.waitlist_position }} in waitlist</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <small class="text-muted">
+                    Application ID: {{ application.application_id }}<br>
+                    Submitted: {{ application.submitted_at|date:"F j, Y \a\t g:i A" }}
+                </small>
+            </div>
+            <a href="{% url 'members:membership_applications_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Applications
+            </a>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Personal Information -->
+                <div class="info-section">
+                    <h5><i class="fas fa-user"></i> Personal Information</h5>
+                    <div class="info-row">
+                        <div class="info-label">Name:</div>
+                        <div class="info-value">{{ application.first_name }} {{ application.last_name }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">
+                            <a href="mailto:{{ application.email }}">{{ application.email }}</a>
+                        </div>
+                    </div>
+                    {% if application.phone %}
+                    <div class="info-row">
+                        <div class="info-label">Phone:</div>
+                        <div class="info-value">
+                            <a href="tel:{{ application.phone }}">{{ application.phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if application.date_of_birth %}
+                    <div class="info-row">
+                        <div class="info-label">Date of Birth:</div>
+                        <div class="info-value">{{ application.date_of_birth|date:"F j, Y" }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.address %}
+                    <div class="info-row">
+                        <div class="info-label">Address:</div>
+                        <div class="info-value">
+                            {{ application.address }}<br>
+                            {{ application.city }}, {{ application.state }} {{ application.zip_code }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="info-row">
+                        <div class="info-label">Location:</div>
+                        <div class="info-value">{{ application.city }}, {{ application.state }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.emergency_contact_name %}
+                    <div class="info-row">
+                        <div class="info-label">Emergency Contact:</div>
+                        <div class="info-value">
+                            {{ application.emergency_contact_name }}
+                            {% if application.emergency_contact_phone %}
+                                <br><a href="tel:{{ application.emergency_contact_phone }}">{{ application.emergency_contact_phone }}</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Aviation Experience -->
+                <div class="info-section">
+                    <h5><i class="fas fa-plane"></i> Aviation Experience</h5>
+                    <div class="experience-badges">
+                        {% if application.pilot_ratings %}
+                            <span class="badge bg-info text-dark">Current Pilot</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">Not Currently a Pilot</span>
+                        {% endif %}
+                        {% if application.previous_soaring_experience %}
+                            <span class="badge bg-success">Has Soaring Experience</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">No Soaring Experience</span>
+                        {% endif %}
+                        {% if application.interested_in_learning_to_fly %}
+                            <span class="badge bg-primary">Wants to Learn</span>
+                        {% endif %}
+                    </div>
+
+                    {% if application.pilot_ratings %}
+                    {% if application.certificates_licenses %}
+                    <div class="info-row">
+                        <div class="info-label">Certificates & Ratings:</div>
+                        <div class="info-value">{{ application.certificates_licenses }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.total_flight_hours %}
+                    <div class="info-row">
+                        <div class="info-label">Total Flight Hours:</div>
+                        <div class="info-value">{{ application.total_flight_hours }}</div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if application.previous_soaring_experience %}
+                    {% if application.soaring_hours %}
+                    <div class="info-row">
+                        <div class="info-label">Soaring Hours:</div>
+                        <div class="info-value">{{ application.soaring_hours }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.previous_clubs_experience %}
+                    <div class="info-row">
+                        <div class="info-label">Previous Clubs/Experience:</div>
+                        <div class="info-value">{{ application.previous_clubs_experience|linebreaks }}</div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if application.glider_ownership %}
+                    <div class="info-row">
+                        <div class="info-label">Glider Ownership:</div>
+                        <div class="info-value">{{ application.get_glider_ownership_display }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Additional Information -->
+                <div class="info-section">
+                    <h5><i class="fas fa-info-circle"></i> Additional Information</h5>
+                    {% if application.why_join_club %}
+                    <div class="info-row">
+                        <div class="info-label">Why Join Club:</div>
+                        <div class="info-value">{{ application.why_join_club|linebreaks }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.how_did_you_hear %}
+                    <div class="info-row">
+                        <div class="info-label">How They Heard:</div>
+                        <div class="info-value">{{ application.how_did_you_hear }}</div>
+                    </div>
+                    {% endif %}
+                    {% if application.additional_comments %}
+                    <div class="info-row">
+                        <div class="info-label">Comments:</div>
+                        <div class="info-value">{{ application.additional_comments|linebreaks }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Review Timeline -->
+                {% if application.reviewed_at or application.status != 'pending' %}
+                <div class="info-section">
+                    <h5><i class="fas fa-clock"></i> Review Timeline</h5>
+                    <div class="timeline-item">
+                        <strong>Submitted</strong><br>
+                        <small class="text-muted">{{ application.submitted_at|date:"M j, Y g:i A" }}</small>
+                    </div>
+                    {% if application.reviewed_at %}
+                    <div class="timeline-item">
+                        <strong>Reviewed by {{ application.reviewed_by.first_name }} {{ application.reviewed_by.last_name }}</strong><br>
+                        <small class="text-muted">{{ application.reviewed_at|date:"M j, Y g:i A" }}</small>
+                    </div>
+                    {% endif %}
+                    {% if application.status == 'approved' and application.member_account %}
+                    <div class="timeline-item">
+                        <strong>Member Account Created</strong><br>
+                        <small class="text-muted">
+                            <a href="{% url 'admin:members_member_change' application.member_account.pk %}">
+                                View Member Profile
+                            </a>
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Review Notes -->
+                {% if application.administrative_notes %}
+                <div class="info-section">
+                    <h5><i class="fas fa-sticky-note"></i> Review Notes</h5>
+                    <div class="small">{{ application.administrative_notes|linebreaks }}</div>
+                </div>
+                {% endif %}
+
+                <!-- Quick Actions -->
+                <div class="info-section">
+                    <h5><i class="fas fa-tools"></i> Quick Actions</h5>
+                    <div class="d-grid gap-2">
+                        <a href="mailto:{{ application.email }}" class="btn btn-outline-primary">
+                            <i class="fas fa-envelope"></i> Send Email
+                        </a>
+                        {% if application.phone %}
+                        <a href="tel:{{ application.phone }}" class="btn btn-outline-primary">
+                            <i class="fas fa-phone"></i> Call Applicant
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'members:membership_application_status' application.application_id %}"
+                           class="btn btn-outline-info" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> Public Status Page
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Form -->
+        {% if application.status != 'approved' and application.status != 'rejected' %}
+        <div class="review-section">
+            <h4><i class="fas fa-gavel"></i> Review Application</h4>
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="{{ review_form.admin_notes.id_for_label }}" class="form-label">
+                                Administrative Notes
+                                <span class="text-danger" id="required-for-info-request" style="display: none;">*</span>
+                            </label>
+                            {{ review_form.admin_notes|add_class:"form-control" }}
+                            <div class="form-text">
+                                Internal notes about this application (not visible to applicant).
+                                <strong>Required when requesting additional information.</strong>
+                            </div>
+                            {% if review_form.admin_notes.errors %}
+                                <div class="invalid-feedback d-block">{{ review_form.admin_notes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button type="submit" name="review_action" value="approve" class="btn btn-success">
+                        <i class="fas fa-check"></i> Approve & Create Member
+                    </button>
+                    <button type="submit" name="review_action" value="waitlist" class="btn btn-warning">
+                        <i class="fas fa-clock"></i> Add to Waitlist
+                    </button>
+                    <button type="submit" name="review_action" value="need_info" class="btn btn-info">
+                        <i class="fas fa-question-circle"></i> Request More Info
+                    </button>
+                    <button type="submit" name="review_action" value="reject" class="btn btn-danger"
+                            onclick="return confirm('Are you sure you want to reject this application? This action cannot be undone.')">
+                        <i class="fas fa-times"></i> Reject Application
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% elif application.status == 'approved' %}
+        <div class="alert alert-success">
+            <h5><i class="fas fa-check-circle"></i> Application Approved</h5>
+            <p>This application was approved and a member account has been created.</p>
+            {% if application.member_account %}
+            <a href="{% url 'admin:members_member_change' application.member_account.pk %}" class="btn btn-outline-success">
+                <i class="fas fa-user"></i> View Member Profile
+            </a>
+            {% endif %}
+        </div>
+        {% elif application.status == 'rejected' %}
+        <div class="alert alert-danger">
+            <h5><i class="fas fa-times-circle"></i> Application Rejected</h5>
+            <p>This application has been rejected.</p>
+            {% if application.reviewed_by %}
+            <small class="text-muted">
+                Rejected by {{ application.reviewed_by.first_name }} {{ application.reviewed_by.last_name }}
+                on {{ application.reviewed_at|date:"F j, Y" }}
+            </small>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Confirmation dialogs for review actions
+document.querySelectorAll('button[name="review_action"]').forEach(button => {
+    if (button.value === 'reject') return; // Already has onclick confirmation
+
+    button.addEventListener('click', function(e) {
+        let action = this.value;
+        let confirmMessage = '';
+
+        switch(action) {
+            case 'approve':
+                confirmMessage = 'Are you sure you want to approve this application and create a member account?';
+                break;
+            case 'waitlist':
+                confirmMessage = 'Are you sure you want to add this applicant to the waitlist?';
+                break;
+            case 'need_info':
+                // Check if admin notes are filled out
+                const adminNotes = document.querySelector('textarea[name="admin_notes"]');
+                if (!adminNotes || !adminNotes.value.trim()) {
+                    alert('Please explain what additional information is needed from the applicant in the Administrative Notes field before requesting more info.');
+                    adminNotes.focus();
+                    e.preventDefault();
+                    return false;
+                }
+                confirmMessage = 'Are you sure you want to request additional information from this applicant?';
+                break;
+        }
+
+        if (confirmMessage && !confirm(confirmMessage)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

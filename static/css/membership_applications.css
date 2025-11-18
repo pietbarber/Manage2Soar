@@ -1,0 +1,735 @@
+/*
+ * Membership Applications CSS
+ * Following Bootstrap5 Modernization Style Guide
+ * Created for Issue #245 - Membership Application System
+ */
+
+/* ========================================
+   Modern Card Styling
+   ======================================== */
+.membership-card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.membership-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* ========================================
+   Modern Button Styling
+   ======================================== */
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+}
+
+/* ========================================
+   Application Form Styling - Bootstrap5 Card Design
+   ======================================== */
+.application-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.application-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.application-header h1 {
+    color: var(--bs-primary);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+/* Modern Card Design matching site patterns */
+.section-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border-left: 4px solid var(--bs-primary);
+}
+
+.section-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.section-header {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+    color: white;
+    padding: 1.25rem 1.5rem;
+    margin: 0;
+    border-bottom: none;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.section-header i {
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.section-body {
+    padding: 2rem 1.5rem;
+    background: white;
+}
+
+/* Form Field Styling */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.required-field::after {
+    content: " *";
+    color: var(--bs-danger);
+    font-weight: bold;
+}
+
+.help-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Checkbox and Radio Styling */
+.form-check {
+    margin: 1rem 0;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.form-check-label {
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+/* Row Layout for Side-by-Side Fields */
+.form-row {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* Welcome and Info Sections - Card Design */
+.welcome-section {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+    border-left: 4px solid var(--bs-info);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.welcome-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.terms-section {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin: 2rem 0;
+    border-left: 4px solid var(--bs-success);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.terms-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.submit-section {
+    background: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 3rem 2rem;
+    text-align: center;
+    margin-top: 3rem;
+    border-left: 4px solid var(--bs-success);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.submit-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.submit-section .btn {
+    min-width: 200px;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* ========================================
+   Application List Styling
+   ======================================== */
+.filter-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    border-left: 4px solid var(--bs-primary);
+}
+
+.status-counts {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.status-count-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 2px solid #dee2e6;
+    text-align: center;
+    min-width: 120px;
+    transition: all 0.2s ease;
+}
+
+.status-count-item:hover {
+    border-color: var(--bs-primary);
+    transform: translateY(-2px);
+}
+
+.status-count-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--bs-primary);
+    line-height: 1;
+}
+
+.status-count-label {
+    display: block;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.status-pending {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+    border: 1px solid #ffecb5;
+}
+
+.status-under_review {
+    background-color: #d1ecf1 !important;
+    color: #0c5460 !important;
+    border: 1px solid #b8daff;
+}
+
+.status-additional_info_needed {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    border: 1px solid #f5c6cb;
+}
+
+.status-approved {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+    border: 1px solid #badbcc;
+}
+
+.status-rejected {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    border: 1px solid #f5c6cb;
+}
+
+.status-waitlisted {
+    background-color: #e2e3e5 !important;
+    color: #41464b !important;
+    border: 1px solid #d3d3d4;
+}
+
+/* ========================================
+   Application Detail Styling
+   ======================================== */
+.application-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.info-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.info-section-header {
+    background: var(--bs-primary);
+    color: white;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.info-section-header i {
+    margin-right: 0.75rem;
+}
+
+.info-section-body {
+    padding: 1.5rem;
+}
+
+.info-row {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    min-width: 180px;
+    font-weight: 600;
+    color: #495057;
+    margin-right: 1rem;
+    font-size: 0.9rem;
+}
+
+.info-value {
+    flex: 1;
+    color: #212529;
+}
+
+.experience-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.experience-badges .badge {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* ========================================
+   Review Section Styling
+   ======================================== */
+.review-section {
+    background: white;
+    border: 2px solid var(--bs-primary);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 2rem;
+}
+
+.review-section h4 {
+    color: var(--bs-primary);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.review-section h4 i {
+    margin-right: 0.75rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.action-buttons .btn {
+    min-width: 150px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+}
+
+/* ========================================
+   Waitlist Management Styling
+   ======================================== */
+.waitlist-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.waitlist-item:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.position-number {
+    background: var(--bs-primary);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-right: 1.5rem;
+}
+
+.applicant-info {
+    flex: 1;
+}
+
+.waitlist-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.empty-waitlist {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.empty-waitlist i {
+    color: #dee2e6;
+}
+
+/* ========================================
+   Timeline Styling (for review history)
+   ======================================== */
+.timeline-item {
+    border-left: 3px solid #dee2e6;
+    padding-left: 1.5rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 0.25rem;
+    width: 12px;
+    height: 12px;
+    background-color: var(--bs-primary);
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.timeline-item:last-child {
+    border-left-color: transparent;
+}
+
+/* ========================================
+   Form Error Display
+   ======================================== */
+.alert-danger {
+    border-left: 4px solid var(--bs-danger);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(220, 53, 69, 0.15);
+    margin-bottom: 2rem;
+}
+
+.alert-danger .alert-heading {
+    color: var(--bs-danger);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(220, 53, 69, 0.2);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.alert-danger .alert-heading i {
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.alert-danger ul {
+    margin-bottom: 0;
+}
+
+.alert-danger li {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: flex-start;
+}
+
+.alert-danger li:last-child {
+    margin-bottom: 0;
+}
+
+.alert-danger strong {
+    color: var(--bs-danger);
+    font-weight: 600;
+    margin-right: 0.5rem;
+    min-width: fit-content;
+}
+
+/* ========================================
+   Contact Information Cards
+   ======================================== */
+.contact-info {
+    border-left: 4px solid var(--bs-primary);
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.contact-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.contact-item:last-child {
+    border-bottom: none;
+}
+
+.contact-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.contact-label i {
+    margin-right: 0.5rem;
+    color: var(--bs-primary);
+}
+
+.contact-value {
+    font-size: 1rem;
+}
+
+/* ========================================
+   Status Page Styling
+   ======================================== */
+.status-page {
+    max-width: 700px;
+    margin: 3rem auto;
+    padding: 2rem;
+    text-align: center;
+}
+
+.status-icon {
+    font-size: 4rem;
+    margin-bottom: 2rem;
+}
+
+.status-display-badge {
+    font-size: 1.5rem;
+    padding: 1rem 2rem;
+    border-radius: 50px;
+    margin: 2rem 0;
+    display: inline-block;
+    font-weight: 600;
+}
+
+.status-description {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.next-steps {
+    background: #e7f3ff;
+    padding: 2rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--bs-primary);
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.next-steps h6 {
+    color: var(--bs-primary);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.next-steps h6 i {
+    margin-right: 0.5rem;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+@media (max-width: 768px) {
+    .application-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .section-body {
+        padding: 1.5rem 1rem;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .form-row .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+    }
+
+    .info-row {
+        flex-direction: column;
+    }
+
+    .info-label {
+        min-width: unset;
+        margin-bottom: 0.5rem;
+        margin-right: 0;
+    }
+
+    .status-counts {
+        justify-content: center;
+    }
+
+    .status-count-item {
+        min-width: 100px;
+    }
+
+    .waitlist-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .position-number {
+        margin-right: 0;
+        margin-bottom: 1rem;
+    }
+
+    .waitlist-actions {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .status-page {
+        padding: 1rem;
+        margin: 1rem auto;
+    }
+
+    .status-description,
+    .next-steps {
+        padding: 1.5rem;
+    }
+
+    .submit-section {
+        padding: 2rem 1rem;
+    }
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+@media print {
+
+    .btn,
+    .action-buttons,
+    .navbar,
+    .footer {
+        display: none !important;
+    }
+
+    .application-detail-container,
+    .application-container {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .section-card,
+    .info-section {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        margin-bottom: 1rem;
+    }
+}

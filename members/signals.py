@@ -15,6 +15,7 @@ from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 
 from .models import Member
+from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
 
@@ -221,3 +222,276 @@ def notify_member_managers_of_visiting_pilot(sender, instance, created, **kwargs
     except Exception as e:
         # Log the error but don't fail the member creation
         logger.error(f"Failed to process visiting pilot notification signal: {e}")
+
+
+def notify_membership_managers_of_new_application(application):
+    """
+    Send notifications to membership managers about new membership application.
+    Called directly from views when a new application is submitted.
+    """
+    try:
+        # Get site configuration
+        config = SiteConfiguration.objects.first()
+        if not config:
+            logger.error("SiteConfiguration not found - cannot send notifications")
+            return
+
+        # Get all member managers
+        member_managers = Member.objects.filter(member_manager=True, is_active=True)
+
+        if not member_managers.exists():
+            # Fallback to webmasters if no member managers
+            member_managers = Member.objects.filter(webmaster=True, is_active=True)
+
+        if not member_managers.exists():
+            logger.warning(
+                "No member managers or webmasters found for membership application notification"
+            )
+            return
+
+        # Email notification (if email is configured)
+        if hasattr(settings, "DEFAULT_FROM_EMAIL") and settings.DEFAULT_FROM_EMAIL:
+            try:
+                # Sanitize all user input for email content
+                safe_name = f"{application.first_name} {application.last_name}".replace(
+                    "\r", ""
+                ).replace("\n", " ")
+                safe_email = application.email.replace("\r", "").replace("\n", " ")
+                safe_phone = (
+                    (application.phone or "Not provided")
+                    .replace("\r", "")
+                    .replace("\n", " ")
+                )
+                safe_city = f"{application.city}, {application.state}".replace(
+                    "\r", ""
+                ).replace("\n", " ")
+
+                subject = f"New Membership Application: {safe_name[:50]}"
+
+                message_lines = [
+                    f"A new membership application has been submitted through the club website.",
+                    "",
+                    "Applicant Details:",
+                    f"- Name: {safe_name}",
+                    f"- Email: {safe_email}",
+                    f"- Phone: {safe_phone}",
+                    f"- Location: {safe_city}",
+                    f"- Application ID: {application.application_id}",
+                    f"- Submission Time: {application.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                    "",
+                    "Application Status: Pending Review",
+                    "",
+                    "To review this application:",
+                    "1. Log into the member management interface",
+                    "2. Navigate to Membership Applications",
+                    "3. Review the applicant's information and background",
+                    "4. Approve, reject, or request additional information",
+                    "",
+                    "Management Links:",
+                    f"- Review Application: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
+                    f"- All Applications: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/",
+                    "",
+                    "This message was sent automatically by the club website membership system.",
+                ]
+
+                message = "\n".join(message_lines)
+
+                # Send email to each member manager
+                recipient_emails = [
+                    manager.email for manager in member_managers if manager.email
+                ]
+
+                if recipient_emails:
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=recipient_emails,
+                        fail_silently=False,  # We want to know if email fails
+                    )
+
+            except Exception as e:
+                # Log the error but don't fail the application submission
+                logger.error(
+                    f"Failed to send membership application notification email: {e}"
+                )
+
+        # In-app notifications
+        try:
+            notification_message = (
+                f"New membership application: {application.first_name} {application.last_name} "
+                f"({application.city}, {application.state}) - pending review"
+            )
+
+            try:
+                notification_url = reverse(
+                    "members:membership_application_detail",
+                    args=[application.application_id],
+                )
+            except Exception:
+                notification_url = None
+
+            for manager in member_managers:
+                _create_notification_if_not_exists(
+                    manager, notification_message, url=notification_url
+                )
+
+        except Exception as e:
+            # Log but don't fail
+            logger.error(f"Failed to create membership application notifications: {e}")
+
+    except Exception as e:
+        # Log the error but don't fail the application submission
+        logger.error(f"Failed to notify member managers of membership application: {e}")
+
+
+def notify_membership_managers_of_application(application):
+    """
+    Send notifications to membership managers about new membership applications.
+    Called directly from views when an application is submitted.
+
+    Args:
+        application (MembershipApplication): The application that was submitted
+    """
+    try:
+        # Get site configuration
+        config = SiteConfiguration.objects.first()
+        if not config:
+            logger.error("SiteConfiguration not found - cannot send notifications")
+            return
+
+        # Get all member managers
+        member_managers = Member.objects.filter(member_manager=True, is_active=True)
+
+        if not member_managers.exists():
+            # Fallback to webmasters if no member managers
+            member_managers = Member.objects.filter(webmaster=True, is_active=True)
+
+        if not member_managers.exists():
+            logger.warning(
+                "No member managers or webmasters found for membership application notification"
+            )
+            return
+
+        # Email notification (if email is configured)
+        if hasattr(settings, "DEFAULT_FROM_EMAIL") and settings.DEFAULT_FROM_EMAIL:
+            try:
+                # Sanitize all user input for email content
+                safe_name = f"{application.first_name} {application.last_name}".replace(
+                    "\r", ""
+                ).replace("\n", " ")
+                safe_email = application.email.replace("\r", "").replace("\n", " ")
+
+                subject = f"New Membership Application: {safe_name[:50]}"
+
+                message_lines = [
+                    f"A new membership application has been submitted through the club website.",
+                    "",
+                    "Applicant Details:",
+                    f"- Name: {safe_name}",
+                    f"- Email: {safe_email}",
+                    f"- Phone: {application.phone or 'Not provided'}",
+                    f"- City, State: {application.city}, {application.state}",
+                    f"- Application ID: {application.application_id}",
+                    f"- Submission Time: {application.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                    "",
+                    "Pilot Experience:",
+                    f"- Current Pilot: {'Yes' if application.pilot_ratings else 'No'}",
+                ]
+
+                if application.pilot_ratings:
+                    message_lines.append(f"- Ratings: {application.pilot_ratings}")
+                if application.certificates_licenses:
+                    message_lines.append(
+                        f"- Certificates: {application.certificates_licenses}"
+                    )
+                if application.total_flight_hours:
+                    message_lines.append(
+                        f"- Flight Hours: {application.total_flight_hours}"
+                    )
+
+                message_lines.extend(
+                    [
+                        "",
+                        "Soaring Experience:",
+                        f"- Previous Soaring: {'Yes' if application.previous_soaring_experience else 'No'}",
+                    ]
+                )
+
+                if application.soaring_hours:
+                    message_lines.append(
+                        f"- Soaring Hours: {application.soaring_hours}"
+                    )
+                if application.glider_ownership:
+                    message_lines.append(
+                        f"- Glider Ownership: {application.glider_ownership}"
+                    )
+
+                message_lines.extend(
+                    [
+                        "",
+                        f"- Interested in Learning: {'Yes' if application.interested_in_learning_to_fly else 'No'}",
+                        f"- How They Heard: {application.how_did_you_hear or 'Not specified'}",
+                        "",
+                        "Review and Action Required:",
+                        "1. Review the complete application in the member management system",
+                        "2. Contact the applicant to schedule any required interviews or visits",
+                        "3. Approve, waitlist, or request additional information",
+                        "",
+                        "Management Links:",
+                        f"- View Application: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
+                        f"- All Applications: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/",
+                        "",
+                        "This message was sent automatically by the club website membership system.",
+                    ]
+                )
+
+                message = "\n".join(message_lines)
+
+                # Send email to each member manager
+                recipient_emails = [
+                    manager.email for manager in member_managers if manager.email
+                ]
+
+                if recipient_emails:
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=recipient_emails,
+                        fail_silently=False,  # We want to know if email fails
+                    )
+
+            except Exception as e:
+                # Log the error but don't fail the application submission
+                logger.error(
+                    f"Failed to send membership application notification email: {e}"
+                )
+
+        # In-app notifications
+        try:
+            notification_message = (
+                f"New membership application from {application.first_name} {application.last_name} "
+                f"({application.email}) - ID: {application.application_id}"
+            )
+
+            try:
+                notification_url = reverse(
+                    "members:membership_application_detail",
+                    args=[application.application_id],
+                )
+            except Exception:
+                notification_url = None
+
+            for manager in member_managers:
+                _create_notification_if_not_exists(
+                    manager, notification_message, url=notification_url
+                )
+
+        except Exception as e:
+            # Log but don't fail
+            logger.error(f"Failed to create membership application notifications: {e}")
+
+    except Exception as e:
+        # Log the error but don't fail the application submission
+        logger.error(f"Failed to notify member managers of membership application: {e}")

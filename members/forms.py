@@ -1,6 +1,11 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+# Import application forms from separate module
+from .forms_applications import (
+    MembershipApplicationForm,
+    MembershipApplicationReviewForm,
+)
 from .models import Biography, Member
 
 #########################

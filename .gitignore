@@ -193,3 +193,4 @@ security-gate-results.json
 pushy-enhanced-v3-template.sh
 pushy-enhanced-v2.sh
 pushy-enhanced-v3.sh
+run-dev-server.sh

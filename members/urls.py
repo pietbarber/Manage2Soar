@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import views
+from . import views, views_applications
 from .views import tinymce_image_upload
 
 app_name = "members"
@@ -42,6 +42,32 @@ urlpatterns = [
         "visiting-pilot/qr-display/",
         views.visiting_pilot_qr_display,
         name="visiting_pilot_qr_display",
+    ),
+    # Membership Application URLs
+    path(
+        "apply/",
+        views_applications.membership_application,
+        name="membership_application",
+    ),
+    path(
+        "applications/",
+        views_applications.membership_applications_list,
+        name="membership_applications_list",
+    ),
+    path(
+        "applications/<uuid:application_id>/",
+        views_applications.membership_application_detail,
+        name="membership_application_detail",
+    ),
+    path(
+        "applications/waitlist/",
+        views_applications.membership_waitlist,
+        name="membership_waitlist",
+    ),
+    path(
+        "application-status/<uuid:application_id>/",
+        views_applications.membership_application_status,
+        name="membership_application_status",
     ),
 ]
 

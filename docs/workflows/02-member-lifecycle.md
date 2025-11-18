@@ -15,41 +15,68 @@ The member lifecycle describes how individuals join the club, get their profiles
 
 ```mermaid
 flowchart TD
-    A[New User Visits Site] --> B{Has Google Account?}
-    B -->|No| C[Create Google Account]
-    B -->|Yes| D[Click Login]
-    C --> D
+    %% Entry Points
+    A1[New User Visits Site] --> B{User Type}
+    B -->|Existing Member/Login| C[OAuth2 Login Flow]
+    B -->|New Member Interest| D[Membership Application Form]
 
-    D --> E[Google OAuth2 Flow]
+    %% OAuth2 Path (Existing Members)
+    C --> E[Google OAuth2 Flow]
     E --> F[Django Social Auth Pipeline]
-    F --> G[Create Member Record]
-    G --> H[Set Default Status: 'Guest']
+    F --> G[Access Member Account]
 
-    H --> I[User Completes Profile]
-    I --> J[Upload Photo]
-    I --> K[Add Bio/Contact Info]
-    I --> L[Profile Review Complete]
+    %% New Application Path (Issue #245)
+    D --> H[Complete Application Form]
+    H --> I{Form Complete?}
+    I -->|No| J[Validation Errors]
+    I -->|Yes| K[Submit Application]
+    J --> H
+    K --> L[Notify Membership Managers]
 
-    L --> M{Admin Review}
-    M -->|Approved| N[Set Membership Status]
-    M -->|Needs More Info| O[Request Additional Info]
-    M -->|Rejected| P[Set Inactive Status]
+    %% Application Review Process
+    L --> M[Membership Manager Review]
+    M --> N{Review Decision}
+    N -->|Approve| O[Create Member Account]
+    N -->|Waitlist| P[Add to Waiting List]
+    N -->|Need Info| Q[Request Additional Info]
+    N -->|Reject| R[Send Rejection Notice]
 
-    N --> Q[Assign Initial Roles]
-    Q --> R[Send Welcome Notification]
-    R --> S[Member Active]
+    %% Approved Path
+    O --> S[Generate Username: firstname.lastname]
+    S --> T[Set Initial Status: Probationary Member]
+    T --> U[Account Initially Inactive]
+    U --> V[Send Welcome Notification]
+    V --> W[Manual Account Activation]
+    W --> X[Member Active]
 
-    O --> I
-    P --> T[Account Suspended]
+    %% Waitlist Path
+    P --> Y[Assign Waitlist Position]
+    Y --> Z[Send Waitlist Confirmation]
+    Z --> AA[Periodic Status Updates]
+    AA --> BB{Opening Available?}
+    BB -->|Yes| CC[Invite to Complete Process]
+    BB -->|No| AA
+    CC --> O
 
-    S --> U[Ongoing Profile Updates]
-    U --> V[Role Changes]
-    U --> W[Badge Awards]
-    U --> X[Status Updates]
+    %% Additional Info Path
+    Q --> DD[Follow-up Communication]
+    DD --> EE[Applicant Provides Info]
+    EE --> M
 
-    style A fill:#e1f5fe
-    style S fill:#e8f5e8
-    style T fill:#ffebee
+    %% Active Member Activities
+    X --> FF[Profile Management]
+    X --> GG[Role Assignments]
+    X --> HH[Badge Tracking]
+    X --> II[Status Progression]
+
+    %% Annual Cleanup
+    JJ[New Year's Eve] --> KK[Automatic Cleanup]
+    KK --> LL[Remove Old Approved Applications]
+
+    style A1 fill:#e1f5fe
+    style X fill:#e8f5e8
+    style R fill:#ffebee
+    style O fill:#fff3e0
 ```
 
 ## Technical Implementation

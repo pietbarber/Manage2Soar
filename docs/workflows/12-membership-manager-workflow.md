@@ -5,17 +5,20 @@
 The Membership Manager is one of the most critical human roles in the soaring club, serving as the primary gateway for new member onboarding and ongoing membership administration. With the implementation of the visitor contact system (Issue #70), Membership Managers now have streamlined tools to handle inquiries, process applications, and manage member lifecycles efficiently.
 
 **Core Responsibilities:**
+- **Membership Application Processing**: Review and approve/reject applications via dedicated interface (Issue #245)
 - **Visitor Contact Management**: Process and respond to inquiries from the `/contact/` form
-- **New Member Onboarding**: Review applications, verify profiles, approve/reject memberships
+- **New Member Onboarding**: Create member accounts, verify profiles, assign initial status
+- **Waiting List Administration**: Manage prospective member queue with position tracking
 - **Membership Status Management**: Handle renewals, status changes, and member transitions
-- **Waiting List Administration**: Manage prospective member queue and communications
 - **Communication Coordination**: Send welcome emails, notifications, and updates
 
 **Key Integration Points:**
+- **Membership Application System**: Dedicated web interface at `/members/applications/` (Issue #245)
+- **Application Model**: `members.models_applications.MembershipApplication` with comprehensive data
 - Visitor contact form system (`cms.models.VisitorContact`)
 - Member management through Django admin (`members.models.Member`)
 - Email notification system (`notifications.models.Notification`)
-- OAuth2 authentication pipeline for new registrations
+- OAuth2 authentication pipeline for existing member logins
 
 ## Process Flow
 
@@ -137,9 +140,86 @@ sequenceDiagram
 | **Aircraft/Equipment** | Questions about fleet and maintenance | Forward to maintenance officer |
 | **Events/Activities** | Club events and competitions | Forward to appropriate organizer |
 
-### 2. New Member Application Process
+### 2. Membership Application Processing (Issue #245)
 
-**Purpose**: Process membership applications from multiple sources and handle various registration scenarios.
+**Purpose**: Process membership applications submitted through the dedicated application form at `/members/apply/`.
+
+**Access Method**: `/members/applications/` - Dedicated membership management interface
+
+**Application System Overview:**
+The membership application system (Issue #245) provides a streamlined process for non-logged-in users to apply for membership. This replaces the previous OAuth2-first approach with a more traditional application workflow.
+
+```mermaid
+flowchart TD
+    A[Prospective Member Visits /members/apply/] --> B{User Logged In?}
+    B -->|Yes| C[Redirect with Message: Use Profile Instead]
+    B -->|No| D[Display Application Form]
+
+    D --> E[Complete Comprehensive Application]
+    E --> F{Form Validation}
+    F -->|Errors| G[Show Validation Messages]
+    F -->|Valid| H[Submit Application]
+    G --> E
+
+    H --> I[Generate Application ID]
+    I --> J[Send Notification to Membership Managers]
+    J --> K[Display Confirmation with Application ID]
+
+    %% Membership Manager Review
+    L[Membership Manager Visits /members/applications/] --> M[View Applications List]
+    M --> N{Filter Applications}
+    N --> O[Active Applications: Need Attention]
+    N --> P[All Applications: Including Completed]
+
+    O --> Q[Review Individual Application]
+    P --> Q
+    Q --> R[Application Detail View: /members/applications/uuid/]
+
+    R --> S{Review Decision}
+    S -->|Approve| T[Approve and Create Member Button]
+    S -->|Waitlist| U[Add to Waiting List Button]
+    S -->|Need Info| V[Request Additional Information]
+    S -->|Reject| W[Reject Application Button]
+
+    %% Approval Process
+    T --> X[Create Member Account: firstname.lastname]
+    X --> Y[Transfer Application Data to Member]
+    Y --> Z[Set Status: Probationary Member]
+    Z --> AA[Link Application to Member Account]
+    AA --> BB[Success Message with Member Details]
+
+    %% Waitlist Process
+    U --> CC[Assign Next Waitlist Position]
+    CC --> DD[Update Application Status to 'waitlisted']
+    DD --> EE[Success Message with Position]
+
+    %% Additional Info Process
+    V --> FF[Update Status to 'additional_info_needed']
+    FF --> GG[Add Administrative Notes]
+    GG --> HH[Contact Applicant via Email/Phone]
+
+    %% Automatic Cleanup
+    II[New Year's Eve 11:30 PM] --> JJ[Cleanup CronJob Runs]
+    JJ --> KK[Delete Applications Approved 365+ Days Ago]
+
+    style A fill:#e1f5fe
+    style T fill:#e8f5e8
+    style W fill:#ffebee
+    style CC fill:#fff3e0
+```
+
+**Key Features:**
+- **Non-authenticated Access**: Applicants don't need existing accounts
+- **Comprehensive Data Collection**: Personal info, aviation experience, club history
+- **Status Tracking**: pending → under_review → waitlisted/approved/rejected/withdrawn
+- **Waitlist Management**: Automatic position assignment and tracking
+- **Administrative Notes**: Private notes for membership manager use
+- **Automatic Cleanup**: Annual removal of old approved applications
+- **Error Messaging**: Detailed validation and process feedback
+
+### 3. New Member Application Process (Legacy OAuth2)
+
+**Purpose**: Handle users who register via OAuth2 first (existing workflow for current members).
 
 ```mermaid
 flowchart TD
@@ -401,7 +481,26 @@ flowchart TD
 
 ## Technical Implementation
 
-### Django Admin Configuration
+### Web Interface Configuration (Primary)
+
+**Membership Application Management:**
+```python
+# Access: /members/applications/
+- Application List: Filter by status (Active/All), search by name/email
+- Application Detail: /members/applications/<uuid>/
+- Review Actions: Approve, Waitlist, Request Info, Reject
+- Waitlist Management: /members/applications/waitlist/
+- Status Tracking: pending, under_review, waitlisted, approved, rejected
+```
+
+**Key URLs:**
+- `/members/apply/` - Public application form
+- `/members/applications/` - Manager application list  
+- `/members/applications/<uuid>/` - Individual application review
+- `/members/applications/waitlist/` - Waitlist management
+- `/members/application-status/<uuid>/` - Public status check
+
+### Django Admin Configuration (Secondary)
 
 **Visitor Contact Management:**
 ```python
@@ -420,6 +519,8 @@ flowchart TD
 - Search fields: username, first_name, last_name, email
 - Bulk actions: activate_members, send_renewal_notices
 ```
+
+**Note**: No Django admin interface exists for MembershipApplication - use the dedicated web interface instead.
 
 ### Key Model Relationships
 

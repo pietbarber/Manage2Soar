@@ -16,6 +16,7 @@ from utils.upload_entropy import (
     upload_profile_photo,
 )
 
+from .models_applications import MembershipApplication
 from .utils.avatar_generator import generate_identicon
 
 
@@ -402,3 +403,6 @@ class MemberBadge(models.Model):
 
     def __str__(self):
         return f"{self.member} - {self.badge.name}"
+
+
+# Import MembershipApplication model from separate file to keep models.py manageable
