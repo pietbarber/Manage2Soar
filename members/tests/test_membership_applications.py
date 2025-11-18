@@ -3,16 +3,12 @@ Tests for the membership application system.
 """
 
 import pytest
-from django.contrib.auth.models import AnonymousUser
-from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.utils import timezone
 
 from members.forms_applications import MembershipApplicationForm
 from members.models import Member
 from members.models_applications import MembershipApplication
-from siteconfig.models import SiteConfiguration
 
 
 @pytest.mark.django_db
@@ -397,7 +393,7 @@ class MembershipApplicationViewTests(TestCase):
 
         # Create some waitlisted applications
         for i in range(3):
-            app = MembershipApplication.objects.create(
+            application = MembershipApplication.objects.create(
                 first_name=f"Person{i}",
                 last_name="Test",
                 email=f"person{i}@example.com",
@@ -414,7 +410,7 @@ class MembershipApplicationViewTests(TestCase):
                 agrees_to_safety_rules=True,
                 agrees_to_financial_obligations=True,
             )
-            app.add_to_waitlist()
+            application.add_to_waitlist()
 
         response = self.client.get(reverse("members:membership_waitlist"), follow=True)
         self.assertEqual(response.status_code, 200)
@@ -441,7 +437,7 @@ class MembershipApplicationAdminTests:
         )
 
         # Create application
-        app = MembershipApplication.objects.create(
+        MembershipApplication.objects.create(
             first_name="John",
             last_name="Doe",
             email="john@example.com",

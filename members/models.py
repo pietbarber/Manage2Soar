@@ -16,7 +16,7 @@ from utils.upload_entropy import (
     upload_profile_photo,
 )
 
-from .models_applications import MembershipApplication
+# Membership application models are in models_applications.py to avoid circular imports
 from .utils.avatar_generator import generate_identicon
 
 

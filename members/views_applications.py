@@ -1,12 +1,10 @@
 import logging
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.http import Http404, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
@@ -287,8 +285,16 @@ def membership_application_detail(request, application_id):
                         application.status = "additional_info_needed"
                         application.reviewed_by = request.user
                         application.reviewed_at = timezone.now()
+                        application.admin_notes = review_form.cleaned_data.get(
+                            "admin_notes", ""
+                        )
                         application.save(
-                            update_fields=["status", "reviewed_by", "reviewed_at"]
+                            update_fields=[
+                                "status",
+                                "reviewed_by",
+                                "reviewed_at",
+                                "admin_notes",
+                            ]
                         )
 
                         messages.success(

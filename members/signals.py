@@ -12,11 +12,9 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 
-from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 
 from .models import Member
-from .models_applications import MembershipApplication
 
 logger = logging.getLogger(__name__)
 
@@ -555,7 +553,7 @@ def notify_membership_managers_of_withdrawal(application):
                     "",
                     "The application record has been marked as withdrawn and is retained for record-keeping purposes.",
                     "",
-                    f"Review application details: {config.site_url}/members/applications/{application.application_id}/",
+                    f"Review application details: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
                     "",
                     f"Regards,",
                     f"{config.club_name} Membership System",

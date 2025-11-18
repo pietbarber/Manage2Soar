@@ -5,8 +5,8 @@
 {% block title %}Application Review - {{ application.first_name }} {{ application.last_name }}{% endblock %}
 
 {% block head_extra %}
-<link href="/ssc/static/css/baseline.css" rel="stylesheet">
-<link href="/ssc/static/css/membership_applications.css" rel="stylesheet">
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+<link href="{% static 'css/membership_applications.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}

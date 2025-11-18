@@ -3,10 +3,8 @@ Tests for visiting pilot notification system.
 Tests the signals and notification functionality for member managers.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-import pytest
-from django.contrib.auth.models import Group
 from django.core import mail
 from django.test import TestCase, override_settings
 
@@ -89,7 +87,7 @@ class VisitingPilotNotificationTests(TestCase):
         with patch(
             "members.signals._notify_member_managers_of_visiting_pilot"
         ) as mock_notify:
-            regular_member = Member.objects.create_user(
+            Member.objects.create_user(
                 username="regular@test.com",
                 email="regular@test.com",
                 first_name="Regular",
@@ -109,7 +107,7 @@ class VisitingPilotNotificationTests(TestCase):
         with patch(
             "members.signals._notify_member_managers_of_visiting_pilot"
         ) as mock_notify:
-            visiting_pilot = Member.objects.create_user(
+            Member.objects.create_user(
                 username="visitor@test.com",
                 email="visitor@test.com",
                 first_name="Visiting",
@@ -131,7 +129,7 @@ class VisitingPilotNotificationTests(TestCase):
             member_managers.count(), 2, "Should have 2 member managers in test setup"
         )
 
-        visiting_pilot = Member.objects.create_user(
+        Member.objects.create_user(
             username="visitor@test.com",
             email="visitor@test.com",
             first_name="Visiting",
@@ -168,7 +166,7 @@ class VisitingPilotNotificationTests(TestCase):
         self.config.visiting_pilot_auto_approve = False
         self.config.save()
 
-        visiting_pilot = Member.objects.create_user(
+        Member.objects.create_user(
             username="visitor@test.com",
             email="visitor@test.com",
             first_name="Manual",
@@ -321,7 +319,7 @@ class VisitingPilotNotificationTests(TestCase):
         """Test that user input is properly sanitized in emails."""
         # Signal should automatically trigger notification
         with override_settings(DEFAULT_FROM_EMAIL="noreply@test.com"):
-            visiting_pilot = Member.objects.create_user(
+            Member.objects.create_user(
                 username="visitor@test.com",
                 email="visitor@test.com",
                 first_name="Visiting\r\nInjection",
@@ -344,7 +342,7 @@ class VisitingPilotNotificationTests(TestCase):
         self.assertIn("ClubWith BadChars", email.body)  # \r\n removed from club name
         self.assertIn("123 45", email.body)  # \n replaced with space in SSA number
 
-    @patch("members.signals.Notification.objects.create")
+    @patch("notifications.models.Notification.objects.create")
     def test_notification_creation_error_handling(self, mock_create):
         """Test error handling when notification creation fails."""
         # Make notification creation raise an exception

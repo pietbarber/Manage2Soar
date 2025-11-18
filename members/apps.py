@@ -24,4 +24,6 @@ class MembersConfig(AppConfig):
         try:
             import members.signals  # noqa
         except ImportError:
+            # Signals module may not be present in some environments (e.g., during migrations or testing).
+            # Safe to ignore if signals are not required.
             pass
