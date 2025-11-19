@@ -72,12 +72,14 @@
                         {{ config.instructor_title|default:'Instructor' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.instructor.full_display_name }}</p>
-                      {% if assignment.instructor.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.instructor.phone %}
+                        {% if assignment.instructor.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.instructor.phone }}</small>
                         {% endif %}
-                      {% elif assignment.instructor.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.instructor.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
@@ -91,12 +93,14 @@
                         {{ config.towpilot_title|default:'Tow Pilot' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.tow_pilot.full_display_name }}</p>
-                      {% if assignment.tow_pilot.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.tow_pilot.phone %}
+                        {% if assignment.tow_pilot.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
                         {% endif %}
-                      {% elif assignment.tow_pilot.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
@@ -110,12 +114,14 @@
                         {{ config.duty_officer_title|default:'Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.duty_officer.full_display_name }}</p>
-                      {% if assignment.duty_officer.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.duty_officer.phone %}
+                        {% if assignment.duty_officer.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
                         {% endif %}
-                      {% elif assignment.duty_officer.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
@@ -129,12 +135,14 @@
                         {{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.assistant_duty_officer.full_display_name }}</p>
-                      {% if assignment.assistant_duty_officer.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.assistant_duty_officer.phone %}
+                        {% if assignment.assistant_duty_officer.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
                         {% endif %}
-                      {% elif assignment.assistant_duty_officer.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
@@ -148,12 +156,14 @@
                         {{ config.surge_instructor_title|default:'Surge Instructor' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_instructor.full_display_name }}</p>
-                      {% if assignment.surge_instructor.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.surge_instructor.phone %}
+                        {% if assignment.surge_instructor.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
                         {% endif %}
-                      {% elif assignment.surge_instructor.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
@@ -167,12 +177,14 @@
                         {{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_tow_pilot.full_display_name }}</p>
-                      {% if assignment.surge_tow_pilot.redact_contact %}
-                        {% if user.is_authenticated and user.is_active_member %}
-                          <small class="text-muted fst-italic">Phone number redacted</small>
+                      {% if assignment.surge_tow_pilot.phone %}
+                        {% if assignment.surge_tow_pilot.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
                         {% endif %}
-                      {% elif assignment.surge_tow_pilot.phone and user.is_authenticated and user.is_active_member %}
-                        <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
                       {% endif %}
                     </div>
                   </div>
