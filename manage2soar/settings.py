@@ -91,6 +91,7 @@ LOGOUT_REDIRECT_URL = "/login/"
 AUTH_USER_MODEL = "members.Member"
 
 MIDDLEWARE = [
+    "utils.middleware.HealthCheckMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

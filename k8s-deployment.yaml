@@ -52,8 +52,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: django
+  name: django-app
+  annotations:
+    cloud.google.com/backend-config: '{"default": "django-app-config"}'
 spec:
+  type: NodePort
   selector:
     app: django-app
   ports:
