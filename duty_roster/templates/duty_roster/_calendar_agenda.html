@@ -73,7 +73,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.instructor.full_display_name }}</p>
                       {% if assignment.instructor.phone %}
-                        <small class="text-muted">{{ assignment.instructor.phone }}</small>
+                        {% if assignment.instructor.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.instructor.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -88,7 +94,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.tow_pilot.full_display_name }}</p>
                       {% if assignment.tow_pilot.phone %}
-                        <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
+                        {% if assignment.tow_pilot.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.tow_pilot.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -103,7 +115,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.duty_officer.full_display_name }}</p>
                       {% if assignment.duty_officer.phone %}
-                        <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
+                        {% if assignment.duty_officer.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.duty_officer.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -118,7 +136,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.assistant_duty_officer.full_display_name }}</p>
                       {% if assignment.assistant_duty_officer.phone %}
-                        <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
+                        {% if assignment.assistant_duty_officer.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.assistant_duty_officer.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -133,7 +157,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_instructor.full_display_name }}</p>
                       {% if assignment.surge_instructor.phone %}
-                        <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
+                        {% if assignment.surge_instructor.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.surge_instructor.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -148,7 +178,13 @@
                       </h6>
                       <p class="mb-0 fw-bold">{{ assignment.surge_tow_pilot.full_display_name }}</p>
                       {% if assignment.surge_tow_pilot.phone %}
-                        <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
+                        {% if assignment.surge_tow_pilot.redact_contact %}
+                          {% if user.is_authenticated and user.is_active_member %}
+                            <small class="text-muted fst-italic">Phone number redacted</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">{{ assignment.surge_tow_pilot.phone }}</small>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
