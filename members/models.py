@@ -311,12 +311,14 @@ class Member(AbstractUser):
             # create_user(is_staff=True)), preserve that explicit value. Only
             # auto-derive is_staff when it is currently False.
             if not self.is_staff:
-                # Grant staff status to instructors, member managers, rostermeisters, or webmasters
+                # Grant staff status to instructors, member managers, rostermeisters, webmasters, secretaries, or treasurers
                 self.is_staff = (
                     self.instructor
                     or self.member_manager
                     or self.rostermeister
                     or self.webmaster
+                    or self.secretary
+                    or self.treasurer
                 )
 
         # 2) Sync is_active with membership status
