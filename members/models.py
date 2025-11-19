@@ -277,6 +277,10 @@ class Member(AbstractUser):
             names.append("Member Managers")
         if self.webmaster:
             names.append("Webmasters")
+        if self.secretary:
+            names.append("Secretary")
+        if self.treasurer:
+            names.append("Treasurer")
         return names
 
     def _sync_groups(self):
