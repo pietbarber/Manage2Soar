@@ -203,6 +203,7 @@ def cms_page(request, **kwargs):
             "has_documents": has_documents,
             "page_has_role_restrictions": page.has_role_restrictions(),
             "page_required_roles": page_required_roles,
+            "can_edit_page": can_edit_page(request.user, page),
         },
     )
 
@@ -239,7 +240,15 @@ def homepage(request):
         page = HomePageContent.objects.filter(audience="public", slug="home").first()
 
     if page:
-        return render(request, "cms/homepage.html", {"page": page})
+        # Homepage editing is webmaster-only
+        can_edit_homepage = user.is_authenticated and (
+            user.is_superuser or getattr(user, "webmaster", False)
+        )
+        return render(
+            request,
+            "cms/homepage.html",
+            {"page": page, "can_edit_page": can_edit_homepage},
+        )
 
     # Fallback: show CMS index of top-level pages using optimized helper function
     pages = get_accessible_top_level_pages(request.user)
@@ -253,7 +262,15 @@ def cms_resources_index(request):
     """
     # Use helper function to get accessible pages with optimized queries
     pages = get_accessible_top_level_pages(request.user)
-    return render(request, "cms/index.html", {"pages": pages})
+    return render(
+        request,
+        "cms/index.html",
+        {
+            "pages": pages,
+            # Top-level creation
+            "can_create_page": can_create_in_directory(request.user, None),
+        },
+    )
 
 
 # Site Feedback Views for Issue #117
@@ -565,20 +582,50 @@ DocumentFormSet = inlineformset_factory(
 )
 
 
-def can_edit_cms(user):
-    """Check if user can edit CMS content (webmaster, secretary, or treasurer)."""
-    return user.is_authenticated and (
-        user.is_superuser
-        or getattr(user, "webmaster", False)
-        or getattr(user, "secretary", False)
-        or getattr(user, "treasurer", False)
-    )
+def can_edit_page(user, page):
+    """Check if user can edit a specific CMS page based on role-based permissions."""
+    if not user.is_authenticated:
+        return False
+
+    # Webmaster override - can edit everything
+    if user.is_superuser or getattr(user, "webmaster", False):
+        return True
+
+    # Role-based editing: if page has role restrictions AND user can access it
+    if page.has_role_restrictions() and page.can_user_access(user):
+        return True
+
+    # Public/member-only pages: webmaster only
+    return False
 
 
-@user_passes_test(can_edit_cms)
+def can_create_in_directory(user, parent_page=None):
+    """Check if user can create pages in a directory (uses parent page permissions)."""
+    if not user.is_authenticated:
+        return False
+
+    # Webmaster can create anywhere
+    if user.is_superuser or getattr(user, "webmaster", False):
+        return True
+
+    # If no parent (top-level), only webmaster can create
+    if not parent_page:
+        return False
+
+    # Can create if can access parent directory
+    if parent_page.has_role_restrictions() and parent_page.can_user_access(user):
+        return True
+
+    return False
+
+
 def edit_cms_page(request, page_id):
     """Edit a CMS page with full TinyMCE functionality."""
     page = get_object_or_404(Page, id=page_id)
+
+    # Check page-specific edit permissions
+    if not can_edit_page(request.user, page):
+        return HttpResponseForbidden("You don't have permission to edit this page.")
 
     if request.method == "POST":
         form = CmsPageForm(request.POST, instance=page)
@@ -616,9 +663,15 @@ def edit_cms_page(request, page_id):
     )
 
 
-@user_passes_test(can_edit_cms)
 def edit_homepage_content(request, content_id):
     """Edit homepage content with full TinyMCE functionality."""
+    # Homepage editing is webmaster-only (no role restrictions)
+    if not (
+        request.user.is_authenticated
+        and (request.user.is_superuser or getattr(request.user, "webmaster", False))
+    ):
+        return HttpResponseForbidden("Only webmasters can edit homepage content.")
+
     content = get_object_or_404(HomePageContent, id=content_id)
 
     if request.method == "POST":
@@ -643,9 +696,20 @@ def edit_homepage_content(request, content_id):
     )
 
 
-@user_passes_test(can_edit_cms)
 def create_cms_page(request):
     """Create a new CMS page with full TinyMCE functionality."""
+    # Get parent page if specified
+    parent_id = request.GET.get("parent")
+    parent_page = None
+    if parent_id:
+        parent_page = get_object_or_404(Page, id=parent_id)
+
+    # Check creation permissions
+    if not can_create_in_directory(request.user, parent_page):
+        return HttpResponseForbidden(
+            "You don't have permission to create pages in this directory."
+        )
+
     if request.method == "POST":
         form = CmsPageForm(request.POST)
         formset = DocumentFormSet(request.POST, request.FILES)

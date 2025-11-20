@@ -2,7 +2,7 @@
 {% block content %}
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <h1 style="margin:0">{{ page.title }}</h1>
-    {% if user.is_authenticated and (user.webmaster or user.secretary or user.treasurer) %}
+    {% if can_edit_page %}
       <div>
         <a class="btn btn-sm btn-primary me-2" href="{% url 'cms:edit_page' page.id %}">✏️ Edit Page</a>
         <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:cms_page_change' page.pk %}">⚙️ Admin</a>
