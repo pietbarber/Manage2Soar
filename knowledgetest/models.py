@@ -185,6 +185,13 @@ class WrittenTestAssignment(models.Model):
 
 
 class TestPreset(models.Model):
+    """
+    Django model for managing quiz test presets and configurations.
+    Not a pytest test class - this is a database model.
+    """
+
+    __test__ = False  # Explicitly tell pytest this is not a test class
+
     name = models.CharField(
         max_length=100,
         unique=True,
