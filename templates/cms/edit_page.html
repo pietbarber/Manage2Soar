@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% load static %}
+{% load cms_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/tinymce-enhancements.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cms.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Modern page header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="display-6 fw-bold text-primary mb-1">
+                <i class="bi bi-pencil-square me-2"></i>{{ page_title }}
+            </h1>
+            <p class="text-muted mb-0">Edit CMS page content with enhanced rich text editor</p>
+        </div>
+        <div>
+            <a href="{{ page.get_absolute_url }}" class="btn btn-outline-secondary btn-modern">
+                <i class="bi bi-arrow-left me-2"></i>Back to Page
+            </a>
+        </div>
+    </div>
+
+    <!-- Edit form card -->
+    <div class="card cms-edit-card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-file-text me-2"></i>Page Details
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.media }}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-4">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-type text-primary me-2"></i>{{ form.title.label }}
+                            </label>
+                            {{ form.title|add_class:"form-control form-control-lg" }}
+                            {% if form.title.help_text %}
+                                <div class="form-text">{{ form.title.help_text }}</div>
+                            {% endif %}
+                            {% if form.title.errors %}
+                                <div class="text-danger mt-1">{{ form.title.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-4">
+                            <label for="{{ form.slug.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-link-45deg text-primary me-2"></i>{{ form.slug.label }}
+                            </label>
+                            {{ form.slug|add_class:"form-control" }}
+                            {% if form.slug.help_text %}
+                                <div class="form-text">{{ form.slug.help_text }}</div>
+                            {% endif %}
+                            {% if form.slug.errors %}
+                                <div class="text-danger mt-1">{{ form.slug.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <label for="{{ form.parent.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-folder text-primary me-2"></i>{{ form.parent.label }}
+                            </label>
+                            {{ form.parent|add_class:"form-select" }}
+                            {% if form.parent.help_text %}
+                                <div class="form-text">{{ form.parent.help_text }}</div>
+                            {% endif %}
+                            {% if form.parent.errors %}
+                                <div class="text-danger mt-1">{{ form.parent.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-shield-check text-primary me-2"></i>Access Control
+                            </label>
+                            <div class="form-check form-switch">
+                                {{ form.is_public|add_class:"form-check-input" }}
+                                <label class="form-check-label" for="{{ form.is_public.id_for_label }}">
+                                    {{ form.is_public.label }}
+                                </label>
+                            </div>
+                            {% if form.is_public.help_text %}
+                                <div class="form-text">{{ form.is_public.help_text }}</div>
+                            {% endif %}
+                            {% if form.is_public.errors %}
+                                <div class="text-danger mt-1">{{ form.is_public.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="{{ form.content.id_for_label }}" class="form-label fw-bold">
+                        <i class="bi bi-file-richtext text-primary me-2"></i>{{ form.content.label }}
+                    </label>
+                    {{ form.content }}
+                    {% if form.content.help_text %}
+                        <div class="form-text">{{ form.content.help_text }}</div>
+                    {% endif %}
+                    {% if form.content.errors %}
+                        <div class="text-danger mt-1">{{ form.content.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- File Management Section -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-files me-2"></i>Associated Files
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {{ formset.management_form }}
+
+                        <div id="document-formset">
+                            {% for form in formset %}
+                                <div class="document-form border rounded p-3 mb-3" style="background: #f8f9fa;">
+                                    {% if form.instance.pk %}
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <div>
+                                                <h6 class="fw-bold text-primary mb-1">
+                                                    <i class="bi bi-file-earmark me-2"></i>
+                                                    {{ form.instance.title|default:form.instance.file.name }}
+                                                </h6>
+                                                <small class="text-muted">
+                                                    Uploaded {{ form.instance.uploaded_at|date:"M d, Y H:i" }}
+                                                    {% if form.instance.uploaded_by %}
+                                                        by {{ form.instance.uploaded_by.get_full_name|default:form.instance.uploaded_by.username }}
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                            <div>
+                                                <a href="{{ form.instance.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
+                                                    <i class="bi bi-download"></i> Download
+                                                </a>
+                                                {% if form.DELETE %}
+                                                    <div class="form-check form-check-inline">
+                                                        {{ form.DELETE }}
+                                                        <label class="form-check-label text-danger" for="{{ form.DELETE.id_for_label }}">
+                                                            <i class="bi bi-trash"></i> Delete
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <label for="{{ form.file.id_for_label }}" class="form-label fw-bold">
+                                                <i class="bi bi-cloud-upload text-primary me-2"></i>File
+                                            </label>
+                                            {{ form.file|add_class:"form-control" }}
+                                            {% if form.file.errors %}
+                                                <div class="text-danger mt-1">{{ form.file.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
+                                                <i class="bi bi-tag text-primary me-2"></i>Title (Optional)
+                                            </label>
+                                            {{ form.title|add_class:"form-control" }}
+                                            {% if form.title.errors %}
+                                                <div class="text-danger mt-1">{{ form.title.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    {% for hidden in form.hidden_fields %}
+                                        {{ hidden }}
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <button type="button" id="add-document" class="btn btn-outline-success btn-modern">
+                                <i class="bi bi-plus-circle me-2"></i>Add Another File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-3 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-modern btn-lg">
+                        <i class="bi bi-check-circle me-2"></i>Save Changes
+                    </button>
+                    <a href="{{ page.get_absolute_url }}" class="btn btn-outline-secondary btn-modern">
+                        <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Dynamic formset management with drag-and-drop
+            initializeFormsetManagement();
+            initializeDragAndDrop();
+        });
+
+        // Simple PDF insert functionality
+        function initializePdfInsert() {
+            // Add a simple button next to TinyMCE toolbar
+            const editorContainer = document.querySelector('.tox-tinymce');
+            if (editorContainer && !document.querySelector('.pdf-insert-btn')) {
+                const pdfButton = document.createElement('button');
+                pdfButton.type = 'button';
+                pdfButton.className = 'btn btn-outline-primary btn-sm pdf-insert-btn';
+                pdfButton.innerHTML = '📄 Insert PDF';
+                pdfButton.style.marginLeft = '10px';
+
+                pdfButton.onclick = function() {
+                    const url = prompt('Enter PDF URL:');
+                    if (url && url.trim()) {
+                        const iframe = `<iframe src="${url}" width="100%" height="600px" style="border: 1px solid #ddd; border-radius: 8px;" loading="lazy"></iframe><p>&nbsp;</p>`;
+                        // Insert directly into TinyMCE content
+                        const editor = tinymce.activeEditor;
+                        if (editor) {
+                            editor.setContent(editor.getContent() + iframe);
+                        }
+                    }
+                };
+
+                // Insert button after TinyMCE loads
+                const toolbar = editorContainer.querySelector('.tox-toolbar__primary');
+                if (toolbar) {
+                    toolbar.appendChild(pdfButton);
+                }
+            }
+        }
+
+        // Initialize PDF insert when TinyMCE is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initializePdfInsert, 1000); // Give TinyMCE time to load
+        });
+
+        function initializeFormsetManagement() {
+            const totalForms = document.querySelector('#id_documents-TOTAL_FORMS');
+            const addButton = document.querySelector('#add-document');
+
+
+
+            if (!addButton) {
+                console.error('Add button not found!');
+                return;
+            }
+
+            if (!totalForms) {
+                console.error('Total forms element not found!');
+                return;
+            }
+
+
+            addButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Add button clicked!');
+                addNewFormsetForm();
+            });
+        }
+
+        function addNewFormsetForm() {
+            const formsetContainer = document.querySelector('#document-formset');
+            const totalForms = document.querySelector('#id_documents-TOTAL_FORMS');
+            const formCount = parseInt(totalForms.value);
+
+            // Create new form HTML
+            const newFormHTML = `
+                <div class="document-form border rounded p-3 mb-3" style="background: #f8f9fa;">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-cloud-upload text-primary me-2"></i>File
+                            </label>
+                            <input type="file" name="documents-${formCount}-file" class="form-control file-drop-area" id="id_documents-${formCount}-file">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-tag text-primary me-2"></i>Title (Optional)
+                            </label>
+                            <input type="text" name="documents-${formCount}-title" class="form-control" id="id_documents-${formCount}-title" placeholder="Optional: Enter a title for this file">
+                        </div>
+                    </div>
+                    <input type="hidden" name="documents-${formCount}-id" id="id_documents-${formCount}-id">
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form" onclick="removeFormsetForm(this)">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Add new form to container
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newFormHTML;
+            const newForm = tempDiv.firstElementChild;
+
+            formsetContainer.appendChild(newForm);
+
+            // Update total forms count
+            totalForms.value = formCount + 1;
+
+            // Initialize drag-and-drop for new file input
+            initializeDragAndDropForElement(newForm.querySelector('.file-drop-area'));
+        }
+
+        function removeFormsetForm(button) {
+            const form = button.closest('.document-form');
+            const totalForms = document.querySelector('#id_documents-TOTAL_FORMS');
+            form.remove();
+
+            // Update total forms count
+            const currentCount = parseInt(totalForms.value);
+            totalForms.value = Math.max(0, currentCount - 1);
+        }
+
+        function initializeDragAndDrop() {
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            fileInputs.forEach(initializeDragAndDropForElement);
+        }
+
+        function initializeDragAndDropForElement(fileInput) {
+            if (!fileInput) return;
+
+            const dropArea = fileInput.parentElement;
+
+            // Add drag-and-drop styling
+            fileInput.style.position = 'relative';
+            fileInput.style.zIndex = '2';
+
+            // Create overlay for drag-and-drop feedback
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-drop-overlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                border: 2px dashed #007bff;
+                background: rgba(0, 123, 255, 0.1);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: #007bff;
+                border-radius: 8px;
+                z-index: 1;
+            `;
+            overlay.textContent = '📁 Drop file here';
+            dropArea.style.position = 'relative';
+            dropArea.appendChild(overlay);
+
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => {
+                    overlay.style.display = 'flex';
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => {
+                    overlay.style.display = 'none';
+                }, false);
+            });
+
+            // Handle dropped files
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+
+                if (files.length > 0) {
+                    fileInput.files = files;
+
+                    // Update visual feedback
+                    const fileName = files[0].name;
+                    const feedback = document.createElement('div');
+                    feedback.className = 'mt-2 text-success small';
+                    feedback.innerHTML = `<i class="bi bi-check-circle me-1"></i>Selected: ${fileName}`;
+
+                    // Remove any existing feedback
+                    const existingFeedback = dropArea.querySelector('.mt-2.text-success');
+                    if (existingFeedback) {
+                        existingFeedback.remove();
+                    }
+
+                    dropArea.appendChild(feedback);
+                }
+            }
+        }
+    </script>
+{% endblock %}

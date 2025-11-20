@@ -7,6 +7,14 @@ app_name = "cms"
 urlpatterns = [
     # CMS Resources index page at /cms/
     path("", views.cms_resources_index, name="resources"),
+    # CMS Edit pages
+    path("edit/page/<int:page_id>/", views.edit_cms_page, name="edit_page"),
+    path(
+        "edit/homepage/<int:content_id>/",
+        views.edit_homepage_content,
+        name="edit_homepage",
+    ),
+    path("create/page/", views.create_cms_page, name="create_page"),
     # Site feedback URLs (Issue #117)
     path("feedback/", views.submit_feedback, name="feedback"),
     path("feedback/success/", views.feedback_success, name="feedback_success"),

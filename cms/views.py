@@ -1,19 +1,24 @@
 # Generic CMS Page view for arbitrary pages and directories
 import logging
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.views import redirect_to_login
 from django.db.models import Count, Max
+from django.forms import inlineformset_factory
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from tinymce.widgets import TinyMCE
 
 from cms.forms import SiteFeedbackForm, VisitorContactForm
 from cms.models import HomePageContent
 from members.decorators import active_member_required
 from members.utils import is_active_member
 
-from .models import Page
+from .models import Document, Page
 
 # Module-level logger to avoid repeated getLogger calls
 logger = logging.getLogger(__name__)
@@ -510,6 +515,164 @@ This message was sent automatically by the club website contact form.
     except Exception as e:
         # Log the error but don't fail the contact submission
         logger.error(f"Failed to notify member managers of visitor contact: {e}")
+
+
+# CMS Edit Forms and Views
+
+
+class CmsPageForm(forms.ModelForm):
+    """Form for editing CMS pages with enhanced TinyMCE."""
+
+    class Meta:
+        model = Page
+        fields = ["title", "slug", "parent", "content", "is_public"]
+        widgets = {"content": TinyMCE(attrs={"class": "tinymce-enhanced"})}
+
+
+class HomePageContentForm(forms.ModelForm):
+    """Form for editing homepage content with enhanced TinyMCE."""
+
+    class Meta:
+        model = HomePageContent
+        fields = ["title", "slug", "audience", "content"]
+        widgets = {"content": TinyMCE(attrs={"class": "tinymce-enhanced"})}
+
+
+class DocumentForm(forms.ModelForm):
+    """Form for uploading documents to CMS pages."""
+
+    class Meta:
+        model = Document
+        fields = ["file", "title"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Optional: Enter a title for this file",
+                }
+            )
+        }
+
+
+# Create formset for managing multiple documents
+DocumentFormSet = inlineformset_factory(
+    Page,
+    Document,
+    form=DocumentForm,
+    fields=["file", "title"],
+    extra=1,
+    can_delete=True,
+)
+
+
+def can_edit_cms(user):
+    """Check if user can edit CMS content (webmaster, secretary, or treasurer)."""
+    return user.is_authenticated and (
+        user.is_superuser
+        or getattr(user, "webmaster", False)
+        or getattr(user, "secretary", False)
+        or getattr(user, "treasurer", False)
+    )
+
+
+@user_passes_test(can_edit_cms)
+def edit_cms_page(request, page_id):
+    """Edit a CMS page with full TinyMCE functionality."""
+    page = get_object_or_404(Page, id=page_id)
+
+    if request.method == "POST":
+        form = CmsPageForm(request.POST, instance=page)
+        formset = DocumentFormSet(request.POST, request.FILES, instance=page)
+
+        if form.is_valid() and formset.is_valid():
+            form.save()
+
+            # Save documents with uploaded_by field
+            documents = formset.save(commit=False)
+            for document in documents:
+                if not document.uploaded_by:
+                    document.uploaded_by = request.user
+                document.save()
+
+            # Handle deletions
+            for document in formset.deleted_objects:
+                document.delete()
+
+            messages.success(request, f'Page "{page.title}" updated successfully!')
+            return redirect("cms:cms_page", slug1=page.slug)
+    else:
+        form = CmsPageForm(instance=page)
+        formset = DocumentFormSet(instance=page)
+
+    return render(
+        request,
+        "cms/edit_page.html",
+        {
+            "form": form,
+            "formset": formset,
+            "page": page,
+            "page_title": f"Edit Page: {page.title}",
+        },
+    )
+
+
+@user_passes_test(can_edit_cms)
+def edit_homepage_content(request, content_id):
+    """Edit homepage content with full TinyMCE functionality."""
+    content = get_object_or_404(HomePageContent, id=content_id)
+
+    if request.method == "POST":
+        form = HomePageContentForm(request.POST, instance=content)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f'Homepage content "{content.title}" updated successfully!'
+            )
+            return redirect("homepage")
+    else:
+        form = HomePageContentForm(instance=content)
+
+    return render(
+        request,
+        "cms/edit_homepage.html",
+        {
+            "form": form,
+            "content": content,
+            "page_title": f"Edit Homepage: {content.title}",
+        },
+    )
+
+
+@user_passes_test(can_edit_cms)
+def create_cms_page(request):
+    """Create a new CMS page with full TinyMCE functionality."""
+    if request.method == "POST":
+        form = CmsPageForm(request.POST)
+        formset = DocumentFormSet(request.POST, request.FILES)
+
+        if form.is_valid() and formset.is_valid():
+            page = form.save()
+
+            # Save documents with uploaded_by field
+            formset.instance = page
+            documents = formset.save(commit=False)
+            for document in documents:
+                document.page = page
+                if not document.uploaded_by:
+                    document.uploaded_by = request.user
+                document.save()
+
+            messages.success(request, f'Page "{page.title}" created successfully!')
+            return redirect("cms:cms_page", slug1=page.slug)
+    else:
+        form = CmsPageForm()
+        formset = DocumentFormSet()
+
+    return render(
+        request,
+        "cms/create_page.html",
+        {"form": form, "formset": formset, "page_title": "Create New CMS Page"},
+    )
 
 
 # Create your views here.

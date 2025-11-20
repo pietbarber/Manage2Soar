@@ -109,7 +109,8 @@ erDiagram
 - File attachments linked to CMS pages
 - Smart upload paths: public files go to `cms/<page-slug>/`, private files are obfuscated
 - Tracks uploader and upload timestamp
-- Helper methods for file type detection
+- Helper methods for file type detection (`is_pdf`, `extension`)
+- **Default ordering**: Documents are sorted by title first, then filename (ensures consistent ordering in admin and public views)
 
 ### `HomePageContent`
 - Special content pages for the site homepage

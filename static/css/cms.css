@@ -1,3 +1,221 @@
+/* CMS App Modern Bootstrap5 Styling */
+/* Following the established Bootstrap5 modernization guide */
+
 .cms-breadcrumb {
     --bs-breadcrumb-divider: '›';
+}
+
+/* Modern Card Styling */
+.cms-edit-card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-left: 4px solid var(--bs-primary);
+}
+
+.cms-edit-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Modern Button Styling */
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+}
+
+.btn-modern.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* Form Enhancements */
+.form-control,
+.form-select {
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+.form-control-lg {
+    padding: 1rem;
+    font-size: 1.1rem;
+}
+
+/* Form Switch Styling */
+.form-check-input {
+    width: 3rem;
+    height: 1.5rem;
+    border-radius: 2rem;
+    transition: all 0.2s ease;
+}
+
+.form-check-input:checked {
+    background-color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+/* Card Header Enhancements */
+.card-header {
+    border-radius: 8px 8px 0 0 !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+/* TinyMCE Integration */
+textarea.tinymce-enhanced {
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    min-height: 400px;
+}
+
+/* Icon and Text Styling */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.fw-bold {
+    font-weight: 600 !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+
+    .btn-modern.btn-lg {
+        padding: 0.875rem 1.5rem;
+        font-size: 1rem;
+    }
+
+    .display-6 {
+        font-size: 2rem;
+    }
+}
+
+/* Back to Top Button (if needed for long forms) */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 50px;
+    height: 50px;
+    background: var(--bs-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 1000;
+    display: none;
+}
+
+.back-to-top:hover {
+    background: var(--bs-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.back-to-top.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Loading States */
+.btn-modern.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn-modern.loading::after {
+    content: "";
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    top: 50%;
+    left: 50%;
+    margin-left: -0.5rem;
+    margin-top: -0.5rem;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Form Validation Styling */
+.is-invalid {
+    border-color: var(--bs-danger);
+}
+
+.is-valid {
+    border-color: var(--bs-success);
+}
+
+/* Enhanced Form Text */
+.form-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.375rem;
+}
+
+/* Success/Error Message Styling */
+.alert {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Page Header Enhancements */
+.display-6 {
+    font-weight: 700;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* Breadcrumb Styling (if needed) */
+.breadcrumb {
+    background: none;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.breadcrumb-item+.breadcrumb-item::before {
+    content: "›";
+    color: var(--bs-primary);
+    font-weight: bold;
+}
+
+.breadcrumb-item.active {
+    color: var(--bs-secondary);
 }
