@@ -75,8 +75,10 @@ erDiagram
 The CMS app manages the website's pages, document attachments, and homepage content. Below is a concise reference to the current models, routes, and developer notes.
 
 Key points
-- Audience: staff may edit content via admin; members and guests may view public pages.
-- Route: `/cms/` (CMS directory/index) and site root (`/`) is routed to CMS homepage content when available.
+- **Audience**: Role-based editing permissions; public viewing for unrestricted pages
+- **Editing**: Modern web interface with TinyMCE, PDF embedding, and file management
+- **Permissions**: "If you need a token to see it, you can edit it" - webmasters have universal access
+- **Route**: `/cms/` (CMS directory/index) and site root (`/`) is routed to CMS homepage content when available
 
 Models (current)
 
@@ -84,10 +86,17 @@ Models (current)
 	- title, slug, parent (self FK for hierarchy), content (HTML), is_public, created_at, updated_at
 	- related_name `children` for sub-pages
 	- documents: reverse relation to `Document`
+	- role_permissions: Many-to-Many relation to `PageRolePermission`
+
+- PageRolePermission (Issue #239)
+	- page (FK -> Page), role_name (choices: director, treasurer, instructor, etc.)
+	- Enables role-based access control for private pages
+	- OR logic: users need ANY of the assigned roles to access/edit
 
 - Document
 	- page (FK -> Page), file (FileField), title, uploaded_by (user FK), uploaded_at
 	- helper properties: `is_pdf`, `extension`
+	- **Ordering**: Documents sorted by title first, then filename for consistency
 
 - HomePageContent
 	- slug, title, audience (public/member), content, updated_at
@@ -102,11 +111,17 @@ Models (current)
 
 URLs and views (current)
 
+**Public Views:**
 - `/cms/` — CMS index (list of top-level `Page` entries)
 - `/cms/<slug>/` — Page detail (supports nested pages via additional path segments)
 - `/cms/feedback/` — Site feedback submission form (Issue #117)
 - `/cms/feedback/success/` — Feedback submission success page
 - site root `/` — the project routes to `cms.views.homepage` which will render `HomePageContent` (audience-specific) when present, otherwise falls back to the CMS index
+
+**Editing Views (Issue #273):**
+- `/cms/edit/page/<id>/` — Edit CMS page with TinyMCE and file uploads (role-based permissions)
+- `/cms/create/page/` — Create new CMS page with parent context (role-based permissions)
+- `/cms/edit/homepage/<id>/` — Edit homepage content (webmaster-only)
 
 Developer notes
 
@@ -125,8 +140,19 @@ Templates
 
 Admin & permissions
 
-- All models are registered in the admin for staff editing. Public visibility for pages/documents is controlled with `is_public` on `Page` and the `audience` field on `HomePageContent`.
-- **SiteFeedback Admin**: Full-featured admin interface with list display, filtering, search, bulk status actions, and automatic response tracking. Includes custom display methods for referring URLs and responder names.
+**Django Admin:**
+- **Webmaster Access**: Full CRUD permissions for all CMS models without superuser requirement
+- **Role Management**: Intuitive inline interface for setting page role restrictions
+- **Document Management**: File upload tracking with uploader attribution
+- **SiteFeedback Admin**: Full-featured admin interface with list display, filtering, search, bulk status actions, and automatic response tracking
+
+**Web Editing Interface (Issue #273):**
+- **Role-Based Editing**: Users can edit pages they have viewing access to
+- **Permission Model**: "Token to see = ability to edit" with webmaster override
+- **Modern UI**: Bootstrap 5 styling with TinyMCE rich text editor
+- **PDF Embedding**: Simple button for embedding PDF documents
+- **File Management**: Drag-and-drop uploads with formset support
+- **Message Integration**: Success/error feedback via Bootstrap alerts
 
 Where to look
 
@@ -159,5 +185,6 @@ Where to look
 - **Enhanced display**: Clickable referring URLs and readable responder names
 
 Changelog
-- 2025-10-26: Added comprehensive site feedback system (Issue #117) with SiteFeedback model, admin interface, footer integration, and context processors
+- 2025-11-19: **Issue #273** - Complete CMS editing enhancement: PDF embedding, role-based editing permissions, webmaster admin access, Bootstrap 5 modernization, document ordering
+- 2025-10-26: Added comprehensive site feedback system (Issue #117) with SiteFeedback model, admin interface, footer integration, and context processors  
 - 2025-10-19: Updated docs to reflect current models and relationships (Page, Document, HomePageContent, HomePageImage)

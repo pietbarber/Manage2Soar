@@ -39,24 +39,46 @@ Successfully implemented PDF embedding functionality for the CMS editing interfa
 ## Files Modified
 
 ### Core Implementation
-- `templates/cms/edit_page.html` - Main CMS page editing interface
-- `templates/cms/create_page.html` - New CMS page creation interface  
-- `templates/cms/edit_homepage.html` - Homepage content editing interface
+- `templates/cms/edit_page.html` - Main CMS page editing interface with messages and PDF embedding
+- `templates/cms/create_page.html` - New CMS page creation interface with messages and PDF embedding
+- `templates/cms/edit_homepage.html` - Homepage content editing interface with messages and PDF embedding
 - `cms/models.py` - Added Document ordering
 - `manage2soar/settings.py` - TinyMCE configuration (cleaned up)
+
+### Permission System Enhancement
+- `cms/views.py` - Role-based editing permissions with page-aware checks
+- `cms/templates/cms/page.html` - Updated permission template variables
+- `cms/templates/cms/homepage.html` - Updated permission template variables  
+- `cms/templates/cms/index.html` - Updated permission template variables
+- `cms/admin.py` - Added webmaster permissions to all CMS admin models
 
 ### Database Changes
 - Migration: `cms.0011_add_document_ordering` - Added Document model ordering
 
 ### Documentation Updated
 - `cms/docs/models.md` - Updated Document model documentation
+- `docs/resolved-issues/issue-273-tinymce-pdf-embedding-cms.md` - Comprehensive implementation summary
 
-### Cleanup
-- Removed abandoned files:
-  - `static/js/tinymce-pdf-embed.js` (complex plugin approach)
-  - `cms/widgets.py` (custom widget approach)
-- Removed debug console.log statements from all templates
-- Cleaned up unused TinyMCE PDF media configuration
+### 4. Role-Based CMS Editing Permissions (Post-Implementation Enhancement)
+- **Problem**: Initial implementation gave blanket editing permissions to secretary/treasurer
+- **Enhanced Solution**: Role-based editing that matches viewing permissions
+- **Logic**: "If you need a token to see it, you can edit it. If it's public/member-only, only webmasters can edit it."
+- **Implementation**:
+  - `can_edit_page(user, page)` - Page-specific permission checking
+  - `can_create_in_directory(user, parent_page)` - Directory-based creation permissions
+  - Updated all CMS editing views to use page-aware permission checks
+  - Updated templates to use context-based permission variables
+
+### 5. Django Messages Integration
+- **Problem**: CMS editing interface wasn't displaying success/error messages
+- **Solution**: Added Bootstrap-styled message display to all CMS editing templates
+- **Implementation**: Consistent message alerts with auto-dismiss functionality across edit_page.html, create_page.html, and edit_homepage.html
+
+### 6. Webmaster Admin Access Enhancement
+- **Problem**: Webmasters required superuser access to manage CMS permissions in Django admin
+- **Solution**: Added webmaster-specific permission methods to all CMS admin models
+- **Scope**: Full CRUD access to Pages, PageRolePermissions, Documents, and HomePage content
+- **Security**: Maintains separation - webmasters get CMS access without full superuser privileges
 
 ## Key Decisions
 
@@ -78,12 +100,18 @@ Successfully implemented PDF embedding functionality for the CMS editing interfa
 - ✅ Clean, maintainable code
 - ✅ Bootstrap5 modern styling
 - ✅ No abandoned code or debug statements
+- ✅ Role-based CMS editing permissions
+- ✅ Django messages integration
+- ✅ Webmaster admin access for CMS management
 
 ## Technical Notes
 - PDF embedding creates responsive iframes with proper fallback text
 - Document ordering prioritizes titles over filenames for better UX
 - All JavaScript functionality integrated without external dependencies
 - Templates use Bootstrap5 patterns consistent with rest of application
+- **Permission Architecture**: Role-based editing uses existing `page.can_user_access()` logic for consistency
+- **Admin Integration**: Webmaster permissions use Django's standard permission framework with custom overrides
+- **Message Display**: Uses Bootstrap 5 alert components with automatic dismissal for optimal UX
 
 ## Lessons Learned
 - Sometimes the simplest solution is the best solution

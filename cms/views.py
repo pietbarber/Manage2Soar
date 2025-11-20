@@ -591,12 +591,12 @@ def can_edit_page(user, page):
     if user.is_superuser or getattr(user, "webmaster", False):
         return True
 
-    # Role-based editing: if page has role restrictions AND user can access it
-    if page.has_role_restrictions() and page.can_user_access(user):
-        return True
+    # Public pages: only webmaster can edit
+    if page.is_public:
+        return False
 
-    # Public/member-only pages: webmaster only
-    return False
+    # Private pages: "token to see = ability to edit" - if user can access it, they can edit it
+    return page.can_user_access(user)
 
 
 def can_create_in_directory(user, parent_page=None):
@@ -612,11 +612,12 @@ def can_create_in_directory(user, parent_page=None):
     if not parent_page:
         return False
 
-    # Can create if can access parent directory
-    if parent_page.has_role_restrictions() and parent_page.can_user_access(user):
-        return True
+    # Public parent pages: only webmaster can create under them
+    if parent_page.is_public:
+        return False
 
-    return False
+    # Private parent pages: "token to see = ability to create under" - if user can access parent, they can create under it
+    return parent_page.can_user_access(user)
 
 
 def edit_cms_page(request, page_id):
