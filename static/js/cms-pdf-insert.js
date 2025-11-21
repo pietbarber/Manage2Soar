@@ -3,14 +3,6 @@
  * Shared functionality for inserting PDF iframes in TinyMCE editors
  */
 
-// Deprecated - use validateAndSanitizeUrl instead
-function validatePdfUrl(url) {
-    // DEPRECATED: Use validateAndSanitizeUrl for new code.
-    // This function now returns the same object as validateAndSanitizeUrl.
-    console.warn('validatePdfUrl is deprecated. Use validateAndSanitizeUrl instead.');
-    return validateAndSanitizeUrl(url);
-}
-
 function validateAndSanitizeUrl(url) {
     try {
         // Prevent javascript: and data: URLs (critical security fix)

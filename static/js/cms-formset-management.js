@@ -63,11 +63,81 @@ function addNewFormsetForm() {
 function removeFormsetForm(button) {
     const form = button.closest('.document-form');
     const totalForms = document.querySelector('#id_documents-TOTAL_FORMS');
-    form.remove();
 
-    // Update total forms count
-    const currentCount = parseInt(totalForms.value);
-    totalForms.value = Math.max(0, currentCount - 1);
+    // Check if this is an existing form (has id value) or newly added form
+    const idInput = form.querySelector('input[name$="-id"]');
+
+    if (idInput && idInput.value) {
+        // Existing form: mark for deletion and hide
+        let deleteInput = form.querySelector('input[type="checkbox"][name$="-DELETE"]');
+
+        if (!deleteInput) {
+            // Create DELETE checkbox if not present
+            // Extract form index from the idInput name (e.g., documents-0-id)
+            const match = idInput.name.match(/^documents-(\d+)-id$/);
+            const formIndex = match ? match[1] : null;
+
+            if (formIndex !== null) {
+                deleteInput = document.createElement('input');
+                deleteInput.type = 'checkbox';
+                deleteInput.name = `documents-${formIndex}-DELETE`;
+                deleteInput.id = `id_documents-${formIndex}-DELETE`;
+                deleteInput.style.display = 'none'; // Hidden checkbox
+                form.appendChild(deleteInput);
+            }
+        }
+
+        if (deleteInput) {
+            deleteInput.checked = true;
+        }
+
+        // Hide the form instead of removing it
+        form.style.display = 'none';
+
+        // Add visual feedback that it's marked for deletion
+        const deletionMarker = document.createElement('div');
+        deletionMarker.className = 'text-danger small mt-1';
+        deletionMarker.innerHTML = '<i class="bi bi-trash"></i> Marked for deletion';
+        form.appendChild(deletionMarker);
+
+        // Do NOT decrement TOTAL_FORMS for existing forms
+    } else {
+        // Newly added form: remove from DOM and renumber remaining forms
+        form.remove();
+
+        // Renumber all remaining forms to maintain sequential indices
+        renumberFormsetForms();
+
+        // Update TOTAL_FORMS count
+        const allForms = document.querySelectorAll('.document-form');
+        totalForms.value = allForms.length;
+    }
+}
+
+function renumberFormsetForms() {
+    const forms = document.querySelectorAll('.document-form');
+
+    forms.forEach(function (formEl, idx) {
+        // Skip forms that are marked for deletion (hidden existing forms)
+        if (formEl.style.display === 'none') return;
+
+        // Update all input/select/textarea fields
+        const fields = formEl.querySelectorAll('input, select, textarea, label');
+        fields.forEach(function (field) {
+            // Update name attribute
+            if (field.name && field.name.includes('documents-')) {
+                field.name = field.name.replace(/documents-\d+-/, 'documents-' + idx + '-');
+            }
+            // Update id attribute
+            if (field.id && field.id.includes('documents-')) {
+                field.id = field.id.replace(/documents-\d+-/, 'documents-' + idx + '-');
+            }
+            // For labels, update htmlFor
+            if (field.tagName.toLowerCase() === 'label' && field.htmlFor && field.htmlFor.includes('documents-')) {
+                field.htmlFor = field.htmlFor.replace(/documents-\d+-/, 'documents-' + idx + '-');
+            }
+        });
+    });
 }
 
 function initializeDragAndDrop() {

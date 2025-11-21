@@ -108,42 +108,32 @@ class PageAdmin(admin.ModelAdmin):
 
     def has_module_permission(self, request):
         """Allow webmasters access to CMS admin."""
-        return (
-            super().has_module_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_view_permission(self, request, obj=None):
         """Allow webmasters to view CMS pages."""
-        return (
-            super().has_view_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_add_permission(self, request):
         """Allow webmasters to add CMS pages."""
-        return (
-            super().has_add_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_add_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_change_permission(self, request, obj=None):
         """Allow webmasters to edit CMS pages."""
-        return (
-            super().has_change_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_change_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_delete_permission(self, request, obj=None):
         """Allow webmasters to delete CMS pages."""
-        return (
-            super().has_delete_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def save_model(self, request, obj, form, change):
@@ -184,42 +174,32 @@ class PageRolePermissionAdmin(admin.ModelAdmin):
 
     def has_module_permission(self, request):
         """Allow webmasters access to CMS role permissions."""
-        return (
-            super().has_module_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_view_permission(self, request, obj=None):
         """Allow webmasters to view role permissions."""
-        return (
-            super().has_view_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_add_permission(self, request):
         """Allow webmasters to add role permissions."""
-        return (
-            super().has_add_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_add_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_change_permission(self, request, obj=None):
         """Allow webmasters to edit role permissions."""
-        return (
-            super().has_change_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_change_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_delete_permission(self, request, obj=None):
         """Allow webmasters to delete role permissions."""
-        return (
-            super().has_delete_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
 
@@ -242,42 +222,32 @@ class DocumentAdmin(admin.ModelAdmin):
 
     def has_module_permission(self, request):
         """Allow webmasters access to CMS documents."""
-        return (
-            super().has_module_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_view_permission(self, request, obj=None):
         """Allow webmasters to view documents."""
-        return (
-            super().has_view_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_add_permission(self, request):
         """Allow webmasters to add documents."""
-        return (
-            super().has_add_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_add_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_change_permission(self, request, obj=None):
         """Allow webmasters to edit documents."""
-        return (
-            super().has_change_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_change_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_delete_permission(self, request, obj=None):
         """Allow webmasters to delete documents."""
-        return (
-            super().has_delete_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def save_model(self, request, obj, form, change):
@@ -310,42 +280,32 @@ class HomePageContentAdmin(admin.ModelAdmin):
 
     def has_module_permission(self, request):
         """Allow webmasters access to homepage content."""
-        return (
-            super().has_module_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_view_permission(self, request, obj=None):
         """Allow webmasters to view homepage content."""
-        return (
-            super().has_view_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_add_permission(self, request):
         """Allow webmasters to add homepage content."""
-        return (
-            super().has_add_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_add_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_change_permission(self, request, obj=None):
         """Allow webmasters to edit homepage content."""
-        return (
-            super().has_change_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_change_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_delete_permission(self, request, obj=None):
         """Allow webmasters to delete homepage content."""
-        return (
-            super().has_delete_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
 
@@ -358,42 +318,32 @@ class HomePageImageAdmin(admin.ModelAdmin):
 
     def has_module_permission(self, request):
         """Allow webmasters access to homepage images."""
-        return (
-            super().has_module_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_module_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_view_permission(self, request, obj=None):
         """Allow webmasters to view homepage images."""
-        return (
-            super().has_view_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_view_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_add_permission(self, request):
         """Allow webmasters to add homepage images."""
-        return (
-            super().has_add_permission(request)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_add_permission(request) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_change_permission(self, request, obj=None):
         """Allow webmasters to edit homepage images."""
-        return (
-            super().has_change_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_change_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def has_delete_permission(self, request, obj=None):
         """Allow webmasters to delete homepage images."""
-        return (
-            super().has_delete_permission(request, obj)
-            or request.user.is_authenticated
-            and getattr(request.user, "webmaster", False)
+        return super().has_delete_permission(request, obj) or (
+            request.user.is_authenticated and getattr(request.user, "webmaster", False)
         )
 
     def changelist_view(self, request, extra_context=None):
