@@ -280,6 +280,38 @@
                       </div>
                       {{ towform.fuel_added.errors }}
                     </div>
+                  </div>
+                </div>
+                <!-- Rental Section -->
+                <div class="row">
+                  <div class="col-md-12">
+                    <h6 class="text-muted mb-3"><i class="bi bi-cash-coin me-2"></i>Non-Towing Rental Charges</h6>
+                    <div class="row">
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          {{ towform.rental_hours_chargeable.label_tag }}
+                          <div class="input-group">
+                            {{ towform.rental_hours_chargeable }}
+                            <span class="input-group-text">hours</span>
+                          </div>
+                          <div class="form-text">{{ towform.rental_hours_chargeable.help_text }}</div>
+                          {{ towform.rental_hours_chargeable.errors }}
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          {{ towform.rental_charged_to.label_tag }}
+                          {{ towform.rental_charged_to }}
+                          <div class="form-text">{{ towform.rental_charged_to.help_text }}</div>
+                          {{ towform.rental_charged_to.errors }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Notes Section -->
+                <div class="row">
+                  <div class="col-md-12">
                     <div class="mb-3">
                       {{ towform.notes.label_tag }}
                       {{ towform.notes }}

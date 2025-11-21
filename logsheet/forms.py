@@ -885,9 +885,25 @@ class LogsheetDutyCrewForm(forms.ModelForm):
 class TowplaneCloseoutForm(forms.ModelForm):
     class Meta:
         model = TowplaneCloseout
-        fields = ["towplane", "start_tach", "end_tach", "fuel_added", "notes"]
+        fields = [
+            "towplane",
+            "start_tach",
+            "end_tach",
+            "fuel_added",
+            "rental_hours_chargeable",
+            "rental_charged_to",
+            "notes",
+        ]
         widgets = {
             "notes": TinyMCE(mce_attrs={"height": 300}),
+        }
+        labels = {
+            "rental_hours_chargeable": "Rental Hours (Non-Towing)",
+            "rental_charged_to": "Charge Rental To",
+        }
+        help_texts = {
+            "rental_hours_chargeable": "Hours of non-towing usage to charge as rental (sightseeing, flight reviews, retrieval flights, etc.)",
+            "rental_charged_to": "Member who should be charged for the towplane rental time",
         }
 
     def __init__(self, *args, **kwargs):

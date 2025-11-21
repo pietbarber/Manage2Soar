@@ -189,6 +189,7 @@ This document describes all models in `logsheet/models.py`.
 
 ## Towplane
 - Represents a towplane, including status and maintenance.
+- **New in Issue 123**: Added `hourly_rental_rate` field to support charging for non-towing flights like sightseeing, flight reviews, and retrieval missions.
 
 ## Glider
 - Represents a glider, including status and maintenance.
@@ -210,6 +211,8 @@ This document describes all models in `logsheet/models.py`.
 
 ## TowplaneCloseout
 - Records the closeout summary for a towplane.
+- **New in Issue 123**: Includes `rental_hours_chargeable` field and `charged_to` field to track non-towing towplane usage (sightseeing, flight reviews, retrieval flights).
+- **Rental Cost Calculation**: The `rental_cost` property automatically calculates charges based on `rental_hours_chargeable * towplane.hourly_rental_rate`.
 
 ## MaintenanceIssue
 - Tracks maintenance issues for aircraft.

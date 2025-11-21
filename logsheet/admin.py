@@ -60,6 +60,7 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
     search_fields = ("name", "n_number")
     fieldsets = (
         (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
+        ("Rental Rates", {"fields": ("hourly_rental_rate",)}),
         ("Oil Change", {"fields": ("oil_change_interval", "next_oil_change_due")}),
         (
             "100hr Inspection",

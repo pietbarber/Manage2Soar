@@ -356,6 +356,13 @@ class Towplane(models.Model):
         null=True,
         help_text="Tach time at which next 100-hour inspection is due.",
     )
+    hourly_rental_rate = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Hourly rental rate for non-towing flights (sightseeing, flight reviews, retrieval, etc.) in USD per hour.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -767,6 +774,20 @@ class TowplaneCloseout(models.Model):
     fuel_added = models.DecimalField(
         max_digits=5, decimal_places=1, null=True, blank=True
     )
+    rental_hours_chargeable = models.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Hours of towplane use to be charged as rental (non-towing flights like sightseeing, flight reviews, retrieval).",
+    )
+    rental_charged_to = models.ForeignKey(
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Member to be charged for towplane rental time (if any).",
+    )
     notes = HTMLField(blank=True)
 
     class Meta:
@@ -774,6 +795,19 @@ class TowplaneCloseout(models.Model):
         indexes = [
             models.Index(fields=["towplane", "logsheet"]),
         ]
+
+    @property
+    def rental_cost(self):
+        """Calculate rental cost for non-towing towplane usage."""
+        if not self.rental_hours_chargeable or not self.towplane.hourly_rental_rate:
+            return None
+        return self.rental_hours_chargeable * self.towplane.hourly_rental_rate
+
+    @property
+    def rental_cost_display(self):
+        """Display formatted rental cost."""
+        cost = self.rental_cost
+        return f"${cost:.2f}" if cost is not None else "—"
 
     def __str__(self):
         return f"{self.towplane.n_number} on {self.logsheet.log_date}"

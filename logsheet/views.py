@@ -932,6 +932,9 @@ def manage_logsheet_finances(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     flights = logsheet.flights.all()
 
+    # Get towplane rental costs for this logsheet
+    towplane_closeouts = logsheet.towplane_closeouts.all()
+
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
         return {
@@ -945,7 +948,7 @@ def manage_logsheet_finances(request, pk):
         }
 
     flight_data = []
-    total_tow = total_rental = total_sum = 0
+    total_tow = total_rental = total_towplane_rental = total_sum = 0
 
     for flight in flights:
         costs = flight_costs(flight)
@@ -953,6 +956,15 @@ def manage_logsheet_finances(request, pk):
         total_tow += costs["tow"] or 0
         total_rental += costs["rental"] or 0
         total_sum += costs["total"] or 0
+
+    # Add towplane rental costs
+    towplane_data = []
+    for closeout in towplane_closeouts:
+        rental_cost = closeout.rental_cost or 0
+        towplane_data.append((closeout, rental_cost))
+        total_towplane_rental += rental_cost
+
+    total_sum += total_towplane_rental
 
     from collections import defaultdict
     from decimal import Decimal
@@ -975,6 +987,7 @@ def manage_logsheet_finances(request, pk):
         lambda: {
             "tow": Decimal("0.00"),
             "rental": Decimal("0.00"),
+            "towplane_rental": Decimal("0.00"),
             "total": Decimal("0.00"),
         }
     )
@@ -1011,9 +1024,18 @@ def manage_logsheet_finances(request, pk):
                 member_charges[pilot]["tow"] += tow
                 member_charges[pilot]["rental"] += rental
 
+    # Add towplane rental costs to member charges
+    for closeout, rental_cost in towplane_data:
+        if closeout.rental_charged_to and rental_cost > 0:
+            member_charges[closeout.rental_charged_to]["towplane_rental"] += Decimal(
+                str(rental_cost)
+            )
+
     # Add combined totals
     for summary in member_charges.values():
-        summary["total"] = summary["tow"] + summary["rental"]
+        summary["total"] = (
+            summary["tow"] + summary["rental"] + summary["towplane_rental"]
+        )
 
     member_payment_data = []
     for member in member_charges:
@@ -1045,6 +1067,11 @@ def manage_logsheet_finances(request, pk):
                     responsible_members.update([pilot, partner])
                 elif pilot:
                     responsible_members.add(pilot)
+
+            # Add members responsible for towplane rental charges
+            for closeout in towplane_closeouts:
+                if closeout.rental_charged_to and closeout.rental_cost:
+                    responsible_members.add(closeout.rental_charged_to)
 
             missing = []
             for member in responsible_members:
@@ -1126,8 +1153,10 @@ def manage_logsheet_finances(request, pk):
         "logsheet": logsheet,
         "flight_data_sorted": flight_data_sorted,
         "flight_data": flight_data,  # Added for test compatibility
+        "towplane_data": towplane_data,
         "total_tow": total_tow,
         "total_rental": total_rental,
+        "total_towplane_rental": total_towplane_rental,
         "total_sum": total_sum,
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
