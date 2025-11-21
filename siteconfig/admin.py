@@ -106,6 +106,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "allow_glider_reservations",
                     "allow_two_seater_reservations",
+                    "allow_towplane_rental",
                     "redaction_notification_dedupe_minutes",
                 ),
                 "classes": ("collapse",),

@@ -115,7 +115,7 @@
         <th data-sort-method="string">Member</th>
         <th class="text-end" data-sort-method="number">Tow</th>
         <th class="text-end" data-sort-method="number">Rental</th>
-        <th class="text-end" data-sort-method="number">Towplane Rental</th>
+        {% if towplane_rental_enabled %}<th class="text-end" data-sort-method="number">Towplane Rental</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
       </tr>
     </thead>
@@ -125,7 +125,7 @@
       <td data-sort-value="{{ member.last_name|default:'' }}">{{ member|full_display_name }}</td>
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
-      <td class="text-end">${{ summary.towplane_rental|floatformat:2 }}</td>
+      {% if towplane_rental_enabled %}<td class="text-end">${{ summary.towplane_rental|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
     </tr>
     {% endfor %}
@@ -133,7 +133,7 @@
   </table>
 </div>
 
-{% if towplane_data %}
+{% if towplane_data and towplane_rental_enabled %}
 <h4 class="mb-3 mt-5">
   <i class="bi bi-airplane-engines text-secondary me-2"></i>
   Towplane Rental Charges

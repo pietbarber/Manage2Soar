@@ -130,6 +130,12 @@ class SiteConfiguration(models.Model):
         help_text="We allow members to reserve club two seaters ahead of time.",
     )
 
+    # Towplane rental options
+    allow_towplane_rental = models.BooleanField(
+        default=False,
+        help_text="We allow towplanes to be rented for non-towing purposes (sightseeing flights, flight reviews, aircraft retrieval, etc.).",
+    )
+
     # Notification dedupe: number of minutes to suppress duplicate redaction
     # notifications for the same member URL. Editable by the Webmaster in the
     # admin SiteConfiguration UI. If blank/zero, falls back to settings or

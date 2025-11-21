@@ -1149,6 +1149,12 @@ def manage_logsheet_finances(request, pk):
         ),
     )
 
+    # Check if towplane rentals are enabled
+    from siteconfig.models import SiteConfiguration
+
+    config = SiteConfiguration.objects.first()
+    rental_enabled = config.allow_towplane_rental if config else False
+
     context = {
         "logsheet": logsheet,
         "flight_data_sorted": flight_data_sorted,
@@ -1163,6 +1169,7 @@ def manage_logsheet_finances(request, pk):
         "member_payment_data_sorted": member_payment_data_sorted,
         "active_members": active_members,
         "inactive_members": inactive_members,
+        "towplane_rental_enabled": rental_enabled,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)

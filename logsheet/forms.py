@@ -908,6 +908,24 @@ class TowplaneCloseoutForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Check if towplane rentals are enabled
+        from siteconfig.models import SiteConfiguration
+
+        config = SiteConfiguration.objects.first()
+        rental_enabled = config.allow_towplane_rental if config else False
+
+        # Remove rental fields if not enabled
+        if not rental_enabled:
+            if "rental_hours_chargeable" in self.fields:
+                del self.fields["rental_hours_chargeable"]
+            if "rental_charged_to" in self.fields:
+                del self.fields["rental_charged_to"]
+        else:
+            # Set up the rental_charged_to queryset if rentals are enabled
+            if "rental_charged_to" in self.fields:
+                self.fields["rental_charged_to"].queryset = get_active_members()
+
         towplanes = [
             tp for tp in Towplane.objects.filter(is_active=True) if not tp.is_grounded
         ]

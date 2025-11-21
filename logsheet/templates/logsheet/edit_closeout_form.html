@@ -282,7 +282,8 @@
                     </div>
                   </div>
                 </div>
-                <!-- Rental Section -->
+                <!-- Rental Section - Only show if enabled in site configuration -->
+                {% if towform.rental_hours_chargeable %}
                 <div class="row">
                   <div class="col-md-12">
                     <h6 class="text-muted mb-3"><i class="bi bi-cash-coin me-2"></i>Non-Towing Rental Charges</h6>
@@ -309,6 +310,7 @@
                     </div>
                   </div>
                 </div>
+                {% endif %}
                 <!-- Notes Section -->
                 <div class="row">
                   <div class="col-md-12">

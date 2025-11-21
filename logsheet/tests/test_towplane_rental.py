@@ -10,6 +10,7 @@ from django.test import TestCase
 
 from logsheet.models import Airfield, Logsheet, Towplane, TowplaneCloseout
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 User = get_user_model()
 
@@ -170,6 +171,14 @@ class TowplaneRentalFormTestCase(TestCase):
 
     def setUp(self):
         """Set up test data."""
+        # Enable towplane rentals in site configuration
+        self.config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
+            allow_towplane_rental=True,  # Enable rental functionality
+        )
+
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com"
         )
@@ -213,6 +222,7 @@ class TowplaneRentalFormTestCase(TestCase):
             "end_tach": "103.5",
             "fuel_added": "12.5",
             "rental_hours_chargeable": "2.0",
+            "rental_charged_to": self.member.pk,  # Required field when rentals enabled
             "notes": "Test flight review",
         }
 
