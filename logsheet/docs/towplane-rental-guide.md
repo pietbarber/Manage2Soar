@@ -119,17 +119,6 @@ The financial summary now includes:
 6. **Conditional Validation**: Duty officer not required since no flight operations
 7. **Clean Workflow**: All towplane details entered in single form without redundant dropdowns
 
-### Personal Flight (Biff's Scenario)
-**Situation**: Member takes personal flight to Roanoke on non-ops day
-**Process**:
-1. **No Flights Logged**: Day has no glider towing operations
-2. **Manual Addition**: Duty officer uses "Add Towplane" button to add Husky
-3. **Rental Entry**: 2.1 hours personal flight time recorded
-4. **Member Assignment**: Charged to member taking personal flight
-5. **Cost Calculation**: 2.1 × $95.00 = $199.50
-6. **Conditional Validation**: Duty officer not required since no flight operations
-7. **Clean Workflow**: All towplane details entered in single form without redundant dropdowns
-
 ## Business Process
 
 ### Before This Feature

@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_time
@@ -1299,6 +1299,9 @@ def add_towplane_closeout(request, pk):
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
     if request.method == "POST":
         towplane_id = request.POST.get("towplane")
         if towplane_id:
@@ -1356,6 +1359,13 @@ def view_logsheet_closeout(request, pk):
     ).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
     towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
+
+    # Check if towplane rentals are enabled for conditional display
+    from siteconfig.models import SiteConfiguration
+
+    config = SiteConfiguration.objects.first()
+    towplane_rental_enabled = config.allow_towplane_rental if config else False
+
     return render(
         request,
         "logsheet/view_closeout.html",
@@ -1364,6 +1374,7 @@ def view_logsheet_closeout(request, pk):
             "closeout": closeout,
             "towplanes": towplanes,
             "maintenance_issues": maintenance_issues,
+            "towplane_rental_enabled": towplane_rental_enabled,
         },
     )
 

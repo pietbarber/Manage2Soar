@@ -156,9 +156,11 @@
             <th><i class="bi bi-speedometer me-1"></i>Start Tach</th>
             <th><i class="bi bi-speedometer2 me-1"></i>End Tach</th>
             <th><i class="bi bi-fuel-pump me-1"></i>Fuel Added</th>
+            {% if towplane_rental_enabled %}
             <th><i class="bi bi-cash-coin me-1"></i>Rental Hours</th>
             <th><i class="bi bi-person me-1"></i>Charged To</th>
             <th><i class="bi bi-dollar me-1"></i>Rental Cost</th>
+            {% endif %}
             <th><i class="bi bi-chat-text me-1"></i>Notes</th>
           </tr>
         </thead>
@@ -169,9 +171,11 @@
             <td>{{ tow.start_tach|default:"—" }}</td>
             <td>{{ tow.end_tach|default:"—" }}</td>
             <td>{{ tow.fuel_added|default:"—" }} {% if tow.fuel_added %}gal{% endif %}</td>
+            {% if towplane_rental_enabled %}
             <td>{{ tow.rental_hours_chargeable|default:"—" }} {% if tow.rental_hours_chargeable %}hrs{% endif %}</td>
             <td>{{ tow.rental_charged_to.full_display_name|default:"—" }}</td>
             <td>{{ tow.rental_cost_display }}</td>
+            {% endif %}
             <td>{{ tow.notes|default:"—"|safe }}</td>
           </tr>
           {% endfor %}

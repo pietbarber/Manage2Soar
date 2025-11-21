@@ -215,7 +215,7 @@ class ManualTowplaneAdditionTestCase(TestCase):
         # For now, just test that we can add Husky when other towplanes exist
 
         # Create a closeout for Pawnee (simulating it having flights)
-        pawnee_closeout = TowplaneCloseout.objects.create(
+        TowplaneCloseout.objects.create(
             logsheet=self.tuesday_logsheet,
             towplane=self.pawnee,
             start_tach=800.0,

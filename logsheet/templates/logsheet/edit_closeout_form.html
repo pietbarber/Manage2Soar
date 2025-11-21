@@ -276,7 +276,8 @@
         <div class="form-section">
         <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>
 
-        {{ formset.management_form }}          {% for towform in formset %}
+        {{ formset.management_form }}
+        {% for towform in formset %}
             <div class="towplane-form-card mb-4">
               {% if towform.non_field_errors %}
                 <div class="alert alert-danger">
@@ -297,9 +298,6 @@
                 <div class="row">
                   <div class="col-md-6">
                     <!-- Towplane field hidden - already shown in card header -->
-                    {% for hidden in towform.hidden_fields %}
-                      {{ hidden }}
-                    {% endfor %}
                     {{ towform.towplane.as_hidden }}
 
                     <div class="mb-3">
