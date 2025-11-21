@@ -661,7 +661,6 @@ def edit_cms_page(request, page_id):
                 document.delete()
 
             # Finalize formset state (commit all changes)
-            formset.save()
 
             messages.success(request, f'Page "{page.title}" updated successfully!')
             return redirect(page.get_absolute_url())

@@ -110,8 +110,8 @@ function removeFormsetForm(button) {
         renumberFormsetForms();
 
         // Update TOTAL_FORMS count
-        const visibleForms = document.querySelectorAll('.document-form:not([style*="display: none"])');
-        totalForms.value = visibleForms.length;
+        const allForms = document.querySelectorAll('.document-form');
+        totalForms.value = allForms.length;
     }
 }
 

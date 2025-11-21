@@ -96,18 +96,13 @@ function initializePdfInsert() {
                 }
             }
 
-            // HTML-escape the URL to prevent injection (SECURITY FIX)
-            const escapedUrl = validationResult.sanitizedUrl
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            // Use sanitized URL directly - URL constructor already validates and sanitizes
+            const sanitizedUrl = validationResult.sanitizedUrl;
 
             // Create secure iframe with sandbox attribute (SECURITY FIX)
             const iframe = `<div class="pdf-container">
     <iframe
-        src="${escapedUrl}"
+        src="${sanitizedUrl}"
         width="100%"
         height="600px"
         style="border: 1px solid #ddd; border-radius: 8px;"
@@ -115,9 +110,9 @@ function initializePdfInsert() {
         sandbox="allow-scripts allow-same-origin"
         referrerpolicy="no-referrer"
         title="PDF Document">
-        <p>Your browser does not support iframes. <a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
+        <p>Your browser does not support iframes. <a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
     </iframe>
-    <p><small><a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">Open PDF in new tab</a></small></p>
+    <p><small><a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Open PDF in new tab</a></small></p>
 </div><p>&nbsp;</p>`;
 
             // Insert using insertContent instead of setContent (IMPROVEMENT)

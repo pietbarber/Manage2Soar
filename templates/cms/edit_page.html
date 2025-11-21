@@ -232,6 +232,11 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize drag-and-drop for existing file inputs
+            if (typeof initializeDragAndDrop === 'function') {
+                initializeDragAndDrop();
+            }
+
             // Initialize formset management (from shared file)
             if (typeof initializeFormsetManagement === 'function') {
                 initializeFormsetManagement();
