@@ -4,7 +4,6 @@ import logging
 from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.views import redirect_to_login
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
@@ -543,7 +542,13 @@ class CmsPageForm(forms.ModelForm):
     class Meta:
         model = Page
         fields = ["title", "slug", "parent", "content", "is_public"]
-        widgets = {"content": TinyMCE(attrs={"class": "tinymce-enhanced"})}
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control form-control-lg"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "parent": forms.Select(attrs={"class": "form-select"}),
+            "content": TinyMCE(attrs={"class": "tinymce-enhanced"}),
+            "is_public": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
 
 
 class HomePageContentForm(forms.ModelForm):
@@ -552,7 +557,12 @@ class HomePageContentForm(forms.ModelForm):
     class Meta:
         model = HomePageContent
         fields = ["title", "slug", "audience", "content"]
-        widgets = {"content": TinyMCE(attrs={"class": "tinymce-enhanced"})}
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control form-control-lg"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "audience": forms.Select(attrs={"class": "form-select"}),
+            "content": TinyMCE(attrs={"class": "tinymce-enhanced"}),
+        }
 
 
 class DocumentForm(forms.ModelForm):
@@ -584,7 +594,7 @@ DocumentFormSet = inlineformset_factory(
 
 def can_edit_page(user, page):
     """Check if user can edit a specific CMS page based on role-based permissions."""
-    if not user.is_authenticated:
+    if not user or not user.is_authenticated:
         return False
 
     # Webmaster override - can edit everything
@@ -601,7 +611,7 @@ def can_edit_page(user, page):
 
 def can_create_in_directory(user, parent_page=None):
     """Check if user can create pages in a directory (uses parent page permissions)."""
-    if not user.is_authenticated:
+    if not user or not user.is_authenticated:
         return False
 
     # Webmaster can create anywhere
@@ -647,7 +657,7 @@ def edit_cms_page(request, page_id):
                 document.delete()
 
             messages.success(request, f'Page "{page.title}" updated successfully!')
-            return redirect("cms:cms_page", slug1=page.slug)
+            return redirect(page.get_absolute_url())
     else:
         form = CmsPageForm(instance=page)
         formset = DocumentFormSet(instance=page)
@@ -728,7 +738,7 @@ def create_cms_page(request):
                 document.save()
 
             messages.success(request, f'Page "{page.title}" created successfully!')
-            return redirect("cms:cms_page", slug1=page.slug)
+            return redirect(page.get_absolute_url())
     else:
         form = CmsPageForm()
         formset = DocumentFormSet()

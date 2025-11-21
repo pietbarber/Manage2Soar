@@ -124,44 +124,15 @@
 {% endblock %}
 
 {% block extra_scripts %}
+    <!-- Load shared CMS JavaScript functionality -->
+    <script src="{% static 'js/cms-pdf-insert.js' %}"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-        });
-
-        // Simple PDF insert functionality
-        function initializePdfInsert() {
-            // Add a simple button next to TinyMCE toolbar
-            const editorContainer = document.querySelector('.tox-tinymce');
-            if (editorContainer && !document.querySelector('.pdf-insert-btn')) {
-                const pdfButton = document.createElement('button');
-                pdfButton.type = 'button';
-                pdfButton.className = 'btn btn-outline-primary btn-sm pdf-insert-btn';
-                pdfButton.innerHTML = '📄 Insert PDF';
-                pdfButton.style.marginLeft = '10px';
-
-                pdfButton.onclick = function() {
-                    const url = prompt('Enter PDF URL:');
-                    if (url && url.trim()) {
-                        const iframe = `<iframe src="${url}" width="100%" height="600px" style="border: 1px solid #ddd; border-radius: 8px;" loading="lazy"></iframe><p>&nbsp;</p>`;
-                        // Insert directly into TinyMCE content
-                        const editor = tinymce.activeEditor;
-                        if (editor) {
-                            editor.setContent(editor.getContent() + iframe);
-                        }
-                    }
-                };
-
-                // Insert button after TinyMCE loads
-                const toolbar = editorContainer.querySelector('.tox-toolbar__primary');
-                if (toolbar) {
-                    toolbar.appendChild(pdfButton);
-                }
+            // Initialize PDF insert functionality (from shared file)
+            if (typeof initializeTinyMCEPdfInsert === 'function') {
+                initializeTinyMCEPdfInsert();
             }
-        }
-
-        // Initialize PDF insert when TinyMCE is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initializePdfInsert, 1000); // Give TinyMCE time to load
         });
     </script>
 {% endblock %}

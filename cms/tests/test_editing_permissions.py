@@ -535,14 +535,12 @@ def test_edit_page_url_patterns():
 @pytest.mark.django_db
 def test_permission_function_edge_cases():
     """Test edge cases in permission functions."""
-    # Test with None user
+    # Test with None user - should return False gracefully
     page = Page.objects.create(title="Test", slug="test", is_public=False)
 
-    with pytest.raises(AttributeError):
-        can_edit_page(None, page)
-
-    with pytest.raises(AttributeError):
-        can_create_in_directory(None, page)
+    # Should return False for None user, not raise AttributeError
+    assert not can_edit_page(None, page)
+    assert not can_create_in_directory(None, page)
 
     # Test with None page (should not happen in practice)
     user = User.objects.create_user(
