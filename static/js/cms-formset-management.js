@@ -119,8 +119,7 @@ function renumberFormsetForms() {
     const forms = document.querySelectorAll('.document-form');
 
     forms.forEach(function (formEl, idx) {
-        // Skip forms that are marked for deletion (hidden existing forms)
-        if (formEl.style.display === 'none') return;
+        // Renumber all forms, including those marked for deletion (hidden)
 
         // Update all input/select/textarea fields
         const fields = formEl.querySelectorAll('input, select, textarea, label');

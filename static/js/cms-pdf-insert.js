@@ -90,7 +90,7 @@ function initializePdfInsert() {
             // Use sanitized URL directly - URL constructor already validates and sanitizes
             const sanitizedUrl = validationResult.sanitizedUrl;
 
-            // Create secure iframe with sandbox attribute (SECURITY FIX)
+            // Create secure iframe with restrictive sandbox (SECURITY FIX)
             const iframe = `<div class="pdf-container">
     <iframe
         src="${sanitizedUrl}"
@@ -98,7 +98,7 @@ function initializePdfInsert() {
         height="600px"
         style="border: 1px solid #ddd; border-radius: 8px;"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin"
+        sandbox=""
         referrerpolicy="no-referrer"
         title="PDF Document">
         <p>Your browser does not support iframes. <a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
