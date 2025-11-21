@@ -660,6 +660,9 @@ def edit_cms_page(request, page_id):
             for document in formset.deleted_objects:
                 document.delete()
 
+            # Finalize formset state (commit all changes)
+            formset.save()
+
             messages.success(request, f'Page "{page.title}" updated successfully!')
             return redirect(page.get_absolute_url())
     else:
@@ -745,11 +748,14 @@ def create_cms_page(request):
                     document.uploaded_by = request.user
                 document.save()
 
+            # Finalize formset changes (e.g., deletions, post-save hooks)
+            formset.save()
+
             messages.success(request, f'Page "{page.title}" created successfully!')
             return redirect(page.get_absolute_url())
     else:
         form = CmsPageForm()
-        formset = DocumentFormSet()
+        formset = DocumentFormSet(queryset=Document.objects.none())
 
     return render(
         request,

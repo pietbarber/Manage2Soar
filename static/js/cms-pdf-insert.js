@@ -112,7 +112,7 @@ function initializePdfInsert() {
         height="600px"
         style="border: 1px solid #ddd; border-radius: 8px;"
         loading="lazy"
-        sandbox="allow-popups allow-forms"
+        sandbox="allow-scripts allow-same-origin"
         referrerpolicy="no-referrer"
         title="PDF Document">
         <p>Your browser does not support iframes. <a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
@@ -124,7 +124,6 @@ function initializePdfInsert() {
             const editor = tinymce.activeEditor;
             if (editor) {
                 editor.insertContent(iframe);
-                console.log('PDF embedded successfully with security validation:', validationResult.sanitizedUrl);
             } else {
                 alert('Editor not found. Please try again.');
             }

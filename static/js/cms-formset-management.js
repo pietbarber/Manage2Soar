@@ -98,7 +98,8 @@ function removeFormsetForm(button) {
         const deletionMarker = document.createElement('div');
         deletionMarker.className = 'text-danger small mt-1';
         deletionMarker.innerHTML = '<i class="bi bi-trash"></i> Marked for deletion';
-        form.appendChild(deletionMarker);
+        // Insert the marker after the hidden form so it remains visible
+        form.parentNode.insertBefore(deletionMarker, form.nextSibling);
 
         // Do NOT decrement TOTAL_FORMS for existing forms
     } else {
@@ -109,8 +110,8 @@ function removeFormsetForm(button) {
         renumberFormsetForms();
 
         // Update TOTAL_FORMS count
-        const allForms = document.querySelectorAll('.document-form');
-        totalForms.value = allForms.length;
+        const visibleForms = document.querySelectorAll('.document-form:not([style*="display: none"])');
+        totalForms.value = visibleForms.length;
     }
 }
 
