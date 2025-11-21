@@ -315,6 +315,7 @@ class Document(models.Model):
     class Meta:
         verbose_name = "CMS Document"
         verbose_name_plural = "CMS Documents"
+        ordering = ["title", "file"]  # Sort by title first, then filename
 
     def __str__(self):
         return self.title or self.file.name

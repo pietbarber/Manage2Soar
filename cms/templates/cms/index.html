@@ -5,9 +5,10 @@
       <h1 style="margin:0">Resources</h1>
       <p style="margin:0.25rem 0 0 0">Browse top-level resource directories and files available to members.</p>
     </div>
-    {% if user.is_authenticated and perms.cms.change_page %}
+    {% if can_create_page %}
       <div>
-        <a class="btn btn-sm btn-primary" href="{% url 'admin:cms_page_changelist' %}">Manage content</a>
+        <a class="btn btn-sm btn-success me-2" href="{% url 'cms:create_page' %}">+ Create Page</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:cms_page_changelist' %}">⚙️ Admin</a>
       </div>
     {% endif %}
   </div>

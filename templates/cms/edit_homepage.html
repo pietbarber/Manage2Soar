@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+{% load cms_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/tinymce-enhancements.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cms.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Messages -->
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Modern page header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="display-6 fw-bold text-primary mb-1">
+                <i class="bi bi-house-gear me-2"></i>{{ page_title }}
+            </h1>
+            <p class="text-muted mb-0">Edit homepage content with enhanced rich text editor</p>
+        </div>
+        <div>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-modern">
+                <i class="bi bi-arrow-left me-2"></i>Back to Homepage
+            </a>
+        </div>
+    </div>
+
+    <!-- Edit form card -->
+    <div class="card cms-edit-card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-house-fill me-2"></i>Homepage Content
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.media }}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-4">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-type text-primary me-2"></i>{{ form.title.label }}
+                            </label>
+                            {{ form.title|add_class:"form-control form-control-lg" }}
+                            {% if form.title.help_text %}
+                                <div class="form-text">{{ form.title.help_text }}</div>
+                            {% endif %}
+                            {% if form.title.errors %}
+                                <div class="text-danger mt-1">{{ form.title.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-4">
+                            <label for="{{ form.slug.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-link-45deg text-primary me-2"></i>{{ form.slug.label }}
+                            </label>
+                            {{ form.slug|add_class:"form-control" }}
+                            {% if form.slug.help_text %}
+                                <div class="form-text">{{ form.slug.help_text }}</div>
+                            {% endif %}
+                            {% if form.slug.errors %}
+                                <div class="text-danger mt-1">{{ form.slug.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="{{ form.audience.id_for_label }}" class="form-label fw-bold">
+                        <i class="bi bi-people text-primary me-2"></i>{{ form.audience.label }}
+                    </label>
+                    {{ form.audience|add_class:"form-select" }}
+                    {% if form.audience.help_text %}
+                        <div class="form-text">{{ form.audience.help_text }}</div>
+                    {% endif %}
+                    {% if form.audience.errors %}
+                        <div class="text-danger mt-1">{{ form.audience.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <label for="{{ form.content.id_for_label }}" class="form-label fw-bold">
+                        <i class="bi bi-file-richtext text-primary me-2"></i>{{ form.content.label }}
+                    </label>
+                    {{ form.content }}
+                    {% if form.content.help_text %}
+                        <div class="form-text">{{ form.content.help_text }}</div>
+                    {% endif %}
+                    {% if form.content.errors %}
+                        <div class="text-danger mt-1">{{ form.content.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-3 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-modern btn-lg">
+                        <i class="bi bi-check-circle me-2"></i>Save Changes
+                    </button>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-modern">
+                        <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <!-- Load shared CMS JavaScript functionality -->
+    <script src="{% static 'js/cms-pdf-insert.js' %}"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize PDF insert functionality (from shared file)
+            if (typeof initializeTinyMCEPdfInsert === 'function') {
+                initializeTinyMCEPdfInsert();
+            }
+        });
+    </script>
+{% endblock %}

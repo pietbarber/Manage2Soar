@@ -1,19 +1,25 @@
 # Generic CMS Page view for arbitrary pages and directories
 import logging
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
 from django.db.models import Count, Max
+from django.forms import inlineformset_factory
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods
+from tinymce.widgets import TinyMCE
 
 from cms.forms import SiteFeedbackForm, VisitorContactForm
 from cms.models import HomePageContent
 from members.decorators import active_member_required
 from members.utils import is_active_member
 
-from .models import Page
+from .models import Document, Page
 
 # Module-level logger to avoid repeated getLogger calls
 logger = logging.getLogger(__name__)
@@ -198,6 +204,7 @@ def cms_page(request, **kwargs):
             "has_documents": has_documents,
             "page_has_role_restrictions": page.has_role_restrictions(),
             "page_required_roles": page_required_roles,
+            "can_edit_page": can_edit_page(request.user, page),
         },
     )
 
@@ -234,7 +241,15 @@ def homepage(request):
         page = HomePageContent.objects.filter(audience="public", slug="home").first()
 
     if page:
-        return render(request, "cms/homepage.html", {"page": page})
+        # Homepage editing is webmaster-only
+        can_edit_homepage = user.is_authenticated and (
+            user.is_superuser or getattr(user, "webmaster", False)
+        )
+        return render(
+            request,
+            "cms/homepage.html",
+            {"page": page, "can_edit_page": can_edit_homepage},
+        )
 
     # Fallback: show CMS index of top-level pages using optimized helper function
     pages = get_accessible_top_level_pages(request.user)
@@ -248,7 +263,15 @@ def cms_resources_index(request):
     """
     # Use helper function to get accessible pages with optimized queries
     pages = get_accessible_top_level_pages(request.user)
-    return render(request, "cms/index.html", {"pages": pages})
+    return render(
+        request,
+        "cms/index.html",
+        {
+            "pages": pages,
+            # Top-level creation
+            "can_create_page": can_create_in_directory(request.user, None),
+        },
+    )
 
 
 # Site Feedback Views for Issue #117
@@ -510,6 +533,237 @@ This message was sent automatically by the club website contact form.
     except Exception as e:
         # Log the error but don't fail the contact submission
         logger.error(f"Failed to notify member managers of visitor contact: {e}")
+
+
+# CMS Edit Forms and Views
+
+
+class CmsPageForm(forms.ModelForm):
+    """Form for editing CMS pages with enhanced TinyMCE."""
+
+    class Meta:
+        model = Page
+        fields = ["title", "slug", "parent", "content", "is_public"]
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control form-control-lg"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "parent": forms.Select(attrs={"class": "form-select"}),
+            "content": TinyMCE(attrs={"class": "tinymce-enhanced"}),
+            "is_public": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
+class HomePageContentForm(forms.ModelForm):
+    """Form for editing homepage content with enhanced TinyMCE."""
+
+    class Meta:
+        model = HomePageContent
+        fields = ["title", "slug", "audience", "content"]
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control form-control-lg"}),
+            "slug": forms.TextInput(attrs={"class": "form-control"}),
+            "audience": forms.Select(attrs={"class": "form-select"}),
+            "content": TinyMCE(attrs={"class": "tinymce-enhanced"}),
+        }
+
+
+class DocumentForm(forms.ModelForm):
+    """Form for uploading documents to CMS pages."""
+
+    class Meta:
+        model = Document
+        fields = ["file", "title"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Optional: Enter a title for this file",
+                }
+            )
+        }
+
+
+# Create formset for managing multiple documents
+DocumentFormSet = inlineformset_factory(
+    Page,
+    Document,
+    form=DocumentForm,
+    fields=["file", "title"],
+    extra=1,
+    can_delete=True,
+)
+
+
+def can_edit_page(user, page):
+    """Check if user can edit a specific CMS page based on role-based permissions."""
+    if user is None or not user.is_authenticated:
+        return False
+
+    # Webmaster override - can edit everything
+    if user.is_superuser or getattr(user, "webmaster", False):
+        return True
+
+    # Public pages: only webmaster can edit
+    if page.is_public:
+        return False
+
+    # Private pages: "token to see = ability to edit" - if user can access it, they can edit it
+    return page.can_user_access(user)
+
+
+def can_create_in_directory(user, parent_page=None):
+    """Check if user can create pages in a directory (uses parent page permissions)."""
+    if user is None or not user.is_authenticated:
+        return False
+
+    # Webmaster can create anywhere
+    if user.is_superuser or getattr(user, "webmaster", False):
+        return True
+
+    # If no parent (top-level), only webmaster can create
+    if not parent_page:
+        return False
+
+    # Public parent pages: only webmaster can create under them
+    if parent_page.is_public:
+        return False
+
+    # Private parent pages: "token to see = ability to create under" - if user can access parent, they can create under it
+    return parent_page.can_user_access(user)
+
+
+@active_member_required
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def edit_cms_page(request, page_id):
+    """Edit a CMS page with full TinyMCE functionality."""
+    page = get_object_or_404(Page, id=page_id)
+
+    # Check page-specific edit permissions
+    if not can_edit_page(request.user, page):
+        return HttpResponseForbidden("You don't have permission to edit this page.")
+
+    if request.method == "POST":
+        form = CmsPageForm(request.POST, instance=page)
+        formset = DocumentFormSet(request.POST, request.FILES, instance=page)
+
+        if form.is_valid() and formset.is_valid():
+            form.save()
+
+            # Save documents with uploaded_by field
+            documents = formset.save(commit=False)
+            for document in documents:
+                if not document.uploaded_by:
+                    document.uploaded_by = request.user
+                document.save()
+
+            # Handle deletions
+            for document in formset.deleted_objects:
+                document.delete()
+
+            # Finalize formset state (commit all changes)
+
+            messages.success(request, f'Page "{page.title}" updated successfully!')
+            return redirect(page.get_absolute_url())
+    else:
+        form = CmsPageForm(instance=page)
+        formset = DocumentFormSet(instance=page)
+
+    return render(
+        request,
+        "cms/edit_page.html",
+        {
+            "form": form,
+            "formset": formset,
+            "page": page,
+            "page_title": f"Edit Page: {page.title}",
+        },
+    )
+
+
+@active_member_required
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def edit_homepage_content(request, content_id):
+    """Edit homepage content with full TinyMCE functionality."""
+    # Homepage editing is webmaster-only (no role restrictions)
+    if not (
+        request.user.is_authenticated
+        and (request.user.is_superuser or getattr(request.user, "webmaster", False))
+    ):
+        return HttpResponseForbidden("Only webmasters can edit homepage content.")
+
+    content = get_object_or_404(HomePageContent, id=content_id)
+
+    if request.method == "POST":
+        form = HomePageContentForm(request.POST, instance=content)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f'Homepage content "{content.title}" updated successfully!'
+            )
+            return redirect("homepage")
+    else:
+        form = HomePageContentForm(instance=content)
+
+    return render(
+        request,
+        "cms/edit_homepage.html",
+        {
+            "form": form,
+            "content": content,
+            "page_title": f"Edit Homepage: {content.title}",
+        },
+    )
+
+
+@active_member_required
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def create_cms_page(request):
+    """Create a new CMS page with full TinyMCE functionality."""
+    # Get parent page if specified
+    parent_id = request.GET.get("parent")
+    parent_page = None
+    if parent_id:
+        parent_page = get_object_or_404(Page, id=parent_id)
+
+    # Check creation permissions
+    if not can_create_in_directory(request.user, parent_page):
+        return HttpResponseForbidden(
+            "You don't have permission to create pages in this directory."
+        )
+
+    if request.method == "POST":
+        form = CmsPageForm(request.POST)
+        formset = DocumentFormSet(request.POST, request.FILES)
+
+        if form.is_valid() and formset.is_valid():
+            page = form.save()
+
+            # Save documents with uploaded_by field
+            formset.instance = page
+            documents = formset.save(commit=False)
+            for document in documents:
+                document.page = page
+                if not document.uploaded_by:
+                    document.uploaded_by = request.user
+                document.save()
+
+            # Finalize formset changes (e.g., deletions, post-save hooks)
+            formset.save()
+
+            messages.success(request, f'Page "{page.title}" created successfully!')
+            return redirect(page.get_absolute_url())
+    else:
+        form = CmsPageForm()
+        formset = DocumentFormSet(queryset=Document.objects.none())
+
+    return render(
+        request,
+        "cms/create_page.html",
+        {"form": form, "formset": formset, "page_title": "Create New CMS Page"},
+    )
 
 
 # Create your views here.

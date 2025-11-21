@@ -1,0 +1,60 @@
+/* TinyMCE PDF Embedding and Fullscreen Enhancements */
+
+/* PDF Container Styling - Responsive and well-formatted */
+.pdf-container {
+    margin: 1em 0;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.pdf-container iframe {
+    max-width: 100%;
+    border: none;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive PDF containers for different screen sizes */
+@media (max-width: 768px) {
+    .pdf-container iframe {
+        height: 400px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .pdf-container iframe {
+        height: 300px !important;
+    }
+}
+
+/* Fullscreen TinyMCE styling */
+.tox-fullscreen {
+    z-index: 10000 !important;
+}
+
+.mce-fullscreen-body {
+    overflow: hidden;
+}
+
+/* Enhanced TinyMCE toolbar when in fullscreen */
+.tox-fullscreen .tox-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10001;
+    background: white;
+    border-bottom: 1px solid #ccc;
+}
+
+/* PDF embed button styling */
+.tox-tbtn--select[aria-label*="PDF"] {
+    background-color: #dc3545;
+    color: white;
+    border-radius: 3px;
+}
+
+.tox-tbtn--select[aria-label*="PDF"]:hover {
+    background-color: #c82333;
+}

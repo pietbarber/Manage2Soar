@@ -79,3 +79,9 @@ def google_maps_url(site_config):
     encoded_address = quote_plus(full_address)
 
     return f"https://www.google.com/maps/search/?api=1&query={encoded_address}"
+
+
+@register.filter
+def add_class(field, css_class):
+    """Add CSS class to a form field widget."""
+    return field.as_widget(attrs={"class": css_class})

@@ -109,7 +109,8 @@ erDiagram
 - File attachments linked to CMS pages
 - Smart upload paths: public files go to `cms/<page-slug>/`, private files are obfuscated
 - Tracks uploader and upload timestamp
-- Helper methods for file type detection
+- Helper methods for file type detection (`is_pdf`, `extension`)
+- **Default ordering**: Documents are sorted by title first, then filename (ensures consistent ordering in admin and public views)
 
 ### `HomePageContent`
 - Special content pages for the site homepage
@@ -160,10 +161,45 @@ erDiagram
 - **Template Integration**: Role badges and indicators for easy identification of access restrictions
 - **Validation**: Prevents invalid configurations (public pages can't have role restrictions)
 
+### CMS Editing Permissions (Issue #273)
+- **Permission Model**: "If you need a token to see it, you can edit it"
+- **Webmaster Override**: Webmasters have universal edit access to all CMS content
+- **Role-Based Editing**: Users can edit pages they have role-based access to view
+- **Public/Member Pages**: Only webmasters can edit pages without role restrictions
+- **Directory Creation**: Users can create pages in directories they have access to
+- **Admin Access**: Webmasters have full CRUD access to CMS models in Django admin without superuser requirements
+
 ### Workflow Management
 - Both `SiteFeedback` and `VisitorContact` include status tracking
 - Admin assignment capabilities
 - Timestamp tracking for submission, updates, and resolution
+
+## CMS Editing Interface (Issue #273)
+
+### Web-Based Editing
+- **Modern Interface**: Bootstrap 5-styled editing forms with TinyMCE rich text editor
+- **PDF Embedding**: Simple "📄 Insert PDF" button for embedding PDF documents
+- **File Management**: Drag-and-drop file upload with formsets for multiple document attachments
+- **Permission-Aware**: Edit buttons only appear for users with appropriate permissions
+- **Message Integration**: Success/error messages displayed using Bootstrap alert components
+
+### Available Editing Views
+- **Edit Page**: `/cms/edit/page/<id>/` - Edit existing CMS pages with content and file uploads
+- **Create Page**: `/cms/create/page/` - Create new CMS pages with parent directory context
+- **Edit Homepage**: `/cms/edit/homepage/<id>/` - Edit homepage content (webmaster-only)
+
+### Permission Logic
+```python
+def can_edit_page(user, page):
+    # Webmaster override
+    if user.is_superuser or user.webmaster:
+        return True
+    # Public pages cannot be edited except by webmaster
+    if page.is_public:
+        return False
+    # For non-public pages, delegate to can_user_access
+    return page.can_user_access(user)
+```
 
 ## Upload Strategies
 
@@ -178,3 +214,4 @@ erDiagram
 - [README.md](README.md)
 - [index.md](index.md)
 - [SiteConfig Models](../../siteconfig/docs/models.md) - Multi-club configuration integration for VisitorContact
+- [Issue #273 Implementation](../../resolved-issues/issue-273-tinymce-pdf-embedding-cms.md) - Complete CMS editing enhancement details

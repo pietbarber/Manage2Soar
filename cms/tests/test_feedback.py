@@ -495,8 +495,10 @@ class TestFeedbackSecurity:
         url = reverse("cms:feedback")
         response = client.get(url)
 
-        # Should return 403 due to inactive membership
-        assert response.status_code == 403
+        # Inactive members have is_active=False, so Django's auth middleware
+        # redirects them to login instead of letting them reach the view
+        assert response.status_code == 302
+        assert "/login/" in response["Location"]
 
     @pytest.mark.django_db
     def test_users_can_only_see_own_feedback(self, client, active_member):

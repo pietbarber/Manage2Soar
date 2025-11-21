@@ -425,14 +425,19 @@ TINYMCE_DEFAULT_CONFIG = {
     "convert_urls": False,
     "height": 500,
     "menubar": "file edit view insert format tools table help",
-    "plugins": "image link media code lists table",
+    "plugins": "image link media code lists table fullscreen advlist autolink anchor searchreplace visualblocks insertdatetime help wordcount",
     "toolbar": (
-        "undo redo | bold italic underline | alignleft aligncenter alignright | "
-        "bullist numlist outdent indent | link image media | table | code"
+        "undo redo | blocks | bold italic underline | alignleft aligncenter alignright alignjustify | "
+        "bullist numlist outdent indent | link image media | table | code | fullscreen | help"
     ),
+    # Allow embedding PDFs and other content, but restrict attributes to prevent XSS
+    "extended_valid_elements": "iframe[src|width|height|style|class|loading|sandbox|title|referrerpolicy],object[classid|width|height|codebase|data|type],param[name|value],embed[type|width|height|src]",
+    "valid_children": "+body[iframe|object|embed]",
+    "custom_elements": "embed,object,param",
     "image_caption": True,
     "automatic_uploads": True,
-    "file_picker_types": "image",
+    "file_picker_types": "image media",
+    "media_live_embeds": True,
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
     "table_default_attributes": {"border": "1"},
