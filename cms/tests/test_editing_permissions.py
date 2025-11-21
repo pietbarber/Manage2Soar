@@ -161,11 +161,12 @@ class EditPageViewTests(TestCase):
         self.webmaster.save()
 
     def test_edit_page_requires_authentication(self):
-        """Edit page returns 403 for anonymous users."""
+        """Edit page redirects anonymous users to login."""
         url = reverse("cms:edit_page", kwargs={"page_id": self.page.id})
         response = self.client.get(url)
-        # View returns 403 for anonymous users
-        self.assertEqual(response.status_code, 403)
+        # @active_member_required redirects anonymous users to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
 
     def test_edit_page_permission_denied(self):
         """Edit page denies access to users without permission."""
@@ -265,10 +266,12 @@ class CreatePageViewTests(TestCase):
         self.webmaster.save()
 
     def test_create_page_requires_authentication(self):
-        """Create page returns 403 for anonymous users."""
+        """Create page redirects anonymous users to login."""
         url = reverse("cms:create_page")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)  # View returns 403, not redirect
+        # @active_member_required redirects anonymous users to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
 
     def test_create_page_root_level_webmaster_only(self):
         """Only webmasters can create root-level pages."""

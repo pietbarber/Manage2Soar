@@ -215,7 +215,10 @@ function initializeDragAndDropForElement(fileInput) {
             const fileName = files[0].name;
             const feedback = document.createElement('div');
             feedback.className = 'mt-2 text-success small';
-            feedback.innerHTML = `<i class="bi bi-check-circle me-1"></i>Selected: ${fileName}`;
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-check-circle me-1';
+            feedback.appendChild(icon);
+            feedback.appendChild(document.createTextNode(`Selected: ${fileName}`));
 
             // Remove any existing feedback
             const existingFeedback = dropArea.querySelector('.mt-2.text-success');

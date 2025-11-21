@@ -632,6 +632,7 @@ def can_create_in_directory(user, parent_page=None):
     return parent_page.can_user_access(user)
 
 
+@active_member_required
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def edit_cms_page(request, page_id):
@@ -680,6 +681,7 @@ def edit_cms_page(request, page_id):
     )
 
 
+@active_member_required
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def edit_homepage_content(request, content_id):
@@ -715,6 +717,7 @@ def edit_homepage_content(request, content_id):
     )
 
 
+@active_member_required
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def create_cms_page(request):

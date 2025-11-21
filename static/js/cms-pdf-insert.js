@@ -5,21 +5,12 @@
 
 function validateAndSanitizeUrl(url) {
     try {
-        // Prevent javascript: and data: URLs (critical security fix)
-        if (url.toLowerCase().startsWith('javascript:') ||
-            url.toLowerCase().startsWith('data:') ||
-            url.toLowerCase().startsWith('vbscript:')) {
-            return {
-                isValid: false,
-                error: 'JavaScript, data, and VBScript URLs are not allowed for security reasons'
-            };
-        }
-
         // Create URL object to validate and sanitize
         let urlObj;
         try {
             // Handle relative URLs by adding https if no protocol specified
-            if (!url.match(/^https?:\/\//i)) {
+            // Use RFC 3986 protocol pattern to avoid bypass attempts
+            if (!url.match(/^[a-z][a-z0-9+.-]*:/i)) {
                 url = 'https://' + url;
             }
             urlObj = new URL(url);
@@ -30,11 +21,11 @@ function validateAndSanitizeUrl(url) {
             };
         }
 
-        // Only allow HTTP and HTTPS protocols
+        // Only allow HTTP and HTTPS protocols (SECURITY: Check AFTER URL parsing)
         if (!['http:', 'https:'].includes(urlObj.protocol)) {
             return {
                 isValid: false,
-                error: 'Only HTTP and HTTPS URLs are allowed'
+                error: 'Only HTTP and HTTPS URLs are allowed for security reasons'
             };
         }
 
