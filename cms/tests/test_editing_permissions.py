@@ -6,6 +6,7 @@ Tests the new role-based editing permission system added in Issue #273.
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -33,7 +34,7 @@ class EditingPermissionFunctionTests(TestCase):
         PageRolePermission.objects.create(page=self.board_page, role_name="director")
 
         # Create test users
-        self.anonymous_user = User()  # Not authenticated
+        self.anonymous_user = AnonymousUser()  # Proper anonymous user representation
         self.member = User.objects.create_user(
             username="member",
             email="member@test.com",

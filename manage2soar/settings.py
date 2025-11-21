@@ -430,8 +430,9 @@ TINYMCE_DEFAULT_CONFIG = {
         "undo redo | blocks | bold italic underline | alignleft aligncenter alignright alignjustify | "
         "bullist numlist outdent indent | link image media | table | code | fullscreen | help"
     ),
-    # Allow embedding PDFs and other content
-    "extended_valid_elements": "iframe[src|width|height|name|align|style|class|loading|frameborder|allowfullscreen],object[classid|width|height|codebase|*],param[name|value],embed[type|width|height|src|*]",
+    # Allow embedding PDFs and other content, but restrict attributes to prevent XSS
+    "extended_valid_elements": "iframe[src|width|height|style|class|loading|sandbox|title|referrerpolicy],object[classid|width|height|codebase|data|type],param[name|value],embed[type|width|height|src]",
+    "valid_children": "+body[iframe|object|embed]",
     "custom_elements": "embed,object,param",
     "image_caption": True,
     "automatic_uploads": True,

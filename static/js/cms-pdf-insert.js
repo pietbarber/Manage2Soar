@@ -5,25 +5,10 @@
 
 // Deprecated - use validateAndSanitizeUrl instead
 function validatePdfUrl(url) {
-    // This function kept for compatibility but use validateAndSanitizeUrl for new code
-    if (!url || !url.trim()) {
-        return false;
-    }
-
-    const validationResult = validateAndSanitizeUrl(url);
-    if (!validationResult.isValid) {
-        alert('Invalid URL: ' + validationResult.error);
-        return false;
-    }
-
-    if (!validationResult.isPdf) {
-        const confirmResult = confirm('This URL does not appear to be a PDF file. Continue anyway?');
-        if (!confirmResult) {
-            return false;
-        }
-    }
-
-    return true;
+    // DEPRECATED: Use validateAndSanitizeUrl for new code.
+    // This function now returns the same object as validateAndSanitizeUrl.
+    console.warn('validatePdfUrl is deprecated. Use validateAndSanitizeUrl instead.');
+    return validateAndSanitizeUrl(url);
 }
 
 function validateAndSanitizeUrl(url) {
@@ -135,7 +120,7 @@ function initializePdfInsert() {
         height="600px"
         style="border: 1px solid #ddd; border-radius: 8px;"
         loading="lazy"
-        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+        sandbox="allow-popups allow-forms"
         referrerpolicy="no-referrer"
         title="PDF Document">
         <p>Your browser does not support iframes. <a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
@@ -163,16 +148,19 @@ function initializePdfInsert() {
 
 // Initialize PDF insert when TinyMCE is ready
 function initializeTinyMCEPdfInsert() {
-    // Try immediate initialization
-    initializePdfInsert();
+    // Use a single retry mechanism with exponential backoff
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    // Also try with a delay for slower loading
-    setTimeout(initializePdfInsert, 1000);
-
-    // And listen for TinyMCE specific events if available
-    if (typeof tinymce !== 'undefined') {
-        tinymce.on('AddEditor', function () {
-            setTimeout(initializePdfInsert, 100);
-        });
+    function tryInitialize() {
+        const editorContainer = document.querySelector('.tox-tinymce');
+        if (editorContainer && !document.querySelector('.pdf-insert-btn')) {
+            initializePdfInsert();
+        } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(tryInitialize, Math.pow(2, attempts) * 100); // Exponential backoff
+        }
     }
+
+    tryInitialize();
 }

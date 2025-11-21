@@ -194,11 +194,11 @@ def can_edit_page(user, page):
     # Webmaster override
     if user.is_superuser or user.webmaster:
         return True
-    # Role-based editing: if page has role restrictions AND user can access it
-    if page.has_role_restrictions() and page.can_user_access(user):
-        return True
-    # Public/member-only pages: webmaster only
-    return False
+    # Public pages cannot be edited except by webmaster
+    if page.is_public:
+        return False
+    # For non-public pages, delegate to can_user_access
+    return page.can_user_access(user)
 ```
 
 ## Upload Strategies

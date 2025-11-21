@@ -10,6 +10,8 @@ from django.forms import inlineformset_factory
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods
 from tinymce.widgets import TinyMCE
 
 from cms.forms import SiteFeedbackForm, VisitorContactForm
@@ -594,7 +596,7 @@ DocumentFormSet = inlineformset_factory(
 
 def can_edit_page(user, page):
     """Check if user can edit a specific CMS page based on role-based permissions."""
-    if not user or not user.is_authenticated:
+    if user is None or not user.is_authenticated:
         return False
 
     # Webmaster override - can edit everything
@@ -611,7 +613,7 @@ def can_edit_page(user, page):
 
 def can_create_in_directory(user, parent_page=None):
     """Check if user can create pages in a directory (uses parent page permissions)."""
-    if not user or not user.is_authenticated:
+    if user is None or not user.is_authenticated:
         return False
 
     # Webmaster can create anywhere
@@ -630,6 +632,8 @@ def can_create_in_directory(user, parent_page=None):
     return parent_page.can_user_access(user)
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def edit_cms_page(request, page_id):
     """Edit a CMS page with full TinyMCE functionality."""
     page = get_object_or_404(Page, id=page_id)
@@ -674,6 +678,8 @@ def edit_cms_page(request, page_id):
     )
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def edit_homepage_content(request, content_id):
     """Edit homepage content with full TinyMCE functionality."""
     # Homepage editing is webmaster-only (no role restrictions)
@@ -707,6 +713,8 @@ def edit_homepage_content(request, content_id):
     )
 
 
+@csrf_protect
+@require_http_methods(["GET", "POST"])
 def create_cms_page(request):
     """Create a new CMS page with full TinyMCE functionality."""
     # Get parent page if specified
