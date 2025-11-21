@@ -10,6 +10,52 @@
 
 Issue #123 successfully implemented a comprehensive towplane rental tracking system that enables clubs to charge for non-towing towplane usage such as sightseeing flights, flight reviews, aircraft retrieval, and other operational activities. The implementation includes both the core functionality and an optional site configuration setting that allows clubs to control whether towplane rentals are enabled, respecting different club policies regarding towplane usage.
 
+## Additional UI/UX Issues Resolved
+
+### Issue: Redundant Towplane Dropdown in Closeout Forms
+**Problem Discovered**: During testing, we identified a UX issue where towplane closeout forms displayed redundant information:
+- Card header clearly showed "Husky (N6085S)"
+- Form also contained a dropdown field showing "Husky (N6085S)"
+- Users were confused about why they needed to select a towplane that was already identified
+
+**Root Cause Analysis**:
+- Inherited design from generic `TowplaneCloseoutForm`
+- Original form was designed for contexts where towplane selection might change
+- In closeout edit context, towplane is already determined and shouldn't be changeable
+- DRY principle applied incorrectly - same form used in different contexts with different needs
+
+**Solution Implemented**:
+1. **Removed visible towplane dropdown** from `edit_closeout_form.html` template
+2. **Preserved form functionality** using `{{ towform.towplane.as_hidden }}`
+3. **Added explanatory comment** in template for future developers
+4. **Improved UX focus** - users now concentrate on actual data entry fields
+
+**Result**:
+- ✅ **Clean interface** - towplane name shown in card header only
+- ✅ **Reduced cognitive load** - no redundant dropdown selection
+- ✅ **Preserved functionality** - form validation and data submission still work
+- ✅ **Better information hierarchy** - header shows context, form shows editable fields
+
+### Issue: Bootstrap5 Modernization Gaps
+**Problem Discovered**: Duty crew dropdown fields were using default Django styling instead of Bootstrap5 classes.
+
+**Solution Implemented**:
+1. **Added Bootstrap5 widgets** to `LogsheetDutyCrewForm.Meta.widgets`
+2. **Applied `form-select` class** to all duty crew dropdown fields
+3. **Consistent styling** with modernization guide standards
+
+**Result**: All form elements now follow Bootstrap5 design system for professional appearance.
+
+### Issue: Redirect Behavior After Form Submission
+**Problem Discovered**: After submitting the main closeout form, users were redirected to the management page instead of staying on the closeout edit page.
+
+**Solution Implemented**:
+- Changed redirect target from `logsheet:manage` to `logsheet:edit_logsheet_closeout`
+- Users now stay on closeout page for continued editing
+- Improved workflow for multiple changes
+
+**Result**: Better user workflow - users can make multiple changes without navigation interruption.
+
 ## Problem Statement
 
 ### Original Issue

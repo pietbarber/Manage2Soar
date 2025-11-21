@@ -5,7 +5,7 @@
   Uses the same dark styling as the navbar and excludes from print views.
   {% endcomment %}
   <footer class="footer bg-dark text-light mt-5 py-4 no-print-nav">
-    <div class="container">
+    <div class="container-fluid">
       {% get_siteconfig as siteconfig %}
       {{ footer_content.content|safe }}
 

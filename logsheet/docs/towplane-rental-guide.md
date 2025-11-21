@@ -21,11 +21,20 @@ Example rates:
 
 ## Recording Towplane Rental Usage
 
+### Manual Towplane Addition
+For non-towing operations where no flights were logged (e.g., Biff's personal flight to Roanoke):
+
+1. Navigate to the **Logsheet Closeout** page
+2. In the **Towplane Closeout** section, find the **"Add Towplane for Rental Usage"** card
+3. Select the desired towplane from the dropdown (shows rental rates)
+4. Click **"Add Towplane"** button
+5. The towplane form will appear with all rental tracking fields
+
 ### During Logsheet Closeout
 When closing out a logsheet that includes non-towing towplane usage:
 
 1. Navigate to the **Logsheet Closeout** page
-2. In the **Towplane Summary** section, find the relevant towplane
+2. In the **Towplane Summary** section, find the relevant towplane (or add manually if needed)
 3. Fill out the standard fields:
    - Start Tach
    - End Tach  
@@ -33,6 +42,12 @@ When closing out a logsheet that includes non-towing towplane usage:
 4. **New**: Enter **Rental Hours (Non-Towing)** - the number of hours to be charged as rental
 5. **New**: Select **Charged To** - the member responsible for paying the rental costs
 6. Add notes describing the rental usage (e.g., "Flight review", "Sightseeing flight")
+
+### UI Improvements
+- **Bootstrap5 Styling**: All duty crew dropdowns use modern `form-select` styling
+- **Clean Interface**: Towplane selector hidden in individual cards (towplane name shown in header)
+- **Smart Filtering**: "Add Towplane" only shows towplanes not already in the closeout form
+- **Improved Workflow**: Form submissions stay on closeout page for continued editing
 
 ### Important Notes
 - **Rental Hours ≠ Total Tach Time**: Only enter the hours that should be charged as rental
@@ -93,6 +108,28 @@ The financial summary now includes:
 - Notes: "Regular towing ops plus 1 hour flight review"
 - **Rental Cost**: 1.0 × $95.00 = $95.00 (towing costs handled separately)
 
+### Personal Flight (Biff's Scenario)
+**Situation**: Member takes personal flight to Roanoke on non-ops day
+**Process**:
+1. **No Flights Logged**: Day has no glider towing operations
+2. **Manual Addition**: Duty officer uses "Add Towplane" button to add Husky
+3. **Rental Entry**: 2.1 hours personal flight time recorded
+4. **Member Assignment**: Charged to member taking personal flight
+5. **Cost Calculation**: 2.1 × $95.00 = $199.50
+6. **Conditional Validation**: Duty officer not required since no flight operations
+7. **Clean Workflow**: All towplane details entered in single form without redundant dropdowns
+
+### Personal Flight (Biff's Scenario)
+**Situation**: Member takes personal flight to Roanoke on non-ops day
+**Process**:
+1. **No Flights Logged**: Day has no glider towing operations
+2. **Manual Addition**: Duty officer uses "Add Towplane" button to add Husky
+3. **Rental Entry**: 2.1 hours personal flight time recorded
+4. **Member Assignment**: Charged to member taking personal flight
+5. **Cost Calculation**: 2.1 × $95.00 = $199.50
+6. **Conditional Validation**: Duty officer not required since no flight operations
+7. **Clean Workflow**: All towplane details entered in single form without redundant dropdowns
+
 ## Business Process
 
 ### Before This Feature
@@ -120,8 +157,12 @@ The financial summary now includes:
 
 ### Forms and Templates
 - TowplaneCloseoutForm includes rental fields with helpful labels
-- Closeout templates display rental information
+- Manual towplane addition via "Add Towplane" button interface
+- Bootstrap5 styling for all form elements (`form-select` class)
+- Closeout templates display rental information with clean card-based layout
+- Hidden towplane selector in individual forms (shown in card headers)
 - Financial templates show towplane rental costs alongside flight costs
+- Conditional duty officer validation for rental-only operations
 
 ## Migration Notes
 - Issue #123 adds new database fields via Django migrations

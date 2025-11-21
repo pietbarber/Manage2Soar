@@ -48,8 +48,51 @@
     {% endfor %}
   {% endif %}
 
+  <!-- Add Towplane Rental Section (only show if rentals enabled and towplanes available) -->
+  {% if towplane_rental_enabled and available_towplanes %}
+    <div class="card mb-4 border-success">
+      <div class="card-header bg-light border-success">
+        <h5 class="mb-0 text-success">
+          <i class="bi bi-plus-circle me-2"></i>Add Towplane for Rental Usage
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Add a towplane to track non-towing usage (sightseeing flights, flight reviews, retrieval flights, personal flights, etc.)
+        </p>
+        <form method="post" action="{% url 'logsheet:add_towplane_closeout' logsheet.pk %}" class="d-inline">
+          {% csrf_token %}
+          <div class="row align-items-end">
+            <div class="col-md-8">
+              <label for="towplane" class="form-label">
+                <i class="bi bi-airplane-engines me-1"></i>Select Towplane
+              </label>
+              <select name="towplane" id="towplane" class="form-select" required>
+                <option value="">Choose towplane to add...</option>
+                {% for towplane in available_towplanes %}
+                  <option value="{{ towplane.pk }}">
+                    {{ towplane.name }} ({{ towplane.n_number }})
+                    {% if towplane.hourly_rental_rate %}
+                      - ${{ towplane.hourly_rental_rate }}/hour
+                    {% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-success">
+                <i class="bi bi-plus-circle me-1"></i>Add Towplane
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
   <div class="closeout-form-container">
-    <form method="post" id="closeout-form">
+    <form method="post" action="{% url 'logsheet:edit_logsheet_closeout' logsheet.pk %}" id="closeout-form">
       {% csrf_token %}
 
       {% if form.errors %}
@@ -231,11 +274,9 @@
 
       {% if formset %}
         <div class="form-section">
-          <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>
-          {% csrf_token %}
-          {{ formset.management_form }}
+        <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>
 
-          {% for towform in formset %}
+        {{ formset.management_form }}          {% for towform in formset %}
             <div class="towplane-form-card mb-4">
               {% if towform.non_field_errors %}
                 <div class="alert alert-danger">
@@ -255,11 +296,12 @@
               <div class="card-body">
                 <div class="row">
                   <div class="col-md-6">
-                    <div class="mb-3">
-                      {{ towform.towplane.label_tag }}
-                      {{ towform.towplane }}
-                      {{ towform.towplane.errors }}
-                    </div>
+                    <!-- Towplane field hidden - already shown in card header -->
+                    {% for hidden in towform.hidden_fields %}
+                      {{ hidden }}
+                    {% endfor %}
+                    {{ towform.towplane.as_hidden }}
+
                     <div class="mb-3">
                       {{ towform.start_tach.label_tag }}
                       {{ towform.start_tach }}
@@ -424,7 +466,8 @@
   </div>
 </div>
 
-
+  </div> <!-- Close closeout-form-container -->
+</div> <!-- Close container -->
 
 <footer style="font-size: 0.8em; color: gray;">
   Template: <code>logsheet/edit_closeout_form.html</code>

@@ -779,6 +779,33 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         if not hasattr(self, "warnings"):
             self.warnings = []
 
+        # Check if this logsheet has any actual flight operations
+        logsheet = getattr(self.instance, "logsheet", None) if self.instance else None
+        has_flights = logsheet.flights.exists() if logsheet else False
+
+        # Check if this logsheet has only rental operations
+        has_only_rentals = (
+            (
+                logsheet
+                and not has_flights
+                and logsheet.towplane_closeouts.filter(
+                    rental_hours_chargeable__gt=0
+                ).exists()
+            )
+            if logsheet
+            else False
+        )
+
+        # Conditional duty officer validation
+        if not duty_officer:
+            if has_flights:
+                # Normal validation for operational days - duty officer required
+                raise ValidationError("Duty Officer is required for flight operations.")
+            elif has_only_rentals:
+                # For rental-only logsheets, duty officer is optional
+                pass  # Allow empty duty officer
+            # For completely empty logsheets, also allow empty (will be caught later in workflow)
+
         # PROHIBITIONS: Prevent instructor from being the same as surge instructor
         if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
             raise ValidationError(
@@ -860,6 +887,14 @@ class LogsheetDutyCrewForm(forms.ModelForm):
             "tow_pilot",
             "surge_tow_pilot",
         ]
+        widgets = {
+            "duty_officer": forms.Select(attrs={"class": "form-select"}),
+            "assistant_duty_officer": forms.Select(attrs={"class": "form-select"}),
+            "duty_instructor": forms.Select(attrs={"class": "form-select"}),
+            "surge_instructor": forms.Select(attrs={"class": "form-select"}),
+            "tow_pilot": forms.Select(attrs={"class": "form-select"}),
+            "surge_tow_pilot": forms.Select(attrs={"class": "form-select"}),
+        }
 
 
 ######################################################

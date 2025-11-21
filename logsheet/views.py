@@ -1214,11 +1214,22 @@ def edit_logsheet_closeout(request, pk):
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
-    # Identify towplanes used in this logsheet
-    towplanes_used = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
+    # Enhanced towplane detection logic
+    def get_relevant_towplanes(logsheet):
+        """Get all towplanes that need closeout forms for this logsheet."""
+        # Towplanes used for towing
+        towing_towplanes = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
 
-    # Make sure a TowplaneCloseout exists for each
-    for towplane in towplanes_used:
+        # Towplanes with existing closeouts (manual additions or previous rentals)
+        closeout_towplanes = Towplane.objects.filter(
+            towplanecloseout__logsheet=logsheet
+        ).distinct()
+
+        return towing_towplanes.union(closeout_towplanes)
+
+    # Get all relevant towplanes and create closeouts
+    relevant_towplanes = get_relevant_towplanes(logsheet)
+    for towplane in relevant_towplanes:
         TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
 
     # Build formset for towplane closeouts
@@ -1243,6 +1254,22 @@ def edit_logsheet_closeout(request, pk):
         form = LogsheetCloseoutForm(instance=closeout)
         duty_form = LogsheetDutyCrewForm(instance=logsheet)
 
+    # Get towplanes available for manual addition (not already in closeouts)
+    existing_closeout_towplanes = TowplaneCloseout.objects.filter(
+        logsheet=logsheet
+    ).values_list("towplane_id", flat=True)
+    available_towplanes = (
+        Towplane.objects.filter(is_active=True)
+        .exclude(id__in=existing_closeout_towplanes)
+        .order_by("n_number")
+    )
+
+    # Check if towplane rentals are enabled for UI display
+    from siteconfig.models import SiteConfiguration
+
+    config = SiteConfiguration.objects.first()
+    towplane_rental_enabled = config.allow_towplane_rental if config else False
+
     return render(
         request,
         "logsheet/edit_closeout_form.html",
@@ -1256,8 +1283,47 @@ def edit_logsheet_closeout(request, pk):
             ),
             "towplanes": Towplane.objects.filter(is_active=True).order_by("n_number"),
             "maintenance_issues": maintenance_issues,
+            "available_towplanes": available_towplanes,
+            "towplane_rental_enabled": towplane_rental_enabled,
         },
     )
+
+
+@active_member_required
+def add_towplane_closeout(request, pk):
+    """Add a towplane closeout manually for rental or other non-towing usage."""
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    from logsheet.utils.permissions import can_edit_logsheet
+
+    if not can_edit_logsheet(request.user, logsheet):
+        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
+
+    if request.method == "POST":
+        towplane_id = request.POST.get("towplane")
+        if towplane_id:
+            towplane = get_object_or_404(Towplane, pk=towplane_id, is_active=True)
+
+            # Create the towplane closeout if it doesn't exist
+            closeout, created = TowplaneCloseout.objects.get_or_create(
+                logsheet=logsheet, towplane=towplane
+            )
+
+            if created:
+                messages.success(
+                    request,
+                    f"Added {towplane.name} ({towplane.n_number}) to closeout form. "
+                    f"You can now enter rental hours and other details.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"{towplane.name} ({towplane.n_number}) is already in the closeout form.",
+                )
+        else:
+            messages.error(request, "Please select a towplane to add.")
+
+    return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.pk)
 
 
 #################################################
