@@ -36,7 +36,8 @@ class TinyMCEConfigurationTest(TestCase):
         tinymce_js_url = getattr(settings, "TINYMCE_JS_URL", None)
         self.assertIsNotNone(tinymce_js_url, "TINYMCE_JS_URL should be configured")
         if tinymce_js_url:
+            # Check that it uses the configured STATIC_URL (which may be /static/ or /ssc/static/ etc)
             self.assertTrue(
-                tinymce_js_url.startswith("/static/"),
-                "TinyMCE JS should be served from local static files",
+                tinymce_js_url.startswith(settings.STATIC_URL),
+                f"TinyMCE JS should be served from local static files (expected to start with {settings.STATIC_URL}, got {tinymce_js_url})",
             )
