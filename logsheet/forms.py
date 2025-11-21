@@ -784,16 +784,12 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         has_flights = logsheet.flights.exists() if logsheet else False
 
         # Check if this logsheet has only rental operations
-        has_only_rentals = (
-            (
-                logsheet
-                and not has_flights
-                and logsheet.towplane_closeouts.filter(
-                    rental_hours_chargeable__gt=0
-                ).exists()
-            )
-            if logsheet
-            else False
+        has_only_rentals = bool(
+            logsheet
+            and not has_flights
+            and logsheet.towplane_closeouts.filter(
+                rental_hours_chargeable__gt=0
+            ).exists()
         )
 
         # Conditional duty officer validation

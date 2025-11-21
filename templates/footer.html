@@ -5,7 +5,11 @@
   Uses the same dark styling as the navbar and excludes from print views.
   {% endcomment %}
   <footer class="footer bg-dark text-light mt-5 py-4 no-print-nav">
-    <!-- Use container-fluid for full-width footer (resolves nested container issue) -->
+    <!--
+      Use container-fluid for full-width footer.
+      This footer template is included within pages that may already have a Bootstrap .container div.
+      Using .container-fluid here prevents nested container layout conflicts and ensures the footer spans the full width of the viewport.
+    -->
     <div class="container-fluid">
       {% get_siteconfig as siteconfig %}
       {{ footer_content.content|safe }}

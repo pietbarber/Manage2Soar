@@ -37,8 +37,18 @@ def test_summary_by_flight_table_layout(client, active_member, logsheet_with_fli
     response = client.get(url)
     assert response.status_code == 200
     assert b"Summary by Flight" in response.content
-    # Check for correct number of columns in a row (Pilot, Glider, Duration, Tow, Rental, Total, Edit Split)
-    assert response.content.count(b"<td") % 7 == 0
+    content = response.content.decode("utf-8")
+    # Check that the expected column headers are present in the Summary by Flight table
+    assert ">Pilot</th>" in content
+    assert ">Glider</th>" in content
+    assert ">Duration</th>" in content
+    assert ">Tow Cost</th>" in content
+    assert ">Rental Cost</th>" in content
+    assert ">Total</th>" in content
+    assert ">Split</th>" in content
+    # Check that the table footer has proper structure
+    assert 'colspan="3"' in content
+    assert "Totals:" in content
 
 
 @pytest.mark.django_db

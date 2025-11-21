@@ -798,7 +798,15 @@ class TowplaneCloseout(models.Model):
 
     @property
     def rental_cost(self):
-        """Calculate rental cost for non-towing towplane usage."""
+        """
+        Calculate rental cost for non-towing towplane usage.
+
+        Performance note:
+        Accesses self.towplane.hourly_rental_rate, which will trigger a database query
+        if the towplane relation is not prefetched. For best performance, especially in
+        financial views or loops, use select_related('towplane') when querying
+        TowplaneCloseout objects.
+        """
         if not self.rental_hours_chargeable or not self.towplane.hourly_rental_rate:
             return None
         return self.rental_hours_chargeable * self.towplane.hourly_rental_rate

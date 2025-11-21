@@ -1302,29 +1302,28 @@ def add_towplane_closeout(request, pk):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
 
-    if request.method == "POST":
-        towplane_id = request.POST.get("towplane")
-        if towplane_id:
-            towplane = get_object_or_404(Towplane, pk=towplane_id, is_active=True)
+    towplane_id = request.POST.get("towplane")
+    if towplane_id:
+        towplane = get_object_or_404(Towplane, pk=towplane_id, is_active=True)
 
-            # Create the towplane closeout if it doesn't exist
-            closeout, created = TowplaneCloseout.objects.get_or_create(
-                logsheet=logsheet, towplane=towplane
+        # Create the towplane closeout if it doesn't exist
+        closeout, created = TowplaneCloseout.objects.get_or_create(
+            logsheet=logsheet, towplane=towplane
+        )
+
+        if created:
+            messages.success(
+                request,
+                f"Added {towplane.name} ({towplane.n_number}) to closeout form. "
+                f"You can now enter rental hours and other details.",
             )
-
-            if created:
-                messages.success(
-                    request,
-                    f"Added {towplane.name} ({towplane.n_number}) to closeout form. "
-                    f"You can now enter rental hours and other details.",
-                )
-            else:
-                messages.info(
-                    request,
-                    f"{towplane.name} ({towplane.n_number}) is already in the closeout form.",
-                )
         else:
-            messages.error(request, "Please select a towplane to add.")
+            messages.info(
+                request,
+                f"{towplane.name} ({towplane.n_number}) is already in the closeout form.",
+            )
+    else:
+        messages.error(request, "Please select a towplane to add.")
 
     return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.pk)
 

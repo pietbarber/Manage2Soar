@@ -394,6 +394,12 @@ def test_flight_form_warns_unscheduled_tow_pilot(
 ):
     """Test that FlightForm warns when tow pilot is not on scheduled list"""
     from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
 
     # Set up logsheet with scheduled tow pilots
     logsheet.tow_pilot = member_towpilot  # Only this member is scheduled
