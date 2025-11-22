@@ -1152,8 +1152,6 @@ def manage_logsheet_finances(request, pk):
     )
 
     # Check if towplane rentals are enabled
-    from siteconfig.models import SiteConfiguration
-
     config = SiteConfiguration.objects.first()
     rental_enabled = config.allow_towplane_rental if config else False
 
@@ -1256,8 +1254,6 @@ def edit_logsheet_closeout(request, pk):
     )
 
     # Check if towplane rentals are enabled for UI display
-    from siteconfig.models import SiteConfiguration
-
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
 
@@ -1353,8 +1349,6 @@ def view_logsheet_closeout(request, pk):
     ).all()
 
     # Check if towplane rentals are enabled for conditional display
-    from siteconfig.models import SiteConfiguration
-
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
 

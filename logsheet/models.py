@@ -782,7 +782,7 @@ class TowplaneCloseout(models.Model):
         help_text="Hours of towplane use to be charged as rental (non-towing flights like sightseeing, flight reviews, retrieval).",
     )
     rental_charged_to = models.ForeignKey(
-        "members.Member",
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

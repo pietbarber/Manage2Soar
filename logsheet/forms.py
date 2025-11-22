@@ -11,6 +11,7 @@ from tinymce.widgets import TinyMCE
 from logsheet.models import Glider, MaintenanceIssue, Towplane
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
+from siteconfig.models import SiteConfiguration
 
 from .models import (
     Airfield,
@@ -240,8 +241,6 @@ class FlightForm(forms.ModelForm):
                     self.initial[field_name] = value[:5]
 
         # Pilot dropdown: optgroups for Active Members, Visiting Pilots, and Inactive Members
-        from siteconfig.models import SiteConfiguration
-
         # Always fetch configuration from database for security-sensitive flags
         # The visiting_pilot_enabled flag is security-critical and should not be cached
         config = SiteConfiguration.objects.first()
@@ -696,8 +695,6 @@ class CreateLogsheetForm(forms.ModelForm):
 
         # Set dynamic labels for duty crew fields using siteconfig
         try:
-            from siteconfig.models import SiteConfiguration
-
             config = SiteConfiguration.objects.first()
         except Exception:
             config = None
@@ -804,7 +801,7 @@ class LogsheetDutyCrewForm(forms.ModelForm):
                     has_rental_closeouts = logsheet.towplane_closeouts.filter(
                         rental_hours_chargeable__gt=0
                     ).exists()
-            except:
+            except (AttributeError, KeyError):
                 # Fallback if there are any issues with the optimization
                 has_rental_closeouts = logsheet.towplane_closeouts.filter(
                     rental_hours_chargeable__gt=0
@@ -870,8 +867,6 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         )
 
         try:
-            from siteconfig.models import SiteConfiguration
-
             config = SiteConfiguration.objects.first()
         except Exception:
             config = None
@@ -961,8 +956,6 @@ class TowplaneCloseoutForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Check if towplane rentals are enabled
-        from siteconfig.models import SiteConfiguration
-
         config = SiteConfiguration.objects.first()
         rental_enabled = config.allow_towplane_rental if config else False
 
