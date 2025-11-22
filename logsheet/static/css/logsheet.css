@@ -1,0 +1,221 @@
+/* Logsheet App - Bootstrap5 Modernization CSS */
+
+/* Modern Modal Styling */
+.logsheet-modal {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.logsheet-modal .modal-header {
+    border-bottom: none;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+}
+
+.logsheet-modal .modal-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.logsheet-modal .modal-body {
+    padding: 2rem;
+    background: #f8f9fa;
+}
+
+.logsheet-modal .modal-footer {
+    border-top: none;
+    padding: 1.5rem 2rem;
+    gap: 1rem;
+}
+
+/* Section Headers */
+.section-header {
+    border-left: 4px solid var(--bs-primary);
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Modern Button Styling */
+.btn-modern {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.btn-modern:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-modern.btn-primary {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+    border-color: var(--bs-primary);
+}
+
+.btn-modern.btn-success {
+    background: linear-gradient(135deg, var(--bs-success) 0%, #157347 100%);
+    border-color: var(--bs-success);
+}
+
+.btn-modern.btn-outline-secondary {
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+.btn-modern.btn-outline-secondary:hover {
+    background: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+/* Form Styling */
+.form-label {
+    margin-bottom: 0.5rem;
+}
+
+.form-label i {
+    font-size: 0.9rem;
+}
+
+.form-control,
+.form-select {
+    border-radius: 8px;
+    border: 1.5px solid #e0e6ed;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Alert Styling */
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.25rem;
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d1edff 0%, #b3d9ff 100%);
+    color: #0c5460;
+}
+
+/* Page Header Styling */
+.display-6 {
+    font-size: 2.5rem;
+}
+
+/* Action Section Styling */
+.btn-lg.btn-modern {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 12px;
+}
+
+/* Modal Responsive Design */
+@media (max-width: 768px) {
+    .logsheet-modal .modal-body {
+        padding: 1.5rem;
+    }
+
+    .logsheet-modal .modal-footer {
+        padding: 1rem 1.5rem;
+    }
+
+    .section-header {
+        padding-left: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .btn-modern {
+        padding: 0.6rem 1.2rem;
+    }
+
+    .btn-lg.btn-modern {
+        padding: 0.8rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+    .logsheet-modal .modal-body {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+
+    .form-control,
+    .form-select {
+        background-color: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        background-color: #4a5568;
+        border-color: var(--bs-primary);
+        color: #e2e8f0;
+    }
+}
+
+/* Animation for modal appearance */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+    transform: none;
+}
+
+/* Loading states for form submission */
+.btn-modern:disabled {
+    opacity: 0.6;
+    transform: none;
+    cursor: not-allowed;
+}
+
+.btn-modern.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn-modern.loading::after {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    margin-left: -10px;
+    margin-top: -10px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
