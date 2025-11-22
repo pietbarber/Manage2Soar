@@ -85,3 +85,37 @@ def google_maps_url(site_config):
 def add_class(field, css_class):
     """Add CSS class to a form field widget."""
     return field.as_widget(attrs={"class": css_class})
+
+
+@register.filter
+def fix_youtube_embeds(content):
+    """Fix YouTube embed iframes to prevent Error 153 by adding proper referrer policy."""
+    import re
+
+    if not content:
+        return content
+
+    # Pattern to match YouTube iframe embeds
+    youtube_pattern = re.compile(
+        r'(<iframe[^>]*src="[^"]*youtube\.com/embed[^"]*"[^>]*)(>)', re.IGNORECASE
+    )
+
+    def fix_iframe(match):
+        iframe_attrs = match.group(1)
+        closing = match.group(2)
+
+        # Check if referrerpolicy is already set correctly
+        if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
+            return match.group(0)  # Already correct
+
+        # Remove any existing referrerpolicy
+        iframe_attrs = re.sub(
+            r'\s*referrerpolicy="[^"]*"', "", iframe_attrs, flags=re.IGNORECASE
+        )
+
+        # Add the correct referrerpolicy
+        return (
+            f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"{closing}'
+        )
+
+    return youtube_pattern.sub(fix_iframe, content)
