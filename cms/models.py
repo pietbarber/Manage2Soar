@@ -206,9 +206,13 @@ class Page(models.Model):
         # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
         if self.pk:
             self.clean()
-
-        # Fix YouTube embeds before saving to prevent Error 153
-        self._fix_youtube_embeds()
+            # Only fix YouTube embeds if content has changed
+            old_content = Page.objects.get(pk=self.pk).content
+            if old_content != self.content:
+                self._fix_youtube_embeds()
+        else:
+            # New object, always check
+            self._fix_youtube_embeds()
 
         super().save(*args, **kwargs)
 
@@ -216,37 +220,12 @@ class Page(models.Model):
         """
         Automatically fix YouTube iframe embeds to prevent Error 153.
 
-        Adds referrerpolicy="strict-origin-when-cross-origin" to YouTube iframes
-        to ensure proper domain verification and prevent playback errors.
+        Uses shared utility function to add referrerpolicy="strict-origin-when-cross-origin"
+        to YouTube iframes for proper domain verification.
         """
-        import re
+        from .utils import fix_youtube_embeds
 
-        if not self.content:
-            return
-
-        # Pattern to match YouTube iframe embeds
-        youtube_pattern = re.compile(
-            r'(<iframe[^>]*src="[^"]*youtube\.com/embed[^"]*"[^>]*)(>)', re.IGNORECASE
-        )
-
-        def fix_iframe(match):
-            iframe_attrs = match.group(1)
-            closing = match.group(2)
-
-            # Check if referrerpolicy is already set correctly
-            if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
-                return match.group(0)  # Already correct
-
-            # Remove any existing referrerpolicy
-            iframe_attrs = re.sub(
-                r'\s*referrerpolicy="[^"]*"', "", iframe_attrs, flags=re.IGNORECASE
-            )
-
-            # Add the correct referrerpolicy
-            return f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"{closing}'
-
-        # Apply the fix to content
-        fixed_content = youtube_pattern.sub(fix_iframe, self.content)
+        fixed_content = fix_youtube_embeds(self.content)
         if fixed_content != self.content:
             self.content = fixed_content
 
@@ -404,45 +383,26 @@ class HomePageContent(models.Model):
 
     def save(self, *args, **kwargs):
         """Save with automatic YouTube embed fixes to prevent Error 153."""
-        # Fix YouTube embeds before saving to prevent Error 153
-        self._fix_youtube_embeds()
+        # Only fix YouTube embeds if content has changed
+        if self.pk:
+            old_content = HomePageContent.objects.get(pk=self.pk).content
+            if old_content != self.content:
+                self._fix_youtube_embeds()
+        else:
+            # New object, always check
+            self._fix_youtube_embeds()
         super().save(*args, **kwargs)
 
     def _fix_youtube_embeds(self):
         """
         Automatically fix YouTube iframe embeds to prevent Error 153.
 
-        Adds referrerpolicy="strict-origin-when-cross-origin" to YouTube iframes
-        to ensure proper domain verification and prevent playback errors.
+        Uses shared utility function to add referrerpolicy="strict-origin-when-cross-origin"
+        to YouTube iframes for proper domain verification.
         """
-        import re
+        from .utils import fix_youtube_embeds
 
-        if not self.content:
-            return
-
-        # Pattern to match YouTube iframe embeds
-        youtube_pattern = re.compile(
-            r'(<iframe[^>]*src="[^"]*youtube\.com/embed[^"]*"[^>]*)(>)', re.IGNORECASE
-        )
-
-        def fix_iframe(match):
-            iframe_attrs = match.group(1)
-            closing = match.group(2)
-
-            # Check if referrerpolicy is already set correctly
-            if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
-                return match.group(0)  # Already correct
-
-            # Remove any existing referrerpolicy
-            iframe_attrs = re.sub(
-                r'\s*referrerpolicy="[^"]*"', "", iframe_attrs, flags=re.IGNORECASE
-            )
-
-            # Add the correct referrerpolicy
-            return f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"{closing}'
-
-        # Apply the fix to content
-        fixed_content = youtube_pattern.sub(fix_iframe, self.content)
+        fixed_content = fix_youtube_embeds(self.content)
         if fixed_content != self.content:
             self.content = fixed_content
 

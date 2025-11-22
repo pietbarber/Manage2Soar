@@ -15,7 +15,7 @@ Options:
 
 import re
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from cms.models import HomePageContent, Page
 
@@ -101,21 +101,23 @@ class Command(BaseCommand):
         # Apply fixes
         fixes_applied = 0
 
-        # Fix Pages
+        # Fix Pages - let model save() handle the fixing to avoid double-fix
         for page in pages_to_fix:
             old_content = page.content
-            page.content = self.fix_youtube_embeds(page.content)
+            page.save()  # Model will automatically fix YouTube embeds
+            # Re-check if content was actually modified
+            page.refresh_from_db()
             if page.content != old_content:
-                page.save()
                 fixes_applied += 1
                 self.stdout.write(f"✅ Fixed: {page.title}")
 
-        # Fix HomePageContent
+        # Fix HomePageContent - let model save() handle the fixing
         for homepage in homepage_to_fix:
             old_content = homepage.content
-            homepage.content = self.fix_youtube_embeds(homepage.content)
+            homepage.save()  # Model will automatically fix YouTube embeds
+            # Re-check if content was actually modified
+            homepage.refresh_from_db()
             if homepage.content != old_content:
-                homepage.save()
                 fixes_applied += 1
                 self.stdout.write(f"✅ Fixed: {homepage.title} [{homepage.audience}]")
 
@@ -128,46 +130,6 @@ class Command(BaseCommand):
 
     def needs_youtube_fix(self, content):
         """Check if content has YouTube iframes that need referrerpolicy fixing."""
-        if not content:
-            return False
+        from cms.utils import needs_youtube_fix
 
-        # Look for YouTube iframes without proper referrerpolicy
-        youtube_pattern = re.compile(
-            r'<iframe[^>]*src="[^"]*youtube\.com/embed[^"]*"[^>]*>', re.IGNORECASE
-        )
-
-        for match in youtube_pattern.finditer(content):
-            iframe = match.group(0)
-            # If it doesn't have the correct referrerpolicy, it needs fixing
-            if 'referrerpolicy="strict-origin-when-cross-origin"' not in iframe:
-                return True
-
-        return False
-
-    def fix_youtube_embeds(self, content):
-        """Fix YouTube iframe embeds by adding proper referrerpolicy."""
-        if not content:
-            return content
-
-        # Pattern to match YouTube iframe embeds
-        youtube_pattern = re.compile(
-            r'(<iframe[^>]*src="[^"]*youtube\.com/embed[^"]*"[^>]*)(>)', re.IGNORECASE
-        )
-
-        def fix_iframe(match):
-            iframe_attrs = match.group(1)
-            closing = match.group(2)
-
-            # Check if referrerpolicy is already set correctly
-            if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
-                return match.group(0)  # Already correct
-
-            # Remove any existing referrerpolicy
-            iframe_attrs = re.sub(
-                r'\s*referrerpolicy="[^"]*"', "", iframe_attrs, flags=re.IGNORECASE
-            )
-
-            # Add the correct referrerpolicy
-            return f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"{closing}'
-
-        return youtube_pattern.sub(fix_iframe, content)
+        return needs_youtube_fix(content)
