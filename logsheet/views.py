@@ -1214,20 +1214,9 @@ def edit_logsheet_closeout(request, pk):
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
-    # Enhanced towplane detection logic
-    def get_relevant_towplanes(logsheet):
-        """Get all towplanes that need closeout forms for this logsheet."""
-        # Towplanes used for towing
-        towing_towplanes = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
-
-        # Towplanes with existing closeouts (manual additions or previous rentals)
-        closeout_towplanes = Towplane.objects.filter(
-            towplanecloseout__logsheet=logsheet
-        ).distinct()
-
-        return towing_towplanes.union(closeout_towplanes)
-
     # Get all relevant towplanes and create closeouts
+    from logsheet.utils.towplane_utils import get_relevant_towplanes
+
     relevant_towplanes = get_relevant_towplanes(logsheet)
     for towplane in relevant_towplanes:
         TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
