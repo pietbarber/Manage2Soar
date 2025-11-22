@@ -768,7 +768,6 @@ class TowplaneChargeScheme(models.Model):
             return None
 
         total_cost = self.hookup_fee
-        remaining_altitude = altitude_feet
 
         # Apply tiered pricing in order, cache active tiers to avoid N+1 queries
         if not hasattr(self, "_active_charge_tiers"):

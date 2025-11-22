@@ -422,8 +422,8 @@ class BackwardCompatibilityTestCase(TestCase):
             (500, Decimal("15.00")),  # Uses 500ft rate (highest ≤ 500)
             (1500, Decimal("15.00")),  # Uses rate at 1500ft (highest ≤ 1500)
             (2500, Decimal("20.00")),  # Uses 2500ft rate (exact match)
-            (3500, Decimal("25.00")),  # Uses 3000ft rate
-            (4500, Decimal("30.00")),  # Uses 4000ft rate
+            (3500, Decimal("25.00")),  # Uses 3500ft rate (exact match)
+            (4500, Decimal("30.00")),  # Uses 4500ft rate (exact match)
         ]
 
         for altitude, expected_cost in test_cases:
