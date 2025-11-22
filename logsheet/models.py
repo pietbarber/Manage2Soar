@@ -183,6 +183,7 @@ class Flight(models.Model):
                     if cost is not None:
                         return cost
             except TowplaneChargeScheme.DoesNotExist:
+                # If the towplane does not have a charge scheme, fall back to the global TowRate system below.
                 pass
 
         # Fall back to global TowRate system
