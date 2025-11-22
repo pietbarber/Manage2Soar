@@ -31,6 +31,11 @@ urlpatterns = [
         name="edit_logsheet_closeout",
     ),
     path(
+        "manage/<int:pk>/add-towplane-closeout/",
+        views.add_towplane_closeout,
+        name="add_towplane_closeout",
+    ),
+    path(
         "manage/<int:pk>/view-closeout/",
         views.view_logsheet_closeout,
         name="view_logsheet_closeout",

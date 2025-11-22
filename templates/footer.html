@@ -5,6 +5,11 @@
   Uses the same dark styling as the navbar and excludes from print views.
   {% endcomment %}
   <footer class="footer bg-dark text-light mt-5 py-4 no-print-nav">
+    <!--
+      Use .container to match the main content width.
+      This footer template is included within pages that may already have a Bootstrap .container div.
+      Using .container ensures the footer aligns with the main content and maintains layout consistency.
+    -->
     <div class="container">
       {% get_siteconfig as siteconfig %}
       {{ footer_content.content|safe }}

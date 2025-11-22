@@ -11,6 +11,7 @@ from tinymce.widgets import TinyMCE
 from logsheet.models import Glider, MaintenanceIssue, Towplane
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
+from siteconfig.models import SiteConfiguration
 
 from .models import (
     Airfield,
@@ -240,8 +241,6 @@ class FlightForm(forms.ModelForm):
                     self.initial[field_name] = value[:5]
 
         # Pilot dropdown: optgroups for Active Members, Visiting Pilots, and Inactive Members
-        from siteconfig.models import SiteConfiguration
-
         # Always fetch configuration from database for security-sensitive flags
         # The visiting_pilot_enabled flag is security-critical and should not be cached
         config = SiteConfiguration.objects.first()
@@ -696,8 +695,6 @@ class CreateLogsheetForm(forms.ModelForm):
 
         # Set dynamic labels for duty crew fields using siteconfig
         try:
-            from siteconfig.models import SiteConfiguration
-
             config = SiteConfiguration.objects.first()
         except Exception:
             config = None
@@ -779,6 +776,49 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         if not hasattr(self, "warnings"):
             self.warnings = []
 
+        # Check if this logsheet has any actual flight operations
+        logsheet = getattr(self.instance, "logsheet", None) if self.instance else None
+        has_flights = logsheet.flights.exists() if logsheet else False
+
+        # Check if this logsheet has only rental operations
+        # Optimize by checking if any closeout in an already-loaded queryset has rental hours
+        has_rental_closeouts = False
+        if logsheet and not has_flights:
+            # Check if any closeout has rental hours without hitting the database again
+            try:
+                # Try to use prefetched data if available
+                closeouts = getattr(logsheet, "_prefetched_objects_cache", {}).get(
+                    "towplane_closeouts"
+                )
+                if closeouts is not None:
+                    has_rental_closeouts = any(
+                        closeout.rental_hours_chargeable
+                        and closeout.rental_hours_chargeable > 0
+                        for closeout in closeouts
+                    )
+                else:
+                    # Fall back to database query if not prefetched
+                    has_rental_closeouts = logsheet.towplane_closeouts.filter(
+                        rental_hours_chargeable__gt=0
+                    ).exists()
+            except (AttributeError, KeyError):
+                # Fallback if there are any issues with the optimization
+                has_rental_closeouts = logsheet.towplane_closeouts.filter(
+                    rental_hours_chargeable__gt=0
+                ).exists()
+
+        has_only_rentals = bool(logsheet and not has_flights and has_rental_closeouts)
+
+        # Conditional duty officer validation
+        if not duty_officer:
+            if has_flights:
+                # Normal validation for operational days - duty officer required
+                raise ValidationError("Duty Officer is required for flight operations.")
+            elif has_only_rentals:
+                # For rental-only logsheets, duty officer is optional
+                pass  # Allow empty duty officer
+            # For completely empty logsheets, also allow empty (will be caught later in workflow)
+
         # PROHIBITIONS: Prevent instructor from being the same as surge instructor
         if duty_instructor and surge_instructor and duty_instructor == surge_instructor:
             raise ValidationError(
@@ -827,8 +867,6 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         )
 
         try:
-            from siteconfig.models import SiteConfiguration
-
             config = SiteConfiguration.objects.first()
         except Exception:
             config = None
@@ -860,6 +898,14 @@ class LogsheetDutyCrewForm(forms.ModelForm):
             "tow_pilot",
             "surge_tow_pilot",
         ]
+        widgets = {
+            "duty_officer": forms.Select(attrs={"class": "form-select"}),
+            "assistant_duty_officer": forms.Select(attrs={"class": "form-select"}),
+            "duty_instructor": forms.Select(attrs={"class": "form-select"}),
+            "surge_instructor": forms.Select(attrs={"class": "form-select"}),
+            "tow_pilot": forms.Select(attrs={"class": "form-select"}),
+            "surge_tow_pilot": forms.Select(attrs={"class": "form-select"}),
+        }
 
 
 ######################################################
@@ -885,13 +931,45 @@ class LogsheetDutyCrewForm(forms.ModelForm):
 class TowplaneCloseoutForm(forms.ModelForm):
     class Meta:
         model = TowplaneCloseout
-        fields = ["towplane", "start_tach", "end_tach", "fuel_added", "notes"]
+        fields = [
+            "towplane",
+            "start_tach",
+            "end_tach",
+            "fuel_added",
+            "rental_hours_chargeable",
+            "rental_charged_to",
+            "notes",
+        ]
         widgets = {
             "notes": TinyMCE(mce_attrs={"height": 300}),
+        }
+        labels = {
+            "rental_hours_chargeable": "Rental Hours (Non-Towing)",
+            "rental_charged_to": "Charge Rental To",
+        }
+        help_texts = {
+            "rental_hours_chargeable": "Hours of non-towing usage to charge as rental (sightseeing, flight reviews, retrieval flights, etc.)",
+            "rental_charged_to": "Member who should be charged for the towplane rental time",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Check if towplane rentals are enabled
+        config = SiteConfiguration.objects.first()
+        rental_enabled = config.allow_towplane_rental if config else False
+
+        # Remove rental fields if not enabled
+        if not rental_enabled:
+            if "rental_hours_chargeable" in self.fields:
+                del self.fields["rental_hours_chargeable"]
+            if "rental_charged_to" in self.fields:
+                del self.fields["rental_charged_to"]
+        else:
+            # Set up the rental_charged_to queryset if rentals are enabled
+            if "rental_charged_to" in self.fields:
+                self.fields["rental_charged_to"].queryset = get_active_members()
+
         towplanes = [
             tp for tp in Towplane.objects.filter(is_active=True) if not tp.is_grounded
         ]

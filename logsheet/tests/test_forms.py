@@ -394,6 +394,12 @@ def test_flight_form_warns_unscheduled_tow_pilot(
 ):
     """Test that FlightForm warns when tow pilot is not on scheduled list"""
     from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
 
     # Set up logsheet with scheduled tow pilots
     logsheet.tow_pilot = member_towpilot  # Only this member is scheduled
@@ -424,6 +430,12 @@ def test_flight_form_warns_unscheduled_tow_pilot(
 def test_flight_form_no_warning_scheduled_tow_pilot(member_towpilot, glider, logsheet):
     """Test that FlightForm does not warn when tow pilot is on scheduled list"""
     from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
 
     # Set up logsheet with scheduled tow pilot
     logsheet.tow_pilot = member_towpilot
@@ -451,6 +463,12 @@ def test_flight_form_warns_unscheduled_with_surge_pilot(
 ):
     """Test that FlightForm warns correctly when surge tow pilot is also scheduled"""
     from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
 
     # Set up logsheet with both regular and surge tow pilots
     logsheet.tow_pilot = member_towpilot
@@ -484,6 +502,12 @@ def test_flight_form_warns_unscheduled_with_surge_pilot(
 def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, logsheet):
     """Test that FlightForm does not warn when no tow pilots are scheduled"""
     from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
 
     # Logsheet with no scheduled tow pilots
     assert logsheet.tow_pilot is None

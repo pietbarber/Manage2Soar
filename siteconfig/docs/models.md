@@ -39,6 +39,7 @@ erDiagram
         string equipment_manager_title
         boolean allow_glider_reservations
         boolean allow_two_seater_reservations
+        boolean allow_towplane_rental
         int redaction_notification_dedupe_minutes
         boolean visiting_pilot_enabled
         string visiting_pilot_status
@@ -65,7 +66,7 @@ erDiagram
 - **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle
 - **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
-- **Operational Settings:** Scheduling preferences, reservation controls, notification settings
+- **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 
@@ -177,6 +178,33 @@ The visiting pilot fields in `SiteConfiguration` (added in migrations 0010-0012)
 - `retire_visiting_pilot_token()`: Clears token and date (called on logsheet finalization)
 
 The system provides a secure, streamlined workflow for visiting pilots to register and participate in operations. Security tokens prevent bot abuse while maintaining ease of use. Integration with logsheet management and flight forms provides seamless operational workflow.
+
+### Issue #123 - Towplane Rental Configuration
+The `allow_towplane_rental` field in `SiteConfiguration` (added in migration 0015) provides clubs with control over towplane rental functionality:
+
+**Configuration Field:**
+- `allow_towplane_rental`: Boolean field that enables/disables towplane rental features across the system
+
+**Default Behavior:**
+- Defaults to `False` (disabled) to respect conservative club policies
+- When disabled, rental fields are completely hidden from forms and reports
+- When enabled, full towplane rental functionality becomes available
+
+**Integration Points:**
+- **Forms**: `TowplaneCloseoutForm` conditionally shows rental fields based on this setting
+- **Templates**: Rental sections in closeout and financial management templates are conditionally rendered
+- **Views**: Financial management view passes rental status to templates via context
+
+**Usage:**
+```python
+# Check if towplane rentals are enabled
+config = SiteConfiguration.objects.first()
+if config and config.allow_towplane_rental:
+    # Show rental functionality
+    pass
+```
+
+This feature allows clubs to opt-in to towplane rental functionality for non-towing purposes (sightseeing flights, flight reviews, aircraft retrieval) while maintaining a clean interface for clubs that don't allow such usage.
 
 ---
 

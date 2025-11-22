@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_time
@@ -932,6 +932,11 @@ def manage_logsheet_finances(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     flights = logsheet.flights.all()
 
+    # Get towplane rental costs for this logsheet
+    towplane_closeouts = logsheet.towplane_closeouts.select_related(
+        "towplane", "rental_charged_to"
+    ).all()
+
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
         return {
@@ -945,7 +950,7 @@ def manage_logsheet_finances(request, pk):
         }
 
     flight_data = []
-    total_tow = total_rental = total_sum = 0
+    total_tow = total_rental = total_towplane_rental = total_sum = 0
 
     for flight in flights:
         costs = flight_costs(flight)
@@ -953,6 +958,15 @@ def manage_logsheet_finances(request, pk):
         total_tow += costs["tow"] or 0
         total_rental += costs["rental"] or 0
         total_sum += costs["total"] or 0
+
+    # Add towplane rental costs
+    towplane_data = []
+    for closeout in towplane_closeouts:
+        rental_cost = closeout.rental_cost or 0
+        towplane_data.append((closeout, rental_cost))
+        total_towplane_rental += rental_cost
+
+    total_sum += total_towplane_rental
 
     from collections import defaultdict
     from decimal import Decimal
@@ -975,6 +989,7 @@ def manage_logsheet_finances(request, pk):
         lambda: {
             "tow": Decimal("0.00"),
             "rental": Decimal("0.00"),
+            "towplane_rental": Decimal("0.00"),
             "total": Decimal("0.00"),
         }
     )
@@ -1011,9 +1026,18 @@ def manage_logsheet_finances(request, pk):
                 member_charges[pilot]["tow"] += tow
                 member_charges[pilot]["rental"] += rental
 
+    # Add towplane rental costs to member charges
+    for closeout, rental_cost in towplane_data:
+        if closeout.rental_charged_to and rental_cost > 0:
+            member_charges[closeout.rental_charged_to]["towplane_rental"] += Decimal(
+                str(rental_cost)
+            )
+
     # Add combined totals
     for summary in member_charges.values():
-        summary["total"] = summary["tow"] + summary["rental"]
+        summary["total"] = (
+            summary["tow"] + summary["rental"] + summary["towplane_rental"]
+        )
 
     member_payment_data = []
     for member in member_charges:
@@ -1045,6 +1069,11 @@ def manage_logsheet_finances(request, pk):
                     responsible_members.update([pilot, partner])
                 elif pilot:
                     responsible_members.add(pilot)
+
+            # Add members responsible for towplane rental charges
+            for closeout in towplane_closeouts:
+                if closeout.rental_charged_to and closeout.rental_cost:
+                    responsible_members.add(closeout.rental_charged_to)
 
             missing = []
             for member in responsible_members:
@@ -1122,18 +1151,25 @@ def manage_logsheet_finances(request, pk):
         ),
     )
 
+    # Check if towplane rentals are enabled
+    config = SiteConfiguration.objects.first()
+    rental_enabled = config.allow_towplane_rental if config else False
+
     context = {
         "logsheet": logsheet,
         "flight_data_sorted": flight_data_sorted,
         "flight_data": flight_data,  # Added for test compatibility
+        "towplane_data": towplane_data,
         "total_tow": total_tow,
         "total_rental": total_rental,
+        "total_towplane_rental": total_towplane_rental,
         "total_sum": total_sum,
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
         "member_payment_data_sorted": member_payment_data_sorted,
         "active_members": active_members,
         "inactive_members": inactive_members,
+        "towplane_rental_enabled": rental_enabled,
     }
 
     return render(request, "logsheet/manage_logsheet_finances.html", context)
@@ -1178,11 +1214,11 @@ def edit_logsheet_closeout(request, pk):
     if not can_edit_logsheet(request.user, logsheet):
         return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
 
-    # Identify towplanes used in this logsheet
-    towplanes_used = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
+    # Get all relevant towplanes and create closeouts
+    from logsheet.utils.towplane_utils import get_relevant_towplanes
 
-    # Make sure a TowplaneCloseout exists for each
-    for towplane in towplanes_used:
+    relevant_towplanes = get_relevant_towplanes(logsheet)
+    for towplane in relevant_towplanes:
         TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
 
     # Build formset for towplane closeouts
@@ -1207,6 +1243,20 @@ def edit_logsheet_closeout(request, pk):
         form = LogsheetCloseoutForm(instance=closeout)
         duty_form = LogsheetDutyCrewForm(instance=logsheet)
 
+    # Get towplanes available for manual addition (not already in closeouts)
+    existing_closeout_towplanes = TowplaneCloseout.objects.filter(
+        logsheet=logsheet
+    ).values_list("towplane_id", flat=True)
+    available_towplanes = (
+        Towplane.objects.filter(is_active=True)
+        .exclude(id__in=existing_closeout_towplanes)
+        .order_by("n_number")
+    )
+
+    # Check if towplane rentals are enabled for UI display
+    config = SiteConfiguration.objects.first()
+    towplane_rental_enabled = config.allow_towplane_rental if config else False
+
     return render(
         request,
         "logsheet/edit_closeout_form.html",
@@ -1220,8 +1270,49 @@ def edit_logsheet_closeout(request, pk):
             ),
             "towplanes": Towplane.objects.filter(is_active=True).order_by("n_number"),
             "maintenance_issues": maintenance_issues,
+            "available_towplanes": available_towplanes,
+            "towplane_rental_enabled": towplane_rental_enabled,
         },
     )
+
+
+@active_member_required
+def add_towplane_closeout(request, pk):
+    """Add a towplane closeout manually for rental or other non-towing usage."""
+    logsheet = get_object_or_404(Logsheet, pk=pk)
+
+    from logsheet.utils.permissions import can_edit_logsheet
+
+    if not can_edit_logsheet(request.user, logsheet):
+        return HttpResponseForbidden("This logsheet is finalized and cannot be edited.")
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    towplane_id = request.POST.get("towplane")
+    if towplane_id:
+        towplane = get_object_or_404(Towplane, pk=towplane_id, is_active=True)
+
+        # Create the towplane closeout if it doesn't exist
+        closeout, created = TowplaneCloseout.objects.get_or_create(
+            logsheet=logsheet, towplane=towplane
+        )
+
+        if created:
+            messages.success(
+                request,
+                f"Added {towplane.name} ({towplane.n_number}) to closeout form. "
+                f"You can now enter rental hours and other details.",
+            )
+        else:
+            messages.info(
+                request,
+                f"{towplane.name} ({towplane.n_number}) is already in the closeout form.",
+            )
+    else:
+        messages.error(request, "Please select a towplane to add.")
+
+    return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.pk)
 
 
 #################################################
@@ -1253,7 +1344,14 @@ def view_logsheet_closeout(request, pk):
         logsheet=logsheet
     ).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
-    towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
+    towplanes = logsheet.towplane_closeouts.select_related(
+        "towplane", "rental_charged_to"
+    ).all()
+
+    # Check if towplane rentals are enabled for conditional display
+    config = SiteConfiguration.objects.first()
+    towplane_rental_enabled = config.allow_towplane_rental if config else False
+
     return render(
         request,
         "logsheet/view_closeout.html",
@@ -1262,6 +1360,7 @@ def view_logsheet_closeout(request, pk):
             "closeout": closeout,
             "towplanes": towplanes,
             "maintenance_issues": maintenance_issues,
+            "towplane_rental_enabled": towplane_rental_enabled,
         },
     )
 

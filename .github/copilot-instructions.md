@@ -31,6 +31,7 @@
   ```
 - **HSTS ISSUE**: Port 8000 has persistent HSTS cache (365 days) that forces HTTPS, breaking local development. Port 8001 avoids this issue.
 - **AUTO-RESTART**: Django's development server automatically restarts when you modify `.py` files (views.py, models.py, forms.py, etc.). You do NOT need to manually restart it.
+- **AUTO-RESTART**: Django's development server automatically handles restarts when Python files change. This works regardless of your editor.
 - **WHEN TO RESTART**: Only manually restart the server for:
   - New dependencies/packages installed
   - Settings changes (manage2soar/settings.py)

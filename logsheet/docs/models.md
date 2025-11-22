@@ -16,6 +16,7 @@ erDiagram
     Member ||--o{ LogsheetPayment : paid_by
     Member ||--o{ MaintenanceIssue : reported_by
     Member ||--o{ AircraftMeister : member
+    Member ||--o{ TowplaneCloseout : rental_charged_to
 
     Logsheet {
         int id PK
@@ -69,6 +70,7 @@ erDiagram
         string registration
         string manufacturer
         string model
+        decimal hourly_rental_rate
         string status
         boolean available
         image photo
@@ -117,6 +119,8 @@ erDiagram
         decimal tach_start
         decimal tach_end
         decimal fuel_added
+        decimal rental_hours_chargeable
+        int rental_charged_to_id FK
         text notes
     }
 
@@ -189,6 +193,8 @@ This document describes all models in `logsheet/models.py`.
 
 ## Towplane
 - Represents a towplane, including status and maintenance.
+- **New in Issue 123**: Added `hourly_rental_rate` field to support charging for non-towing flights like sightseeing, flight reviews, and retrieval missions.
+- **Rental Functionality**: When enabled via `SiteConfiguration.allow_towplane_rental`, clubs can charge hourly rates for towplane usage beyond towing (e.g., sightseeing, flight reviews, aircraft retrieval).
 
 ## Glider
 - Represents a glider, including status and maintenance.
@@ -210,6 +216,9 @@ This document describes all models in `logsheet/models.py`.
 
 ## TowplaneCloseout
 - Records the closeout summary for a towplane.
+- **New in Issue 123**: Includes `rental_hours_chargeable` field and `rental_charged_to` field to track non-towing towplane usage (sightseeing, flight reviews, retrieval flights).
+- **Rental Cost Calculation**: The `rental_cost` property automatically calculates charges based on `rental_hours_chargeable * towplane.hourly_rental_rate`.
+- **Site Configuration**: Rental fields are only shown when `SiteConfiguration.allow_towplane_rental` is enabled.
 
 ## MaintenanceIssue
 - Tracks maintenance issues for aircraft.
