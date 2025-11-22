@@ -41,7 +41,7 @@
       <form method="POST" action="{% url 'logsheet:create' %}">
         {% csrf_token %}
 
-        <div class="modal-header text-white">
+        <div class="modal-header bg-primary text-white">
           <h5 class="modal-title d-flex align-items-center" id="createLogsheetModalLabel">
             <i class="bi bi-journal-plus me-2"></i>Create New Logsheet
           </h5>
@@ -374,97 +374,7 @@
 {% endif %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var dateInput = document.getElementById('id_log_date');
-  if (dateInput) {
-    // Auto-populate on page load if there's a date value
-    if (dateInput.value) {
-      console.log('Modal opened with date:', dateInput.value, '- fetching duty assignment');
-      fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateInput.value), {
-        credentials: 'same-origin',
-        headers: {
-          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-      })
-      .then(response => {
-        if (!response.ok) {
-          console.error('API request failed:', response.status, response.statusText);
-          return {};
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Duty assignment data received:', data);
-        var fields = [
-          'duty_officer', 'assistant_duty_officer', 'duty_instructor',
-          'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
-        ];
-        fields.forEach(function(field) {
-          var select = document.getElementById('id_' + field);
-          if (select && data[field]) {
-            console.log('Setting', field, 'to', data[field]);
-            select.value = data[field];
-          }
-        });
-      })
-      .catch(error => {
-        console.error('Error fetching duty assignment:', error);
-      });
-    }
-
-    dateInput.addEventListener('change', function() {
-      var dateVal = this.value;
-      if (!dateVal) return;
-      console.log('Date changed to:', dateVal, '- fetching duty assignment');
-      fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateVal), {
-        credentials: 'same-origin',
-        headers: {
-          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-      })
-      .then(response => {
-        if (!response.ok) {
-          console.error('API request failed:', response.status, response.statusText);
-          return {};
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Duty assignment data received:', data);
-        var fields = [
-          'duty_officer', 'assistant_duty_officer', 'duty_instructor',
-          'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
-        ];
-        fields.forEach(function(field) {
-          var select = document.getElementById('id_' + field);
-          if (select && data[field]) {
-            console.log('Setting', field, 'to', data[field]);
-            select.value = data[field];
-          }
-        });
-      })
-      .catch(error => {
-        console.error('Error fetching duty assignment:', error);
-      });
-    });
-  }
-
-  // Validate default towplane before submitting the modal form
-  var createForm = document.querySelector('#createLogsheetModal form');
-  if (createForm) {
-    createForm.addEventListener('submit', function(e) {
-      var towplane = document.getElementById('id_default_towplane');
-      if (towplane && (!towplane.value || towplane.value === '')) {
-        e.preventDefault();
-        alert('Please select a default towplane before creating the logsheet.');
-        towplane.focus();
-      }
-    });
-  }
-});
-</script>
-
+<script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
 {% endblock %}
 
 

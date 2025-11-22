@@ -270,8 +270,6 @@ def create_logsheet(request):
             return redirect("logsheet:manage", pk=logsheet.pk)
     else:
         # Auto-populate duty crew for today's date
-        from datetime import date
-
         form = CreateLogsheetForm(duty_assignment_date=date.today())
 
     return render(request, "logsheet/start_logsheet.html", {"form": form})

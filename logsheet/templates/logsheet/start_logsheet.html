@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% load static %}{% static 'css/logsheet.css' %}">
+<link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -219,72 +220,7 @@
 </footer>
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var dateInput = document.getElementById('id_log_date');
-  if (dateInput) {
-    // Auto-populate on page load if there's a date value
-    if (dateInput.value) {
-      console.log('Page loaded with date:', dateInput.value, '- fetching duty assignment');
-      fetchDutyAssignment(dateInput.value);
-    }
-
-    // Auto-populate when date changes
-    dateInput.addEventListener('change', function() {
-      var dateVal = this.value;
-      if (!dateVal) return;
-      console.log('Date changed to:', dateVal, '- fetching duty assignment');
-      fetchDutyAssignment(dateVal);
-    });
-  }
-
-  function fetchDutyAssignment(dateVal) {
-    fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateVal), {
-      credentials: 'same-origin',
-      headers: {
-        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-      }
-    })
-    .then(response => {
-      if (!response.ok) {
-        console.error('API request failed:', response.status, response.statusText);
-        return {};
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Duty assignment data received:', data);
-      var fields = [
-        'duty_officer', 'assistant_duty_officer', 'duty_instructor',
-        'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
-      ];
-      fields.forEach(function(field) {
-        var select = document.getElementById('id_' + field);
-        if (select && data[field]) {
-          console.log('Setting', field, 'to', data[field]);
-          select.value = data[field];
-        }
-      });
-    })
-    .catch(error => {
-      console.error('Error fetching duty assignment:', error);
-    });
-  }
-
-  // Validate default towplane before submitting the form
-  var createForm = document.querySelector('form');
-  if (createForm) {
-    createForm.addEventListener('submit', function(e) {
-      var towplane = document.getElementById('id_default_towplane');
-      if (towplane && (!towplane.value || towplane.value === '')) {
-        e.preventDefault();
-        alert('Please select a default towplane before creating the logsheet.');
-        towplane.focus();
-      }
-    });
-  }
-});
-</script>
+<script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
 {% endblock %}
 
 {% endblock %}

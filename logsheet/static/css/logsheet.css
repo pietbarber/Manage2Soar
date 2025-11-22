@@ -114,8 +114,8 @@
 }
 
 .alert-success {
-    background: linear-gradient(135deg, #d1edff 0%, #b3d9ff 100%);
-    color: #0c5460;
+    background: linear-gradient(135deg, #d1e7dd 0%, #badbcc 100%);
+    color: #0f5132;
 }
 
 /* Page Header Styling */
