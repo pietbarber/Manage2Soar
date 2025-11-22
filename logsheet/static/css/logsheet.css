@@ -46,9 +46,17 @@
     border: 2px solid transparent;
 }
 
-.btn-modern:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+@media (prefers-reduced-motion: no-preference) {
+    .btn-modern:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-modern:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
 }
 
 .btn-modern.btn-primary {
@@ -178,13 +186,31 @@
 }
 
 /* Animation for modal appearance */
-.modal.fade .modal-dialog {
-    transition: transform 0.3s ease-out;
-    transform: translate(0, -50px);
+@media (prefers-reduced-motion: no-preference) {
+    .modal.fade .modal-dialog {
+        transition: transform 0.3s ease-out;
+        transform: translate(0, -50px);
+    }
+
+    .modal.show .modal-dialog {
+        transform: none;
+    }
+
+    .btn-modern.loading::after {
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
 }
 
-.modal.show .modal-dialog {
-    transform: none;
+@media (prefers-reduced-motion: reduce) {
+    .modal.fade .modal-dialog {
+        transition: opacity 0.3s ease-out;
+    }
 }
 
 /* Loading states for form submission */
@@ -211,11 +237,4 @@
     border: 2px solid #ffffff;
     border-radius: 50%;
     border-top-color: transparent;
-    animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
 }

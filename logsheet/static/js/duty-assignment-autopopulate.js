@@ -9,10 +9,7 @@
  */
 function fetchDutyAssignment(dateVal) {
     fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateVal), {
-        credentials: 'same-origin',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
+        credentials: 'same-origin'
     })
         .then(response => {
             if (!response.ok) {
@@ -96,7 +93,7 @@ function initDutyAssignmentAutoPopulation() {
         }
 
         // Enhanced form validation for towplane
-        var createForm = document.querySelector('form');
+        var createForm = document.querySelector('form[method="POST"]');
         if (createForm) {
             createForm.addEventListener('submit', function (e) {
                 var towplane = document.getElementById('id_default_towplane');
