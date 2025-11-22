@@ -175,7 +175,7 @@ class Flight(models.Model):
             return None
 
         # First, try towplane-specific charge scheme
-        if self.towplane and hasattr(self.towplane, "charge_scheme"):
+        if self.towplane:
             try:
                 scheme = self.towplane.charge_scheme
                 if scheme.is_active:
@@ -734,7 +734,9 @@ class TowplaneChargeScheme(models.Model):
     )
 
     is_active = models.BooleanField(
-        default=True, help_text="If unchecked, falls back to global TowRate system"
+        default=True,
+        help_text="If unchecked, falls back to global TowRate system",
+        db_index=True,
     )
 
     description = models.TextField(
@@ -768,8 +770,12 @@ class TowplaneChargeScheme(models.Model):
         total_cost = self.hookup_fee
         remaining_altitude = altitude_feet
 
-        # Apply tiered pricing in order
-        for tier in self.charge_tiers.filter(is_active=True).order_by("altitude_start"):
+        # Apply tiered pricing in order, cache active tiers to avoid N+1 queries
+        if not hasattr(self, "_active_charge_tiers"):
+            self._active_charge_tiers = list(
+                self.charge_tiers.filter(is_active=True).order_by("altitude_start")
+            )
+        for tier in self._active_charge_tiers:
             if remaining_altitude <= 0:
                 break
 
@@ -854,7 +860,9 @@ class TowplaneChargeTier(models.Model):
     )
 
     is_active = models.BooleanField(
-        default=True, help_text="If unchecked, this tier is ignored in calculations"
+        default=True,
+        help_text="If unchecked, this tier is ignored in calculations",
+        db_index=True,
     )
 
     description = models.CharField(
@@ -874,11 +882,31 @@ class TowplaneChargeTier(models.Model):
         return f"{self.charge_scheme.towplane.name}: {self.altitude_start}{end_str}ft @ ${self.rate_amount} {self.rate_type}"
 
     def clean(self):
-        """Validate tier altitude ranges."""
+        """Validate tier altitude ranges and prevent overlapping tiers."""
         from django.core.exceptions import ValidationError
 
         if self.altitude_end is not None and self.altitude_end <= self.altitude_start:
             raise ValidationError("End altitude must be greater than start altitude")
+
+        # Check for overlapping tiers within the same charge_scheme
+        if self.charge_scheme_id:
+            # Exclude self from the queryset if already saved
+            overlapping_qs = self.charge_scheme.charge_tiers.exclude(pk=self.pk)
+            # Treat None altitude_end as "open-ended" (infinity)
+            this_start = self.altitude_start
+            this_end = (
+                self.altitude_end if self.altitude_end is not None else float("inf")
+            )
+            for tier in overlapping_qs:
+                other_start = tier.altitude_start
+                other_end = (
+                    tier.altitude_end if tier.altitude_end is not None else float("inf")
+                )
+                # Overlap exists if ranges intersect
+                if not (this_end <= other_start or this_start >= other_end):
+                    raise ValidationError(
+                        f"Tier altitude range {this_start}-{self.altitude_end or '∞'}ft overlaps with existing tier {other_start}-{tier.altitude_end or '∞'}ft"
+                    )
 
     def calculate_cost(self, altitude_feet):
         """
