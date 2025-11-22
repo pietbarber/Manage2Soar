@@ -25,7 +25,7 @@ class ManualTowplaneAdditionTestCase(TestCase):
         )
 
         # Create Biff as a member
-        self.biff = Member.objects.create(
+        self.biff = Member.objects.create_user(
             username="biff",
             password="testpass",
             first_name="Biff",

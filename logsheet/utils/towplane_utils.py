@@ -17,14 +17,10 @@ def get_relevant_towplanes(logsheet):
         logsheet: Logsheet instance to find towplanes for
 
     Returns:
-        QuerySet: Union of towplanes that need closeout forms
+        QuerySet: Towplanes that need closeout forms
     """
-    # Towplanes used for towing
-    towing_towplanes = Towplane.objects.filter(flight__logsheet=logsheet).distinct()
+    from django.db.models import Q
 
-    # Towplanes with existing closeouts (manual additions or previous rentals)
-    closeout_towplanes = Towplane.objects.filter(
-        towplanecloseout__logsheet=logsheet
+    return Towplane.objects.filter(
+        Q(flight__logsheet=logsheet) | Q(towplanecloseout__logsheet=logsheet)
     ).distinct()
-
-    return towing_towplanes.union(closeout_towplanes)

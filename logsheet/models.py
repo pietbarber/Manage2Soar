@@ -807,7 +807,11 @@ class TowplaneCloseout(models.Model):
         financial views or loops, use select_related('towplane') when querying
         TowplaneCloseout objects.
         """
-        if not self.rental_hours_chargeable or not self.towplane.hourly_rental_rate:
+        if (
+            self.rental_hours_chargeable is None
+            or self.rental_hours_chargeable <= 0
+            or not self.towplane.hourly_rental_rate
+        ):
             return None
         return self.rental_hours_chargeable * self.towplane.hourly_rental_rate
 

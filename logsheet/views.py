@@ -933,7 +933,9 @@ def manage_logsheet_finances(request, pk):
     flights = logsheet.flights.all()
 
     # Get towplane rental costs for this logsheet
-    towplane_closeouts = logsheet.towplane_closeouts.all()
+    towplane_closeouts = logsheet.towplane_closeouts.select_related(
+        "towplane", "rental_charged_to"
+    ).all()
 
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
