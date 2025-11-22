@@ -50,6 +50,7 @@ class Migration(migrations.Migration):
                     models.BooleanField(
                         default=True,
                         help_text="If unchecked, falls back to global TowRate system",
+                        db_index=True,
                     ),
                 ),
                 (
@@ -136,6 +137,7 @@ class Migration(migrations.Migration):
                     models.BooleanField(
                         default=True,
                         help_text="If unchecked, this tier is ignored in calculations",
+                        db_index=True,
                     ),
                 ),
                 (

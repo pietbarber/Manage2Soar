@@ -776,26 +776,23 @@ class TowplaneChargeScheme(models.Model):
                 self.charge_tiers.filter(is_active=True).order_by("altitude_start")
             )
         for tier in self._active_charge_tiers:
-            if remaining_altitude <= 0:
-                break
-
             # Calculate altitude range for this tier
             tier_start = tier.altitude_start
             tier_end = tier.altitude_end if tier.altitude_end else float("inf")
 
-            # Skip if we're below this tier's start
+            # Skip if the flight altitude doesn't reach this tier
             if altitude_feet <= tier_start:
                 continue
 
-            # Calculate altitude covered by this tier
-            altitude_in_tier = min(remaining_altitude, tier_end - tier_start)
+            # Calculate the actual altitude range that falls within this tier
+            altitude_start_in_tier = max(tier_start, 0)
+            altitude_end_in_tier = min(altitude_feet, tier_end)
 
-            # Add cost for this tier
-            tier_cost = tier.calculate_cost(altitude_in_tier)
-            total_cost += tier_cost
-
-            # Reduce remaining altitude
-            remaining_altitude -= altitude_in_tier
+            # Only charge if there's actual altitude in this tier
+            if altitude_end_in_tier > altitude_start_in_tier:
+                altitude_in_tier = altitude_end_in_tier - altitude_start_in_tier
+                tier_cost = tier.calculate_cost(altitude_in_tier)
+                total_cost += tier_cost
 
         return total_cost.quantize(Decimal("0.01"))
 
