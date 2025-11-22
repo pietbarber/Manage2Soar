@@ -104,7 +104,7 @@ This fix should work for most video platforms that require referrer verification
 - `cms/templates/cms/page.html` - Applied fix_youtube_embeds filter to content display
 - `cms/templates/cms/homepage.html` - Applied fix_youtube_embeds filter to content display  
 - `cms/management/commands/fix_youtube_embeds.py` - Management command for batch fixing existing content
-- `cms/utils.py` - Shared utility functions for YouTube embed fixing
+- `cms/utils.py` - New shared utility functions for YouTube embed fixing
 - `docs/resolved-issues/issue-277-youtube-error-153-fix.md` - This comprehensive documentation
 
 ## Deployment Steps

@@ -39,9 +39,12 @@ def fix_youtube_embeds(content):
         if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
             return match.group(0)  # Already correct
 
-        # Remove any existing referrerpolicy
+        # Remove any existing referrerpolicy (handles both single and double quotes)
         iframe_attrs = re.sub(
-            r'\s*referrerpolicy="[^"]*"', "", iframe_attrs, flags=re.IGNORECASE
+            r'\s*referrerpolicy=["\'][^"\']*["\']',
+            "",
+            iframe_attrs,
+            flags=re.IGNORECASE,
         )
 
         # Add the correct referrerpolicy

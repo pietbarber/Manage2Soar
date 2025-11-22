@@ -13,8 +13,6 @@ Options:
     --force: Skip confirmation prompt
 """
 
-import re
-
 from django.core.management.base import BaseCommand
 
 from cms.models import HomePageContent, Page
@@ -73,8 +71,7 @@ class Command(BaseCommand):
         if pages_to_fix:
             self.stdout.write(f"\n📄 Pages ({len(pages_to_fix)}):")
             for page in pages_to_fix:
-                self.stdout.write(f"  • {page.title} (/{page.get_absolute_url()})")
-
+                self.stdout.write(f"  • {page.title} ({page.get_absolute_url()})")
         if homepage_to_fix:
             self.stdout.write(f"\n🏠 Homepage Content ({len(homepage_to_fix)}):")
             for homepage in homepage_to_fix:
