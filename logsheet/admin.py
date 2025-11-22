@@ -16,6 +16,8 @@ from .models import (
     LogsheetPayment,
     RevisionLog,
     Towplane,
+    TowplaneChargeScheme,
+    TowplaneChargeTier,
     TowplaneCloseout,
     TowRate,
 )
@@ -276,6 +278,96 @@ class TowRateAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     admin_helper_message = (
         "Tow rates: edit prices for tow altitudes. Prices are shown in the booking UI."
+    )
+
+
+# Inline admin for TowplaneChargeTier - allows editing tiers within charge scheme
+class TowplaneChargeTierInline(admin.TabularInline):
+    model = TowplaneChargeTier
+    extra = 1
+    fields = (
+        "altitude_start",
+        "altitude_end",
+        "rate_type",
+        "rate_amount",
+        "is_active",
+        "description",
+    )
+    ordering = ("altitude_start",)
+
+
+# Admin configuration for TowplaneChargeScheme objects
+# Allows creating custom charging schemes for different towplanes
+# with tiered pricing and hookup fees.
+@admin.register(TowplaneChargeScheme)
+class TowplaneChargeSchemeAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = ("towplane", "name", "hookup_fee", "is_active", "updated_at")
+    list_filter = ("is_active", "created_at")
+    search_fields = ("name", "towplane__name", "towplane__n_number")
+    readonly_fields = ("created_at", "updated_at")
+    inlines = [TowplaneChargeTierInline]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("towplane", "name", "is_active", "description")},
+        ),
+        (
+            "Pricing",
+            {
+                "fields": ("hookup_fee",),
+                "description": "Base fees and pricing structure. Add altitude-based tiers in the Charge Tiers section below.",
+            },
+        ),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    admin_helper_message = (
+        "Towplane charge schemes: Create custom pricing for different towplanes. "
+        "Includes hookup fees and tiered pricing by altitude. "
+        "If no scheme exists for a towplane, the system falls back to global TowRate pricing."
+    )
+
+
+@admin.register(TowplaneChargeTier)
+class TowplaneChargeTierAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "charge_scheme",
+        "altitude_start",
+        "altitude_end",
+        "rate_type",
+        "rate_amount",
+        "is_active",
+    )
+    list_filter = ("rate_type", "is_active", "charge_scheme__towplane")
+    search_fields = (
+        "charge_scheme__name",
+        "charge_scheme__towplane__name",
+        "description",
+    )
+    ordering = ("charge_scheme__towplane__name", "altitude_start")
+
+    fieldsets = (
+        (
+            "Tier Configuration",
+            {
+                "fields": (
+                    "charge_scheme",
+                    "altitude_start",
+                    "altitude_end",
+                    "is_active",
+                )
+            },
+        ),
+        ("Pricing Details", {"fields": ("rate_type", "rate_amount", "description")}),
+    )
+
+    admin_helper_message = (
+        "Towplane charge tiers: Define pricing tiers within charge schemes. "
+        "Each tier covers a specific altitude range with its own pricing structure."
     )
 
 
