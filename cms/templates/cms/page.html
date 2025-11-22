@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load cms_tags %}
 {% block content %}
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <h1 style="margin:0">{{ page.title }}</h1>
@@ -38,7 +39,7 @@
     </div>
   {% endif %}
 
-  <div>{{ page.content|safe }}</div>
+  <div>{{ page.content|fix_youtube_embeds|safe }}</div>
   {% if subpages %}
     <h3>Subpages</h3>
     <table id="subpagesTable" class="table table-sm table-bordered table-striped" style="max-width:1000px;">

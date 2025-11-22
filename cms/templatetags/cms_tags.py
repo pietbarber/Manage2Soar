@@ -85,3 +85,11 @@ def google_maps_url(site_config):
 def add_class(field, css_class):
     """Add CSS class to a form field widget."""
     return field.as_widget(attrs={"class": css_class})
+
+
+@register.filter
+def fix_youtube_embeds(content):
+    """Fix YouTube embed iframes to prevent Error 153 by adding proper referrer policy."""
+    from cms.utils import fix_youtube_embeds as fix_embeds
+
+    return fix_embeds(content)

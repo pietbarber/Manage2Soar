@@ -195,7 +195,7 @@ class Page(models.Model):
         Save the page with automatic slug generation and validation.
 
         Automatically generates a URL-friendly slug from the title if none provided,
-        and runs model validation before saving to ensure data integrity.
+        runs model validation, and fixes YouTube embeds to prevent Error 153.
 
         Args:
             *args, **kwargs: Standard Django save() parameters
@@ -206,8 +206,28 @@ class Page(models.Model):
         # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
         if self.pk:
             self.clean()
+            # Only fix YouTube embeds if content has changed
+            old_content = Page.objects.get(pk=self.pk).content
+            if old_content != self.content:
+                self._fix_youtube_embeds()
+        else:
+            # New object, always check
+            self._fix_youtube_embeds()
 
         super().save(*args, **kwargs)
+
+    def _fix_youtube_embeds(self):
+        """
+        Automatically fix YouTube iframe embeds to prevent Error 153.
+
+        Uses shared utility function to add referrerpolicy="strict-origin-when-cross-origin"
+        to YouTube iframes for proper domain verification.
+        """
+        from .utils import fix_youtube_embeds
+
+        fixed_content = fix_youtube_embeds(self.content)
+        if fixed_content != self.content:
+            self.content = fixed_content
 
     def has_role_restrictions(self):
         """
@@ -360,6 +380,31 @@ class HomePageContent(models.Model):
 
     def __str__(self):
         return f"{self.title} [{self.audience}]"
+
+    def save(self, *args, **kwargs):
+        """Save with automatic YouTube embed fixes to prevent Error 153."""
+        # Only fix YouTube embeds if content has changed
+        if self.pk:
+            old_content = HomePageContent.objects.get(pk=self.pk).content
+            if old_content != self.content:
+                self._fix_youtube_embeds()
+        else:
+            # New object, always check
+            self._fix_youtube_embeds()
+        super().save(*args, **kwargs)
+
+    def _fix_youtube_embeds(self):
+        """
+        Automatically fix YouTube iframe embeds to prevent Error 153.
+
+        Uses shared utility function to add referrerpolicy="strict-origin-when-cross-origin"
+        to YouTube iframes for proper domain verification.
+        """
+        from .utils import fix_youtube_embeds
+
+        fixed_content = fix_youtube_embeds(self.content)
+        if fixed_content != self.content:
+            self.content = fixed_content
 
 
 class HomePageImage(models.Model):

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load cms_tags %}
 
 {% block content %}
   <div class="homepage-content">
@@ -12,7 +13,7 @@
       {% endif %}
     </div>
     <div class="cms-content">
-      {{ page.content|safe }}
+      {{ page.content|fix_youtube_embeds|safe }}
     </div>
     {% if page.images.all %}
       <div class="homepage-gallery">
