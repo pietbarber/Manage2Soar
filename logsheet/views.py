@@ -1348,7 +1348,9 @@ def view_logsheet_closeout(request, pk):
         logsheet=logsheet
     ).select_related("reported_by", "glider", "towplane")
     closeout = getattr(logsheet, "closeout", None)
-    towplanes = logsheet.towplane_closeouts.select_related("towplane").all()
+    towplanes = logsheet.towplane_closeouts.select_related(
+        "towplane", "rental_charged_to"
+    ).all()
 
     # Check if towplane rentals are enabled for conditional display
     from siteconfig.models import SiteConfiguration

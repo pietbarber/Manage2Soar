@@ -784,13 +784,33 @@ class LogsheetDutyCrewForm(forms.ModelForm):
         has_flights = logsheet.flights.exists() if logsheet else False
 
         # Check if this logsheet has only rental operations
-        has_only_rentals = bool(
-            logsheet
-            and not has_flights
-            and logsheet.towplane_closeouts.filter(
-                rental_hours_chargeable__gt=0
-            ).exists()
-        )
+        # Optimize by checking if any closeout in an already-loaded queryset has rental hours
+        has_rental_closeouts = False
+        if logsheet and not has_flights:
+            # Check if any closeout has rental hours without hitting the database again
+            try:
+                # Try to use prefetched data if available
+                closeouts = getattr(logsheet, "_prefetched_objects_cache", {}).get(
+                    "towplane_closeouts"
+                )
+                if closeouts is not None:
+                    has_rental_closeouts = any(
+                        closeout.rental_hours_chargeable
+                        and closeout.rental_hours_chargeable > 0
+                        for closeout in closeouts
+                    )
+                else:
+                    # Fall back to database query if not prefetched
+                    has_rental_closeouts = logsheet.towplane_closeouts.filter(
+                        rental_hours_chargeable__gt=0
+                    ).exists()
+            except:
+                # Fallback if there are any issues with the optimization
+                has_rental_closeouts = logsheet.towplane_closeouts.filter(
+                    rental_hours_chargeable__gt=0
+                ).exists()
+
+        has_only_rentals = bool(logsheet and not has_flights and has_rental_closeouts)
 
         # Conditional duty officer validation
         if not duty_officer:

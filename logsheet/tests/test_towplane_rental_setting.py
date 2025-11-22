@@ -25,7 +25,7 @@ class TowplaneRentalSettingTestCase(TestCase):
         )
 
         # Create a member (which includes the user)
-        self.member = Member.objects.create(
+        self.member = Member.objects.create_user(
             username="testuser",
             password="testpass",
             first_name="Test",
