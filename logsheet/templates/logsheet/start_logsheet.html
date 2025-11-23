@@ -1,12 +1,30 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
+{% endblock %}
+
 {% block content %}
-<h1>Create New Log Sheet</h1>
+<div class="container-fluid">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <h1 class="display-6 fw-bold text-primary mb-1">
+        <i class="bi bi-journal-plus me-2"></i>Create New Logsheet
+      </h1>
+      <p class="text-muted mb-0">Start a new flight operations logsheet with pre-populated duty crew information</p>
+    </div>
+  </div>
 
-
-<!-- Button to trigger modal -->
-<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
-  Create New Logsheet
-</button>
+  <!-- Action Section -->
+  <div class="row mb-4">
+    <div class="col-12 text-center">
+      <button type="button" class="btn btn-primary btn-lg btn-modern" data-bs-toggle="modal" data-bs-target="#createLogsheetModal">
+        <i class="bi bi-plus-circle me-2"></i>Create New Logsheet
+      </button>
+    </div>
+  </div>
 
 {% if message %}
 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -30,83 +48,179 @@
   {% endfor %}
 {% endif %}
 
-<!-- Modal HTML structure -->
+  <!-- Create Logsheet Modal -->
+  <div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content logsheet-modal">
+        <form method="POST">
+          {% csrf_token %}
 
-<div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog">
-    <div class="modal-content">
-
-      <form method="POST">
-        {% csrf_token %}
-        {{ form.non_field_errors }}
-
-        <div class="modal-header">
-          <h5 class="modal-title" id="createLogsheetModalLabel">Create New Logsheet</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            {{ form.log_date.label_tag }}
-            {{ form.log_date }}
-            {{ form.log_date.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.airfield.label_tag }}
-            {{ form.airfield }}
-            {{ form.airfield.errors }}
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="createLogsheetModalLabel">
+              <i class="bi bi-journal-plus me-2"></i>Create New Logsheet
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
 
-          <!-- Duty Crew Fields -->
-          <div class="mb-3">
-            {{ form.duty_officer.label_tag }}
-            {{ form.duty_officer }}
-            {{ form.duty_officer.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.assistant_duty_officer.label_tag }}
-            {{ form.assistant_duty_officer }}
-            {{ form.assistant_duty_officer.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.duty_instructor.label_tag }}
-            {{ form.duty_instructor }}
-            {{ form.duty_instructor.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.surge_instructor.label_tag }}
-            {{ form.surge_instructor }}
-            {{ form.surge_instructor.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.tow_pilot.label_tag }}
-            {{ form.tow_pilot }}
-            {{ form.tow_pilot.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.surge_tow_pilot.label_tag }}
-            {{ form.surge_tow_pilot }}
-            {{ form.surge_tow_pilot.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.default_towplane.label_tag }}
-            {{ form.default_towplane }}
-            {{ form.default_towplane.errors }}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-success">Start Logsheet</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        </div>
-      </form>
+          <div class="modal-body">
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
 
+            <!-- Basic Information Section -->
+            <div class="section-header mb-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-info-circle me-2"></i>Basic Information
+              </h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.log_date.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-calendar3 me-1 text-primary"></i>{{ form.log_date.label }}
+                </label>
+                {{ form.log_date }}
+                {% if form.log_date.errors %}
+                  <div class="text-danger small mt-1">{{ form.log_date.errors }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.airfield.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-geo-alt me-1 text-primary"></i>{{ form.airfield.label }}
+                </label>
+                {{ form.airfield }}
+                {% if form.airfield.errors %}
+                  <div class="text-danger small mt-1">{{ form.airfield.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Duty Crew Section -->
+            <div class="section-header mb-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-people me-2"></i>Duty Crew Assignment
+                <small class="text-muted fw-normal">(Auto-populated from duty roster)</small>
+              </h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.duty_officer.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-person-badge me-1 text-primary"></i>{{ form.duty_officer.label }}
+                </label>
+                {{ form.duty_officer }}
+                {% if form.duty_officer.errors %}
+                  <div class="text-danger small mt-1">{{ form.duty_officer.errors }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.assistant_duty_officer.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-person-plus me-1 text-primary"></i>{{ form.assistant_duty_officer.label }}
+                </label>
+                {{ form.assistant_duty_officer }}
+                {% if form.assistant_duty_officer.errors %}
+                  <div class="text-danger small mt-1">{{ form.assistant_duty_officer.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.duty_instructor.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-mortarboard me-1 text-primary"></i>{{ form.duty_instructor.label }}
+                </label>
+                {{ form.duty_instructor }}
+                {% if form.duty_instructor.errors %}
+                  <div class="text-danger small mt-1">{{ form.duty_instructor.errors }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.surge_instructor.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-mortarboard-fill me-1 text-primary"></i>{{ form.surge_instructor.label }}
+                </label>
+                {{ form.surge_instructor }}
+                {% if form.surge_instructor.errors %}
+                  <div class="text-danger small mt-1">{{ form.surge_instructor.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.tow_pilot.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-airplane me-1 text-primary"></i>{{ form.tow_pilot.label }}
+                </label>
+                {{ form.tow_pilot }}
+                {% if form.tow_pilot.errors %}
+                  <div class="text-danger small mt-1">{{ form.tow_pilot.errors }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.surge_tow_pilot.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-airplane-fill me-1 text-primary"></i>{{ form.surge_tow_pilot.label }}
+                </label>
+                {{ form.surge_tow_pilot }}
+                {% if form.surge_tow_pilot.errors %}
+                  <div class="text-danger small mt-1">{{ form.surge_tow_pilot.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Equipment Section -->
+            <div class="section-header mb-3">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-gear me-2"></i>Default Equipment
+              </h6>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="{{ form.default_towplane.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-airplane me-1 text-primary"></i>{{ form.default_towplane.label }}
+                </label>
+                {{ form.default_towplane }}
+                {% if form.default_towplane.errors %}
+                  <div class="text-danger small mt-1">{{ form.default_towplane.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Warnings Display -->
+            {% if form.warnings %}
+              <div class="alert alert-warning mt-4">
+                <h6 class="alert-heading">
+                  <i class="bi bi-exclamation-triangle me-2"></i>Please Review
+                </h6>
+                {% for warning in form.warnings %}
+                  <p class="mb-0">{{ warning }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="modal-footer bg-light">
+            <button type="submit" class="btn btn-success btn-modern">
+              <i class="bi bi-check-circle me-2"></i>Create Logsheet
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-modern" data-bs-dismiss="modal">
+              <i class="bi bi-x-circle me-2"></i>Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
+
 </div>
 
+<footer class="mt-5" style="font-size: 0.8em; color: gray;">
+  Template: <code>logsheet/start_logsheet.html</code>
+</footer>
 
+{% block extra_scripts %}
+<script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
+{% endblock %}
 
-
-  <footer style="font-size: 0.8em; color: gray;">
-    Template: <code>logsheet/start_logsheet.html</code>
-  </footer>
 {% endblock %}

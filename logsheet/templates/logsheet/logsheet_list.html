@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block extra_css %}
+{% block head_extra %}
 <link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
 {% endblock %}
 
@@ -36,65 +36,135 @@
 
 <!-- Modal HTML structure for creating a new logsheet -->
 <div class="modal fade" id="createLogsheetModal" tabindex="-1" aria-labelledby="createLogsheetModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog">
-    <div class="modal-content">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content logsheet-modal">
       <form method="POST" action="{% url 'logsheet:create' %}">
         {% csrf_token %}
-        {{ form.non_field_errors }}
-        <div class="modal-header">
-          <h5 class="modal-title" id="createLogsheetModalLabel">Create New Logsheet</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title d-flex align-items-center" id="createLogsheetModalLabel">
+            <i class="bi bi-journal-plus me-2"></i>Create New Logsheet
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+
         <div class="modal-body">
-          <div class="mb-3">
-            {{ form.log_date.label_tag }}
-            {{ form.log_date }}
-            {{ form.log_date.errors }}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          <!-- Basic Information Section -->
+          <div class="section-header mb-3">
+            <h6 class="text-primary fw-bold mb-0">
+              <i class="bi bi-info-circle me-2"></i>Basic Information
+            </h6>
           </div>
-          <div class="mb-3">
-            {{ form.airfield.label_tag }}
-            {{ form.airfield }}
-            {{ form.airfield.errors }}
+
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <label for="{{ form.log_date.id_for_label }}" class="form-label">
+                <i class="bi bi-calendar3 me-1 text-primary"></i>{{ form.log_date.label }}
+              </label>
+              {{ form.log_date }}
+              {{ form.log_date.errors }}
+            </div>
+            <div class="col-md-6">
+              <label for="{{ form.airfield.id_for_label }}" class="form-label">
+                <i class="bi bi-geo-alt me-1 text-primary"></i>{{ form.airfield.label }}
+              </label>
+              {{ form.airfield }}
+              {{ form.airfield.errors }}
+            </div>
           </div>
-          <div class="mb-3">
-            {{ form.duty_officer.label_tag }}
-            {{ form.duty_officer }}
-            {{ form.duty_officer.errors }}
+
+          <!-- Duty Crew Assignment Section -->
+          <div class="section-header mb-3">
+            <h6 class="text-primary fw-bold mb-0">
+              <i class="bi bi-people me-2"></i>Duty Crew Assignment
+            </h6>
           </div>
-          <div class="mb-3">
-            {{ form.assistant_duty_officer.label_tag }}
-            {{ form.assistant_duty_officer }}
-            {{ form.assistant_duty_officer.errors }}
+
+          <div class="alert alert-info border-0 mb-3">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Auto-Population:</strong> Crew assignments will be automatically filled based on the duty roster for the selected date.
           </div>
-          <div class="mb-3">
-            {{ form.duty_instructor.label_tag }}
-            {{ form.duty_instructor }}
-            {{ form.duty_instructor.errors }}
+
+          <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.duty_officer.id_for_label }}" class="form-label">
+                <i class="bi bi-person-badge me-1 text-primary"></i>{{ form.duty_officer.label }}
+              </label>
+              {{ form.duty_officer }}
+              {{ form.duty_officer.errors }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.assistant_duty_officer.id_for_label }}" class="form-label">
+                <i class="bi bi-person-plus me-1 text-primary"></i>{{ form.assistant_duty_officer.label }}
+              </label>
+              {{ form.assistant_duty_officer }}
+              {{ form.assistant_duty_officer.errors }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.duty_instructor.id_for_label }}" class="form-label">
+                <i class="bi bi-mortarboard me-1 text-primary"></i>{{ form.duty_instructor.label }}
+              </label>
+              {{ form.duty_instructor }}
+              {{ form.duty_instructor.errors }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.surge_instructor.id_for_label }}" class="form-label">
+                <i class="bi bi-mortarboard-fill me-1 text-primary"></i>{{ form.surge_instructor.label }}
+              </label>
+              {{ form.surge_instructor }}
+              {{ form.surge_instructor.errors }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.tow_pilot.id_for_label }}" class="form-label">
+                <i class="bi bi-airplane me-1 text-primary"></i>{{ form.tow_pilot.label }}
+              </label>
+              {{ form.tow_pilot }}
+              {{ form.tow_pilot.errors }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="{{ form.surge_tow_pilot.id_for_label }}" class="form-label">
+                <i class="bi bi-airplane-fill me-1 text-primary"></i>{{ form.surge_tow_pilot.label }}
+              </label>
+              {{ form.surge_tow_pilot }}
+              {{ form.surge_tow_pilot.errors }}
+            </div>
           </div>
-          <div class="mb-3">
-            {{ form.surge_instructor.label_tag }}
-            {{ form.surge_instructor }}
-            {{ form.surge_instructor.errors }}
+
+          <!-- Default Equipment Section -->
+          <div class="section-header mb-3">
+            <h6 class="text-primary fw-bold mb-0">
+              <i class="bi bi-gear me-2"></i>Default Equipment
+            </h6>
           </div>
-          <div class="mb-3">
-            {{ form.tow_pilot.label_tag }}
-            {{ form.tow_pilot }}
-            {{ form.tow_pilot.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.surge_tow_pilot.label_tag }}
-            {{ form.surge_tow_pilot }}
-            {{ form.surge_tow_pilot.errors }}
-          </div>
-          <div class="mb-3">
-            {{ form.default_towplane.label_tag }}
-            {{ form.default_towplane }}
-            {{ form.default_towplane.errors }}
+
+          <div class="row">
+            <div class="col-12">
+              <label for="{{ form.default_towplane.id_for_label }}" class="form-label">
+                <i class="bi bi-airplane-engines me-1 text-primary"></i>{{ form.default_towplane.label }}
+              </label>
+              {{ form.default_towplane }}
+              {{ form.default_towplane.errors }}
+              <div class="form-text">
+                <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+                This towplane will be pre-selected for all flights in this logsheet.
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-success">Start Logsheet</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+
+        <div class="modal-footer bg-light">
+          <button type="submit" class="btn btn-success btn-modern">
+            <i class="bi bi-check-circle me-2"></i>Create Logsheet
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-modern" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-2"></i>Cancel
+          </button>
         </div>
       </form>
     </div>
@@ -303,48 +373,8 @@
 </nav>
 {% endif %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var dateInput = document.getElementById('id_log_date');
-  if (dateInput) {
-    dateInput.addEventListener('change', function() {
-      var dateVal = this.value;
-      if (!dateVal) return;
-      fetch('/logsheet/api/duty-assignment/?date=' + encodeURIComponent(dateVal), {
-        credentials: 'same-origin'
-      })
-      .then(response => response.json())
-      .then(data => {
-        var fields = [
-          'duty_officer', 'assistant_duty_officer', 'duty_instructor',
-          'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
-        ];
-        fields.forEach(function(field) {
-          var select = document.getElementById('id_' + field);
-          if (select && data[field]) {
-            select.value = data[field];
-          }
-        });
-      });
-    });
-  }
-
-  // Validate default towplane before submitting the modal form
-  var createForm = document.querySelector('#createLogsheetModal form');
-  if (createForm) {
-    createForm.addEventListener('submit', function(e) {
-      var towplane = document.getElementById('id_default_towplane');
-      if (towplane && (!towplane.value || towplane.value === '')) {
-        e.preventDefault();
-        alert('Please select a default towplane before creating the logsheet.');
-        towplane.focus();
-      }
-    });
-  }
-});
-</script>
-
+{% block extra_scripts %}
+<script src="{% static 'js/duty-assignment-autopopulate.js' %}"></script>
 {% endblock %}
 
 
