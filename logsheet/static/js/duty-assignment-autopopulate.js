@@ -71,39 +71,41 @@ function validateTowplane(towplane) {
 }
 
 /**
- * Initialize duty assignment auto-population for logsheet forms
+ * Handler for duty assignment auto-population initialization
  */
-function initDutyAssignmentAutoPopulation() {
-    document.addEventListener('DOMContentLoaded', function () {
-        var dateInput = document.getElementById('id_log_date');
-        if (dateInput) {
-            // Auto-populate on page load if there's a date value
-            if (dateInput.value) {
-                console.log('Page loaded with date:', dateInput.value, '- fetching duty assignment');
-                fetchDutyAssignment(dateInput.value);
+function dutyAssignmentAutoPopulationHandler() {
+    var dateInput = document.getElementById('id_log_date');
+    if (dateInput) {
+        // Auto-populate on page load if there's a date value
+        if (dateInput.value) {
+            console.log('Page loaded with date:', dateInput.value, '- fetching duty assignment');
+            fetchDutyAssignment(dateInput.value);
+        }
+
+        // Auto-populate when date changes
+        dateInput.addEventListener('change', function () {
+            var dateVal = this.value;
+            if (!dateVal) return;
+            console.log('Date changed to:', dateVal, '- fetching duty assignment');
+            fetchDutyAssignment(dateVal);
+        });
+    }
+
+    // Enhanced form validation for towplane
+    var createForm = document.querySelector('form[method="POST"]');
+    if (createForm) {
+        createForm.addEventListener('submit', function (e) {
+            var towplane = document.getElementById('id_default_towplane');
+            if (!validateTowplane(towplane)) {
+                e.preventDefault();
             }
-
-            // Auto-populate when date changes
-            dateInput.addEventListener('change', function () {
-                var dateVal = this.value;
-                if (!dateVal) return;
-                console.log('Date changed to:', dateVal, '- fetching duty assignment');
-                fetchDutyAssignment(dateVal);
-            });
-        }
-
-        // Enhanced form validation for towplane
-        var createForm = document.querySelector('form[method="POST"]');
-        if (createForm) {
-            createForm.addEventListener('submit', function (e) {
-                var towplane = document.getElementById('id_default_towplane');
-                if (!validateTowplane(towplane)) {
-                    e.preventDefault();
-                }
-            });
-        }
-    });
+        });
+    }
 }
 
-// Initialize the functionality
-initDutyAssignmentAutoPopulation();
+// Initialize the functionality robustly
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', dutyAssignmentAutoPopulationHandler);
+} else {
+    dutyAssignmentAutoPopulationHandler();
+}
