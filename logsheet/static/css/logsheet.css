@@ -213,28 +213,9 @@
     }
 }
 
-/* Loading states for form submission */
+/* Disabled button states */
 .btn-modern:disabled {
     opacity: 0.6;
     transform: none;
     cursor: not-allowed;
-}
-
-.btn-modern.loading {
-    position: relative;
-    color: transparent;
-}
-
-.btn-modern.loading::after {
-    content: "";
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    top: 50%;
-    left: 50%;
-    margin-left: -10px;
-    margin-top: -10px;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    border-top-color: transparent;
 }

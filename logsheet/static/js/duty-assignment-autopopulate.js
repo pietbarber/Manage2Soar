@@ -19,7 +19,7 @@ function fetchDutyAssignment(dateVal) {
             return response.json();
         })
         .then(data => {
-            console.log('Duty assignment data received:', data);
+            // Data received and processing form fields
             var fields = [
                 'duty_officer', 'assistant_duty_officer', 'duty_instructor',
                 'surge_instructor', 'tow_pilot', 'surge_tow_pilot'
@@ -27,7 +27,7 @@ function fetchDutyAssignment(dateVal) {
             fields.forEach(function (field) {
                 var select = document.getElementById('id_' + field);
                 if (select && data[field]) {
-                    console.log('Setting', field, 'to', data[field]);
+                    // Setting field value from duty roster data
                     select.value = data[field];
                 }
             });
@@ -38,36 +38,21 @@ function fetchDutyAssignment(dateVal) {
 }
 
 /**
- * Enhanced form validation with Bootstrap styling
+ * Enhanced form validation with Bootstrap styling (optional validation)
  * @param {HTMLElement} towplane - The towplane select element
- * @returns {boolean} - True if validation passes
+ * @returns {boolean} - True if validation passes (always true since field is optional)
  */
 function validateTowplane(towplane) {
-    if (towplane && (!towplane.value || towplane.value === '')) {
-        // Add Bootstrap validation class
-        towplane.classList.add('is-invalid');
-
-        // Create or update validation feedback
+    // Since default_towplane is optional in Django form, only provide visual feedback
+    // Remove any existing validation classes for consistent UX
+    if (towplane) {
+        towplane.classList.remove('is-invalid');
         var feedbackEl = towplane.parentNode.querySelector('.invalid-feedback');
-        if (!feedbackEl) {
-            feedbackEl = document.createElement('div');
-            feedbackEl.className = 'invalid-feedback';
-            towplane.parentNode.appendChild(feedbackEl);
+        if (feedbackEl) {
+            feedbackEl.remove();
         }
-        feedbackEl.textContent = 'Please select a default towplane before creating the logsheet.';
-
-        towplane.focus();
-        return false;
     }
-
-    // Remove validation classes if validation passes
-    towplane.classList.remove('is-invalid');
-    var feedbackEl = towplane.parentNode.querySelector('.invalid-feedback');
-    if (feedbackEl) {
-        feedbackEl.remove();
-    }
-
-    return true;
+    return true; // Always allow submission since field is optional
 }
 
 /**
@@ -78,7 +63,7 @@ function dutyAssignmentAutoPopulationHandler() {
     if (dateInput) {
         // Auto-populate on page load if there's a date value
         if (dateInput.value) {
-            console.log('Page loaded with date:', dateInput.value, '- fetching duty assignment');
+            // Auto-fetching duty assignment for loaded date
             fetchDutyAssignment(dateInput.value);
         }
 
@@ -86,7 +71,7 @@ function dutyAssignmentAutoPopulationHandler() {
         dateInput.addEventListener('change', function () {
             var dateVal = this.value;
             if (!dateVal) return;
-            console.log('Date changed to:', dateVal, '- fetching duty assignment');
+            // Fetching duty assignment for new date
             fetchDutyAssignment(dateVal);
         });
     }
@@ -96,9 +81,7 @@ function dutyAssignmentAutoPopulationHandler() {
     if (createForm) {
         createForm.addEventListener('submit', function (e) {
             var towplane = document.getElementById('id_default_towplane');
-            if (!validateTowplane(towplane)) {
-                e.preventDefault();
-            }
+            validateTowplane(towplane); // Just clean up UI, don't prevent submission
         });
     }
 }
