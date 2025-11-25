@@ -151,7 +151,7 @@ class Command(BaseCronJobCommand):
         else:
             # Check member managers for dry-run logging
             member_meisters = Member.objects.filter(
-                member_manager=True, email__isnull=False
+                member_manager=True, is_active=True, email__isnull=False
             ).exclude(email="")
 
             if member_meisters.exists():
@@ -215,7 +215,7 @@ class Command(BaseCronJobCommand):
 
         # Find Member Managers (use the proper member_manager boolean field)
         member_meisters = Member.objects.filter(
-            member_manager=True, email__isnull=False
+            member_manager=True, is_active=True, email__isnull=False
         ).exclude(email="")
 
         # Fallback to a configured email if no member meisters found

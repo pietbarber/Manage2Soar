@@ -92,7 +92,7 @@ except ImportError:
     from members.constants.membership import DEFAULT_ACTIVE_STATUSES
     active_status_names = DEFAULT_ACTIVE_STATUSES
 
-eligible_members = Member.objects.follow(
+eligible_members = Member.objects.filter(
     Q(joined_club__lt=membership_cutoff_date)
     | Q(joined_club__isnull=True),  # Include null join dates
     membership_status__in=active_status_names,  # Only active statuses
