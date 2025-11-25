@@ -291,13 +291,15 @@
                 {% for hidden in towform.hidden_fields %}
                   {{ hidden }}
                 {% endfor %}
+                <!-- Towplane field as hidden input - towplane name shown in header -->
+                {{ towform.towplane.as_hidden }}
                 <h5 class="mb-0"><i class="bi bi-airplane-engines me-2"></i>{{ towform.instance.towplane }}</h5>
               </div>
 
               <div class="card-body">
                 <div class="row">
                   <div class="col-md-6">
-                    <!-- Towplane field hidden - already rendered in card header -->
+                    <!-- Towplane field hidden above - already rendered in card header -->
 
                     <div class="mb-3">
                       {{ towform.start_tach.label_tag }}
