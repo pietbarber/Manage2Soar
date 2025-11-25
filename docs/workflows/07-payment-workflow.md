@@ -19,7 +19,7 @@ flowchart TD
     B --> C[Calculate Tow Costs]
     B --> D[Calculate Rental Costs]
 
-    C --> F[Apply Tow Rate Table]
+    C --> F[Apply Towplane Charge Scheme]
     D --> G[Apply Hourly Rental Rates]
 
     F --> I[Total Cost Calculation]
@@ -64,7 +64,8 @@ flowchart TD
 
 ### **Models Involved**
 - **`logsheet.Flight`**: Source data for cost calculations
-- **`logsheet.TowRate`**: Pricing for tow services by altitude
+- **`logsheet.TowplaneChargeScheme`**: Towplane-specific pricing schemes
+- **`logsheet.TowplaneChargeTier`**: Altitude-based pricing tiers within schemes
 - **`logsheet.Glider`**: Aircraft rental rates and specifications
 - **`members.Member`**: Account holders and payment recipients
 - **Custom Payment Models**: Member account balances and payment records *(future implementation)*
@@ -87,7 +88,7 @@ sequenceDiagram
     participant Notifications as Notification System
 
     Flight->>System: Flight Completed Signal
-    System->>Rates: Get Current Tow Rates
+    System->>Rates: Get Towplane Charge Scheme
     System->>Rates: Get Aircraft Rental Rates
     System->>System: Calculate Base Costs
 
@@ -113,7 +114,7 @@ flowchart TD
     A[Flight Data Input] --> B[Tow Cost Calculation]
     A --> C[Rent Cost Calculation]
 
-    B --> E[Release Altitude * Tow Rate]
+    B --> E[Release Altitude * Charge Tier Rate]
     C --> F[Flight Duration * Hourly Rate]
 
     E --> H[Apply Member Discounts]
@@ -186,11 +187,20 @@ erDiagram
         json cost_split_details
     }
 
-    TowRate {
+    TowplaneChargeScheme {
         int id PK
+        int towplane_id FK
+        string name
+        text description
+        date effective_date
+        boolean active
+    }
+
+    TowplaneChargeTier {
+        int id PK
+        int scheme_id FK
         int altitude_feet
         decimal rate_dollars
-        date effective_date
         boolean active
     }
 
@@ -229,7 +239,8 @@ erDiagram
     Member ||--o{ Payment : makes
     Flight ||--o{ MemberCharge : generates
     Glider ||--o{ Flight : used_in
-    TowRate ||--o{ Flight : applies_to
+    TowplaneChargeScheme ||--o{ Flight : applies_to
+    TowplaneChargeScheme ||--o{ TowplaneChargeTier : contains
 ```
 
 ## Key Integration Points

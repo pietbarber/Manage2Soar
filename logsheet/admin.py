@@ -19,7 +19,6 @@ from .models import (
     TowplaneChargeScheme,
     TowplaneChargeTier,
     TowplaneCloseout,
-    TowRate,
 )
 
 
@@ -270,17 +269,6 @@ class LogsheetAdmin(AdminHelperMixin, admin.ModelAdmin):
 # a `./manage.py shell` command
 
 
-@admin.register(TowRate)
-class TowRateAdmin(AdminHelperMixin, admin.ModelAdmin):
-    list_display = ("altitude", "price")
-    list_editable = ("price",)
-    ordering = ("altitude",)
-
-    admin_helper_message = (
-        "Tow rates: edit prices for tow altitudes. Prices are shown in the booking UI."
-    )
-
-
 # Inline admin for TowplaneChargeTier - allows editing tiers within charge scheme
 class TowplaneChargeTierInline(admin.TabularInline):
     model = TowplaneChargeTier
@@ -328,7 +316,7 @@ class TowplaneChargeSchemeAdmin(AdminHelperMixin, admin.ModelAdmin):
     admin_helper_message = (
         "Towplane charge schemes: Create custom pricing for different towplanes. "
         "Includes hookup fees and tiered pricing by altitude. "
-        "If no scheme exists for a towplane, the system falls back to global TowRate pricing."
+        "All towplanes should have a charge scheme configured."
     )
 
 

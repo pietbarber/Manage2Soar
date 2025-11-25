@@ -1,8 +1,7 @@
 """
 Tests for towplane-specific charging system (Issue #67).
 
-Tests different towplane charges, flexible pricing schemes,
-and backward compatibility with existing TowRate system.
+Tests different towplane charges and flexible pricing schemes.
 """
 
 from decimal import Decimal
@@ -18,7 +17,6 @@ from logsheet.models import (
     Towplane,
     TowplaneChargeScheme,
     TowplaneChargeTier,
-    TowRate,
 )
 from members.models import Member
 
@@ -262,9 +260,7 @@ class FlightTowCostIntegrationTestCase(TestCase):
             name="Premium Tow", n_number="N456PT"
         )
 
-        # Create global tow rates for fallback
-        TowRate.objects.create(altitude=2000, price=Decimal("25.00"))
-        TowRate.objects.create(altitude=3000, price=Decimal("30.00"))
+        # No longer need global tow rates - all towplanes should have charge schemes
 
         # Create premium towplane charge scheme
         premium_scheme = TowplaneChargeScheme.objects.create(
@@ -293,8 +289,8 @@ class FlightTowCostIntegrationTestCase(TestCase):
         cost = flight.tow_cost_calculated
         self.assertEqual(cost, Decimal("40.00"))
 
-    def test_flight_falls_back_to_global_rates(self):
-        """Test flight falls back to global TowRate when no scheme exists."""
+    def test_flight_without_scheme_returns_none(self):
+        """Test flight returns None when no charge scheme exists."""
         flight = Flight.objects.create(
             logsheet=self.logsheet,
             pilot=self.member,
@@ -302,12 +298,12 @@ class FlightTowCostIntegrationTestCase(TestCase):
             release_altitude=2000,
         )
 
-        # Should use global TowRate: $25.00
+        # Should return None when no charge scheme exists
         cost = flight.tow_cost_calculated
-        self.assertEqual(cost, Decimal("25.00"))
+        self.assertIsNone(cost)
 
-    def test_flight_with_inactive_scheme_falls_back(self):
-        """Test flight falls back when towplane scheme is inactive."""
+    def test_flight_with_inactive_scheme_returns_none(self):
+        """Test flight returns None when towplane scheme is inactive."""
         # Create inactive scheme
         TowplaneChargeScheme.objects.create(
             towplane=self.standard_towplane,
@@ -323,9 +319,9 @@ class FlightTowCostIntegrationTestCase(TestCase):
             release_altitude=2000,
         )
 
-        # Should use global TowRate, not the inactive scheme
+        # Should return None when scheme is inactive
         cost = flight.tow_cost_calculated
-        self.assertEqual(cost, Decimal("25.00"))
+        self.assertIsNone(cost)
 
     def test_tow_cost_property_consistency(self):
         """Test that tow_cost property matches tow_cost_calculated."""
@@ -342,102 +338,3 @@ class FlightTowCostIntegrationTestCase(TestCase):
 
         self.assertEqual(calculated_cost, property_cost)
         self.assertEqual(property_cost, Decimal("55.00"))  # $10 + (3 × $15)
-
-
-class BackwardCompatibilityTestCase(TestCase):
-    """Test backward compatibility with existing TowRate system."""
-
-    def setUp(self):
-        # Create towplane without charge scheme
-        self.towplane = Towplane.objects.create(name="Old Towplane", n_number="N111OLD")
-
-        # Create traditional tow rates (every 100ft like the real system)
-        # This matches the pattern from tow_rate_import.py
-        rates = [
-            (0, "10.00"),
-            (100, "10.00"),
-            (200, "11.00"),
-            (300, "12.00"),
-            (400, "13.00"),
-            (500, "15.00"),
-            (600, "16.00"),
-            (700, "17.00"),
-            (800, "18.00"),
-            (900, "19.00"),
-            (1000, "15.00"),
-            (1100, "16.00"),
-            (1200, "17.00"),
-            (1300, "18.00"),
-            (1400, "19.00"),
-            (1500, "15.00"),
-            (1600, "16.00"),
-            (1700, "17.00"),
-            (1800, "18.00"),
-            (1900, "19.00"),
-            (2000, "20.00"),
-            (2100, "21.00"),
-            (2200, "22.00"),
-            (2300, "23.00"),
-            (2400, "24.00"),
-            (2500, "20.00"),
-            (2600, "21.00"),
-            (2700, "22.00"),
-            (2800, "23.00"),
-            (2900, "24.00"),
-            (3000, "25.00"),
-            (3100, "26.00"),
-            (3200, "27.00"),
-            (3300, "28.00"),
-            (3400, "29.00"),
-            (3500, "25.00"),
-            (3600, "26.00"),
-            (3700, "27.00"),
-            (3800, "28.00"),
-            (3900, "29.00"),
-            (4000, "30.00"),
-            (4100, "31.00"),
-            (4200, "32.00"),
-            (4300, "33.00"),
-            (4400, "34.00"),
-            (4500, "30.00"),
-        ]
-
-        for altitude, price in rates:
-            TowRate.objects.create(altitude=altitude, price=Decimal(price))
-
-    def test_backward_compatibility_preserved(self):
-        """Test that flights work exactly as before when no charge schemes exist."""
-        # Create user and member for flight
-        user = User.objects.create_user(username="oldpilot")
-        member = Member.objects.create(user=user, membership_status="Full Member")
-
-        # Create airfield and logsheet
-        airfield = Airfield.objects.create(identifier="KTEST", name="Test Field")
-        logsheet = Logsheet.objects.create(
-            log_date="2025-01-01", airfield=airfield, created_by=member
-        )
-
-        # Test various altitudes
-        test_cases = [
-            (500, Decimal("15.00")),  # Uses 500ft rate (highest ≤ 500)
-            (1500, Decimal("15.00")),  # Uses rate at 1500ft (highest ≤ 1500)
-            (2500, Decimal("20.00")),  # Uses 2500ft rate (exact match)
-            (3500, Decimal("25.00")),  # Uses 3500ft rate (exact match)
-            (4500, Decimal("30.00")),  # Uses 4500ft rate (exact match)
-        ]
-
-        for altitude, expected_cost in test_cases:
-            with self.subTest(altitude=altitude):
-                flight = Flight.objects.create(
-                    logsheet=logsheet,
-                    pilot=member,
-                    towplane=self.towplane,
-                    release_altitude=altitude,
-                )
-
-                cost = flight.tow_cost_calculated
-                self.assertEqual(
-                    cost,
-                    expected_cost,
-                    f"Altitude {altitude}ft should cost ${expected_cost}, got ${cost}",
-                )

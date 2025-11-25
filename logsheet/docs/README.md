@@ -52,7 +52,8 @@ See [models.md](models.md) for full details and database schema.
 - **Glider/Towplane:** aircraft, status, maintenance
 - **MaintenanceIssue/Deadline:** tracks issues and deadlines
 - **RevisionLog:** audit trail for changes
-- **TowRate, LogsheetPayment, Closeouts:** financials
+- **TowplaneChargeScheme/ChargeTier:** towplane-specific pricing (replaces TowRate)
+- **LogsheetPayment, Closeouts:** financials
 
 ---
 
@@ -104,6 +105,7 @@ See [models.md](models.md) for full details and database schema.
 
 ## Changelog
 
+- **2025-11-24** Issue #283: Deprecated TowRate system, all towplanes now use TowplaneChargeScheme
 - **2025-10** Major documentation update for logsheet app
 - **2025-08** Initial release: daily logsheets, flights, maintenance, closeouts
  - **2025-10-21** Updated `logsheet.signals` to notify instructors when an instruction

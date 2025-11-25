@@ -85,12 +85,26 @@ erDiagram
         image photo
     }
 
-    TowRate {
+    TowplaneChargeScheme {
         int id PK
-        int altitude
-        decimal rate
-        string aircraft_type
-        boolean active
+        int towplane_id FK
+        string name
+        decimal hookup_fee
+        boolean is_active
+        text description
+        datetime created_at
+        datetime updated_at
+    }
+
+    TowplaneChargeTier {
+        int id PK
+        int charge_scheme_id FK
+        int altitude_start
+        int altitude_end
+        string rate_type
+        decimal rate_amount
+        boolean is_active
+        string description
     }
 
     LogsheetPayment {
@@ -179,6 +193,8 @@ erDiagram
     Towplane ||--o{ MaintenanceDeadline : deadlines
     Glider ||--o{ AircraftMeister : maintained_by
     Towplane ||--o{ AircraftMeister : maintained_by
+    Towplane ||--|| TowplaneChargeScheme : pricing
+    TowplaneChargeScheme ||--o{ TowplaneChargeTier : tiers
 ```
 
 This document describes all models in `logsheet/models.py`.
@@ -195,6 +211,7 @@ This document describes all models in `logsheet/models.py`.
 - Represents a towplane, including status and maintenance.
 - **New in Issue 123**: Added `hourly_rental_rate` field to support charging for non-towing flights like sightseeing, flight reviews, and retrieval missions.
 - **Rental Functionality**: When enabled via `SiteConfiguration.allow_towplane_rental`, clubs can charge hourly rates for towplane usage beyond towing (e.g., sightseeing, flight reviews, aircraft retrieval).
+- **Tow Pricing**: Each towplane should have a `TowplaneChargeScheme` for tow cost calculations (Issue #283).
 
 ## Glider
 - Represents a glider, including status and maintenance.
@@ -205,8 +222,14 @@ This document describes all models in `logsheet/models.py`.
 ## Logsheet
 - Represents a daily logsheet, including flights, crew, and closeout.
 
-## TowRate
-- Defines tow rates for different aircraft and altitudes.
+## TowplaneChargeScheme
+- **New in Issue #67, Finalized in Issue #283**: Defines towplane-specific charging schemes with hookup fees and tiered pricing.
+- **Replaces Legacy**: Replaced the global `TowRate` system with flexible, per-towplane pricing.
+- **Self-Launch Support**: Special $0.00 schemes for self-launching gliders (motor gliders).
+
+## TowplaneChargeTier
+- **New in Issue #67**: Defines pricing tiers within a charge scheme (flat rate, per 100ft, per 1000ft).
+- **Flexible Pricing**: Supports complex pricing models like "$25 base + $1 per 100ft above 1000ft".
 
 ## LogsheetPayment
 - Tracks payments for logsheet entries.

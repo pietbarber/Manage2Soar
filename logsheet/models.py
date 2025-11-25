@@ -168,31 +168,22 @@ class Flight(models.Model):
     @property
     def tow_cost_calculated(self):
         """
-        Calculate tow cost using towplane-specific charging scheme if available,
-        otherwise fall back to global TowRate system for backward compatibility.
+        Calculate tow cost using towplane-specific charging scheme.
         """
         if self.release_altitude is None:
             return None
 
-        # First, try towplane-specific charge scheme
+        # Use towplane-specific charge scheme
         if self.towplane:
             try:
                 scheme = self.towplane.charge_scheme
                 if scheme.is_active:
-                    cost = scheme.calculate_tow_cost(self.release_altitude)
-                    if cost is not None:
-                        return cost
+                    return scheme.calculate_tow_cost(self.release_altitude)
             except TowplaneChargeScheme.DoesNotExist:
-                # If the towplane does not have a charge scheme, fall back to the global TowRate system below.
                 pass
 
-        # Fall back to global TowRate system
-        return (
-            TowRate.objects.filter(altitude__lte=self.release_altitude)
-            .order_by("-altitude")
-            .values_list("price", flat=True)
-            .first()
-        )
+        # No charge scheme available
+        return None
 
     @property
     def rental_cost_calculated(self):
@@ -206,8 +197,7 @@ class Flight(models.Model):
     @property
     def tow_cost(self):
         """
-        Calculate tow cost using towplane-specific charging scheme if available,
-        otherwise fall back to global TowRate system for backward compatibility.
+        Calculate tow cost using towplane-specific charging scheme.
 
         This is the same as tow_cost_calculated - keeping both for compatibility.
         """
@@ -216,7 +206,7 @@ class Flight(models.Model):
     @property
     def tow_cost_display(self):
         cost = self.tow_cost
-        return f"${cost:.2f}" if cost else "—"
+        return f"${cost:.2f}" if cost is not None else "—"
 
     @property
     def rental_cost(self):
@@ -675,33 +665,10 @@ class Logsheet(models.Model):
 
 
 ####################################################
-# TowRate model
-#
-# The price for an aerotow to a particular height are stored here
-# All tow heights are all the same price, mo matter the towplane.
-# (This should probably be changed later)
-#
-class TowRate(models.Model):
-    altitude = models.PositiveIntegerField(
-        help_text="Release altitude in feet (e.g. 2000)"
-    )
-    price = models.DecimalField(
-        max_digits=6, decimal_places=2, help_text="Price in USD"
-    )
-
-    class Meta:
-        ordering = ["altitude"]
-
-    def __str__(self):
-        return f"{self.altitude} ft – ${self.price:.2f}"
-
-
-####################################################
 # TowplaneChargeScheme model
 #
 # Defines a charging scheme for a specific towplane.
 # Supports both simple per-altitude pricing and complex tiered pricing with hookup fees.
-# If no scheme exists for a towplane, falls back to global TowRate system.
 #
 
 
@@ -710,7 +677,6 @@ class TowplaneChargeScheme(models.Model):
     Defines a charging scheme for a specific towplane.
 
     Supports both simple per-altitude pricing and complex tiered pricing with hookup fees.
-    If no scheme exists for a towplane, falls back to global TowRate system.
     """
 
     towplane = models.OneToOneField(

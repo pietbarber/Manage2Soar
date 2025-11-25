@@ -65,7 +65,8 @@ flowchart TD
 - **`logsheet.Glider`**: Aircraft fleet management
 - **`logsheet.Towplane`**: Tow aircraft management
 - **`logsheet.Airfield`**: Operations locations
-- **`logsheet.TowRate`**: Pricing for tow services
+- **`logsheet.TowplaneChargeScheme`**: Towplane-specific pricing schemes
+- **`logsheet.TowplaneChargeTier`**: Tiered pricing within charge schemes
 - **`logsheet.MaintenanceIssue`**: Aircraft maintenance tracking
 - **`members.Member`**: Pilots, instructors, and duty officers
 
@@ -231,11 +232,21 @@ erDiagram
         date resolved_date
     }
 
-    TowRate {
+    TowplaneChargeScheme {
         int id PK
-        int altitude_feet
-        decimal rate_dollars
-        date effective_date
+        int towplane_id FK
+        string name
+        decimal hookup_fee
+        boolean is_active
+    }
+
+    TowplaneChargeTier {
+        int id PK
+        int charge_scheme_id FK
+        int altitude_start
+        int altitude_end
+        string rate_type
+        decimal rate_amount
     }
 
     Airfield {
@@ -255,6 +266,8 @@ erDiagram
     Airfield ||--o{ Logsheet : location
     Glider ||--o{ MaintenanceIssue : has_issues
     Member ||--o{ MaintenanceIssue : reports
+    Towplane ||--|| TowplaneChargeScheme : pricing
+    TowplaneChargeScheme ||--o{ TowplaneChargeTier : tiers
 ```
 
 ## Key Integration Points

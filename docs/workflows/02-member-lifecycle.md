@@ -233,7 +233,7 @@ flowchart LR
     D --> O[Maintenance Reports]
 
     E --> P[Tow Logging]
-    E --> Q[Tow Rate Management]
+    E --> Q[Towplane Charge Management]
 
     F --> R[Profile Management]
     F --> S[Flight History]
