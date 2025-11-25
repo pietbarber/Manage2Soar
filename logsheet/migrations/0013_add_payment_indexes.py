@@ -1,5 +1,5 @@
 # Generated manually for Issue #285 - Performance optimization for logsheet finances
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):

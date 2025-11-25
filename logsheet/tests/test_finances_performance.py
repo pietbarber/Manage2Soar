@@ -3,7 +3,7 @@ Test performance improvements for Issue #285 - Logsheet Finances optimization
 """
 
 import time
-from datetime import time as time_obj
+from datetime import time as dt_time
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -84,8 +84,8 @@ class LogsheetFinancesPerformanceTestCase(TestCase):
                 towplane=self.towplane,
                 tow_pilot=self.member,
                 release_altitude=2000 + (i * 100),  # Varying altitudes
-                launch_time=time_obj(9, 0, 0),
-                landing_time=time_obj(10, 30, 0),
+                launch_time=dt_time(9, 0, 0),
+                landing_time=dt_time(10, 30, 0),
             )
 
     def test_finances_view_performance(self):
@@ -171,6 +171,11 @@ class LogsheetFinancesPerformanceTestCase(TestCase):
 
         request_time = end_time - start_time
         query_count = len(connection.queries)
+
+        # Verify POST was successful
+        self.assertEqual(
+            response.status_code, 302
+        )  # Should redirect after successful update
 
         print(f"\n=== POST PERFORMANCE METRICS ===")
         print(f"POST request time: {request_time:.4f} seconds")
