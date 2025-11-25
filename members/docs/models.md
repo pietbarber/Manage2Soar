@@ -140,6 +140,7 @@ erDiagram
 - Methods for profile image, display name, group syncing, and status.
 - Includes `home_club` field for visiting pilots from other soaring clubs.
 - Can be linked to a `MembershipApplication` that created the account.
+- **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
 
