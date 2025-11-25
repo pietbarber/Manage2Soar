@@ -3,7 +3,7 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-    
+
     dependencies = [
         ('members', '0013_add_foreign_pilot_choice'),
     ]

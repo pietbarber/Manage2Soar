@@ -128,20 +128,9 @@ ON logsheet_logsheetpayment (logsheet_id, member_id);
 
 **Impact:** Faster lookups for payment records and member status filtering.
 
-### 4. Configuration Query Caching
+### 4. Code Documentation
 
-**Before:**
-```python
-# Multiple config queries throughout the function
-config = SiteConfiguration.objects.first()
-```
-
-**After:**
-```python
-# Single config query at the start
-config = SiteConfiguration.objects.first()
-# Reuse config object throughout function
-```
+**Improved code comments** to clarify optimization points and caching strategies for future developers.
 
 ## Performance Testing
 
@@ -175,10 +164,10 @@ Created comprehensive test suite in `logsheet/tests/test_finances_performance.py
 
 ## Files Modified
 
-- `logsheet/views.py` - Core optimization implementation
-- `logsheet/migrations/0013_add_payment_indexes.py` - Payment indexes
-- `members/migrations/0014_add_performance_indexes.py` - Member indexes
-- `logsheet/tests/test_finances_performance.py` - Performance test suite
+- `logsheet/views.py` - Core optimization implementation with select_related and bulk operations
+- `logsheet/migrations/0013_add_payment_indexes.py` - Payment lookup indexes  
+- `members/migrations/0014_add_performance_indexes.py` - Member filtering and sorting indexes
+- `logsheet/tests/test_finances_performance.py` - Performance test suite with realistic data volumes
 
 ## Validation
 
