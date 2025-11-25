@@ -52,15 +52,22 @@ class Command(BaseCronJobCommand):
         self.log_info(f"Looking for members joined before {membership_cutoff_date}")
 
         # Step 1: Find all members who have been in the club for 3+ months
+        # Use proper MembershipStatus model for active status filtering
+        try:
+            from siteconfig.models import MembershipStatus
+
+            active_status_names = list(MembershipStatus.get_active_statuses())
+        except ImportError:
+            # Fallback for migrations or missing table
+            from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+            active_status_names = DEFAULT_ACTIVE_STATUSES
+
         eligible_members = Member.objects.filter(
             Q(joined_club__lt=membership_cutoff_date)
             | Q(joined_club__isnull=True),  # Include null join dates
-            membership_status__in=[
-                "Full Member",
-                "Student Member",
-                "Life Member",
-            ],  # Active statuses
-        ).exclude(membership_status__in=["Inactive", "Terminated", "Suspended"])
+            membership_status__in=active_status_names,  # Only active statuses
+        )
 
         self.log_info(
             f"Found {eligible_members.count()} eligible members (3+ months membership)"
@@ -142,6 +149,20 @@ class Command(BaseCronJobCommand):
             self._send_delinquency_report(duty_delinquents, lookback_months)
             self.log_success("Duty delinquency report sent to Member Meister")
         else:
+            # Check member managers for dry-run logging
+            member_meisters = Member.objects.filter(
+                member_manager=True, email__isnull=False
+            ).exclude(email="")
+
+            if member_meisters.exists():
+                self.log_info(
+                    f"Would send report to {member_meisters.count()} Member Manager(s): {', '.join([mm.full_display_name for mm in member_meisters])}"
+                )
+            else:
+                self.log_warning(
+                    "No Member Managers found, would use fallback email: president@skylinesoaring.org"
+                )
+
             self.log_info("Would send duty delinquency report to Member Meister")
             for delinquent in duty_delinquents:
                 member = delinquent["member"]
@@ -192,24 +213,20 @@ class Command(BaseCronJobCommand):
     def _send_delinquency_report(self, duty_delinquents, lookback_months):
         """Send the duty delinquency report to appropriate personnel"""
 
-        # Find Member Meister (look for admin users or specific role)
-        member_meisters = (
-            Member.objects.filter(
-                Q(is_staff=True)
-                | Q(is_superuser=True)
-                | Q(email__icontains="membermeister")
-                | Q(email__icontains="president")
-            )
-            .filter(email__isnull=False)
-            .exclude(email="")
-        )
+        # Find Member Managers (use the proper member_manager boolean field)
+        member_meisters = Member.objects.filter(
+            member_manager=True, email__isnull=False
+        ).exclude(email="")
 
         # Fallback to a configured email if no member meisters found
         if not member_meisters.exists():
             recipient_list = ["president@skylinesoaring.org"]  # Fallback
-            self.log_warning("No Member Meisters found, using fallback email")
+            self.log_warning("No Member Managers found, using fallback email")
         else:
             recipient_list = [mm.email for mm in member_meisters]
+            self.log_info(
+                f"Found {member_meisters.count()} Member Manager(s): {', '.join([mm.full_display_name for mm in member_meisters])}"
+            )
 
         # Build report content
         today = now().date()

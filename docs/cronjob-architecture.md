@@ -103,7 +103,7 @@ Uses PostgreSQL's atomic operations:
 2. ✅ Created new notification commands:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
    - ✅ `notify_late_sprs.py` - **MONITORING 34 FLIGHTS**
-   - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS**
+   - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS** (Issue #288 fixed recipient filtering)
 
 ### ✅ Phase 3: Kubernetes Integration - PRODUCTION DEPLOYED
 1. ✅ Created CronJob YAML manifests - **APPLIED TO CLUSTER**
@@ -124,9 +124,10 @@ Uses PostgreSQL's atomic operations:
 ### 📊 Recent Production Metrics
 - **Aging Logsheets**: Found 1 logsheet (11 days old), notified Todd Morris & Bob Alexander
 - **Late SPRs**: Checked 34 instructional flights, no overdue SPRs found
-- **Duty Delinquents**: Found 19 delinquent members including Nicholas Meeder (74 flights!)
+- **Duty Delinquents**: Found 19 delinquent members, notifications sent to 4 Member Managers only
 - **Execution Times**: 0.29s - 5.52s (excellent performance)
 - **Lock Contention**: Zero conflicts, perfect coordination
+- **Recipients Fixed**: Issue #288 resolved - now sends only to member_manager=True users
 
 ### Time Zone Considerations
 - All schedules in UTC for consistency
