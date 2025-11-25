@@ -62,6 +62,7 @@ member_meisters = (
 # Find Member Managers (use the proper member_manager boolean field)
 member_meisters = Member.objects.filter(
     member_manager=True,
+    is_active=True,
     email__isnull=False
 ).exclude(email="")
 ```
