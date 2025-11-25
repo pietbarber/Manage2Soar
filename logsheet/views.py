@@ -920,8 +920,6 @@ def delete_flight(request, logsheet_pk, flight_pk):
 @active_member_required
 def manage_logsheet_finances(request, pk):
     # For split modal: all members, grouped by active/non-active
-    from django.db.models import Q
-
     from members.models import Member
 
     # OPTIMIZATION: Use database-level filtering with proper MembershipStatus model

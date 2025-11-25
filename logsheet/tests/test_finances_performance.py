@@ -3,6 +3,7 @@ Test performance improvements for Issue #285 - Logsheet Finances optimization
 """
 
 import time
+from datetime import time as time_obj
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -75,8 +76,6 @@ class LogsheetFinancesPerformanceTestCase(TestCase):
         )
 
         # Create multiple flights for realistic scenario
-        from datetime import time
-
         for i, member in enumerate(self.members[:15]):  # Create 15 flights
             Flight.objects.create(
                 logsheet=self.logsheet,
@@ -85,8 +84,8 @@ class LogsheetFinancesPerformanceTestCase(TestCase):
                 towplane=self.towplane,
                 tow_pilot=self.member,
                 release_altitude=2000 + (i * 100),  # Varying altitudes
-                launch_time=time(9, 0, 0),
-                landing_time=time(10, 30, 0),
+                launch_time=time_obj(9, 0, 0),
+                landing_time=time_obj(10, 30, 0),
             )
 
     def test_finances_view_performance(self):

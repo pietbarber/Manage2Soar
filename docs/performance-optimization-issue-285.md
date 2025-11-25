@@ -29,30 +29,43 @@ The `manage_logsheet_finances` view was experiencing significant performance iss
 
 **Before:**
 ```python
-flights = Flight.objects.filter(date=date)
-members = Member.objects.all()
-towplane_closeouts = TowplaneCloseout.objects.filter(date=date)
+flights = logsheet.flights.all()
+all_members = Member.objects.all().order_by("last_name", "first_name")
+active_members = []
+inactive_members = []
+for m in all_members:
+    if m.is_active_member():
+        active_members.append(m)
+    else:
+        inactive_members.append(m)
 ```
 
 **After:**
 ```python
-flights = Flight.objects.filter(date=date).select_related(
-    'pilot', 'pilot__member', 'glider', 'towplane', 'towpilot', 'towpilot__member'
-)
-towplane_closeouts = TowplaneCloseout.objects.filter(date=date).select_related('towplane')
+# OPTIMIZATION: Use select_related to avoid N+1 queries
+flights = logsheet.flights.select_related(
+    "pilot", "instructor", "glider", "towplane", "split_with"
+).all()
 
-# Database-level member filtering with MembershipStatus integration
-active_members = Member.objects.filter(
-    membership_status__in=MembershipStatus.objects.filter(
-        can_fly=True, can_solo=True, is_active=True
-    ).values_list('name', flat=True)
-).select_related('membership_status')
-
-inactive_members = Member.objects.exclude(
-    membership_status__in=MembershipStatus.objects.filter(
-        can_fly=True, can_solo=True, is_active=True
-    ).values_list('name', flat=True)
-).select_related('membership_status')
+# OPTIMIZATION: Use database-level filtering with proper MembershipStatus model
+try:
+    from siteconfig.models import MembershipStatus
+    active_status_names = list(MembershipStatus.get_active_statuses())
+    active_members = Member.objects.filter(
+        membership_status__in=active_status_names
+    ).order_by("last_name", "first_name")
+    inactive_members = Member.objects.exclude(
+        membership_status__in=active_status_names
+    ).order_by("last_name", "first_name")
+except ImportError:
+    # Fallback for migrations or missing table
+    from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+    active_members = Member.objects.filter(
+        membership_status__in=DEFAULT_ACTIVE_STATUSES
+    ).order_by("last_name", "first_name")
+    inactive_members = Member.objects.exclude(
+        membership_status__in=DEFAULT_ACTIVE_STATUSES
+    ).order_by("last_name", "first_name")
 ```
 
 **Impact:** Reduced database queries from ~50+ to ~5 queries per page load.
@@ -61,38 +74,42 @@ inactive_members = Member.objects.exclude(
 
 **Before:**
 ```python
-for member in members:
-    payment, created = LogsheetPayment.objects.get_or_create(
-        date=date,
-        member=member,
-        defaults={'amount': member_charges.get(member.id, 0)}
+for member in member_charges:
+    payment, _ = LogsheetPayment.objects.get_or_create(
+        logsheet=logsheet, member=member
     )
-    if not created:
-        payment.amount = member_charges.get(member.id, 0)
-        payment.save()
+    # Individual save operations for payment method updates
+    payment.payment_method = request.POST.get(f"payment_method_{member.id}")
+    payment.note = request.POST.get(f"note_{member.id}", "").strip()
+    payment.save()
 ```
 
 **After:**
 ```python
-# Bulk create new payments
-new_payments = []
-for member_id, amount in member_charges.items():
-    if member_id not in existing_payment_ids:
-        new_payments.append(LogsheetPayment(
-            date=date,
-            member_id=member_id,
-            amount=amount
-        ))
+# Bulk fetch existing payments to avoid N+1 queries
+existing_payments = {
+    payment.member_id: payment
+    for payment in LogsheetPayment.objects.filter(
+        logsheet=logsheet, member__in=member_charges.keys()
+    ).select_related("member")
+}
 
-if new_payments:
-    LogsheetPayment.objects.bulk_create(new_payments)
+# Create missing payments in bulk
+missing_payment_members = [
+    member for member in member_charges.keys() if member.id not in existing_payments
+]
+if missing_payment_members:
+    LogsheetPayment.objects.bulk_create([
+        LogsheetPayment(logsheet=logsheet, member=member)
+        for member in missing_payment_members
+    ])
 
-# Bulk update existing payments
-if payments_to_update:
-    LogsheetPayment.objects.bulk_update(payments_to_update, ['amount'])
-```
-
-**Impact:** Reduced payment operations from N individual queries to 2-3 bulk operations.
+# Bulk update all payments
+if payment_updates:
+    LogsheetPayment.objects.bulk_update(
+        payment_updates, ["payment_method", "note"]
+    )
+```**Impact:** Reduced payment operations from N individual queries to 2-3 bulk operations.
 
 ### 3. Database Indexes
 
@@ -105,12 +122,8 @@ ON members_member (membership_status);
 #### Logsheet App Migration (`logsheet/migrations/0013_add_payment_indexes.py`)
 ```sql
 -- Composite index for payment lookups
-CREATE INDEX IF NOT EXISTS logsheet_payment_date_member_idx
-ON logsheet_logsheetpayment (date, member_id);
-
--- Index for date-based queries
-CREATE INDEX IF NOT EXISTS logsheet_payment_date_idx
-ON logsheet_logsheetpayment (date);
+CREATE INDEX IF NOT EXISTS logsheet_payment_logsheet_member_idx
+ON logsheet_logsheetpayment (logsheet_id, member_id);
 ```
 
 **Impact:** Faster lookups for payment records and member status filtering.
