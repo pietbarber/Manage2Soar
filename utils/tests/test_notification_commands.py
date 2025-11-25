@@ -405,6 +405,77 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         delinquent_members = [data["member"] for data in delinquent_data]
         assert new_member not in delinquent_members
 
+    def test_recipient_filtering_active_member_managers_only(self):
+        """Test that reports are sent only to active member managers with member_manager=True."""
+        # Clear existing member managers to have clean test
+        Member.objects.filter(member_manager=True).update(member_manager=False)
+
+        # Create member managers with different statuses
+        active_member_manager = Member.objects.create(
+            username="active_mm",
+            email="active_mm@test.com",
+            first_name="Active",
+            last_name="Manager",
+            membership_status="Full Member",
+            member_manager=True,
+            joined_club=timezone.now().date() - timedelta(days=365),
+        )
+
+        inactive_member_manager = Member.objects.create(
+            username="inactive_mm",
+            email="inactive_mm@test.com",
+            first_name="Inactive",
+            last_name="Manager",
+            membership_status="Inactive",  # Use inactive status
+            member_manager=True,
+            joined_club=timezone.now().date() - timedelta(days=365),
+        )
+
+        regular_member = Member.objects.create(
+            username="regular",
+            email="regular@test.com",
+            first_name="Regular",
+            last_name="Member",
+            membership_status="Full Member",
+            member_manager=False,  # Not a member manager
+            joined_club=timezone.now().date() - timedelta(days=365),
+        )
+
+        # Create delinquent data for testing
+        test_delinquents = [
+            {
+                "member": self.flying_member,
+                "flight_count": 5,
+                "most_recent_flight": timezone.now().date() - timedelta(days=30),
+                "membership_duration": "1 year(s), 0 month(s)",
+            }
+        ]
+
+        # Mock the send_mail function to capture recipients
+        with patch(
+            "duty_roster.management.commands.report_duty_delinquents.send_mail"
+        ) as mock_mail:
+            with patch(
+                "duty_roster.management.commands.report_duty_delinquents.Notification.objects.create"
+            ) as mock_notification:
+                # Call _send_delinquency_report directly
+                self.command._send_delinquency_report(test_delinquents, 12)
+
+        # Verify only active member manager received email
+        mock_mail.assert_called_once()
+        recipient_list = mock_mail.call_args[1]["recipient_list"]
+
+        # Should contain only the active member manager's email
+        assert len(recipient_list) == 1
+        assert active_member_manager.email in recipient_list
+        assert inactive_member_manager.email not in recipient_list
+        assert regular_member.email not in recipient_list
+
+        # Verify only active member manager got in-app notification
+        mock_notification.assert_called_once()
+        notification_call = mock_notification.call_args[1]
+        assert notification_call["user"] == active_member_manager
+
 
 class TestCronJobIntegration(TransactionTestCase):
     """Test integration aspects of the CronJob system."""
