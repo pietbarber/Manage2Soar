@@ -1,0 +1,17 @@
+# Generated manually for Issue #285 - Performance optimization for logsheet finances
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('logsheet', '0012_remove_towrate_model'),
+    ]
+
+    operations = [
+        # Add composite index on (logsheet, member) for LogsheetPayment queries
+        migrations.RunSQL(
+            "CREATE INDEX IF NOT EXISTS logsheet_payment_logsheet_member_idx ON logsheet_logsheetpayment (logsheet_id, member_id);",
+            reverse_sql="DROP INDEX IF EXISTS logsheet_payment_logsheet_member_idx;"
+        ),
+    ]

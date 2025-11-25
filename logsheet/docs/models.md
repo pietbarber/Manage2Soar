@@ -233,6 +233,7 @@ This document describes all models in `logsheet/models.py`.
 
 ## LogsheetPayment
 - Tracks payments for logsheet entries.
+- **Performance Optimization (Issue #285)**: Added composite database index on `(logsheet_id, member_id)` for faster payment lookups in finances view.
 
 ## LogsheetCloseout
 - Records the closeout summary for a logsheet.

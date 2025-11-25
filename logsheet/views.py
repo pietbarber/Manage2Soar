@@ -920,20 +920,41 @@ def delete_flight(request, logsheet_pk, flight_pk):
 @active_member_required
 def manage_logsheet_finances(request, pk):
     # For split modal: all members, grouped by active/non-active
+    from django.db.models import Q
+
     from members.models import Member
 
-    all_members = Member.objects.all().order_by("last_name", "first_name")
-    active_members = []
-    inactive_members = []
-    for m in all_members:
-        if m.is_active_member():
-            active_members.append(m)
-        else:
-            inactive_members.append(m)
+    # OPTIMIZATION: Use database-level filtering with proper MembershipStatus model
+    try:
+        from siteconfig.models import MembershipStatus
+
+        active_status_names = list(MembershipStatus.get_active_statuses())
+        active_members = Member.objects.filter(
+            membership_status__in=active_status_names
+        ).order_by("last_name", "first_name")
+        inactive_members = Member.objects.exclude(
+            membership_status__in=active_status_names
+        ).order_by("last_name", "first_name")
+    except ImportError:
+        # Fallback for migrations or missing table
+        from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+        active_members = Member.objects.filter(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES
+        ).order_by("last_name", "first_name")
+        inactive_members = Member.objects.exclude(
+            membership_status__in=DEFAULT_ACTIVE_STATUSES
+        ).order_by("last_name", "first_name")
+
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    flights = logsheet.flights.all()
+
+    # OPTIMIZATION: Use select_related to avoid N+1 queries for pilot, glider, towplane
+    flights = logsheet.flights.select_related(
+        "pilot", "instructor", "glider", "towplane", "split_with"
+    ).all()
 
     # Get towplane rental costs for this logsheet
+    # OPTIMIZATION: Already optimized with select_related
     towplane_closeouts = logsheet.towplane_closeouts.select_related(
         "towplane", "rental_charged_to"
     ).all()
@@ -1040,18 +1061,39 @@ def manage_logsheet_finances(request, pk):
             summary["tow"] + summary["rental"] + summary["towplane_rental"]
         )
 
+    # OPTIMIZATION: Bulk fetch existing payments to avoid N+1 queries
+    existing_payments = {
+        payment.member_id: payment
+        for payment in LogsheetPayment.objects.filter(
+            logsheet=logsheet, member__in=member_charges.keys()
+        ).select_related("member")
+    }
+
+    # Create missing payments in bulk
+    missing_payment_members = [
+        member for member in member_charges.keys() if member.id not in existing_payments
+    ]
+    if missing_payment_members:
+        new_payments = LogsheetPayment.objects.bulk_create(
+            [
+                LogsheetPayment(logsheet=logsheet, member=member)
+                for member in missing_payment_members
+            ]
+        )
+        # Add new payments to existing_payments dict
+        for payment in new_payments:
+            existing_payments[payment.member_id] = payment
+
     member_payment_data = []
     for member in member_charges:
         summary = member_charges[member]
-        payment, _ = LogsheetPayment.objects.get_or_create(
-            logsheet=logsheet, member=member
-        )
+        payment = existing_payments.get(member.id)
         member_payment_data.append(
             {
                 "member": member,
                 "amount": summary["total"],
-                "payment_method": payment.payment_method,
-                "note": payment.note,
+                "payment_method": payment.payment_method if payment else None,
+                "note": payment.note if payment else "",
             }
         )
     if request.method == "POST":
@@ -1111,16 +1153,23 @@ def manage_logsheet_finances(request, pk):
             return redirect("logsheet:manage", pk=logsheet.pk)
 
         else:
+            # OPTIMIZATION: Bulk update payments to avoid N individual saves
+            payment_updates = []
             for entry in member_payment_data:
                 member = entry["member"]
-                payment, _ = LogsheetPayment.objects.get_or_create(
-                    logsheet=logsheet, member=member
+                payment = existing_payments.get(member.id)
+                if payment:
+                    payment_method = request.POST.get(f"payment_method_{member.id}")
+                    note = request.POST.get(f"note_{member.id}", "").strip()
+                    payment.payment_method = payment_method or None
+                    payment.note = note
+                    payment_updates.append(payment)
+
+            # Bulk update all payments
+            if payment_updates:
+                LogsheetPayment.objects.bulk_update(
+                    payment_updates, ["payment_method", "note"]
                 )
-                payment_method = request.POST.get(f"payment_method_{member.id}")
-                note = request.POST.get(f"note_{member.id}", "").strip()
-                payment.payment_method = payment_method or None
-                payment.note = note
-                payment.save()
 
             messages.success(request, "Payment methods updated.")
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
@@ -1152,7 +1201,7 @@ def manage_logsheet_finances(request, pk):
         ),
     )
 
-    # Check if towplane rentals are enabled
+    # Check if towplane rentals are enabled (cache config query)
     config = SiteConfiguration.objects.first()
     rental_enabled = config.allow_towplane_rental if config else False
 
