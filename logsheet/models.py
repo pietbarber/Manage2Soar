@@ -339,13 +339,13 @@ class Towplane(models.Model):
         upload_to=upload_towplane_photo_medium,
         blank=True,
         null=True,
-        help_text="150x150 square thumbnail (auto-generated)",
+        help_text="150x150 square thumbnail. Auto-generated when photo is uploaded via admin.",
     )
     photo_small = models.ImageField(
         upload_to=upload_towplane_photo_small,
         blank=True,
         null=True,
-        help_text="100x100 square thumbnail (auto-generated)",
+        help_text="100x100 square thumbnail. Auto-generated when photo is uploaded via admin.",
     )
     is_active = models.BooleanField(default=True)
     club_owned = models.BooleanField(default=False)
@@ -424,14 +424,8 @@ class Towplane(models.Model):
             if hasattr(self.photo_small, "url"):
                 return self.photo_small.url
             return f"{settings.MEDIA_URL}{self.photo_small}"
-        # Fallback chain: medium -> full
-        if self.photo_medium:
-            return self.photo_url_medium
-        if self.photo:
-            if hasattr(self.photo, "url"):
-                return self.photo.url
-            return f"{settings.MEDIA_URL}{self.photo}"
-        return None
+        # Fallback chain: medium -> full (reuse photo_url_medium for both)
+        return self.photo_url_medium
 
 
 ####################################################
@@ -454,13 +448,13 @@ class Glider(models.Model):
         upload_to=upload_glider_photo_medium,
         blank=True,
         null=True,
-        help_text="150x150 square thumbnail (auto-generated)",
+        help_text="150x150 square thumbnail. Auto-generated when photo is uploaded via admin.",
     )
     photo_small = models.ImageField(
         upload_to=upload_glider_photo_small,
         blank=True,
         null=True,
-        help_text="100x100 square thumbnail (auto-generated)",
+        help_text="100x100 square thumbnail. Auto-generated when photo is uploaded via admin.",
     )
     rental_rate = models.DecimalField(
         max_digits=6, decimal_places=2, blank=True, null=True
@@ -538,14 +532,8 @@ class Glider(models.Model):
             if hasattr(self.photo_small, "url"):
                 return self.photo_small.url
             return f"{settings.MEDIA_URL}{self.photo_small}"
-        # Fallback chain: medium -> full
-        if self.photo_medium:
-            return self.photo_url_medium
-        if self.photo:
-            if hasattr(self.photo, "url"):
-                return self.photo.url
-            return f"{settings.MEDIA_URL}{self.photo}"
-        return None
+        # Fallback chain: medium -> full (reuse photo_url_medium for both)
+        return self.photo_url_medium
 
 
 ####################################################

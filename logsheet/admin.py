@@ -61,7 +61,8 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
     )
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("name", "n_number")
-    readonly_fields = ("photo_preview", "photo_medium", "photo_small")
+    readonly_fields = ("photo_preview",)
+    exclude = ("photo_medium", "photo_small")
     fieldsets = (
         (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
         ("Photo", {"fields": ("photo", "photo_preview")}),
@@ -90,15 +91,14 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
                 # Get base filename from original
                 base_name = obj.photo.name.split("/")[-1]
 
-                # Save thumbnails
-                obj.photo.save(base_name, thumbnails["original"], save=False)
+                # Save thumbnails only (original is already saved by Django)
                 obj.photo_medium.save(
                     f"medium_{base_name}", thumbnails["medium"], save=False
                 )
                 obj.photo_small.save(
                     f"small_{base_name}", thumbnails["small"], save=False
                 )
-            except ValidationError as e:
+            except (ValidationError, ValueError) as e:
                 # Re-raise to show in admin
                 raise ValidationError(f"Photo processing failed: {e}")
 
@@ -137,7 +137,8 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("n_number", "competition_number", "make", "model")
     ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
-    readonly_fields = ("photo_preview", "photo_medium", "photo_small")
+    readonly_fields = ("photo_preview",)
+    exclude = ("photo_medium", "photo_small")
     fieldsets = (
         (
             None,
@@ -179,15 +180,14 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
                 # Get base filename from original
                 base_name = obj.photo.name.split("/")[-1]
 
-                # Save thumbnails
-                obj.photo.save(base_name, thumbnails["original"], save=False)
+                # Save thumbnails only (original is already saved by Django)
                 obj.photo_medium.save(
                     f"medium_{base_name}", thumbnails["medium"], save=False
                 )
                 obj.photo_small.save(
                     f"small_{base_name}", thumbnails["small"], save=False
                 )
-            except ValidationError as e:
+            except (ValidationError, ValueError) as e:
                 # Re-raise to show in admin
                 raise ValidationError(f"Photo processing failed: {e}")
 

@@ -113,6 +113,16 @@ class TestGliderPhotoUrlProperties:
         url = glider.photo_url_small
         assert url == "/media/glider_photos/test.jpg"
 
+    def test_photo_url_small_returns_none_when_no_photos(self):
+        """Should return None when no photos are available."""
+        glider = Glider(n_number="N12345", make="Schleicher", model="ASK-21")
+        glider.photo_small = ""
+        glider.photo_medium = ""
+        glider.photo = ""
+
+        url = glider.photo_url_small
+        assert url is None
+
 
 class TestTowplanePhotoUrlProperties:
     """Tests for Towplane photo_url_medium and photo_url_small properties."""

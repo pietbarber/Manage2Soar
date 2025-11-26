@@ -15,6 +15,7 @@ Usage:
 
 import logging
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from logsheet.models import Glider, Towplane
@@ -84,9 +85,10 @@ class Command(BaseCommand):
                 continue
 
             try:
-                # Read the original photo - works with cloud storage
-                glider.photo.seek(0)
-                thumbnails = generate_equipment_thumbnails(glider.photo)
+                # Read the original photo - use .open() for cloud storage compatibility
+                with glider.photo.open("rb") as photo_file:
+                    photo_content = ContentFile(photo_file.read())
+                thumbnails = generate_equipment_thumbnails(photo_content)
 
                 # Get base filename
                 base_name = glider.photo.name.split("/")[-1]
@@ -106,6 +108,14 @@ class Command(BaseCommand):
                     )
                 )
                 glider_count += 1
+
+            except FileNotFoundError:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"  ✗ Photo file not found for {glider.n_number}: {glider.photo.name}"
+                    )
+                )
+                glider_errors += 1
 
             except Exception as e:
                 self.stdout.write(
@@ -142,9 +152,10 @@ class Command(BaseCommand):
                 continue
 
             try:
-                # Read the original photo - works with cloud storage
-                towplane.photo.seek(0)
-                thumbnails = generate_equipment_thumbnails(towplane.photo)
+                # Read the original photo - use .open() for cloud storage compatibility
+                with towplane.photo.open("rb") as photo_file:
+                    photo_content = ContentFile(photo_file.read())
+                thumbnails = generate_equipment_thumbnails(photo_content)
 
                 # Get base filename
                 base_name = towplane.photo.name.split("/")[-1]
@@ -164,6 +175,14 @@ class Command(BaseCommand):
                     )
                 )
                 towplane_count += 1
+
+            except FileNotFoundError:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"  ✗ Photo file not found for {towplane.n_number}: {towplane.photo.name}"
+                    )
+                )
+                towplane_errors += 1
 
             except Exception as e:
                 self.stdout.write(
