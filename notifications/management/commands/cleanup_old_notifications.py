@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Case, Count, IntegerField, When
 from django.utils.timezone import now
 
 from notifications.models import Notification
@@ -40,8 +41,16 @@ class Command(BaseCronJobCommand):
 
         notification_count = old_notifications.count()
 
-        # Get stats for logging
-        dismissed_count = old_notifications.filter(dismissed=True).count()
+        # Get stats for logging (use aggregate to avoid multiple DB queries)
+        from django.db.models import Case, Count, IntegerField, When
+
+        stats = old_notifications.aggregate(
+            dismissed_count=Count(
+                Case(When(dismissed=True, then=1), output_field=IntegerField())
+            ),
+            total_count=Count("id"),
+        )
+        dismissed_count = stats["dismissed_count"]
         undismissed_count = notification_count - dismissed_count
 
         self.log_info(
@@ -50,12 +59,15 @@ class Command(BaseCronJobCommand):
         )
 
         if not options.get("dry_run"):
-            # Perform the actual deletion
-            deleted_count, _ = old_notifications.delete()
-
-            self.log_success(
-                f"Successfully purged {deleted_count} notification(s) older than {purge_days} days"
-            )
+            # Perform the actual deletion with error handling
+            try:
+                deleted_count, _ = old_notifications.delete()
+                self.log_success(
+                    f"Successfully purged {deleted_count} notification(s) older than {purge_days} days"
+                )
+            except Exception as e:
+                self.log_error(f"Failed to delete notifications: {str(e)}")
+                raise
         else:
             self.log_info(
                 f"Would purge {notification_count} notification(s) older than {purge_days} days"

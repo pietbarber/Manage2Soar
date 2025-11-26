@@ -2,7 +2,7 @@
 
 **Issue Summary**: Implement automatic cleanup of old notifications to prevent accumulation of stale notifications for members who may be away from the club.
 
-**Resolution Date**: December 26, 2024
+**Resolution Date**: November 25, 2025
 
 ## Problem Statement
 
@@ -156,7 +156,7 @@ kind: CronJob
 metadata:
   name: cleanup-old-notifications
 spec:
-  schedule: "59 23 L * *"  # Last day of month at 11:59 PM UTC
+  schedule: "59 23 28-31 * *"  # Last days of month at 11:59 PM UTC
   jobTemplate:
     spec:
       template:
