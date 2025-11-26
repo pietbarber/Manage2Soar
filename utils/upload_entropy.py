@@ -14,6 +14,20 @@ def upload_profile_photo(instance, filename):
     return f"profile_photos/{name}-{token}{ext}"
 
 
+def upload_profile_photo_medium(instance, filename):
+    """Upload path for 200x200 square medium thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"profile_photos/medium/{name}-{token}{ext}"
+
+
+def upload_profile_photo_small(instance, filename):
+    """Upload path for 64x64 square small thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"profile_photos/small/{name}-{token}{ext}"
+
+
 def upload_badge_image(instance, filename):
     name, ext = os.path.splitext(filename)
     token = secrets.token_urlsafe(6)

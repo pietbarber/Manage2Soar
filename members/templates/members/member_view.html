@@ -73,7 +73,7 @@
       <div class="card profile-photo-container">
         <div class="card-body text-center">
           {% if member.profile_photo %}
-          <img src="{{ member.profile_photo.url }}" class="profile-photo img-fluid" alt="Profile Photo">
+          <img src="{{ member.profile_image_url_medium }}" class="profile-photo img-fluid" alt="Profile Photo">
           {% else %}
           <img src="{% static 'images/default-avatar-large.png' %}" class="profile-photo img-fluid" alt="Default Avatar">
           {% endif %}

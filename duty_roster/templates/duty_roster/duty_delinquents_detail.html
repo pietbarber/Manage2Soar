@@ -57,7 +57,7 @@
                         <div class="delinquent-header">
                             <div class="member-photo">
                                 {% if delinquent.member.profile_photo %}
-                                    <img src="{{ delinquent.member.profile_photo.url }}"
+                                    <img src="{{ delinquent.member.profile_image_url_small }}"
                                          alt="{{ delinquent.member.full_display_name }}"
                                          title="{{ delinquent.member.full_display_name }}"
                                          height="60" class="rounded-circle me-2">

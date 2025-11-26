@@ -127,7 +127,7 @@
           <!-- Profile Photo -->
           <div class="flex-shrink-0 me-3">
             {% if member.profile_photo %}
-            <img src="{{ member.profile_photo.url }}" alt="Profile photo" class="rounded-circle member-avatar">
+            <img src="{{ member.profile_image_url_small }}" alt="Profile photo" class="rounded-circle member-avatar">
             {% else %}
             <img src="{% static 'images/default-avatar-100px.png' %}" class="rounded-circle member-avatar">
             {% endif %}

@@ -189,7 +189,7 @@
         {% if user.is_authenticated %}
         <div class="d-flex align-items-center me-3">
           <a href="{% url 'members:member_view' member_id=user.pk %}" class="profile-bubble" title="View My Profile">
-            <img src="{{ user.profile_image_url }}" class="nav-avatar" alt="Profile Photo">
+            <img src="{{ user.profile_image_url_small }}" class="nav-avatar" alt="Profile Photo">
           </a>
           <span class="navbar-text ms-2">
             Welcome, {{ user.full_display_name }}
