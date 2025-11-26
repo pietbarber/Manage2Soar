@@ -104,8 +104,7 @@ Uses PostgreSQL's atomic operations:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
    - ✅ `notify_late_sprs.py` - **MONITORING 34 FLIGHTS**
    - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS** (Issue #288 fixed recipient filtering)
-   - ✅ `cleanup_old_notifications.py` - **PURGING STALE NOTIFICATIONS** (Issue #290 60+ day cleanup)
-   - ✅ `cleanup_old_notifications.py` - **PREVENTS NOTIFICATION ACCUMULATION** (Issue #290 notification timeout)
+   - ✅ `cleanup_old_notifications.py` - **PURGING STALE NOTIFICATIONS / PREVENTS NOTIFICATION ACCUMULATION** (Issue #290 60+ day cleanup & notification timeout)
 
 ### ✅ Phase 3: Kubernetes Integration - PRODUCTION DEPLOYED
 1. ✅ Created CronJob YAML manifests - **APPLIED TO CLUSTER**
@@ -310,33 +309,6 @@ kubectl delete jobs --field-selector=status.successful=0
 kubectl delete jobs --field-selector=status.successful=1 --field-selector=metadata.creationTimestamp<$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ')
 ```
 
-## Command Usage Examples
-
-### Notification Cleanup Command (Issue #290)
-```bash
-# Run notification cleanup with default 60-day cutoff
-python manage.py cleanup_old_notifications
-
-# Test with dry run to see what would be deleted
-python manage.py cleanup_old_notifications --dry-run --verbosity=2
-
-# Use custom cutoff (30 days)
-python manage.py cleanup_old_notifications --days=30
-
-# Force execution bypassing distributed lock (debugging only)
-python manage.py cleanup_old_notifications --force
-```
-
-**Purpose**: Purges notifications older than 60 days (both dismissed and undismissed) to prevent accumulation of stale notifications for members who may be away from the club.
-
-**Schedule**: Monthly at end of month (11:59 PM UTC) to minimize impact on active users.
-
-**Safety Features**:
-- Configurable days parameter (default: 60)
-- Dry-run mode for testing
-- Comprehensive logging with statistics
-- Distributed locking prevents overlapping executions
-
 ## Testing Strategy
 
 ### Unit Tests
@@ -363,7 +335,20 @@ python manage.py cleanup_old_notifications --days 90
 
 # Dry run to see what would be deleted
 python manage.py cleanup_old_notifications --dry-run --days 60
+
+# Force execution bypassing distributed lock (debugging only)
+python manage.py cleanup_old_notifications --force
 ```
+
+**Purpose**: Purges notifications older than 60 days (both dismissed and undismissed) to prevent accumulation of stale notifications for members who may be away from the club.
+
+**Schedule**: Monthly at end of month (11:59 PM UTC) to minimize impact on active users.
+
+**Safety Features**:
+- Configurable days parameter (default: 60)
+- Dry-run mode for testing
+- Comprehensive logging with statistics
+- Distributed locking prevents overlapping executions
 
 ### Other Notification Commands
 ```bash
