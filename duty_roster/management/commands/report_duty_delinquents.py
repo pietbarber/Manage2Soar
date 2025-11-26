@@ -52,16 +52,10 @@ class Command(BaseCronJobCommand):
         self.log_info(f"Looking for members joined before {membership_cutoff_date}")
 
         # Step 1: Find all members who have been in the club for 3+ months
-        # Use proper MembershipStatus model for active status filtering
-        try:
-            from siteconfig.models import MembershipStatus
+        # Use centralized helper for active status filtering
+        from members.utils.membership import get_active_membership_statuses
 
-            active_status_names = list(MembershipStatus.get_active_statuses())
-        except ImportError:
-            # Fallback for migrations or missing table
-            from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-
-            active_status_names = DEFAULT_ACTIVE_STATUSES
+        active_status_names = get_active_membership_statuses()
 
         eligible_members = Member.objects.filter(
             Q(joined_club__lt=membership_cutoff_date)
@@ -150,14 +144,9 @@ class Command(BaseCronJobCommand):
             self.log_success("Duty delinquency report sent to Member Meister")
         else:
             # Check member managers for dry-run logging
-            try:
-                from siteconfig.models import MembershipStatus
+            from members.utils.membership import get_active_membership_statuses
 
-                active_status_names = list(MembershipStatus.get_active_statuses())
-            except ImportError:
-                from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-
-                active_status_names = DEFAULT_ACTIVE_STATUSES
+            active_status_names = get_active_membership_statuses()
 
             member_meisters = Member.objects.filter(
                 member_manager=True,
@@ -225,15 +214,10 @@ class Command(BaseCronJobCommand):
         """Send the duty delinquency report to appropriate personnel"""
 
         # Find Member Managers (use the proper member_manager boolean field)
-        # Filter by active membership status instead of is_active field
-        try:
-            from siteconfig.models import MembershipStatus
+        # Use centralized helper for active membership status filtering
+        from members.utils.membership import get_active_membership_statuses
 
-            active_status_names = list(MembershipStatus.get_active_statuses())
-        except ImportError:
-            from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-
-            active_status_names = DEFAULT_ACTIVE_STATUSES
+        active_status_names = get_active_membership_statuses()
 
         member_meisters = Member.objects.filter(
             member_manager=True,

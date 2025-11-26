@@ -922,27 +922,16 @@ def manage_logsheet_finances(request, pk):
     # For split modal: all members, grouped by active/non-active
     from members.models import Member
 
-    # OPTIMIZATION: Use database-level filtering with proper MembershipStatus model
-    try:
-        from siteconfig.models import MembershipStatus
+    # Use centralized helper for active membership status filtering
+    from members.utils.membership import get_active_membership_statuses
 
-        active_status_names = list(MembershipStatus.get_active_statuses())
-        active_members = Member.objects.filter(
-            membership_status__in=active_status_names
-        ).order_by("last_name", "first_name")
-        inactive_members = Member.objects.exclude(
-            membership_status__in=active_status_names
-        ).order_by("last_name", "first_name")
-    except ImportError:
-        # Fallback for migrations or missing table
-        from members.constants.membership import DEFAULT_ACTIVE_STATUSES
-
-        active_members = Member.objects.filter(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES
-        ).order_by("last_name", "first_name")
-        inactive_members = Member.objects.exclude(
-            membership_status__in=DEFAULT_ACTIVE_STATUSES
-        ).order_by("last_name", "first_name")
+    active_status_names = get_active_membership_statuses()
+    active_members = Member.objects.filter(
+        membership_status__in=active_status_names
+    ).order_by("last_name", "first_name")
+    inactive_members = Member.objects.exclude(
+        membership_status__in=active_status_names
+    ).order_by("last_name", "first_name")
 
     logsheet = get_object_or_404(Logsheet, pk=pk)
 

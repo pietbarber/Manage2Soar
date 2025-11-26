@@ -42,7 +42,7 @@ def test_set_password_get_shows_form(client, django_user_model):
     user = django_user_model.objects.create_user(
         username="tester",
         password="oldpass",
-        # ✅ Must be one of the items in DEFAULT_ACTIVE_STATUSES
+        # Must be an active status in siteconfig.MembershipStatus
         membership_status="Full Member",
         is_superuser=False,
     )
@@ -97,7 +97,7 @@ def test_tinymce_upload_accepts_image(client, django_user_model, settings):
     user = django_user_model.objects.create_user(
         username="tester",
         password="oldpass",
-        # ✅ Must be one of the items in DEFAULT_ACTIVE_STATUSES
+        # Must be an active status in siteconfig.MembershipStatus
         membership_status="Full Member",
         is_superuser=False,
     )

@@ -12,7 +12,8 @@ class Command(BaseCommand):
     Backfill StudentProgressSnapshot for all active members.
 
     This command iterates through every member whose membership_status
-    is in DEFAULT_ACTIVE_STATUSES and rebuilds their progress snapshot.
+    is in the active statuses configured in siteconfig.MembershipStatus
+    and rebuilds their progress snapshot.
     """
 
     def handle(self, *args, **options):

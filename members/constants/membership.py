@@ -1,7 +1,29 @@
 # members/constants/membership.py
-# Canonical membership-related constants for the project. Import these from
-# `members.constants` (this module) rather than duplicating the lists elsewhere.
+"""
+Legacy membership-related constants for the project.
 
+DEPRECATION NOTICE:
+===================
+These constants are DEPRECATED and will be removed in a future version.
+
+Instead of using these constants directly, use the centralized helpers:
+
+    from members.utils.membership import (
+        get_active_membership_statuses,   # Replaces DEFAULT_ACTIVE_STATUSES
+        get_all_membership_statuses,      # Replaces ALLOWED_MEMBERSHIP_STATUSES
+    )
+
+Membership statuses are now configured via the siteconfig.MembershipStatus model
+in Django admin. This allows clubs to customize their membership status types
+without code changes.
+
+These constants remain only for migration fallback scenarios when the database
+is not yet available. New code should NEVER import these directly.
+"""
+
+# =============================================================================
+# DEPRECATED: Use members.utils.membership.get_all_membership_statuses() instead
+# =============================================================================
 ALLOWED_MEMBERSHIP_STATUSES = [
     "Charter Member",
     "Full Member",
@@ -16,8 +38,16 @@ ALLOWED_MEMBERSHIP_STATUSES = [
     "Transient Member",
     "Temporary Member",
     "Introductory Member",
+    "Inactive",
+    "Non-Member",
+    "Pending",
+    "Role Account",
+    "Deceased",
 ]
 
+# =============================================================================
+# DEPRECATED: Use members.utils.membership.get_active_membership_statuses() instead
+# =============================================================================
 DEFAULT_ACTIVE_STATUSES = [
     "Charter Member",
     "Full Member",
@@ -49,6 +79,7 @@ MEMBERSHIP_STATUS_CHOICES = [
     ("Inactive", "Inactive"),
     ("Non-Member", "Non-Member"),
     ("Pending", "Pending"),
+    ("Role Account", "Role Account"),  # System/robot accounts
     ("Deceased", "Deceased"),
 ]
 

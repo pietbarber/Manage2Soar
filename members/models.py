@@ -5,11 +5,7 @@ from django.contrib.auth.models import AbstractUser, Group
 from django.db import models, transaction
 from tinymce.models import HTMLField
 
-from members.constants.membership import (
-    DEFAULT_ACTIVE_STATUSES,
-    MEMBERSHIP_STATUS_CHOICES,
-    US_STATE_CHOICES,
-)
+from members.constants.membership import MEMBERSHIP_STATUS_CHOICES, US_STATE_CHOICES
 from utils.upload_entropy import (
     upload_badge_image,
     upload_biography,
@@ -254,18 +250,22 @@ class Member(AbstractUser):
 
     #################
     # is_active_member(self)
-    # Returns True if the member's membership_status is in DEFAULT_ACTIVE_STATUSES.
+    # Returns True if the member's membership_status is in the configured active statuses.
+    # Active statuses are configured via siteconfig.MembershipStatus in Django admin.
     # Used for filtering members in operational roles and UI.
 
     def is_active_member(self):
-        try:
-            from siteconfig.models import MembershipStatus
+        """Check if this member has an active membership status.
 
-            active_statuses = list(MembershipStatus.get_active_statuses())
-            return self.membership_status in active_statuses
-        except (ImportError, Exception):
-            # Fallback to hardcoded list during migrations or if table doesn't exist
-            return self.membership_status in DEFAULT_ACTIVE_STATUSES
+        Active statuses are determined by siteconfig.MembershipStatus model.
+        This uses the centralized helper from members.utils.membership.
+
+        Returns:
+            bool: True if member's status is in active statuses list.
+        """
+        from .utils.membership import get_active_membership_statuses
+
+        return self.membership_status in get_active_membership_statuses()
 
     def _desired_group_names(self):
         names = []

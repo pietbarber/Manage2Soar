@@ -25,7 +25,7 @@ def test_biography_form_accepts_html(django_user_model):
     user = django_user_model.objects.create_user(
         username="tester",
         password="oldpass",
-        membership_status="Full Member",  # ✅ Must be one of the items in DEFAULT_ACTIVE_STATUSES
+        membership_status="Full Member",  # Must be an active status in siteconfig.MembershipStatus
         is_superuser=False,
     )
     form = BiographyForm(data={"content": "<p>Hello, world!</p>"})
