@@ -120,7 +120,7 @@ Uses PostgreSQL's atomic operations:
 - **Weekly Sunday 9:00 AM UTC**: Maintenance digest ✅ **DEPLOYED**
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
 - **Monthly 1st @ 7:00 AM UTC**: Duty delinquent reports ✅ **DEPLOYED**
-- **Monthly 28th-31st @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
+- **Monthly 28th @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
 - **Daily 6:00 PM UTC**: Expire ad-hoc days (for tomorrow) ✅ **DEPLOYED**
 
 ### 📊 Recent Production Metrics
@@ -342,7 +342,7 @@ python manage.py cleanup_old_notifications --force
 
 **Purpose**: Purges notifications older than 60 days (both dismissed and undismissed) to prevent accumulation of stale notifications for members who may be away from the club.
 
-**Schedule**: Monthly on the 28th-31st (11:59 PM UTC) to approximate end-of-month timing and minimize impact on active users.
+**Schedule**: Monthly on the 28th (11:59 PM UTC) to approximate end-of-month timing and minimize impact on active users.
 
 **Safety Features**:
 - Configurable days parameter (default: 60)

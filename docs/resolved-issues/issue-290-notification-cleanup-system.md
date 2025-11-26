@@ -59,8 +59,15 @@ class Command(BaseCronJobCommand):
             self.log_info("No old notifications found to purge")
             return 0
 
-        notification_count = old_notifications.count()
-        dismissed_count = old_notifications.filter(dismissed=True).count()
+        # Get stats for logging (use aggregate to avoid multiple DB queries)
+        stats = old_notifications.aggregate(
+            dismissed_count=Count(
+                Case(When(dismissed=True, then=1), output_field=IntegerField())
+            ),
+            total_count=Count("id"),
+        )
+        notification_count = stats["total_count"]
+        dismissed_count = stats["dismissed_count"]
         undismissed_count = notification_count - dismissed_count
 
         if not options.get("dry_run"):
@@ -156,7 +163,7 @@ kind: CronJob
 metadata:
   name: cleanup-old-notifications
 spec:
-  schedule: "59 23 28-31 * *"  # Last days of month at 11:59 PM UTC
+  schedule: "59 23 28 * *"  # 28th of month at 11:59 PM UTC (safe for all months)
   jobTemplate:
     spec:
       template:

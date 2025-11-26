@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Case, Count, IntegerField, When
 from django.utils.timezone import now
 
 from notifications.models import Notification
@@ -38,8 +39,6 @@ class Command(BaseCronJobCommand):
             return 0
 
         # Get stats for logging (use aggregate to avoid multiple DB queries)
-        from django.db.models import Case, Count, IntegerField, When
-
         stats = old_notifications.aggregate(
             dismissed_count=Count(
                 Case(When(dismissed=True, then=1), output_field=IntegerField())

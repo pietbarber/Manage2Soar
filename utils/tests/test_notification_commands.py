@@ -264,7 +264,7 @@ class TestLateSPRsCommand(TransactionTestCase):
         mock_send.assert_not_called()
 
 
-class TestDutyDelinquentsCommand(TestCase):
+class TestDutyDelinquentsCommand(TransactionTestCase):
     """Test the duty delinquents report command."""
 
     def setUp(self):
@@ -407,13 +407,6 @@ class TestDutyDelinquentsCommand(TestCase):
 
         # Report should still be sent because original flying_member is delinquent
         # But new member should be excluded (joined within 90 days)
-        if mock_send.call_count == 0:
-            # If no report was sent, print debug info to help diagnose
-            print(f"\nDEBUG: Command output:\n{output}")
-            print(f"DEBUG: Flying member join date: {self.flying_member.joined_club}")
-            print(f"DEBUG: New member join date: {new_member.joined_club}")
-            print(f"DEBUG: Current date: {timezone.now().date()}")
-
         mock_send.assert_called_once()
         delinquent_data = mock_send.call_args[0][0]
         delinquent_members = [data["member"] for data in delinquent_data]
