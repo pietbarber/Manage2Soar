@@ -26,9 +26,9 @@
       <tr>
         <td>
           {% if issue.glider and issue.glider.photo %}
-            <img src="{{ issue.glider.photo.url }}" style="max-width: 100px; max-height: 100px;" class="rounded shadow">
+            <img src="{{ issue.glider.photo_url_small }}" style="max-width: 100px; max-height: 100px;" class="rounded shadow">
           {% elif issue.towplane and issue.towplane.photo %}
-            <img src="{{ issue.towplane.photo.url }}" style="max-width: 100px; max-height: 100px;" class="rounded shadow">
+            <img src="{{ issue.towplane.photo_url_small }}" style="max-width: 100px; max-height: 100px;" class="rounded shadow">
           {% else %}
             ✈️ No Photo
           {% endif %}
