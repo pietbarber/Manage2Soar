@@ -46,16 +46,14 @@ class MemberProfilePhotoForm(forms.ModelForm):
                     uploaded_file.name, thumbnails["original"], save=False
                 )
 
-                # Save medium thumbnail
-                medium_name = f"medium_{uploaded_file.name}"
+                # Save medium thumbnail (upload path function adds directory prefix)
                 instance.profile_photo_medium.save(
-                    medium_name, thumbnails["medium"], save=False
+                    uploaded_file.name, thumbnails["medium"], save=False
                 )
 
-                # Save small thumbnail
-                small_name = f"small_{uploaded_file.name}"
+                # Save small thumbnail (upload path function adds directory prefix)
                 instance.profile_photo_small.save(
-                    small_name, thumbnails["small"], save=False
+                    uploaded_file.name, thumbnails["small"], save=False
                 )
             except ValueError as e:
                 # Re-raise as validation error so it shows in form

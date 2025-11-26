@@ -1,5 +1,4 @@
 import logging
-import os
 from io import BytesIO
 
 from django.core.files.base import ContentFile
@@ -111,7 +110,7 @@ def generate_profile_thumbnails(uploaded_file):
         if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
         img = Image.open(uploaded_file)
-        img_format = img.format or "JPEG"
+        # Always convert to RGB and save as JPEG for consistency
         img = img.convert("RGB")
     except Exception as e:
         raise ValueError(f"Invalid image file: {e}")
@@ -131,70 +130,26 @@ def generate_profile_thumbnails(uploaded_file):
     if width > MAX_WIDTH or height > MAX_HEIGHT:
         original.thumbnail((MAX_WIDTH, MAX_HEIGHT), Image.Resampling.LANCZOS)
 
-    buffer = BytesIO()
-    original.save(buffer, format="JPEG", quality=85, optimize=True)
-    result["original"] = ContentFile(buffer.getvalue())
+    original_buffer = BytesIO()
+    original.save(original_buffer, format="JPEG", quality=85, optimize=True)
+    result["original"] = ContentFile(original_buffer.getvalue())
 
     # Create medium thumbnail (square crop)
     medium = create_square_thumbnail(img, THUMBNAIL_MEDIUM)
-    buffer = BytesIO()
-    medium.save(buffer, format="JPEG", quality=85, optimize=True)
-    result["medium"] = ContentFile(buffer.getvalue())
+    medium_buffer = BytesIO()
+    medium.save(medium_buffer, format="JPEG", quality=85, optimize=True)
+    result["medium"] = ContentFile(medium_buffer.getvalue())
 
     # Create small thumbnail (square crop)
     small = create_square_thumbnail(img, THUMBNAIL_SMALL)
-    buffer = BytesIO()
-    small.save(buffer, format="JPEG", quality=85, optimize=True)
-    result["small"] = ContentFile(buffer.getvalue())
+    small_buffer = BytesIO()
+    small.save(small_buffer, format="JPEG", quality=85, optimize=True)
+    result["small"] = ContentFile(small_buffer.getvalue())
 
     logger.info(
         f"Generated profile thumbnails: original={original.size}, "
         f"medium={THUMBNAIL_MEDIUM}x{THUMBNAIL_MEDIUM}, "
         f"small={THUMBNAIL_SMALL}x{THUMBNAIL_SMALL}"
     )
-
-    return result
-
-
-def generate_thumbnails_from_existing(image_path):
-    """
-    Generate thumbnails from an existing profile photo file.
-
-    Used for backfilling thumbnails for members who already have photos.
-
-    Args:
-        image_path: Path to the existing image file
-
-    Returns:
-        dict with keys 'medium', 'small', each containing
-        a ContentFile ready to be saved
-
-    Raises:
-        ValueError: If the image cannot be opened or processed
-        FileNotFoundError: If the image file doesn't exist
-    """
-    try:
-        with open(image_path, "rb") as f:
-            img = Image.open(f)
-            img.load()  # Force load before file closes
-            img = img.convert("RGB")
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Image file not found: {image_path}")
-    except Exception as e:
-        raise ValueError(f"Could not process image {image_path}: {e}")
-
-    result = {}
-
-    # Create medium thumbnail
-    medium = create_square_thumbnail(img, THUMBNAIL_MEDIUM)
-    buffer = BytesIO()
-    medium.save(buffer, format="JPEG", quality=85, optimize=True)
-    result["medium"] = ContentFile(buffer.getvalue())
-
-    # Create small thumbnail
-    small = create_square_thumbnail(img, THUMBNAIL_SMALL)
-    buffer = BytesIO()
-    small.save(buffer, format="JPEG", quality=85, optimize=True)
-    result["small"] = ContentFile(buffer.getvalue())
 
     return result

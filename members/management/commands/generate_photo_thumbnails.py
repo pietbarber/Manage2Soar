@@ -102,15 +102,15 @@ class Command(BaseCommand):
                 # Generate thumbnails
                 # Medium thumbnail
                 medium = create_square_thumbnail(img, THUMBNAIL_MEDIUM)
-                buffer = BytesIO()
-                medium.save(buffer, format="JPEG", quality=85, optimize=True)
-                medium_content = ContentFile(buffer.getvalue())
+                medium_buffer = BytesIO()
+                medium.save(medium_buffer, format="JPEG", quality=85, optimize=True)
+                medium_content = ContentFile(medium_buffer.getvalue())
 
                 # Small thumbnail
                 small = create_square_thumbnail(img, THUMBNAIL_SMALL)
-                buffer = BytesIO()
-                small.save(buffer, format="JPEG", quality=85, optimize=True)
-                small_content = ContentFile(buffer.getvalue())
+                small_buffer = BytesIO()
+                small.save(small_buffer, format="JPEG", quality=85, optimize=True)
+                small_content = ContentFile(small_buffer.getvalue())
 
                 # Get base filename for thumbnails
                 base_name = os.path.basename(photo_name)

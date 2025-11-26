@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, PropertyMock
+
 from django.test import TestCase
 from django.urls import reverse
 
@@ -22,6 +24,99 @@ class MemberModelTests(TestCase):
     def test_is_active_member_true_for_student(self):
         m = Member(membership_status="Student Member")
         self.assertTrue(m.is_active_member())
+
+
+# =============================================================================
+# Profile Photo URL Property Tests (Issue #286)
+# =============================================================================
+
+
+class ProfileImageUrlTests(TestCase):
+    """Tests for profile_image_url, profile_image_url_medium, and profile_image_url_small properties."""
+
+    def test_profile_image_url_small_returns_small_thumbnail_url(self):
+        """Should return small thumbnail URL when available."""
+        member = Member(username="test_small")
+        # Mock the profile_photo_small field
+        mock_field = MagicMock()
+        mock_field.url = "/media/profile_photos/small/test.jpg"
+        mock_field.__bool__ = lambda self: True
+        member.profile_photo_small = mock_field
+
+        url = member.profile_image_url_small
+        self.assertEqual(url, "/media/profile_photos/small/test.jpg")
+
+    def test_profile_image_url_medium_returns_medium_thumbnail_url(self):
+        """Should return medium thumbnail URL when available."""
+        member = Member(username="test_medium")
+        # Mock the profile_photo_medium field
+        mock_field = MagicMock()
+        mock_field.url = "/media/profile_photos/medium/test.jpg"
+        mock_field.__bool__ = lambda self: True
+        member.profile_photo_medium = mock_field
+
+        url = member.profile_image_url_medium
+        self.assertEqual(url, "/media/profile_photos/medium/test.jpg")
+
+    def test_profile_image_url_small_falls_back_to_medium(self):
+        """Should fall back to medium when small is not available."""
+        member = Member(username="test_fallback")
+        # Small is empty, medium is available
+        member.profile_photo_small = ""
+        mock_medium = MagicMock()
+        mock_medium.url = "/media/profile_photos/medium/test.jpg"
+        mock_medium.__bool__ = lambda self: True
+        member.profile_photo_medium = mock_medium
+
+        url = member.profile_image_url_small
+        self.assertEqual(url, "/media/profile_photos/medium/test.jpg")
+
+    def test_profile_image_url_small_falls_back_to_full(self):
+        """Should fall back to full image when small and medium are not available."""
+        member = Member(username="test_full_fallback")
+        member.profile_photo_small = ""
+        member.profile_photo_medium = ""
+        mock_full = MagicMock()
+        mock_full.url = "/media/profile_photos/test.jpg"
+        mock_full.__bool__ = lambda self: True
+        member.profile_photo = mock_full
+
+        url = member.profile_image_url_small
+        self.assertEqual(url, "/media/profile_photos/test.jpg")
+
+    def test_profile_image_url_small_falls_back_to_pydenticon(self):
+        """Should fall back to pydenticon when no photos are available."""
+        member = Member(username="test_pydenticon")
+        member.profile_photo_small = ""
+        member.profile_photo_medium = ""
+        member.profile_photo = ""
+
+        url = member.profile_image_url_small
+        # Should return pydenticon URL
+        expected_url = reverse("pydenticon", kwargs={"username": "test_pydenticon"})
+        self.assertEqual(url, expected_url)
+
+    def test_profile_image_url_medium_falls_back_to_full(self):
+        """Should fall back to full image when medium is not available."""
+        member = Member(username="test_medium_fallback")
+        member.profile_photo_medium = ""
+        mock_full = MagicMock()
+        mock_full.url = "/media/profile_photos/test.jpg"
+        mock_full.__bool__ = lambda self: True
+        member.profile_photo = mock_full
+
+        url = member.profile_image_url_medium
+        self.assertEqual(url, "/media/profile_photos/test.jpg")
+
+    def test_profile_image_url_handles_string_path(self):
+        """Should handle string paths (not FieldFile objects)."""
+        member = Member(username="test_string_path")
+        # Simulate a string path instead of FieldFile
+        member.profile_photo_small = "profile_photos/small/test.jpg"
+
+        url = member.profile_image_url_small
+        # Should build URL from MEDIA_URL + path
+        self.assertIn("profile_photos/small/test.jpg", url)
 
 
 class SetPasswordFormTests(TestCase):
