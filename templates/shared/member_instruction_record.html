@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <div class="d-flex align-items-center">
     {% if member.profile_photo %}
-      <img src="{{ member.profile_image_url }}" alt="{{ member.full_display_name }}" class="rounded-circle me-3" style="height:3.5em; width:3.5em; object-fit:cover; border:1px solid #ccc;" />
+      <img src="{{ member.profile_image_url_small }}" alt="{{ member.full_display_name }}" class="rounded-circle me-3" style="height:3.5em; width:3.5em; object-fit:cover; border:1px solid #ccc;" />
     {% endif %}
     <h2 class="mb-0">Instruction Record for {{ member.full_display_name }}</h2>
   </div>
@@ -276,7 +276,7 @@
         <div class="mt-2 small text-muted">
           Written by:
           {% if block.report.instructor.profile_photo %}
-            <img src="{{ block.report.instructor.profile_photo.url }}" alt="{{ block.report.instructor.full_display_name }}" class="rounded-circle me-1" style="height:2.4em; width:2.4em; object-fit:cover; vertical-align:middle; border:1px solid #ccc;" />
+            <img src="{{ block.report.instructor.profile_image_url_small }}" alt="{{ block.report.instructor.full_display_name }}" class="rounded-circle me-1" style="height:2.4em; width:2.4em; object-fit:cover; vertical-align:middle; border:1px solid #ccc;" />
           {% endif %}
           {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
           {# Show edit indicator if report was modified #}

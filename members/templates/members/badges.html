@@ -35,7 +35,7 @@
 
         <a href="{% url 'members:member_view' mb.member.pk %}" class="d-flex align-items-center text-decoration-none">
           {% if mb.member.profile_photo %}
-            <img src="{{ mb.member.profile_photo.url }}"
+            <img src="{{ mb.member.profile_image_url_small }}"
                  alt="{{ mb.member }}"
                  class="rounded-circle me-1"
                  style="width: 32px; height: 32px; object-fit: cover;">
