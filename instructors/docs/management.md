@@ -14,7 +14,7 @@ This document covers all custom Django management commands in `instructors/manag
 python manage.py backfill_student_progress_snapshot
 ```
 
-* Iterates over members with statuses in `DEFAULT_ACTIVE_STATUSES`.
+* Iterates over members with active statuses from `siteconfig.MembershipStatus`.
 * Calls `update_student_progress_snapshot(member)` for each.
 * Prints progress (`[1/42] Updated snapshot for Alice Smith`).
 
