@@ -53,7 +53,7 @@ class Command(BaseCronJobCommand):
         # Find notifications older than cutoff (both dismissed and undismissed)
         old_notifications = Notification.objects.filter(
             created_at__lt=cutoff_date
-        ).select_related("user")
+        )
 
         if not old_notifications.exists():
             self.log_info("No old notifications found to purge")

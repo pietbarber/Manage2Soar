@@ -33,11 +33,6 @@ class Command(BaseCronJobCommand):
         # Find notifications older than the cutoff (both dismissed and undismissed)
         old_notifications = Notification.objects.filter(created_at__lt=cutoff_date)
 
-        notification_count = old_notifications.count()
-        if notification_count == 0:
-            self.log_info("No old notifications found to purge")
-            return 0
-
         # Get stats for logging (use aggregate to avoid multiple DB queries)
         stats = old_notifications.aggregate(
             dismissed_count=Count(
@@ -45,6 +40,12 @@ class Command(BaseCronJobCommand):
             ),
             total_count=Count("id"),
         )
+        notification_count = stats["total_count"]
+
+        if notification_count == 0:
+            self.log_info("No old notifications found to purge")
+            return 0
+
         dismissed_count = stats["dismissed_count"]
         undismissed_count = notification_count - dismissed_count
 
