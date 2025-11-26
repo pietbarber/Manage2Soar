@@ -83,6 +83,14 @@ class TestMemberProfilePhotoForm:
         assert saved_member.profile_photo_medium
         assert saved_member.profile_photo_small
 
+        # Clean up uploaded files to avoid storage bloat
+        if saved_member.profile_photo:
+            saved_member.profile_photo.delete(save=False)
+        if saved_member.profile_photo_medium:
+            saved_member.profile_photo_medium.delete(save=False)
+        if saved_member.profile_photo_small:
+            saved_member.profile_photo_small.delete(save=False)
+
     def test_form_rejects_invalid_aspect_ratio(self, django_user_model, settings):
         """Form should reject images with extreme aspect ratios."""
         settings.TESTING = True
@@ -99,7 +107,7 @@ class TestMemberProfilePhotoForm:
         )
 
         assert form.is_valid()  # Form validation passes
-        # But save should raise ValidationError
+        # But save should raise ValidationError (no files saved, so no cleanup needed)
         with pytest.raises(ValidationError):
             form.save()
 
