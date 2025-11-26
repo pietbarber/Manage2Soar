@@ -2,6 +2,7 @@ from io import BytesIO
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
@@ -99,7 +100,7 @@ class TestMemberProfilePhotoForm:
 
         assert form.is_valid()  # Form validation passes
         # But save should raise ValidationError
-        with pytest.raises(Exception):  # ValidationError
+        with pytest.raises(ValidationError):
             form.save()
 
     def test_form_works_without_photo_upload(self, django_user_model, settings):

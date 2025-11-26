@@ -251,8 +251,6 @@ class Member(AbstractUser):
         Return URL for medium (200x200) thumbnail.
         Falls back to full image if thumbnail not available, then pydenticon.
         """
-        from django.urls import reverse
-
         if self.profile_photo_medium:
             if hasattr(self.profile_photo_medium, "url"):
                 return self.profile_photo_medium.url
@@ -266,8 +264,6 @@ class Member(AbstractUser):
         Return URL for small (64x64) thumbnail.
         Falls back to medium, then full image, then pydenticon.
         """
-        from django.urls import reverse
-
         if self.profile_photo_small:
             if hasattr(self.profile_photo_small, "url"):
                 return self.profile_photo_small.url

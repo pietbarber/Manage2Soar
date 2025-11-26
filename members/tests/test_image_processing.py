@@ -11,8 +11,6 @@ import pytest
 from PIL import Image
 
 from members.utils.image_processing import (
-    MAX_ASPECT_RATIO,
-    MIN_ASPECT_RATIO,
     THUMBNAIL_MEDIUM,
     THUMBNAIL_SMALL,
     create_square_thumbnail,
