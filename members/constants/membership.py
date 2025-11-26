@@ -38,6 +38,11 @@ ALLOWED_MEMBERSHIP_STATUSES = [
     "Transient Member",
     "Temporary Member",
     "Introductory Member",
+    "Inactive",
+    "Non-Member",
+    "Pending",
+    "Role Account",
+    "Deceased",
 ]
 
 # =============================================================================
