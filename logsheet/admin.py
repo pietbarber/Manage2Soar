@@ -1,10 +1,12 @@
 from datetime import timedelta
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.html import format_html
 
 from logsheet.models import AircraftMeister, MaintenanceDeadline, MaintenanceIssue
+from logsheet.utils.image_processing import generate_equipment_thumbnails
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
@@ -59,8 +61,11 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
     )
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("name", "n_number")
+    readonly_fields = ("photo_preview",)
+    exclude = ("photo_medium", "photo_small")
     fieldsets = (
         (None, {"fields": ("name", "n_number", "is_active", "club_owned")}),
+        ("Photo", {"fields": ("photo", "photo_preview")}),
         ("Rental Rates", {"fields": ("hourly_rental_rate",)}),
         ("Oil Change", {"fields": ("oil_change_interval", "next_oil_change_due")}),
         (
@@ -68,6 +73,36 @@ class TowplaneAdmin(AdminHelperMixin, admin.ModelAdmin):
             {"fields": ("requires_100hr_inspection", "next_100hr_due")},
         ),
     )
+
+    @admin.display(description="Current Photo")
+    def photo_preview(self, obj):
+        if obj.photo:
+            return format_html(
+                '<img src="{}" style="max-height: 150px;" />', obj.photo.url
+            )
+        return "(No photo uploaded)"
+
+    def save_model(self, request, obj, form, change):
+        """Generate thumbnails when a photo is uploaded."""
+        if "photo" in form.changed_data and obj.photo:
+            try:
+                thumbnails = generate_equipment_thumbnails(obj.photo)
+
+                # Get base filename from original
+                base_name = obj.photo.name.split("/")[-1]
+
+                # Save thumbnails only (original is already saved by Django)
+                obj.photo_medium.save(
+                    f"medium_{base_name}", thumbnails["medium"], save=False
+                )
+                obj.photo_small.save(
+                    f"small_{base_name}", thumbnails["small"], save=False
+                )
+            except (ValidationError, ValueError) as e:
+                # Re-raise to show in admin
+                raise ValidationError(f"Photo processing failed: {e}")
+
+        super().save_model(request, obj, form, change)
 
     def get_search_results(self, request, queryset, search_term):
         queryset = queryset.filter(is_active=True)
@@ -102,6 +137,8 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
     list_filter = ("is_active", "requires_100hr_inspection")
     search_fields = ("n_number", "competition_number", "make", "model")
     ordering = ("-is_active", "-club_owned", "-seats", "competition_number")
+    readonly_fields = ("photo_preview",)
+    exclude = ("photo_medium", "photo_small")
     fieldsets = (
         (
             None,
@@ -119,11 +156,42 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
                 )
             },
         ),
+        ("Photo", {"fields": ("photo", "photo_preview")}),
         (
             "100hr Inspection",
             {"fields": ("requires_100hr_inspection", "next_100hr_due")},
         ),
     )
+
+    @admin.display(description="Current Photo")
+    def photo_preview(self, obj):
+        if obj.photo:
+            return format_html(
+                '<img src="{}" style="max-height: 150px;" />', obj.photo.url
+            )
+        return "(No photo uploaded)"
+
+    def save_model(self, request, obj, form, change):
+        """Generate thumbnails when a photo is uploaded."""
+        if "photo" in form.changed_data and obj.photo:
+            try:
+                thumbnails = generate_equipment_thumbnails(obj.photo)
+
+                # Get base filename from original
+                base_name = obj.photo.name.split("/")[-1]
+
+                # Save thumbnails only (original is already saved by Django)
+                obj.photo_medium.save(
+                    f"medium_{base_name}", thumbnails["medium"], save=False
+                )
+                obj.photo_small.save(
+                    f"small_{base_name}", thumbnails["small"], save=False
+                )
+            except (ValidationError, ValueError) as e:
+                # Re-raise to show in admin
+                raise ValidationError(f"Photo processing failed: {e}")
+
+        super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

@@ -19,7 +19,7 @@
     <tr>
       <td>
         {% if g.photo %}
-        <img src="{{ g.photo.url }}" alt="Glider Photo" style="max-width: 150px; max-height: 150px; cursor: pointer;"
+        <img src="{{ g.photo_url_medium }}" alt="Glider Photo" style="max-width: 150px; max-height: 150px; cursor: pointer;"
           class="rounded shadow" onclick="showFullImage('{{ g.photo.url }}')">
         {% else %}
         ✈️ No Photo
@@ -60,7 +60,7 @@
     <tr>
       <td>
         {% if t.photo %}
-        <img src="{{ t.photo.url }}" alt="Tow Plane Photo" style="max-width: 150px; max-height: 150px; cursor: pointer;"
+        <img src="{{ t.photo_url_medium }}" alt="Tow Plane Photo" style="max-width: 150px; max-height: 150px; cursor: pointer;"
           class="rounded shadow" onclick="showFullImage('{{ t.photo.url }}')">
         {% else %}
         ✈️ No Photo

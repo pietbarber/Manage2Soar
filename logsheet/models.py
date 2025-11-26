@@ -11,7 +11,11 @@ from members.models import Member
 from utils.upload_entropy import (
     upload_airfield_photo,
     upload_glider_photo,
+    upload_glider_photo_medium,
+    upload_glider_photo_small,
     upload_towplane_photo,
+    upload_towplane_photo_medium,
+    upload_towplane_photo_small,
 )
 
 ####################################################
@@ -331,6 +335,18 @@ class Towplane(models.Model):
     model = models.CharField(max_length=100, blank=True, null=True)
     n_number = models.CharField(max_length=50)  # e.g., N-number
     photo = models.ImageField(upload_to=upload_towplane_photo, blank=True, null=True)
+    photo_medium = models.ImageField(
+        upload_to=upload_towplane_photo_medium,
+        blank=True,
+        null=True,
+        help_text="150x150 square thumbnail. Auto-generated when photo is uploaded via admin.",
+    )
+    photo_small = models.ImageField(
+        upload_to=upload_towplane_photo_small,
+        blank=True,
+        null=True,
+        help_text="100x100 square thumbnail. Auto-generated when photo is uploaded via admin.",
+    )
     is_active = models.BooleanField(default=True)
     club_owned = models.BooleanField(default=False)
     initial_hours = models.DecimalField(
@@ -387,6 +403,30 @@ class Towplane(models.Model):
     def get_active_issues(self):
         return MaintenanceIssue.objects.filter(towplane=self, resolved=False)
 
+    @property
+    def photo_url_medium(self):
+        """Return URL for medium (150x150) thumbnail, falling back to full photo."""
+        if self.photo_medium:
+            if hasattr(self.photo_medium, "url"):
+                return self.photo_medium.url
+            return f"{settings.MEDIA_URL}{self.photo_medium}"
+        # Fallback to full photo
+        if self.photo:
+            if hasattr(self.photo, "url"):
+                return self.photo.url
+            return f"{settings.MEDIA_URL}{self.photo}"
+        return None
+
+    @property
+    def photo_url_small(self):
+        """Return URL for small (100x100) thumbnail, falling back to medium, then full."""
+        if self.photo_small:
+            if hasattr(self.photo_small, "url"):
+                return self.photo_small.url
+            return f"{settings.MEDIA_URL}{self.photo_small}"
+        # Fallback chain: medium -> full (reuse photo_url_medium for both)
+        return self.photo_url_medium
+
 
 ####################################################
 # Glider model
@@ -404,6 +444,18 @@ class Glider(models.Model):
     competition_number = models.CharField(max_length=10, blank=True)
     seats = models.PositiveIntegerField(default=2)
     photo = models.ImageField(upload_to=upload_glider_photo, blank=True, null=True)
+    photo_medium = models.ImageField(
+        upload_to=upload_glider_photo_medium,
+        blank=True,
+        null=True,
+        help_text="150x150 square thumbnail. Auto-generated when photo is uploaded via admin.",
+    )
+    photo_small = models.ImageField(
+        upload_to=upload_glider_photo_small,
+        blank=True,
+        null=True,
+        help_text="100x100 square thumbnail. Auto-generated when photo is uploaded via admin.",
+    )
     rental_rate = models.DecimalField(
         max_digits=6, decimal_places=2, blank=True, null=True
     )
@@ -458,6 +510,30 @@ class Glider(models.Model):
 
     def get_active_issues(self):
         return MaintenanceIssue.objects.filter(glider=self, resolved=False)
+
+    @property
+    def photo_url_medium(self):
+        """Return URL for medium (150x150) thumbnail, falling back to full photo."""
+        if self.photo_medium:
+            if hasattr(self.photo_medium, "url"):
+                return self.photo_medium.url
+            return f"{settings.MEDIA_URL}{self.photo_medium}"
+        # Fallback to full photo
+        if self.photo:
+            if hasattr(self.photo, "url"):
+                return self.photo.url
+            return f"{settings.MEDIA_URL}{self.photo}"
+        return None
+
+    @property
+    def photo_url_small(self):
+        """Return URL for small (100x100) thumbnail, falling back to medium, then full."""
+        if self.photo_small:
+            if hasattr(self.photo_small, "url"):
+                return self.photo_small.url
+            return f"{settings.MEDIA_URL}{self.photo_small}"
+        # Fallback chain: medium -> full (reuse photo_url_medium for both)
+        return self.photo_url_medium
 
 
 ####################################################

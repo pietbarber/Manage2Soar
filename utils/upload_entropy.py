@@ -58,10 +58,38 @@ def upload_towplane_photo(instance, filename):
     return f"towplane_photos/{name}-{token}{ext}"
 
 
+def upload_towplane_photo_medium(instance, filename):
+    """Upload path for 150x150 square medium thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"towplane_photos/medium/{name}-{token}{ext}"
+
+
+def upload_towplane_photo_small(instance, filename):
+    """Upload path for 100x100 square small thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"towplane_photos/small/{name}-{token}{ext}"
+
+
 def upload_glider_photo(instance, filename):
     name, ext = os.path.splitext(filename)
     token = secrets.token_urlsafe(6)
     return f"glider_photos/{name}-{token}{ext}"
+
+
+def upload_glider_photo_medium(instance, filename):
+    """Upload path for 150x150 square medium thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"glider_photos/medium/{name}-{token}{ext}"
+
+
+def upload_glider_photo_small(instance, filename):
+    """Upload path for 100x100 square small thumbnail."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"glider_photos/small/{name}-{token}{ext}"
 
 
 def upload_airfield_photo(instance, filename):
