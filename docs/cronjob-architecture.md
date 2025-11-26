@@ -104,6 +104,7 @@ Uses PostgreSQL's atomic operations:
    - ✅ `notify_aging_logsheets.py` - **FINDING REAL ISSUES**
    - ✅ `notify_late_sprs.py` - **MONITORING 34 FLIGHTS**
    - ✅ `report_duty_delinquents.py` - **IDENTIFIED 19 DELINQUENTS** (Issue #288 fixed recipient filtering)
+   - ✅ `cleanup_old_notifications.py` - **PURGING STALE NOTIFICATIONS / PREVENTS NOTIFICATION ACCUMULATION** (Issue #290 60+ day cleanup & notification timeout)
 
 ### ✅ Phase 3: Kubernetes Integration - PRODUCTION DEPLOYED
 1. ✅ Created CronJob YAML manifests - **APPLIED TO CLUSTER**
@@ -119,12 +120,14 @@ Uses PostgreSQL's atomic operations:
 - **Weekly Sunday 9:00 AM UTC**: Maintenance digest ✅ **DEPLOYED**
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
 - **Monthly 1st @ 7:00 AM UTC**: Duty delinquent reports ✅ **DEPLOYED**
+- **Monthly 28th @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
 - **Daily 6:00 PM UTC**: Expire ad-hoc days (for tomorrow) ✅ **DEPLOYED**
 
 ### 📊 Recent Production Metrics
 - **Aging Logsheets**: Found 1 logsheet (11 days old), notified Todd Morris & Bob Alexander
 - **Late SPRs**: Checked 34 instructional flights, no overdue SPRs found
 - **Duty Delinquents**: Found 19 delinquent members, notifications sent to 4 Member Managers only
+- **Notification Cleanup**: New monthly job to purge notifications older than 60 days (both dismissed and undismissed)
 - **Execution Times**: 0.29s - 5.52s (excellent performance)
 - **Lock Contention**: Zero conflicts, perfect coordination
 - **Recipients Fixed**: Issue #288 resolved - now sends only to member_manager=True users
@@ -190,6 +193,7 @@ kubectl describe cronjobs
 kubectl describe cronjob notify-aging-logsheets
 kubectl describe cronjob notify-late-sprs
 kubectl describe cronjob report-duty-delinquents
+kubectl describe cronjob cleanup-old-notifications
 
 # List recent job executions (shows actual runs)
 kubectl get jobs
@@ -225,6 +229,7 @@ kubectl logs job/notify-aging-logsheets-28413150 --previous
 kubectl create job --from=cronjob/notify-aging-logsheets test-aging-logsheets-$(date +%H%M)
 kubectl create job --from=cronjob/notify-late-sprs test-late-sprs-$(date +%H%M)
 kubectl create job --from=cronjob/report-duty-delinquents test-duty-report-$(date +%H%M)
+kubectl create job --from=cronjob/cleanup-old-notifications test-cleanup-notifications-$(date +%H%M)
 
 # Monitor test job execution
 kubectl get jobs | grep test-
@@ -317,6 +322,45 @@ kubectl delete jobs --field-selector=status.successful=1 --field-selector=metada
 - Race condition detection
 - End-to-end CronJob execution
 - Failure recovery validation
+
+## Command Usage Examples
+
+### Notification Cleanup (Issue #290)
+```bash
+# Monthly cleanup of old notifications (production schedule)
+python manage.py cleanup_old_notifications
+
+# Test with different age threshold
+python manage.py cleanup_old_notifications --days 90
+
+# Dry run to see what would be deleted
+python manage.py cleanup_old_notifications --dry-run --days 60
+
+# Force execution bypassing distributed lock (debugging only)
+python manage.py cleanup_old_notifications --force
+```
+
+**Purpose**: Purges notifications older than 60 days (both dismissed and undismissed) to prevent accumulation of stale notifications for members who may be away from the club.
+
+**Schedule**: Monthly on the 28th (11:59 PM UTC) to approximate end-of-month timing and minimize impact on active users.
+
+**Safety Features**:
+- Configurable days parameter (default: 60)
+- Dry-run mode for testing
+- Comprehensive logging with statistics
+- Distributed locking prevents overlapping executions
+
+### Other Notification Commands
+```bash
+# Weekly aging logsheet notifications
+python manage.py notify_aging_logsheets
+
+# Monthly duty delinquent reports
+python manage.py report_duty_delinquents --lookback-months 6
+
+# Weekly late SPR notifications
+python manage.py notify_late_sprs
+```
 
 ## Migration Path
 

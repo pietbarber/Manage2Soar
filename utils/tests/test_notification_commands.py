@@ -26,6 +26,9 @@ from instructors.management.commands.notify_late_sprs import Command as LateSPRs
 from instructors.models import InstructionReport
 from logsheet.models import Airfield, Flight, Logsheet
 from members.models import Member
+from notifications.management.commands.cleanup_old_notifications import (
+    Command as CleanupNotificationsCommand,
+)
 from notifications.models import Notification
 from utils.models import CronJobLock
 
@@ -261,11 +264,12 @@ class TestLateSPRsCommand(TransactionTestCase):
         mock_send.assert_not_called()
 
 
-class TestDutyDelinquentsCommand(TransactionTestCase):
+class TestDutyDelinquentsCommand(TestCase):
     """Test the duty delinquents report command."""
 
     def setUp(self):
         """Set up test data."""
+
         # Create flying and non-flying members directly
         self.flying_member = Member.objects.create(
             username="flying_member",
@@ -399,7 +403,7 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
                     lookback_months=12, min_flights=1, dry_run=False, verbosity=1
                 )
 
-        # New member should be excluded (joined within 90 days)
+        # Should identify only the flying member (new member excluded)
         mock_send.assert_called_once()
         delinquent_data = mock_send.call_args[0][0]
         delinquent_members = [data["member"] for data in delinquent_data]
@@ -466,8 +470,8 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         recipient_list = mock_mail.call_args[1]["recipient_list"]
 
         # Should contain only the active member manager's email
-        assert len(recipient_list) == 1
-        assert active_member_manager.email in recipient_list
+        expected_recipients = [active_member_manager.email]
+        assert recipient_list == expected_recipients
         assert inactive_member_manager.email not in recipient_list
         assert regular_member.email not in recipient_list
 
@@ -475,6 +479,165 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
         mock_notification.assert_called_once()
         notification_call = mock_notification.call_args[1]
         assert notification_call["user"] == active_member_manager
+
+
+class TestCleanupNotificationsCommand(TransactionTestCase):
+    """Test the old notifications cleanup command."""
+
+    def setUp(self):
+        """Set up test data."""
+        # Create test users
+        self.user1 = Member.objects.create(
+            username="user1",
+            email="user1@test.com",
+            first_name="User",
+            last_name="One",
+            membership_status="Full Member",
+        )
+
+        self.user2 = Member.objects.create(
+            username="user2",
+            email="user2@test.com",
+            first_name="User",
+            last_name="Two",
+            membership_status="Full Member",
+        )
+
+        # Create old notifications (65 days old)
+        old_time = timezone.now() - timedelta(days=65)
+        self.old_dismissed = Notification.objects.create(
+            user=self.user1,
+            message="Old dismissed notification",
+            dismissed=True,
+            created_at=old_time,
+        )
+
+        self.old_undismissed = Notification.objects.create(
+            user=self.user1,
+            message="Old undismissed notification",
+            dismissed=False,
+            created_at=old_time,
+        )
+
+        # Create recent notifications (30 days old)
+        recent_time = timezone.now() - timedelta(days=30)
+        self.recent_dismissed = Notification.objects.create(
+            user=self.user2,
+            message="Recent dismissed notification",
+            dismissed=True,
+            created_at=recent_time,
+        )
+
+        self.recent_undismissed = Notification.objects.create(
+            user=self.user2,
+            message="Recent undismissed notification",
+            dismissed=False,
+            created_at=recent_time,
+        )
+
+        self.command = CleanupNotificationsCommand()
+
+    def test_identifies_old_notifications(self):
+        """Test that command identifies notifications older than 60 days."""
+        command = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command.stdout = mock_stdout
+            result = command.handle(dry_run=True, verbosity=2)
+            output = mock_stdout.getvalue()
+
+        # Should identify 2 old notifications (both dismissed and undismissed)
+        assert "Found 2 old notification(s)" in output
+        assert "1 dismissed, 1 undismissed" in output
+        assert result == 2
+
+    def test_purges_old_notifications_only(self):
+        """Test that only old notifications are deleted, recent ones preserved."""
+        # Verify initial state
+        assert Notification.objects.count() == 4
+
+        command = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command.stdout = mock_stdout
+            command.handle(dry_run=False, verbosity=1)
+
+        # Should have deleted 2 old notifications, kept 2 recent ones
+        remaining = Notification.objects.all()
+        assert remaining.count() == 2
+
+        # Recent notifications should still exist
+        assert self.recent_dismissed in remaining
+        assert self.recent_undismissed in remaining
+
+        # Old notifications should be gone
+        assert self.old_dismissed not in remaining
+        assert self.old_undismissed not in remaining
+
+    def test_custom_days_parameter(self):
+        """Test that custom days parameter works correctly."""
+        command1 = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command1.stdout = mock_stdout
+            # Use 40 days cutoff - should delete 65-day old notifications
+            result = command1.handle(days=40, dry_run=True, verbosity=1)
+
+        # Should still find 2 old notifications (65 > 40)
+        assert result == 2
+
+        command2 = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command2.stdout = mock_stdout
+            # Use 70 days cutoff - should delete nothing
+            result = command2.handle(days=70, dry_run=True, verbosity=1)
+
+        # Should find no notifications to delete (65 < 70)
+        assert result == 0
+
+    def test_handles_no_old_notifications(self):
+        """Test behavior when no old notifications exist."""
+        # Delete old notifications, keep only recent ones
+        Notification.objects.filter(
+            created_at__lt=timezone.now() - timedelta(days=60)
+        ).delete()
+
+        # Create fresh command instance and override stdout
+        command = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command.stdout = mock_stdout
+            result = command.handle(dry_run=False, verbosity=1)
+            output = mock_stdout.getvalue()
+
+        assert "No old notifications found to purge" in output
+        assert result == 0
+
+    def test_dry_run_does_not_delete(self):
+        """Test that dry run mode does not actually delete notifications."""
+        initial_count = Notification.objects.count()
+
+        command = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command.stdout = mock_stdout
+            command.handle(dry_run=True, verbosity=1)
+
+        # Count should be unchanged in dry run
+        assert Notification.objects.count() == initial_count
+
+    def test_purges_both_dismissed_and_undismissed(self):
+        """Test that both dismissed and undismissed old notifications are purged."""
+        command = CleanupNotificationsCommand()
+
+        with StringIO() as mock_stdout:
+            command.stdout = mock_stdout
+            command.handle(dry_run=False, verbosity=1)
+
+        # Both old notifications should be gone regardless of dismissed status
+        assert not Notification.objects.filter(pk=self.old_dismissed.pk).exists()
+        assert not Notification.objects.filter(pk=self.old_undismissed.pk).exists()
 
 
 class TestCronJobIntegration(TransactionTestCase):
@@ -488,20 +651,24 @@ class TestCronJobIntegration(TransactionTestCase):
         assert issubclass(AgingLogsheetsCommand, BaseCronJobCommand)
         assert issubclass(LateSPRsCommand, BaseCronJobCommand)
         assert issubclass(DutyDelinquentsCommand, BaseCronJobCommand)
+        assert issubclass(CleanupNotificationsCommand, BaseCronJobCommand)
 
     def test_commands_have_job_names(self):
         """Test that all commands define job_name."""
         aging_cmd = AgingLogsheetsCommand()
         late_spr_cmd = LateSPRsCommand()
         duty_cmd = DutyDelinquentsCommand()
+        cleanup_cmd = CleanupNotificationsCommand()
 
         assert hasattr(aging_cmd, "job_name")
         assert hasattr(late_spr_cmd, "job_name")
         assert hasattr(duty_cmd, "job_name")
+        assert hasattr(cleanup_cmd, "job_name")
 
         assert aging_cmd.job_name is not None
         assert late_spr_cmd.job_name is not None
         assert duty_cmd.job_name is not None
+        assert cleanup_cmd.job_name is not None
 
     def test_distributed_locking_prevents_overlap(self):
         """Test that distributed locking prevents overlapping executions."""
@@ -526,6 +693,7 @@ class TestCronJobIntegration(TransactionTestCase):
             "notify_aging_logsheets",
             "notify_late_sprs",
             "report_duty_delinquents",
+            "cleanup_old_notifications",
         ]
 
         for cmd_name in commands:
