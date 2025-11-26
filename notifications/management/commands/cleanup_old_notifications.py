@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.db.models import Case, Count, IntegerField, When
 from django.utils.timezone import now
 
 from notifications.models import Notification
@@ -31,15 +30,12 @@ class Command(BaseCronJobCommand):
         )
 
         # Find notifications older than the cutoff (both dismissed and undismissed)
-        old_notifications = Notification.objects.filter(
-            created_at__lt=cutoff_date
-        ).select_related("user")
-
-        if not old_notifications.exists():
-            self.log_info("No old notifications found to purge")
-            return 0
+        old_notifications = Notification.objects.filter(created_at__lt=cutoff_date)
 
         notification_count = old_notifications.count()
+        if notification_count == 0:
+            self.log_info("No old notifications found to purge")
+            return 0
 
         # Get stats for logging (use aggregate to avoid multiple DB queries)
         from django.db.models import Case, Count, IntegerField, When

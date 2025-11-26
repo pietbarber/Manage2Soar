@@ -264,7 +264,7 @@ class TestLateSPRsCommand(TransactionTestCase):
         mock_send.assert_not_called()
 
 
-class TestDutyDelinquentsCommand(TransactionTestCase):
+class TestDutyDelinquentsCommand(TestCase):
     """Test the duty delinquents report command."""
 
     def setUp(self):
@@ -396,16 +396,31 @@ class TestDutyDelinquentsCommand(TransactionTestCase):
             airfield=af_new,
         )
 
-        with patch("sys.stdout", new_callable=StringIO):
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             with patch.object(self.command, "_send_delinquency_report") as mock_send:
                 self.command.handle(
                     lookback_months=12, min_flights=1, dry_run=False, verbosity=1
                 )
 
-        # New member should be excluded (joined within 90 days)
+        # Debug information in case test fails
+        output = mock_stdout.getvalue()
+
+        # Report should still be sent because original flying_member is delinquent
+        # But new member should be excluded (joined within 90 days)
+        if mock_send.call_count == 0:
+            # If no report was sent, print debug info to help diagnose
+            print(f"\nDEBUG: Command output:\n{output}")
+            print(f"DEBUG: Flying member join date: {self.flying_member.joined_club}")
+            print(f"DEBUG: New member join date: {new_member.joined_club}")
+            print(f"DEBUG: Current date: {timezone.now().date()}")
+
         mock_send.assert_called_once()
         delinquent_data = mock_send.call_args[0][0]
         delinquent_members = [data["member"] for data in delinquent_data]
+
+        # Original flying member should still be reported as delinquent
+        assert self.flying_member in delinquent_members
+        # New member should be excluded due to recent join date
         assert new_member not in delinquent_members
 
     def test_recipient_filtering_active_member_managers_only(self):

@@ -150,8 +150,19 @@ class Command(BaseCronJobCommand):
             self.log_success("Duty delinquency report sent to Member Meister")
         else:
             # Check member managers for dry-run logging
+            try:
+                from siteconfig.models import MembershipStatus
+
+                active_status_names = list(MembershipStatus.get_active_statuses())
+            except ImportError:
+                from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+                active_status_names = DEFAULT_ACTIVE_STATUSES
+
             member_meisters = Member.objects.filter(
-                member_manager=True, is_active=True, email__isnull=False
+                member_manager=True,
+                membership_status__in=active_status_names,
+                email__isnull=False,
             ).exclude(email="")
 
             if member_meisters.exists():
@@ -214,8 +225,20 @@ class Command(BaseCronJobCommand):
         """Send the duty delinquency report to appropriate personnel"""
 
         # Find Member Managers (use the proper member_manager boolean field)
+        # Filter by active membership status instead of is_active field
+        try:
+            from siteconfig.models import MembershipStatus
+
+            active_status_names = list(MembershipStatus.get_active_statuses())
+        except ImportError:
+            from members.constants.membership import DEFAULT_ACTIVE_STATUSES
+
+            active_status_names = DEFAULT_ACTIVE_STATUSES
+
         member_meisters = Member.objects.filter(
-            member_manager=True, is_active=True, email__isnull=False
+            member_manager=True,
+            membership_status__in=active_status_names,
+            email__isnull=False,
         ).exclude(email="")
 
         # Fallback to a configured email if no member meisters found

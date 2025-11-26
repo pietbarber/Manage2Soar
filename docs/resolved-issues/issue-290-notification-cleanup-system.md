@@ -75,7 +75,7 @@ class Command(BaseCronJobCommand):
 - **Both Dismissed & Undismissed**: Purges all old notifications regardless of status
 - **Distributed Locking**: Uses `BaseCronJobCommand` framework for multi-pod safety
 - **Comprehensive Logging**: Detailed statistics and dry-run support
-- **Performance Optimized**: Uses `select_related("user")` and bulk delete operations
+- **Performance Optimized**: Uses bulk delete operations for efficient cleanup
 
 ### 2. Comprehensive Test Coverage
 
