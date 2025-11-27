@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load static %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{% static 'css/equipment_logbook.css' %}">
+{% endblock %}
 
 {% block content %}
 
@@ -25,7 +30,6 @@
     </div>
     {% endif %}
 
-    <link rel="stylesheet" href="/static/css/equipment_logbook.css">
     <div class="table-responsive">
         <table class="table table-sm align-middle sort" id="equipmentLogbookTable">
             <thead class="table-light">
