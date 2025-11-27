@@ -102,5 +102,4 @@ This optimization uses the same pattern as Issue #296 (instruction record perfor
 3. **Index in Python** - Build lookup dictionaries from batch results
 4. **Lookup in loop** - Use O(1) dict lookups instead of O(n) queries
 
-## Date
-July 2025
+**Resolution Date**: November 26, 2025

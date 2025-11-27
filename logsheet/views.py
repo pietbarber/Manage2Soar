@@ -1977,8 +1977,6 @@ def towplane_logbook(request, pk: int):
 
     # OPTIMIZATION: Pre-fetch ALL flights for this towplane in a single query
     # instead of querying per-day (N+1 fix)
-    from logsheet.models import Flight
-
     all_flights = Flight.objects.filter(towplane=towplane).values(
         "logsheet__log_date", "tow_pilot", "guest_towpilot_name", "legacy_towpilot_name"
     )
@@ -2001,8 +1999,6 @@ def towplane_logbook(request, pk: int):
             flights_by_day[day]["towpilots"].add(f["legacy_towpilot_name"])
 
     # OPTIMIZATION: Pre-fetch ALL member names in a single query
-    from members.models import Member
-
     id_to_name = {}
     if all_towpilot_ids:
         for m in Member.objects.filter(id__in=all_towpilot_ids).only(
@@ -2014,21 +2010,24 @@ def towplane_logbook(request, pk: int):
     issues_by_day = _issues_by_day_for_towplane(towplane)
 
     # Group closeouts by day
+    # Note: When multiple closeouts exist for the same day (e.g., from different
+    # logsheets), we use the first logsheet's PK encountered. The closeouts are
+    # ordered by log_date and logsheet_id, so this is deterministic.
     daily_data = {}
     for c in closeouts:
         day = c.logsheet.log_date
         flight_info = flights_by_day.get(day, {"count": 0, "towpilots": set()})
         tow_count = flight_info["count"]
 
-        # Convert tow pilot IDs to names
-        towpilot_names = []
-        for ref in flight_info["towpilots"]:
-            if isinstance(ref, int) and ref in id_to_name:
-                towpilot_names.append(id_to_name[ref])
-            else:
-                towpilot_names.append(ref)
-
         if day not in daily_data:
+            # Convert tow pilot IDs to names (only when creating new day entry)
+            towpilot_names = []
+            for ref in flight_info["towpilots"]:
+                if isinstance(ref, int) and ref in id_to_name:
+                    towpilot_names.append(id_to_name[ref])
+                else:
+                    towpilot_names.append(ref)
+
             daily_data[day] = {
                 "day": day,
                 "logsheet_pk": c.logsheet.pk,

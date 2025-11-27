@@ -300,6 +300,323 @@ class TowplaneLogbookPerformanceTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class TowplaneLogbookEdgeCasesTestCase(TestCase):
+    """Test edge cases for towplane logbook view."""
+
+    def setUp(self):
+        """Create test data for edge case testing."""
+        self.member = Member.objects.create_user(
+            username="testpilot",
+            password="testpass123",
+            first_name="Test",
+            last_name="Pilot",
+            membership_status="Full Member",
+        )
+
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+
+        self.towplane = Towplane.objects.create(
+            name="Test Towplane",
+            n_number="N123TP",
+            is_active=True,
+        )
+
+        self.glider = Glider.objects.create(
+            competition_number="XY",
+            make="Test",
+            model="Glider",
+            n_number="N123XY",
+            is_active=True,
+        )
+
+    def test_multiple_closeouts_same_day(self):
+        """
+        Test aggregation when multiple TowplaneCloseout records exist for the same day.
+
+        This covers the real-world scenario where a towplane is used at different
+        times of the day with multiple logsheet entries. The view should aggregate
+        tach hours correctly.
+
+        Note: Multiple logsheets for the same day require different airfields due
+        to the unique constraint on (log_date, airfield_id).
+        """
+        log_date = date(2024, 6, 15)
+
+        # Create second airfield for afternoon operations
+        afternoon_airfield = Airfield.objects.create(
+            name="Afternoon Field", identifier="AFT"
+        )
+
+        # Create two logsheets for the same day (e.g., morning and afternoon ops)
+        morning_logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        afternoon_logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=afternoon_airfield,  # Different airfield
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        # Create two closeouts for the same day with different tach times
+        TowplaneCloseout.objects.create(
+            logsheet=morning_logsheet,
+            towplane=self.towplane,
+            start_tach=1000.0,
+            end_tach=1001.5,
+            tach_time=1.5,  # Morning session
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=afternoon_logsheet,
+            towplane=self.towplane,
+            start_tach=1001.5,
+            end_tach=1003.0,
+            tach_time=1.5,  # Afternoon session
+        )
+
+        # Create flights for both logsheets
+        Flight.objects.create(
+            logsheet=morning_logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=self.member,
+            release_altitude=2000,
+            launch_time=dt_time(9, 0, 0),
+            landing_time=dt_time(10, 0, 0),
+        )
+        Flight.objects.create(
+            logsheet=afternoon_logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=self.member,
+            release_altitude=2000,
+            launch_time=dt_time(14, 0, 0),
+            landing_time=dt_time(15, 0, 0),
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Should have only 1 day entry (aggregated)
+        daily = response.context["daily"]
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], log_date)
+
+        # day_hours should be the SUM of both closeouts (1.5 + 1.5 = 3.0)
+        self.assertEqual(day_data["day_hours"], 3.0)
+
+        # cum_hours should be the LAST end_tach value (1003.0)
+        self.assertEqual(day_data["cum_hours"], 1003.0)
+
+        # glider_tows should count all flights for the day
+        self.assertEqual(day_data["glider_tows"], 2)
+
+    def test_guest_towpilot_name(self):
+        """
+        Test that guest tow pilot names are correctly displayed.
+
+        Guest tow pilots are non-member tow pilots stored as strings.
+        """
+        log_date = date(2024, 7, 20)
+
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=1000.0,
+            end_tach=1001.0,
+            tach_time=1.0,
+        )
+
+        # Create flight with guest tow pilot (non-member)
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=None,  # No member tow pilot
+            guest_towpilot_name="John Guest Pilot",  # Guest name
+            release_altitude=2000,
+            launch_time=dt_time(10, 0, 0),
+            landing_time=dt_time(11, 0, 0),
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        daily = response.context["daily"]
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        # Guest name should appear in towpilots list
+        self.assertIn("John Guest Pilot", day_data["towpilots"])
+
+    def test_legacy_towpilot_name(self):
+        """
+        Test that legacy tow pilot names are correctly displayed.
+
+        Legacy tow pilot names are from historical data imports.
+        """
+        log_date = date(2024, 8, 10)
+
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=1000.0,
+            end_tach=1001.0,
+            tach_time=1.0,
+        )
+
+        # Create flight with legacy tow pilot name (from data import)
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=None,
+            guest_towpilot_name=None,
+            legacy_towpilot_name="Smith, Robert (Legacy)",  # Legacy import name
+            release_altitude=2000,
+            launch_time=dt_time(10, 0, 0),
+            landing_time=dt_time(11, 0, 0),
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        daily = response.context["daily"]
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        # Legacy name should appear in towpilots list
+        self.assertIn("Smith, Robert (Legacy)", day_data["towpilots"])
+
+    def test_mixed_towpilot_types(self):
+        """
+        Test that a day with mixed tow pilot types (member, guest, legacy) works correctly.
+        """
+        log_date = date(2024, 9, 5)
+
+        logsheet = Logsheet.objects.create(
+            log_date=log_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=1000.0,
+            end_tach=1002.0,
+            tach_time=2.0,
+        )
+
+        # Flight with member tow pilot
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=self.member,
+            release_altitude=2000,
+            launch_time=dt_time(9, 0, 0),
+            landing_time=dt_time(9, 30, 0),
+        )
+
+        # Flight with guest tow pilot
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=None,
+            guest_towpilot_name="Guest Tow Pilot",
+            release_altitude=2000,
+            launch_time=dt_time(10, 0, 0),
+            landing_time=dt_time(10, 30, 0),
+        )
+
+        # Flight with legacy tow pilot
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=self.member,
+            glider=self.glider,
+            towplane=self.towplane,
+            tow_pilot=None,
+            guest_towpilot_name=None,
+            legacy_towpilot_name="Legacy Tow Pilot",
+            release_altitude=2000,
+            launch_time=dt_time(11, 0, 0),
+            landing_time=dt_time(11, 30, 0),
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        daily = response.context["daily"]
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+
+        # Should have 3 flights
+        self.assertEqual(day_data["glider_tows"], 3)
+
+        # All three tow pilot names should appear
+        towpilots = day_data["towpilots"]
+        self.assertEqual(len(towpilots), 3)
+
+        # Check each type of pilot is represented
+        # Member pilot should be resolved to name
+        self.assertIn("Test Pilot", towpilots)
+        self.assertIn("Guest Tow Pilot", towpilots)
+        self.assertIn("Legacy Tow Pilot", towpilots)
+
+
 class TowplaneLogbookMinimalTestCase(TestCase):
     """Test with minimal data to ensure view works correctly."""
 
