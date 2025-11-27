@@ -9,10 +9,9 @@ a lookup dict keyed by (instructor_id, report_date) for O(1) access.
 """
 
 import datetime
-from unittest.mock import patch
 
 import pytest
-from django.test import Client, RequestFactory
+from django.test import Client
 from django.urls import reverse
 
 from instructors.models import (
@@ -103,7 +102,9 @@ def create_logsheet(log_date, airfield, created_by):
 class TestMemberLogbookPerformance:
     """Test that member_logbook view uses efficient batch queries."""
 
-    def test_logbook_loads_without_n_plus_one_queries(self, setup_logbook_data):
+    def test_logbook_loads_without_n_plus_one_queries(
+        self, setup_logbook_data, django_assert_max_num_queries
+    ):
         """
         Verify that the logbook view does not make per-flight queries.
 
@@ -123,7 +124,7 @@ class TestMemberLogbookPerformance:
             flight_date = base_date + datetime.timedelta(days=i * 18)  # ~5 years
             logsheet = create_logsheet(flight_date, airfield, student)
 
-            flight = Flight.objects.create(
+            Flight.objects.create(
                 logsheet=logsheet,
                 pilot=student,
                 instructor=instructor,
@@ -149,10 +150,12 @@ class TestMemberLogbookPerformance:
         client = Client()
         client.force_login(student)
 
-        # Use Django's assertNumQueries would be ideal, but for now
-        # just verify the view works and returns successfully
+        # Assert constant query count regardless of flight count
+        # Max 20 queries for: session, user auth, flights, ground instruction,
+        # instruction reports, lesson scores, pagination, etc.
         url = reverse("instructors:member_logbook") + "?show_all_years=1"
-        response = client.get(url)
+        with django_assert_max_num_queries(20):
+            response = client.get(url)
 
         assert response.status_code == 200
         # Verify we got pages with flights
@@ -175,14 +178,13 @@ class TestMemberLogbookPerformance:
         data = setup_logbook_data
         student = data["student"]
         instructor = data["instructor"]
-        passenger = data["passenger"]
         glider = data["glider"]
         lesson = data["lesson"]
         airfield = data["airfield"]
 
         # Flight 1: Student as pilot with instructor
         ls1 = create_logsheet(datetime.date(2024, 1, 1), airfield, student)
-        f1 = Flight.objects.create(
+        Flight.objects.create(
             logsheet=ls1,
             pilot=student,
             instructor=instructor,
@@ -199,7 +201,7 @@ class TestMemberLogbookPerformance:
 
         # Flight 2: Student as solo pilot
         ls2 = create_logsheet(datetime.date(2024, 2, 1), airfield, student)
-        f2 = Flight.objects.create(
+        Flight.objects.create(
             logsheet=ls2,
             pilot=student,
             glider=glider,
@@ -209,7 +211,7 @@ class TestMemberLogbookPerformance:
 
         # Flight 3: Student as passenger
         ls3 = create_logsheet(datetime.date(2024, 3, 1), airfield, student)
-        f3 = Flight.objects.create(
+        Flight.objects.create(
             logsheet=ls3,
             pilot=instructor,
             passenger=student,
@@ -337,7 +339,7 @@ class TestMemberLogbookPerformance:
         logsheet = create_logsheet(flight_date, airfield, student)
 
         # Flight with instructor 1
-        f1 = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=student,
             instructor=instructor,
@@ -348,7 +350,7 @@ class TestMemberLogbookPerformance:
         )
 
         # Flight with instructor 2
-        f2 = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=student,
             instructor=instructor2,
@@ -402,7 +404,7 @@ class TestMemberLogbookPerformance:
         # Create flight with instructor but NO instruction report
         flight_date = datetime.date(2024, 7, 1)
         logsheet = create_logsheet(flight_date, airfield, student)
-        flight = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=student,
             instructor=instructor,
