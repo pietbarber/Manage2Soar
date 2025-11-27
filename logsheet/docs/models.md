@@ -62,6 +62,8 @@ erDiagram
         string status
         boolean available
         image photo
+        image photo_medium
+        image photo_small
         text description
     }
 
@@ -74,6 +76,8 @@ erDiagram
         string status
         boolean available
         image photo
+        image photo_medium
+        image photo_small
         text description
     }
 
@@ -212,9 +216,11 @@ This document describes all models in `logsheet/models.py`.
 - **New in Issue 123**: Added `hourly_rental_rate` field to support charging for non-towing flights like sightseeing, flight reviews, and retrieval missions.
 - **Rental Functionality**: When enabled via `SiteConfiguration.allow_towplane_rental`, clubs can charge hourly rates for towplane usage beyond towing (e.g., sightseeing, flight reviews, aircraft retrieval).
 - **Tow Pricing**: Each towplane should have a `TowplaneChargeScheme` for tow cost calculations (Issue #283).
+- **Photo Thumbnails (Issue #286)**: Added `photo_medium` (150x150) and `photo_small` (100x100) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`photo_url_medium`, `photo_url_small`) provide graceful fallback chains.
 
 ## Glider
 - Represents a glider, including status and maintenance.
+- **Photo Thumbnails (Issue #286)**: Added `photo_medium` (150x150) and `photo_small` (100x100) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`photo_url_medium`, `photo_url_small`) provide graceful fallback chains.
 
 ## Airfield
 - Represents an airfield where operations occur.

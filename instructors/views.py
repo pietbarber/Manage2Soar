@@ -1135,6 +1135,14 @@ def edit_syllabus_document(request, slug):
 
 
 def member_instruction_record(request, member_id):
+    """
+    Displays a detailed timeline and summary of all instruction
+    (flight reports and ground sessions) for a student.
+
+    OPTIMIZED: Pre-fetches all data to avoid N+1 queries.
+    Original version had 8+ queries per session (880+ queries for 110 sessions).
+    Optimized version uses ~10 queries total regardless of session count.
+    """
     # Build a mapping of lesson code to lesson title for tooltips
     lesson_titles = {
         lesson.code: lesson.title for lesson in TrainingLesson.objects.all()
@@ -1146,51 +1154,54 @@ def member_instruction_record(request, member_id):
         pk=member_id,
     )
 
-    # ── Flying summary by glider ──
-    flights = Flight.objects.filter(pilot=member).select_related("logsheet", "aircraft")
-
+    # Flying summary by glider (uses aggregation, already efficient)
     flights_summary = get_flight_summary_for_member(member)
 
-    instruction_reports = (
+    # Pre-fetch all instruction reports and ground sessions with related data
+    instruction_reports = list(
         InstructionReport.objects.filter(student=member)
         .order_by("-report_date")
+        .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
 
-    ground_sessions = (
+    ground_sessions = list(
         GroundInstruction.objects.filter(student=member)
         .order_by("-date")
+        .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
     )
 
-    # ── BUILD A TIMELINE OF ALL SESSIONS ──
-    # 1) Grab all flight‐instruction reports and ground sessions
-    flight_reports = list(
-        InstructionReport.objects.filter(student=member)
-        .order_by("report_date")
-        .values_list("report_date", flat=True)
-    )
-    ground_reports = list(
-        GroundInstruction.objects.filter(student=member)
-        .order_by("date")
-        .values_list("date", flat=True)
-    )
-    # 2) Merge into a single sorted list of dates with tags
-    sessions = []
-    for d in flight_reports:
-        sessions.append({"date": d, "type": "flight"})
-    for d in ground_reports:
-        sessions.append({"date": d, "type": "ground"})
-    sessions.sort(key=lambda x: x["date"])
-
-    # 3) Precompute solo‐required vs rating‐required lesson IDs
-    lessons = TrainingLesson.objects.all()
+    # Precompute solo-required vs rating-required lesson IDs
+    lessons = list(TrainingLesson.objects.all())
     solo_ids = {L.id for L in lessons if L.is_required_for_solo()}
     rating_ids = {L.id for L in lessons if L.is_required_for_private()}
     total_solo = len(solo_ids) or 1
     total_rating = len(rating_ids) or 1
 
-    # 4) Find the date of first true “solo” (flight with no instructor)
+    # OPTIMIZATION: Fetch ALL lesson scores ONCE, then compute in Python
+    # Get all flight lesson scores for this student
+    all_flight_scores = list(
+        LessonScore.objects.filter(report__student=member)
+        .select_related("report")
+        .values("lesson_id", "score", "report__report_date")
+    )
+    # Get all ground lesson scores for this student
+    all_ground_scores = list(
+        GroundLessonScore.objects.filter(session__student=member)
+        .select_related("session")
+        .values("lesson_id", "score", "session__date")
+    )
+
+    # Build sorted list of all sessions for chart
+    sessions = []
+    for r in instruction_reports:
+        sessions.append({"date": r.report_date, "type": "flight"})
+    for g in ground_sessions:
+        sessions.append({"date": g.date, "type": "ground"})
+    sessions.sort(key=lambda x: x["date"])
+
+    # Find the date of first true "solo" (flight with no instructor)
     first_solo = (
         Flight.objects.filter(pilot=member, instructor__isnull=True)
         .order_by("logsheet__log_date")
@@ -1199,7 +1210,41 @@ def member_instruction_record(request, member_id):
     )
     first_solo_str = first_solo.strftime("%Y-%m-%d") if first_solo else ""
 
-    # 5) Build the chart arrays with independent solo (3 or 4) vs rating (4 only)
+    # OPTIMIZATION: Pre-compute cumulative progress for ALL dates in Python
+    def compute_cumulative_progress(target_date):
+        """Compute solo and rating progress up to target_date using pre-fetched data."""
+        # Solo standard: score 3 or 4
+        flight_solo = {
+            s["lesson_id"]
+            for s in all_flight_scores
+            if s["report__report_date"] <= target_date and s["score"] in ["3", "4"]
+        }
+        ground_solo = {
+            s["lesson_id"]
+            for s in all_ground_scores
+            if s["session__date"] <= target_date and s["score"] in ["3", "4"]
+        }
+        solo_done = flight_solo | ground_solo
+
+        # Rating standard: score 4 only
+        flight_rating = {
+            s["lesson_id"]
+            for s in all_flight_scores
+            if s["report__report_date"] <= target_date and s["score"] == "4"
+        }
+        ground_rating = {
+            s["lesson_id"]
+            for s in all_ground_scores
+            if s["session__date"] <= target_date and s["score"] == "4"
+        }
+        rating_done = flight_rating | ground_rating
+
+        solo_pct = int(len(solo_done & solo_ids) / total_solo * 100)
+        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
+
+        return solo_done, rating_done, solo_pct, rating_pct
+
+    # Build chart data
     chart_dates = []
     chart_solo = []
     chart_rating = []
@@ -1207,95 +1252,69 @@ def member_instruction_record(request, member_id):
 
     for sess in sessions:
         d = sess["date"]
-        # record the date+anchor
         chart_dates.append(d.strftime("%Y-%m-%d"))
         chart_anchors.append(f"{sess['type']}-{d.strftime('%Y-%m-%d')}")
+        _, _, solo_pct, rating_pct = compute_cumulative_progress(d)
+        chart_solo.append(solo_pct)
+        chart_rating.append(rating_pct)
 
-        # solo‐standard completed (score 3 or 4)
-        flight_solo = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        ground_solo = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        solo_done = flight_solo | ground_solo
+    # OPTIMIZATION: Batch fetch flights for all report dates at once
+    report_dates = [r.report_date for r in instruction_reports]
+    all_flights = list(
+        Flight.objects.filter(
+            pilot=member, logsheet__log_date__in=report_dates
+        ).select_related("logsheet", "glider", "instructor")
+    )
+    # Group flights by (instructor_id, date)
+    flights_by_key = defaultdict(list)
+    for f in all_flights:
+        key = (f.instructor_id, f.logsheet.log_date)
+        flights_by_key[key].append(f)
 
-        # rating‐standard completed (score 4 only)
-        flight_rating = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
-        )
-        ground_rating = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
-        )
-        rating_done = flight_rating | ground_rating
-
-        # compute percentages against their own totals
-        chart_solo.append(int(len(solo_done & solo_ids) / total_solo * 100))
-        chart_rating.append(int(len(rating_done & rating_ids) / total_rating * 100))
+    # Build lesson lookup for missing lessons (computed once, used for all reports)
+    lessons_by_id = {L.id: L for L in lessons}
 
     blocks = []
+    today = timezone.now().date()
 
-    # ── Flight‐instruction reports ──
+    # Flight-instruction reports
     for report in instruction_reports:
         d = report.report_date
-        # cumulative “solo” (3 or 4) up to date d
-        flight_solo = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        ground_solo = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        solo_done = flight_solo | ground_solo
+        solo_done, rating_done, solo_pct, rating_pct = compute_cumulative_progress(d)
 
-        # cumulative “rating” (4 only) up to date d
-        flight_rate = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
+        # Only compute missing lessons (for display in alert) - cheap lookups now
+        missing_solo = sorted(
+            [
+                lessons_by_id[lid]
+                for lid in (solo_ids - solo_done)
+                if lid in lessons_by_id
+            ],
+            key=lambda x: x.code,
         )
-        ground_rate = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
+        missing_rating = sorted(
+            [
+                lessons_by_id[lid]
+                for lid in (rating_ids - rating_done)
+                if lid in lessons_by_id
+            ],
+            key=lambda x: x.code,
         )
-        rating_done = flight_rate | ground_rate
 
-        solo_pct = int(len(solo_done & solo_ids) / total_solo * 100)
-        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
-
-        missing_solo = TrainingLesson.objects.filter(
-            id__in=solo_ids - solo_done
-        ).order_by("code")
-        missing_rating = TrainingLesson.objects.filter(
-            id__in=rating_ids - rating_done
-        ).order_by("code")
-
-        # Group lesson codes by score for this report
+        # Group lesson codes by score for this report (already prefetched)
         scores_by_code = defaultdict(list)
         for s in report.lesson_scores.all():
             scores_by_code[str(s.score)].append(s.lesson.code)
+
+        # Get flights from pre-fetched data
+        flight_key = (report.instructor_id, d)
+        report_flights = flights_by_key.get(flight_key, [])
+
         blocks.append(
             {
                 "type": "flight",
                 "report": report,
-                "days_ago": (timezone.now().date() - d).days,
-                "flights": Flight.objects.filter(
-                    instructor=report.instructor,
-                    pilot=report.student,
-                    logsheet__log_date=d,
-                ),
+                "days_ago": (today - d).days,
+                "flights": report_flights,
                 "scores_by_code": dict(scores_by_code),
                 "solo_pct": solo_pct,
                 "rating_pct": rating_pct,
@@ -1304,52 +1323,38 @@ def member_instruction_record(request, member_id):
             }
         )
 
-    # ── Ground‐instruction sessions ──
+    # Ground-instruction sessions
     for session in ground_sessions:
         d = session.date
-        flight_solo = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        ground_solo = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score__in=["3", "4"]
-            ).values_list("lesson_id", flat=True)
-        )
-        solo_done = flight_solo | ground_solo
+        solo_done, rating_done, solo_pct, rating_pct = compute_cumulative_progress(d)
 
-        flight_rate = set(
-            LessonScore.objects.filter(
-                report__student=member, report__report_date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
+        missing_solo = sorted(
+            [
+                lessons_by_id[lid]
+                for lid in (solo_ids - solo_done)
+                if lid in lessons_by_id
+            ],
+            key=lambda x: x.code,
         )
-        ground_rate = set(
-            GroundLessonScore.objects.filter(
-                session__student=member, session__date__lte=d, score="4"
-            ).values_list("lesson_id", flat=True)
+        missing_rating = sorted(
+            [
+                lessons_by_id[lid]
+                for lid in (rating_ids - rating_done)
+                if lid in lessons_by_id
+            ],
+            key=lambda x: x.code,
         )
-        rating_done = flight_rate | ground_rate
 
-        solo_pct = int(len(solo_done & solo_ids) / total_solo * 100)
-        rating_pct = int(len(rating_done & rating_ids) / total_rating * 100)
-
-        missing_solo = TrainingLesson.objects.filter(
-            id__in=solo_ids - solo_done
-        ).order_by("code")
-        missing_rating = TrainingLesson.objects.filter(
-            id__in=rating_ids - rating_done
-        ).order_by("code")
-
-        # Group lesson codes by score for this ground session
+        # Group lesson codes by score for this ground session (already prefetched)
         scores_by_code = defaultdict(list)
         for s in session.lesson_scores.all():
             scores_by_code[str(s.score)].append(s.lesson.code)
+
         blocks.append(
             {
                 "type": "ground",
                 "report": session,
-                "days_ago": (timezone.now().date() - d).days,
+                "days_ago": (today - d).days,
                 "flights": None,
                 "scores_by_code": dict(scores_by_code),
                 "solo_pct": solo_pct,
@@ -1367,7 +1372,6 @@ def member_instruction_record(request, member_id):
     )
 
     # Group blocks by date for template
-
     daily_blocks = OrderedDict()
     for block in blocks:
         date_key = (

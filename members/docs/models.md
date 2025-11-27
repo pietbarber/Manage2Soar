@@ -29,6 +29,8 @@ erDiagram
         text public_notes
         text private_notes
         image profile_photo
+        image profile_photo_medium
+        image profile_photo_small
         boolean instructor
         boolean towpilot
         boolean duty_officer
@@ -141,6 +143,7 @@ erDiagram
 - Includes `home_club` field for visiting pilots from other soaring clubs.
 - Can be linked to a `MembershipApplication` that created the account.
 - **Performance Optimization (Issue #285)**: Added database indexes on `membership_status` and `(last_name, first_name)` for faster filtering and sorting in logsheet operations.
+- **Photo Thumbnails (Issue #286)**: Added `profile_photo_medium` (200x200) and `profile_photo_small` (64x64) fields for optimized page loading. Thumbnails are auto-generated when photos are uploaded via admin. URL properties (`profile_image_url_medium`, `profile_image_url_small`) provide graceful fallback chains.
 
 See also: [Redaction of Personal Contact Information](redaction.md)
 
