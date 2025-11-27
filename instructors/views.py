@@ -1271,7 +1271,7 @@ def member_instruction_record(request, member_id):
         key = (f.instructor_id, f.logsheet.log_date)
         flights_by_key[key].append(f)
 
-    # Build lesson lookup for missing lessons (only compute once for latest)
+    # Build lesson lookup for missing lessons (computed once, used for all reports)
     lessons_by_id = {L.id: L for L in lessons}
 
     blocks = []
