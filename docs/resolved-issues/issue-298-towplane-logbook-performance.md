@@ -95,7 +95,7 @@ daily_data[day] = {
   - `test_single_day_logbook`: Edge case with minimal data
 
 ## Pattern Applied
-This optimization uses the same pattern as Issue #296 (instruction record performance):
+This optimization uses the same pattern as Issue #297 (instruction record performance):
 
 1. **Identify the loop** - Find code that runs queries inside loops
 2. **Batch the query** - Move query outside loop, fetch ALL data at once
