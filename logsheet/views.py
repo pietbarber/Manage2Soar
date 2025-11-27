@@ -1959,45 +1959,75 @@ def _issues_by_day_for_towplane(towplane):
 
 
 def towplane_logbook(request, pk: int):
+    """
+    Display the logbook for a towplane.
+
+    Performance optimized: Uses batch queries instead of per-day queries.
+    For a towplane with 10+ years of data (potentially thousands of days),
+    this reduces query count from O(days) to O(1) for major data fetches.
+    """
     towplane = get_object_or_404(Towplane, pk=pk)
 
     # Get TowplaneCloseout records for this towplane, grouped by day
-
     closeouts = (
         TowplaneCloseout.objects.filter(towplane=towplane)
         .select_related("logsheet")
         .order_by("logsheet__log_date", "logsheet_id")
     )
 
-    # Group by day
-    # Use explicit dict construction to avoid defaultdict type confusion
-    daily_data = {}
-
-    # Ensure all keys are initialized with correct types
-    # (float for day_hours/cum_hours, None for day/logsheet_pk, list for issues/deadlines)
+    # OPTIMIZATION: Pre-fetch ALL flights for this towplane in a single query
+    # instead of querying per-day (N+1 fix)
     from logsheet.models import Flight
 
-    # Collect all unique tow_pilot IDs for mapping
+    all_flights = Flight.objects.filter(towplane=towplane).values(
+        "logsheet__log_date", "tow_pilot", "guest_towpilot_name", "legacy_towpilot_name"
+    )
+
+    # Build per-day flight data: count and tow pilot IDs/names
+    flights_by_day = {}  # day -> {"count": int, "towpilots": set}
     all_towpilot_ids = set()
-    daily_towpilot_refs = {}
+    for f in all_flights:
+        day = f["logsheet__log_date"]
+        if day not in flights_by_day:
+            flights_by_day[day] = {"count": 0, "towpilots": set()}
+        flights_by_day[day]["count"] += 1
+
+        if f["tow_pilot"]:
+            flights_by_day[day]["towpilots"].add(f["tow_pilot"])
+            all_towpilot_ids.add(f["tow_pilot"])
+        elif f["guest_towpilot_name"]:
+            flights_by_day[day]["towpilots"].add(f["guest_towpilot_name"])
+        elif f["legacy_towpilot_name"]:
+            flights_by_day[day]["towpilots"].add(f["legacy_towpilot_name"])
+
+    # OPTIMIZATION: Pre-fetch ALL member names in a single query
+    from members.models import Member
+
+    id_to_name = {}
+    if all_towpilot_ids:
+        for m in Member.objects.filter(id__in=all_towpilot_ids).only(
+            "id", "first_name", "last_name", "username"
+        ):
+            id_to_name[m.id] = m.get_full_name() or m.username
+
+    # OPTIMIZATION: Pre-fetch ALL issues once (instead of re-querying per day)
+    issues_by_day = _issues_by_day_for_towplane(towplane)
+
+    # Group closeouts by day
+    daily_data = {}
     for c in closeouts:
         day = c.logsheet.log_date
-        # Only include flights for this towplane and this day
-        flights = Flight.objects.filter(
-            towplane=towplane, logsheet__log_date=day
-        ).values("tow_pilot", "guest_towpilot_name", "legacy_towpilot_name")
-        tow_count = flights.count()
-        towpilots = set()
-        for f in flights:
-            if f["tow_pilot"]:
-                towpilots.add(f["tow_pilot"])
-                all_towpilot_ids.add(f["tow_pilot"])
-            elif f["guest_towpilot_name"]:
-                towpilots.add(f["guest_towpilot_name"])
-            elif f["legacy_towpilot_name"]:
-                towpilots.add(f["legacy_towpilot_name"])
-        # Only towpilots for this towplane/day are included
-        daily_towpilot_refs[day] = towpilots
+        flight_info = flights_by_day.get(day, {"count": 0, "towpilots": set()})
+        tow_count = flight_info["count"]
+
+        # Convert tow pilot IDs to names
+        towpilot_names = []
+        for ref in flight_info["towpilots"]:
+            if isinstance(ref, int) and ref in id_to_name:
+                towpilot_names.append(id_to_name[ref])
+            else:
+                towpilot_names.append(ref)
+
         if day not in daily_data:
             daily_data[day] = {
                 "day": day,
@@ -2005,39 +2035,17 @@ def towplane_logbook(request, pk: int):
                 "day_hours": float(c.tach_time or 0),
                 "cum_hours": float(c.end_tach or 0),
                 "glider_tows": tow_count,
-                "towpilots": None,  # will fill in below
-                "issues": [],
+                "towpilots": towpilot_names,
+                "issues": issues_by_day.get(day, []),
                 "deadlines": [],
             }
         else:
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
             daily_data[day]["cum_hours"] = float(c.end_tach or 0)
-            daily_data[day]["glider_tows"] = tow_count
-    # Map tow_pilot IDs to names
-    from members.models import Member
+            # glider_tows is already set from flights_by_day
 
-    id_to_name = {}
-    if all_towpilot_ids:
-        for m in Member.objects.filter(id__in=all_towpilot_ids):
-            id_to_name[m.id] = m.get_full_name() or m.username
-    # Fill in towpilots as names for each day
-    for day, refs in daily_towpilot_refs.items():
-        names = []
-        for ref in refs:
-            if isinstance(ref, int) and ref in id_to_name:
-                names.append(id_to_name[ref])
-            else:
-                names.append(ref)
-        daily_data[day]["towpilots"] = names
-
-    # Sort days
-    days_sorted = sorted(daily_data.keys())
-    daily = []
-    for day in days_sorted:
-        row = daily_data[day]
-        # Attach issues for the day
-        row["issues"] = _issues_by_day_for_towplane(towplane).get(day, [])
-        daily.append(row)
+    # Sort days and build final list
+    daily = [daily_data[day] for day in sorted(daily_data.keys())]
 
     # Year navigation anchors
     year_seen = set()
