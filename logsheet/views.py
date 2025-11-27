@@ -2025,6 +2025,9 @@ def towplane_logbook(request, pk: int):
             for ref in flight_info["towpilots"]:
                 if isinstance(ref, int) and ref in id_to_name:
                     towpilot_names.append(id_to_name[ref])
+                elif isinstance(ref, int):
+                    # Orphaned member ID - member was deleted
+                    towpilot_names.append(f"[Member ID {ref}]")
                 else:
                     towpilot_names.append(ref)
 
