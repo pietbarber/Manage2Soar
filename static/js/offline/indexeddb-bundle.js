@@ -341,6 +341,43 @@
         return pending.filter(f => f.serverId === null || f.editType !== 'update');
     }
 
+    /**
+     * Create a pending operation (launch/landing) for an existing flight
+     * @param {string} operationType - 'launch' or 'landing'
+     * @param {number} flightId - The server flight ID
+     * @param {string} time - The time value (HH:MM format)
+     * @param {number} logsheetId - ID of the parent logsheet
+     * @returns {Promise<number>} - Local ID of the pending operation
+     */
+    async function createPendingOperation(operationType, flightId, time, logsheetId) {
+        const operation = {
+            operationType: operationType,  // 'launch' or 'landing'
+            serverId: flightId,
+            time: time,
+            logsheetId: logsheetId,
+            syncStatus: SyncStatus.PENDING,
+            editType: 'operation',  // Distinguish from flight edits
+            idempotencyKey: generateIdempotencyKey(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            syncAttempts: 0,
+            lastSyncError: null
+        };
+
+        const localId = await put('pendingFlights', operation);
+        console.log(`[IndexedDB] Created pending ${operationType} operation ${localId} for flight ${flightId}`);
+        return localId;
+    }
+
+    /**
+     * Get all pending operations (launch/landing)
+     * @returns {Promise<object[]>}
+     */
+    async function getPendingOperations() {
+        const pending = await getPendingFlights();
+        return pending.filter(f => f.editType === 'operation');
+    }
+
     // =========================================================
     // REFERENCE DATA HELPERS
     // =========================================================
@@ -474,9 +511,11 @@
         generateIdempotencyKey,
         createPendingFlight,
         createPendingEdit,
+        createPendingOperation,
         getPendingFlights,
         getPendingEdits,
         getPendingNewFlights,
+        getPendingOperations,
         getFlightsByLogsheet,
         getPendingFlightCount,
         updateFlightSyncStatus,

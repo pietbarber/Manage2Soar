@@ -437,7 +437,7 @@
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.id = 'offline-toast-container';
-            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
             toastContainer.style.zIndex = '1100';
             document.body.appendChild(toastContainer);
         }

@@ -17,6 +17,7 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 ## Key Features
 - Secure Google OAuth2 login (with Django fallback)
 - Role-based access for all club roles (admin, instructor, member, etc.)
+- **Progressive Web App (PWA) with offline support** - Duty officers can log flights even without internet connectivity (Issue #315)
 - **Configurable membership statuses** - Clubs can customize their membership types (Issue #169)
 - **Configurable test presets** - Knowledge test presets managed via Django admin (Issue #135)
 - Member profiles with bios, photos, badges, and qualifications
@@ -92,6 +93,9 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
  - All operations are logged by a duty officer with a nice web interface
  -- include takeoff time, landing time, release height, glider, pilot, instructor.
  -- Any errors or missing data are announced to the duty officer.
+ - **Offline-capable PWA**: Add, copy, launch, land, and delete flights even without internet
+ -- Changes sync automatically when connectivity returns
+ -- Reference data (members, gliders) cached locally for offline form rendering
  - Closeout including finances, who paid, who is on account, etc.
  - Closeout including Tow Plane information, safety issues, Operation Essay.
  -- Log maintenance issues, indicate a glider is grounded.

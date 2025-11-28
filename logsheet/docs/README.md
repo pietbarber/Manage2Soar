@@ -77,6 +77,30 @@ See [models.md](models.md) for full details and database schema.
 
 ---
 
+## Offline Mode (PWA)
+
+The logsheet management page supports **Progressive Web App (PWA) offline functionality**, enabling duty officers to continue flight operations during connectivity outages.
+
+### Offline-Capable Actions
+- **Add Flight**: Opens offline form using cached member/glider data
+- **Copy Flight**: Pre-fills offline form with existing flight data
+- **Launch/Landing**: Records time locally, syncs when online
+- **Delete Flight**: Marks for deletion, syncs when online
+
+### How It Works
+1. Reference data (members, gliders, towplanes) is cached on page load
+2. When offline, forms render using cached data and save to IndexedDB
+3. A "Pending Sync" indicator shows unsynced items
+4. When connectivity returns, pending items auto-sync to the server
+
+### Technical Files
+- `static/js/offline/indexeddb-bundle.js` - IndexedDB schema and operations
+- `static/js/offline/offline-form-bundle.js` - Offline form rendering
+- `static/js/service-worker.js` - Service worker for caching
+- `logsheet/templates/logsheet/logsheet_manage.html` - Offline-aware UI logic
+
+---
+
 ## Troubleshooting
 
 - **Missing flights:** check logsheet status and permissions
@@ -105,6 +129,7 @@ See [models.md](models.md) for full details and database schema.
 
 ## Changelog
 
+- **2025-11-28** Issue #315: PWA offline mode for logsheet operations (add, copy, launch, land, delete flights)
 - **2025-11-24** Issue #283: Deprecated TowRate system, all towplanes now use TowplaneChargeScheme
 - **2025-10** Major documentation update for logsheet app
 - **2025-08** Initial release: daily logsheets, flights, maintenance, closeouts

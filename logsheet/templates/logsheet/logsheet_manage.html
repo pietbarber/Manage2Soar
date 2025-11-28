@@ -57,7 +57,7 @@
 </div>
 
 <!-- Main Management Card -->
-<div class="container-fluid">
+<div class="container-fluid" id="logsheet-container" data-logsheet-id="{{ logsheet.pk }}">
   <div class="management-card">
     <div class="management-card-header">
       <div class="d-flex align-items-center justify-content-between">
@@ -123,7 +123,7 @@
     <div class="management-actions">
       <div class="actions-grid">
         <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
-           class="action-card {% if logsheet.finalized %}action-card-view{% else %}action-card-edit{% endif %}">
+           class="action-card online-only-btn {% if logsheet.finalized %}action-card-view{% else %}action-card-edit{% endif %}">
           <div class="action-icon">
             <i class="bi bi-graph-up"></i>
           </div>
@@ -136,7 +136,7 @@
         </a>
 
         {% if logsheet.finalized %}
-          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view">
+          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -146,7 +146,7 @@
             </div>
           </a>
         {% else %}
-          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit">
+          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -160,7 +160,7 @@
         {% if not logsheet.finalized %}
           <form method="post" class="action-form" onsubmit="return confirmFinalize();">
             {% csrf_token %}
-            <button type="submit" name="finalize" class="action-card action-card-danger">
+            <button type="submit" name="finalize" class="action-card action-card-danger online-only-btn">
               <div class="action-icon">
                 <i class="bi bi-lock"></i>
               </div>
@@ -181,7 +181,7 @@
         {% if logsheet.finalized and user.is_superuser %}
           <form method="post" class="action-form">
             {% csrf_token %}
-            <button type="submit" name="revise" class="action-card action-card-warning">
+            <button type="submit" name="revise" class="action-card action-card-warning online-only-btn">
               <div class="action-icon">
                 <i class="bi bi-unlock"></i>
               </div>
@@ -223,7 +223,7 @@
 
         {% if visiting_pilot_config and visiting_pilot_config.visiting_pilot_enabled %}
           <button type="button"
-                  class="btn btn-outline-success"
+                  class="btn btn-outline-success online-only-btn"
                   data-bs-toggle="modal"
                   data-bs-target="#visitingPilotModal">
             <i class="bi bi-person-plus me-2"></i>
@@ -389,7 +389,9 @@
 
                 <td class="actions-col" data-sort="">
                   <div class="action-buttons">
-                    <a href="{% url 'logsheet:flight_view' flight.id %}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{% url 'logsheet:flight_view' flight.id %}"
+                       class="btn btn-outline-secondary btn-sm online-only-btn"
+                       title="View flight details">
                       <i class="bi bi-eye"></i>
                       <span class="d-none d-md-inline ms-1">View</span>
                     </a>
@@ -418,15 +420,13 @@
                         <span class="d-none d-md-inline ms-1">Copy</span>
                       </button>
 
-                      <form method="post"
-                            action="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
-                            class="d-inline"
-                            onsubmit="return confirm('Are you sure you want to delete this flight?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
-                          <i class="bi bi-trash"></i>
-                        </button>
-                      </form>
+                      <button type="button"
+                              class="btn btn-outline-danger btn-sm delete-flight-btn"
+                              title="Delete"
+                              data-flight-id="{{ flight.pk }}"
+                              data-delete-url="{% url 'logsheet:delete_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
+                        <i class="bi bi-trash"></i>
+                      </button>
                     {% endif %}
                   </div>
                 </td>
@@ -579,8 +579,38 @@
 </div>
 
 <script>
+// Global toast function for offline notifications (defined early so it's available everywhere)
+window.showOfflineToast = window.showOfflineToast || function(message) {
+  let toastContainer = document.getElementById('offline-toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'offline-toast-container';
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
+    toastContainer.style.zIndex = '1100';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toastId = 'offline-toast-' + Date.now();
+  const toastHtml = `
+    <div id="${toastId}" class="toast align-items-center text-white bg-info border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-cloud-slash me-2"></i>
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  `;
+
+  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+  const toastEl = document.getElementById(toastId);
+  const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+  toast.show();
+};
+
 // Handle "Launch them now" and "Landing now" button clicks
-document.addEventListener("click", function(e) {
+document.addEventListener("click", async function(e) {
   if (e.target && e.target.classList.contains("launch-now-btn")) {
     e.preventDefault();
     const btn = e.target;
@@ -590,7 +620,28 @@ document.addEventListener("click", function(e) {
     const hh = now.getHours().toString().padStart(2, '0');
     const mm = now.getMinutes().toString().padStart(2, '0');
     const launchTime = `${hh}:${mm}`;
-    // POST to a new endpoint to set launch_time
+
+    // Check if offline
+    if (!navigator.onLine && typeof M2SIndexedDB !== 'undefined') {
+      try {
+        const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+        await M2SIndexedDB.createPendingOperation('launch', parseInt(flightId), launchTime, logsheetId);
+        window.showOfflineToast(`Launch time ${launchTime} saved offline. Will sync when back online.`);
+        // Update the UI to show pending state
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-warning');
+        btn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i>Pending Sync...';
+        btn.disabled = true;
+        // Update the pending indicator
+        if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+      } catch (err) {
+        console.error('[Offline] Failed to save launch:', err);
+        alert('Failed to save launch time offline. Please try again.');
+      }
+      return;
+    }
+
+    // POST to endpoint to set launch_time (online mode)
     fetch(`/logsheet/flight/${flightId}/launch_now/`, {
       method: "POST",
       headers: {
@@ -608,7 +659,26 @@ document.addEventListener("click", function(e) {
         alert(data.error || "Could not launch flight.");
       }
     })
-    .catch(() => alert("Could not launch flight. Please try again."));
+    .catch(async () => {
+      // Network error - try to save offline
+      if (typeof M2SIndexedDB !== 'undefined') {
+        try {
+          const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+          await M2SIndexedDB.createPendingOperation('launch', parseInt(flightId), launchTime, logsheetId);
+          window.showOfflineToast(`Launch time ${launchTime} saved offline. Will sync when back online.`);
+          btn.classList.remove('btn-success');
+          btn.classList.add('btn-warning');
+          btn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i>Pending Sync...';
+          btn.disabled = true;
+          if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+        } catch (err) {
+          console.error('[Offline] Failed to save launch:', err);
+          alert('Could not launch flight. Please try again.');
+        }
+      } else {
+        alert("Could not launch flight. Please try again.");
+      }
+    });
   }
   if (e.target && e.target.classList.contains("landing-now-btn")) {
     e.preventDefault();
@@ -619,7 +689,28 @@ document.addEventListener("click", function(e) {
     const hh = now.getHours().toString().padStart(2, '0');
     const mm = now.getMinutes().toString().padStart(2, '0');
     const landingTime = `${hh}:${mm}`;
-    // POST to a new endpoint to set landing_time
+
+    // Check if offline
+    if (!navigator.onLine && typeof M2SIndexedDB !== 'undefined') {
+      try {
+        const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+        await M2SIndexedDB.createPendingOperation('landing', parseInt(flightId), landingTime, logsheetId);
+        window.showOfflineToast(`Landing time ${landingTime} saved offline. Will sync when back online.`);
+        // Update the UI to show pending state
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-secondary');
+        btn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i>Pending Sync...';
+        btn.disabled = true;
+        // Update the pending indicator
+        if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+      } catch (err) {
+        console.error('[Offline] Failed to save landing:', err);
+        alert('Failed to save landing time offline. Please try again.');
+      }
+      return;
+    }
+
+    // POST to endpoint to set landing_time (online mode)
     fetch(`/logsheet/flight/${flightId}/landing_now/`, {
       method: "POST",
       headers: {
@@ -637,7 +728,110 @@ document.addEventListener("click", function(e) {
         alert(data.error || "Could not mark landing.");
       }
     })
-    .catch(() => alert("Could not mark landing. Please try again."));
+    .catch(async () => {
+      // Network error - try to save offline
+      if (typeof M2SIndexedDB !== 'undefined') {
+        try {
+          const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+          await M2SIndexedDB.createPendingOperation('landing', parseInt(flightId), landingTime, logsheetId);
+          window.showOfflineToast(`Landing time ${landingTime} saved offline. Will sync when back online.`);
+          btn.classList.remove('btn-warning');
+          btn.classList.add('btn-secondary');
+          btn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i>Pending Sync...';
+          btn.disabled = true;
+          if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+        } catch (err) {
+          console.error('[Offline] Failed to save landing:', err);
+          alert('Could not mark landing. Please try again.');
+        }
+      } else {
+        alert("Could not mark landing. Please try again.");
+      }
+    });
+  }
+
+  // Handle delete flight button clicks
+  if (e.target && (e.target.classList.contains("delete-flight-btn") || e.target.closest(".delete-flight-btn"))) {
+    e.preventDefault();
+    const btn = e.target.classList.contains("delete-flight-btn") ? e.target : e.target.closest(".delete-flight-btn");
+    const flightId = btn.getAttribute("data-flight-id");
+    const deleteUrl = btn.getAttribute("data-delete-url");
+
+    // Confirmation dialog
+    if (!confirm("Are you sure you want to delete this flight?")) {
+      return;
+    }
+
+    // Check if offline
+    if (!navigator.onLine && typeof M2SIndexedDB !== 'undefined') {
+      try {
+        const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+        await M2SIndexedDB.createPendingOperation('delete', parseInt(flightId), null, logsheetId);
+        window.showOfflineToast(`Flight deletion saved offline. Will sync when back online.`);
+        // Update the UI to show pending delete state
+        const row = btn.closest('tr');
+        if (row) {
+          row.classList.add('table-secondary', 'text-muted');
+          row.style.opacity = '0.6';
+          // Add pending delete badge
+          const statusCell = row.querySelector('.status-col');
+          if (statusCell) {
+            statusCell.innerHTML = '<span class="badge bg-danger">Pending Delete</span>';
+          }
+        }
+        btn.disabled = true;
+        btn.classList.add('disabled');
+        // Update the pending indicator
+        if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+      } catch (err) {
+        console.error('[Offline] Failed to save delete:', err);
+        alert('Failed to save deletion offline. Please try again.');
+      }
+      return;
+    }
+
+    // POST to delete endpoint (online mode)
+    fetch(deleteUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    })
+    .then(resp => {
+      if (resp.ok || resp.redirected) {
+        location.reload();
+      } else {
+        return resp.text().then(text => { throw new Error(text); });
+      }
+    })
+    .catch(async (error) => {
+      // Network error - try to save offline
+      if (typeof M2SIndexedDB !== 'undefined') {
+        try {
+          const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+          await M2SIndexedDB.createPendingOperation('delete', parseInt(flightId), null, logsheetId);
+          window.showOfflineToast(`Flight deletion saved offline. Will sync when back online.`);
+          const row = btn.closest('tr');
+          if (row) {
+            row.classList.add('table-secondary', 'text-muted');
+            row.style.opacity = '0.6';
+            const statusCell = row.querySelector('.status-col');
+            if (statusCell) {
+              statusCell.innerHTML = '<span class="badge bg-danger">Pending Delete</span>';
+            }
+          }
+          btn.disabled = true;
+          btn.classList.add('disabled');
+          if (window.M2SOffline) window.M2SOffline.updatePendingIndicator();
+        } catch (err) {
+          console.error('[Offline] Failed to save delete:', err);
+          alert('Could not delete flight. Please try again.');
+        }
+      } else {
+        alert("Could not delete flight. Please try again.");
+      }
+    });
   }
 
   // Handle copy flight button clicks
@@ -656,10 +850,128 @@ document.addEventListener("click", function(e) {
       release_altitude: btn.getAttribute("data-release-altitude")
     };
 
-    // Open the add flight modal with pre-filled data (no confirmation needed)
+    // Helper function to pre-fill the form with copied data
+    function prefillCopyForm() {
+      const form = document.querySelector('#flightModalContent form');
+      if (form) {
+        // Set pilot
+        const pilotSelect = form.querySelector('select[name="pilot"]');
+        if (pilotSelect && flightData.pilot) {
+          pilotSelect.value = flightData.pilot;
+          // Trigger change event for any dependent logic
+          pilotSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Set instructor
+        const instructorSelect = form.querySelector('select[name="instructor"]');
+        if (instructorSelect && flightData.instructor) {
+          instructorSelect.value = flightData.instructor;
+          instructorSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Set glider
+        const gliderSelect = form.querySelector('select[name="glider"]');
+        if (gliderSelect && flightData.glider) {
+          gliderSelect.value = flightData.glider;
+          gliderSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Set release altitude
+        const altitudeSelect = form.querySelector('select[name="release_altitude"]');
+        if (altitudeSelect && flightData.release_altitude) {
+          altitudeSelect.value = flightData.release_altitude;
+        }
+        // Also try input in case it's an input field
+        const altitudeInput = form.querySelector('input[name="release_altitude"]');
+        if (altitudeInput && flightData.release_altitude) {
+          altitudeInput.value = flightData.release_altitude;
+        }
+
+        // Clear time fields
+        const launchTimeInput = form.querySelector('input[name="launch_time"]');
+        if (launchTimeInput) launchTimeInput.value = '';
+
+        const landingTimeInput = form.querySelector('input[name="landing_time"]');
+        if (landingTimeInput) landingTimeInput.value = '';
+      }
+    }
+
+    // Helper to add clone notice to modal
+    function addCloneNotice() {
+      const modalContent = document.getElementById('flightModalContent');
+      const existingHeader = modalContent.querySelector('.modal-header');
+      if (existingHeader && !modalContent.querySelector('.clone-notice')) {
+        const cloneNotice = document.createElement('div');
+        cloneNotice.className = 'alert alert-success clone-notice mb-0';
+        cloneNotice.innerHTML = `
+          <i class="bi bi-copy me-2"></i>
+          <strong>Cloned Flight:</strong> Pre-filled from ${flightData.pilot_name || 'pilot'}${flightData.instructor_name ? ` & ${flightData.instructor_name}` : ''} in ${flightData.glider_name || 'glider'}
+        `;
+        existingHeader.insertAdjacentElement('afterend', cloneNotice);
+      }
+    }
+
+    // Check if offline - use offline form with pre-filled data
+    if (!navigator.onLine && window.M2SOffline) {
+      (async () => {
+        try {
+          if (await window.M2SOffline.hasReferenceData()) {
+            const refData = await window.M2SOffline.getReferenceData();
+            if (refData) {
+              const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, logsheetId);
+              document.getElementById('flightModalContent').innerHTML = html;
+
+              // Add visual indication that this is a cloned flight
+              const modalElement = document.getElementById('flightModal');
+              modalElement.classList.add('cloned-flight-modal');
+
+              // Add clone notice and pre-fill form after a small delay
+              setTimeout(() => {
+                addCloneNotice();
+                prefillCopyForm();
+              }, 50);
+
+              // Initialize offline form handlers
+              window.M2SOffline.initOfflineFormHandlers(() => {
+                window.M2SOffline.updatePendingIndicator();
+              });
+
+              // Show the modal
+              const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+              modal.show();
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('[Offline] Error loading offline copy form:', err);
+        }
+
+        // Fall through to show error if offline form failed
+        document.getElementById('flightModalContent').innerHTML = `
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-wifi-off me-2"></i>You're Offline</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              No cached data available for offline entry. Please connect to the internet at least once to cache flight data.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        `;
+        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+        modal.show();
+      })();
+      return;
+    }
+
+    // Online mode - fetch the add flight form from server
     const addFlightUrl = "{% url 'logsheet:add_flight' logsheet_pk=logsheet.pk %}";
 
-    // Fetch the add flight form
     fetch(addFlightUrl)
       .then(response => response.text())
       .then(html => {
@@ -670,54 +982,10 @@ document.addEventListener("click", function(e) {
         const modalElement = document.getElementById('flightModal');
         modalElement.classList.add('cloned-flight-modal');
 
-        // Add a header notice for cloned flight
-        const modalContent = document.getElementById('flightModalContent');
-        const existingHeader = modalContent.querySelector('.modal-header');
-        if (existingHeader) {
-          const cloneNotice = document.createElement('div');
-          cloneNotice.className = 'alert alert-success clone-notice mb-0';
-          cloneNotice.innerHTML = `
-            <i class="bi bi-copy me-2"></i>
-            <strong>Cloned Flight:</strong> Pre-filled from ${flightData.pilot_name}${flightData.instructor_name ? ` & ${flightData.instructor_name}` : ''} in ${flightData.glider_name}
-          `;
-          existingHeader.insertAdjacentElement('afterend', cloneNotice);
-        }
-
-        // Pre-fill the form with copied data
-        setTimeout(() => { // Small delay to ensure form is rendered
-          const form = document.querySelector('#flightModalContent form');
-          if (form) {
-            // Set pilot
-            const pilotSelect = form.querySelector('select[name="pilot"]');
-            if (pilotSelect && flightData.pilot) {
-              pilotSelect.value = flightData.pilot;
-            }
-
-            // Set instructor
-            const instructorSelect = form.querySelector('select[name="instructor"]');
-            if (instructorSelect && flightData.instructor) {
-              instructorSelect.value = flightData.instructor;
-            }
-
-            // Set glider
-            const gliderSelect = form.querySelector('select[name="glider"]');
-            if (gliderSelect && flightData.glider) {
-              gliderSelect.value = flightData.glider;
-            }
-
-            // Set release altitude
-            const altitudeInput = form.querySelector('input[name="release_altitude"]');
-            if (altitudeInput && flightData.release_altitude) {
-              altitudeInput.value = flightData.release_altitude;
-            }
-
-            // Clear time fields (they should be empty by default, but just to be sure)
-            const launchTimeInput = form.querySelector('input[name="launch_time"]');
-            if (launchTimeInput) launchTimeInput.value = '';
-
-            const landingTimeInput = form.querySelector('input[name="landing_time"]');
-            if (landingTimeInput) landingTimeInput.value = '';
-          }
+        // Add clone notice and pre-fill form
+        setTimeout(() => {
+          addCloneNotice();
+          prefillCopyForm();
         }, 100);
 
         // Show the modal
@@ -757,7 +1025,7 @@ document.addEventListener("click", function(e) {
 </script>
 
 
-<div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-logsheet-id="{{ logsheet.pk }}">
   <div class="modal-dialog modal-lg">
     <div class="modal-content" id="flightModalContent">
       <!-- The form will be loaded here via JS -->
@@ -948,7 +1216,51 @@ document.addEventListener("click", function(e) {
       cacheReferenceData();
       // Trigger sync of pending flights
       syncPendingFlights();
+      // Re-enable online-only buttons
+      updateOnlineOnlyButtons(true);
     });
+
+    window.addEventListener('offline', () => {
+      console.log('[Offline] Gone offline');
+      // Disable online-only buttons
+      updateOnlineOnlyButtons(false);
+    });
+
+    // Manage buttons that only work online (View, Register Visiting Pilot, Finances, Closeout, Finalize)
+    function updateOnlineOnlyButtons(isOnline) {
+      const buttons = document.querySelectorAll('.online-only-btn');
+      buttons.forEach(btn => {
+        if (isOnline) {
+          btn.classList.remove('disabled');
+          btn.removeAttribute('aria-disabled');
+          btn.style.pointerEvents = '';
+          btn.style.opacity = '';
+          btn.title = btn.getAttribute('data-original-title') || '';
+          // Restore href for links
+          if (btn.tagName === 'A' && btn.hasAttribute('data-original-href')) {
+            btn.href = btn.getAttribute('data-original-href');
+          }
+        } else {
+          btn.classList.add('disabled');
+          btn.setAttribute('aria-disabled', 'true');
+          btn.style.pointerEvents = 'none';
+          btn.style.opacity = '0.5';
+          // Save original title and set offline message
+          if (!btn.hasAttribute('data-original-title')) {
+            btn.setAttribute('data-original-title', btn.title || '');
+          }
+          btn.title = 'Available when online';
+          // For links, save and remove href to prevent navigation
+          if (btn.tagName === 'A' && !btn.hasAttribute('data-original-href')) {
+            btn.setAttribute('data-original-href', btn.href);
+            btn.href = 'javascript:void(0)';
+          }
+        }
+      });
+    }
+
+    // Set initial state based on current online status
+    updateOnlineOnlyButtons(navigator.onLine);
 
     // Listen for messages from Service Worker
     if ('serviceWorker' in navigator) {
@@ -976,12 +1288,18 @@ document.addEventListener("click", function(e) {
           return;
         }
 
-        console.log('[Offline] Syncing', pendingFlights.length, 'pending flight(s)...');
+        console.log('[Offline] Syncing', pendingFlights.length, 'pending item(s)...');
 
         for (const flight of pendingFlights) {
           try {
             // Mark as syncing
             await db.updateFlightSyncStatus(flight.localId, db.SyncStatus.SYNCING);
+
+            // Check if this is a launch/landing/delete operation
+            if (flight.editType === 'operation') {
+              await syncOperation(flight);
+              continue;
+            }
 
             // Determine if this is a new flight or an edit
             const isEdit = flight.serverId !== null && flight.editType === 'update';
@@ -1073,13 +1391,76 @@ document.addEventListener("click", function(e) {
       }
     }
 
+    // Sync a launch/landing/delete operation
+    async function syncOperation(operation) {
+      let endpoint, body, contentType;
+
+      if (operation.operationType === 'delete') {
+        // Delete operation - POST to delete URL
+        endpoint = `/logsheet/manage/${operation.logsheetId}/delete-flight/${operation.serverId}/`;
+        body = null;  // No body needed for delete
+        contentType = null;
+      } else {
+        // Launch or landing operation
+        endpoint = operation.operationType === 'launch'
+          ? `/logsheet/flight/${operation.serverId}/launch_now/`
+          : `/logsheet/flight/${operation.serverId}/landing_now/`;
+
+        body = operation.operationType === 'launch'
+          ? { launch_time: operation.time }
+          : { landing_time: operation.time };
+        contentType = 'application/json';
+      }
+
+      const headers = {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-Idempotency-Key': operation.idempotencyKey
+      };
+      if (contentType) {
+        headers['Content-Type'] = contentType;
+      }
+
+      const fetchOptions = {
+        method: 'POST',
+        headers: headers,
+        credentials: 'same-origin'
+      };
+      if (body) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(endpoint, fetchOptions);
+
+      if (response.ok || response.redirected) {
+        // For delete, we may get a redirect on success
+        if (operation.operationType === 'delete') {
+          await db.markFlightSynced(operation.localId, operation.serverId);
+          console.log(`[Offline] delete synced for flight ${operation.serverId}`);
+        } else {
+          const result = await response.json();
+          if (result.success) {
+            await db.markFlightSynced(operation.localId, operation.serverId);
+            console.log(`[Offline] ${operation.operationType} synced for flight ${operation.serverId}`);
+          } else {
+            throw new Error(result.error || 'Operation sync failed');
+          }
+        }
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    }
+
+    // Alias for use within this IIFE (function defined earlier in page)
+    const showOfflineToast = window.showOfflineToast;
+
     // Show sync complete toast
     function showSyncCompleteToast() {
       let toastContainer = document.getElementById('offline-toast-container');
       if (!toastContainer) {
         toastContainer = document.createElement('div');
         toastContainer.id = 'offline-toast-container';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
         toastContainer.style.zIndex = '1100';
         document.body.appendChild(toastContainer);
       }
@@ -1109,10 +1490,22 @@ document.addEventListener("click", function(e) {
 
 <script>
   const flightModal = document.getElementById("flightModal");
-  const LOGSHEET_ID = {{ logsheet.pk }};
+  const LOGSHEET_ID = parseInt(flightModal.dataset.logsheetId, 10);
 
   flightModal.addEventListener("show.bs.modal", async function (event) {
-    const button = event.relatedTarget;
+    // Get the button that triggered the modal - may be an icon inside the button
+    let button = event.relatedTarget;
+    if (button && !button.hasAttribute('data-url')) {
+      // Clicked on child element (icon/span), find the parent with data-url
+      button = button.closest('[data-url]');
+    }
+
+    // Guard against null button
+    if (!button) {
+      console.error('[Modal] No trigger button found');
+      return;
+    }
+
     const url = button.getAttribute("data-url");
     const isAddFlight = url && url.includes('/add-flight/');
 
@@ -1129,7 +1522,7 @@ document.addEventListener("click", function(e) {
       </div>
     `;
 
-    // Check if we're offline BEFORE trying to fetch
+    // Check if we're offline BEFORE trying to fetch - only Add Flight works offline
     if (!navigator.onLine && isAddFlight) {
       console.log('[Offline] Detected offline state, using offline form');
       try {
@@ -1142,7 +1535,6 @@ document.addEventListener("click", function(e) {
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
               window.M2SOffline.updatePendingIndicator();
-              // Could add a visual indicator to the flight list here
             });
             return; // Don't try to fetch
           }
@@ -1284,7 +1676,7 @@ document.addEventListener("click", function(e) {
         if (!toastContainer) {
           toastContainer = document.createElement('div');
           toastContainer.id = 'offline-toast-container';
-          toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+          toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
           toastContainer.style.zIndex = '1100';
           document.body.appendChild(toastContainer);
         }
