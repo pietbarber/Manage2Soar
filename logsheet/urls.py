@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import api, views
 
 app_name = "logsheet"
 
@@ -97,5 +97,21 @@ urlpatterns = [
         "flight/<int:flight_id>/update_split/",
         views.update_flight_split,
         name="update_flight_split",
+    ),
+    # Offline sync API endpoints (Issue #315)
+    path(
+        "api/offline/reference-data/",
+        api.reference_data,
+        name="api_offline_reference_data",
+    ),
+    path(
+        "api/offline/flights/sync/",
+        api.flights_sync,
+        name="api_offline_flights_sync",
+    ),
+    path(
+        "api/offline/sync-status/",
+        api.sync_status,
+        name="api_offline_sync_status",
     ),
 ]
