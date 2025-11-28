@@ -1,58 +1,41 @@
 /**
  * Manage2Soar Service Worker
  *
- * Level 1: App Shell Caching - Caches static assets for faster loads
+ * Level 1: App Shell Caching - Caches navigation pages for faster loads
  * Level 2: Offline fallback - Shows friendly offline page when network unavailable
  *
  * Future: Level 3 will add IndexedDB for offline logsheet data entry
+ *
+ * Note: Static assets (CSS, JS, images) are served from GCS with proper caching
+ * headers, so we don't cache them here. We focus on HTML pages and the offline
+ * fallback experience.
  */
 
-const CACHE_NAME = 'manage2soar-v1';
+const CACHE_NAME = 'manage2soar-v2';
 const OFFLINE_URL = '/offline/';
 
-// Static assets to cache on install
-// These form the "app shell" - the basic UI that loads instantly
-const STATIC_ASSETS = [
+// Pages to cache on install - these are served by Django, not GCS
+const CORE_PAGES = [
   '/',
   '/offline/',
-  '/static/css/baseline.css',
-  '/static/css/bootstrap.min.css',
-  '/static/css/calendar.css',
-  '/static/css/cms.css',
-  '/static/css/cms-responsive.css',
-  '/static/css/logbook.css',
-  '/static/css/members.css',
-  '/static/css/mobile-fixes.css',
-  '/static/css/progress.css',
-  '/static/analytics/analytics.css',
-  '/static/js/service-worker-register.js',
-  '/static/manifest.json',
-  '/static/images/pwa-icon-192.png',
-  '/static/images/pwa-icon-512.png',
+  '/manifest.json',
 ];
 
-// Install event - cache static assets
+// Install event - cache core pages
 self.addEventListener('install', (event) => {
   console.log('[ServiceWorker] Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[ServiceWorker] Caching app shell');
-        // Use addAll for critical assets, but don't fail if some are missing
-        return cache.addAll(STATIC_ASSETS).catch((error) => {
-          console.warn('[ServiceWorker] Some assets failed to cache:', error);
-          // Cache what we can individually
-          return Promise.all(
-            STATIC_ASSETS.map((url) =>
-              cache.add(url).catch(() => console.warn(`Failed to cache: ${url}`))
-            )
-          );
-        });
+        console.log('[ServiceWorker] Caching core pages');
+        return cache.addAll(CORE_PAGES);
       })
       .then(() => {
         console.log('[ServiceWorker] Install complete');
-        // Activate immediately without waiting for old service worker
         return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.warn('[ServiceWorker] Install failed:', error);
       })
   );
 });
@@ -124,36 +107,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets, use cache-first strategy
-  event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        if (cachedResponse) {
-          // Return cached version, but also update cache in background
-          fetch(request).then((response) => {
-            if (response.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, response);
-              });
-            }
-          }).catch(() => {});
-          return cachedResponse;
-        }
-
-        // Not in cache - fetch from network
-        return fetch(request)
-          .then((response) => {
-            // Cache successful responses
-            if (response.ok) {
-              const responseClone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseClone);
-              });
-            }
-            return response;
-          });
-      })
-  );
+  // For non-navigation requests (API calls, etc.), just use network
+  // Static assets are served from GCS with proper caching headers
 });
 
 // Handle messages from the main thread

@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
@@ -33,17 +33,62 @@ def service_worker_view(request):
     """Serve service worker from root URL for proper scope."""
     import os
 
-    sw_path = os.path.join(
-        settings.STATIC_ROOT or settings.BASE_DIR / "static", "js", "service-worker.js"
-    )
-    # Fallback to static dir if collectstatic hasn't run
-    if not os.path.exists(sw_path):
-        sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
+    # Try multiple locations for the service worker file
+    possible_paths = [
+        os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js"),
+    ]
+    if settings.STATIC_ROOT:
+        possible_paths.insert(
+            0, os.path.join(settings.STATIC_ROOT, "js", "service-worker.js")
+        )
+
+    for sw_path in possible_paths:
+        if os.path.exists(sw_path):
+            return FileResponse(
+                open(sw_path, "rb"),
+                content_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/"},
+            )
+
+    # If file not found, return a minimal no-op service worker
     return FileResponse(
-        open(sw_path, "rb"),
         content_type="application/javascript",
         headers={"Service-Worker-Allowed": "/"},
     )
+
+
+def manifest_view(request):
+    """Serve PWA manifest from Django to avoid CORS issues with GCS."""
+    # Get the static URL prefix for icon paths
+    static_url = settings.STATIC_URL.rstrip("/")
+
+    manifest = {
+        "name": "Manage2Soar",
+        "short_name": "M2S",
+        "description": "Soaring club management - members, flights, instruction, and operations",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#212529",
+        "orientation": "any",
+        "icons": [
+            {
+                "src": f"{static_url}/images/pwa-icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+            {
+                "src": f"{static_url}/images/pwa-icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
+        "categories": ["business", "productivity"],
+        "lang": "en-US",
+    }
+    return JsonResponse(manifest)
 
 
 urlpatterns = [
@@ -114,6 +159,7 @@ urlpatterns = [
         "offline/", TemplateView.as_view(template_name="offline.html"), name="offline"
     ),
     path("service-worker.js", service_worker_view, name="service-worker"),
+    path("manifest.json", manifest_view, name="manifest"),
 ]
 
 # Serve media files in development only
