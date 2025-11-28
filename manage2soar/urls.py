@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.http import FileResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
@@ -33,8 +33,10 @@ def service_worker_view(request):
     """Serve service worker with dynamic cache version based on build hash."""
     import hashlib
     import os
+    from datetime import date
 
-    from django.http import HttpResponse
+    # Compute service worker path once
+    sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
 
     # Generate a cache version hash from:
     # 1. BUILD_HASH env var (set during Docker build)
@@ -43,8 +45,6 @@ def service_worker_view(request):
     build_hash = os.environ.get("BUILD_HASH", "")
 
     if not build_hash:
-        # Try to get hash from service worker file modification time
-        sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
         if os.path.exists(sw_path):
             mtime = os.path.getmtime(sw_path)
             build_hash = hashlib.md5(
@@ -52,8 +52,6 @@ def service_worker_view(request):
             ).hexdigest()[:8]
         else:
             # Fall back to date-based hash (changes daily)
-            from datetime import date
-
             build_hash = hashlib.md5(
                 str(date.today()).encode(), usedforsecurity=False
             ).hexdigest()[:8]
@@ -61,8 +59,7 @@ def service_worker_view(request):
     cache_name = f"manage2soar-{build_hash}"
 
     # Read the service worker template and inject the cache name
-    sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
-    if os.path.exists(sw_path):
+    try:
         with open(sw_path) as f:
             content = f.read()
         # Replace the placeholder or hardcoded version
@@ -70,8 +67,8 @@ def service_worker_view(request):
             "const CACHE_NAME = 'manage2soar-v2';",
             f"const CACHE_NAME = '{cache_name}';",
         )
-    else:
-        # Minimal no-op service worker if file not found
+    except OSError:
+        # Minimal no-op service worker if file not found or cannot be read
         content = "// Service worker file not found"
 
     return HttpResponse(

@@ -107,8 +107,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For non-navigation requests (API calls, etc.), just use network
+  // For non-navigation requests (API calls, etc.), pass through to network
   // Static assets are served from GCS with proper caching headers
+  event.respondWith(fetch(request));
 });
 
 // Handle messages from the main thread
