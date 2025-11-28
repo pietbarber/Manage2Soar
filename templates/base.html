@@ -14,6 +14,15 @@
   {% else %}
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
   {% endif %}
+
+  <!-- PWA Support -->
+  <link rel="manifest" href="{% static 'manifest.json' %}">
+  <meta name="theme-color" content="#212529">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{{ siteconfig.club_name|default:'Manage2Soar' }}">
+  <link rel="apple-touch-icon" href="{% static 'images/pwa-icon-192.png' %}">
+
   {% block head_extra %}{% endblock %}
 
   <meta charset="UTF-8">
@@ -225,6 +234,12 @@
   <!-- Site Footer -->
   {% include "footer.html" %}
 
+  <!-- Offline Indicator Banner -->
+  <div id="offline-indicator" class="d-none align-items-center justify-content-center bg-warning text-dark py-2 position-fixed bottom-0 start-0 end-0" style="z-index: 9999;">
+    <i class="bi bi-wifi-off me-2"></i>
+    <span>You're offline. Some features may be unavailable.</span>
+  </div>
+
   <!-- Optional Bootstrap JS for interactivity (dropdowns, etc.) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <!-- HTMX include -->
@@ -232,6 +247,8 @@
   <!-- Tablesort: use vendored local file for deterministic loading -->
   <script src="{% static 'vendor/tablesort.min.js' %}"></script>
   <script src="{% static 'js/tablesort-init.js' %}"></script>
+  <!-- PWA Service Worker Registration -->
+  <script src="{% static 'js/service-worker-register.js' %}"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', (event) => {
       const token = document.cookie
