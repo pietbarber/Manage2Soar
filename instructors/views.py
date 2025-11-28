@@ -1536,9 +1536,28 @@ def member_logbook(request):
         ).count()
     grounds = (
         GroundInstruction.objects.filter(student=member, date__year__in=years_to_load)
+        .select_related("instructor")
         .prefetch_related("lesson_scores__lesson")
         .order_by("date")
     )
+
+    # Pre-fetch all instruction reports for this member to avoid N+1 queries
+    # Build a lookup dict keyed by (instructor_id, report_date)
+    instruction_reports = (
+        InstructionReport.objects.filter(
+            student=member, report_date__year__in=years_to_load
+        )
+        .select_related("instructor")
+        .prefetch_related("lesson_scores__lesson")
+    )
+    # Build lookup: (instructor_id, date) -> report with pre-loaded lesson codes
+    report_lookup = {}
+    for rpt in instruction_reports:
+        codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
+        report_lookup[(rpt.instructor_id, rpt.report_date)] = {
+            "report": rpt,
+            "codes": codes,
+        }
 
     # 3) Use actual private_glider_checkride_date if available
     rating_date = getattr(member, "private_glider_checkride_date", None)
@@ -1606,13 +1625,12 @@ def member_logbook(request):
                     else:
                         dual_m += dur_m
 
-                    # Look up the instructor report
-                    rpt = InstructionReport.objects.filter(
-                        student=member, instructor=f.instructor, report_date=date
-                    ).first()
+                    # Look up the instruction report from pre-fetched dict (O(1) lookup)
+                    report_data = report_lookup.get((f.instructor_id, date))
 
-                    if rpt:
-                        codes = [ls.lesson.code for ls in rpt.lesson_scores.all()]
+                    if report_data:
+                        rpt = report_data["report"]
+                        codes = report_data["codes"]
                         comments = (
                             f"{', '.join(codes)} /s/ {f.instructor.full_display_name}"
                         )
@@ -1707,6 +1725,7 @@ def member_logbook(request):
 
         else:  # ground instruction
             g = ev["obj"]
+            ground_date = ev["date"]
             gm = int(g.duration.total_seconds() // 60) if g.duration else 0
             # build the lesson list + instructor tag
             codes = [ls.lesson.code for ls in g.lesson_scores.all()]
@@ -1718,7 +1737,7 @@ def member_logbook(request):
                 comments += f" /s/ {g.instructor.full_display_name}"
 
             row = {
-                "date": date,
+                "date": ground_date,
                 "flight_no": "",
                 "model": "",
                 "n_number": "",
