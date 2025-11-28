@@ -91,7 +91,18 @@ This implementation covers Levels 1-2 of a 4-level PWA maturity model:
 ### Verifying Service Worker
 - DevTools → Application → Service Workers
 - Should show `service-worker.js` as "activated and running"
-- Cache Storage should show `manage2soar-v1` with cached assets
+- Cache Storage should show `manage2soar-{hash}` with cached assets
+
+### Cache Versioning
+The service worker cache is automatically versioned using a build hash:
+1. **BUILD_HASH env var** - Set during Docker build (preferred)
+2. **File mtime** - Falls back to service-worker.js modification time
+3. **Date hash** - Ultimate fallback, changes daily
+
+To pass a build hash during Docker build:
+```bash
+docker build --build-arg BUILD_HASH=$(git rev-parse --short HEAD) -t manage2soar .
+```
 
 ## Future Enhancements (Issue #62)
 
