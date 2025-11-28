@@ -98,11 +98,8 @@ class TestServiceWorkerView:
 
     def test_service_worker_cache_name_fallback_to_mtime(self, client):
         """Test that file mtime is used when BUILD_HASH not set."""
-        # Ensure BUILD_HASH is not set
-        env = os.environ.copy()
-        env.pop("BUILD_HASH", None)
-
-        with patch.dict(os.environ, env, clear=True):
+        # Ensure BUILD_HASH is not set by setting it to empty string
+        with patch.dict(os.environ, {"BUILD_HASH": ""}, clear=False):
             response = client.get("/service-worker.js")
             content = response.content.decode()
 
@@ -130,7 +127,7 @@ class TestServiceWorkerView:
             return original_exists(path)
 
         with patch("os.path.exists", side_effect=mock_exists):
-            with patch.dict(os.environ, {}, clear=True):
+            with patch.dict(os.environ, {"BUILD_HASH": ""}, clear=False):
                 response = client.get("/service-worker.js")
                 content = response.content.decode()
 

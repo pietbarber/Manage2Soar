@@ -36,6 +36,8 @@ self.addEventListener('install', (event) => {
             })
             .catch((error) => {
                 console.warn('[ServiceWorker] Install failed:', error);
+                // Re-throw to prevent broken service worker from activating
+                throw error;
             })
     );
 });
@@ -109,7 +111,16 @@ self.addEventListener('fetch', (event) => {
 
     // For non-navigation requests (API calls, etc.), pass through to network
     // Static assets are served from GCS with proper caching headers
-    event.respondWith(fetch(request));
+    event.respondWith(
+        fetch(request).catch(() => {
+            // Network failed for non-navigation request
+            return new Response('Service unavailable', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' }
+            });
+        })
+    );
 });
 
 // Handle messages from the main thread
