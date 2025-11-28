@@ -1,0 +1,467 @@
+{% comment %}
+Offline Sync Status Indicator Component
+
+Include this in templates that need to show offline sync status.
+Usage: {% include 'logsheet/partials/sync_status.html' %}
+
+Part of Issue #315: PWA Fully-offline Logsheet data entry
+{% endcomment %}
+
+<!-- Offline Sync Status Indicator -->
+<div id="offline-sync-status" class="offline-sync-status d-none" role="status" aria-live="polite">
+    <!-- Online/Offline Indicator -->
+    <div class="sync-connection-status">
+        <span id="sync-online-indicator" class="sync-indicator sync-online d-none" title="Online">
+            <i class="bi bi-wifi"></i>
+        </span>
+        <span id="sync-offline-indicator" class="sync-indicator sync-offline d-none" title="Offline">
+            <i class="bi bi-wifi-off"></i>
+        </span>
+    </div>
+
+    <!-- Pending Flights Counter -->
+    <div id="sync-pending-container" class="sync-pending-container d-none">
+        <button id="sync-pending-badge" class="btn btn-sm btn-warning sync-pending-badge"
+                type="button" title="Flights pending sync">
+            <i class="bi bi-cloud-arrow-up me-1"></i>
+            <span id="sync-pending-count">0</span> pending
+        </button>
+    </div>
+
+    <!-- Sync In Progress -->
+    <div id="sync-progress-container" class="sync-progress-container d-none">
+        <span class="sync-spinner">
+            <span class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Syncing...</span>
+            </span>
+            <span class="ms-1">Syncing...</span>
+        </span>
+    </div>
+
+    <!-- Sync Error/Conflict Indicator -->
+    <div id="sync-error-container" class="sync-error-container d-none">
+        <button id="sync-error-badge" class="btn btn-sm btn-danger sync-error-badge"
+                type="button" title="Sync issues">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <span id="sync-error-count">0</span> issues
+        </button>
+    </div>
+</div>
+
+<!-- Sync Status Modal -->
+<div class="modal fade" id="syncStatusModal" tabindex="-1" aria-labelledby="syncStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="syncStatusModalLabel">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>
+                    Offline Sync Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Connection Status -->
+                <div class="sync-modal-section">
+                    <h6 class="text-muted mb-2">Connection</h6>
+                    <div id="sync-modal-connection" class="d-flex align-items-center">
+                        <span id="sync-modal-online" class="badge bg-success d-none">
+                            <i class="bi bi-wifi me-1"></i> Online
+                        </span>
+                        <span id="sync-modal-offline" class="badge bg-secondary d-none">
+                            <i class="bi bi-wifi-off me-1"></i> Offline
+                        </span>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Pending Syncs -->
+                <div class="sync-modal-section">
+                    <h6 class="text-muted mb-2">Pending Flights</h6>
+                    <div id="sync-modal-pending-list" class="list-group list-group-flush">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-check-circle me-1"></i>
+                            All flights synced
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Last Sync -->
+                <div class="sync-modal-section">
+                    <h6 class="text-muted mb-2">Last Sync</h6>
+                    <p id="sync-modal-last-sync" class="mb-0 text-muted">
+                        Never
+                    </p>
+                </div>
+
+                <!-- Errors/Conflicts -->
+                <div id="sync-modal-errors-section" class="sync-modal-section d-none">
+                    <hr>
+                    <h6 class="text-danger mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Sync Issues
+                    </h6>
+                    <div id="sync-modal-error-list" class="list-group list-group-flush">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="sync-modal-sync-now" disabled>
+                    <i class="bi bi-cloud-arrow-up me-1"></i>
+                    Sync Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Offline Sync Status Styles */
+.offline-sync-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 0.875rem;
+}
+
+.sync-indicator.sync-online {
+    background-color: #d1fae5;
+    color: #059669;
+}
+
+.sync-indicator.sync-offline {
+    background-color: #fee2e2;
+    color: #dc2626;
+}
+
+.sync-pending-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.sync-error-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.sync-spinner {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.sync-modal-section {
+    margin-bottom: 0.5rem;
+}
+
+/* Animation for pending indicator */
+@keyframes pulse-pending {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.sync-pending-badge.syncing {
+    animation: pulse-pending 1s ease-in-out infinite;
+}
+</style>
+
+<script>
+/**
+ * Offline Sync Status UI Controller
+ *
+ * Manages the display of offline sync status and handles user interactions.
+ */
+(function() {
+    'use strict';
+
+    // State
+    let isOnline = navigator.onLine;
+    let pendingCount = 0;
+    let errorCount = 0;
+    let lastSync = null;
+    let syncInProgress = false;
+
+    // DOM Elements
+    const statusContainer = document.getElementById('offline-sync-status');
+    const onlineIndicator = document.getElementById('sync-online-indicator');
+    const offlineIndicator = document.getElementById('sync-offline-indicator');
+    const pendingContainer = document.getElementById('sync-pending-container');
+    const pendingBadge = document.getElementById('sync-pending-badge');
+    const pendingCount_ = document.getElementById('sync-pending-count');
+    const progressContainer = document.getElementById('sync-progress-container');
+    const errorContainer = document.getElementById('sync-error-container');
+    const errorCount_ = document.getElementById('sync-error-count');
+
+    // Modal elements
+    const syncModal = document.getElementById('syncStatusModal');
+    const modalOnline = document.getElementById('sync-modal-online');
+    const modalOffline = document.getElementById('sync-modal-offline');
+    const modalLastSync = document.getElementById('sync-modal-last-sync');
+    const syncNowButton = document.getElementById('sync-modal-sync-now');
+
+    // Initialize
+    function init() {
+        if (!statusContainer) return;
+
+        // Show the status container
+        statusContainer.classList.remove('d-none');
+
+        // Set initial online/offline state
+        updateOnlineStatus();
+
+        // Listen for online/offline events
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        // Listen for service worker messages
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        }
+
+        // Set up click handlers
+        if (pendingBadge) {
+            pendingBadge.addEventListener('click', showSyncModal);
+        }
+        if (document.getElementById('sync-error-badge')) {
+            document.getElementById('sync-error-badge').addEventListener('click', showSyncModal);
+        }
+        if (syncNowButton) {
+            syncNowButton.addEventListener('click', triggerSync);
+        }
+
+        // Initial sync status check
+        requestSyncStatus();
+
+        // Check status periodically
+        setInterval(requestSyncStatus, 30000); // Every 30 seconds
+    }
+
+    function updateOnlineStatus() {
+        isOnline = navigator.onLine;
+
+        if (onlineIndicator && offlineIndicator) {
+            if (isOnline) {
+                onlineIndicator.classList.remove('d-none');
+                offlineIndicator.classList.add('d-none');
+            } else {
+                onlineIndicator.classList.add('d-none');
+                offlineIndicator.classList.remove('d-none');
+            }
+        }
+
+        // Update modal
+        if (modalOnline && modalOffline) {
+            if (isOnline) {
+                modalOnline.classList.remove('d-none');
+                modalOffline.classList.add('d-none');
+            } else {
+                modalOnline.classList.add('d-none');
+                modalOffline.classList.remove('d-none');
+            }
+        }
+
+        // Enable/disable sync button
+        if (syncNowButton) {
+            syncNowButton.disabled = !isOnline || syncInProgress || pendingCount === 0;
+        }
+    }
+
+    function handleOnline() {
+        updateOnlineStatus();
+        // Trigger sync when coming back online
+        if (pendingCount > 0) {
+            triggerSync();
+        }
+    }
+
+    function handleOffline() {
+        updateOnlineStatus();
+    }
+
+    function handleServiceWorkerMessage(event) {
+        const { type, result, status } = event.data;
+
+        switch (type) {
+            case 'sync-complete':
+                handleSyncComplete(result);
+                break;
+            case 'sync-status':
+                updateSyncStatus(status);
+                break;
+            case 'reference-data-refreshed':
+                console.log('Reference data refreshed:', result);
+                break;
+        }
+    }
+
+    function requestSyncStatus() {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage('get-sync-status');
+        }
+    }
+
+    function updateSyncStatus(status) {
+        if (!status) return;
+
+        pendingCount = status.pendingCount || 0;
+        errorCount = (status.failedCount || 0) + (status.conflictCount || 0);
+        lastSync = status.lastSyncAttempt;
+        syncInProgress = status.syncInProgress;
+
+        // Update pending display
+        if (pendingContainer && pendingCount_) {
+            if (pendingCount > 0) {
+                pendingContainer.classList.remove('d-none');
+                pendingCount_.textContent = pendingCount;
+            } else {
+                pendingContainer.classList.add('d-none');
+            }
+        }
+
+        // Update error display
+        if (errorContainer && errorCount_) {
+            if (errorCount > 0) {
+                errorContainer.classList.remove('d-none');
+                errorCount_.textContent = errorCount;
+            } else {
+                errorContainer.classList.add('d-none');
+            }
+        }
+
+        // Update progress display
+        if (progressContainer) {
+            if (syncInProgress) {
+                progressContainer.classList.remove('d-none');
+                if (pendingBadge) {
+                    pendingBadge.classList.add('syncing');
+                }
+            } else {
+                progressContainer.classList.add('d-none');
+                if (pendingBadge) {
+                    pendingBadge.classList.remove('syncing');
+                }
+            }
+        }
+
+        // Update modal last sync
+        if (modalLastSync && lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            modalLastSync.textContent = lastSyncDate.toLocaleString();
+        }
+
+        // Update sync button
+        if (syncNowButton) {
+            syncNowButton.disabled = !isOnline || syncInProgress || pendingCount === 0;
+        }
+    }
+
+    function handleSyncComplete(result) {
+        syncInProgress = false;
+
+        if (result) {
+            // Update counts based on result
+            requestSyncStatus();
+
+            // Show success/failure notification
+            if (result.synced > 0) {
+                showNotification(`${result.synced} flight(s) synced successfully`, 'success');
+            }
+            if (result.failed > 0) {
+                showNotification(`${result.failed} flight(s) failed to sync`, 'danger');
+            }
+            if (result.conflicts && result.conflicts.length > 0) {
+                showNotification(`${result.conflicts.length} conflict(s) detected`, 'warning');
+            }
+        }
+    }
+
+    function showSyncModal() {
+        if (!syncModal) return;
+
+        // Update modal content
+        requestSyncStatus();
+
+        // Show modal
+        const modal = new bootstrap.Modal(syncModal);
+        modal.show();
+    }
+
+    function triggerSync() {
+        if (!isOnline || syncInProgress || pendingCount === 0) return;
+
+        syncInProgress = true;
+        updateSyncStatus({ syncInProgress: true, pendingCount, errorCount: 0 });
+
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage('sync-now');
+        }
+    }
+
+    function showNotification(message, type) {
+        // Create a toast notification
+        const toastHtml = `
+            <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+
+        // Find or create toast container
+        let container = document.querySelector('.toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '1055';
+            document.body.appendChild(container);
+        }
+
+        container.insertAdjacentHTML('beforeend', toastHtml);
+        const toastEl = container.lastElementChild;
+        const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 3000 });
+        toast.show();
+
+        // Remove toast element after hidden
+        toastEl.addEventListener('hidden.bs.toast', () => {
+            toastEl.remove();
+        });
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>

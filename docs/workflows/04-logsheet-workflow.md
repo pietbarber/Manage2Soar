@@ -409,10 +409,12 @@ flowchart LR
 
 ### **Identified Gaps**
 - 🟡 **Real-time Updates**: Limited real-time collaboration between duty officers
-- 🟡 **Mobile Interface**: Duty officers need better mobile access for field operations
 - 🟡 **Weather Integration**: No automated weather data integration
 - 🟡 **Aircraft Scheduling**: No advance booking system for aircraft
 - 🟡 **Digital Signatures**: Paper-based sign-offs for maintenance and inspections
+
+### **Recently Completed**
+- ✅ **Offline Mode (PWA)**: Duty officers can now add, edit, launch, land, copy, and delete flights while offline. Changes sync automatically when connectivity returns. See [Offline Operations](#offline-operations) below.
 
 ### **Improvement Opportunities**
 - 🔄 **Predictive Analytics**: Use historical data to predict busy periods and maintenance needs
@@ -433,6 +435,64 @@ flowchart LR
 - 🔄 **Regulatory Compliance**: Automated compliance checking and reporting
 - 🔄 **Audit Trail**: Complete tracking of all changes and modifications
 - 🔄 **Risk Management**: Integration with safety management systems
+
+## Offline Operations
+
+The logsheet management page supports **Progressive Web App (PWA) offline functionality**, allowing duty officers to continue logging flights even when internet connectivity is lost.
+
+### **Offline Capabilities**
+
+```mermaid
+flowchart TD
+    A[Internet Lost] --> B[Offline Banner Appears]
+    B --> C{User Action}
+
+    C -->|Add Flight| D[Open Offline Form]
+    C -->|Copy Flight| E[Open Pre-filled Offline Form]
+    C -->|Launch/Land| F[Record Time Locally]
+    C -->|Delete Flight| G[Mark for Deletion]
+
+    D --> H[Save to IndexedDB]
+    E --> H
+    F --> H
+    G --> H
+
+    H --> I[Show Pending Indicator]
+    I --> J[Internet Restored]
+    J --> K[Auto-Sync to Server]
+    K --> L[Page Refreshes]
+    L --> M[Normal Operations Resume]
+
+    style A fill:#fff3cd
+    style J fill:#d4edda
+    style M fill:#e8f5e8
+```
+
+### **What Works Offline**
+| Action | Offline Support | Notes |
+|--------|----------------|-------|
+| Add Flight | ✅ Yes | Uses cached member/glider/towplane data |
+| Copy Flight | ✅ Yes | Pre-fills from existing flight data |
+| Launch (set time) | ✅ Yes | Records current time locally |
+| Landing (set time) | ✅ Yes | Records current time locally |
+| Delete Flight | ✅ Yes | Marks for deletion, syncs when online |
+| Edit Flight | ❌ No | Requires server connection |
+| View Flight Details | ❌ No | Requires server connection |
+| Finances/Closeout | ❌ No | Requires server connection |
+
+### **Technical Implementation**
+- **IndexedDB Storage**: Pending flights stored in browser's IndexedDB
+- **Service Worker**: Caches reference data (members, gliders, towplanes) for offline form rendering
+- **Idempotency Keys**: Prevent duplicate submissions during sync
+- **Auto-Sync**: Triggers automatically when `online` event fires
+- **Pending Indicator**: Badge shows count of unsynced items
+
+### **User Experience**
+1. **Offline Detection**: Yellow banner appears at bottom of page
+2. **Disabled Features**: Buttons that require connectivity show reduced opacity
+3. **Toast Notifications**: Confirm when actions are saved for later sync
+4. **Pending Badge**: Shows number of items awaiting sync
+5. **Auto-Refresh**: Page reloads after successful sync to show updated data
 
 ## Related Workflows
 
