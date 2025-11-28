@@ -30,28 +30,52 @@ from members import views as members_views
 
 
 def service_worker_view(request):
-    """Serve service worker from root URL for proper scope."""
+    """Serve service worker with dynamic cache version based on build hash."""
+    import hashlib
     import os
 
-    # Try multiple locations for the service worker file
-    possible_paths = [
-        os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js"),
-    ]
-    if settings.STATIC_ROOT:
-        possible_paths.insert(
-            0, os.path.join(settings.STATIC_ROOT, "js", "service-worker.js")
-        )
+    from django.http import HttpResponse
 
-    for sw_path in possible_paths:
+    # Generate a cache version hash from:
+    # 1. BUILD_HASH env var (set during Docker build)
+    # 2. Or fall back to service worker file mtime
+    # 3. Or fall back to current date (changes daily)
+    build_hash = os.environ.get("BUILD_HASH", "")
+
+    if not build_hash:
+        # Try to get hash from service worker file modification time
+        sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
         if os.path.exists(sw_path):
-            return FileResponse(
-                open(sw_path, "rb"),
-                content_type="application/javascript",
-                headers={"Service-Worker-Allowed": "/"},
-            )
+            mtime = os.path.getmtime(sw_path)
+            build_hash = hashlib.md5(
+                str(mtime).encode(), usedforsecurity=False
+            ).hexdigest()[:8]
+        else:
+            # Fall back to date-based hash (changes daily)
+            from datetime import date
 
-    # If file not found, return a minimal no-op service worker
-    return FileResponse(
+            build_hash = hashlib.md5(
+                str(date.today()).encode(), usedforsecurity=False
+            ).hexdigest()[:8]
+
+    cache_name = f"manage2soar-{build_hash}"
+
+    # Read the service worker template and inject the cache name
+    sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
+    if os.path.exists(sw_path):
+        with open(sw_path) as f:
+            content = f.read()
+        # Replace the placeholder or hardcoded version
+        content = content.replace(
+            "const CACHE_NAME = 'manage2soar-v2';",
+            f"const CACHE_NAME = '{cache_name}';",
+        )
+    else:
+        # Minimal no-op service worker if file not found
+        content = "// Service worker file not found"
+
+    return HttpResponse(
+        content,
         content_type="application/javascript",
         headers={"Service-Worker-Allowed": "/"},
     )

@@ -19,6 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
 COPY . .
 
+# Generate build hash from git commit or timestamp for cache busting
+# This is used by the service worker to version its cache
+ARG BUILD_HASH
+ENV BUILD_HASH=${BUILD_HASH:-unknown}
+
 ENV DJANGO_SETTINGS_MODULE=manage2soar.settings
 ENV PYTHONUNBUFFERED=1
 
