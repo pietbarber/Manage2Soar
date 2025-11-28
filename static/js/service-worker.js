@@ -10,7 +10,7 @@
  * fallback experience.
  */
 
-const CACHE_NAME = 'manage2soar-v3';
+const CACHE_NAME = 'manage2soar-v8';
 const OFFLINE_URL = '/offline/';
 
 // Pages to cache on install - these are served by Django, not GCS
@@ -32,39 +32,9 @@ const OFFLINE_APIS = [
     '/logsheet/api/offline/sync-status/',
 ];
 
-// Import IndexedDB module for offline data management
-// Note: This uses importScripts for service worker compatibility
-// The actual module is loaded dynamically to avoid bundling issues
-let M2SOfflineDB = null;
-let M2SSyncManager = null;
-let offlineDB = null;
-let syncManager = null;
-
-// Initialize offline modules (lazy loading)
-async function initOfflineModules() {
-    if (offlineDB) return;
-
-    try {
-        // Import the modules
-        // Using dynamic import for service worker context
-        importScripts('/static/js/offline/indexeddb.js');
-        importScripts('/static/js/offline/sync-manager.js');
-
-        // Initialize database and sync manager
-        if (typeof M2SOfflineDB !== 'undefined') {
-            offlineDB = new M2SOfflineDB();
-            await offlineDB.init();
-
-            if (typeof M2SSyncManager !== 'undefined') {
-                syncManager = new M2SSyncManager(offlineDB);
-            }
-
-            console.log('[ServiceWorker] Offline modules initialized');
-        }
-    } catch (e) {
-        console.warn('[ServiceWorker] Failed to initialize offline modules:', e);
-    }
-}
+// Note: Service workers cannot directly access IndexedDB modules loaded in the page.
+// Instead, we use postMessage to communicate with the main page for sync operations.
+// The main page has M2SIndexedDB and M2SOffline loaded and handles the actual data operations.
 
 // Install event - cache core pages
 self.addEventListener('install', (event) => {
@@ -167,6 +137,83 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // For logsheet AJAX requests (modals, partials), use network-first with cache fallback
+    if (isLogsheetAjaxRequest(url.pathname)) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    // Cache successful responses for offline use
+                    if (response.ok) {
+                        const responseClone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(request, responseClone);
+                        });
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    // Network failed - try cache first
+                    return caches.match(request)
+                        .then((cachedResponse) => {
+                            if (cachedResponse) {
+                                return cachedResponse;
+                            }
+                            // Return offline-friendly HTML for modals with auto-retry
+                            return new Response(`
+                                <div class="alert alert-warning m-3" id="offline-modal-alert">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <i class="bi bi-wifi-off me-2"></i>
+                                            <strong>You're offline.</strong>
+                                            This action requires an internet connection.
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="location.reload()">
+                                            <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                                        </button>
+                                    </div>
+                                    <div class="small mt-2 text-muted" id="offline-status-text">
+                                        Waiting for connection...
+                                    </div>
+                                </div>
+                                <script>
+                                    // Auto-detect when back online
+                                    function checkOnline() {
+                                        if (navigator.onLine) {
+                                            const statusText = document.getElementById('offline-status-text');
+                                            const alert = document.getElementById('offline-modal-alert');
+                                            if (statusText) {
+                                                statusText.innerHTML = '<i class="bi bi-wifi text-success me-1"></i>Connection restored! <a href="#" onclick="location.reload(); return false;">Click to retry</a> or the page will reload automatically...';
+                                            }
+                                            if (alert) {
+                                                alert.classList.remove('alert-warning');
+                                                alert.classList.add('alert-success');
+                                            }
+                                            // Auto-reload after a brief delay
+                                            setTimeout(() => location.reload(), 2000);
+                                        }
+                                    }
+                                    window.addEventListener('online', checkOnline);
+                                    // Also poll in case the event doesn't fire
+                                    const pollInterval = setInterval(() => {
+                                        if (navigator.onLine) {
+                                            checkOnline();
+                                            clearInterval(pollInterval);
+                                        }
+                                    }, 1000);
+                                    // Initial check
+                                    checkOnline();
+                                </script>
+                            `, {
+                                status: 503,
+                                statusText: 'Service Unavailable',
+                                headers: { 'Content-Type': 'text/html' }
+                            });
+                        });
+                })
+        );
+        return;
+    }
+
     // For non-navigation requests (API calls, etc.), pass through to network
     // Static assets are served from GCS with proper caching headers
     event.respondWith(
@@ -186,36 +233,36 @@ function isOfflineApiRequest(pathname) {
     return OFFLINE_APIS.some(api => pathname.startsWith(api) || pathname === api.replace(/\/$/, ''));
 }
 
+// Check if request is a logsheet AJAX request (modals, partials)
+function isLogsheetAjaxRequest(pathname) {
+    // Match logsheet modal/partial endpoints like:
+    // /logsheet/manage/1234/edit-flight/5678/
+    // /logsheet/manage/1234/add-flight/
+    // /logsheet/manage/1234/delete-flight/5678/
+    const logsheetPatterns = [
+        /^\/logsheet\/manage\/\d+\/edit-flight\/\d+\/?$/,
+        /^\/logsheet\/manage\/\d+\/add-flight\/?$/,
+        /^\/logsheet\/manage\/\d+\/delete-flight\/\d+\/?$/,
+        /^\/logsheet\/manage\/\d+\/flight-details\/\d+\/?$/,
+        /^\/logsheet\/api\/(?!offline)/,  // Non-offline logsheet APIs
+    ];
+    return logsheetPatterns.some(pattern => pattern.test(pathname));
+}
+
 // Handle GET requests for offline API (reference data, sync status)
 async function handleOfflineApiGet(request, url) {
     try {
         // Try network first
         const response = await fetch(request);
         if (response.ok) {
-            // Cache reference data in IndexedDB for offline use
-            if (url.pathname.includes('reference-data')) {
-                await initOfflineModules();
-                const data = await response.clone().json();
-                if (offlineDB && data.success) {
-                    await cacheReferenceData(data);
-                }
-            }
             return response;
         }
         throw new Error('Network response not ok');
     } catch (e) {
-        // Network failed - serve from IndexedDB if available
-        console.log('[ServiceWorker] Network failed, serving from cache:', url.pathname);
+        // Network failed - return offline indicator
+        // The page's JavaScript will handle serving from IndexedDB
+        console.log('[ServiceWorker] Network failed for API:', url.pathname);
 
-        await initOfflineModules();
-
-        if (url.pathname.includes('reference-data')) {
-            return serveReferenceDataFromCache();
-        } else if (url.pathname.includes('sync-status')) {
-            return serveSyncStatusFromCache();
-        }
-
-        // Default offline response
         return new Response(JSON.stringify({
             success: false,
             offline: true,
@@ -237,156 +284,14 @@ async function handleOfflineApiPost(request) {
         }
         throw new Error('Network response not ok');
     } catch (e) {
-        // Network failed - queue for background sync
-        console.log('[ServiceWorker] Queuing POST for background sync');
-
-        try {
-            const data = await request.json();
-            await initOfflineModules();
-
-            if (syncManager && data.flights) {
-                // Queue each flight for sync
-                for (const flight of data.flights) {
-                    await syncManager.queueFlight(flight.data);
-                }
-
-                // Register for background sync
-                await self.registration.sync.register('sync-flights');
-
-                return new Response(JSON.stringify({
-                    success: true,
-                    offline: true,
-                    queued: data.flights.length,
-                    message: 'Flights queued for sync when online'
-                }), {
-                    status: 202, // Accepted
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-        } catch (queueError) {
-            console.error('[ServiceWorker] Failed to queue:', queueError);
-        }
+        // Network failed - return offline indicator
+        // The page's JavaScript handles storing to IndexedDB
+        console.log('[ServiceWorker] Network failed for POST, returning offline response');
 
         return new Response(JSON.stringify({
             success: false,
             offline: true,
-            error: 'Failed to queue for sync'
-        }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-}
-
-// Cache reference data in IndexedDB
-async function cacheReferenceData(data) {
-    if (!offlineDB) return;
-
-    try {
-        if (data.members) {
-            await offlineDB.bulkAddMembers(data.members);
-        }
-        if (data.gliders) {
-            await offlineDB.bulkAddGliders(data.gliders);
-        }
-        if (data.towplanes) {
-            await offlineDB.bulkAddTowplanes(data.towplanes);
-        }
-        if (data.airfields) {
-            await offlineDB.bulkAddAirfields(data.airfields);
-        }
-
-        // Store metadata
-        await offlineDB.setMetadata('referenceDataVersion', data.version);
-        await offlineDB.setMetadata('referenceDataCached', new Date().toISOString());
-        await offlineDB.setMetadata('flightTypes', JSON.stringify(data.flight_types || []));
-        await offlineDB.setMetadata('releaseAltitudes', JSON.stringify(data.release_altitudes || []));
-        await offlineDB.setMetadata('launchMethods', JSON.stringify(data.launch_methods || []));
-
-        console.log('[ServiceWorker] Reference data cached');
-    } catch (e) {
-        console.error('[ServiceWorker] Failed to cache reference data:', e);
-    }
-}
-
-// Serve reference data from IndexedDB cache
-async function serveReferenceDataFromCache() {
-    if (!offlineDB) {
-        return new Response(JSON.stringify({
-            success: false,
-            offline: true,
-            error: 'Offline database not available'
-        }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
-    try {
-        const members = await offlineDB.getAllMembers();
-        const gliders = await offlineDB.getAllGliders();
-        const towplanes = await offlineDB.getAllTowplanes();
-        const airfields = await offlineDB.getAllAirfields();
-        const version = await offlineDB.getMetadata('referenceDataVersion');
-        const cachedAt = await offlineDB.getMetadata('referenceDataCached');
-        const flightTypes = JSON.parse(await offlineDB.getMetadata('flightTypes') || '[]');
-        const releaseAltitudes = JSON.parse(await offlineDB.getMetadata('releaseAltitudes') || '[]');
-        const launchMethods = JSON.parse(await offlineDB.getMetadata('launchMethods') || '[]');
-
-        return new Response(JSON.stringify({
-            success: true,
-            offline: true,
-            cached_at: cachedAt,
-            version: version,
-            members: members,
-            gliders: gliders,
-            towplanes: towplanes,
-            airfields: airfields,
-            flight_types: flightTypes,
-            release_altitudes: releaseAltitudes,
-            launch_methods: launchMethods
-        }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    } catch (e) {
-        console.error('[ServiceWorker] Failed to serve reference data from cache:', e);
-        return new Response(JSON.stringify({
-            success: false,
-            offline: true,
-            error: 'Failed to read cached data'
-        }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-}
-
-// Serve sync status from local state
-async function serveSyncStatusFromCache() {
-    if (!syncManager) {
-        return new Response(JSON.stringify({
-            success: true,
-            online: false,
-            pendingCount: 0,
-            message: 'Sync manager not available'
-        }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
-    try {
-        const status = await syncManager.getSyncStatus();
-        return new Response(JSON.stringify({
-            success: true,
-            ...status
-        }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    } catch (e) {
-        return new Response(JSON.stringify({
-            success: false,
-            offline: true,
-            error: 'Failed to get sync status'
+            error: 'You are offline. Changes saved locally.'
         }), {
             status: 503,
             headers: { 'Content-Type': 'application/json' }
@@ -404,32 +309,32 @@ self.addEventListener('sync', (event) => {
 });
 
 // Sync pending flights to server
+// This notifies all clients to perform the sync using their loaded M2SIndexedDB
 async function syncPendingFlights() {
-    console.log('[ServiceWorker] Syncing pending flights...');
+    console.log('[ServiceWorker] Syncing pending flights - notifying clients...');
 
     try {
-        await initOfflineModules();
+        // Notify all clients to perform sync
+        const clients = await self.clients.matchAll({ type: 'window' });
 
-        if (!syncManager) {
-            console.warn('[ServiceWorker] Sync manager not available');
-            return;
+        if (clients.length === 0) {
+            console.log('[ServiceWorker] No clients available for sync');
+            return { success: false, reason: 'no_clients' };
         }
 
-        const result = await syncManager.syncNow();
-        console.log('[ServiceWorker] Sync complete:', result);
-
-        // Notify clients about sync completion
-        const clients = await self.clients.matchAll();
+        // Send sync message to all clients
         clients.forEach(client => {
             client.postMessage({
-                type: 'sync-complete',
-                result: result
+                type: 'perform-sync',
+                timestamp: new Date().toISOString()
             });
         });
 
-        return result;
+        console.log('[ServiceWorker] Sync message sent to', clients.length, 'client(s)');
+        return { success: true, clientsNotified: clients.length };
+
     } catch (e) {
-        console.error('[ServiceWorker] Sync failed:', e);
+        console.error('[ServiceWorker] Sync notification failed:', e);
         throw e; // Re-throw to trigger retry
     }
 }
@@ -441,40 +346,24 @@ self.addEventListener('message', (event) => {
     }
 
     if (event.data === 'sync-now') {
-        // Manually trigger sync
+        // Manually trigger sync - notify page to perform sync
         syncPendingFlights().then(result => {
-            event.source.postMessage({
-                type: 'sync-complete',
-                result: result
-            });
+            if (event.source) {
+                event.source.postMessage({
+                    type: 'sync-triggered',
+                    result: result
+                });
+            }
         });
     }
 
     if (event.data === 'get-sync-status') {
-        // Return current sync status
-        initOfflineModules().then(() => {
-            if (syncManager) {
-                syncManager.getSyncStatus().then(status => {
-                    event.source.postMessage({
-                        type: 'sync-status',
-                        status: status
-                    });
-                });
-            }
-        });
-    }
-
-    if (event.data === 'refresh-reference-data') {
-        // Trigger reference data refresh
-        initOfflineModules().then(() => {
-            if (syncManager) {
-                syncManager.refreshReferenceData().then(result => {
-                    event.source.postMessage({
-                        type: 'reference-data-refreshed',
-                        result: result
-                    });
-                });
-            }
-        });
+        // Tell the page to report its own sync status
+        // (The page has access to IndexedDB, not the service worker)
+        if (event.source) {
+            event.source.postMessage({
+                type: 'request-sync-status'
+            });
+        }
     }
 });
