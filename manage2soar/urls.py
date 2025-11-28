@@ -33,6 +33,7 @@ def service_worker_view(request):
     """Serve service worker with dynamic cache version based on build hash."""
     import hashlib
     import os
+    import re
     from datetime import date
 
     # Compute service worker path once
@@ -62,10 +63,11 @@ def service_worker_view(request):
     try:
         with open(sw_path) as f:
             content = f.read()
-        # Replace the placeholder or hardcoded version
-        content = content.replace(
-            "const CACHE_NAME = 'manage2soar-v2';",
+        # Replace the cache name using regex for flexibility
+        content = re.sub(
+            r"const CACHE_NAME = '[^']+';",
             f"const CACHE_NAME = '{cache_name}';",
+            content,
         )
     except OSError:
         # Minimal no-op service worker if file not found or cannot be read

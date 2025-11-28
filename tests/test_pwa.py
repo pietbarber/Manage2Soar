@@ -7,13 +7,6 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.test import Client, override_settings
-
-
-@pytest.fixture
-def client():
-    """Return a Django test client."""
-    return Client()
 
 
 @pytest.mark.django_db
@@ -128,14 +121,22 @@ class TestServiceWorkerView:
         ).hexdigest()[:8]
 
         # Mock os.path.exists to return False for service worker file
-        with patch("os.path.exists", return_value=False):
+        # The function imports os inside, so patch the actual os.path.exists
+        original_exists = os.path.exists
+
+        def mock_exists(path):
+            if "service-worker.js" in str(path):
+                return False
+            return original_exists(path)
+
+        with patch("os.path.exists", side_effect=mock_exists):
             with patch.dict(os.environ, {}, clear=True):
                 response = client.get("/service-worker.js")
                 content = response.content.decode()
 
-                # When file doesn't exist, should return fallback content
-                # or use date-based hash if file exists check happens later
+                # When file doesn't exist, it falls back to date-based hash
                 assert response.status_code == 200
+                assert f"manage2soar-{expected_hash}" in content
 
     def test_service_worker_includes_offline_url(self, client):
         """Test that service worker references the offline URL."""

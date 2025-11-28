@@ -1,7 +1,7 @@
 /**
  * Manage2Soar Service Worker
  *
- * Level 1: App Shell Caching - Caches navigation pages for faster loads
+ * Level 1: Page Caching - Caches navigation pages for faster loads
  * Level 2: Offline fallback - Shows friendly offline page when network unavailable
  *
  * Future: Level 3 will add IndexedDB for offline logsheet data entry
