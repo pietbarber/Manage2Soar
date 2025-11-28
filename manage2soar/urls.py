@@ -20,11 +20,31 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.http import FileResponse
 from django.urls import include, path
+from django.views.generic import TemplateView
 
 from cms import views as cms_views
 from instructors import views as instr_views
 from members import views as members_views
+
+
+def service_worker_view(request):
+    """Serve service worker from root URL for proper scope."""
+    import os
+
+    sw_path = os.path.join(
+        settings.STATIC_ROOT or settings.BASE_DIR / "static", "js", "service-worker.js"
+    )
+    # Fallback to static dir if collectstatic hasn't run
+    if not os.path.exists(sw_path):
+        sw_path = os.path.join(settings.BASE_DIR, "static", "js", "service-worker.js")
+    return FileResponse(
+        open(sw_path, "rb"),
+        content_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -89,6 +109,11 @@ urlpatterns = [
     path("", cms_views.homepage, name="home"),
     # Notifications app
     path("notifications/", include("notifications.urls")),
+    # PWA Support
+    path(
+        "offline/", TemplateView.as_view(template_name="offline.html"), name="offline"
+    ),
+    path("service-worker.js", service_worker_view, name="service-worker"),
 ]
 
 # Serve media files in development only
