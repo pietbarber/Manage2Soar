@@ -2,7 +2,6 @@
 
 import json
 import os
-from datetime import date
 from unittest.mock import patch
 
 import pytest
@@ -110,15 +109,10 @@ class TestServiceWorkerView:
             assert match is not None
 
     def test_service_worker_cache_name_fallback_to_date(self, client):
-        """Test that date-based hash is used when file doesn't exist."""
-        import hashlib
-
-        expected_hash = hashlib.md5(
-            str(date.today()).encode(), usedforsecurity=False
-        ).hexdigest()[:8]
+        """Test that fallback content is returned when service worker file doesn't exist."""
+        import builtins
 
         # Mock os.path.exists to return False for service worker file
-        # The function imports os inside, so patch the actual os.path.exists
         original_exists = os.path.exists
 
         def mock_exists(path):
@@ -126,14 +120,24 @@ class TestServiceWorkerView:
                 return False
             return original_exists(path)
 
-        with patch("os.path.exists", side_effect=mock_exists):
-            with patch.dict(os.environ, {"BUILD_HASH": ""}, clear=False):
-                response = client.get("/service-worker.js")
-                content = response.content.decode()
+        # Mock open to raise OSError when service worker is opened
+        original_open = builtins.open
 
-                # When file doesn't exist, it falls back to date-based hash
-                assert response.status_code == 200
-                assert f"manage2soar-{expected_hash}" in content
+        def mock_open(path, *args, **kwargs):
+            if "service-worker.js" in str(path):
+                raise OSError("Mocked: file not found")
+            return original_open(path, *args, **kwargs)
+
+        with patch("os.path.exists", side_effect=mock_exists):
+            with patch("builtins.open", side_effect=mock_open):
+                with patch.dict(os.environ, {"BUILD_HASH": ""}, clear=False):
+                    response = client.get("/service-worker.js")
+                    content = response.content.decode()
+
+                    # When file doesn't exist, open() raises OSError
+                    # and the view returns minimal fallback content
+                    assert response.status_code == 200
+                    assert "// Service worker file not found" in content
 
     def test_service_worker_includes_offline_url(self, client):
         """Test that service worker references the offline URL."""
