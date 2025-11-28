@@ -5,10 +5,10 @@ Part of Issue #315: PWA Fully-offline Logsheet data entry
 """
 
 import json
-from datetime import date, time
+from datetime import date
 
 import pytest
-from django.test import Client, TestCase
+from django.test import Client
 from django.urls import reverse
 
 from logsheet.models import Airfield, Flight, Glider, Logsheet, Towplane

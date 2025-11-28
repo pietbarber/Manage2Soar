@@ -1451,9 +1451,6 @@ document.addEventListener("click", async function(e) {
       }
     }
 
-    // Alias for use within this IIFE (function defined earlier in page)
-    const showOfflineToast = window.showOfflineToast;
-
     // Show sync complete toast
     function showSyncCompleteToast() {
       let toastContainer = document.getElementById('offline-toast-container');

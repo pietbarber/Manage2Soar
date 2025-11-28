@@ -11,10 +11,7 @@ Part of Issue #315: PWA Fully-offline Logsheet data entry
 
 import json
 import logging
-import uuid
-from datetime import date
 
-from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
 from django.utils import timezone
