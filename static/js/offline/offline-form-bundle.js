@@ -13,6 +13,17 @@
 (function (global) {
     'use strict';
 
+    // HTML escape helper to prevent XSS in attribute values
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     // Get IndexedDB module from global namespace
     function getDB() {
         if (!global.M2SIndexedDB) {
@@ -233,7 +244,7 @@
                                 <label for="id_passenger_name" class="form-label fw-semibold">
                                     <i class="bi bi-person-plus me-1"></i>Passenger Name (Non-member)
                                 </label>
-                                <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member" value="${prefillData?.passengerNameText || ''}">
+                                <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member" value="${escapeHtml(prefillData?.passengerNameText)}">
                             </div>
                         </div>
                     </div>
@@ -282,7 +293,7 @@
                                     <i class="bi bi-arrow-up-circle me-1"></i>Launch Time
                                 </label>
                                 <div class="input-group">
-                                    <input type="time" name="launch_time" id="id_launch_time" class="form-control" placeholder="--:--" value="${prefillData?.launchTime || ''}">
+                                    <input type="time" name="launch_time" id="id_launch_time" class="form-control" placeholder="--:--" value="${escapeHtml(prefillData?.launchTime)}">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="now-launch-btn">
                                         <i class="bi bi-clock-fill me-1"></i>NOW
                                     </button>
@@ -295,7 +306,7 @@
                                     <i class="bi bi-arrow-down-circle me-1"></i>Landing Time
                                 </label>
                                 <div class="input-group">
-                                    <input type="time" name="landing_time" id="id_landing_time" class="form-control" placeholder="--:--" value="${prefillData?.landingTime || ''}">
+                                    <input type="time" name="landing_time" id="id_landing_time" class="form-control" placeholder="--:--" value="${escapeHtml(prefillData?.landingTime)}">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="now-landing-btn">
                                         <i class="bi bi-clock-fill me-1"></i>NOW
                                     </button>

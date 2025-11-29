@@ -415,8 +415,8 @@
                          {% if flight.landing_time %}data-landing-time="{{ flight.landing_time|time:'H:i' }}"{% endif %}
                          {% if flight.flight_type %}data-flight-type="{{ flight.flight_type }}"{% endif %}
                          {% if flight.passenger %}data-passenger="{{ flight.passenger.pk }}" data-passenger-name="{{ flight.passenger|full_display_name }}"{% endif %}
-                         {% if flight.passenger_name %}data-passenger-name-text="{{ flight.passenger_name }}"{% endif %}
-                         {% if flight.notes %}data-notes="{{ flight.notes }}"{% endif %}>
+                         {% if flight.passenger_name %}data-passenger-name-text="{{ flight.passenger_name|escapejs }}"{% endif %}
+                         {% if flight.notes %}data-notes="{{ flight.notes|escapejs }}"{% endif %}>
                         <i class="bi bi-pencil"></i>
                         <span class="d-none d-md-inline ms-1">Edit</span>
                       </a>
