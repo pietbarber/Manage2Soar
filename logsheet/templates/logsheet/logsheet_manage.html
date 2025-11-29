@@ -398,10 +398,25 @@
 
                     {% if not logsheet.finalized %}
                       <a href="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
-                         class="btn btn-outline-primary btn-sm"
+                         class="btn btn-outline-primary btn-sm edit-flight-btn"
                          data-bs-toggle="modal"
                          data-bs-target="#flightModal"
-                         data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}">
+                         data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
+                         data-flight-id="{{ flight.pk }}"
+                         data-pilot="{{ flight.pilot.pk }}"
+                         data-pilot-name="{{ flight.pilot|full_display_name|escapejs }}"
+                         {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name|escapejs }}"{% endif %}
+                         data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
+                         data-glider-name="{{ flight.glider|escapejs }}"
+                         {% if flight.towplane %}data-towplane="{{ flight.towplane.pk }}" data-towplane-name="{{ flight.towplane|escapejs }}"{% endif %}
+                         {% if flight.tow_pilot %}data-tow-pilot="{{ flight.tow_pilot.pk }}" data-tow-pilot-name="{{ flight.tow_pilot|full_display_name|escapejs }}"{% endif %}
+                         {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
+                         {% if flight.launch_time %}data-launch-time="{{ flight.launch_time|time:'H:i' }}"{% endif %}
+                         {% if flight.landing_time %}data-landing-time="{{ flight.landing_time|time:'H:i' }}"{% endif %}
+                         {% if flight.flight_type %}data-flight-type="{{ flight.flight_type }}"{% endif %}
+                         {% if flight.passenger %}data-passenger="{{ flight.passenger.pk }}" data-passenger-name="{{ flight.passenger|full_display_name|escapejs }}"{% endif %}
+                         {% if flight.passenger_name %}data-passenger-name-text="{{ flight.passenger_name|escapejs }}"{% endif %}
+                         {% if flight.notes %}data-notes="{{ flight.notes|escapejs }}"{% endif %}>
                         <i class="bi bi-pencil"></i>
                         <span class="d-none d-md-inline ms-1">Edit</span>
                       </a>
@@ -410,10 +425,10 @@
                               class="btn btn-outline-success btn-sm copy-flight-btn"
                               data-flight-id="{{ flight.pk }}"
                               data-pilot="{{ flight.pilot.pk }}"
-                              data-pilot-name="{{ flight.pilot|full_display_name }}"
-                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name }}"{% endif %}
+                              data-pilot-name="{{ flight.pilot|full_display_name|escapejs }}"
+                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name|escapejs }}"{% endif %}
                               data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
-                              data-glider-name="{{ flight.glider }}"
+                              data-glider-name="{{ flight.glider|escapejs }}"
                               {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
                               title="Copy flight details">
                         <i class="bi bi-copy"></i>
@@ -1489,6 +1504,32 @@ document.addEventListener("click", async function(e) {
   const flightModal = document.getElementById("flightModal");
   const LOGSHEET_ID = parseInt(flightModal.dataset.logsheetId, 10);
 
+  // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
+  function extractPrefillDataFromButton(button, flightId) {
+    if (!button || !flightId) return null;
+    return {
+      flightId: parseInt(flightId, 10),
+      pilot: button.getAttribute('data-pilot'),
+      pilotName: button.getAttribute('data-pilot-name'),
+      instructor: button.getAttribute('data-instructor'),
+      instructorName: button.getAttribute('data-instructor-name'),
+      glider: button.getAttribute('data-glider'),
+      gliderName: button.getAttribute('data-glider-name'),
+      towplane: button.getAttribute('data-towplane'),
+      towplaneName: button.getAttribute('data-towplane-name'),
+      towPilot: button.getAttribute('data-tow-pilot'),
+      towPilotName: button.getAttribute('data-tow-pilot-name'),
+      releaseAltitude: button.getAttribute('data-release-altitude'),
+      launchTime: button.getAttribute('data-launch-time'),
+      landingTime: button.getAttribute('data-landing-time'),
+      flightType: button.getAttribute('data-flight-type'),
+      passenger: button.getAttribute('data-passenger'),
+      passengerName: button.getAttribute('data-passenger-name'),
+      passengerNameText: button.getAttribute('data-passenger-name-text'),
+      notes: button.getAttribute('data-notes')
+    };
+  }
+
   flightModal.addEventListener("show.bs.modal", async function (event) {
     // Get the button that triggered the modal - may be an icon inside the button
     let button = event.relatedTarget;
@@ -1505,6 +1546,8 @@ document.addEventListener("click", async function(e) {
 
     const url = button.getAttribute("data-url");
     const isAddFlight = url && url.includes('/add-flight/');
+    const isEditFlight = url && url.includes('/edit-flight/');
+    const flightId = button.getAttribute("data-flight-id");
 
     // Show loading indicator
     document.getElementById("flightModalContent").innerHTML = `
@@ -1519,15 +1562,17 @@ document.addEventListener("click", async function(e) {
       </div>
     `;
 
-    // Check if we're offline BEFORE trying to fetch - only Add Flight works offline
-    if (!navigator.onLine && isAddFlight) {
-      console.log('[Offline] Detected offline state, using offline form');
+    // Check if we're offline BEFORE trying to fetch - Add and Edit flights work offline
+    if (!navigator.onLine && (isAddFlight || isEditFlight)) {
+      console.log('[Offline] Detected offline state, using offline form for', isEditFlight ? 'edit' : 'add');
       try {
         // Check if we have cached reference data
         if (window.M2SOffline && await window.M2SOffline.hasReferenceData()) {
           const refData = await window.M2SOffline.getReferenceData();
           if (refData) {
-            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID);
+            // For edit, extract pre-fill data from button's data attributes
+            const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
+            const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
             document.getElementById("flightModalContent").innerHTML = html;
             window.M2SOffline.initOfflineFormHandlers(() => {
               // Callback after save - update UI
@@ -1883,15 +1928,18 @@ document.addEventListener("click", async function(e) {
       // Handle offline/network errors gracefully
       const isOffline = error.message === 'offline' || !navigator.onLine;
       const isAddFlight = url && url.includes('/add-flight/');
+      const isEditFlight = url && url.includes('/edit-flight/');
       const modalContent = document.getElementById("flightModalContent");
 
-      // If offline and adding a flight, try to use offline form
-      if (isOffline && isAddFlight && window.M2SOffline) {
+      // If offline and adding/editing a flight, try to use offline form
+      if (isOffline && (isAddFlight || isEditFlight) && window.M2SOffline) {
         try {
           if (await window.M2SOffline.hasReferenceData()) {
             const refData = await window.M2SOffline.getReferenceData();
             if (refData) {
-              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID);
+              // For edit, extract pre-fill data from button's data attributes
+              const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
+              const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
               modalContent.innerHTML = html;
               window.M2SOffline.initOfflineFormHandlers(() => {
                 window.M2SOffline.updatePendingIndicator();
@@ -1918,7 +1966,7 @@ document.addEventListener("click", async function(e) {
             <i class="bi bi-exclamation-triangle me-2"></i>
             <strong>${isOffline ? "No internet connection." : "Could not load the form."}</strong>
             <p class="mb-0 mt-2">
-              ${isOffline && isAddFlight
+              ${isOffline && (isAddFlight || isEditFlight)
                 ? "No cached data available for offline entry. Please connect to the internet at least once to cache flight data."
                 : isOffline
                   ? "This action requires an internet connection."
