@@ -10,7 +10,7 @@
  * fallback experience.
  */
 
-const CACHE_NAME = 'manage2soar-v18';
+const CACHE_NAME = 'manage2soar-v19';
 const OFFLINE_URL = '/offline/';
 
 // Pages to cache on install - these are served by Django, not GCS

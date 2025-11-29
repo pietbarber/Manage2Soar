@@ -92,7 +92,7 @@
         `;
     }
 
-    function renderAltitudeSelect() {
+    function renderAltitudeSelect(selectedValue = null) {
         const altitudes = [];
         // Match the real form: 0-7000 in 100ft steps
         for (let alt = 0; alt <= 7000; alt += 100) {
@@ -101,10 +101,15 @@
             }
         }
 
+        const isSelected = (val) => {
+            if (!selectedValue) return '';
+            return String(val) === String(selectedValue) ? 'selected' : '';
+        };
+
         return `
             <select name="release_altitude" id="id_release_altitude" class="form-select">
                 <option value="">--------------</option>
-                ${altitudes.map(a => `<option value="${a.value}">${a.label}</option>`).join('')}
+                ${altitudes.map(a => `<option value="${a.value}" ${isSelected(a.value)}>${a.label}</option>`).join('')}
             </select>
         `;
     }
@@ -117,9 +122,10 @@
      * Render the offline flight form HTML
      * @param {object} refData - Cached reference data
      * @param {number} logsheetId - ID of the logsheet
+     * @param {object} prefillData - Optional data to pre-fill (for editing existing flights)
      * @returns {string} HTML string
      */
-    function renderOfflineFlightForm(refData, logsheetId) {
+    function renderOfflineFlightForm(refData, logsheetId, prefillData = null) {
         const { members, gliders, towplanes } = refData;
 
         // Separate members by role hints (if available)
@@ -131,13 +137,24 @@
         const clubGliders = gliders.filter(g => g.clubOwned === true);
         const privateGliders = gliders.filter(g => g.clubOwned === false);
 
+        // Determine if this is an edit vs add
+        const isEdit = prefillData && prefillData.flightId;
+        const modalTitle = isEdit ? 'Edit Flight (Offline Mode)' : 'Add Flight (Offline Mode)';
+        const modalIcon = isEdit ? 'bi-pencil' : 'bi-plus-circle';
+
+        // Helper to check if value matches option
+        const isSelected = (optionValue, prefillValue) => {
+            if (!prefillValue) return '';
+            return String(optionValue) === String(prefillValue) ? 'selected' : '';
+        };
+
         return `
             <div class="modal-header bg-warning text-dark">
                 <div class="d-flex align-items-center">
                     <i class="bi bi-wifi-off me-2 fs-4"></i>
                     <div>
                         <h5 class="modal-title mb-0">
-                            <i class="bi bi-plus-circle me-1"></i>Add Flight (Offline Mode)
+                            <i class="${modalIcon} me-1"></i>${modalTitle}
                         </h5>
                         <small class="opacity-75">Data will sync when back online</small>
                     </div>
@@ -150,7 +167,7 @@
                     <strong>Working Offline</strong> - This flight will be saved locally and synced when you're back online.
                 </div>
 
-                <form id="offline-flight-form" data-logsheet-id="${logsheetId}">
+                <form id="offline-flight-form" data-logsheet-id="${logsheetId}"${isEdit ? ` data-flight-id="${prefillData.flightId}"` : ''}>
                     <!-- Aircraft & Crew Section -->
                     <div class="flight-form-section flight-form-section--primary p-3 mb-4" style="background: rgba(13, 110, 253, 0.05); border-radius: 8px; border-left: 4px solid #0d6efd;">
                         <h6 class="text-primary mb-3">
@@ -167,12 +184,12 @@
                                     <option value="">Choose a glider...</option>
                                     ${clubGliders.length > 0 ? `
                                     <optgroup label="🏆 Club Gliders">
-                                        ${clubGliders.map(g => `<option value="${g.id}">${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
+                                        ${clubGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
                                     </optgroup>
                                     ` : ''}
                                     ${privateGliders.length > 0 ? `
                                     <optgroup label="🏠 Private Gliders">
-                                        ${privateGliders.map(g => `<option value="${g.id}">${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
+                                        ${privateGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
                                     </optgroup>
                                     ` : ''}
                                 </select>
@@ -183,7 +200,10 @@
                                 <label for="id_pilot" class="form-label fw-semibold">
                                     <i class="bi bi-person-badge me-1"></i>Pilot <span class="text-danger">*</span>
                                 </label>
-                                ${renderSelect('pilot', 'id_pilot', allMembers, m => m.displayName || m.name, m => m.id, '--------')}
+                                <select name="pilot" id="id_pilot" class="form-select">
+                                    <option value="">--------</option>
+                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${m.displayName || m.name}</option>`).join('')}
+                                </select>
                             </div>
 
                             <!-- Instructor -->
@@ -191,7 +211,10 @@
                                 <label for="id_instructor" class="form-label fw-semibold">
                                     <i class="bi bi-mortarboard me-1"></i>Instructor
                                 </label>
-                                ${renderSelect('instructor', 'id_instructor', instructors.length > 0 ? instructors : allMembers, m => m.displayName || m.name, m => m.id, '--------')}
+                                <select name="instructor" id="id_instructor" class="form-select">
+                                    <option value="">--------</option>
+                                    ${(instructors.length > 0 ? instructors : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${m.displayName || m.name}</option>`).join('')}
+                                </select>
                             </div>
 
                             <!-- Passenger (Member) -->
@@ -199,7 +222,10 @@
                                 <label for="id_passenger" class="form-label fw-semibold">
                                     <i class="bi bi-person me-1"></i>Passenger (Member)
                                 </label>
-                                ${renderSelect('passenger', 'id_passenger', allMembers, m => m.displayName || m.name, m => m.id, '--------')}
+                                <select name="passenger" id="id_passenger" class="form-select">
+                                    <option value="">--------</option>
+                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${m.displayName || m.name}</option>`).join('')}
+                                </select>
                             </div>
 
                             <!-- Passenger Name (Non-member) -->
@@ -207,7 +233,7 @@
                                 <label for="id_passenger_name" class="form-label fw-semibold">
                                     <i class="bi bi-person-plus me-1"></i>Passenger Name (Non-member)
                                 </label>
-                                <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member">
+                                <input type="text" name="passenger_name" id="id_passenger_name" class="form-control" placeholder="If not a member" value="${prefillData?.passengerNameText || ''}">
                             </div>
                         </div>
                     </div>
@@ -224,7 +250,10 @@
                                 <label for="id_tow_pilot" class="form-label fw-semibold">
                                     <i class="bi bi-person-gear me-1"></i>Tow Pilot
                                 </label>
-                                ${renderSelect('tow_pilot', 'id_tow_pilot', towPilots.length > 0 ? towPilots : allMembers, m => m.displayName || m.name, m => m.id, '--------')}
+                                <select name="tow_pilot" id="id_tow_pilot" class="form-select">
+                                    <option value="">--------</option>
+                                    ${(towPilots.length > 0 ? towPilots : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${m.displayName || m.name}</option>`).join('')}
+                                </select>
                             </div>
 
                             <!-- Towplane -->
@@ -232,7 +261,10 @@
                                 <label for="id_towplane" class="form-label fw-semibold">
                                     <i class="bi bi-airplane-engines me-1"></i>Towplane
                                 </label>
-                                ${renderSelect('towplane', 'id_towplane', towplanes, t => t.displayName || t.name || t.nNumber, t => t.id, '--------')}
+                                <select name="towplane" id="id_towplane" class="form-select">
+                                    <option value="">--------</option>
+                                    ${towplanes.map(t => `<option value="${t.id}" ${isSelected(t.id, prefillData?.towplane)}>${t.displayName || t.name || t.nNumber}</option>`).join('')}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -250,7 +282,7 @@
                                     <i class="bi bi-arrow-up-circle me-1"></i>Launch Time
                                 </label>
                                 <div class="input-group">
-                                    <input type="time" name="launch_time" id="id_launch_time" class="form-control" placeholder="--:--">
+                                    <input type="time" name="launch_time" id="id_launch_time" class="form-control" placeholder="--:--" value="${prefillData?.launchTime || ''}">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="now-launch-btn">
                                         <i class="bi bi-clock-fill me-1"></i>NOW
                                     </button>
@@ -263,7 +295,7 @@
                                     <i class="bi bi-arrow-down-circle me-1"></i>Landing Time
                                 </label>
                                 <div class="input-group">
-                                    <input type="time" name="landing_time" id="id_landing_time" class="form-control" placeholder="--:--">
+                                    <input type="time" name="landing_time" id="id_landing_time" class="form-control" placeholder="--:--" value="${prefillData?.landingTime || ''}">
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="now-landing-btn">
                                         <i class="bi bi-clock-fill me-1"></i>NOW
                                     </button>
@@ -276,7 +308,7 @@
                                     <i class="bi bi-graph-up me-1"></i>Release Altitude (AGL)
                                 </label>
                                 <div class="input-group">
-                                    ${renderAltitudeSelect()}
+                                    ${renderAltitudeSelect(prefillData?.releaseAltitude)}
                                     <button type="button" class="btn btn-outline-info btn-sm" id="alt-2k-btn">2K</button>
                                     <button type="button" class="btn btn-outline-info btn-sm" id="alt-3k-btn">3K</button>
                                 </div>
@@ -291,7 +323,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-warning" id="save-offline-flight-btn">
                     <i class="bi bi-download me-1"></i>
-                    Save Offline
+                    ${isEdit ? 'Save Edit Offline' : 'Save Offline'}
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             </div>
@@ -363,6 +395,8 @@
         }
 
         const logsheetId = parseInt(form.dataset.logsheetId, 10);
+        const flightId = form.dataset.flightId ? parseInt(form.dataset.flightId, 10) : null;
+        const isEdit = flightId !== null;
 
         // Validate required fields
         const pilotSelect = document.getElementById('id_pilot');
@@ -396,8 +430,17 @@
 
         try {
             const db = getDB();
-            const localId = await db.createPendingFlight(flightData, logsheetId);
-            console.log('[OfflineForm] Flight saved with local ID:', localId);
+            let localId;
+
+            if (isEdit) {
+                // Editing existing flight
+                localId = await db.createPendingEdit(flightId, flightData, logsheetId);
+                console.log('[OfflineForm] Flight edit saved with local ID:', localId);
+            } else {
+                // Creating new flight
+                localId = await db.createPendingFlight(flightData, logsheetId);
+                console.log('[OfflineForm] Flight saved with local ID:', localId);
+            }
 
             // Close modal
             const modalEl = document.getElementById('flightModal');
@@ -407,7 +450,7 @@
             }
 
             // Show success message
-            showOfflineFlightSaved(flightData);
+            showOfflineFlightSaved(flightData, isEdit);
 
             // Trigger callback to update UI
             if (onSaveCallback) {
@@ -431,7 +474,7 @@
     // UI FEEDBACK
     // =========================================================
 
-    function showOfflineFlightSaved(flightData) {
+    function showOfflineFlightSaved(flightData, isEdit = false) {
         // Create toast container if not exists
         let toastContainer = document.getElementById('offline-toast-container');
         if (!toastContainer) {
@@ -443,12 +486,13 @@
         }
 
         const toastId = 'offline-saved-toast-' + Date.now();
+        const message = isEdit ? 'Flight edit saved offline!' : 'Flight saved offline!';
         const toastHtml = `
             <div id="${toastId}" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">
                     <div class="toast-body">
                         <i class="bi bi-download me-2"></i>
-                        <strong>Flight saved offline!</strong>
+                        <strong>${message}</strong>
                         Will sync when online.
                     </div>
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
