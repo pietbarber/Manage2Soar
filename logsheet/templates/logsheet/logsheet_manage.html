@@ -404,17 +404,17 @@
                          data-url="{% url 'logsheet:edit_flight' logsheet_pk=logsheet.pk flight_pk=flight.pk %}"
                          data-flight-id="{{ flight.pk }}"
                          data-pilot="{{ flight.pilot.pk }}"
-                         data-pilot-name="{{ flight.pilot|full_display_name }}"
-                         {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name }}"{% endif %}
+                         data-pilot-name="{{ flight.pilot|full_display_name|escapejs }}"
+                         {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name|escapejs }}"{% endif %}
                          data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
-                         data-glider-name="{{ flight.glider }}"
-                         {% if flight.towplane %}data-towplane="{{ flight.towplane.pk }}" data-towplane-name="{{ flight.towplane }}"{% endif %}
-                         {% if flight.tow_pilot %}data-tow-pilot="{{ flight.tow_pilot.pk }}" data-tow-pilot-name="{{ flight.tow_pilot|full_display_name }}"{% endif %}
+                         data-glider-name="{{ flight.glider|escapejs }}"
+                         {% if flight.towplane %}data-towplane="{{ flight.towplane.pk }}" data-towplane-name="{{ flight.towplane|escapejs }}"{% endif %}
+                         {% if flight.tow_pilot %}data-tow-pilot="{{ flight.tow_pilot.pk }}" data-tow-pilot-name="{{ flight.tow_pilot|full_display_name|escapejs }}"{% endif %}
                          {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
                          {% if flight.launch_time %}data-launch-time="{{ flight.launch_time|time:'H:i' }}"{% endif %}
                          {% if flight.landing_time %}data-landing-time="{{ flight.landing_time|time:'H:i' }}"{% endif %}
                          {% if flight.flight_type %}data-flight-type="{{ flight.flight_type }}"{% endif %}
-                         {% if flight.passenger %}data-passenger="{{ flight.passenger.pk }}" data-passenger-name="{{ flight.passenger|full_display_name }}"{% endif %}
+                         {% if flight.passenger %}data-passenger="{{ flight.passenger.pk }}" data-passenger-name="{{ flight.passenger|full_display_name|escapejs }}"{% endif %}
                          {% if flight.passenger_name %}data-passenger-name-text="{{ flight.passenger_name|escapejs }}"{% endif %}
                          {% if flight.notes %}data-notes="{{ flight.notes|escapejs }}"{% endif %}>
                         <i class="bi bi-pencil"></i>
@@ -425,10 +425,10 @@
                               class="btn btn-outline-success btn-sm copy-flight-btn"
                               data-flight-id="{{ flight.pk }}"
                               data-pilot="{{ flight.pilot.pk }}"
-                              data-pilot-name="{{ flight.pilot|full_display_name }}"
-                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name }}"{% endif %}
+                              data-pilot-name="{{ flight.pilot|full_display_name|escapejs }}"
+                              {% if flight.instructor %}data-instructor="{{ flight.instructor.pk }}" data-instructor-name="{{ flight.instructor|full_display_name|escapejs }}"{% endif %}
                               data-glider="{% if flight.glider.pk %}{{ flight.glider.pk }}{% else %}{{ flight.glider }}{% endif %}"
-                              data-glider-name="{{ flight.glider }}"
+                              data-glider-name="{{ flight.glider|escapejs }}"
                               {% if flight.release_altitude %}data-release-altitude="{{ flight.release_altitude }}"{% endif %}
                               title="Copy flight details">
                         <i class="bi bi-copy"></i>
