@@ -1504,6 +1504,32 @@ document.addEventListener("click", async function(e) {
   const flightModal = document.getElementById("flightModal");
   const LOGSHEET_ID = parseInt(flightModal.dataset.logsheetId, 10);
 
+  // Helper function to extract pre-fill data from Edit button's data attributes (DRY)
+  function extractPrefillDataFromButton(button, flightId) {
+    if (!button || !flightId) return null;
+    return {
+      flightId: parseInt(flightId, 10),
+      pilot: button.getAttribute('data-pilot'),
+      pilotName: button.getAttribute('data-pilot-name'),
+      instructor: button.getAttribute('data-instructor'),
+      instructorName: button.getAttribute('data-instructor-name'),
+      glider: button.getAttribute('data-glider'),
+      gliderName: button.getAttribute('data-glider-name'),
+      towplane: button.getAttribute('data-towplane'),
+      towplaneName: button.getAttribute('data-towplane-name'),
+      towPilot: button.getAttribute('data-tow-pilot'),
+      towPilotName: button.getAttribute('data-tow-pilot-name'),
+      releaseAltitude: button.getAttribute('data-release-altitude'),
+      launchTime: button.getAttribute('data-launch-time'),
+      landingTime: button.getAttribute('data-landing-time'),
+      flightType: button.getAttribute('data-flight-type'),
+      passenger: button.getAttribute('data-passenger'),
+      passengerName: button.getAttribute('data-passenger-name'),
+      passengerNameText: button.getAttribute('data-passenger-name-text'),
+      notes: button.getAttribute('data-notes')
+    };
+  }
+
   flightModal.addEventListener("show.bs.modal", async function (event) {
     // Get the button that triggered the modal - may be an icon inside the button
     let button = event.relatedTarget;
@@ -1545,30 +1571,7 @@ document.addEventListener("click", async function(e) {
           const refData = await window.M2SOffline.getReferenceData();
           if (refData) {
             // For edit, extract pre-fill data from button's data attributes
-            let prefillData = null;
-            if (isEditFlight && flightId) {
-              prefillData = {
-                flightId: parseInt(flightId, 10),
-                pilot: button.getAttribute('data-pilot'),
-                pilotName: button.getAttribute('data-pilot-name'),
-                instructor: button.getAttribute('data-instructor'),
-                instructorName: button.getAttribute('data-instructor-name'),
-                glider: button.getAttribute('data-glider'),
-                gliderName: button.getAttribute('data-glider-name'),
-                towplane: button.getAttribute('data-towplane'),
-                towplaneName: button.getAttribute('data-towplane-name'),
-                towPilot: button.getAttribute('data-tow-pilot'),
-                towPilotName: button.getAttribute('data-tow-pilot-name'),
-                releaseAltitude: button.getAttribute('data-release-altitude'),
-                launchTime: button.getAttribute('data-launch-time'),
-                landingTime: button.getAttribute('data-landing-time'),
-                flightType: button.getAttribute('data-flight-type'),
-                passenger: button.getAttribute('data-passenger'),
-                passengerName: button.getAttribute('data-passenger-name'),
-                passengerNameText: button.getAttribute('data-passenger-name-text'),
-                notes: button.getAttribute('data-notes')
-              };
-            }
+            const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
             const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
             document.getElementById("flightModalContent").innerHTML = html;
             window.M2SOffline.initOfflineFormHandlers(() => {
@@ -1935,30 +1938,7 @@ document.addEventListener("click", async function(e) {
             const refData = await window.M2SOffline.getReferenceData();
             if (refData) {
               // For edit, extract pre-fill data from button's data attributes
-              let prefillData = null;
-              if (isEditFlight && flightId) {
-                prefillData = {
-                  flightId: parseInt(flightId, 10),
-                  pilot: button.getAttribute('data-pilot'),
-                  pilotName: button.getAttribute('data-pilot-name'),
-                  instructor: button.getAttribute('data-instructor'),
-                  instructorName: button.getAttribute('data-instructor-name'),
-                  glider: button.getAttribute('data-glider'),
-                  gliderName: button.getAttribute('data-glider-name'),
-                  towplane: button.getAttribute('data-towplane'),
-                  towplaneName: button.getAttribute('data-towplane-name'),
-                  towPilot: button.getAttribute('data-tow-pilot'),
-                  towPilotName: button.getAttribute('data-tow-pilot-name'),
-                  releaseAltitude: button.getAttribute('data-release-altitude'),
-                  launchTime: button.getAttribute('data-launch-time'),
-                  landingTime: button.getAttribute('data-landing-time'),
-                  flightType: button.getAttribute('data-flight-type'),
-                  passenger: button.getAttribute('data-passenger'),
-                  passengerName: button.getAttribute('data-passenger-name'),
-                  passengerNameText: button.getAttribute('data-passenger-name-text'),
-                  notes: button.getAttribute('data-notes')
-                };
-              }
+              const prefillData = isEditFlight ? extractPrefillDataFromButton(button, flightId) : null;
               const html = window.M2SOffline.renderOfflineFlightForm(refData, LOGSHEET_ID, prefillData);
               modalContent.innerHTML = html;
               window.M2SOffline.initOfflineFormHandlers(() => {
