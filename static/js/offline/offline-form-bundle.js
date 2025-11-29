@@ -195,12 +195,12 @@
                                     <option value="">Choose a glider...</option>
                                     ${clubGliders.length > 0 ? `
                                     <optgroup label="🏆 Club Gliders">
-                                        ${clubGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
+                                        ${clubGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${escapeHtml(g.displayName || g.competitionNumber || g.nNumber)}</option>`).join('')}
                                     </optgroup>
                                     ` : ''}
                                     ${privateGliders.length > 0 ? `
                                     <optgroup label="🏠 Private Gliders">
-                                        ${privateGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${g.displayName || g.competitionNumber || g.nNumber}</option>`).join('')}
+                                        ${privateGliders.map(g => `<option value="${g.id}" ${isSelected(g.id, prefillData?.glider)}>${escapeHtml(g.displayName || g.competitionNumber || g.nNumber)}</option>`).join('')}
                                     </optgroup>
                                     ` : ''}
                                 </select>
@@ -213,7 +213,7 @@
                                 </label>
                                 <select name="pilot" id="id_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${m.displayName || m.name}</option>`).join('')}
+                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.pilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -224,7 +224,7 @@
                                 </label>
                                 <select name="instructor" id="id_instructor" class="form-select">
                                     <option value="">--------</option>
-                                    ${(instructors.length > 0 ? instructors : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${m.displayName || m.name}</option>`).join('')}
+                                    ${(instructors.length > 0 ? instructors : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.instructor)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -235,7 +235,7 @@
                                 </label>
                                 <select name="passenger" id="id_passenger" class="form-select">
                                     <option value="">--------</option>
-                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${m.displayName || m.name}</option>`).join('')}
+                                    ${allMembers.map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.passenger)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -263,7 +263,7 @@
                                 </label>
                                 <select name="tow_pilot" id="id_tow_pilot" class="form-select">
                                     <option value="">--------</option>
-                                    ${(towPilots.length > 0 ? towPilots : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${m.displayName || m.name}</option>`).join('')}
+                                    ${(towPilots.length > 0 ? towPilots : allMembers).map(m => `<option value="${m.id}" ${isSelected(m.id, prefillData?.towPilot)}>${escapeHtml(m.displayName || m.name)}</option>`).join('')}
                                 </select>
                             </div>
 
@@ -274,7 +274,7 @@
                                 </label>
                                 <select name="towplane" id="id_towplane" class="form-select">
                                     <option value="">--------</option>
-                                    ${towplanes.map(t => `<option value="${t.id}" ${isSelected(t.id, prefillData?.towplane)}>${t.displayName || t.name || t.nNumber}</option>`).join('')}
+                                    ${towplanes.map(t => `<option value="${t.id}" ${isSelected(t.id, prefillData?.towplane)}>${escapeHtml(t.displayName || t.name || t.nNumber)}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
