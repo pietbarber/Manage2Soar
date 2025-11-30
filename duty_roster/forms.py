@@ -229,10 +229,13 @@ class InstructionRequestForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        assert self.assignment is not None  # Validated in clean()
         instance.assignment = self.assignment
         instance.student = self.student
-        # Default to the primary instructor, can be changed later
-        instance.instructor = self.assignment.instructor
+        # Default to the primary instructor, or surge instructor if primary is None
+        instance.instructor = (
+            self.assignment.instructor or self.assignment.surge_instructor
+        )
         instance.status = "pending"
         instance.instructor_response = "pending"
         if commit:

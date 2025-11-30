@@ -360,6 +360,20 @@ def calendar_day_detail(request, year, month, day):
     show_surge_alert = instruction_intent_count > 3
     show_tow_surge_alert = tow_count >= 6
 
+    # Check if user already has a non-cancelled instruction request for this day
+    user_has_instruction_request = False
+    if request.user.is_authenticated and assignment:
+        from .models import InstructionSlot
+
+        user_has_instruction_request = (
+            InstructionSlot.objects.filter(
+                assignment=assignment,
+                student=request.user,
+            )
+            .exclude(status="cancelled")
+            .exists()
+        )
+
     return render(
         request,
         "duty_roster/calendar_day_modal.html",
@@ -374,6 +388,7 @@ def calendar_day_detail(request, year, month, day):
             "tow_count": tow_count,
             "show_tow_surge_alert": show_tow_surge_alert,
             "today": date.today(),
+            "user_has_instruction_request": user_has_instruction_request,
         },
     )
 
@@ -1351,7 +1366,6 @@ def request_instruction(request, year, month, day):
             "The instructor will review your request.",
         )
 
-        # TODO: Send notification to instructor about new request
         _notify_instructor_new_request(slot)
 
     else:
@@ -1362,6 +1376,7 @@ def request_instruction(request, year, month, day):
 
 
 @active_member_required
+@require_POST
 def cancel_instruction_request(request, slot_id):
     """Student cancels their own instruction request."""
     from .models import InstructionSlot
@@ -1377,7 +1392,6 @@ def cancel_instruction_request(request, slot_id):
         slot.save()
         messages.success(request, "Your instruction request has been cancelled.")
 
-        # TODO: Notify instructor if they had already accepted
         if slot.instructor_response == "accepted":
             _notify_instructor_cancellation(slot)
 
@@ -1482,8 +1496,8 @@ def instructor_requests(request):
         {
             "pending_by_date": dict(pending_by_date),
             "accepted_by_date": dict(accepted_by_date),
-            "pending_count": pending_slots.count(),
-            "accepted_count": accepted_slots.count(),
+            "pending_count": len(pending_slots),
+            "accepted_count": len(accepted_slots),
             "today": today,
         },
     )
@@ -1514,6 +1528,10 @@ def instructor_respond(request, slot_id):
         return redirect("duty_roster:instructor_requests")
 
     action = request.POST.get("action")
+    if action not in ["accept", "reject"]:
+        messages.error(request, "Invalid action.")
+        return redirect("duty_roster:instructor_requests")
+
     form = InstructorResponseForm(request.POST, instance=slot, instructor=request.user)
 
     if form.is_valid():

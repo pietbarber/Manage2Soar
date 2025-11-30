@@ -84,11 +84,13 @@
                   </td>
                   <td>
                     {% if req.status != "cancelled" and req.assignment.date >= today %}
-                      <a href="{% url 'duty_roster:cancel_instruction_request' slot_id=req.id %}"
-                         class="btn btn-sm btn-outline-danger"
-                         onclick="return confirm('Are you sure you want to cancel this request?');">
-                        <i class="fas fa-times me-1"></i>Cancel
-                      </a>
+                      <form method="post" action="{% url 'duty_roster:cancel_instruction_request' slot_id=req.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Are you sure you want to cancel this request?');">
+                          <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                      </form>
                     {% endif %}
                   </td>
                 </tr>

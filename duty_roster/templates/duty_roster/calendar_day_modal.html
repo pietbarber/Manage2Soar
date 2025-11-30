@@ -54,22 +54,30 @@
 
   {# Student instruction request button #}
   {% if user.is_authenticated and assignment.instructor and day >= today %}
-    {% with user_has_request=False %}
-      {% for slot in assignment.instruction_slots.all %}
-        {% if slot.student == user and slot.status != "cancelled" %}
-          {% with user_has_request=True %}{% endwith %}
-        {% endif %}
-      {% endfor %}
-      {% if not user_has_request %}
-        <hr>
-        <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-outline-primary w-100">
-            <i class="fas fa-hand-paper me-1"></i>Request Instruction
-          </button>
-        </form>
-      {% endif %}
-    {% endwith %}
+    {% if user_has_instruction_request %}
+      <hr>
+      <div class="alert alert-info mb-0">
+        <i class="fas fa-check-circle me-1"></i>
+        You have already requested instruction for this day.
+        {% for slot in assignment.instruction_slots.all %}
+          {% if slot.student == user and slot.status != "cancelled" %}
+            {% if slot.instructor_response == "accepted" %}
+              <strong>Confirmed!</strong>
+            {% elif slot.instructor_response == "pending" %}
+              <em>Awaiting instructor response.</em>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <hr>
+      <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="fas fa-hand-paper me-1"></i>Request Instruction
+        </button>
+      </form>
+    {% endif %}
   {% endif %}
 {% else %}
   <p>No duty crew assigned for this date.</p>
