@@ -356,10 +356,16 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{# Pass Django template values to JavaScript via data attributes to avoid linter confusion #}
+<div id="application-data"
+     data-is-pilot="{{ application.is_pilot|yesno:'true,false' }}"
+     data-has-soaring-experience="{{ application.has_soaring_experience|yesno:'true,false' }}"
+     style="display: none;"></div>
 <script>
-// Applicant pilot status for confirmation dialogs
-const applicantIsPilot = {{ application.is_pilot|yesno:"true,false" }};
-const applicantHasSoaringExperience = {{ application.has_soaring_experience|yesno:"true,false" }};
+// Read applicant pilot status from data attributes (avoids Django/JS linter conflicts)
+const appData = document.getElementById('application-data');
+const applicantIsPilot = appData.dataset.isPilot === 'true';
+const applicantHasSoaringExperience = appData.dataset.hasSoaringExperience === 'true';
 
 // Confirmation dialogs for review actions
 document.querySelectorAll('button[name="review_action"]').forEach(button => {
