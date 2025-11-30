@@ -49,6 +49,8 @@
   <link href="{% static 'css/cms.css' %}" rel="stylesheet">
   <link href="{% static 'css/mobile-fixes.css' %}" rel="stylesheet">
 
+  {% block extra_css %}{% endblock %}
+
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const csrfToken = '{{ csrf_token }}';
