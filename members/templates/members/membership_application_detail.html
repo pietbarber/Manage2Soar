@@ -355,8 +355,15 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
+// Applicant pilot status for confirmation dialogs
+const applicantIsPilot = {{ application.has_private_pilot|yesno:"true,false" }} ||
+                         {{ application.has_commercial_pilot|yesno:"true,false" }} ||
+                         {{ application.has_cfi|yesno:"true,false" }} ||
+                         '{{ application.glider_rating }}' !== 'none';
+const applicantHasSoaringExperience = {{ application.glider_flight_hours }} > 0;
+
 // Confirmation dialogs for review actions
 document.querySelectorAll('button[name="review_action"]').forEach(button => {
     if (button.value === 'reject') return; // Already has onclick confirmation
@@ -367,7 +374,17 @@ document.querySelectorAll('button[name="review_action"]').forEach(button => {
 
         switch(action) {
             case 'approve':
-                confirmMessage = 'Are you sure you want to approve this application and create a member account?';
+                // Build a more specific confirmation message based on applicant's experience
+                if (!applicantIsPilot && !applicantHasSoaringExperience) {
+                    confirmMessage = '⚠️ NOTICE: This applicant has NO pilot certificates and NO soaring experience.\n\n' +
+                                     'Are you sure you want to approve this application?\n\n' +
+                                     'Click OK to approve, or Cancel to review further.';
+                } else if (!applicantIsPilot) {
+                    confirmMessage = '⚠️ NOTICE: This applicant does not currently hold any pilot certificates.\n\n' +
+                                     'Are you sure you want to approve this application?';
+                } else {
+                    confirmMessage = 'Are you sure you want to approve this application and create a member account?';
+                }
                 break;
             case 'waitlist':
                 confirmMessage = 'Are you sure you want to add this applicant to the waitlist?';
