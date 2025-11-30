@@ -328,6 +328,21 @@ class MembershipApplication(models.Model):
             parts.append(self.country)
         return "\n".join(parts)
 
+    @property
+    def is_pilot(self):
+        """Check if the applicant holds any pilot certificates."""
+        return (
+            self.has_private_pilot
+            or self.has_commercial_pilot
+            or self.has_cfi
+            or (self.glider_rating and self.glider_rating != "none")
+        )
+
+    @property
+    def has_soaring_experience(self):
+        """Check if the applicant has any soaring/glider flight experience."""
+        return (self.glider_flight_hours or 0) > 0
+
     def can_be_approved(self):
         """Check if the application has all required information for approval."""
         required_fields = [

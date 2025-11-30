@@ -749,6 +749,103 @@ class MembershipApplicationViewTests(TestCase):
         app2.refresh_from_db()
         self.assertEqual(app2.waitlist_position, 2)
 
+    def test_is_pilot_property(self):
+        """Test the is_pilot property correctly identifies pilots."""
+        # Non-pilot: no certificates, glider_rating='none'
+        app = MembershipApplication.objects.create(
+            first_name="Non",
+            last_name="Pilot",
+            email="nonpilot@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Learn to fly",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+            has_private_pilot=False,
+            has_commercial_pilot=False,
+            has_cfi=False,
+            glider_rating="none",
+        )
+        self.assertFalse(app.is_pilot)
+
+        # Pilot with private certificate
+        app.has_private_pilot = True
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Reset and test glider rating
+        app.has_private_pilot = False
+        app.glider_rating = "private"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test commercial pilot certificate
+        app.glider_rating = "none"
+        app.has_commercial_pilot = True
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test CFI certificate
+        app.has_commercial_pilot = False
+        app.has_cfi = True
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test student glider rating
+        app.has_cfi = False
+        app.glider_rating = "student"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test transition glider rating
+        app.glider_rating = "transition"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test commercial glider rating
+        app.glider_rating = "commercial"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test foreign pilot rating
+        app.glider_rating = "foreign"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+    def test_has_soaring_experience_property(self):
+        """Test the has_soaring_experience property."""
+        app = MembershipApplication.objects.create(
+            first_name="Test",
+            last_name="Pilot",
+            email="testpilot@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Learn to fly",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+            glider_flight_hours=0,
+        )
+        self.assertFalse(app.has_soaring_experience)
+
+        # Set some hours
+        app.glider_flight_hours = 50
+        app.save()
+        self.assertTrue(app.has_soaring_experience)
+
 
 @pytest.mark.django_db
 class MembershipApplicationAdminTests:
