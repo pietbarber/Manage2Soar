@@ -415,6 +415,25 @@
 /* ========================================
    Waitlist Management Styling
    ======================================== */
+.waitlist-header {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid var(--bs-primary);
+}
+
+.waitlist-header h4 {
+    color: var(--bs-primary);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.waitlist-container {
+    margin-bottom: 2rem;
+}
+
 .waitlist-item {
     background: white;
     border: 1px solid #dee2e6;
