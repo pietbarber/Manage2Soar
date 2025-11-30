@@ -5,14 +5,15 @@
 /* The container itself must enforce boundaries */
 .cms-content {
     max-width: 100%;
-    overflow-x: auto;  /* Allow horizontal scroll if absolutely necessary */
+    overflow-x: auto;
+    /* Allow horizontal scroll if absolutely necessary */
     overflow-wrap: break-word;
     word-wrap: break-word;
     box-sizing: border-box;
 }
 
 /* Issue #337: Bootstrap rows in CMS content have negative margins that cause overflow */
-.cms-content > .row,
+.cms-content>.row,
 .cms-content .row {
     margin-left: 0;
     margin-right: 0;
@@ -22,8 +23,10 @@
 .cms-content table {
     width: 100% !important;
     max-width: 100% !important;
-    min-width: 0 !important;  /* Override any min-width set by TinyMCE */
-    table-layout: fixed !important;  /* Fixed layout respects width constraints */
+    min-width: 0 !important;
+    /* Override any min-width set by TinyMCE */
+    table-layout: fixed !important;
+    /* Fixed layout respects width constraints */
     word-break: break-word;
     box-sizing: border-box;
     border-collapse: collapse;

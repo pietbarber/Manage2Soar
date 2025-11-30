@@ -1,5 +1,6 @@
 /* Issue #337: Prevent horizontal scrollbar from footer overflow */
-html, body {
+html,
+body {
   overflow-x: hidden;
 }
 
