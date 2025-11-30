@@ -159,6 +159,65 @@ class MembershipApplicationModelTests:
         assert app.status == "waitlisted"
         assert app.waitlist_position == 1
 
+    def test_add_to_waitlist_already_waitlisted(self):
+        """Test that adding an already-waitlisted application doesn't change position.
+
+        This prevents the bug where clicking 'Add to Waitlist' on someone already
+        on the waitlist would assign them a new position (causing gaps).
+        """
+        # Create first waitlisted application
+        app1 = MembershipApplication.objects.create(
+            first_name="First",
+            last_name="Person",
+            email="first@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        app1.add_to_waitlist()
+        assert app1.waitlist_position == 1
+
+        # Create second waitlisted application
+        app2 = MembershipApplication.objects.create(
+            first_name="Second",
+            last_name="Person",
+            email="second@example.com",
+            phone="555-123-4567",
+            address_line1="456 Oak St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        app2.add_to_waitlist()
+        assert app2.waitlist_position == 2
+
+        # Try to add app1 to waitlist again - should not change position
+        original_position = app1.waitlist_position
+        app1.add_to_waitlist()
+        app1.refresh_from_db()
+        assert app1.waitlist_position == original_position  # Still position 1
+        assert app1.status == "waitlisted"
+
+        # Verify app2 still at position 2 (no gaps created)
+        app2.refresh_from_db()
+        assert app2.waitlist_position == 2
+
     def test_reject_application(self):
         """Test rejecting an application."""
         app = MembershipApplication.objects.create(
@@ -531,6 +590,91 @@ class MembershipApplicationViewTests(TestCase):
 
         # Should show info message about already being at bottom
         self.assertContains(response, "already at the bottom")
+
+    def test_save_notes_without_status_change(self):
+        """Test that the 'Save Notes' action saves notes without changing status."""
+        self._create_manager()
+
+        # Create a pending application
+        application = MembershipApplication.objects.create(
+            first_name="Test",
+            last_name="Applicant",
+            email="test@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        original_status = application.status
+
+        # Save notes via the review action
+        response = self.client.post(
+            reverse(
+                "members:membership_application_detail",
+                args=[application.application_id],
+            ),
+            {
+                "review_action": "save_notes",
+                "admin_notes": "These are my private notes about this applicant.",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Notes saved successfully")
+
+        # Verify notes were saved but status unchanged
+        application.refresh_from_db()
+        self.assertEqual(
+            application.admin_notes, "These are my private notes about this applicant."
+        )
+        self.assertEqual(application.status, original_status)
+
+    def test_add_to_waitlist_already_waitlisted_keeps_position(self):
+        """Test that clicking 'Add to Waitlist' on someone already waitlisted doesn't change position.
+
+        This regression test prevents the bug where clicking 'Add to Waitlist'
+        on someone already on the waitlist would assign them a new position
+        (e.g., position 3 → position 4), causing gaps in the waitlist numbering.
+        """
+        self._create_manager()
+
+        # Create two waitlisted applications
+        app1 = self._create_waitlisted_app("First", "first@example.com")
+        app2 = self._create_waitlisted_app("Second", "second@example.com")
+
+        self.assertEqual(app1.waitlist_position, 1)
+        self.assertEqual(app2.waitlist_position, 2)
+
+        # Try to "Add to Waitlist" again on app1 (who is already at position 1)
+        response = self.client.post(
+            reverse(
+                "members:membership_application_detail",
+                args=[app1.application_id],
+            ),
+            {
+                "review_action": "waitlist",
+                "admin_notes": "",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # app1 should still be at position 1, NOT moved to position 3
+        app1.refresh_from_db()
+        self.assertEqual(app1.waitlist_position, 1)
+        self.assertEqual(app1.status, "waitlisted")
+
+        # app2 should still be at position 2
+        app2.refresh_from_db()
+        self.assertEqual(app2.waitlist_position, 2)
 
 
 @pytest.mark.django_db

@@ -310,6 +310,17 @@ def membership_application_detail(request, application_id):
                             f"Application {application.application_id} needs more info - marked by {request.user}"
                         )
 
+                    elif review_action == "save_notes":
+                        # Just save the notes without changing status
+                        application.admin_notes = review_form.cleaned_data.get(
+                            "admin_notes", ""
+                        )
+                        application.save(update_fields=["admin_notes"])
+                        messages.success(request, "Notes saved successfully.")
+                        logger.info(
+                            f"Application {application.application_id} notes updated by {request.user}"
+                        )
+
                     return HttpResponseRedirect(request.path)
 
             except Exception as e:
