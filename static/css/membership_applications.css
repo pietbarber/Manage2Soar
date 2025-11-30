@@ -769,7 +769,8 @@ table.sort thead th[data-sort-method]:hover {
 }
 
 table.sort thead th[data-sort-method]::after {
-    content: '\2195'; /* up-down arrow */
+    content: '\2195';
+    /* up-down arrow */
     position: absolute;
     right: 0.5rem;
     opacity: 0.4;
@@ -777,13 +778,15 @@ table.sort thead th[data-sort-method]::after {
 }
 
 table.sort thead th[data-sort-method][aria-sort="ascending"]::after {
-    content: '\2191'; /* up arrow */
+    content: '\2191';
+    /* up arrow */
     opacity: 1;
     color: var(--bs-primary);
 }
 
 table.sort thead th[data-sort-method][aria-sort="descending"]::after {
-    content: '\2193'; /* down arrow */
+    content: '\2193';
+    /* down arrow */
     opacity: 1;
     color: var(--bs-primary);
 }
