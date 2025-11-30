@@ -277,6 +277,23 @@ def cms_resources_index(request):
 # Site Feedback Views for Issue #117
 
 
+def _validate_referring_url(url, request):
+    """
+    Validate that a referring URL is safe (relative or same-host).
+    Prevents XSS and open redirect vulnerabilities.
+    """
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    if not url:
+        return ""
+    # Only allow relative URLs or URLs pointing to the same host
+    if url_has_allowed_host_and_scheme(
+        url, allowed_hosts={request.get_host()}, require_https=False
+    ):
+        return url
+    return ""
+
+
 @active_member_required
 def submit_feedback(request):
     """
@@ -286,7 +303,9 @@ def submit_feedback(request):
     if request.method == "POST":
         form = SiteFeedbackForm(request.POST)
         # Get referring URL from hidden form field (preserved from initial GET)
-        referring_url = request.POST.get("referring_url", "")
+        # Validate to prevent XSS and open redirect attacks
+        raw_url = request.POST.get("referring_url", "")
+        referring_url = _validate_referring_url(raw_url, request)
         if form.is_valid():
             feedback = form.save(commit=False)
             feedback.user = request.user
@@ -304,7 +323,9 @@ def submit_feedback(request):
     else:
         form = SiteFeedbackForm()
         # Capture referring URL on initial GET request
-        referring_url = request.GET.get("from", request.headers.get("referer", ""))
+        # Validate to prevent open redirect attacks
+        raw_url = request.GET.get("from", request.headers.get("referer", ""))
+        referring_url = _validate_referring_url(raw_url, request)
 
     return render(
         request,
