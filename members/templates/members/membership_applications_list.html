@@ -136,7 +136,7 @@
                                                 <div class="small text-muted">{{ app.total_flight_hours }} hrs</div>
                                             {% endif %}
                                         </td>
-                                        <td data-sort-value="{{ app.status }}">
+                                        <td data-sort="{{ app.status }}">
                                             <span class="badge status-badge status-{{ app.status }}">
                                                 {{ app.get_status_display }}
                                             </span>
@@ -144,9 +144,9 @@
                                                 <div class="small text-muted">#{{ app.waitlist_position }} in line</div>
                                             {% endif %}
                                         </td>
-                                        <td data-sort-value="{{ app.submitted_at|date:'Y-m-d H:i:s' }}">
+                                        <td data-sort="{{ app.submitted_at|date:'Y-m-d H:i:s' }}">
                                             <div>{{ app.submitted_at|date:"M j, Y" }}</div>
-                                            <small class="text-muted">{{ app.submitted_at|date:"g:i A" }}</small>
+                                            <small class="text-muted">{{ app.submitted_at|date:"g:i A" }}
                                         </td>
                                         <td>
                                             <div class="btn-group" role="group">
