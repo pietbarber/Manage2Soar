@@ -528,6 +528,117 @@ class MembershipApplicationViewTests(TestCase):
             apps[i].refresh_from_db()
             self.assertEqual(apps[i].waitlist_position, i)
 
+    def test_waitlist_move_to_top_already_at_top(self):
+        """Test moving an applicant to top when already at position 1."""
+        manager = Member.objects.create_user(
+            username="manager",
+            email="manager@example.com",
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+
+        # Create a single waitlisted application
+        application = MembershipApplication.objects.create(
+            first_name="Person0",
+            last_name="Test",
+            email="person0@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        application.add_to_waitlist()
+
+        # Try to move to top when already at position 1
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_top", "application_id": application.application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Position should remain at 1
+        application.refresh_from_db()
+        self.assertEqual(application.waitlist_position, 1)
+
+        # Should show info message about already being at top
+        self.assertContains(response, "already at the top")
+
+    def test_waitlist_move_to_bottom_already_at_bottom(self):
+        """Test moving an applicant to bottom when already at last position."""
+        manager = Member.objects.create_user(
+            username="manager",
+            email="manager@example.com",
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+
+        # Create two waitlisted applications
+        app1 = MembershipApplication.objects.create(
+            first_name="Person0",
+            last_name="Test",
+            email="person0@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        app1.add_to_waitlist()
+
+        app2 = MembershipApplication.objects.create(
+            first_name="Person1",
+            last_name="Test",
+            email="person1@example.com",
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        app2.add_to_waitlist()
+
+        # Try to move app2 (position 2, the last position) to bottom
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_bottom", "application_id": app2.application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Position should remain at 2
+        app2.refresh_from_db()
+        self.assertEqual(app2.waitlist_position, 2)
+
+        # Should show info message about already being at bottom
+        self.assertContains(response, "already at the bottom")
+
 
 @pytest.mark.django_db
 class MembershipApplicationAdminTests:

@@ -444,27 +444,31 @@ def membership_waitlist(request):
                                 f"Moved {application.full_name} down in the waiting list.",
                             )
 
-                elif (
-                    action == "move_to_top"
-                    and application.waitlist_position
-                    and application.waitlist_position > 1
-                ):
+                elif action == "move_to_top" and application.waitlist_position:
                     # Move to position 1, shift everyone else down
-                    with transaction.atomic():
-                        old_position = application.waitlist_position
-                        # Shift all applications above this one down by 1
-                        MembershipApplication.objects.filter(
-                            status="waitlisted",
-                            waitlist_position__lt=old_position,
-                        ).update(waitlist_position=models.F("waitlist_position") + 1)
+                    if application.waitlist_position > 1:
+                        with transaction.atomic():
+                            old_position = application.waitlist_position
+                            # Shift all applications above this one down by 1
+                            MembershipApplication.objects.filter(
+                                status="waitlisted",
+                                waitlist_position__lt=old_position,
+                            ).update(
+                                waitlist_position=models.F("waitlist_position") + 1
+                            )
 
-                        # Move this application to position 1
-                        application.waitlist_position = 1
-                        application.save(update_fields=["waitlist_position"])
+                            # Move this application to position 1
+                            application.waitlist_position = 1
+                            application.save(update_fields=["waitlist_position"])
 
-                        messages.success(
+                            messages.success(
+                                request,
+                                f"Moved {application.full_name} to the top of the waiting list.",
+                            )
+                    else:
+                        messages.info(
                             request,
-                            f"Moved {application.full_name} to the top of the waiting list.",
+                            f"{application.full_name} is already at the top of the waiting list.",
                         )
 
                 elif action == "move_to_bottom" and application.waitlist_position:
@@ -491,6 +495,11 @@ def membership_waitlist(request):
                             messages.success(
                                 request,
                                 f"Moved {application.full_name} to the bottom of the waiting list.",
+                            )
+                        else:
+                            messages.info(
+                                request,
+                                f"{application.full_name} is already at the bottom of the waiting list.",
                             )
 
             except Exception as e:
