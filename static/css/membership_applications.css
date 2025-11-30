@@ -752,3 +752,46 @@
         margin-bottom: 1rem;
     }
 }
+
+/* ========================================
+   Sortable Table Styling
+   ======================================== */
+table.sort thead th[data-sort-method] {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 1.5rem;
+    transition: background-color 0.2s ease;
+}
+
+table.sort thead th[data-sort-method]:hover {
+    background-color: #e9ecef;
+}
+
+table.sort thead th[data-sort-method]::after {
+    content: '\2195'; /* up-down arrow */
+    position: absolute;
+    right: 0.5rem;
+    opacity: 0.4;
+    font-size: 0.8rem;
+}
+
+table.sort thead th[data-sort-method][aria-sort="ascending"]::after {
+    content: '\2191'; /* up arrow */
+    opacity: 1;
+    color: var(--bs-primary);
+}
+
+table.sort thead th[data-sort-method][aria-sort="descending"]::after {
+    content: '\2193'; /* down arrow */
+    opacity: 1;
+    color: var(--bs-primary);
+}
+
+table.sort thead th.no-sort {
+    cursor: default;
+}
+
+table.sort thead th.no-sort::after {
+    display: none;
+}
