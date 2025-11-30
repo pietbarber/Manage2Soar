@@ -473,13 +473,13 @@ def membership_waitlist(request):
 
                 elif action == "move_to_bottom" and application.waitlist_position:
                     # Move to the last position, shift everyone below up
-                    with transaction.atomic():
-                        old_position = application.waitlist_position
-                        max_position = MembershipApplication.objects.filter(
-                            status="waitlisted"
-                        ).aggregate(max_pos=models.Max("waitlist_position"))["max_pos"]
+                    old_position = application.waitlist_position
+                    max_position = MembershipApplication.objects.filter(
+                        status="waitlisted"
+                    ).aggregate(max_pos=models.Max("waitlist_position"))["max_pos"]
 
-                        if max_position and old_position < max_position:
+                    if max_position and old_position < max_position:
+                        with transaction.atomic():
                             # Shift all applications below this one up by 1
                             MembershipApplication.objects.filter(
                                 status="waitlisted",
@@ -496,11 +496,11 @@ def membership_waitlist(request):
                                 request,
                                 f"Moved {application.full_name} to the bottom of the waiting list.",
                             )
-                        else:
-                            messages.info(
-                                request,
-                                f"{application.full_name} is already at the bottom of the waiting list.",
-                            )
+                    else:
+                        messages.info(
+                            request,
+                            f"{application.full_name} is already at the bottom of the waiting list.",
+                        )
 
             except Exception as e:
                 logger.error(f"Error reordering waitlist: {e}")

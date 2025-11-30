@@ -266,6 +266,40 @@ class MembershipApplicationViewTests(TestCase):
                 membership_application_enabled=True,
             )
 
+    def _create_manager(self, username="manager", email="manager@example.com"):
+        """Create and return a member manager user."""
+        manager = Member.objects.create_user(
+            username=username,
+            email=email,
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+        return manager
+
+    def _create_waitlisted_app(self, first_name, email):
+        """Create and return a waitlisted application."""
+        application = MembershipApplication.objects.create(
+            first_name=first_name,
+            last_name="Test",
+            email=email,
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        application.add_to_waitlist()
+        return application
+
     def test_application_form_get(self):
         """Test GET request to application form."""
         response = self.client.get(
@@ -381,36 +415,11 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_view(self):
         """Test the waitlist view."""
-        # Create a member manager to access the waitlist
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create some waitlisted applications
         for i in range(3):
-            application = MembershipApplication.objects.create(
-                first_name=f"Person{i}",
-                last_name="Test",
-                email=f"person{i}@example.com",
-                phone="555-123-4567",
-                address_line1="123 Main St",
-                city="Anytown",
-                state="CA",
-                zip_code="12345",
-                emergency_contact_name="Contact Person",
-                emergency_contact_relationship="Friend",
-                emergency_contact_phone="555-987-6543",
-                soaring_goals="Test",
-                agrees_to_terms=True,
-                agrees_to_safety_rules=True,
-                agrees_to_financial_obligations=True,
-            )
-            application.add_to_waitlist()
+            self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
 
         response = self.client.get(reverse("members:membership_waitlist"), follow=True)
         self.assertEqual(response.status_code, 200)
@@ -421,38 +430,13 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_move_to_top(self):
         """Test moving an applicant to the top of the waitlist."""
-        # Create a member manager to access the waitlist
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create waitlisted applications
         apps = []
         for i in range(5):
-            application = MembershipApplication.objects.create(
-                first_name=f"Person{i}",
-                last_name="Test",
-                email=f"person{i}@example.com",
-                phone="555-123-4567",
-                address_line1="123 Main St",
-                city="Anytown",
-                state="CA",
-                zip_code="12345",
-                emergency_contact_name="Contact Person",
-                emergency_contact_relationship="Friend",
-                emergency_contact_phone="555-987-6543",
-                soaring_goals="Test",
-                agrees_to_terms=True,
-                agrees_to_safety_rules=True,
-                agrees_to_financial_obligations=True,
-            )
-            application.add_to_waitlist()
-            apps.append(application)
+            app = self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
+            apps.append(app)
 
         # Verify initial positions
         for i, app in enumerate(apps):
@@ -478,38 +462,13 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_move_to_bottom(self):
         """Test moving an applicant to the bottom of the waitlist."""
-        # Create a member manager to access the waitlist
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create waitlisted applications
         apps = []
         for i in range(5):
-            application = MembershipApplication.objects.create(
-                first_name=f"Person{i}",
-                last_name="Test",
-                email=f"person{i}@example.com",
-                phone="555-123-4567",
-                address_line1="123 Main St",
-                city="Anytown",
-                state="CA",
-                zip_code="12345",
-                emergency_contact_name="Contact Person",
-                emergency_contact_relationship="Friend",
-                emergency_contact_phone="555-987-6543",
-                soaring_goals="Test",
-                agrees_to_terms=True,
-                agrees_to_safety_rules=True,
-                agrees_to_financial_obligations=True,
-            )
-            application.add_to_waitlist()
-            apps.append(application)
+            app = self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
+            apps.append(app)
 
         # Move Person0 (position 1) to the bottom
         response = self.client.post(
@@ -530,34 +489,10 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_move_to_top_already_at_top(self):
         """Test moving an applicant to top when already at position 1."""
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create a single waitlisted application
-        application = MembershipApplication.objects.create(
-            first_name="Person0",
-            last_name="Test",
-            email="person0@example.com",
-            phone="555-123-4567",
-            address_line1="123 Main St",
-            city="Anytown",
-            state="CA",
-            zip_code="12345",
-            emergency_contact_name="Contact Person",
-            emergency_contact_relationship="Friend",
-            emergency_contact_phone="555-987-6543",
-            soaring_goals="Test",
-            agrees_to_terms=True,
-            agrees_to_safety_rules=True,
-            agrees_to_financial_obligations=True,
-        )
-        application.add_to_waitlist()
+        application = self._create_waitlisted_app("Person0", "person0@example.com")
 
         # Try to move to top when already at position 1
         response = self.client.post(
@@ -576,53 +511,11 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_move_to_bottom_already_at_bottom(self):
         """Test moving an applicant to bottom when already at last position."""
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create two waitlisted applications
-        app1 = MembershipApplication.objects.create(
-            first_name="Person0",
-            last_name="Test",
-            email="person0@example.com",
-            phone="555-123-4567",
-            address_line1="123 Main St",
-            city="Anytown",
-            state="CA",
-            zip_code="12345",
-            emergency_contact_name="Contact Person",
-            emergency_contact_relationship="Friend",
-            emergency_contact_phone="555-987-6543",
-            soaring_goals="Test",
-            agrees_to_terms=True,
-            agrees_to_safety_rules=True,
-            agrees_to_financial_obligations=True,
-        )
-        app1.add_to_waitlist()
-
-        app2 = MembershipApplication.objects.create(
-            first_name="Person1",
-            last_name="Test",
-            email="person1@example.com",
-            phone="555-123-4567",
-            address_line1="123 Main St",
-            city="Anytown",
-            state="CA",
-            zip_code="12345",
-            emergency_contact_name="Contact Person",
-            emergency_contact_relationship="Friend",
-            emergency_contact_phone="555-987-6543",
-            soaring_goals="Test",
-            agrees_to_terms=True,
-            agrees_to_safety_rules=True,
-            agrees_to_financial_obligations=True,
-        )
-        app2.add_to_waitlist()
+        self._create_waitlisted_app("Person0", "person0@example.com")
+        app2 = self._create_waitlisted_app("Person1", "person1@example.com")
 
         # Try to move app2 (position 2, the last position) to bottom
         response = self.client.post(
