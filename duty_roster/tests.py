@@ -803,7 +803,7 @@ class InstructorManagementViewTests(TestCase):
         self.assertEqual(slot.instructor_response, "accepted")
 
         # Second response - should be ignored with warning
-        response = self.client.post(
+        self.client.post(
             url, {"action": "reject", "instructor_note": "changed mind"}, follow=True
         )
 
@@ -956,7 +956,7 @@ class InstructionRequestEdgeCaseTests(TestCase):
         url = reverse(
             "duty_roster:cancel_instruction_request", kwargs={"slot_id": slot.id}
         )
-        response = self.client.post(url, follow=True)
+        self.client.post(url, follow=True)
 
         # Should still be cancelled
         slot.refresh_from_db()
@@ -1031,7 +1031,7 @@ class InstructionRequestEdgeCaseTests(TestCase):
             },
         )
 
-        response = self.client.post(url)
+        self.client.post(url)
 
         # Should succeed and use surge instructor
         slot = InstructionSlot.objects.get(assignment=assignment, student=self.student)

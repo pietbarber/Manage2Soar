@@ -1569,9 +1569,6 @@ def _notify_instructor_new_request(slot):
         return
 
     try:
-        from django.conf import settings
-        from django.core.mail import send_mail
-
         subject = (
             f"New Instruction Request for {slot.assignment.date.strftime('%B %d, %Y')}"
         )
@@ -1599,9 +1596,6 @@ def _notify_instructor_cancellation(slot):
         return
 
     try:
-        from django.conf import settings
-        from django.core.mail import send_mail
-
         subject = (
             f"Instruction Cancellation for {slot.assignment.date.strftime('%B %d, %Y')}"
         )
@@ -1629,9 +1623,6 @@ def _notify_student_accepted(slot):
         return
 
     try:
-        from django.conf import settings
-        from django.core.mail import send_mail
-
         instructor_name = (
             slot.instructor.full_display_name if slot.instructor else "The instructor"
         )
@@ -1666,9 +1657,6 @@ def _notify_student_rejected(slot):
         return
 
     try:
-        from django.conf import settings
-        from django.core.mail import send_mail
-
         subject = f"Instruction Request Declined for {slot.assignment.date.strftime('%B %d, %Y')}"
         message = (
             f"Unfortunately, your instruction request for "
@@ -1723,9 +1711,6 @@ def _check_surge_instructor_needed(assignment):
 def _notify_surge_instructor_needed(assignment, student_count):
     """Notify the instructors mailing list that a surge instructor is needed."""
     try:
-        from django.conf import settings
-        from django.core.mail import send_mail
-
         config = SiteConfiguration.objects.first()
         instructor_email = getattr(config, "instructors_email", None)
 
