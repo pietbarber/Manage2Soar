@@ -283,10 +283,10 @@ def submit_feedback(request):
     View for submitting site feedback.
     Captures referring URL and notifies webmasters.
     """
-    referring_url = request.GET.get("from", request.headers.get("referer", ""))
-
     if request.method == "POST":
         form = SiteFeedbackForm(request.POST)
+        # Get referring URL from hidden form field (preserved from initial GET)
+        referring_url = request.POST.get("referring_url", "")
         if form.is_valid():
             feedback = form.save(commit=False)
             feedback.user = request.user
@@ -303,6 +303,8 @@ def submit_feedback(request):
             return redirect("cms:feedback_success")
     else:
         form = SiteFeedbackForm()
+        # Capture referring URL on initial GET request
+        referring_url = request.GET.get("from", request.headers.get("referer", ""))
 
     return render(
         request,

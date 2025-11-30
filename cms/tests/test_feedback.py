@@ -212,9 +212,10 @@ class TestFeedbackViews:
             "feedback_type": "bug",
             "subject": "Test Bug Report",
             "message": "This is a test bug report message",
+            "referring_url": "/test-page/",
         }
 
-        response = client.post(url + "?from=/test-page/", form_data)
+        response = client.post(url, form_data)
 
         # Should redirect to success page
         assert response.status_code == 302
@@ -567,9 +568,10 @@ class TestFeedbackWorkflow:
             "feedback_type": "bug",
             "subject": "Critical Bug",
             "message": "This bug needs fixing",
+            "referring_url": "/problematic-page/",
         }
 
-        response = client.post(url + "?from=/problematic-page/", form_data)
+        response = client.post(url, form_data)
         assert response.status_code == 302
 
         feedback = SiteFeedback.objects.get()

@@ -24,6 +24,7 @@
 
                     <form method="post">
                         {% csrf_token %}
+                        <input type="hidden" name="referring_url" value="{{ referring_url }}">
                         {{ form.media }}
 
                         <div class="mb-3">
