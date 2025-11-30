@@ -804,6 +804,11 @@ class MembershipApplicationViewTests(TestCase):
         app.save()
         self.assertTrue(app.is_pilot)
 
+        # Test transition glider rating
+        app.glider_rating = "transition"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
         # Test commercial glider rating
         app.glider_rating = "commercial"
         app.save()
