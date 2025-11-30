@@ -26,6 +26,59 @@
   <p><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ assignment.surge_tow_pilot|default:"—" }}</p>
   <p><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ assignment.duty_officer|default:"—" }}</p>
   <p><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ assignment.assistant_duty_officer|default:"—" }}</p>
+
+  {# Show students signed up for instruction #}
+  {% if assignment.instruction_slots.all %}
+    <hr>
+    <h6><i class="fas fa-users me-1"></i>Students Requesting Instruction:</h6>
+    <ul class="list-unstyled ps-2">
+      {% for slot in assignment.instruction_slots.all %}
+        {% if slot.status != "cancelled" %}
+          <li class="py-1">
+            {% if slot.instructor_response == "accepted" %}
+              <i class="fas fa-check-circle text-success me-1" title="Confirmed"></i>
+            {% elif slot.instructor_response == "pending" %}
+              <i class="fas fa-clock text-warning me-1" title="Pending"></i>
+            {% elif slot.instructor_response == "rejected" %}
+              <i class="fas fa-times-circle text-danger me-1" title="Declined"></i>
+            {% endif %}
+            {{ slot.student.full_display_name }}
+            {% if slot.student == user %}
+              <span class="badge bg-info ms-1">You</span>
+            {% endif %}
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {# Student instruction request button #}
+  {% if user.is_authenticated and assignment.instructor and day >= today %}
+    {% if user_has_instruction_request %}
+      <hr>
+      <div class="alert alert-info mb-0">
+        <i class="fas fa-check-circle me-1"></i>
+        You have already requested instruction for this day.
+        {% for slot in assignment.instruction_slots.all %}
+          {% if slot.student == user and slot.status != "cancelled" %}
+            {% if slot.instructor_response == "accepted" %}
+              <strong>Confirmed!</strong>
+            {% elif slot.instructor_response == "pending" %}
+              <em>Awaiting instructor response.</em>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <hr>
+      <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="fas fa-hand-paper me-1"></i>Request Instruction
+        </button>
+      </form>
+    {% endif %}
+  {% endif %}
 {% else %}
   <p>No duty crew assigned for this date.</p>
 {% endif %}

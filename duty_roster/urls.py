@@ -84,4 +84,31 @@ urlpatterns = [
         views.duty_delinquents_detail,
         name="duty_delinquents_detail",
     ),
+    # Instruction Request URLs
+    path(
+        "instruction/request/<int:year>/<int:month>/<int:day>/",
+        views.request_instruction,
+        name="request_instruction",
+    ),
+    path(
+        "instruction/cancel/<int:slot_id>/",
+        views.cancel_instruction_request,
+        name="cancel_instruction_request",
+    ),
+    path(
+        "instruction/my-requests/",
+        views.my_instruction_requests,
+        name="my_instruction_requests",
+    ),
+    # Instructor Management URLs
+    path(
+        "instruction/instructor-requests/",
+        views.instructor_requests,
+        name="instructor_requests",
+    ),
+    path(
+        "instruction/respond/<int:slot_id>/",
+        views.instructor_respond,
+        name="instructor_respond",
+    ),
 ]

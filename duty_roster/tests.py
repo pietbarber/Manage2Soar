@@ -373,3 +373,666 @@ class CalendarRefreshResponseTests(TestCase):
         self.assertEqual(trigger_data["refreshCalendar"]["month"], 11)
         self.assertIsInstance(trigger_data["refreshCalendar"]["year"], int)
         self.assertIsInstance(trigger_data["refreshCalendar"]["month"], int)
+
+
+class InstructionSlotModelTests(TestCase):
+    """Tests for the InstructionSlot model."""
+
+    def setUp(self):
+        """Set up test data"""
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+
+        # Create instructor
+        self.instructor = Member.objects.create(
+            username="instructor",
+            email="instructor@test.com",
+            first_name="Test",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+
+        # Create student
+        self.student = Member.objects.create(
+            username="student",
+            email="student@test.com",
+            first_name="Test",
+            last_name="Student",
+            membership_status="Student Member",
+        )
+
+        # Create future duty assignment
+        from duty_roster.models import DutyAssignment
+
+        self.future_date = date.today() + timedelta(days=7)
+        self.assignment = DutyAssignment.objects.create(
+            date=self.future_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+    def test_instruction_slot_creation(self):
+        """Test creating an instruction slot."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+            instructor=self.instructor,
+        )
+
+        self.assertEqual(slot.status, "pending")
+        self.assertEqual(slot.instructor_response, "pending")
+        self.assertEqual(slot.student, self.student)
+        self.assertEqual(slot.instructor, self.instructor)
+
+    def test_accept_method(self):
+        """Test instructor accepting a student."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+        )
+
+        slot.accept(instructor=self.instructor, note="See you Saturday!")
+
+        self.assertEqual(slot.status, "confirmed")
+        self.assertEqual(slot.instructor_response, "accepted")
+        self.assertEqual(slot.instructor, self.instructor)
+        self.assertEqual(slot.instructor_note, "See you Saturday!")
+        self.assertIsNotNone(slot.instructor_response_at)
+
+    def test_reject_method(self):
+        """Test instructor rejecting a student."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+            instructor=self.instructor,
+        )
+
+        slot.reject(note="Please try next week")
+
+        self.assertEqual(slot.status, "cancelled")
+        self.assertEqual(slot.instructor_response, "rejected")
+        self.assertEqual(slot.instructor_note, "Please try next week")
+        self.assertIsNotNone(slot.instructor_response_at)
+
+    def test_unique_together_constraint(self):
+        """Test that a student can only have one request per assignment."""
+        from django.db import IntegrityError
+
+        from duty_roster.models import InstructionSlot
+
+        InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+        )
+
+        with self.assertRaises(IntegrityError):
+            InstructionSlot.objects.create(
+                assignment=self.assignment,
+                student=self.student,
+            )
+
+
+class InstructionRequestViewTests(TestCase):
+    """Tests for instruction request views."""
+
+    def setUp(self):
+        """Set up test data"""
+        self.client = Client()
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+
+        # Create instructor
+        self.instructor = Member.objects.create(
+            username="instructor",
+            email="instructor@test.com",
+            first_name="Test",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+        self.instructor.set_password("testpass123")
+        self.instructor.save()
+
+        # Create student
+        self.student = Member.objects.create(
+            username="student",
+            email="student@test.com",
+            first_name="Test",
+            last_name="Student",
+            membership_status="Student Member",
+        )
+        self.student.set_password("testpass123")
+        self.student.save()
+
+        # Create future duty assignment
+        from duty_roster.models import DutyAssignment
+
+        self.future_date = date.today() + timedelta(days=7)
+        self.assignment = DutyAssignment.objects.create(
+            date=self.future_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+    def test_student_can_request_instruction(self):
+        """Test that a student can request instruction."""
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": self.future_date.year,
+                "month": self.future_date.month,
+                "day": self.future_date.day,
+            },
+        )
+
+        response = self.client.post(url)
+
+        # Should redirect after successful request
+        self.assertEqual(response.status_code, 302)
+
+        # Verify slot was created
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.filter(
+            assignment=self.assignment,
+            student=self.student,
+        ).first()
+
+        self.assertIsNotNone(slot)
+        assert slot is not None  # Type narrowing for Pylance
+        self.assertEqual(slot.status, "pending")
+        self.assertEqual(slot.instructor_response, "pending")
+
+    def test_duplicate_request_prevented(self):
+        """Test that duplicate requests are prevented."""
+        from duty_roster.models import InstructionSlot
+
+        # Create initial request
+        InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+            status="pending",
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": self.future_date.year,
+                "month": self.future_date.month,
+                "day": self.future_date.day,
+            },
+        )
+
+        response = self.client.post(url, follow=True)
+
+        # Should still redirect but with error message
+        self.assertEqual(response.status_code, 200)
+
+        # Should still only be one request
+        count = InstructionSlot.objects.filter(
+            assignment=self.assignment,
+            student=self.student,
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_my_instruction_requests_view(self):
+        """Test the my instruction requests view."""
+        from duty_roster.models import InstructionSlot
+
+        # Create a request
+        InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student,
+            status="pending",
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse("duty_roster:my_instruction_requests")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My Instruction Requests")
+        self.assertContains(response, self.future_date.strftime("%B"))
+
+
+class InstructorManagementViewTests(TestCase):
+    """Tests for instructor management views."""
+
+    def setUp(self):
+        """Set up test data"""
+        self.client = Client()
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+
+        # Create instructor
+        self.instructor = Member.objects.create(
+            username="instructor",
+            email="instructor@test.com",
+            first_name="Test",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+        self.instructor.set_password("testpass123")
+        self.instructor.save()
+
+        # Create students
+        self.student1 = Member.objects.create(
+            username="student1",
+            email="student1@test.com",
+            first_name="Alice",
+            last_name="Student",
+            membership_status="Student Member",
+        )
+
+        self.student2 = Member.objects.create(
+            username="student2",
+            email="student2@test.com",
+            first_name="Bob",
+            last_name="Student",
+            membership_status="Student Member",
+        )
+
+        # Create future duty assignment
+        from duty_roster.models import DutyAssignment
+
+        self.future_date = date.today() + timedelta(days=7)
+        self.assignment = DutyAssignment.objects.create(
+            date=self.future_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+    def test_instructor_can_see_requests(self):
+        """Test that instructor can see pending requests."""
+        from duty_roster.models import InstructionSlot
+
+        # Create pending requests
+        InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+        )
+        InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student2,
+            status="pending",
+        )
+
+        self.client.login(username="instructor", password="testpass123")
+
+        url = reverse("duty_roster:instructor_requests")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alice")
+        self.assertContains(response, "Bob")
+
+    def test_instructor_can_accept_student(self):
+        """Test that instructor can accept a student."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+        )
+
+        self.client.login(username="instructor", password="testpass123")
+
+        url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.id})
+        response = self.client.post(url, {"action": "accept", "instructor_note": ""})
+
+        # Should redirect
+        self.assertEqual(response.status_code, 302)
+
+        # Verify slot was updated
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, "confirmed")
+        self.assertEqual(slot.instructor_response, "accepted")
+        self.assertEqual(slot.instructor, self.instructor)
+
+    def test_instructor_can_reject_student(self):
+        """Test that instructor can reject a student."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+            instructor=self.instructor,
+        )
+
+        self.client.login(username="instructor", password="testpass123")
+
+        url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.id})
+        response = self.client.post(
+            url, {"action": "reject", "instructor_note": "Please try next week"}
+        )
+
+        # Should redirect
+        self.assertEqual(response.status_code, 302)
+
+        # Verify slot was updated
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, "cancelled")
+        self.assertEqual(slot.instructor_response, "rejected")
+        self.assertEqual(slot.instructor_note, "Please try next week")
+
+    def test_non_instructor_cannot_access(self):
+        """Test that non-instructors cannot access instructor views."""
+        # Create non-instructor member
+        regular = Member.objects.create(
+            username="regular",
+            email="regular@test.com",
+            first_name="Regular",
+            last_name="Member",
+            membership_status="Full Member",
+            instructor=False,
+        )
+        regular.set_password("testpass123")
+        regular.save()
+
+        self.client.login(username="regular", password="testpass123")
+
+        url = reverse("duty_roster:instructor_requests")
+        response = self.client.get(url, follow=True)
+
+        # Should redirect with error
+        self.assertEqual(response.status_code, 200)
+
+    def test_instructor_cannot_respond_to_other_days_slot(self):
+        """Test that instructor can only respond to slots for their assigned days."""
+        from duty_roster.models import InstructionSlot
+
+        # Create another instructor and assignment
+        other_instructor = Member.objects.create(
+            username="other_instructor",
+            email="other@test.com",
+            first_name="Other",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+        other_instructor.set_password("testpass123")
+        other_instructor.save()
+
+        # Create slot for self.instructor's day
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+        )
+
+        # Log in as other_instructor who is NOT assigned to this day
+        self.client.login(username="other_instructor", password="testpass123")
+
+        url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.id})
+        response = self.client.post(url, {"action": "accept", "instructor_note": ""})
+
+        # Should get 403 Forbidden
+        self.assertEqual(response.status_code, 403)
+
+    def test_double_response_prevented(self):
+        """Test that instructor cannot respond twice to the same request."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+            instructor_response="pending",
+        )
+
+        self.client.login(username="instructor", password="testpass123")
+
+        # First response - should succeed
+        url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.id})
+        self.client.post(url, {"action": "accept", "instructor_note": ""})
+
+        slot.refresh_from_db()
+        self.assertEqual(slot.instructor_response, "accepted")
+
+        # Second response - should be ignored with warning
+        self.client.post(
+            url, {"action": "reject", "instructor_note": "changed mind"}, follow=True
+        )
+
+        # Should still be accepted (not changed to rejected)
+        slot.refresh_from_db()
+        self.assertEqual(slot.instructor_response, "accepted")
+
+    def test_invalid_action_rejected(self):
+        """Test that invalid action values are rejected."""
+        from duty_roster.models import InstructionSlot
+
+        slot = InstructionSlot.objects.create(
+            assignment=self.assignment,
+            student=self.student1,
+            status="pending",
+        )
+
+        self.client.login(username="instructor", password="testpass123")
+
+        url = reverse("duty_roster:instructor_respond", kwargs={"slot_id": slot.id})
+        response = self.client.post(
+            url, {"action": "invalid_action", "instructor_note": ""}
+        )
+
+        # Should redirect (302) with error message
+        self.assertEqual(response.status_code, 302)
+
+        # Slot should remain pending
+        slot.refresh_from_db()
+        self.assertEqual(slot.instructor_response, "pending")
+
+
+class InstructionRequestEdgeCaseTests(TestCase):
+    """Additional edge case tests for instruction requests."""
+
+    def setUp(self):
+        """Set up test data"""
+        self.client = Client()
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+
+        # Create instructor
+        self.instructor = Member.objects.create(
+            username="instructor",
+            email="instructor@test.com",
+            first_name="Test",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+        self.instructor.set_password("testpass123")
+        self.instructor.save()
+
+        # Create student
+        self.student = Member.objects.create(
+            username="student",
+            email="student@test.com",
+            first_name="Test",
+            last_name="Student",
+            membership_status="Student Member",
+        )
+        self.student.set_password("testpass123")
+        self.student.save()
+
+    def test_cannot_request_instruction_for_past_date(self):
+        """Test that students cannot request instruction for past dates."""
+        from duty_roster.models import DutyAssignment
+
+        past_date = date.today() - timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=past_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": past_date.year,
+                "month": past_date.month,
+                "day": past_date.day,
+            },
+        )
+
+        response = self.client.post(url, follow=True)
+
+        # Should redirect with error message
+        self.assertEqual(response.status_code, 200)
+
+        # No slot should be created
+        from duty_roster.models import InstructionSlot
+
+        self.assertFalse(
+            InstructionSlot.objects.filter(
+                assignment=assignment, student=self.student
+            ).exists()
+        )
+
+    def test_cannot_cancel_past_date_request(self):
+        """Test that students cannot cancel requests for past dates."""
+        from duty_roster.models import DutyAssignment, InstructionSlot
+
+        past_date = date.today() - timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=past_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+        slot = InstructionSlot.objects.create(
+            assignment=assignment,
+            student=self.student,
+            status="pending",
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:cancel_instruction_request", kwargs={"slot_id": slot.id}
+        )
+        response = self.client.post(url, follow=True)
+
+        # Should redirect with error
+        self.assertEqual(response.status_code, 200)
+
+        # Slot should still be pending (not cancelled)
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, "pending")
+
+    def test_cannot_cancel_already_cancelled_request(self):
+        """Test that already cancelled requests show appropriate warning."""
+        from duty_roster.models import DutyAssignment, InstructionSlot
+
+        future_date = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future_date,
+            instructor=self.instructor,
+            location=self.airfield,
+        )
+
+        slot = InstructionSlot.objects.create(
+            assignment=assignment,
+            student=self.student,
+            status="cancelled",
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:cancel_instruction_request", kwargs={"slot_id": slot.id}
+        )
+        self.client.post(url, follow=True)
+
+        # Should still be cancelled
+        slot.refresh_from_db()
+        self.assertEqual(slot.status, "cancelled")
+
+    def test_cannot_request_when_no_instructor_assigned(self):
+        """Test that students cannot request when no instructor is assigned."""
+        from duty_roster.models import DutyAssignment
+
+        future_date = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future_date,
+            instructor=None,
+            surge_instructor=None,
+            location=self.airfield,
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+
+        response = self.client.post(url, follow=True)
+
+        # Should redirect with error message
+        self.assertEqual(response.status_code, 200)
+
+        # No slot should be created
+        from duty_roster.models import InstructionSlot
+
+        self.assertFalse(
+            InstructionSlot.objects.filter(
+                assignment=assignment, student=self.student
+            ).exists()
+        )
+
+    def test_surge_instructor_fallback(self):
+        """Test that surge instructor is used when no primary instructor."""
+        from duty_roster.models import DutyAssignment, InstructionSlot
+
+        surge_instructor = Member.objects.create(
+            username="surge",
+            email="surge@test.com",
+            first_name="Surge",
+            last_name="Instructor",
+            membership_status="Full Member",
+            instructor=True,
+        )
+
+        future_date = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future_date,
+            instructor=None,
+            surge_instructor=surge_instructor,
+            location=self.airfield,
+        )
+
+        self.client.login(username="student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+
+        self.client.post(url)
+
+        # Should succeed and use surge instructor
+        slot = InstructionSlot.objects.get(assignment=assignment, student=self.student)
+        self.assertEqual(slot.instructor, surge_instructor)

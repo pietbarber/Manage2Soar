@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}My Instruction Requests{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-graduation-cap me-2"></i>My Instruction Requests</h1>
+    <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-calendar me-1"></i>Back to Calendar
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Upcoming Requests -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Upcoming Requests</h5>
+    </div>
+    <div class="card-body">
+      {% if upcoming_requests %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Instructor</th>
+                <th>Status</th>
+                <th>Instructor Response</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for req in upcoming_requests %}
+                <tr>
+                  <td>
+                    <strong>{{ req.assignment.date|date:"l, F j, Y" }}</strong>
+                    {% if req.assignment.date == today %}
+                      <span class="badge bg-warning text-dark ms-1">TODAY</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if req.instructor %}
+                      {{ req.instructor.full_display_name }}
+                    {% else %}
+                      <span class="text-muted">Not yet assigned</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if req.status == "pending" %}
+                      <span class="badge bg-warning text-dark">Pending</span>
+                    {% elif req.status == "confirmed" %}
+                      <span class="badge bg-success">Confirmed</span>
+                    {% elif req.status == "waitlist" %}
+                      <span class="badge bg-info">Waitlist</span>
+                    {% elif req.status == "cancelled" %}
+                      <span class="badge bg-secondary">Cancelled</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if req.instructor_response == "pending" %}
+                      <span class="text-muted">Awaiting response</span>
+                    {% elif req.instructor_response == "accepted" %}
+                      <span class="text-success"><i class="fas fa-check me-1"></i>Accepted</span>
+                      {% if req.instructor_note %}
+                        <br><small class="text-muted">{{ req.instructor_note }}</small>
+                      {% endif %}
+                    {% elif req.instructor_response == "rejected" %}
+                      <span class="text-danger"><i class="fas fa-times me-1"></i>Declined</span>
+                      {% if req.instructor_note %}
+                        <br><small class="text-muted">{{ req.instructor_note }}</small>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if req.status != "cancelled" and req.assignment.date >= today %}
+                      <form method="post" action="{% url 'duty_roster:cancel_instruction_request' slot_id=req.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Are you sure you want to cancel this request?');">
+                          <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-4">
+          <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+          <p class="text-muted mb-0">You have no upcoming instruction requests.</p>
+          <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-primary mt-3">
+            <i class="fas fa-calendar-plus me-1"></i>Browse Calendar
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Past Requests -->
+  {% if past_requests %}
+    <div class="card shadow-sm">
+      <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Past Requests</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Instructor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for req in past_requests %}
+                <tr class="text-muted">
+                  <td>{{ req.assignment.date|date:"M j, Y" }}</td>
+                  <td>{{ req.instructor.full_display_name|default:"Not assigned" }}</td>
+                  <td>
+                    {% if req.status == "confirmed" %}
+                      <span class="badge bg-success">Completed</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ req.get_status_display }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
