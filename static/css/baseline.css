@@ -21,6 +21,12 @@ html, body {
   overflow-x: hidden;
 }
 
+/* CMS content inside footer has rows without proper container wrapping */
+.footer .cms-content .row {
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .emoji {
   font-size: 1.5em;
   line-height: 1;

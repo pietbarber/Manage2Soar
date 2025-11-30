@@ -1,5 +1,6 @@
 /* Make TinyMCE tables responsive and prevent overflow */
 /* Issue #322: Tables must be contained within their parent container */
+/* Issue #337: CMS content with Bootstrap rows must not overflow */
 
 /* The container itself must enforce boundaries */
 .cms-content {
@@ -8,6 +9,13 @@
     overflow-wrap: break-word;
     word-wrap: break-word;
     box-sizing: border-box;
+}
+
+/* Issue #337: Bootstrap rows in CMS content have negative margins that cause overflow */
+.cms-content > .row,
+.cms-content .row {
+    margin-left: 0;
+    margin-right: 0;
 }
 
 /* Force all tables to respect container width */
