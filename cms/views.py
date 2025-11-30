@@ -10,6 +10,7 @@ from django.forms import inlineformset_factory
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from tinymce.widgets import TinyMCE
@@ -282,8 +283,6 @@ def _validate_referring_url(url, request):
     Validate that a referring URL is safe (relative or same-host).
     Prevents XSS and open redirect vulnerabilities.
     """
-    from django.utils.http import url_has_allowed_host_and_scheme
-
     if not url:
         return ""
     # Only allow relative URLs or URLs pointing to the same host
@@ -323,7 +322,7 @@ def submit_feedback(request):
     else:
         form = SiteFeedbackForm()
         # Capture referring URL on initial GET request
-        # Validate to prevent open redirect attacks
+        # Validate to prevent XSS and open redirect attacks
         raw_url = request.GET.get("from", request.headers.get("referer", ""))
         referring_url = _validate_referring_url(raw_url, request)
 
