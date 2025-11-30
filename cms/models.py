@@ -441,11 +441,11 @@ class SiteFeedback(models.Model):
     feedback_type = models.CharField(
         max_length=20, choices=FEEDBACK_TYPE_CHOICES, default="other"
     )
-    referring_url = models.URLField(
+    referring_url = models.CharField(
         max_length=500,
         blank=True,
-        null=True,
-        help_text="URL of the page where feedback was submitted from",
+        default="",
+        help_text="URL path of the page where feedback was submitted from",
     )
     subject = models.CharField(max_length=200)
     message = HTMLField(help_text="Detailed feedback message")

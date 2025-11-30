@@ -200,6 +200,18 @@ class TestFeedbackViews:
         assert response.context["referring_url"] == "/some/page/"
 
     @pytest.mark.django_db
+    def test_feedback_form_with_referer_header_fallback(self, client, active_member):
+        """Test feedback form captures referring URL from HTTP Referer header when query param not provided"""
+        client.force_login(active_member)
+        url = reverse("cms:feedback")
+        # Use HTTP_REFERER header without ?from= query parameter
+        response = client.get(url, HTTP_REFERER="/previous/page/")
+
+        assert response.status_code == 200
+        assert "referring_url" in response.context
+        assert response.context["referring_url"] == "/previous/page/"
+
+    @pytest.mark.django_db
     @patch("cms.views._notify_webmasters_of_feedback")
     def test_feedback_form_post_valid(
         self, mock_notify_webmasters, client, active_member
@@ -212,9 +224,10 @@ class TestFeedbackViews:
             "feedback_type": "bug",
             "subject": "Test Bug Report",
             "message": "This is a test bug report message",
+            "referring_url": "/test-page/",
         }
 
-        response = client.post(url + "?from=/test-page/", form_data)
+        response = client.post(url, form_data)
 
         # Should redirect to success page
         assert response.status_code == 302
@@ -530,6 +543,54 @@ class TestFeedbackSecurity:
         assert feedback.subject == '<script>alert("xss")</script>'  # Raw storage
         # HTML rendering would be sanitized by TinyMCE/template system
 
+    @pytest.mark.django_db
+    @patch("cms.views._notify_webmasters_of_feedback")
+    def test_open_redirect_prevention_in_referring_url(
+        self, mock_notify_webmasters, client, active_member
+    ):
+        """Test that malicious external URLs in referring_url are rejected"""
+        client.force_login(active_member)
+        url = reverse("cms:feedback")
+
+        # Try to inject an external URL (open redirect attack)
+        form_data = {
+            "feedback_type": "bug",
+            "subject": "Test",
+            "message": "Test message",
+            "referring_url": "https://evil.com/malicious",
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        feedback = SiteFeedback.objects.get()
+        # External URL should be rejected and stored as empty
+        assert feedback.referring_url == ""
+
+    @pytest.mark.django_db
+    @patch("cms.views._notify_webmasters_of_feedback")
+    def test_xss_prevention_in_referring_url(
+        self, mock_notify_webmasters, client, active_member
+    ):
+        """Test that XSS attempts in referring_url are rejected"""
+        client.force_login(active_member)
+        url = reverse("cms:feedback")
+
+        # Try to inject JavaScript (XSS attack)
+        form_data = {
+            "feedback_type": "bug",
+            "subject": "Test",
+            "message": "Test message",
+            "referring_url": "javascript:alert('xss')",
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        feedback = SiteFeedback.objects.get()
+        # JavaScript URL should be rejected and stored as empty
+        assert feedback.referring_url == ""
+
 
 class TestFeedbackWorkflow:
     """Test complete feedback workflow scenarios"""
@@ -567,9 +628,10 @@ class TestFeedbackWorkflow:
             "feedback_type": "bug",
             "subject": "Critical Bug",
             "message": "This bug needs fixing",
+            "referring_url": "/problematic-page/",
         }
 
-        response = client.post(url + "?from=/problematic-page/", form_data)
+        response = client.post(url, form_data)
         assert response.status_code == 302
 
         feedback = SiteFeedback.objects.get()
