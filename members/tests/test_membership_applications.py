@@ -786,6 +786,34 @@ class MembershipApplicationViewTests(TestCase):
         app.save()
         self.assertTrue(app.is_pilot)
 
+        # Test commercial pilot certificate
+        app.glider_rating = "none"
+        app.has_commercial_pilot = True
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test CFI certificate
+        app.has_commercial_pilot = False
+        app.has_cfi = True
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test student glider rating
+        app.has_cfi = False
+        app.glider_rating = "student"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test commercial glider rating
+        app.glider_rating = "commercial"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
+        # Test foreign pilot rating
+        app.glider_rating = "foreign"
+        app.save()
+        self.assertTrue(app.is_pilot)
+
     def test_has_soaring_experience_property(self):
         """Test the has_soaring_experience property."""
         app = MembershipApplication.objects.create(
