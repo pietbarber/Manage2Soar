@@ -765,7 +765,7 @@ table.sort thead th[data-sort-method] {
 }
 
 table.sort thead th[data-sort-method]:hover {
-    background-color: #e9ecef;
+    background-color: var(--bs-gray-200);
 }
 
 table.sort thead th[data-sort-method]::after {
