@@ -141,6 +141,14 @@
 - **Email notifications:** Automated for operations, reminders, and ad-hoc events via distributed CronJob system.
 - **Distributed Systems:** PostgreSQL-backed locking for multi-pod coordination, production Kubernetes deployment.
 
+## TinyMCE Content Rendering (CRITICAL)
+- **ALWAYS** wrap TinyMCE HTML content in a `<div class="cms-content">` container when rendering with `|safe`.
+- **WHY**: Tables and other elements in TinyMCE can overflow their container without the `cms-content` CSS wrapper.
+- **CSS**: `static/css/cms-responsive.css` enforces `table-layout: fixed`, `max-width: 100%`, and word-wrap constraints.
+- **Pattern**: Use `<div class="cms-content">{{ content|safe }}</div>` NOT `<div>{{ content|safe }}</div>`.
+- **Affected templates**: CMS pages, biography, syllabus, instruction reports, closeouts, badge descriptions, footer, homepage, membership terms.
+- **Issue #322**: This was a recurring problem - tables would "drip to the right" and overflow the page.
+
 ## Patterns & Structure
 - **App structure:** Each app has `models.py`, `views.py`, `admin.py`, `urls.py`, and `tests.py`.
 - **Templates:** Per-app in `templates/`; global in `templates/` root.

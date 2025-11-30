@@ -335,7 +335,7 @@
           <div id="collapsePublicNotes" class="accordion-collapse collapse" aria-labelledby="headingPublicNotes" data-bs-parent="#additionalInfoAccordion">
             <div class="accordion-body">
               {% if member.public_notes %}
-                {{ member.public_notes|safe }}
+                <div class="cms-content">{{ member.public_notes|safe }}</div>
               {% else %}
                 <span class="text-muted fst-italic">No public notes available</span>
               {% endif %}
@@ -551,7 +551,7 @@
         </div>
         <div class="card-body">
           {% if member.biography %}
-          <div class="prose">
+          <div class="cms-content">
             {{ member.biography.content|safe }}
           </div>
           {% if can_edit %}

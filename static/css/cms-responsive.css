@@ -1,24 +1,64 @@
 /* Make TinyMCE tables responsive and prevent overflow */
-.cms-content table {
-    width: 100% !important;
+/* Issue #322: Tables must be contained within their parent container */
+
+/* The container itself must enforce boundaries */
+.cms-content {
     max-width: 100%;
-    table-layout: auto;
-    word-break: break-word;
+    overflow-x: auto;  /* Allow horizontal scroll if absolutely necessary */
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    box-sizing: border-box;
 }
 
+/* Force all tables to respect container width */
+.cms-content table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;  /* Override any min-width set by TinyMCE */
+    table-layout: fixed !important;  /* Fixed layout respects width constraints */
+    word-break: break-word;
+    box-sizing: border-box;
+    border-collapse: collapse;
+}
+
+/* Table cells must wrap text and respect boundaries */
 .cms-content td,
 .cms-content th {
     word-break: break-word;
+    overflow-wrap: break-word;
     white-space: normal !important;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
+/* Prevent any inline styles from overriding our constraints */
+.cms-content table[style],
+.cms-content td[style],
+.cms-content th[style] {
+    max-width: 100% !important;
+}
+
+/* Images must also respect container bounds */
 .cms-content img {
     max-width: 100%;
     height: auto;
     display: block;
 }
 
-/* Optional: Add horizontal scrolling for very wide tables */
-.cms-content {
-    overflow-x: auto;
+/* Embedded iframes and media */
+.cms-content iframe,
+.cms-content embed,
+.cms-content object,
+.cms-content video {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Pre and code blocks */
+.cms-content pre,
+.cms-content code {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }

@@ -52,17 +52,17 @@
 {% if closeout %}
   <div class="closeout-section">
     <h4><i class="bi bi-shield-exclamation"></i>Safety Issues</h4>
-    <div class="content-display">{{ closeout.safety_issues|safe }}</div>
+    <div class="content-display cms-content">{{ closeout.safety_issues|safe }}</div>
   </div>
 
   <div class="closeout-section">
     <h4><i class="bi bi-tools"></i>Equipment Issues</h4>
-    <div class="content-display">{{ closeout.equipment_issues|safe }}</div>
+    <div class="content-display cms-content">{{ closeout.equipment_issues|safe }}</div>
   </div>
 
   <div class="closeout-section">
     <h4><i class="bi bi-clipboard-data"></i>Operations Summary</h4>
-    <div class="content-display">{{ closeout.operations_summary|safe }}</div>
+    <div class="content-display cms-content">{{ closeout.operations_summary|safe }}</div>
   </div>
 
 {% else %}

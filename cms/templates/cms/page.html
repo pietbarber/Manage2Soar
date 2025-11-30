@@ -39,7 +39,7 @@
     </div>
   {% endif %}
 
-  <div>{{ page.content|fix_youtube_embeds|safe }}</div>
+  <div class="cms-content">{{ page.content|fix_youtube_embeds|safe }}</div>
   {% if subpages %}
     <h3>Subpages</h3>
     <table id="subpagesTable" class="table table-sm table-bordered table-striped" style="max-width:1000px;">

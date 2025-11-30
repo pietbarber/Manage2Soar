@@ -8,9 +8,9 @@
 {% block content %}
   <div class="syllabus-full">
     <h1>{{ header.title }}</h1>
-    <div>{{ header.content|safe }}</div>
+    <div class="cms-content">{{ header.content|safe }}</div>
     <h2>{{ materials.title }}</h2>
-    <div>{{ materials.content|safe }}</div>
+    <div class="cms-content">{{ materials.content|safe }}</div>
 
     <h2>Table of Contents</h2>
     <ul>
@@ -24,7 +24,7 @@
     {% for lesson in lessons %}
       <div id="{{ lesson.code }}" class="lesson-section mb-5" style="page-break-before: always">
         <h3>{{ lesson.code }} - {{ lesson.title }}</h3>
-        <div>{{ lesson.description|safe }}</div>
+        <div class="cms-content">{{ lesson.description|safe }}</div>
       </div>
     {% endfor %}
   </div>
