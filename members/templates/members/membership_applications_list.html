@@ -89,21 +89,21 @@
                 <div class="card-body">
                     {% if applications %}
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="table table-hover sort">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Applicant</th>
-                                        <th>Contact</th>
-                                        <th>Experience</th>
-                                        <th>Status</th>
-                                        <th>Submitted</th>
-                                        <th>Actions</th>
+                                        <th data-sort-method="last-name">Applicant</th>
+                                        <th class="no-sort">Contact</th>
+                                        <th class="no-sort">Experience</th>
+                                        <th data-sort-method="string">Status</th>
+                                        <th data-sort-method="date">Submitted</th>
+                                        <th class="no-sort">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for app in applications %}
                                     <tr>
-                                        <td>
+                                        <td data-sort-value="{{ app.last_name }}, {{ app.first_name }}">
                                             <strong>{{ app.first_name }} {{ app.last_name }}</strong><br>
                                             {% if app.city and app.state %}
                                                 <small class="text-muted">{{ app.city }}, {{ app.state }}</small>
@@ -136,7 +136,7 @@
                                                 <div class="small text-muted">{{ app.total_flight_hours }} hrs</div>
                                             {% endif %}
                                         </td>
-                                        <td>
+                                        <td data-sort="{{ app.status }}">
                                             <span class="badge status-badge status-{{ app.status }}">
                                                 {{ app.get_status_display }}
                                             </span>
@@ -144,7 +144,7 @@
                                                 <div class="small text-muted">#{{ app.waitlist_position }} in line</div>
                                             {% endif %}
                                         </td>
-                                        <td>
+                                        <td data-sort="{{ app.submitted_at|date:'Y-m-d H:i:s' }}">
                                             <div>{{ app.submitted_at|date:"M j, Y" }}</div>
                                             <small class="text-muted">{{ app.submitted_at|date:"g:i A" }}</small>
                                         </td>
