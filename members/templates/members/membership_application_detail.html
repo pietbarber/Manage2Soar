@@ -314,9 +314,11 @@
                     <button type="submit" name="review_action" value="approve" class="btn btn-success">
                         <i class="fas fa-check"></i> Approve & Create Member
                     </button>
+                    {% if application.status != 'waitlisted' %}
                     <button type="submit" name="review_action" value="waitlist" class="btn btn-warning">
                         <i class="fas fa-clock"></i> Add to Waitlist
                     </button>
+                    {% endif %}
                     <button type="submit" name="review_action" value="need_info" class="btn btn-info">
                         <i class="fas fa-question-circle"></i> Request More Info
                     </button>
