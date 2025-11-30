@@ -200,6 +200,18 @@ class TestFeedbackViews:
         assert response.context["referring_url"] == "/some/page/"
 
     @pytest.mark.django_db
+    def test_feedback_form_with_referer_header_fallback(self, client, active_member):
+        """Test feedback form captures referring URL from HTTP Referer header when query param not provided"""
+        client.force_login(active_member)
+        url = reverse("cms:feedback")
+        # Use HTTP_REFERER header without ?from= query parameter
+        response = client.get(url, HTTP_REFERER="/previous/page/")
+
+        assert response.status_code == 200
+        assert "referring_url" in response.context
+        assert response.context["referring_url"] == "/previous/page/"
+
+    @pytest.mark.django_db
     @patch("cms.views._notify_webmasters_of_feedback")
     def test_feedback_form_post_valid(
         self, mock_notify_webmasters, client, active_member
