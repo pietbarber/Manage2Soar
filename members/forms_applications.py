@@ -406,40 +406,44 @@ class MembershipApplicationForm(forms.ModelForm):
 
         # Validate agreement checkboxes
         if not cleaned_data.get("agrees_to_terms"):
-            raise ValidationError("You must agree to the club terms and conditions.")
+            self.add_error(
+                "agrees_to_terms", "You must agree to the club terms and conditions."
+            )
         if not cleaned_data.get("agrees_to_safety_rules"):
-            raise ValidationError("You must agree to follow club safety rules.")
+            self.add_error(
+                "agrees_to_safety_rules", "You must agree to follow club safety rules."
+            )
         if not cleaned_data.get("agrees_to_financial_obligations"):
-            raise ValidationError("You must agree to meet financial obligations.")
+            self.add_error(
+                "agrees_to_financial_obligations",
+                "You must agree to meet financial obligations.",
+            )
 
         # If insurance rejection is checked, details are required
         if cleaned_data.get("insurance_rejection_history") and not cleaned_data.get(
             "insurance_rejection_details"
         ):
-            raise ValidationError(
-                {
-                    "insurance_rejection_details": "Please explain the insurance rejection circumstances."
-                }
+            self.add_error(
+                "insurance_rejection_details",
+                "Please explain the insurance rejection circumstances.",
             )
 
         # If club rejection is checked, details are required
         if cleaned_data.get("club_rejection_history") and not cleaned_data.get(
             "club_rejection_details"
         ):
-            raise ValidationError(
-                {
-                    "club_rejection_details": "Please explain the club rejection circumstances."
-                }
+            self.add_error(
+                "club_rejection_details",
+                "Please explain the club rejection circumstances.",
             )
 
         # If aviation incidents is checked, details are required
         if cleaned_data.get("aviation_incidents") and not cleaned_data.get(
             "aviation_incident_details"
         ):
-            raise ValidationError(
-                {
-                    "aviation_incident_details": "Please provide details about the aviation incidents."
-                }
+            self.add_error(
+                "aviation_incident_details",
+                "Please provide details about the aviation incidents.",
             )
 
         # Validate address fields based on country
