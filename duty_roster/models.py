@@ -164,6 +164,9 @@ class DutyAssignment(models.Model):
     is_confirmed = models.BooleanField(default=True)
     notes = models.TextField(blank=True)
 
+    class Meta:
+        ordering = ["date"]
+
     def __str__(self):
         return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"
 

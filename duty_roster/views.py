@@ -268,7 +268,7 @@ def duty_calendar_view(request, year=None, month=None):
     last_visible_day = weeks[-1][-1]
     assignments = DutyAssignment.objects.filter(
         date__range=(first_visible_day, last_visible_day)
-    )
+    ).order_by("date")
 
     assignments_by_date = {a.date: a for a in assignments}
 
