@@ -525,6 +525,7 @@ class MembershipApplicationReviewForm(forms.ModelForm):
         ("waitlist", "Add to Waiting List"),
         ("need_info", "Request Additional Information"),
         ("reject", "Reject Application"),
+        ("save_notes", "Save Notes Only"),
     ]
 
     review_action = forms.ChoiceField(

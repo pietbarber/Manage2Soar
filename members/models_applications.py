@@ -444,7 +444,16 @@ class MembershipApplication(models.Model):
         self.save(update_fields=["status", "reviewed_by", "reviewed_at"])
 
     def add_to_waitlist(self, reviewed_by=None):
-        """Add the application to the waiting list."""
+        """Add the application to the waiting list.
+
+        If already waitlisted, does not change position (prevents duplicate
+        position bugs when clicking 'Add to Waitlist' on an already-waitlisted
+        application).
+        """
+        # If already waitlisted, don't reassign position
+        if self.status == "waitlisted" and self.waitlist_position:
+            return
+
         # Find the next position on the waitlist
         max_position = MembershipApplication.objects.filter(
             status="waitlisted"
