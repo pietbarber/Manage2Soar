@@ -75,6 +75,34 @@
                       {% if assignment.instructor.phone and user.is_authenticated and user.is_active_member and not assignment.instructor.redact_contact %}
                         <small class="text-muted">{{ assignment.instructor.phone }}</small>
                       {% endif %}
+
+                      {# Show students signed up for instruction #}
+                      {% with students=assignment.instruction_slots.all %}
+                        {% if students %}
+                          <hr class="my-2">
+                          <div class="small">
+                            <strong class="text-primary">
+                              <i class="fas fa-users me-1"></i>Students ({{ students|length }}):
+                            </strong>
+                            <ul class="list-unstyled mb-0 mt-1">
+                              {% for slot in students %}
+                                {% if slot.status != "cancelled" %}
+                                  <li class="ps-2">
+                                    {% if slot.instructor_response == "accepted" %}
+                                      <i class="fas fa-check-circle text-success me-1" title="Confirmed"></i>
+                                    {% elif slot.instructor_response == "pending" %}
+                                      <i class="fas fa-clock text-warning me-1" title="Pending"></i>
+                                    {% elif slot.instructor_response == "rejected" %}
+                                      <i class="fas fa-times-circle text-danger me-1" title="Declined"></i>
+                                    {% endif %}
+                                    {{ slot.student.full_display_name }}
+                                  </li>
+                                {% endif %}
+                              {% endfor %}
+                            </ul>
+                          </div>
+                        {% endif %}
+                      {% endwith %}
                     </div>
                   </div>
                 {% endif %}

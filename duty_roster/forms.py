@@ -2,7 +2,7 @@ from django import forms
 
 from members.models import Member
 
-from .models import DutyAssignment, DutyPreference, MemberBlackout
+from .models import DutyAssignment, DutyPreference, InstructionSlot, MemberBlackout
 
 # Maps member role attributes to their corresponding form field names
 DUTY_ROLE_FIELDS = [
@@ -180,3 +180,98 @@ class DutyAssignmentForm(forms.ModelForm):
         self.fields["assistant_duty_officer"].queryset = active_members.filter(
             assistant_duty_officer=True
         ).order_by("last_name", "first_name")
+
+
+class InstructionRequestForm(forms.ModelForm):
+    """Form for students to request instruction on a duty day."""
+
+    class Meta:
+        model = InstructionSlot
+        fields = []  # No fields needed - assignment and student set in view
+
+    def __init__(self, *args, assignment=None, student=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.assignment = assignment
+        self.student = student
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if not self.assignment:
+            raise forms.ValidationError("No duty assignment specified.")
+
+        if not self.student:
+            raise forms.ValidationError("No student specified.")
+
+        # Check if student already has a request for this day
+        existing = (
+            InstructionSlot.objects.filter(
+                assignment=self.assignment,
+                student=self.student,
+            )
+            .exclude(status="cancelled")
+            .exists()
+        )
+
+        if existing:
+            raise forms.ValidationError(
+                "You have already requested instruction for this day."
+            )
+
+        # Check if there's an instructor assigned
+        if not self.assignment.instructor and not self.assignment.surge_instructor:
+            raise forms.ValidationError(
+                "No instructor is scheduled for this day. "
+                "Please check back later or choose another day."
+            )
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.assignment = self.assignment
+        instance.student = self.student
+        # Default to the primary instructor, can be changed later
+        instance.instructor = self.assignment.instructor
+        instance.status = "pending"
+        instance.instructor_response = "pending"
+        if commit:
+            instance.save()
+        return instance
+
+
+class InstructorResponseForm(forms.ModelForm):
+    """Form for instructors to accept or reject student requests."""
+
+    class Meta:
+        model = InstructionSlot
+        fields = ["instructor_note"]
+        widgets = {
+            "instructor_note": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Optional note to student (e.g., scheduling instructions, reasons for declining)",
+                }
+            ),
+        }
+
+    def __init__(self, *args, instructor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instructor = instructor
+
+    def accept(self):
+        """Accept the instruction request."""
+        if self.instance and self.instructor:
+            note = self.cleaned_data.get("instructor_note", "")
+            self.instance.accept(instructor=self.instructor, note=note)
+            return self.instance
+        return None
+
+    def reject(self):
+        """Reject the instruction request."""
+        if self.instance:
+            note = self.cleaned_data.get("instructor_note", "")
+            self.instance.reject(note=note)
+            return self.instance
+        return None

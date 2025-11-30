@@ -172,6 +172,16 @@ class DutyAssignment(models.Model):
 
 
 class InstructionSlot(models.Model):
+    """
+    Represents a student's request for instruction on a specific duty day.
+
+    Workflow:
+    1. Student sees instructor scheduled, requests instruction (status=pending)
+    2. Instructor reviews request, accepts or rejects (instructor_response)
+    3. If accepted, student is notified and slot is confirmed
+    4. If rejected, student is notified and can try another date
+    """
+
     assignment = models.ForeignKey(
         "DutyAssignment", on_delete=models.CASCADE, related_name="instruction_slots"
     )
@@ -184,18 +194,74 @@ class InstructionSlot(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="assigned_students",
+        help_text="The instructor assigned to work with this student",
     )
 
+    # Student's request status (from student's perspective)
     STATUS_CHOICES = [
-        ("scheduled", "Scheduled"),
-        ("waitlist", "Waitlist"),
-        ("cancelled", "Cancelled"),
+        ("pending", "Pending"),  # Student has requested, awaiting instructor response
+        ("confirmed", "Confirmed"),  # Instructor accepted, student is scheduled
+        ("waitlist", "Waitlist"),  # Student is on waitlist for this day
+        ("cancelled", "Cancelled"),  # Student cancelled their request
     ]
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="waitlist")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+
+    # Instructor's response (from instructor's perspective)
+    INSTRUCTOR_RESPONSE_CHOICES = [
+        ("pending", "Pending"),  # Instructor hasn't responded yet
+        ("accepted", "Accepted"),  # Instructor accepted this student
+        ("rejected", "Rejected"),  # Instructor declined this student
+    ]
+    instructor_response = models.CharField(
+        max_length=20,
+        choices=INSTRUCTOR_RESPONSE_CHOICES,
+        default="pending",
+        help_text="Instructor's response to the student's request",
+    )
+
+    # Optional note from instructor (e.g., reason for rejection, scheduling note)
+    instructor_note = models.TextField(
+        blank=True,
+        help_text="Optional note from instructor to student",
+    )
+
+    # Track when instructor responded
+    instructor_response_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the instructor responded to this request",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["assignment__date", "created_at"]
+        unique_together = ["assignment", "student"]  # One request per student per day
 
     def __str__(self):
         return f"{self.student.full_display_name} for {self.assignment.date} ({self.status})"
+
+    def accept(self, instructor, note=""):
+        """Instructor accepts this student's request."""
+        from django.utils import timezone
+
+        self.instructor = instructor
+        self.instructor_response = "accepted"
+        self.status = "confirmed"
+        self.instructor_note = note
+        self.instructor_response_at = timezone.now()
+        self.save()
+
+    def reject(self, note=""):
+        """Instructor rejects this student's request."""
+        from django.utils import timezone
+
+        self.instructor_response = "rejected"
+        self.status = "cancelled"
+        self.instructor_note = note
+        self.instructor_response_at = timezone.now()
+        self.save()
 
 
 class DutySwapRequest(models.Model):

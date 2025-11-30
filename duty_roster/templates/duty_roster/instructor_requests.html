@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Instructor - Student Requests{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-chalkboard-teacher me-2"></i>Student Requests</h1>
+    <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-calendar me-1"></i>Back to Calendar
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row">
+    <!-- Pending Requests Column -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-clock me-2"></i>Pending Requests
+            {% if pending_count %}
+              <span class="badge bg-dark ms-2">{{ pending_count }}</span>
+            {% endif %}
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if pending_by_date %}
+            {% for day, slots in pending_by_date.items %}
+              <div class="mb-4">
+                <h6 class="border-bottom pb-2">
+                  <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
+                  {% if day == today %}
+                    <span class="badge bg-danger ms-1">TODAY</span>
+                  {% endif %}
+                </h6>
+                {% for slot in slots %}
+                  <div class="card mb-2">
+                    <div class="card-body py-2 px-3">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                          <strong>{{ slot.student.full_display_name }}</strong>
+                          {% if slot.student.phone %}
+                            <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
+                          {% endif %}
+                          {% if slot.student.email %}
+                            <br><small class="text-muted"><i class="fas fa-envelope me-1"></i>{{ slot.student.email }}</small>
+                          {% endif %}
+                          <br><small class="text-muted">Requested: {{ slot.created_at|date:"M j, g:i a" }}</small>
+                        </div>
+                        <div class="text-end">
+                          <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="accept">
+                            <button type="submit" class="btn btn-sm btn-success mb-1" title="Accept this student">
+                              <i class="fas fa-check"></i>
+                            </button>
+                          </form>
+                          <br>
+                          <button type="button" class="btn btn-sm btn-outline-danger"
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#rejectModal{{ slot.id }}"
+                                  title="Decline with note">
+                            <i class="fas fa-times"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Reject Modal -->
+                  <div class="modal fade" id="rejectModal{{ slot.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                      <div class="modal-content">
+                        <form action="{% url 'duty_roster:instructor_respond' slot_id=slot.id %}" method="post">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="reject">
+                          <div class="modal-header">
+                            <h5 class="modal-title">Decline {{ slot.student.first_name }}?</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>Declining instruction request from <strong>{{ slot.student.full_display_name }}</strong>
+                               for {{ slot.assignment.date|date:"l, F j" }}.</p>
+                            <div class="mb-3">
+                              <label class="form-label">Note to student (optional)</label>
+                              <textarea name="instructor_note" class="form-control" rows="3"
+                                        placeholder="e.g., 'Already at capacity, please try another day'"></textarea>
+                            </div>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger">Decline Request</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-0">No pending requests.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Accepted Students Column -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-check-circle me-2"></i>Accepted Students
+            {% if accepted_count %}
+              <span class="badge bg-light text-success ms-2">{{ accepted_count }}</span>
+            {% endif %}
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if accepted_by_date %}
+            {% for day, slots in accepted_by_date.items %}
+              <div class="mb-4">
+                <h6 class="border-bottom pb-2">
+                  <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
+                  {% if day == today %}
+                    <span class="badge bg-warning text-dark ms-1">TODAY</span>
+                  {% endif %}
+                  <span class="badge bg-secondary ms-1">{{ slots|length }} student{{ slots|length|pluralize }}</span>
+                </h6>
+                {% for slot in slots %}
+                  <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                      <strong>{{ slot.student.full_display_name }}</strong>
+                      {% if slot.student.phone %}
+                        <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
+                      {% endif %}
+                    </div>
+                    <span class="badge bg-success">Confirmed</span>
+                  </div>
+                {% endfor %}
+
+                {% if slots|length >= 3 %}
+                  <div class="alert alert-warning mt-2 mb-0 py-2">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <small>High student count - consider requesting a surge instructor if needed.</small>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center py-4">
+              <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-0">No accepted students yet.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Tips -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-header bg-light">
+      <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Tips for Managing Instruction Requests</h6>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <p class="small mb-0">
+            <i class="fas fa-check text-success me-1"></i>
+            <strong>Accept</strong> students you can work with. They'll receive email confirmation.
+          </p>
+        </div>
+        <div class="col-md-4">
+          <p class="small mb-0">
+            <i class="fas fa-times text-danger me-1"></i>
+            <strong>Decline</strong> with a note if you can't take a student. Suggest alternative dates.
+          </p>
+        </div>
+        <div class="col-md-4">
+          <p class="small mb-0">
+            <i class="fas fa-users text-warning me-1"></i>
+            <strong>3+ students?</strong> The system will automatically notify other instructors.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

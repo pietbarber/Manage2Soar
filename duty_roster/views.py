@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.mail import send_mail
+from django.db import models
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -1309,3 +1310,431 @@ def _calculate_membership_duration(member, today):
             return f"{months} month(s)"
     else:
         return "Unknown (no join date)"
+
+
+# =============================================================================
+# Instruction Request Views
+# =============================================================================
+
+
+@active_member_required
+@require_POST
+def request_instruction(request, year, month, day):
+    """
+    Student requests instruction on a specific duty day.
+
+    This creates an InstructionSlot with status=pending, which the instructor
+    can then accept or reject.
+    """
+    from .forms import InstructionRequestForm
+    from .models import InstructionSlot
+
+    day_date = date(year, month, day)
+    assignment = get_object_or_404(DutyAssignment, date=day_date)
+
+    # Check if day is in the past
+    if day_date < date.today():
+        messages.error(request, "Cannot request instruction for past dates.")
+        return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+
+    form = InstructionRequestForm(
+        request.POST,
+        assignment=assignment,
+        student=request.user,
+    )
+
+    if form.is_valid():
+        slot = form.save()
+        messages.success(
+            request,
+            f"Instruction request submitted for {day_date.strftime('%B %d, %Y')}. "
+            "The instructor will review your request.",
+        )
+
+        # TODO: Send notification to instructor about new request
+        _notify_instructor_new_request(slot)
+
+    else:
+        for error in form.non_field_errors():
+            messages.error(request, str(error))
+
+    return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+
+
+@active_member_required
+def cancel_instruction_request(request, slot_id):
+    """Student cancels their own instruction request."""
+    from .models import InstructionSlot
+
+    slot = get_object_or_404(InstructionSlot, id=slot_id, student=request.user)
+
+    if slot.assignment.date < date.today():
+        messages.error(request, "Cannot cancel instruction for past dates.")
+    elif slot.status == "cancelled":
+        messages.warning(request, "This request was already cancelled.")
+    else:
+        slot.status = "cancelled"
+        slot.save()
+        messages.success(request, "Your instruction request has been cancelled.")
+
+        # TODO: Notify instructor if they had already accepted
+        if slot.instructor_response == "accepted":
+            _notify_instructor_cancellation(slot)
+
+    return redirect(
+        "duty_roster:duty_calendar_month",
+        year=slot.assignment.date.year,
+        month=slot.assignment.date.month,
+    )
+
+
+@active_member_required
+def my_instruction_requests(request):
+    """Show a student their pending and upcoming instruction requests."""
+    from .models import InstructionSlot
+
+    today = date.today()
+
+    # Get all non-cancelled requests for this user
+    requests_qs = (
+        InstructionSlot.objects.filter(student=request.user)
+        .exclude(status="cancelled")
+        .select_related("assignment", "instructor")
+        .order_by("assignment__date")
+    )
+
+    upcoming = requests_qs.filter(assignment__date__gte=today)
+    past = requests_qs.filter(assignment__date__lt=today)[:10]
+
+    return render(
+        request,
+        "duty_roster/my_instruction_requests.html",
+        {
+            "upcoming_requests": upcoming,
+            "past_requests": past,
+            "today": today,
+        },
+    )
+
+
+# =============================================================================
+# Instructor Management Views
+# =============================================================================
+
+
+@active_member_required
+def instructor_requests(request):
+    """
+    Show an instructor all pending instruction requests for days they are scheduled.
+
+    Only visible to members who are instructors.
+    """
+    from .models import InstructionSlot
+
+    if not request.user.instructor:
+        messages.error(request, "Only instructors can access this page.")
+        return redirect("duty_roster:duty_calendar")
+
+    today = date.today()
+
+    # Get all future assignments where this user is the instructor
+    my_assignments = DutyAssignment.objects.filter(
+        date__gte=today,
+    ).filter(
+        models.Q(instructor=request.user) | models.Q(surge_instructor=request.user)
+    )
+
+    # Get all instruction slots for those assignments
+    pending_slots = (
+        InstructionSlot.objects.filter(
+            assignment__in=my_assignments,
+            instructor_response="pending",
+        )
+        .exclude(status="cancelled")
+        .select_related("assignment", "student")
+        .order_by("assignment__date", "created_at")
+    )
+
+    accepted_slots = (
+        InstructionSlot.objects.filter(
+            assignment__in=my_assignments,
+            instructor_response="accepted",
+        )
+        .exclude(status="cancelled")
+        .select_related("assignment", "student")
+        .order_by("assignment__date", "created_at")
+    )
+
+    # Group by assignment date for easier display
+    from collections import defaultdict
+
+    pending_by_date = defaultdict(list)
+    for slot in pending_slots:
+        pending_by_date[slot.assignment.date].append(slot)
+
+    accepted_by_date = defaultdict(list)
+    for slot in accepted_slots:
+        accepted_by_date[slot.assignment.date].append(slot)
+
+    return render(
+        request,
+        "duty_roster/instructor_requests.html",
+        {
+            "pending_by_date": dict(pending_by_date),
+            "accepted_by_date": dict(accepted_by_date),
+            "pending_count": pending_slots.count(),
+            "accepted_count": accepted_slots.count(),
+            "today": today,
+        },
+    )
+
+
+@active_member_required
+@require_POST
+def instructor_respond(request, slot_id):
+    """
+    Instructor accepts or rejects a student's instruction request.
+    """
+    from .forms import InstructorResponseForm
+    from .models import InstructionSlot
+
+    if not request.user.instructor:
+        return HttpResponseForbidden("Only instructors can respond to requests.")
+
+    slot = get_object_or_404(InstructionSlot, id=slot_id)
+
+    # Verify this instructor is assigned to this day
+    assignment = slot.assignment
+    if request.user not in [assignment.instructor, assignment.surge_instructor]:
+        return HttpResponseForbidden("You are not the instructor for this day.")
+
+    # Check if already responded
+    if slot.instructor_response != "pending":
+        messages.warning(request, "You have already responded to this request.")
+        return redirect("duty_roster:instructor_requests")
+
+    action = request.POST.get("action")
+    form = InstructorResponseForm(request.POST, instance=slot, instructor=request.user)
+
+    if form.is_valid():
+        if action == "accept":
+            form.accept()
+            messages.success(
+                request,
+                f"Accepted {slot.student.full_display_name} for {slot.assignment.date.strftime('%B %d')}.",
+            )
+            _notify_student_accepted(slot)
+
+            # Check if we now have 3+ students and need surge instructor
+            _check_surge_instructor_needed(slot.assignment)
+
+        elif action == "reject":
+            form.reject()
+            messages.info(
+                request,
+                f"Declined {slot.student.full_display_name} for {slot.assignment.date.strftime('%B %d')}.",
+            )
+            _notify_student_rejected(slot)
+
+    return redirect("duty_roster:instructor_requests")
+
+
+# =============================================================================
+# Instruction Notification Helpers
+# =============================================================================
+
+
+def _notify_instructor_new_request(slot):
+    """Notify instructor about a new instruction request."""
+    instructor = slot.instructor
+    if not instructor or not instructor.email:
+        return
+
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        subject = (
+            f"New Instruction Request for {slot.assignment.date.strftime('%B %d, %Y')}"
+        )
+        message = (
+            f"{slot.student.full_display_name} has requested instruction on "
+            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
+            f"Please log in to Manage2Soar to accept or decline this request."
+        )
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [instructor.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send instructor notification")
+
+
+def _notify_instructor_cancellation(slot):
+    """Notify instructor when an accepted student cancels."""
+    instructor = slot.instructor
+    if not instructor or not instructor.email:
+        return
+
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        subject = (
+            f"Instruction Cancellation for {slot.assignment.date.strftime('%B %d, %Y')}"
+        )
+        message = (
+            f"{slot.student.full_display_name} has cancelled their instruction request for "
+            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
+            f"You now have one fewer student for this day."
+        )
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [instructor.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send cancellation notification")
+
+
+def _notify_student_accepted(slot):
+    """Notify student that their instruction request was accepted."""
+    student = slot.student
+    if not student.email:
+        return
+
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        instructor_name = (
+            slot.instructor.full_display_name if slot.instructor else "The instructor"
+        )
+        subject = (
+            f"Instruction Confirmed for {slot.assignment.date.strftime('%B %d, %Y')}"
+        )
+        message = (
+            f"Good news! {instructor_name} has accepted your instruction request for "
+            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
+        )
+
+        if slot.instructor_note:
+            message += f"Note from instructor: {slot.instructor_note}\n\n"
+
+        message += "See you at the field!"
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [student.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send student acceptance notification")
+
+
+def _notify_student_rejected(slot):
+    """Notify student that their instruction request was declined."""
+    student = slot.student
+    if not student.email:
+        return
+
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        subject = f"Instruction Request Declined for {slot.assignment.date.strftime('%B %d, %Y')}"
+        message = (
+            f"Unfortunately, your instruction request for "
+            f"{slot.assignment.date.strftime('%A, %B %d, %Y')} has been declined.\n\n"
+        )
+
+        if slot.instructor_note:
+            message += f"Note from instructor: {slot.instructor_note}\n\n"
+
+        message += (
+            "Please check the duty calendar for other available days, "
+            "or contact another instructor."
+        )
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [student.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send student rejection notification")
+
+
+def _check_surge_instructor_needed(assignment):
+    """
+    Check if the assignment now has 3+ accepted students and needs a surge instructor.
+
+    If so, and no surge instructor is already assigned, notify the instructor list.
+    """
+    from .models import InstructionSlot
+
+    accepted_count = (
+        InstructionSlot.objects.filter(
+            assignment=assignment,
+            instructor_response="accepted",
+        )
+        .exclude(status="cancelled")
+        .count()
+    )
+
+    # If 3+ students and no surge instructor yet, notify
+    if accepted_count >= 3 and not assignment.surge_instructor:
+        # Only notify once
+        if not assignment.surge_notified:
+            _notify_surge_instructor_needed(assignment, accepted_count)
+            assignment.surge_notified = True
+            assignment.save(update_fields=["surge_notified"])
+
+
+def _notify_surge_instructor_needed(assignment, student_count):
+    """Notify the instructors mailing list that a surge instructor is needed."""
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        config = SiteConfiguration.objects.first()
+        instructor_email = getattr(config, "instructors_email", None)
+
+        if not instructor_email:
+            logger.warning("No instructor email configured in SiteConfiguration")
+            return
+
+        primary_instructor = assignment.instructor
+        instructor_name = (
+            primary_instructor.full_display_name if primary_instructor else "Unknown"
+        )
+
+        subject = f"Surge Instructor Needed - {assignment.date.strftime('%B %d, %Y')}"
+        message = (
+            f"Instructor {instructor_name} has {student_count} students signed up for "
+            f"{assignment.date.strftime('%A, %B %d, %Y')} and needs assistance.\n\n"
+            f"If you are available to provide instruction on this day, please contact "
+            f"{instructor_name} or update your availability in Manage2Soar.\n\n"
+            f"Students signed up: {student_count}"
+        )
+
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [instructor_email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send surge instructor notification")
