@@ -312,9 +312,7 @@ def membership_application_detail(request, application_id):
 
                     elif review_action == "save_notes":
                         # Just save the notes without changing status
-                        application.admin_notes = review_form.cleaned_data.get(
-                            "admin_notes", ""
-                        )
+                        # (form.save(commit=False) already updated application.admin_notes)
                         application.save(update_fields=["admin_notes"])
                         messages.success(request, "Notes saved successfully.")
                         logger.info(
