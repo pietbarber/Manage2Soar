@@ -546,6 +546,7 @@ class InstructionRequestViewTests(TestCase):
         ).first()
 
         self.assertIsNotNone(slot)
+        assert slot is not None  # Type narrowing for Pylance
         self.assertEqual(slot.status, "pending")
         self.assertEqual(slot.instructor_response, "pending")
 
