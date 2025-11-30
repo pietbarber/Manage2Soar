@@ -444,6 +444,64 @@ def membership_waitlist(request):
                                 f"Moved {application.full_name} down in the waiting list.",
                             )
 
+                elif action == "move_to_top" and application.waitlist_position:
+                    # Move to position 1, shift everyone else down
+                    if application.waitlist_position > 1:
+                        with transaction.atomic():
+                            old_position = application.waitlist_position
+                            # Shift all applications above this one down by 1
+                            MembershipApplication.objects.filter(
+                                status="waitlisted",
+                                waitlist_position__lt=old_position,
+                            ).update(
+                                waitlist_position=models.F("waitlist_position") + 1
+                            )
+
+                            # Move this application to position 1
+                            application.waitlist_position = 1
+                            application.save(update_fields=["waitlist_position"])
+
+                            messages.success(
+                                request,
+                                f"Moved {application.full_name} to the top of the waiting list.",
+                            )
+                    else:
+                        messages.info(
+                            request,
+                            f"{application.full_name} is already at the top of the waiting list.",
+                        )
+
+                elif action == "move_to_bottom" and application.waitlist_position:
+                    # Move to the last position, shift everyone below up
+                    old_position = application.waitlist_position
+                    max_position = MembershipApplication.objects.filter(
+                        status="waitlisted"
+                    ).aggregate(max_pos=models.Max("waitlist_position"))["max_pos"]
+
+                    if max_position and old_position < max_position:
+                        with transaction.atomic():
+                            # Shift all applications below this one up by 1
+                            MembershipApplication.objects.filter(
+                                status="waitlisted",
+                                waitlist_position__gt=old_position,
+                            ).update(
+                                waitlist_position=models.F("waitlist_position") - 1
+                            )
+
+                            # Move this application to the last position
+                            application.waitlist_position = max_position
+                            application.save(update_fields=["waitlist_position"])
+
+                            messages.success(
+                                request,
+                                f"Moved {application.full_name} to the bottom of the waiting list.",
+                            )
+                    else:
+                        messages.info(
+                            request,
+                            f"{application.full_name} is already at the bottom of the waiting list.",
+                        )
+
             except Exception as e:
                 logger.error(f"Error reordering waitlist: {e}")
                 messages.error(

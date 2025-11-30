@@ -617,6 +617,31 @@ Sincerely,
 [Membership Manager Name]
 ```
 
+### Reversing an Accidental Rejection
+
+**Purpose**: Handle the rare case where an application is rejected in error.
+
+**Important**: Rejections are normally final actions in the web interface. If a Membership Manager accidentally rejects an application that should have been approved or waitlisted, the rejection must be reversed through the Django Admin interface by a superuser (webmaster).
+
+**Recovery Process:**
+1. **Immediately document the error** - Note which application was accidentally rejected
+2. **Contact a superuser** (webmaster or administrator) with:
+   - The applicant's name and email address
+   - The application ID (UUID) if known
+   - The intended action (approve or add to waitlist)
+3. **Superuser corrects in Django Admin**:
+   - Navigate to Admin → Members → Membership Applications
+   - Find the application by name, email, or UUID
+   - Change status from `rejected` back to `pending` or the intended status
+   - Clear the `reviewed_at` date if the application should be re-reviewed
+   - Add an admin note documenting the correction
+4. **Follow up with the applicant** - If the rejection notice was already sent, contact the applicant to explain the error and provide the correct status
+
+**Prevention Tips:**
+- Review the application details carefully before clicking action buttons
+- Double-check you're on the correct application page
+- Consider the Reject action as a "final" decision requiring certainty
+
 ### Response Time Standards
 
 | Task Type | Target Response Time | Escalation Threshold |

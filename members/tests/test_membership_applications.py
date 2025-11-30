@@ -266,6 +266,40 @@ class MembershipApplicationViewTests(TestCase):
                 membership_application_enabled=True,
             )
 
+    def _create_manager(self, username="manager", email="manager@example.com"):
+        """Create and return a member manager user."""
+        manager = Member.objects.create_user(
+            username=username,
+            email=email,
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+        return manager
+
+    def _create_waitlisted_app(self, first_name, email):
+        """Create and return a waitlisted application."""
+        application = MembershipApplication.objects.create(
+            first_name=first_name,
+            last_name="Test",
+            email=email,
+            phone="555-123-4567",
+            address_line1="123 Main St",
+            city="Anytown",
+            state="CA",
+            zip_code="12345",
+            emergency_contact_name="Contact Person",
+            emergency_contact_relationship="Friend",
+            emergency_contact_phone="555-987-6543",
+            soaring_goals="Test",
+            agrees_to_terms=True,
+            agrees_to_safety_rules=True,
+            agrees_to_financial_obligations=True,
+        )
+        application.add_to_waitlist()
+        return application
+
     def test_application_form_get(self):
         """Test GET request to application form."""
         response = self.client.get(
@@ -381,36 +415,11 @@ class MembershipApplicationViewTests(TestCase):
 
     def test_waitlist_view(self):
         """Test the waitlist view."""
-        # Create a member manager to access the waitlist
-        manager = Member.objects.create_user(
-            username="manager",
-            email="manager@example.com",
-            password="testpass",
-            member_manager=True,
-            membership_status="Full Member",
-        )
-        self.client.force_login(manager)
+        self._create_manager()
 
         # Create some waitlisted applications
         for i in range(3):
-            application = MembershipApplication.objects.create(
-                first_name=f"Person{i}",
-                last_name="Test",
-                email=f"person{i}@example.com",
-                phone="555-123-4567",
-                address_line1="123 Main St",
-                city="Anytown",
-                state="CA",
-                zip_code="12345",
-                emergency_contact_name="Contact Person",
-                emergency_contact_relationship="Friend",
-                emergency_contact_phone="555-987-6543",
-                soaring_goals="Test",
-                agrees_to_terms=True,
-                agrees_to_safety_rules=True,
-                agrees_to_financial_obligations=True,
-            )
-            application.add_to_waitlist()
+            self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
 
         response = self.client.get(reverse("members:membership_waitlist"), follow=True)
         self.assertEqual(response.status_code, 200)
@@ -418,6 +427,110 @@ class MembershipApplicationViewTests(TestCase):
         self.assertContains(response, "Person0 Test")
         self.assertContains(response, "Person1 Test")
         self.assertContains(response, "Person2 Test")
+
+    def test_waitlist_move_to_top(self):
+        """Test moving an applicant to the top of the waitlist."""
+        self._create_manager()
+
+        # Create waitlisted applications
+        apps = []
+        for i in range(5):
+            app = self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
+            apps.append(app)
+
+        # Verify initial positions
+        for i, app in enumerate(apps):
+            app.refresh_from_db()
+            self.assertEqual(app.waitlist_position, i + 1)
+
+        # Move Person4 (position 5) to the top
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_top", "application_id": apps[4].application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify new positions - Person4 should be at position 1
+        apps[4].refresh_from_db()
+        self.assertEqual(apps[4].waitlist_position, 1)
+
+        # All others should have shifted down by 1
+        for i in range(4):
+            apps[i].refresh_from_db()
+            self.assertEqual(apps[i].waitlist_position, i + 2)
+
+    def test_waitlist_move_to_bottom(self):
+        """Test moving an applicant to the bottom of the waitlist."""
+        self._create_manager()
+
+        # Create waitlisted applications
+        apps = []
+        for i in range(5):
+            app = self._create_waitlisted_app(f"Person{i}", f"person{i}@example.com")
+            apps.append(app)
+
+        # Move Person0 (position 1) to the bottom
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_bottom", "application_id": apps[0].application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify new positions - Person0 should be at position 5
+        apps[0].refresh_from_db()
+        self.assertEqual(apps[0].waitlist_position, 5)
+
+        # All others should have shifted up by 1
+        for i in range(1, 5):
+            apps[i].refresh_from_db()
+            self.assertEqual(apps[i].waitlist_position, i)
+
+    def test_waitlist_move_to_top_already_at_top(self):
+        """Test moving an applicant to top when already at position 1."""
+        self._create_manager()
+
+        # Create a single waitlisted application
+        application = self._create_waitlisted_app("Person0", "person0@example.com")
+
+        # Try to move to top when already at position 1
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_top", "application_id": application.application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Position should remain at 1
+        application.refresh_from_db()
+        self.assertEqual(application.waitlist_position, 1)
+
+        # Should show info message about already being at top
+        self.assertContains(response, "already at the top")
+
+    def test_waitlist_move_to_bottom_already_at_bottom(self):
+        """Test moving an applicant to bottom when already at last position."""
+        self._create_manager()
+
+        # Create two waitlisted applications
+        self._create_waitlisted_app("Person0", "person0@example.com")
+        app2 = self._create_waitlisted_app("Person1", "person1@example.com")
+
+        # Try to move app2 (position 2, the last position) to bottom
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_bottom", "application_id": app2.application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Position should remain at 2
+        app2.refresh_from_db()
+        self.assertEqual(app2.waitlist_position, 2)
+
+        # Should show info message about already being at bottom
+        self.assertContains(response, "already at the bottom")
 
 
 @pytest.mark.django_db
