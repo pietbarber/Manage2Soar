@@ -9,6 +9,13 @@ from members.models import Member
 class Command(BaseCommand):
     help = "Import duty crew from legacy ops_days table into Logsheet model"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--date",
+            type=str,
+            help="Only import ops_days on or after this date (YYYY-MM-DD)",
+        )
+
     def handle(self, *args, **options):
 
         # Ensure import_bot exists
@@ -44,7 +51,17 @@ class Command(BaseCommand):
         )
 
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM ops_days ORDER BY flight_date ASC")
+            date_arg = options.get("date")
+            if date_arg:
+                self.stdout.write(
+                    self.style.NOTICE(f"Importing ops_days on or after {date_arg}")
+                )
+                cursor.execute(
+                    "SELECT * FROM ops_days WHERE flight_date >= %s ORDER BY flight_date ASC",
+                    [date_arg],
+                )
+            else:
+                cursor.execute("SELECT * FROM ops_days ORDER BY flight_date ASC")
             if cursor.description is None:
                 self.stdout.write(
                     self.style.ERROR("❌ No columns returned from ops_days query!")

@@ -9,6 +9,13 @@ from logsheet.utils.aliases import resolve_towplane
 class Command(BaseCommand):
     help = "Import towplane closeout data from legacy towplane_data table"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--date",
+            type=str,
+            help="Only import towplane closeouts on or after this date (YYYY-MM-DD)",
+        )
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Connecting to legacy towplane_data..."))
 
@@ -22,7 +29,19 @@ class Command(BaseCommand):
         )
 
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM towplane_data ORDER BY flight_date ASC")
+            date_arg = options.get("date")
+            if date_arg:
+                self.stdout.write(
+                    self.style.NOTICE(
+                        f"Importing towplane closeouts on or after {date_arg}"
+                    )
+                )
+                cursor.execute(
+                    "SELECT * FROM towplane_data WHERE flight_date >= %s ORDER BY flight_date ASC",
+                    [date_arg],
+                )
+            else:
+                cursor.execute("SELECT * FROM towplane_data ORDER BY flight_date ASC")
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
 
