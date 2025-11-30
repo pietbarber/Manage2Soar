@@ -5,8 +5,20 @@ html, body {
 
 .footer {
   width: 100%;
-  max-width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   box-sizing: border-box;
+}
+
+/* Constrain footer row to prevent negative margin overflow */
+.footer .row {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.footer .container {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .emoji {
