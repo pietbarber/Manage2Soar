@@ -85,10 +85,19 @@
                                 {% if app.waitlist_position > 1 %}
                                 <form method="post" style="display: inline;">
                                     {% csrf_token %}
+                                    <input type="hidden" name="action" value="move_to_top">
+                                    <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-success"
+                                            title="Move to Top of List">
+                                        <i class="fas fa-angle-double-up"></i>
+                                    </button>
+                                </form>
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
                                     <input type="hidden" name="action" value="move_up">
                                     <input type="hidden" name="application_id" value="{{ app.application_id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-success"
-                                            title="Move Up in Line">
+                                            title="Move Up One Position">
                                         <i class="fas fa-arrow-up"></i>
                                     </button>
                                 </form>
@@ -100,8 +109,17 @@
                                     <input type="hidden" name="action" value="move_down">
                                     <input type="hidden" name="application_id" value="{{ app.application_id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-warning"
-                                            title="Move Down in Line">
+                                            title="Move Down One Position">
                                         <i class="fas fa-arrow-down"></i>
+                                    </button>
+                                </form>
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="move_to_bottom">
+                                    <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                            title="Move to Bottom of List">
+                                        <i class="fas fa-angle-double-down"></i>
                                     </button>
                                 </form>
                                 {% endif %}
@@ -121,10 +139,11 @@
                                 <div class="col-md-6">
                                     <h6>Managing the Waitlist:</h6>
                                     <ul class="small">
-                                        <li>Use <i class="fas fa-arrow-up"></i> to move an applicant up in priority</li>
-                                        <li>Use <i class="fas fa-arrow-down"></i> to move an applicant down in priority</li>
-                                        <li>Click <i class="fas fa-eye"></i> to view full application details</li>
-                                        <li>Applicants are automatically notified of position changes</li>
+                                        <li>Use <i class="fas fa-angle-double-up text-success"></i> to move an applicant to the <strong>top</strong> of the list</li>
+                                        <li>Use <i class="fas fa-arrow-up text-success"></i> to move an applicant up one position</li>
+                                        <li>Use <i class="fas fa-arrow-down text-warning"></i> to move an applicant down one position</li>
+                                        <li>Use <i class="fas fa-angle-double-down text-warning"></i> to move an applicant to the <strong>bottom</strong> of the list</li>
+                                        <li>Click <i class="fas fa-eye text-primary"></i> to view full application details</li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
@@ -132,7 +151,7 @@
                                     <ul class="small">
                                         <li>Contact the #1 applicant to offer membership</li>
                                         <li>If accepted, approve their application (creates member account)</li>
-                                        <li>If declined, move to next person in line</li>
+                                        <li>If declined, move to the bottom or next person in line</li>
                                         <li>Waitlist positions automatically update when someone is approved</li>
                                     </ul>
                                 </div>

@@ -419,6 +419,115 @@ class MembershipApplicationViewTests(TestCase):
         self.assertContains(response, "Person1 Test")
         self.assertContains(response, "Person2 Test")
 
+    def test_waitlist_move_to_top(self):
+        """Test moving an applicant to the top of the waitlist."""
+        # Create a member manager to access the waitlist
+        manager = Member.objects.create_user(
+            username="manager",
+            email="manager@example.com",
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+
+        # Create waitlisted applications
+        apps = []
+        for i in range(5):
+            application = MembershipApplication.objects.create(
+                first_name=f"Person{i}",
+                last_name="Test",
+                email=f"person{i}@example.com",
+                phone="555-123-4567",
+                address_line1="123 Main St",
+                city="Anytown",
+                state="CA",
+                zip_code="12345",
+                emergency_contact_name="Contact Person",
+                emergency_contact_relationship="Friend",
+                emergency_contact_phone="555-987-6543",
+                soaring_goals="Test",
+                agrees_to_terms=True,
+                agrees_to_safety_rules=True,
+                agrees_to_financial_obligations=True,
+            )
+            application.add_to_waitlist()
+            apps.append(application)
+
+        # Verify initial positions
+        for i, app in enumerate(apps):
+            app.refresh_from_db()
+            self.assertEqual(app.waitlist_position, i + 1)
+
+        # Move Person4 (position 5) to the top
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_top", "application_id": apps[4].application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify new positions - Person4 should be at position 1
+        apps[4].refresh_from_db()
+        self.assertEqual(apps[4].waitlist_position, 1)
+
+        # All others should have shifted down by 1
+        for i in range(4):
+            apps[i].refresh_from_db()
+            self.assertEqual(apps[i].waitlist_position, i + 2)
+
+    def test_waitlist_move_to_bottom(self):
+        """Test moving an applicant to the bottom of the waitlist."""
+        # Create a member manager to access the waitlist
+        manager = Member.objects.create_user(
+            username="manager",
+            email="manager@example.com",
+            password="testpass",
+            member_manager=True,
+            membership_status="Full Member",
+        )
+        self.client.force_login(manager)
+
+        # Create waitlisted applications
+        apps = []
+        for i in range(5):
+            application = MembershipApplication.objects.create(
+                first_name=f"Person{i}",
+                last_name="Test",
+                email=f"person{i}@example.com",
+                phone="555-123-4567",
+                address_line1="123 Main St",
+                city="Anytown",
+                state="CA",
+                zip_code="12345",
+                emergency_contact_name="Contact Person",
+                emergency_contact_relationship="Friend",
+                emergency_contact_phone="555-987-6543",
+                soaring_goals="Test",
+                agrees_to_terms=True,
+                agrees_to_safety_rules=True,
+                agrees_to_financial_obligations=True,
+            )
+            application.add_to_waitlist()
+            apps.append(application)
+
+        # Move Person0 (position 1) to the bottom
+        response = self.client.post(
+            reverse("members:membership_waitlist"),
+            {"action": "move_to_bottom", "application_id": apps[0].application_id},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify new positions - Person0 should be at position 5
+        apps[0].refresh_from_db()
+        self.assertEqual(apps[0].waitlist_position, 5)
+
+        # All others should have shifted up by 1
+        for i in range(1, 5):
+            apps[i].refresh_from_db()
+            self.assertEqual(apps[i].waitlist_position, i)
+
 
 @pytest.mark.django_db
 class MembershipApplicationAdminTests:
