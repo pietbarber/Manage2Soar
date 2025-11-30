@@ -435,6 +435,79 @@ class MembershipApplicationViewTests(TestCase):
         self.assertEqual(response.status_code, 200)  # Form re-rendered with errors
         self.assertContains(response, "This field is required")
 
+    def test_multiple_validation_errors_shown_together(self):
+        """Test that multiple validation errors are shown at once, not one at a time.
+
+        This is a regression test for issue #303 where form errors appeared one
+        at a time instead of all together.
+        """
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "Jane Doe",
+            "emergency_contact_relationship": "Spouse",
+            "emergency_contact_phone": "555-987-6543",
+            "soaring_goals": "I want to learn gliding",
+            # Intentionally omit all three agreement checkboxes
+            "agrees_to_terms": False,
+            "agrees_to_safety_rules": False,
+            "agrees_to_financial_obligations": False,
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+        self.assertFalse(form.is_valid())
+
+        # All three errors should be present at once
+        self.assertIn("agrees_to_terms", form.errors)
+        self.assertIn("agrees_to_safety_rules", form.errors)
+        self.assertIn("agrees_to_financial_obligations", form.errors)
+
+    def test_conditional_field_errors_shown_together(self):
+        """Test that multiple conditional field errors are shown at once.
+
+        This is a regression test for issue #303. When checkboxes for insurance
+        rejection, club rejection, and aviation incidents are checked but the
+        detail fields are left empty, all errors should appear together.
+        """
+        form_data = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "phone": "555-123-4567",
+            "address_line1": "123 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip_code": "12345",
+            "emergency_contact_name": "Jane Doe",
+            "emergency_contact_relationship": "Spouse",
+            "emergency_contact_phone": "555-987-6543",
+            "soaring_goals": "I want to learn gliding",
+            "agrees_to_terms": True,
+            "agrees_to_safety_rules": True,
+            "agrees_to_financial_obligations": True,
+            # Check all three conditional checkboxes but leave details empty
+            "insurance_rejection_history": True,
+            "insurance_rejection_details": "",
+            "club_rejection_history": True,
+            "club_rejection_details": "",
+            "aviation_incidents": True,
+            "aviation_incident_details": "",
+        }
+
+        form = MembershipApplicationForm(data=form_data)
+        self.assertFalse(form.is_valid())
+
+        # All three conditional field errors should be present at once
+        self.assertIn("insurance_rejection_details", form.errors)
+        self.assertIn("club_rejection_details", form.errors)
+        self.assertIn("aviation_incident_details", form.errors)
+
     def test_application_status_view_valid_id(self):
         """Test application status view with valid ID."""
         app = MembershipApplication.objects.create(
