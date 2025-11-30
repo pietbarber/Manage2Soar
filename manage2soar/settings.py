@@ -471,12 +471,25 @@ TINYMCE_DEFAULT_CONFIG = {
     }""",
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
+    # Issue #322: Force tables to use responsive CSS by default
     "table_default_attributes": {"border": "1"},
+    "table_default_styles": {
+        "width": "100%",
+        "max-width": "100%",
+        "table-layout": "fixed",
+    },
+    "table_sizing_mode": "responsive",  # Use responsive sizing mode
+    "table_responsive_width": True,  # Enable responsive table widths
     "table_toolbar": (
         "tableprops cellprops | "
         "tableinsertrowbefore tableinsertrowafter tabledeleterow | "
         "tableinsertcolbefore tableinsertcolafter tabledeletecol"
     ),
+    # Apply content CSS in the editor to match rendered output
+    "content_style": """
+        table { width: 100% !important; max-width: 100% !important; table-layout: fixed !important; }
+        td, th { word-break: break-word; white-space: normal !important; }
+    """,
     "promotion": False,  # Disable TinyMCE 'Upgrade' button
     "license_key": "gpl",  # Use GPL license for open source projects
 }

@@ -271,7 +271,7 @@
           </a>
         {% endif %}
       </div>
-      <div class="border p-3 bg-white card-body mb-2" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
+      <div class="border p-3 bg-white card-body mb-2 cms-content" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.report_text|safe }}
         <div class="mt-2 small text-muted">
           Written by:
@@ -287,7 +287,7 @@
       </div>
       {% elif block.report.notes %}
       <h5>📝 Notes</h5>
-      <div class="border p-3 bg-white card-body mb-2" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
+      <div class="border p-3 bg-white card-body mb-2 cms-content" id="report-{{ block.report.report_date|date:'Y-m-d' }}">
         {{ block.report.notes|safe }}
         <div class="mt-2 small text-muted">
           Written by: {{ block.report.instructor.full_display_name }} on {{ block.report.created_at|date:"Y-m-d H:i" }}
