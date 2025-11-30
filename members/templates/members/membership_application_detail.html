@@ -109,12 +109,12 @@
                 <div class="info-section">
                     <h5><i class="fas fa-plane"></i> Aviation Experience</h5>
                     <div class="experience-badges">
-                        {% if application.has_private_pilot or application.has_commercial_pilot or application.has_cfi or application.glider_rating != 'none' %}
+                        {% if application.is_pilot %}
                             <span class="badge bg-info text-dark">Current Pilot</span>
                         {% else %}
                             <span class="badge bg-light text-dark">Not Currently a Pilot</span>
                         {% endif %}
-                        {% if application.glider_flight_hours and application.glider_flight_hours > 0 %}
+                        {% if application.has_soaring_experience %}
                             <span class="badge bg-success">Has Soaring Experience</span>
                         {% else %}
                             <span class="badge bg-light text-dark">No Soaring Experience</span>
@@ -358,11 +358,8 @@
 {% block extra_scripts %}
 <script>
 // Applicant pilot status for confirmation dialogs
-const applicantIsPilot = {{ application.has_private_pilot|yesno:"true,false" }} ||
-                         {{ application.has_commercial_pilot|yesno:"true,false" }} ||
-                         {{ application.has_cfi|yesno:"true,false" }} ||
-                         '{{ application.glider_rating }}' !== 'none';
-const applicantHasSoaringExperience = {{ application.glider_flight_hours }} > 0;
+const applicantIsPilot = {{ application.is_pilot|yesno:"true,false" }};
+const applicantHasSoaringExperience = {{ application.has_soaring_experience|yesno:"true,false" }};
 
 // Confirmation dialogs for review actions
 document.querySelectorAll('button[name="review_action"]').forEach(button => {
