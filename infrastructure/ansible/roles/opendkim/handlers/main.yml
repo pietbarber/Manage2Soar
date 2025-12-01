@@ -1,0 +1,12 @@
+---
+# Handlers for opendkim role
+
+- name: Restart OpenDKIM
+  ansible.builtin.service:
+    name: opendkim
+    state: restarted
+
+- name: Restart Postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted

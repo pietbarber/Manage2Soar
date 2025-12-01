@@ -1,0 +1,120 @@
+---
+# ============================================================
+# OpenDKIM Role - DKIM Signing
+# ============================================================
+
+- name: Install OpenDKIM
+  ansible.builtin.apt:
+    name:
+      - opendkim
+      - opendkim-tools
+    state: present
+
+- name: Create OpenDKIM directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: opendkim
+    group: opendkim
+    mode: "0750"
+  loop:
+    - "{{ opendkim_config_dir }}"
+    - "{{ opendkim_keys_dir }}"
+
+- name: Create key directories for each club domain
+  ansible.builtin.file:
+    path: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}"
+    state: directory
+    owner: opendkim
+    group: opendkim
+    mode: "0750"
+  loop: "{{ club_domains }}"
+
+- name: Generate DKIM keys for each club domain
+  ansible.builtin.command:
+    cmd: >
+      opendkim-genkey
+      -b {{ dkim_key_size }}
+      -d {{ item.prefix }}.{{ mail_domain }}
+      -s {{ dkim_selector }}
+      -D {{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/
+    creates: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+  loop: "{{ club_domains }}"
+
+- name: Set ownership on DKIM private keys
+  ansible.builtin.file:
+    path: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    owner: opendkim
+    group: opendkim
+    mode: "0600"
+  loop: "{{ club_domains }}"
+
+- name: Create OpenDKIM config
+  ansible.builtin.template:
+    src: opendkim.conf.j2
+    dest: "{{ opendkim_config_dir }}/opendkim.conf"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  notify: Restart OpenDKIM
+
+- name: Create KeyTable
+  ansible.builtin.template:
+    src: KeyTable.j2
+    dest: "{{ opendkim_config_dir }}/KeyTable"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  notify: Restart OpenDKIM
+
+- name: Create SigningTable
+  ansible.builtin.template:
+    src: SigningTable.j2
+    dest: "{{ opendkim_config_dir }}/SigningTable"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  notify: Restart OpenDKIM
+
+- name: Create TrustedHosts
+  ansible.builtin.template:
+    src: TrustedHosts.j2
+    dest: "{{ opendkim_config_dir }}/TrustedHosts"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  notify: Restart OpenDKIM
+
+- name: Create OpenDKIM socket directory
+  ansible.builtin.file:
+    path: /run/opendkim
+    state: directory
+    owner: opendkim
+    group: postfix
+    mode: "0750"
+
+- name: Configure OpenDKIM defaults
+  ansible.builtin.copy:
+    dest: /etc/default/opendkim
+    content: |
+      RUNDIR=/run/opendkim
+      SOCKET="local:/run/opendkim/opendkim.sock"
+      USER=opendkim
+      GROUP=opendkim
+      PIDFILE=$RUNDIR/opendkim.pid
+      EXTRAAFTER=
+    mode: "0644"
+  notify: Restart OpenDKIM
+
+- name: Add postfix to opendkim group
+  ansible.builtin.user:
+    name: postfix
+    groups: opendkim
+    append: true
+  notify: Restart Postfix
+
+- name: Ensure OpenDKIM is enabled and running
+  ansible.builtin.service:
+    name: opendkim
+    enabled: true
+    state: started

@@ -194,3 +194,12 @@ pushy-enhanced-v3-template.sh
 pushy-enhanced-v2.sh
 pushy-enhanced-v3.sh
 run-dev-server.sh
+
+# ============================================================
+# Infrastructure / Ansible secrets
+# ============================================================
+# NEVER commit actual inventory or variables with passwords
+infrastructure/ansible/inventory/hosts.yml
+infrastructure/ansible/group_vars/all.yml
+infrastructure/ansible/group_vars/*.vault.yml
+infrastructure/ansible/*.retry
