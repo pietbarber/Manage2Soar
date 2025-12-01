@@ -5,34 +5,14 @@ from utils.admin_helpers import AdminHelperMixin
 from .models import (
     DutyAssignment,
     DutyAvoidance,
-    DutyDay,
     DutyPairing,
     DutyPreference,
-    DutySlot,
     DutySwapOffer,
     DutySwapRequest,
     InstructionSlot,
     MemberBlackout,
     OpsIntent,
 )
-
-
-@admin.register(DutyDay)
-class DutyDayAdmin(AdminHelperMixin, admin.ModelAdmin):
-    list_display = ("date", "notes")
-    search_fields = ("notes",)
-    ordering = ("date",)
-    admin_helper_message = "<b>Duty Days:</b> Record the dates when club operations run. See duty_roster/docs/ for guidance."
-
-
-@admin.register(DutySlot)
-class DutySlotAdmin(AdminHelperMixin, admin.ModelAdmin):
-    list_display = ("duty_day", "role", "member")
-    list_filter = ("role",)
-    search_fields = ("member__first_name", "member__last_name")
-    autocomplete_fields = ("member", "duty_day")
-    ordering = ("duty_day", "role")
-    admin_helper_message = "<b>Duty Slots:</b> Individual role assignments for a duty day. Use Duty Assignments to manage whole-day crews."
 
 
 @admin.register(MemberBlackout)

@@ -21,7 +21,7 @@ from duty_roster.management.commands.notify_aging_logsheets import (
 from duty_roster.management.commands.report_duty_delinquents import (
     Command as DutyDelinquentsCommand,
 )
-from duty_roster.models import DutyAssignment, DutyDay, DutySlot
+from duty_roster.models import DutyAssignment
 from instructors.management.commands.notify_late_sprs import Command as LateSPRsCommand
 from instructors.models import InstructionReport
 from logsheet.models import Airfield, Flight, Logsheet
@@ -335,10 +335,12 @@ class TestDutyDelinquentsCommand(TestCase):
         """Test that members who did duty are not flagged."""
         # Create duty assignment for flying member
         duty_date = timezone.now().date() - timedelta(days=60)
-        # Create a duty day and assign the flying member as duty officer
-        duty_day = DutyDay.objects.create(date=duty_date)
-        DutySlot.objects.create(
-            duty_day=duty_day, member=self.flying_member, role="duty_officer"
+        # Create a duty assignment with the flying member as duty officer
+        airfield = Airfield.objects.create(identifier="DUTY", name="Duty Field")
+        DutyAssignment.objects.create(
+            date=duty_date,
+            duty_officer=self.flying_member,
+            location=airfield,
         )
 
         with patch("sys.stdout", new_callable=StringIO):

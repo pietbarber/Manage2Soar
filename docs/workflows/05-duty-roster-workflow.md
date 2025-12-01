@@ -60,8 +60,7 @@ flowchart TD
 ## Technical Implementation
 
 ### **Models Involved**
-- **`duty_roster.DutyAssignment`**: Individual duty assignments
-- **`duty_roster.DutyDay`**: Duty requirements for specific dates
+- **`duty_roster.DutyAssignment`**: Individual duty assignments for a specific date
 - **`duty_roster.MemberBlackout`**: Member unavailable dates
 - **`duty_roster.DutyPreference`**: Member role preferences
 - **`duty_roster.DutySwapRequest`**: Swap requests between members
@@ -194,14 +193,6 @@ erDiagram
         boolean is_active
     }
 
-    DutyDay {
-        int id PK
-        date duty_date UK
-        string day_type
-        boolean operations_expected
-        text special_requirements
-    }
-
     DutyAssignment {
         int id PK
         date date UK
@@ -211,6 +202,9 @@ erDiagram
         int surge_instructor_id FK
         int tow_pilot_id FK
         int surge_tow_pilot_id FK
+        int location_id FK
+        boolean is_scheduled
+        boolean is_confirmed
         text notes
         datetime created_at
     }
@@ -258,7 +252,6 @@ erDiagram
     Member ||--o{ MemberBlackout : unavailable
     Member ||--o{ DutyPreference : prefers
     Member ||--o{ DutySwapRequest : requests
-    DutyDay ||--o{ DutyAssignment : scheduled_for
     DutyAssignment ||--o{ DutySwapRequest : involves
 ```
 

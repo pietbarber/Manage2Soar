@@ -14,26 +14,6 @@ erDiagram
     Member ||--o{ DutySwapOffer : offerer
     Member ||--o{ OpsIntent : creator
 
-    DutyDay {
-        int id PK
-        date duty_date
-        string day_type
-        boolean finalized
-        text notes
-    }
-
-    DutySlot {
-        int id PK
-        int duty_day_id FK
-        string role_type
-        time start_time
-        time end_time
-        int min_members
-        int max_members
-        boolean required
-        text description
-    }
-
     MemberBlackout {
         int id PK
         int member_id FK
@@ -54,22 +34,27 @@ erDiagram
 
     DutyAssignment {
         int id PK
-        int duty_slot_id FK
-        int member_id FK
-        string assignment_status
-        datetime assigned_at
-        int assigned_by_id FK
+        date date
+        int duty_officer_id FK
+        int assistant_duty_officer_id FK
+        int instructor_id FK
+        int surge_instructor_id FK
+        int tow_pilot_id FK
+        int surge_tow_pilot_id FK
+        int location_id FK
+        boolean is_scheduled
+        boolean is_confirmed
         text notes
     }
 
     InstructionSlot {
         int id PK
-        int duty_day_id FK
+        int assignment_id FK
+        int student_id FK
         int instructor_id FK
-        time start_time
-        time end_time
-        int max_students
-        boolean available
+        string status
+        string instructor_response
+        text instructor_note
     }
 
     DutySwapRequest {
@@ -100,9 +85,7 @@ erDiagram
         boolean finalized
     }
 
-    DutyDay ||--o{ DutySlot : contains
-    DutyDay ||--o{ InstructionSlot : instruction_slots
-    DutySlot ||--o{ DutyAssignment : assignments
+    DutyAssignment ||--o{ InstructionSlot : instruction_slots
     DutyAssignment ||--o{ DutySwapRequest : swap_requests
     DutySwapRequest ||--o{ DutySwapOffer : offers
 ```

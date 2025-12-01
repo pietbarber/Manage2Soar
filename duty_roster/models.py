@@ -3,41 +3,6 @@ from django.db import models
 from members.models import Member
 
 
-class DutyDay(models.Model):
-    date = models.DateField(unique=True)
-    notes = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.date.strftime("%A, %B %d, %Y")
-
-
-class DutySlot(models.Model):
-    # Static role keys; display titles are resolved at runtime
-    ROLE_CHOICES = [
-        ("duty_officer", "Duty Officer"),
-        ("assistant_duty_officer", "Assistant Duty Officer"),
-        ("instructor", "Instructor"),
-        ("surge_instructor", "Surge Instructor"),
-        ("tow_pilot", "Tow Pilot"),
-        ("surge_tow_pilot", "Surge Tow Pilot"),
-    ]
-
-    duty_day = models.ForeignKey(
-        DutyDay, on_delete=models.CASCADE, related_name="slots"
-    )
-    member = models.ForeignKey(Member, on_delete=models.CASCADE)
-    role = models.CharField(max_length=32, choices=ROLE_CHOICES)
-
-    class Meta:
-        unique_together = ("duty_day", "role")
-        ordering = ["duty_day", "role"]
-
-    def __str__(self):
-        from siteconfig.utils import get_role_title
-
-        return f"{self.duty_day.date} – {get_role_title(self.role)} – {self.member.full_display_name}"
-
-
 class MemberBlackout(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     date = models.DateField()

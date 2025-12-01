@@ -39,7 +39,6 @@ from .models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
-    DutySlot,
     MemberBlackout,
     OpsIntent,
 )
@@ -1013,37 +1012,6 @@ def propose_roster(request):
     )
 
 
-@active_member_required
-def calendar_view(request, year=None, month=None):
-    today = timezone.now().date()
-    year = int(year) if year else today.year
-    month = int(month) if month else today.month
-    cal = calendar.Calendar()
-    weeks = cal.monthdatescalendar(year, month)
-    grid = []
-    for week in weeks:
-        days = []
-        for d in week:
-            if d.month != month:
-                days.append({"date": d, "slots": None})
-            else:
-                assignments = DutySlot.objects.filter(duty_day__date=d)
-                slots = {role: "" for role in DEFAULT_ROLES}
-                for a in assignments:
-                    slots[a.role] = a.member.full_display_name
-                days.append({"date": d, "slots": slots})
-        grid.append(days)
-    context = {
-        "weeks": grid,
-        "year": year,
-        "month": month,
-        "DEFAULT_ROLES": DEFAULT_ROLES,
-    }
-    if request.headers.get("HX-Request") == "true":
-        return render(request, "duty_roster/partials/calendar_grid.html", context)
-    return render(request, "duty_roster/calendar.html", context)
-
-
 @user_passes_test(
     lambda u: u.is_authenticated
     and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
@@ -1058,12 +1026,7 @@ def duty_delinquents_detail(request):
     from django.db.models import Count, Q
     from django.utils.timezone import now
 
-    from duty_roster.models import (
-        DutyAssignment,
-        DutyPreference,
-        DutySlot,
-        MemberBlackout,
-    )
+    from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
     from logsheet.models import Flight
     from members.models import Member
 
@@ -1203,7 +1166,7 @@ def _has_performed_duty_detailed(member, cutoff_date):
     """
     from django.db.models import Q
 
-    from duty_roster.models import DutyAssignment, DutySlot
+    from duty_roster.models import DutyAssignment
     from logsheet.models import Flight
 
     # Check actual flight participation for instructors and tow pilots
@@ -1241,28 +1204,7 @@ def _has_performed_duty_detailed(member, cutoff_date):
     # For duty officers and assistant duty officers, check scheduled assignments
     # (since this is the only way to track their participation)
 
-    # Check DutySlot assignments (newer system) - only for DO/ADO roles
-    duty_officer_slots = DutySlot.objects.filter(
-        member=member,
-        duty_day__date__gte=cutoff_date,
-        role__in=["duty_officer", "assistant_duty_officer"],
-    ).order_by("-duty_day__date")
-
-    latest_do_slot = duty_officer_slots.first()
-    if latest_do_slot is not None:
-        role_display = (
-            "Duty Officer"
-            if latest_do_slot.role == "duty_officer"
-            else "Assistant Duty Officer"
-        )
-        return {
-            "has_duty": True,
-            "last_duty_date": latest_do_slot.duty_day.date,
-            "last_duty_role": f"{role_display} (Scheduled)",
-            "last_duty_type": "DutySlot",
-        }
-
-    # Check DutyAssignment assignments (older system) - only for DO/ADO
+    # Check DutyAssignment assignments - for DO/ADO
     duty_assignments = DutyAssignment.objects.filter(
         Q(duty_officer=member) | Q(assistant_duty_officer=member), date__gte=cutoff_date
     ).order_by("-date")
@@ -1282,26 +1224,32 @@ def _has_performed_duty_detailed(member, cutoff_date):
             "last_duty_type": "DutyAssignment",
         }
 
-    # Also check if instructors/tow pilots were scheduled (less important but still relevant)
-    scheduled_slots = DutySlot.objects.filter(
-        member=member,
-        duty_day__date__gte=cutoff_date,
-        role__in=["instructor", "surge_instructor", "tow_pilot", "surge_tow_pilot"],
-    ).order_by("-duty_day__date")
+    # Check if instructors/tow pilots were scheduled via DutyAssignment
+    instructor_assignments = DutyAssignment.objects.filter(
+        Q(instructor=member)
+        | Q(surge_instructor=member)
+        | Q(tow_pilot=member)
+        | Q(surge_tow_pilot=member),
+        date__gte=cutoff_date,
+    ).order_by("-date")
 
-    latest_scheduled = scheduled_slots.first()
+    latest_scheduled = instructor_assignments.first()
     if latest_scheduled is not None:
-        role_map = {
-            "instructor": "Instructor",
-            "surge_instructor": "Surge Instructor",
-            "tow_pilot": "Tow Pilot",
-            "surge_tow_pilot": "Surge Tow Pilot",
-        }
+        roles = []
+        if latest_scheduled.instructor == member:
+            roles.append("Instructor")
+        if latest_scheduled.surge_instructor == member:
+            roles.append("Surge Instructor")
+        if latest_scheduled.tow_pilot == member:
+            roles.append("Tow Pilot")
+        if latest_scheduled.surge_tow_pilot == member:
+            roles.append("Surge Tow Pilot")
+
         return {
             "has_duty": True,
-            "last_duty_date": latest_scheduled.duty_day.date,
-            "last_duty_role": f"{role_map[latest_scheduled.role]} (Scheduled Only)",
-            "last_duty_type": "DutySlot - Scheduled",
+            "last_duty_date": latest_scheduled.date,
+            "last_duty_role": f"{', '.join(roles)} (Scheduled Only)",
+            "last_duty_type": "DutyAssignment - Scheduled",
         }
 
     return {
