@@ -109,7 +109,7 @@ flowchart LR
 |-----|---------|------------|--------------|
 | `members` | User management, profiles, roles | Member, Badge | Auth (Django) |
 | `logsheet` | Flight operations, glider fleet | Flight, Logsheet, Glider | members |
-| `duty_roster` | Duty scheduling | DutyAssignment, DutyDay | members |
+| `duty_roster` | Duty scheduling | DutyAssignment, MemberBlackout | members |
 | `instructors` | Training management | TrainingLesson, SyllabusDocument | members |
 | `knowledgetest` | Written examinations | TestSession, Question | members |
 | `analytics` | Read-only reporting | *(no models)* | logsheet, members |

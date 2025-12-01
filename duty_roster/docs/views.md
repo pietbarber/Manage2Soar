@@ -19,7 +19,6 @@ This document describes the main view functions in `duty_roster/views.py` and th
 - **calendar_cancel_ops_day(request, year, month, day)**: Cancels an ops day and notifies members.
 - **calendar_cancel_ops_modal(request, year, month, day)**: Modal dialog for confirming ops day cancellation.
 - **propose_roster(request)**: Rostermeister-only view to propose/generate a new roster.
-- **calendar_view(request, year=None, month=None)**: Alternate calendar view (legacy or alternate display).
 
 ## Helper Functions
 

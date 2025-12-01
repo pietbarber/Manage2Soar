@@ -5,7 +5,7 @@ from django.core.mail import send_mail
 from django.db.models import Count, Q
 from django.utils.timezone import now
 
-from duty_roster.models import DutyAssignment, DutySlot
+from duty_roster.models import DutyAssignment
 from logsheet.models import Flight
 from members.models import Member
 from notifications.models import Notification
@@ -175,15 +175,7 @@ class Command(BaseCronJobCommand):
     def _has_performed_duty(self, member, cutoff_date):
         """Check if member has performed any duty since cutoff_date"""
 
-        # Check DutySlot assignments (newer system)
-        duty_slots = DutySlot.objects.filter(
-            member=member, duty_day__date__gte=cutoff_date
-        ).exists()
-
-        if duty_slots:
-            return True
-
-        # Check DutyAssignment assignments (older system)
+        # Check DutyAssignment assignments
         duty_assignments = DutyAssignment.objects.filter(
             Q(duty_officer=member)
             | Q(assistant_duty_officer=member)

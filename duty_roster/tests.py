@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from duty_roster.models import DutyDay, DutyPreference, DutySlot, MemberBlackout
+from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
 from duty_roster.views import (
     _calculate_membership_duration,
     _has_performed_duty_detailed,
@@ -161,10 +161,11 @@ class DutyDelinquentsDetailViewTests(TestCase):
 
     def test_member_with_recent_duty_not_in_report(self):
         """Member who has done recent duty should not appear"""
-        # Give delinquent member a recent duty assignment
-        duty_day = DutyDay.objects.create(date=date.today() - timedelta(days=30))
-        DutySlot.objects.create(
-            duty_day=duty_day, member=self.delinquent_member, role="instructor"
+        # Give delinquent member a recent duty assignment via DutyAssignment
+        DutyAssignment.objects.create(
+            date=date.today() - timedelta(days=30),
+            instructor=self.delinquent_member,
+            location=self.airfield,
         )
 
         self.client.force_login(self.rostermeister)
@@ -254,12 +255,16 @@ class HelperFunctionTests(TestCase):
         self.assertIsNone(result["last_duty_date"])
         self.assertIsNone(result["last_duty_role"])
 
-    def test_has_performed_duty_detailed_with_duty_slot(self):
-        """Test helper function when member has recent duty slot"""
+    def test_has_performed_duty_detailed_with_duty_assignment(self):
+        """Test helper function when member has recent duty assignment"""
+        from logsheet.models import Airfield
+
+        airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
         duty_date = date.today() - timedelta(days=30)
-        duty_day = DutyDay.objects.create(date=duty_date)
-        DutySlot.objects.create(
-            duty_day=duty_day, member=self.member, role="instructor"
+        DutyAssignment.objects.create(
+            date=duty_date,
+            instructor=self.member,
+            location=airfield,
         )
 
         cutoff_date = date.today() - timedelta(days=365)
@@ -268,7 +273,7 @@ class HelperFunctionTests(TestCase):
         self.assertTrue(result["has_duty"])
         self.assertEqual(result["last_duty_date"], duty_date)
         self.assertEqual(result["last_duty_role"], "Instructor (Scheduled Only)")
-        self.assertEqual(result["last_duty_type"], "DutySlot - Scheduled")
+        self.assertEqual(result["last_duty_type"], "DutyAssignment - Scheduled")
 
     def test_has_performed_duty_detailed_with_instruction_flight(self):
         """Test helper function when member has performed actual instruction"""
