@@ -7,9 +7,9 @@
     state: restarted
 
 - name: Reload Postfix
-  ansible.builtin.command:
-    cmd: postfix reload
-  changed_when: true
+  ansible.builtin.service:
+    name: postfix
+    state: reloaded
 
 - name: Restart saslauthd
   ansible.builtin.service:

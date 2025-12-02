@@ -8,8 +8,8 @@
 # SMTP2GO requires verified sender domains, so we rewrite the
 # From header to use our domain.
 #
-# Note: Reply-To preservation is handled by smtp_header_checks
-# which captures the original sender before From is rewritten.
+# Note: Reply-To is set by smtp_header_checks to enable reply-to-list behaviour,
+# causing replies to go to the mailing list address rather than the original sender.
 
 # ============================================================
 # FROM HEADER REWRITING
@@ -23,10 +23,11 @@
 #   Becomes: From: "SSC Members List" <members@ssc.manage2soar.com>
 
 # Match any From header NOT from our domain and rewrite it
-# Using simple regex - PCRE negative lookahead can be finicky
-/^From:\s*"?([^"<]*)"?\s*<([^@]+)@(?!ssc\.manage2soar\.com)[^>]+>/
-    REPLACE From: "$1 via SSC" <members@ssc.manage2soar.com>
+# The negative lookahead is anchored with > to prevent subdomain bypass
+/^From:\s*"?[^"<]*"?\s*<[^@]+@(?!ssc\.manage2soar\.com>)[^>]+>/
+    REPLACE From: "SSC Members List" <members@ssc.manage2soar.com>
 
 # Fallback: catch From headers without angle brackets
-/^From:\s*([^@]+)@(?!ssc\.manage2soar\.com)\S+/
+# Anchored with whitespace or end-of-string to prevent subdomain bypass
+/^From:\s*[^@]+@(?!ssc\.manage2soar\.com(?:\s|$))\S+/
     REPLACE From: "SSC Members List" <members@ssc.manage2soar.com>
