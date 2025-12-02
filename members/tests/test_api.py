@@ -179,26 +179,50 @@ class TestEmailListsAPI:
     def test_members_without_email_excluded(
         self, api_client, active_member, membership_statuses
     ):
-        """Test that members with empty email addresses are excluded from lists."""
-        # Create a member with no email
-        no_email_member = Member.objects.create_user(
+        """Test that members with empty email addresses are excluded from all lists."""
+        # Create members with no email but various roles
+        Member.objects.create_user(
             username="noemail_user",
             email="",  # Empty email
             password="testpass123",
             membership_status="Full Member",
             is_active=True,
         )
+        Member.objects.create_user(
+            username="noemail_instructor",
+            email="",  # Empty email
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            instructor=True,
+        )
+        Member.objects.create_user(
+            username="noemail_towpilot",
+            email="",  # Empty email
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            towpilot=True,
+        )
+        Member.objects.create_user(
+            username="noemail_board",
+            email="",  # Empty email
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            treasurer=True,  # Board member role
+        )
 
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
         data = response.json()
 
-        # Get all emails in the members list
-        member_emails = data["lists"]["members"]
-
-        # Member with no email should not appear (no empty strings)
-        assert all(email != "" for email in member_emails)
-        # Active member with email should still be present
-        assert active_member.email in member_emails
-        # Whitelist should not contain empty strings
+        # No empty strings should appear in any list
+        assert all(email != "" for email in data["lists"]["members"])
+        assert all(email != "" for email in data["lists"]["instructors"])
+        assert all(email != "" for email in data["lists"]["towpilots"])
+        assert all(email != "" for email in data["lists"]["board"])
         assert all(email != "" for email in data["whitelist"])
+
+        # Active member with email should still be present
+        assert active_member.email in data["lists"]["members"]
