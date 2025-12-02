@@ -21,6 +21,9 @@
   hosts: mail_servers
   become: true
 
+  vars_files:
+    - ../group_vars/all.yml
+
   vars:
     # Paths
     postfix_config_dir: /etc/postfix
