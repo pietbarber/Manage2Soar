@@ -112,6 +112,19 @@ smtpd_milters = unix:/run/opendkim/opendkim.sock
 non_smtpd_milters = $smtpd_milters
 
 # ============================================================
+# OUTBOUND RELAY (SMTP2GO)
+# ============================================================
+# GCP blocks outbound port 25, so we relay through SMTP2GO
+{% if smtp_relay_host is defined and smtp_relay_host %}
+relayhost = [{{ smtp_relay_host }}]:{{ smtp_relay_port | default(587) }}
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_security_level = encrypt
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+{% endif %}
+
+# ============================================================
 # PERFORMANCE TUNING
 # ============================================================
 default_process_limit = 100

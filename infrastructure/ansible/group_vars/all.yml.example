@@ -49,6 +49,17 @@ club_domains:
 m2s_api_key: "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
 
 # ============================================================
+# OUTBOUND RELAY (SMTP2GO / SendGrid / etc.)
+# ============================================================
+# GCP blocks outbound port 25, so we relay through a service
+# Get these from your SMTP2GO dashboard under "Sending > SMTP Users"
+
+smtp_relay_host: "mail.smtp2go.com"
+smtp_relay_port: 587
+smtp_relay_username: "YOUR_SMTP2GO_USERNAME"
+smtp_relay_password: "YOUR_SMTP2GO_PASSWORD"
+
+# ============================================================
 # SMTP AUTHENTICATION (for M2S to send via this server)
 # ============================================================
 # Credentials that M2S Django app will use to send email

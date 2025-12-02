@@ -5,4 +5,8 @@
 # This file contains passwords and should be mode 0600
 
 # Format: [server]:port username:password
-# These are for outbound relay if needed (not currently used)
+
+{% if smtp_relay_host is defined and smtp_relay_host %}
+# SMTP2GO / Outbound relay credentials
+[{{ smtp_relay_host }}]:{{ smtp_relay_port | default(587) }} {{ smtp_relay_username }}:{{ smtp_relay_password }}
+{% endif %}
