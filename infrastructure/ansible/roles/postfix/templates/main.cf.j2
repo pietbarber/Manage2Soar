@@ -134,3 +134,14 @@ smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 default_process_limit = 100
 smtpd_client_connection_count_limit = 10
 smtpd_client_connection_rate_limit = 30
+
+# ============================================================
+# HEADER REWRITING (Mailing Lists)
+# ============================================================
+# Rewrite From headers for mailing list traffic.
+# SMTP2GO requires verified sender domains, so we rewrite
+# external From addresses to use our domain.
+header_checks = pcre:{{ postfix_config_dir }}/header_checks
+
+# Add mailing list headers (List-Id, Reply-To, etc.) on outbound mail
+smtp_header_checks = pcre:{{ postfix_config_dir }}/smtp_header_checks

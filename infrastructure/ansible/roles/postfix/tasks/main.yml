@@ -7,6 +7,7 @@
   ansible.builtin.apt:
     name:
       - postfix
+      - postfix-pcre
       - libsasl2-modules
       - sasl2-bin
     state: present
@@ -28,6 +29,20 @@
     mode: "0644"
     backup: true
   notify: Restart Postfix
+
+- name: Create header_checks (From rewriting for mailing lists)
+  ansible.builtin.template:
+    src: header_checks.j2
+    dest: "{{ postfix_config_dir }}/header_checks"
+    mode: "0644"
+  notify: Reload Postfix
+
+- name: Create smtp_header_checks (List headers for outbound mail)
+  ansible.builtin.template:
+    src: smtp_header_checks.j2
+    dest: "{{ postfix_config_dir }}/smtp_header_checks"
+    mode: "0644"
+  notify: Reload Postfix
 
 - name: Create virtual alias domains file
   ansible.builtin.template:
