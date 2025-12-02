@@ -339,12 +339,25 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
-# Always use console email backend for now (not ready for production email)
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+#############################################################
+# Email Configuration
+#############################################################
 
 # Mail server API key for fetching member lists
 # Set this in production via environment variable
 M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
+
+# Email backend configuration
+# In production, use SMTP2GO relay; in development, use console backend
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.smtp2go.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
 # Development vs Production URLs
 if DEBUG:
@@ -354,7 +367,8 @@ else:
     CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
     SITE_URL = "https://m2s.skylinesoaring.org"
 
-DEFAULT_FROM_EMAIL = "noreply@default.manage2soar.org"
+# Default sender address - can be overridden per-club via siteconfig
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@manage2soar.com")
 EMAIL_SUBJECT_PREFIX = "[Manage2Soar] "
 
 #############################################################
