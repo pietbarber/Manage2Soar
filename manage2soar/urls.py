@@ -27,6 +27,7 @@ from django.views.generic import TemplateView
 from cms import views as cms_views
 from instructors import views as instr_views
 from members import views as members_views
+from members.api import email_lists
 
 
 def service_worker_view(request):
@@ -168,6 +169,8 @@ urlpatterns = [
         name="public_syllabus_qr",
     ),
     path("analytics/", include("analytics.urls")),
+    # API endpoints for mail server integration
+    path("api/email-lists/", email_lists, name="api_email_lists"),
     path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
     # Public contact form for visitors (no authentication required)
     path("contact/", cms_views.contact, name="contact"),

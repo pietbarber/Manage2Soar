@@ -1,0 +1,106 @@
+# Ansible Variables for Manage2Soar Infrastructure
+#
+# COPY THIS FILE TO all.yml AND FILL IN YOUR VALUES
+# all.yml is gitignored - never commit passwords or secrets
+#
+# Usage: cp all.yml.example all.yml && vim all.yml
+
+---
+# ============================================================
+# MAIL SERVER CONFIGURATION
+# ============================================================
+
+# Primary mail server hostname
+mail_hostname: "mail.manage2soar.com"
+
+# Primary domain for sending
+mail_domain: "manage2soar.com"
+
+# Admin email for DMARC reports and postmaster
+admin_email: "postmaster@manage2soar.com"
+
+# Let's Encrypt email for TLS certificate notifications
+letsencrypt_email: "ops@manage2soar.com"
+
+# ============================================================
+# CLUB SUBDOMAINS
+# ============================================================
+# List all clubs that will have email under manage2soar.com
+# Each club gets: MX, SPF, DKIM, DMARC, and mailing lists
+
+club_domains:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    # M2S API endpoint for this club's member lists
+    api_url: "https://ssc.manage2soar.com/api/email-lists/"
+
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+    api_url: "https://masa.manage2soar.com/api/email-lists/"
+
+  # Add more clubs as needed:
+  # - prefix: "nfss"
+  #   name: "Northern Florida Soaring Society"
+  #   api_url: "https://nfss.manage2soar.com/api/email-lists/"
+
+# ============================================================
+# M2S API AUTHENTICATION
+# ============================================================
+# API key for the mail server to fetch member lists from M2S
+# This should be a long random string, shared with M2S settings
+
+m2s_api_key: "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
+
+# ============================================================
+# OUTBOUND RELAY (SMTP2GO / SendGrid / etc.)
+# ============================================================
+# GCP blocks outbound port 25, so we relay through a service
+# Get these from your SMTP2GO dashboard under "Sending > SMTP Users"
+
+smtp_relay_host: "mail.smtp2go.com"
+smtp_relay_port: 587
+smtp_relay_username: "YOUR_SMTP2GO_USERNAME"
+smtp_relay_password: "YOUR_SMTP2GO_PASSWORD"
+
+# ============================================================
+# SMTP AUTHENTICATION (for M2S to send via this server)
+# ============================================================
+# Credentials that M2S Django app will use to send email
+
+smtp_auth_users:
+  - username: "m2s-app"
+    password: "CHANGE_ME_STRONG_PASSWORD"
+    # Which domains this user can send from
+    allowed_domains:
+      - "ssc.manage2soar.com"
+      - "masa.manage2soar.com"
+      # Add all club domains
+
+# ============================================================
+# DKIM CONFIGURATION
+# ============================================================
+# DKIM selector (used in DNS record name)
+dkim_selector: "mail"
+
+# DKIM key size (2048 recommended, 1024 for compatibility)
+dkim_key_size: 2048
+
+# ============================================================
+# FIREWALL / SECURITY
+# ============================================================
+# IPs allowed to relay through this server (M2S app servers)
+# These are added to Postfix mynetworks
+
+trusted_relay_ips:
+  - "10.0.0.0/8"       # Internal GCP network
+  - "35.192.0.0/12"    # GCP IP range (adjust as needed)
+  # Add your Kubernetes cluster IPs
+
+# ============================================================
+# MONITORING (optional)
+# ============================================================
+# Email to receive Postfix queue alerts
+alert_email: "ops@manage2soar.com"
+
+# Threshold for queue size warning
+queue_alert_threshold: 100

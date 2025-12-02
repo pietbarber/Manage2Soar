@@ -1,0 +1,32 @@
+---
+# Handlers for postfix role
+
+- name: Restart Postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+
+- name: Restart saslauthd
+  ansible.builtin.service:
+    name: saslauthd
+    state: restarted
+
+- name: Postmap virtual domains
+  ansible.builtin.command:
+    cmd: postmap {{ postfix_config_dir }}/virtual_domains
+  changed_when: true
+
+- name: Postmap virtual aliases
+  ansible.builtin.command:
+    cmd: postmap {{ postfix_config_dir }}/virtual
+  changed_when: true
+
+- name: Postmap sender whitelist
+  ansible.builtin.command:
+    cmd: postmap {{ postfix_config_dir }}/sender_whitelist
+  changed_when: true
+
+- name: Postmap SASL passwords
+  ansible.builtin.command:
+    cmd: postmap {{ postfix_config_dir }}/sasl_passwd
+  changed_when: true

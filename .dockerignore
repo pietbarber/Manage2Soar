@@ -28,3 +28,6 @@ k8s-deployment.yaml
 ingress.yaml
 membership.json
 setup-dev.sh
+
+# Exclude infrastructure/ansible (not needed in Docker image)
+infrastructure/

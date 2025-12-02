@@ -1,0 +1,100 @@
+---
+# ============================================================
+# Common Role - Base System Setup
+# ============================================================
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ mail_hostname }}"
+
+- name: Update /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ mail_hostname }} {{ mail_hostname.split('.')[0] }}"
+    state: present
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - vim
+      - htop
+      - curl
+      - wget
+      - unzip
+      - fail2ban
+      - ufw
+      - python3
+      - python3-pip
+      - python3-requests
+      - python3-yaml
+      - mailutils
+    state: present
+
+- name: Configure UFW defaults
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Allow SMTP
+  community.general.ufw:
+    rule: allow
+    port: "25"
+    proto: tcp
+
+- name: Allow submission (587)
+  community.general.ufw:
+    rule: allow
+    port: "587"
+    proto: tcp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Install certbot for Let's Encrypt certificates
+  ansible.builtin.apt:
+    name:
+      - certbot
+    state: present
+
+- name: Obtain Let's Encrypt certificate (if not exists)
+  ansible.builtin.command: >
+    certbot certonly --standalone --non-interactive --agree-tos
+    --email {{ letsencrypt_email }}
+    --domains {{ mail_hostname }}
+  args:
+    creates: /etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem
+  when: letsencrypt_email is defined
+
+- name: Configure fail2ban for postfix
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 5
+
+      [postfix]
+      enabled = true
+      port = smtp,submission
+      filter = postfix
+      logpath = /var/log/mail.log
+
+      [postfix-sasl]
+      enabled = true
+      port = smtp,submission
+      filter = postfix-sasl
+      logpath = /var/log/mail.log
+    mode: "0644"
+  notify: Restart fail2ban

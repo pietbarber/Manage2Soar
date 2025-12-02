@@ -1,0 +1,56 @@
+---
+# ============================================================
+# M2S Mail Sync Role - Dynamic List Updates
+# ============================================================
+# Syncs mailing list membership from M2S API to Postfix
+
+- name: Create sync script directory
+  ansible.builtin.file:
+    path: "{{ m2s_sync_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install sync script
+  ansible.builtin.template:
+    src: sync-aliases.py.j2
+    dest: "{{ m2s_sync_dir }}/sync-aliases.py"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install sync configuration
+  ansible.builtin.template:
+    src: sync-config.yml.j2
+    dest: "{{ m2s_sync_dir }}/config.yml"
+    owner: root
+    group: root
+    mode: "0600"  # Contains API key
+
+- name: Create cron job for alias sync
+  ansible.builtin.cron:
+    name: "Sync M2S email aliases"
+    minute: "*/15"
+    job: "{{ m2s_sync_dir }}/sync-aliases.py >> /var/log/m2s-sync.log 2>&1"
+    user: root
+
+- name: Create log rotation for sync logs
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/m2s-sync
+    content: |
+      /var/log/m2s-sync.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+      }
+    mode: "0644"
+
+- name: Run initial sync
+  ansible.builtin.command:
+    cmd: "{{ m2s_sync_dir }}/sync-aliases.py"
+  changed_when: true
+  ignore_errors: true  # May fail if M2S API not yet configured

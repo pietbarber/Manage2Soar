@@ -1,0 +1,113 @@
+---
+# ============================================================
+# Mail Server Setup Playbook
+# ============================================================
+# Sets up a complete mail server for Manage2Soar:
+# - Postfix (MTA) for sending/receiving
+# - OpenDKIM for email signing
+# - Virtual aliases for mailing lists
+# - M2S sync script for dynamic list updates
+#
+# Usage:
+#   ansible-playbook playbooks/mail-server.yml
+#
+# Prerequisites:
+#   - Debian 12 (Bookworm) target host
+#   - SSH access configured
+#   - inventory/hosts.yml populated
+#   - group_vars/all.yml populated with secrets
+
+- name: Configure Manage2Soar Mail Server
+  hosts: mail_servers
+  become: true
+
+  vars_files:
+    - ../group_vars/all.yml
+
+  vars:
+    # Paths
+    postfix_config_dir: /etc/postfix
+    opendkim_config_dir: /etc/opendkim
+    opendkim_keys_dir: /etc/opendkim/keys
+    m2s_sync_dir: /opt/m2s-mail-sync
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - mail_hostname is defined
+          - mail_domain is defined
+          - admin_email is defined
+          - club_domains is defined
+          - m2s_api_key is defined
+          - smtp_auth_users is defined
+        fail_msg: "Required variables not set. Check group_vars/all.yml"
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: postfix
+      tags: [postfix, mail]
+
+    - role: opendkim
+      tags: [opendkim, dkim, mail]
+
+    - role: m2s-mail-sync
+      tags: [sync, mail]
+
+  post_tasks:
+    - name: Display DKIM public keys for DNS
+      ansible.builtin.debug:
+        msg: |
+
+          ============================================================
+          DKIM PUBLIC KEYS - ADD THESE TO YOUR DNS
+          ============================================================
+
+          For each club domain, add this TXT record:
+
+          {% for club in club_domains %}
+          {{ dkim_selector }}._domainkey.{{ club.prefix }}.{{ mail_domain }}
+          (See /etc/opendkim/keys/{{ club.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt)
+
+          {% endfor %}
+
+          After adding DNS records, test with:
+          opendkim-testkey -d ssc.manage2soar.com -s mail -vvv
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg: |
+
+          ============================================================
+          MAIL SERVER SETUP COMPLETE
+          ============================================================
+
+          Next steps:
+
+          1. Add DNS records (MX, SPF, DKIM, DMARC) for each club domain
+
+          2. Configure M2S Django settings:
+             EMAIL_HOST = "{{ mail_hostname }}"
+             EMAIL_PORT = 587
+             EMAIL_USE_TLS = True
+             EMAIL_HOST_USER = "m2s-app"
+             EMAIL_HOST_PASSWORD = "<from group_vars/all.yml>"
+
+          3. Create the M2S API endpoint:
+             /api/email-lists/ (see infrastructure/README.md)
+
+          4. Test email delivery:
+             echo "Test" | mail -s "Test from M2S" your@email.com
+
+          5. Test mailing list:
+             Send email to members@ssc.manage2soar.com
+
+          Logs: /var/log/mail.log
+          Queue: mailq
