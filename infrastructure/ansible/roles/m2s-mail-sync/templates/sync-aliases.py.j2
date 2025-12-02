@@ -147,7 +147,10 @@ def main():
 
     if not clubs_data:
         print(f"[{datetime.now()}] WARNING: No club data fetched, keeping existing aliases")
-        sys.exit(1)
+        # Exit with 0 (success) because we intentionally preserved existing aliases.
+        # This is a graceful degradation, not a failure - the mail system continues
+        # working with the previous alias data. Cron will retry on the next run.
+        sys.exit(0)
 
     # Generate and update virtual aliases
     virtual_content = generate_virtual_aliases(clubs_data)

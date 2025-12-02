@@ -60,8 +60,8 @@ def get_active_members():
     ).exclude(email="")
 
 
-@csrf_exempt
 @require_GET
+@csrf_exempt
 @api_key_required
 def email_lists(request):
     """
