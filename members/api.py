@@ -7,6 +7,9 @@ member lists for mailing list aliases and sender whitelists.
 Security: All endpoints require API key authentication via X-API-Key header.
 """
 
+import secrets
+from functools import wraps
+
 from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse
@@ -26,16 +29,17 @@ def api_key_required(view_func):
     the M2S_MAIL_API_KEY setting.
     """
 
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         api_key = request.headers.get("X-API-Key")
         expected_key = getattr(settings, "M2S_MAIL_API_KEY", None)
 
-        if not expected_key:
+        if not expected_key or not expected_key.strip():
             return JsonResponse(
                 {"error": "API key not configured on server"}, status=500
             )
 
-        if not api_key or api_key != expected_key:
+        if not api_key or not secrets.compare_digest(api_key, expected_key):
             return JsonResponse({"error": "Invalid or missing API key"}, status=401)
 
         return view_func(request, *args, **kwargs)

@@ -19,6 +19,9 @@ mail_domain: "manage2soar.com"
 # Admin email for DMARC reports and postmaster
 admin_email: "postmaster@manage2soar.com"
 
+# Let's Encrypt email for TLS certificate notifications
+letsencrypt_email: "ops@manage2soar.com"
+
 # ============================================================
 # CLUB SUBDOMAINS
 # ============================================================

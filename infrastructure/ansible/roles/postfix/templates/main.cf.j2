@@ -42,10 +42,11 @@ virtual_alias_maps = hash:{{ postfix_config_dir }}/virtual
 # TLS SETTINGS
 # ============================================================
 # Enable TLS for both sending and receiving
+# Uses Let's Encrypt certificates obtained by certbot
 
 # Incoming TLS
-smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
-smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_cert_file = /etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem
+smtpd_tls_key_file = /etc/letsencrypt/live/{{ mail_hostname }}/privkey.pem
 smtpd_tls_security_level = may
 smtpd_tls_loglevel = 1
 

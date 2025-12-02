@@ -69,7 +69,7 @@ flowchart TB
 
         OpenDKIM --> Postfix
         Postfix --> Virtual
-        Sync -->|hourly sync| Virtual
+        Sync -->|every 15 min| Virtual
     end
 
     subgraph K8s["M2S Django App (Kubernetes / multiple clubs)"]

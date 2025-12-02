@@ -30,7 +30,6 @@ def fetch_club_lists(club, api_key):
 
     Expected response format:
     {
-        "domain": "ssc.manage2soar.com",
         "lists": {
             "members": ["alice@gmail.com", "bob@yahoo.com", ...],
             "instructors": ["alice@gmail.com", ...],
@@ -42,7 +41,7 @@ def fetch_club_lists(club, api_key):
     """
     try:
         headers = {
-            'Authorization': f'Bearer {api_key}',
+            'X-API-Key': api_key,
             'Accept': 'application/json',
         }
         response = requests.get(club['api_url'], headers=headers, timeout=30)
@@ -112,8 +111,8 @@ def file_changed(filepath, new_content):
     with open(filepath, 'r') as f:
         old_content = f.read()
 
-    old_hash = hashlib.md5(old_content.encode()).hexdigest()
-    new_hash = hashlib.md5(new_content.encode()).hexdigest()
+    old_hash = hashlib.sha256(old_content.encode()).hexdigest()
+    new_hash = hashlib.sha256(new_content.encode()).hexdigest()
 
     return old_hash != new_hash
 

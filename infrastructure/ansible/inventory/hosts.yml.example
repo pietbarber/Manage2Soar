@@ -6,13 +6,18 @@
 # Usage: cp hosts.yml.example hosts.yml && vim hosts.yml
 
 all:
+  vars:
+    # SSH connection settings (moved from ansible.cfg for portability)
+    ansible_user: "your_ssh_user"
+    ansible_ssh_private_key_file: "~/.ssh/id_rsa"
   children:
     mail_servers:
       hosts:
         mail.manage2soar.com:
           ansible_host: "10.0.0.1"  # Replace with your GCP VM IP
-          ansible_user: "your_ssh_user"
-          # ansible_ssh_private_key_file: "~/.ssh/your_key"
+          # Override user/key per host if needed:
+          # ansible_user: "different_user"
+          # ansible_ssh_private_key_file: "~/.ssh/different_key"
 
     # Future expansion
     # db_servers:

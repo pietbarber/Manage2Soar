@@ -91,10 +91,14 @@
 
 - name: Create SASL users
   ansible.builtin.shell: |
-    echo "{{ item.password }}" | saslpasswd2 -p -c -u {{ mail_domain }} {{ item.username }}
+    if ! sasldblistusers2 2>/dev/null | grep -q "{{ item.username }}@{{ mail_domain }}"; then
+      echo "{{ item.password }}" | saslpasswd2 -p -c -u {{ mail_domain }} {{ item.username }}
+      echo "created"
+    fi
   loop: "{{ smtp_auth_users }}"
   no_log: true # Don't log passwords
-  changed_when: true
+  register: sasl_result
+  changed_when: "'created' in sasl_result.stdout"
 
 - name: Add postfix to sasl group
   ansible.builtin.user:

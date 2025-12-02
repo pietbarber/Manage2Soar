@@ -27,6 +27,7 @@
       - python3
       - python3-pip
       - python3-requests
+      - python3-yaml
       - mailutils
     state: present
 
@@ -59,6 +60,21 @@
 - name: Enable UFW
   community.general.ufw:
     state: enabled
+
+- name: Install certbot for Let's Encrypt certificates
+  ansible.builtin.apt:
+    name:
+      - certbot
+    state: present
+
+- name: Obtain Let's Encrypt certificate (if not exists)
+  ansible.builtin.command: >
+    certbot certonly --standalone --non-interactive --agree-tos
+    --email {{ letsencrypt_email }}
+    --domains {{ mail_hostname }}
+  args:
+    creates: /etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem
+  when: letsencrypt_email is defined
 
 - name: Configure fail2ban for postfix
   ansible.builtin.copy:
