@@ -174,3 +174,31 @@ class TestEmailListsAPI:
         url = reverse("api_email_lists")
         response = api_client.post(url, HTTP_X_API_KEY="test-api-key-12345")
         assert response.status_code == 405  # Method Not Allowed
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_members_without_email_excluded(
+        self, api_client, active_member, membership_statuses
+    ):
+        """Test that members with empty email addresses are excluded from lists."""
+        # Create a member with no email
+        no_email_member = Member.objects.create_user(
+            username="noemail_user",
+            email="",  # Empty email
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        # Get all emails in the members list
+        member_emails = data["lists"]["members"]
+
+        # Member with no email should not appear (no empty strings)
+        assert all(email != "" for email in member_emails)
+        # Active member with email should still be present
+        assert active_member.email in member_emails
+        # Whitelist should not contain empty strings
+        assert all(email != "" for email in data["whitelist"])

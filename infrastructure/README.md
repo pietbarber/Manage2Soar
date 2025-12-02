@@ -121,3 +121,34 @@ Each club automatically gets these lists:
 - `board@{club}.manage2soar.com` - Members with is_board_member=True
 
 Lists are **whitelist-only** - only club members can send to them.
+
+## SMTP Relay (SMTP2GO)
+
+GCP blocks outbound port 25 (SMTP) by default to prevent spam. To enable outbound email delivery, we use SMTP2GO as a relay service.
+
+### Why SMTP2GO?
+
+- **GCP Port 25 Block**: Google Cloud blocks outbound SMTP on port 25 for all VMs
+- **Reputation**: SMTP2GO has established IP reputation for better deliverability
+- **Monitoring**: Provides delivery logs and bounce handling
+
+### Configuration
+
+The mail server uses SMTP2GO as a smarthost relay on port 587:
+
+```
+# In Postfix main.cf
+relayhost = [mail.smtp2go.com]:587
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+```
+
+### Required Credentials
+
+Store SMTP2GO credentials in `group_vars/all.yml`:
+```yaml
+smtp2go_username: "your-smtp2go-username"
+smtp2go_password: "your-smtp2go-password"
+```
+
+These are written to `/etc/postfix/sasl_passwd` (mode 600) during deployment.
