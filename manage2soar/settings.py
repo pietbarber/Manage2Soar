@@ -342,6 +342,10 @@ if not DEBUG:
 # Always use console email backend for now (not ready for production email)
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# Mail server API key for fetching member lists
+# Set this in production via environment variable
+M2S_MAIL_API_KEY = os.getenv("M2S_MAIL_API_KEY", "")
+
 # Development vs Production URLs
 if DEBUG:
     CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
