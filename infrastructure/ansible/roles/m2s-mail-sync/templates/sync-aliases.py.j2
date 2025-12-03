@@ -28,9 +28,9 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-
-# Email validation pattern (RFC 5322 simplified)
-EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+# Email validation pattern (RFC 5322 simplified, stricter: no leading/trailing dots)
+# Single-char local parts are allowed (e.g., a@domain.com)
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$')
 
 
 def is_valid_email(email):
@@ -121,10 +121,12 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                         raise ValueError(f"Invalid dev_redirect email: {dev_redirect}")
                     # Include original recipient count in comment for visibility
                     # Sanitize preview recipients to prevent injection in comment
-                    preview_recipients = sorted(set(r for r in recipients if is_valid_email(r)))[:3]
+                    valid_recipients = sorted(set(r for r in recipients if is_valid_email(r)))
+                    preview_recipients = valid_recipients[:3]
                     preview = ','.join(preview_recipients)
-                    suffix = '...' if len(recipients) > 3 else ''
-                    lines.append(f"# Original recipients ({len(recipients)}): {preview}{suffix}")
+                    valid_count = len(valid_recipients)
+                    suffix = '...' if valid_count > 3 else ''
+                    lines.append(f"# Original recipients ({valid_count}): {preview}{suffix}")
                     lines.append(f"{list_name}@{domain}  {dev_redirect}")
                 else:
                     # PRODUCTION: Normal recipients - sanitize to prevent injection
@@ -349,7 +351,9 @@ def main():
         if not is_valid_email(redirect_to):
             print(f"[{datetime.now()}] ERROR: Invalid dev_mode redirect_to email: {redirect_to}")
             sys.exit(1)
-        # Store stripped value back into config for generate_virtual_aliases
+        # Store stripped/validated value back into config dict.
+        # This is intentional: dev_mode dict is only used by generate_virtual_aliases()
+        # which is called immediately after this block, so the mutation is safe.
         dev_mode['redirect_to'] = redirect_to
         print(f"[{datetime.now()}] *** DEV MODE ENABLED ***")
         print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
