@@ -91,7 +91,7 @@ Rspamd provides spam filtering for incoming mailing list traffic:
 - **Milter integration**: Scans mail during SMTP, rejects spam before accepting
 - **Whitelist bypass**: Club members (synced from M2S API) skip all spam checks
 - **Hard reject**: Spam is rejected during SMTP (score 15+), no bounces generated
-- **Auto-updates**: Rules update automatically via cron
+- **Auto-updates**: Rules update automatically via Rspamd's built-in updater
 
 ### How it works
 

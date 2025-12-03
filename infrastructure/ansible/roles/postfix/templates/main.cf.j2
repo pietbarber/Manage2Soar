@@ -118,6 +118,8 @@ smtpd_relay_restrictions =
 milter_default_action = tempfail
 milter_protocol = 6
 smtpd_milters = unix:/run/opendkim/opendkim.sock, inet:localhost:11332
+# Only OpenDKIM for non-SMTP mail (sendmail, pickup queue).
+# Rspamd excluded: spam filtering only needed for external SMTP, not local mail.
 non_smtpd_milters = unix:/run/opendkim/opendkim.sock
 
 # ============================================================

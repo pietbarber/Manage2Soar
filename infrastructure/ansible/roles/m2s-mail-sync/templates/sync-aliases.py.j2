@@ -11,8 +11,10 @@ import grp
 import hashlib
 import os
 import pwd
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 
 import requests
@@ -114,8 +116,8 @@ def generate_rspamd_whitelist(clubs_data):
         f"# Generated: {datetime.now().isoformat()}",
         "# DO NOT EDIT MANUALLY - will be overwritten by cron",
         "#",
-        "# Whitelisted senders bypass Rspamd spam checks when SPF passes.",
-        "# (SPF requirement prevents spoofing of whitelisted addresses)",
+        "# Whitelisted senders bypass Rspamd spam checks only when SPF returns PASS.",
+        "# (SPF PASS requirement prevents spoofing of whitelisted addresses)",
         "# Format: one email address per line",
         "",
     ]
@@ -170,12 +172,15 @@ def write_rspamd_whitelist(filepath, content):
     if not file_changed(filepath, content):
         return False
 
-    import shutil
-    import tempfile
-
+    temp_path = None
     try:
-        # Write to temp file first, then atomic move
+        # Verify directory exists
         dir_path = os.path.dirname(filepath)
+        if not os.path.isdir(dir_path):
+            print(f"[{datetime.now()}] ERROR: Rspamd whitelist directory does not exist: {dir_path}")
+            return False
+
+        # Write to temp file first, then atomic move
         fd, temp_path = tempfile.mkstemp(dir=dir_path)
         try:
             with os.fdopen(fd, 'w') as f:
@@ -195,7 +200,7 @@ def write_rspamd_whitelist(filepath, content):
             shutil.move(temp_path, filepath)
         except Exception:
             # Clean up temp file on error
-            if os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 os.unlink(temp_path)
             raise
 

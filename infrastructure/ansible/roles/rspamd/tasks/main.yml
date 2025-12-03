@@ -116,14 +116,14 @@
       rules {
         M2S_WHITELIST {
           valid_dkim = false;
-          # Require valid SPF to prevent spoofing of whitelisted addresses
+          # Only whitelist if SPF passes (prevents spoofing via SPF validation)
           valid_spf = "allow";
           domains = false;
           from = true;
           prefilter = true;
           action = "no action";
           map = "file:///etc/rspamd/local.d/sender_whitelist.map";
-          description = "M2S club member whitelist - bypass spam checks (requires SPF pass)";
+          description = "M2S club member whitelist - bypass spam checks (requires SPF pass, DKIM not required)";
         }
       }
     mode: "0644"
@@ -162,8 +162,8 @@
   ansible.builtin.copy:
     dest: /etc/rspamd/local.d/rspamd_update.conf
     content: |
-      # Enable automatic rule updates
-      # Rspamd handles updates internally via this config
+      # Enable built-in periodic rule updates from Rspamd project
+      # Rspamd downloads updated spam rules automatically
       enabled = true;
     mode: "0644"
   notify: Restart Rspamd
