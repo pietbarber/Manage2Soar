@@ -313,7 +313,7 @@ def main():
             if write_rspamd_whitelist(whitelist_file, whitelist_content):
                 print(f"[{datetime.now()}] Updated Rspamd whitelist for {club_prefix}")
             else:
-                print(f"[{datetime.now()}] WARNING: Failed to update Rspamd whitelist for {club_prefix}")
+                print(f"[{datetime.now()}] Rspamd whitelist unchanged for {club_prefix}")
 
     # Legacy: Also update single combined whitelist if configured (backward compat)
     elif 'rspamd_whitelist_file' in config:
