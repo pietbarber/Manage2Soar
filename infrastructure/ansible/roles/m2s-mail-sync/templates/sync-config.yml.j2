@@ -19,7 +19,7 @@ rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists"
 # This prevents accidental emails during development/testing
 dev_mode:
   enabled: {{ dev_mode_enabled | default(false) | lower }}
-  redirect_to: "{{ dev_mode_redirect_to | default('') }}"
+  redirect_to: "{{ dev_mode_redirect_to | default('', true) }}"
 
 # Club configurations
 # Each club can have its own auth_token for API isolation

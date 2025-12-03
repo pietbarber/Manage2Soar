@@ -189,6 +189,15 @@ dev_mode_redirect_to: ""
 
 Then redeploy with `ansible-playbook playbooks/mail-server.yml --tags sync`.
 
+### Pre-Deployment Checklist
+
+Before deploying to production, verify:
+
+1. **Check dev mode is disabled**: `grep dev_mode_enabled group_vars/all.yml`
+2. **Verify configuration**: Run `ansible-playbook playbooks/mail-server.yml --check --diff`
+3. **Test sync manually**: SSH to mail server and run `/opt/m2s-mail-sync/sync-aliases.py`
+4. **Verify aliases**: Check `/etc/postfix/virtual` contains real recipients, not dev email
+
 ### Per-Club API Keys
 
 For stronger tenant isolation, each club can have its own API key:

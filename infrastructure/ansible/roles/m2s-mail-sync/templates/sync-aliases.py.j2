@@ -29,6 +29,24 @@ def load_config():
         return yaml.safe_load(f)
 
 
+# Email validation pattern (RFC 5322 simplified)
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+def is_valid_email(email):
+    """Validate email format and check for injection characters.
+
+    This prevents malicious recipients from injecting newlines, comments,
+    or other control characters into the Postfix virtual alias file.
+    """
+    if not email or not isinstance(email, str):
+        return False
+    # Check for injection characters
+    if any(c in email for c in '\n\r\t#'):
+        return False
+    return bool(EMAIL_PATTERN.match(email))
+
+
 def fetch_club_lists(club, default_auth_token):
     """
     Fetch email lists from M2S API for a club.
@@ -97,21 +115,20 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
         for list_name, recipients in data['lists'].items():
             if recipients:
                 if dev_enabled:
-                    if dev_redirect:
-                        # DEV MODE: Redirect all recipients to dev address
-                        # Include original recipient count in comment for visibility
-                        preview_recipients = sorted(set(recipients))[:3]
-                        preview = ','.join(preview_recipients)
-                        suffix = '...' if len(recipients) > 3 else ''
-                        lines.append(f"# Original recipients ({len(recipients)}): {preview}{suffix}")
-                        lines.append(f"{list_name}@{domain}  {dev_redirect}")
-                    else:
-                        # Skip this list if dev mode is enabled but no redirect configured
-                        lines.append(f"# SKIPPED: {list_name}@{domain} (dev mode enabled but no redirect_to configured)")
+                    # DEV MODE: Redirect all recipients to dev address
+                    # Note: dev_redirect is guaranteed valid here (validated in main())
+                    # Include original recipient count in comment for visibility
+                    preview_recipients = sorted(set(recipients))[:3]
+                    preview = ','.join(preview_recipients)
+                    suffix = '...' if len(recipients) > 3 else ''
+                    lines.append(f"# Original recipients ({len(recipients)}): {preview}{suffix}")
+                    lines.append(f"{list_name}@{domain}  {dev_redirect}")
                 else:
-                    # PRODUCTION: Normal recipients
-                    recipients_str = ','.join(sorted(set(recipients)))
-                    lines.append(f"{list_name}@{domain}  {recipients_str}")
+                    # PRODUCTION: Normal recipients - sanitize to prevent injection
+                    sanitized = [r for r in recipients if is_valid_email(r)]
+                    if sanitized:
+                        recipients_str = ','.join(sorted(set(sanitized)))
+                        lines.append(f"{list_name}@{domain}  {recipients_str}")
 
         lines.append("")
 
