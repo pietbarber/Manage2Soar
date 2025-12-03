@@ -1,0 +1,17 @@
+---
+# Rspamd handlers
+
+- name: Restart Rspamd
+  ansible.builtin.service:
+    name: rspamd
+    state: restarted
+
+- name: Reload Rspamd
+  ansible.builtin.service:
+    name: rspamd
+    state: reloaded
+
+- name: Restart Redis
+  ansible.builtin.service:
+    name: redis-server
+    state: restarted
