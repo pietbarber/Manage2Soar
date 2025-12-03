@@ -35,15 +35,6 @@
     src: header_checks.j2
     dest: "{{ postfix_config_dir }}/header_checks"
     mode: "0644"
-  register: header_checks_result
-
-- name: Validate header_checks PCRE syntax
-  ansible.builtin.command:
-    cmd: "postmap -q test pcre:{{ postfix_config_dir }}/header_checks"
-  when: header_checks_result is changed
-  register: header_checks_validation
-  failed_when: header_checks_validation.rc != 0
-  changed_when: false
   notify: Reload Postfix
 
 - name: Create smtp_header_checks (List headers for outbound mail)
@@ -51,16 +42,12 @@
     src: smtp_header_checks.j2
     dest: "{{ postfix_config_dir }}/smtp_header_checks"
     mode: "0644"
-  register: smtp_header_checks_result
-
-- name: Validate smtp_header_checks PCRE syntax
-  ansible.builtin.command:
-    cmd: "postmap -q test pcre:{{ postfix_config_dir }}/smtp_header_checks"
-  when: smtp_header_checks_result is changed
-  register: smtp_header_checks_validation
-  failed_when: smtp_header_checks_validation.rc != 0
-  changed_when: false
   notify: Reload Postfix
+
+- name: Validate Postfix configuration
+  ansible.builtin.command:
+    cmd: postfix check
+  changed_when: false
 
 - name: Create virtual alias domains file
   ansible.builtin.template:

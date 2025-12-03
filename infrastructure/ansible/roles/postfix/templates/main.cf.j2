@@ -143,5 +143,5 @@ smtpd_client_connection_rate_limit = 30
 # external From addresses to use our domain.
 header_checks = pcre:{{ postfix_config_dir }}/header_checks
 
-# Add mailing list headers (List-Id, Reply-To, etc.) on outbound mail
+# Add mailing list headers (List-Id, List-Post, Precedence) on outbound mail
 smtp_header_checks = pcre:{{ postfix_config_dir }}/smtp_header_checks
