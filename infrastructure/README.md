@@ -69,8 +69,8 @@ flowchart TB
         Virtual["/etc/postfix/virtual<br/>(alias maps - generated)"]
         Sync["m2s-sync-aliases.py<br/>(pulls from M2S API)"]
 
-        Postfix -.->|milter| Rspamd
-        Postfix -.->|milter| OpenDKIM
+        Postfix -.->|1. DKIM| OpenDKIM
+        OpenDKIM -.->|2. spam| Rspamd
         Postfix --> Virtual
         Sync -->|every 15 min| Virtual
     end
