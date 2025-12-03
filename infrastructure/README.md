@@ -97,24 +97,71 @@ Rspamd provides spam filtering for incoming mailing list traffic:
 
 1. External email arrives at Postfix
 2. Postfix calls Rspamd milter (port 11332)
-3. Rspamd checks sender against whitelist (`/etc/rspamd/local.d/sender_whitelist.map`)
-4. If whitelisted → bypass all checks, return OK
+3. Rspamd checks sender against per-club whitelist (`/etc/rspamd/local.d/whitelists/{club}_whitelist.map`)
+4. If whitelisted AND recipient matches club domain → bypass all checks, return OK
 5. If not whitelisted → full spam scan
 6. Score 15+ → REJECT during SMTP
 7. Score 6-15 → Accept with X-Spam-Status header
 8. Score <6 → Clean pass
 
+### Multi-Tenant Whitelist Isolation
+
+Each club has its own whitelist file that **only applies to mail destined for that club's domain**. This prevents a malicious club admin from whitelisting spammers that could affect other clubs.
+
+```
+/etc/rspamd/local.d/whitelists/
+├── ssc_whitelist.map      # Only applies to *@ssc.manage2soar.com
+├── masa_whitelist.map     # Only applies to *@masa.manage2soar.com
+└── ...
+```
+
+The whitelist rule uses `rcpt` matching to scope each whitelist:
+- `ssc_whitelist.map` → only bypasses spam checks for mail TO `@ssc.manage2soar.com`
+- `masa_whitelist.map` → only bypasses spam checks for mail TO `@masa.manage2soar.com`
+
 ### Monitoring
 
 ```bash
 # View Rspamd stats
-rspamadm stat
+rspamc stat
 
 # Check Rspamd logs
 journalctl -u rspamd -f
 
 # Test spam detection
 rspamc < /path/to/test-email.eml
+
+# View per-club whitelist
+cat /etc/rspamd/local.d/whitelists/ssc_whitelist.map
+```
+
+## Multi-Tenant Architecture
+
+The mail server supports multiple clubs (tenants), each with:
+- Separate email domain (`{club}.manage2soar.com`)
+- Independent mailing lists
+- Isolated spam whitelists
+- Optional per-club API authentication
+
+### Per-Club API Keys
+
+For stronger tenant isolation, each club can have its own API key:
+
+```yaml
+# group_vars/all.yml
+club_domains:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    api_url: "https://ssc.manage2soar.com/api/email-lists/"
+    auth_token: "SSC_SPECIFIC_KEY_HERE"  # Optional
+
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+    api_url: "https://masa.manage2soar.com/api/email-lists/"
+    auth_token: "MASA_SPECIFIC_KEY_HERE"  # Optional
+
+# Default key used if club doesn't have its own auth_token
+m2s_api_key: "DEFAULT_FALLBACK_KEY"
 ```
 
 ## Supported Domains
