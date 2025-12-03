@@ -4,21 +4,23 @@
 # DO NOT EDIT MANUALLY - changes will be overwritten
 # This file contains secrets - mode 0600
 
-# Authentication token for M2S API
+# Default authentication token for M2S API (used if club doesn't have its own)
 # (Value is injected from Ansible Vault at deploy time, not hardcoded)
-auth_token: "{{ m2s_api_key }}"
+default_auth_token: "{{ m2s_api_key }}"
 
 # Postfix configuration paths
 postfix_virtual_file: "{{ postfix_config_dir }}/virtual"
 postfix_whitelist_file: "{{ postfix_config_dir }}/sender_whitelist"
 
-# Rspamd whitelist path (for spam filter bypass)
-rspamd_whitelist_file: "/etc/rspamd/local.d/sender_whitelist.map"
+# Rspamd whitelist directory (per-club whitelist files stored here)
+rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists"
 
 # Club configurations
+# Each club can have its own auth_token for API isolation
 clubs:
 {% for club in club_domains %}
   - prefix: "{{ club.prefix }}"
     domain: "{{ club.prefix }}.{{ mail_domain }}"
     api_url: "{{ club.api_url }}"
+    auth_token: "{{ club.auth_token | default(m2s_api_key) }}"
 {% endfor %}

@@ -33,20 +33,26 @@ club_domains:
     name: "Skyline Soaring Club"
     # M2S API endpoint for this club's member lists
     api_url: "https://ssc.manage2soar.com/api/email-lists/"
+    # Per-club API key (optional - falls back to m2s_api_key if not set)
+    # For multi-tenant isolation, each club should have its own key
+    # auth_token: "CLUB_SPECIFIC_API_KEY_HERE"
 
   - prefix: "masa"
     name: "Mid-Atlantic Soaring Association"
     api_url: "https://masa.manage2soar.com/api/email-lists/"
+    # auth_token: "MASA_SPECIFIC_API_KEY_HERE"
 
   # Add more clubs as needed:
   # - prefix: "nfss"
   #   name: "Northern Florida Soaring Society"
   #   api_url: "https://nfss.manage2soar.com/api/email-lists/"
+  #   auth_token: "NFSS_SPECIFIC_API_KEY_HERE"
 
 # ============================================================
 # M2S API AUTHENTICATION
 # ============================================================
-# API key for the mail server to fetch member lists from M2S
+# Default API key for clubs that don't have their own auth_token
+# For better multi-tenant isolation, prefer per-club auth_tokens above
 # This should be a long random string, shared with M2S settings
 
 m2s_api_key: "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
