@@ -11,6 +11,7 @@ import grp
 import hashlib
 import os
 import pwd
+import re
 import shutil
 import subprocess
 import sys
@@ -95,11 +96,18 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
 
         for list_name, recipients in data['lists'].items():
             if recipients:
-                if dev_enabled and dev_redirect:
-                    # DEV MODE: Redirect all recipients to dev address
-                    # Include original recipient count in comment for visibility
-                    lines.append(f"# Original recipients ({len(recipients)}): {','.join(sorted(set(recipients))[:3])}...")
-                    lines.append(f"{list_name}@{domain}  {dev_redirect}")
+                if dev_enabled:
+                    if dev_redirect:
+                        # DEV MODE: Redirect all recipients to dev address
+                        # Include original recipient count in comment for visibility
+                        preview_recipients = sorted(set(recipients))[:3]
+                        preview = ','.join(preview_recipients)
+                        suffix = '...' if len(recipients) > 3 else ''
+                        lines.append(f"# Original recipients ({len(recipients)}): {preview}{suffix}")
+                        lines.append(f"{list_name}@{domain}  {dev_redirect}")
+                    else:
+                        # Skip this list if dev mode is enabled but no redirect configured
+                        lines.append(f"# SKIPPED: {list_name}@{domain} (dev mode enabled but no redirect_to configured)")
                 else:
                     # PRODUCTION: Normal recipients
                     recipients_str = ','.join(sorted(set(recipients)))
@@ -312,10 +320,16 @@ def main():
     if dev_mode.get('enabled', False):
         redirect_to = dev_mode.get('redirect_to', '')
         if redirect_to:
+            # Basic email validation
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, redirect_to):
+                print(f"[{datetime.now()}] ERROR: Invalid dev_mode redirect_to email: {redirect_to}")
+                sys.exit(1)
             print(f"[{datetime.now()}] *** DEV MODE ENABLED ***")
             print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
         else:
-            print(f"[{datetime.now()}] WARNING: dev_mode enabled but no redirect_to address configured!")
+            print(f"[{datetime.now()}] ERROR: dev_mode enabled but no redirect_to address configured!")
+            sys.exit(1)
 
     # Generate and update virtual aliases
     virtual_content = generate_virtual_aliases(clubs_data, dev_mode=dev_mode)

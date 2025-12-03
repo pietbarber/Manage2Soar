@@ -149,6 +149,8 @@ During development and testing, you can redirect **all** mailing list recipients
 
 ### Enable Dev Mode
 
+**⚠️ Check your current settings first!** In production environments, this should always be `false`.
+
 In `group_vars/all.yml`:
 
 ```yaml
