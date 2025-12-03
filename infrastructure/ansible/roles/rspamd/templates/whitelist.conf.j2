@@ -15,7 +15,7 @@ rules {
   M2S_{{ club.prefix | upper }}_WHITELIST {
     valid_dkim = false;
     # Only whitelist if SPF passes (prevents spoofing via SPF validation)
-    valid_spf = "allow";
+    valid_spf = true;
     domains = false;
     from = true;
     prefilter = true;
