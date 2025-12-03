@@ -108,12 +108,14 @@ smtpd_relay_restrictions =
     defer_unauth_destination
 
 # ============================================================
-# DKIM (OpenDKIM milter)
+# MILTERS (OpenDKIM + Rspamd)
 # ============================================================
+# OpenDKIM signs outgoing mail
+# Rspamd scans incoming mail for spam (rejects during SMTP)
 milter_default_action = accept
 milter_protocol = 6
-smtpd_milters = unix:/run/opendkim/opendkim.sock
-non_smtpd_milters = $smtpd_milters
+smtpd_milters = inet:localhost:11332, unix:/run/opendkim/opendkim.sock
+non_smtpd_milters = unix:/run/opendkim/opendkim.sock
 
 # ============================================================
 # OUTBOUND RELAY (SMTP2GO)

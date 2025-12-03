@@ -20,6 +20,7 @@ infrastructure/
 │       ├── common/              # Base system setup
 │       ├── postfix/             # Postfix MTA
 │       ├── opendkim/            # DKIM signing
+│       ├── rspamd/              # Spam filtering
 │       └── m2s-mail-sync/       # M2S alias sync script
 └── README.md
 ```
@@ -63,10 +64,12 @@ flowchart TB
 
     subgraph GCP["mail.manage2soar.com (GCP VM)"]
         Postfix[Postfix<br/>MTA]
+        Rspamd[Rspamd<br/>spam filter]
         OpenDKIM[OpenDKIM<br/>signing]
         Virtual["/etc/postfix/virtual<br/>(alias maps - generated)"]
         Sync["m2s-sync-aliases.py<br/>(pulls from M2S API)"]
 
+        Rspamd --> Postfix
         OpenDKIM --> Postfix
         Postfix --> Virtual
         Sync -->|every 15 min| Virtual
@@ -76,9 +79,42 @@ flowchart TB
         Django[Django Application]
     end
 
-    ExtMail --> Postfix
+    ExtMail --> Rspamd
     Postfix --> ExtMail
     Django -->|"SMTP :587"| Postfix
+```
+
+## Spam Filtering (Rspamd)
+
+Rspamd provides spam filtering for incoming mailing list traffic:
+
+- **Milter integration**: Scans mail during SMTP, rejects spam before accepting
+- **Whitelist bypass**: Club members (synced from M2S API) skip all spam checks
+- **Hard reject**: Spam is rejected during SMTP (score 15+), no bounces generated
+- **Auto-updates**: Rules update automatically via cron
+
+### How it works
+
+1. External email arrives at Postfix
+2. Postfix calls Rspamd milter (port 11332)
+3. Rspamd checks sender against whitelist (`/etc/rspamd/local.d/sender_whitelist.map`)
+4. If whitelisted → bypass all checks, return OK
+5. If not whitelisted → full spam scan
+6. Score 15+ → REJECT during SMTP
+7. Score 6-15 → Accept with X-Spam-Status header
+8. Score <6 → Clean pass
+
+### Monitoring
+
+```bash
+# View Rspamd stats
+rspamadm stat
+
+# Check Rspamd logs
+journalctl -u rspamd -f
+
+# Test spam detection
+rspamc < /path/to/test-email.eml
 ```
 
 ## Supported Domains

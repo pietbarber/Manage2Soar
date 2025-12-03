@@ -4,12 +4,16 @@
 # DO NOT EDIT MANUALLY - changes will be overwritten
 # This file contains secrets - mode 0600
 
-# API key for authenticating with M2S
-api_key: "{{ m2s_api_key }}"
+# Authentication token for M2S API
+# (Value is injected from Ansible Vault at deploy time, not hardcoded)
+auth_token: "{{ m2s_api_key }}"
 
 # Postfix configuration paths
 postfix_virtual_file: "{{ postfix_config_dir }}/virtual"
 postfix_whitelist_file: "{{ postfix_config_dir }}/sender_whitelist"
+
+# Rspamd whitelist path (for spam filter bypass)
+rspamd_whitelist_file: "/etc/rspamd/local.d/sender_whitelist.map"
 
 # Club configurations
 clubs:

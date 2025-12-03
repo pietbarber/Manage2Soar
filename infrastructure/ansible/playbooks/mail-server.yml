@@ -58,6 +58,9 @@
     - role: opendkim
       tags: [opendkim, dkim, mail]
 
+    - role: rspamd
+      tags: [rspamd, spam, mail]
+
     - role: m2s-mail-sync
       tags: [sync, mail]
 
