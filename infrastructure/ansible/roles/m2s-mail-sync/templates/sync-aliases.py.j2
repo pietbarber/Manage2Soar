@@ -259,10 +259,11 @@ def main():
     config = load_config()
     default_auth_token = config.get('default_auth_token', config.get('auth_token', ''))
     if not default_auth_token:
-        # Check if any club has its own auth_token
-        has_club_token = any(club.get('auth_token') for club in config.get('clubs', []))
-        if not has_club_token:
-            print(f"[{datetime.now()}] ERROR: No default_auth_token, auth_token, or per-club auth_token in config")
+        # Check if ALL clubs have their own auth_token
+        clubs = config.get('clubs', [])
+        missing_tokens = [club['prefix'] for club in clubs if not club.get('auth_token')]
+        if missing_tokens:
+            print(f"[{datetime.now()}] ERROR: No default_auth_token and clubs missing auth_token: {', '.join(missing_tokens)}")
             sys.exit(1)
 
     # Fetch lists from all clubs
