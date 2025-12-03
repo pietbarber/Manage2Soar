@@ -116,9 +116,12 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
             if recipients:
                 if dev_enabled:
                     # DEV MODE: Redirect all recipients to dev address
-                    # Note: dev_redirect is guaranteed valid here (validated in main())
+                    # Defense-in-depth: re-validate dev_redirect even though main() checked it
+                    if not is_valid_email(dev_redirect):
+                        raise ValueError(f"Invalid dev_redirect email: {dev_redirect}")
                     # Include original recipient count in comment for visibility
-                    preview_recipients = sorted(set(recipients))[:3]
+                    # Sanitize preview recipients to prevent injection in comment
+                    preview_recipients = sorted(set(r for r in recipients if is_valid_email(r)))[:3]
                     preview = ','.join(preview_recipients)
                     suffix = '...' if len(recipients) > 3 else ''
                     lines.append(f"# Original recipients ({len(recipients)}): {preview}{suffix}")
@@ -126,7 +129,10 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                 else:
                     # PRODUCTION: Normal recipients - sanitize to prevent injection
                     sanitized = [r for r in recipients if is_valid_email(r)]
-                    if sanitized:
+                    if not sanitized:
+                        # All recipients were filtered out - log warning
+                        lines.append(f"# WARNING: {list_name}@{domain} - all recipients filtered (invalid emails)")
+                    else:
                         recipients_str = ','.join(sorted(set(sanitized)))
                         lines.append(f"{list_name}@{domain}  {recipients_str}")
 
@@ -335,18 +341,18 @@ def main():
     # Check for dev mode (safety valve for development)
     dev_mode = config.get('dev_mode', {})
     if dev_mode.get('enabled', False):
-        redirect_to = dev_mode.get('redirect_to', '')
-        if redirect_to:
-            # Basic email validation
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if not re.match(email_pattern, redirect_to):
-                print(f"[{datetime.now()}] ERROR: Invalid dev_mode redirect_to email: {redirect_to}")
-                sys.exit(1)
-            print(f"[{datetime.now()}] *** DEV MODE ENABLED ***")
-            print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
-        else:
+        redirect_to = dev_mode.get('redirect_to', '').strip()
+        if not redirect_to:
             print(f"[{datetime.now()}] ERROR: dev_mode enabled but no redirect_to address configured!")
             sys.exit(1)
+        # Use is_valid_email() for consistent validation
+        if not is_valid_email(redirect_to):
+            print(f"[{datetime.now()}] ERROR: Invalid dev_mode redirect_to email: {redirect_to}")
+            sys.exit(1)
+        # Store stripped value back into config for generate_virtual_aliases
+        dev_mode['redirect_to'] = redirect_to
+        print(f"[{datetime.now()}] *** DEV MODE ENABLED ***")
+        print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
 
     # Generate and update virtual aliases
     virtual_content = generate_virtual_aliases(clubs_data, dev_mode=dev_mode)
