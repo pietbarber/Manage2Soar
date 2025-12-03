@@ -27,6 +27,13 @@
     state: directory
     mode: "0755"
 
+- name: Ensure Redis includes conf.d directory
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    line: 'include /etc/redis/redis.conf.d/*.conf'
+    state: present
+  notify: Restart Redis
+
 - name: Configure Redis security (bind to localhost, protected mode)
   ansible.builtin.copy:
     dest: /etc/redis/redis.conf.d/security.conf
@@ -48,7 +55,7 @@
     content: |
       # Milter mode for Postfix integration
       milter = yes;
-      timeout = 120s;
+      timeout = 30s;
       upstream "local" {
         default = yes;
         self_scan = yes;
@@ -109,14 +116,14 @@
       rules {
         M2S_WHITELIST {
           valid_dkim = false;
-          valid_spf = false;
+          # Require valid SPF to prevent spoofing of whitelisted addresses
+          valid_spf = "allow";
           domains = false;
           from = true;
           prefilter = true;
           action = "no action";
-          score = -100.0;
           map = "file:///etc/rspamd/local.d/sender_whitelist.map";
-          description = "M2S club member whitelist - bypass spam checks";
+          description = "M2S club member whitelist - bypass spam checks (requires SPF pass)";
         }
       }
     mode: "0644"
@@ -156,31 +163,10 @@
     dest: /etc/rspamd/local.d/rspamd_update.conf
     content: |
       # Enable automatic rule updates
+      # Rspamd handles updates internally via this config
       enabled = true;
     mode: "0644"
   notify: Restart Rspamd
-
-- name: Create Rspamd update cron job
-  ansible.builtin.cron:
-    name: "Rspamd rule updates"
-    minute: "30"
-    hour: "3"
-    job: "/usr/bin/rspamadm configwizard --update >> /var/log/rspamd-update.log 2>&1"
-    user: root
-
-- name: Install logrotate config for rspamd-update.log
-  ansible.builtin.copy:
-    dest: /etc/logrotate.d/rspamd-update
-    content: |
-      /var/log/rspamd-update.log {
-          daily
-          rotate 14
-          compress
-          missingok
-          notifempty
-          create 0640 root adm
-      }
-    mode: "0644"
 
 - name: Ensure Rspamd is enabled and running
   ansible.builtin.service:

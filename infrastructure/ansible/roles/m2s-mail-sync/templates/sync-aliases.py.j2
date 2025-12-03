@@ -114,7 +114,8 @@ def generate_rspamd_whitelist(clubs_data):
         f"# Generated: {datetime.now().isoformat()}",
         "# DO NOT EDIT MANUALLY - will be overwritten by cron",
         "#",
-        "# Whitelisted senders bypass all Rspamd spam checks.",
+        "# Whitelisted senders bypass Rspamd spam checks when SPF passes.",
+        "# (SPF requirement prevents spoofing of whitelisted addresses)",
         "# Format: one email address per line",
         "",
     ]
@@ -161,23 +162,42 @@ def write_and_postmap(filepath, content):
 
 
 def write_rspamd_whitelist(filepath, content):
-    """Write Rspamd whitelist file if content changed."""
+    """Write Rspamd whitelist file if content changed.
+
+    Uses atomic write via temp file to prevent race conditions where
+    Rspamd might read a partially-written file.
+    """
     if not file_changed(filepath, content):
         return False
 
-    try:
-        # Write new content
-        with open(filepath, 'w') as f:
-            f.write(content)
+    import shutil
+    import tempfile
 
-        # Set ownership to _rspamd user so Rspamd can read the file
+    try:
+        # Write to temp file first, then atomic move
+        dir_path = os.path.dirname(filepath)
+        fd, temp_path = tempfile.mkstemp(dir=dir_path)
         try:
-            rspamd_uid = pwd.getpwnam('_rspamd').pw_uid
-            rspamd_gid = grp.getgrnam('_rspamd').gr_gid
-            os.chown(filepath, rspamd_uid, rspamd_gid)
-        except KeyError:
-            # _rspamd user doesn't exist (maybe on dev machine)
-            pass
+            with os.fdopen(fd, 'w') as f:
+                f.write(content)
+
+            # Set ownership and permissions before moving
+            try:
+                rspamd_uid = pwd.getpwnam('_rspamd').pw_uid
+                rspamd_gid = grp.getgrnam('_rspamd').gr_gid
+                os.chown(temp_path, rspamd_uid, rspamd_gid)
+                os.chmod(temp_path, 0o644)
+            except KeyError:
+                # _rspamd user doesn't exist (maybe on dev machine)
+                os.chmod(temp_path, 0o644)
+
+            # Atomic move
+            shutil.move(temp_path, filepath)
+        except Exception:
+            # Clean up temp file on error
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise
 
         # Rspamd auto-reloads map files, no need to signal
         return True

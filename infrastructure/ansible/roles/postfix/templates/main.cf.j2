@@ -110,11 +110,14 @@ smtpd_relay_restrictions =
 # ============================================================
 # MILTERS (OpenDKIM + Rspamd)
 # ============================================================
-# OpenDKIM signs outgoing mail
-# Rspamd scans incoming mail for spam (rejects during SMTP)
-milter_default_action = accept
+# OpenDKIM: verifies DKIM on incoming, signs outgoing
+# Rspamd: scans incoming mail for spam (rejects during SMTP)
+#
+# Order matters: OpenDKIM first so Rspamd can use DKIM/SPF results for scoring
+# tempfail = defer mail if milter unavailable (security: don't skip spam checks)
+milter_default_action = tempfail
 milter_protocol = 6
-smtpd_milters = inet:localhost:11332, unix:/run/opendkim/opendkim.sock
+smtpd_milters = unix:/run/opendkim/opendkim.sock, inet:localhost:11332
 non_smtpd_milters = unix:/run/opendkim/opendkim.sock
 
 # ============================================================

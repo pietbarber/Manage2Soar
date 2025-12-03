@@ -69,8 +69,8 @@ flowchart TB
         Virtual["/etc/postfix/virtual<br/>(alias maps - generated)"]
         Sync["m2s-sync-aliases.py<br/>(pulls from M2S API)"]
 
-        Rspamd --> Postfix
-        OpenDKIM --> Postfix
+        Postfix -.->|milter| Rspamd
+        Postfix -.->|milter| OpenDKIM
         Postfix --> Virtual
         Sync -->|every 15 min| Virtual
     end
@@ -79,7 +79,7 @@ flowchart TB
         Django[Django Application]
     end
 
-    ExtMail --> Rspamd
+    ExtMail --> Postfix
     Postfix --> ExtMail
     Django -->|"SMTP :587"| Postfix
 ```
