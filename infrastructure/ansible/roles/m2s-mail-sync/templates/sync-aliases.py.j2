@@ -188,8 +188,8 @@ def write_and_postmap(filepath, content):
     with open(filepath, 'w') as f:
         f.write(content)
 
-    # Run postmap to rebuild hash database
-    subprocess.run(['postmap', filepath], check=True)
+    # Run postmap to rebuild hash database (use full path for cron compatibility)
+    subprocess.run(['/usr/sbin/postmap', filepath], check=True)
 
     return True
 
