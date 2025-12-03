@@ -48,7 +48,7 @@ def fetch_club_lists(club, default_auth_token):
     """
     try:
         # Use club-specific token if available, otherwise default
-        auth_token = club.get('auth_token') or default_auth_token
+        auth_token = club.get('auth_token', default_auth_token)
         headers = {
             'X-API-Key': auth_token,
             'Accept': 'application/json',
@@ -244,14 +244,13 @@ def write_rspamd_whitelist(filepath, content):
 
 def ensure_rspamd_whitelist_dir(dir_path):
     """Ensure the Rspamd whitelist directory exists with correct permissions."""
-    if not os.path.isdir(dir_path):
-        os.makedirs(dir_path, mode=0o755)
-        try:
-            rspamd_uid = pwd.getpwnam('_rspamd').pw_uid
-            rspamd_gid = grp.getgrnam('_rspamd').gr_gid
-            os.chown(dir_path, rspamd_uid, rspamd_gid)
-        except KeyError:
-            pass  # _rspamd user doesn't exist (dev machine)
+    os.makedirs(dir_path, mode=0o755, exist_ok=True)
+    try:
+        rspamd_uid = pwd.getpwnam('_rspamd').pw_uid
+        rspamd_gid = grp.getgrnam('_rspamd').gr_gid
+        os.chown(dir_path, rspamd_uid, rspamd_gid)
+    except KeyError:
+        pass  # _rspamd user doesn't exist (dev machine)
 
 
 def main():
@@ -259,6 +258,9 @@ def main():
 
     config = load_config()
     default_auth_token = config.get('default_auth_token', config.get('auth_token', ''))
+    if not default_auth_token:
+        print(f"[{datetime.now()}] ERROR: No default_auth_token or auth_token in config")
+        sys.exit(1)
 
     # Fetch lists from all clubs
     clubs_data = {}
@@ -306,6 +308,8 @@ def main():
             )
             if write_rspamd_whitelist(whitelist_file, whitelist_content):
                 print(f"[{datetime.now()}] Updated Rspamd whitelist for {club_prefix}")
+            else:
+                print(f"[{datetime.now()}] WARNING: Failed to update Rspamd whitelist for {club_prefix}")
 
     # Legacy: Also update single combined whitelist if configured (backward compat)
     elif 'rspamd_whitelist_file' in config:

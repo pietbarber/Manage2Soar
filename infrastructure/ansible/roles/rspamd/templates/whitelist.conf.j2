@@ -22,7 +22,7 @@ rules {
     action = "no action";
     map = "file:///etc/rspamd/local.d/whitelists/{{ club.prefix }}_whitelist.map";
     # Only apply to mail destined for this club's domain
-    rcpt = "/{{ club.prefix }}\.{{ mail_domain | replace('.', '\\.') }}$/";
+    rcpt = "/.*@{{ club.prefix }}\.{{ mail_domain | replace('.', '\\.') }}$/";
     description = "{{ club.name }} member whitelist - bypass spam checks (requires SPF pass)";
   }
 {% endfor %}
