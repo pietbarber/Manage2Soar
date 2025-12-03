@@ -39,7 +39,7 @@
 
 - name: Validate header_checks PCRE syntax
   ansible.builtin.command:
-    cmd: "postmap -F pcre:{{ postfix_config_dir }}/header_checks"
+    cmd: "postmap -q test pcre:{{ postfix_config_dir }}/header_checks"
   when: header_checks_result is changed
   register: header_checks_validation
   failed_when: header_checks_validation.rc != 0
@@ -55,7 +55,7 @@
 
 - name: Validate smtp_header_checks PCRE syntax
   ansible.builtin.command:
-    cmd: "postmap -F pcre:{{ postfix_config_dir }}/smtp_header_checks"
+    cmd: "postmap -q test pcre:{{ postfix_config_dir }}/smtp_header_checks"
   when: smtp_header_checks_result is changed
   register: smtp_header_checks_validation
   failed_when: smtp_header_checks_validation.rc != 0

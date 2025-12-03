@@ -19,12 +19,13 @@
     PREPEND List-Id: SSC Members <members.ssc.manage2soar.com>
 
 # Add List-Post header (where to send messages to the list)
+# Mail clients use this for "Reply to List" functionality
 /^From:.*@ssc\.manage2soar\.com/
     PREPEND List-Post: <mailto:members@ssc.manage2soar.com>
 
-# Add Reply-To header pointing to the list (reply-to-list behavior)
-/^From:.*@ssc\.manage2soar\.com/
-    PREPEND Reply-To: members@ssc.manage2soar.com
+# Note: We intentionally do NOT set Reply-To header.
+# The List-Post header above enables mail client "Reply to List" buttons,
+# while allowing recipients to reply privately to the sender if desired.
 
 # Add Precedence header (helps spam filters recognize bulk mail)
 /^From:.*@ssc\.manage2soar\.com/
