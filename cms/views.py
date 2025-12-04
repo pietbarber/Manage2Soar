@@ -453,10 +453,9 @@ def _notify_member_managers_of_contact(contact_submission):
     This replaces sending emails to the spam-prone welcome@skylinesoaring.org
     """
     try:
-        from django.core.mail import send_mail
-
         from members.models import Member
         from siteconfig.models import SiteConfiguration
+        from utils.email import send_mail
 
         # Get site configuration for domain info
         site_config = SiteConfiguration.objects.first()

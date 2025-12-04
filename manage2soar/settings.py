@@ -362,12 +362,16 @@ else:
 # =============================================================================
 # EMAIL DEV MODE - Safety valve for development/testing
 # =============================================================================
-# When enabled, ALL outgoing emails are redirected to a single address.
+# When enabled, ALL outgoing emails are redirected to configured test address(es).
 # This prevents accidentally emailing real members during development.
 #
 # Set via environment variables:
 #   EMAIL_DEV_MODE=true
-#   EMAIL_DEV_MODE_REDIRECT_TO=developer@example.com
+#   EMAIL_DEV_MODE_REDIRECT_TO=developer@example.com[,other@example.com]
+#
+# Note: EMAIL_DEV_MODE only takes effect when DEBUG=False. When DEBUG=True,
+# Django uses the console email backend which doesn't actually send emails.
+# Use EMAIL_DEV_MODE in staging/production environments where real SMTP is used.
 #
 # Works independently of the mail server dev mode (which only affects
 # mailing lists routed through Postfix). This catches ALL Django emails

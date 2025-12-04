@@ -4,14 +4,20 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
-from utils.email import DevModeEmailMessage, get_dev_mode_info, send_mail
+from utils.email import (
+    DevModeEmailMessage,
+    get_dev_mode_info,
+    send_mail,
+    send_mass_mail,
+)
 
 
 class DevModeEmailTests(TestCase):
     """Tests for email dev mode functionality."""
 
-    def test_get_dev_mode_info_disabled_by_default(self):
-        """Dev mode should be disabled by default."""
+    @override_settings(EMAIL_DEV_MODE=False, EMAIL_DEV_MODE_REDIRECT_TO="")
+    def test_get_dev_mode_info_disabled(self):
+        """Dev mode should be disabled when EMAIL_DEV_MODE=False."""
         enabled, redirect_list = get_dev_mode_info()
         self.assertFalse(enabled)
         self.assertEqual(redirect_list, [])
@@ -114,3 +120,61 @@ class DevModeEmailTests(TestCase):
         self.assertIn("user1@example.com", msg.subject)
         self.assertIn("cc@example.com", msg.subject)
         self.assertIn("bcc@example.com", msg.subject)
+
+
+class SendMassMailTests(TestCase):
+    """Tests for send_mass_mail dev mode functionality."""
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    @patch("django.core.mail.send_mass_mail")
+    def test_send_mass_mail_normal_mode(self, mock_send):
+        """Normal mode should send to original recipients."""
+        mock_send.return_value = 2
+
+        datatuple = [
+            ("Subject 1", "Body 1", "from@example.com", ["user1@example.com"]),
+            ("Subject 2", "Body 2", "from@example.com", ["user2@example.com"]),
+        ]
+        send_mass_mail(datatuple)
+
+        mock_send.assert_called_once()
+        sent_datatuple = mock_send.call_args[0][0]
+        self.assertEqual(sent_datatuple[0][0], "Subject 1")
+        self.assertEqual(sent_datatuple[0][3], ["user1@example.com"])
+        self.assertEqual(sent_datatuple[1][0], "Subject 2")
+        self.assertEqual(sent_datatuple[1][3], ["user2@example.com"])
+
+    @override_settings(
+        EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
+    )
+    @patch("django.core.mail.send_mass_mail")
+    def test_send_mass_mail_dev_mode_redirects(self, mock_send):
+        """Dev mode should redirect all emails to configured address."""
+        mock_send.return_value = 2
+
+        datatuple = [
+            ("Subject 1", "Body 1", "from@example.com", ["user1@example.com"]),
+            ("Subject 2", "Body 2", "from@example.com", ["user2@example.com"]),
+        ]
+        send_mass_mail(datatuple)
+
+        mock_send.assert_called_once()
+        sent_datatuple = mock_send.call_args[0][0]
+        # Subject should include dev mode prefix and original recipients
+        self.assertIn("[DEV MODE]", sent_datatuple[0][0])
+        self.assertIn("user1@example.com", sent_datatuple[0][0])
+        self.assertIn("[DEV MODE]", sent_datatuple[1][0])
+        self.assertIn("user2@example.com", sent_datatuple[1][0])
+        # All emails should be redirected to dev address
+        self.assertEqual(sent_datatuple[0][3], ["dev@example.com"])
+        self.assertEqual(sent_datatuple[1][3], ["dev@example.com"])
+
+    @override_settings(EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="")
+    def test_send_mass_mail_dev_mode_no_redirect_raises(self):
+        """Dev mode without redirect address should raise ValueError."""
+        datatuple = [
+            ("Subject", "Body", "from@example.com", ["user@example.com"]),
+        ]
+        with self.assertRaises(ValueError) as context:
+            send_mass_mail(datatuple)
+        self.assertIn("EMAIL_DEV_MODE_REDIRECT_TO", str(context.exception))

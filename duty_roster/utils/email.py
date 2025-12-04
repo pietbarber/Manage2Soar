@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.core.mail import send_mail
+
+from utils.email import send_mail
 
 
 def notify_ops_status(assignment):

@@ -9,7 +9,6 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
-from django.core.mail import send_mail
 from django.db import models
 from django.http import (
     HttpResponse,
@@ -32,6 +31,7 @@ from members.models import Member
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
+from utils.email import send_mail
 
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 from .models import (
@@ -398,7 +398,6 @@ def ops_intent_toggle(request, year, month, day):
         return HttpResponse("Not authorized", status=403)
 
     from django.conf import settings
-    from django.core.mail import send_mail
     from django.utils import timezone
 
     day_date = date(year, month, day)

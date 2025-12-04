@@ -2,7 +2,10 @@
 Email utilities with dev mode support.
 
 This module provides email sending functions that respect EMAIL_DEV_MODE settings,
-redirecting all emails to a configured address during development/testing.
+redirecting all emails to configured address(es) during development/testing.
+
+Note: EMAIL_DEV_MODE only takes effect when DEBUG=False (production/staging).
+When DEBUG=True, Django uses the console email backend which doesn't send emails.
 """
 
 from django.conf import settings
@@ -42,7 +45,7 @@ def send_mail(
     """Send email with dev mode support.
 
     When EMAIL_DEV_MODE is enabled, all emails are redirected to
-    EMAIL_DEV_MODE_REDIRECT_TO address. The original recipients are
+    EMAIL_DEV_MODE_REDIRECT_TO address(es). The original recipients are
     preserved in the subject line for debugging.
 
     Args:
@@ -87,7 +90,7 @@ def send_mass_mail(
     """Send multiple emails with dev mode support.
 
     When EMAIL_DEV_MODE is enabled, all emails are redirected to
-    EMAIL_DEV_MODE_REDIRECT_TO address.
+    EMAIL_DEV_MODE_REDIRECT_TO address(es).
 
     Args:
         datatuple: Sequence of (subject, message, from_email, recipient_list) tuples
@@ -130,7 +133,22 @@ class DevModeEmailMessage(EmailMessage):
     """EmailMessage subclass with dev mode support.
 
     When EMAIL_DEV_MODE is enabled, emails are redirected to
-    EMAIL_DEV_MODE_REDIRECT_TO address.
+    EMAIL_DEV_MODE_REDIRECT_TO address(es).
+
+    Use this class when you need to construct EmailMessage objects directly
+    instead of using send_mail(). This is useful for HTML emails with attachments
+    or when you need more control over the email structure.
+
+    Example:
+        from utils.email import DevModeEmailMessage
+
+        msg = DevModeEmailMessage(
+            subject="Welcome!",
+            body="Your account is ready.",
+            from_email="noreply@example.com",
+            to=["user@example.com"],
+        )
+        msg.send()
     """
 
     def __init__(self, *args, **kwargs):
