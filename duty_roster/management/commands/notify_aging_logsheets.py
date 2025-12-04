@@ -1,11 +1,11 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.utils.timezone import now
 
 from logsheet.models import Logsheet
 from notifications.models import Notification
+from utils.email import send_mail
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 

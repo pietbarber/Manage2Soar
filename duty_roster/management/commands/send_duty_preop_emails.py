@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 
-from django.core.mail import send_mail
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
+from utils.email import send_mail
 
 
 class Command(BaseCommand):
@@ -17,6 +18,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Show dev mode status
+        if settings.EMAIL_DEV_MODE:
+            redirect_to = settings.EMAIL_DEV_MODE_REDIRECT_TO
+            if redirect_to:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"⚠️  EMAIL DEV MODE ENABLED - All emails will be redirected to: {redirect_to}"
+                    )
+                )
+            else:
+                self.stdout.write(
+                    self.style.ERROR(
+                        "⚠️  EMAIL DEV MODE ENABLED but EMAIL_DEV_MODE_REDIRECT_TO is not set! "
+                        "Emails will fail to send."
+                    )
+                )
+
         if options["date"]:
             try:
                 target_date = datetime.strptime(options["date"], "%Y-%m-%d").date()

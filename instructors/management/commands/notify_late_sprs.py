@@ -1,7 +1,6 @@
 from datetime import date, timedelta
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db.models import Q
 from django.utils.timezone import now
 
@@ -9,6 +8,7 @@ from instructors.models import InstructionReport
 from logsheet.models import Flight
 from members.models import Member
 from notifications.models import Notification
+from utils.email import send_mail
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
