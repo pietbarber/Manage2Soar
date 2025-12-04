@@ -88,6 +88,8 @@ smtp_relay_password: "YOUR_SMTP2GO_PASSWORD"
 # SMTP AUTHENTICATION (for M2S to send via this server)
 # ============================================================
 # Credentials that M2S Django app will use to send email
+# NOTE: Django must use full username format: username@mail_domain
+#       e.g., EMAIL_HOST_USER=m2s-app@manage2soar.com
 
 smtp_auth_users:
   - username: "m2s-app"

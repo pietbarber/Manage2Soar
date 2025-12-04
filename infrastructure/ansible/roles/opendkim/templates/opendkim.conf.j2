@@ -13,7 +13,8 @@ UserID                  opendkim:opendkim
 UMask                   007
 
 # Socket for Postfix communication
-Socket                  local:/run/opendkim/opendkim.sock
+# Socket must be inside Postfix chroot for smtpd to access it
+Socket                  local:/var/spool/postfix/opendkim/opendkim.sock
 
 # Pid file
 PidFile                 /run/opendkim/opendkim.pid

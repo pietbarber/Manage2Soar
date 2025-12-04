@@ -57,6 +57,12 @@
     port: "587"
     proto: tcp
 
+- name: Allow HTTP (80) for Let's Encrypt certificate renewal
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled

@@ -11,11 +11,6 @@
     name: postfix
     state: reloaded
 
-- name: Restart saslauthd
-  ansible.builtin.service:
-    name: saslauthd
-    state: restarted
-
 - name: Postmap virtual domains
   ansible.builtin.command:
     cmd: postmap {{ postfix_config_dir }}/virtual_domains
@@ -35,3 +30,12 @@
   ansible.builtin.command:
     cmd: postmap {{ postfix_config_dir }}/sasl_passwd
   changed_when: true
+
+- name: Copy sasldb to chroot
+  ansible.builtin.copy:
+    src: /etc/sasldb2
+    dest: /var/spool/postfix/etc/sasldb2
+    remote_src: true
+    owner: root
+    group: postfix
+    mode: "0640"

@@ -290,3 +290,56 @@ smtp2go_password: "your-smtp2go-password"
 ```
 
 These are written to `/etc/postfix/sasl_passwd` (mode 600) during deployment.
+
+## Django Email Configuration
+
+The M2S Django application connects to the mail server on port 587 with SASL authentication.
+
+### Required Environment Variables
+
+Configure these in your Django `.env` file or Kubernetes secrets:
+
+```bash
+EMAIL_HOST=mail.manage2soar.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=<username>@manage2soar.com   # Full username with domain
+EMAIL_HOST_PASSWORD=<password>
+EMAIL_DEV_MODE=false                          # Set true to redirect all emails
+EMAIL_DEV_MODE_REDIRECT_TO=                   # Only needed if EMAIL_DEV_MODE=true
+```
+
+**Important:** The `EMAIL_HOST_USER` must include the full domain suffix (e.g., `m2s-app@manage2soar.com`), not just the username.
+
+### Kubernetes Secrets
+
+For GKE deployments:
+
+```bash
+kubectl patch secret manage2soar-env --patch='{"stringData":{
+  "EMAIL_HOST":"mail.manage2soar.com",
+  "EMAIL_PORT":"587",
+  "EMAIL_USE_TLS":"True",
+  "EMAIL_HOST_USER":"<username>@manage2soar.com",
+  "EMAIL_HOST_PASSWORD":"<password>",
+  "EMAIL_DEV_MODE":"false",
+  "EMAIL_DEV_MODE_REDIRECT_TO":""
+}}'
+kubectl rollout restart deployment/django-app
+```
+
+### Testing Email
+
+```bash
+# From Django pod
+kubectl exec -it deployment/django-app -- python manage.py sendtestemail your@email.com
+```
+
+### Architecture Notes
+
+The SASL authentication uses `auxprop` with `sasldb` (not `saslauthd`) because:
+- Postfix runs in a chroot at `/var/spool/postfix`
+- The sasldb file is copied into the chroot at `/var/spool/postfix/etc/sasldb2`
+- This avoids socket access issues between the chroot and saslauthd
+
+Similarly, the OpenDKIM socket is placed inside the Postfix chroot at `/var/spool/postfix/opendkim/opendkim.sock`.
