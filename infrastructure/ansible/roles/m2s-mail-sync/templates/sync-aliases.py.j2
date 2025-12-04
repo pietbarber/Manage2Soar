@@ -122,10 +122,13 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                     # Include original recipient count in comment for visibility
                     # Sanitize preview recipients to prevent injection in comment
                     valid_recipients = sorted(set(r for r in recipients if is_valid_email(r)))
+                    invalid_count = len(recipients) - len(valid_recipients)
                     preview_recipients = valid_recipients[:3]
                     preview = ','.join(preview_recipients)
                     valid_count = len(valid_recipients)
                     suffix = '...' if valid_count > 3 else ''
+                    if invalid_count > 0:
+                        lines.append(f"# WARNING: {invalid_count} invalid recipients filtered out")
                     lines.append(f"# Original recipients ({valid_count}): {preview}{suffix}")
                     lines.append(f"{list_name}@{domain}  {dev_redirect}")
                 else:
@@ -352,10 +355,9 @@ def main():
         if not is_valid_email(redirect_to):
             print(f"[{datetime.now()}] ERROR: Invalid dev_mode redirect_to email: {redirect_to}")
             sys.exit(1)
-        # Store stripped/validated value back into config dict.
-        # This is intentional: dev_mode dict is only used by generate_virtual_aliases()
-        # which is called immediately after this block, so the mutation is safe.
-        dev_mode['redirect_to'] = redirect_to
+        # Store stripped/validated value in a new dev_mode dict to avoid mutating config.
+        # This is safer and more maintainable if config is reused elsewhere.
+        dev_mode = {**dev_mode, 'redirect_to': redirect_to}
         print(f"[{datetime.now()}] *** DEV MODE ENABLED ***")
         print(f"[{datetime.now()}] All mailing list recipients will be redirected to: {redirect_to}")
 
