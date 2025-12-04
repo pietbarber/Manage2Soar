@@ -71,7 +71,9 @@ def send_mail(
         # Preserve original recipients in subject for debugging
         # Truncate long recipient lists to avoid email server subject line limits
         MAX_RECIPIENTS_IN_SUBJECT = 3
-        if len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
+        if not recipient_list:
+            original_recipients = "no recipients"
+        elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
             shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
             remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
             original_recipients = ", ".join(shown) + f", ... and {remaining} more"
@@ -124,7 +126,9 @@ def send_mass_mail(
         MAX_RECIPIENTS_IN_SUBJECT = 3
         modified_datatuple = []
         for subject, message, from_email, recipient_list in datatuple:
-            if len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
+            if not recipient_list:
+                original_recipients = "no recipients"
+            elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
                 shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
                 remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
                 original_recipients = ", ".join(shown) + f", ... and {remaining} more"
@@ -178,7 +182,8 @@ class DevModeEmailMessage(EmailMessage):
         if dev_mode:
             if not redirect_list:
                 raise ValueError(
-                    "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set."
+                    "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
+                    "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
                 )
 
             # Collect all original recipients

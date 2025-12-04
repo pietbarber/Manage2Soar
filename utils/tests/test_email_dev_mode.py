@@ -200,3 +200,26 @@ class SendMassMailTests(TestCase):
         with self.assertRaises(ValueError) as context:
             send_mass_mail(datatuple)
         self.assertIn("EMAIL_DEV_MODE_REDIRECT_TO", str(context.exception))
+
+    @override_settings(
+        EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com"
+    )
+    @patch("utils.email.django_send_mail")
+    def test_send_mail_dev_mode_empty_recipients(self, mock_send):
+        """Dev mode with empty recipient list should show 'no recipients' in subject."""
+        mock_send.return_value = 1
+
+        send_mail(
+            subject="Test Subject",
+            message="Test body",
+            from_email="from@example.com",
+            recipient_list=[],
+        )
+
+        mock_send.assert_called_once()
+        call_kwargs = mock_send.call_args.kwargs
+        # Subject should include "no recipients" for empty list
+        self.assertIn("[DEV MODE]", call_kwargs["subject"])
+        self.assertIn("no recipients", call_kwargs["subject"])
+        # Should still be redirected to dev address
+        self.assertEqual(call_kwargs["recipient_list"], ["dev@example.com"])
