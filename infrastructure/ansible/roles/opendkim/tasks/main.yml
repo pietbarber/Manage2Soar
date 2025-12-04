@@ -85,9 +85,9 @@
     mode: "0644"
   notify: Restart OpenDKIM
 
-- name: Create OpenDKIM socket directory
+- name: Create OpenDKIM socket directory in Postfix chroot
   ansible.builtin.file:
-    path: /run/opendkim
+    path: /var/spool/postfix/opendkim
     state: directory
     owner: opendkim
     group: postfix
@@ -98,7 +98,7 @@
     dest: /etc/default/opendkim
     content: |
       RUNDIR=/run/opendkim
-      SOCKET="local:/run/opendkim/opendkim.sock"
+      SOCKET="local:/var/spool/postfix/opendkim/opendkim.sock"
       USER=opendkim
       GROUP=opendkim
       PIDFILE=$RUNDIR/opendkim.pid

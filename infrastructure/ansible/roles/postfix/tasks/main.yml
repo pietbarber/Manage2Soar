@@ -87,38 +87,56 @@
     mode: "0600"
   notify: Postmap SASL passwords
 
-- name: Configure SASL authentication
+# ============================================================
+# SASL Authentication for M2S Django App
+# ============================================================
+# We use auxprop with sasldb (not saslauthd) because Postfix runs
+# in a chroot and can't access the saslauthd socket. The sasldb
+# file is copied into the chroot.
+
+- name: Create SASL config directory in Postfix chroot
+  ansible.builtin.file:
+    path: /var/spool/postfix/etc/sasl2
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure SASL authentication (auxprop with sasldb)
   ansible.builtin.copy:
-    dest: /etc/postfix/sasl/smtpd.conf
+    dest: /var/spool/postfix/etc/sasl2/smtpd.conf
     content: |
-      pwcheck_method: saslauthd
+      # SASL config for Postfix submission (port 587)
+      # Uses sasldb for password lookup (not saslauthd)
+      pwcheck_method: auxprop
+      auxprop_plugin: sasldb
       mech_list: plain login
+      # Path is relative to Postfix chroot (/var/spool/postfix)
+      # Actual file location: /var/spool/postfix/etc/sasldb2
+      sasldb_path: /etc/sasldb2
     mode: "0644"
+  notify: Reload Postfix
 
-- name: Create saslauthd config
-  ansible.builtin.copy:
-    dest: /etc/default/saslauthd
-    content: |
-      START=yes
-      DESC="SASL Authentication Daemon"
-      NAME="saslauthd"
-      MECHANISMS="sasldb"
-      MECH_OPTIONS=""
-      THREADS=5
-      OPTIONS="-c -m /var/run/saslauthd"
-    mode: "0644"
-  notify: Restart saslauthd
-
-- name: Create SASL users
+- name: Create SASL users in sasldb
   ansible.builtin.shell: |
     if ! sasldblistusers2 2>/dev/null | grep -q "{{ item.username }}@{{ mail_domain }}"; then
       echo "{{ item.password }}" | saslpasswd2 -p -c -u {{ mail_domain }} {{ item.username }}
       echo "created"
     fi
   loop: "{{ smtp_auth_users }}"
-  no_log: true # Don't log passwords
+  no_log: true
   register: sasl_result
   changed_when: "'created' in sasl_result.stdout"
+  notify: Copy sasldb to chroot
+
+- name: Copy sasldb to Postfix chroot
+  ansible.builtin.copy:
+    src: /etc/sasldb2
+    dest: /var/spool/postfix/etc/sasldb2
+    remote_src: true
+    owner: root
+    group: postfix
+    mode: "0640"
 
 - name: Add postfix to sasl group
   ansible.builtin.user:

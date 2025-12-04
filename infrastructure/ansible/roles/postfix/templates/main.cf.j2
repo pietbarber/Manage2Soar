@@ -115,12 +115,14 @@ smtpd_relay_restrictions =
 #
 # Order matters: OpenDKIM first so Rspamd can use DKIM/SPF results for scoring
 # tempfail = defer mail if milter unavailable (security: don't skip spam checks)
+#
+# NOTE: Paths are relative to Postfix chroot (/var/spool/postfix)
 milter_default_action = tempfail
 milter_protocol = 6
-smtpd_milters = unix:/run/opendkim/opendkim.sock, inet:localhost:11332
+smtpd_milters = unix:/opendkim/opendkim.sock, inet:localhost:11332
 # Only OpenDKIM for non-SMTP mail (sendmail, pickup queue).
 # Rspamd excluded: spam filtering only needed for external SMTP, not local mail.
-non_smtpd_milters = unix:/run/opendkim/opendkim.sock
+non_smtpd_milters = unix:/opendkim/opendkim.sock
 
 # ============================================================
 # OUTBOUND RELAY (SMTP2GO)
