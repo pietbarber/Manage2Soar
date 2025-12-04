@@ -14,6 +14,9 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.core.mail import send_mail as django_send_mail
 
+# Maximum recipients to show in subject line before truncating
+MAX_RECIPIENTS_IN_SUBJECT = 3
+
 
 def get_dev_mode_info():
     """Get dev mode configuration status.
@@ -70,7 +73,6 @@ def send_mail(
 
         # Preserve original recipients in subject for debugging
         # Truncate long recipient lists to avoid email server subject line limits
-        MAX_RECIPIENTS_IN_SUBJECT = 3
         if not recipient_list:
             original_recipients = "no recipients"
         elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
@@ -123,7 +125,6 @@ def send_mass_mail(
 
         # Redirect all emails
         # Truncate long recipient lists to avoid email server subject line limits
-        MAX_RECIPIENTS_IN_SUBJECT = 3
         modified_datatuple = []
         for subject, message, from_email, recipient_list in datatuple:
             if not recipient_list:
@@ -196,7 +197,6 @@ class DevModeEmailMessage(EmailMessage):
                 recipients_info = "TO: (no recipients)"
             else:
                 # Truncate long recipient lists
-                MAX_RECIPIENTS_IN_SUBJECT = 3
                 if len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
                     shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
                     remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
