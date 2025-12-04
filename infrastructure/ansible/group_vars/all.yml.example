@@ -58,6 +58,22 @@ club_domains:
 m2s_api_key: "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
 
 # ============================================================
+# DEVELOPMENT MODE - SAFETY VALVE
+# ============================================================
+# When enabled, ALL mailing list recipients are redirected to a single
+# email address. This prevents accidental emails to real users during
+# development and testing.
+#
+# Safe default: development mode is disabled.
+# To enable development mode (redirect all emails to a test address), set:
+#   dev_mode_enabled: true
+#   dev_mode_redirect_to: "your_test_email@example.com"
+# Only enable for development/testing environments!
+
+dev_mode_enabled: false
+dev_mode_redirect_to: ""
+
+# ============================================================
 # OUTBOUND RELAY (SMTP2GO / SendGrid / etc.)
 # ============================================================
 # GCP blocks outbound port 25, so we relay through a service

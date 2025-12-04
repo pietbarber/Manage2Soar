@@ -143,6 +143,61 @@ The mail server supports multiple clubs (tenants), each with:
 - Isolated spam whitelists
 - Optional per-club API authentication
 
+## Development Mode (Safety Valve)
+
+During development and testing, you can redirect **all** mailing list recipients to a single email address. This prevents accidentally sending emails to real club members.
+
+### Enable Dev Mode
+
+**⚠️ Check your current settings first!** In production environments, this should always be `false`.
+
+In `group_vars/all.yml`:
+
+```yaml
+# Development mode - redirect all mailing list recipients
+dev_mode_enabled: true
+dev_mode_redirect_to: "developer@example.com"
+```
+
+### How It Works
+
+When dev mode is enabled:
+1. The sync script fetches real member lists from M2S API (as normal)
+2. Instead of writing real recipients to virtual aliases, it writes only your dev email
+3. All mailing list emails go to your dev address instead of real members
+
+Example virtual alias output in dev mode:
+```
+# *** DEV MODE ENABLED ***
+# All mailing list recipients redirected to: developer@example.com
+
+# --- ssc.manage2soar.com ---
+# Original recipients (45): alice@gmail.com,bob@yahoo.com,carol@...
+members@ssc.manage2soar.com  developer@example.com
+# Original recipients (8): alice@gmail.com,david@outlook.com,eve@...
+instructors@ssc.manage2soar.com  developer@example.com
+```
+
+### Disable for Production
+
+**⚠️ WARNING**: Always disable dev mode for production!
+
+```yaml
+dev_mode_enabled: false
+dev_mode_redirect_to: ""
+```
+
+Then redeploy with `ansible-playbook playbooks/mail-server.yml --tags sync`.
+
+### Pre-Deployment Checklist
+
+Before deploying to production, verify:
+
+1. **Check dev mode is disabled**: `grep dev_mode_enabled group_vars/all.yml`
+2. **Verify configuration**: Run `ansible-playbook playbooks/mail-server.yml --check --diff`
+3. **Test sync manually**: SSH to mail server and run `/opt/m2s-mail-sync/sync-aliases.py`
+4. **Verify aliases**: Check `/etc/postfix/virtual` contains real recipients, not dev email
+
 ### Per-Club API Keys
 
 For stronger tenant isolation, each club can have its own API key:

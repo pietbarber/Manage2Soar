@@ -15,6 +15,12 @@ postfix_whitelist_file: "{{ postfix_config_dir }}/sender_whitelist"
 # Rspamd whitelist directory (per-club whitelist files stored here)
 rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists"
 
+# Development mode - redirect all mailing list recipients to a single address
+# This prevents accidental emails during development/testing
+dev_mode:
+  enabled: {{ dev_mode_enabled | default(false) | lower }}
+  redirect_to: "{{ dev_mode_redirect_to | default('', true) }}"
+
 # Club configurations
 # Each club can have its own auth_token for API isolation
 clubs:
