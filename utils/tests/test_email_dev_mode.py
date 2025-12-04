@@ -12,18 +12,28 @@ class DevModeEmailTests(TestCase):
 
     def test_get_dev_mode_info_disabled_by_default(self):
         """Dev mode should be disabled by default."""
-        enabled, redirect_to = get_dev_mode_info()
+        enabled, redirect_list = get_dev_mode_info()
         self.assertFalse(enabled)
-        self.assertEqual(redirect_to, "")
+        self.assertEqual(redirect_list, [])
 
     @override_settings(
         EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="test@example.com"
     )
     def test_get_dev_mode_info_enabled(self):
         """Dev mode settings should be readable when enabled."""
-        enabled, redirect_to = get_dev_mode_info()
+        enabled, redirect_list = get_dev_mode_info()
         self.assertTrue(enabled)
-        self.assertEqual(redirect_to, "test@example.com")
+        self.assertEqual(redirect_list, ["test@example.com"])
+
+    @override_settings(
+        EMAIL_DEV_MODE=True,
+        EMAIL_DEV_MODE_REDIRECT_TO="dev1@example.com, dev2@example.com",
+    )
+    def test_get_dev_mode_info_multiple_addresses(self):
+        """Dev mode should support comma-separated addresses."""
+        enabled, redirect_list = get_dev_mode_info()
+        self.assertTrue(enabled)
+        self.assertEqual(redirect_list, ["dev1@example.com", "dev2@example.com"])
 
     @override_settings(EMAIL_DEV_MODE=False)
     @patch("utils.email.django_send_mail")

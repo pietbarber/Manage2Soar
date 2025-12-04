@@ -14,11 +14,18 @@ def get_dev_mode_info():
     """Get dev mode configuration status.
 
     Returns:
-        tuple: (is_enabled, redirect_to_address)
+        tuple: (is_enabled, list_of_redirect_addresses)
     """
     enabled = getattr(settings, "EMAIL_DEV_MODE", False)
     redirect_to = getattr(settings, "EMAIL_DEV_MODE_REDIRECT_TO", "")
-    return enabled, redirect_to
+    # Support comma-separated list of addresses
+    if redirect_to:
+        redirect_list = [
+            addr.strip() for addr in redirect_to.split(",") if addr.strip()
+        ]
+    else:
+        redirect_list = []
+    return enabled, redirect_list
 
 
 def send_mail(
@@ -47,10 +54,10 @@ def send_mail(
     Raises:
         ValueError: If dev mode is enabled but no redirect address is configured
     """
-    dev_mode, redirect_to = get_dev_mode_info()
+    dev_mode, redirect_list = get_dev_mode_info()
 
     if dev_mode:
-        if not redirect_to:
+        if not redirect_list:
             raise ValueError(
                 "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
                 "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
@@ -59,7 +66,7 @@ def send_mail(
         # Preserve original recipients in subject for debugging
         original_recipients = ", ".join(recipient_list)
         subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
-        recipient_list = [redirect_to]
+        recipient_list = redirect_list
 
     return django_send_mail(
         subject=subject,
@@ -91,10 +98,10 @@ def send_mass_mail(
     """
     from django.core.mail import send_mass_mail as django_send_mass_mail
 
-    dev_mode, redirect_to = get_dev_mode_info()
+    dev_mode, redirect_list = get_dev_mode_info()
 
     if dev_mode:
-        if not redirect_to:
+        if not redirect_list:
             raise ValueError(
                 "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
                 "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
@@ -106,7 +113,7 @@ def send_mass_mail(
             original_recipients = ", ".join(recipient_list)
             modified_subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
             modified_datatuple.append(
-                (modified_subject, message, from_email, [redirect_to])
+                (modified_subject, message, from_email, redirect_list)
             )
         datatuple = modified_datatuple
 
@@ -132,10 +139,10 @@ class DevModeEmailMessage(EmailMessage):
 
     def _apply_dev_mode(self):
         """Apply dev mode redirection if enabled."""
-        dev_mode, redirect_to = get_dev_mode_info()
+        dev_mode, redirect_list = get_dev_mode_info()
 
         if dev_mode:
-            if not redirect_to:
+            if not redirect_list:
                 raise ValueError(
                     "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set."
                 )
@@ -152,6 +159,6 @@ class DevModeEmailMessage(EmailMessage):
                 recipients_info += f", BCC: {original_bcc}"
 
             self.subject = f"[DEV MODE] {self.subject} ({recipients_info})"
-            self.to = [redirect_to]
+            self.to = redirect_list
             self.cc = []
             self.bcc = []
