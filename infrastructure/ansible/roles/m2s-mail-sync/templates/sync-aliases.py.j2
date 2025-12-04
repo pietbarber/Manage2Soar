@@ -42,7 +42,7 @@ def is_valid_email(email):
     if not email or not isinstance(email, str):
         return False
     # Check for injection characters
-    if any(c in email for c in '\n\r\t#'):
+    if any(c in email for c in '\n\r\t# '):
         return False
     return bool(EMAIL_PATTERN.match(email))
 
@@ -133,6 +133,7 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                     sanitized = [r for r in recipients if is_valid_email(r)]
                     if not sanitized:
                         # All recipients were filtered out - log warning
+                        print(f"[{datetime.now()}] WARNING: {list_name}@{domain} - all {len(recipients)} recipients filtered (invalid emails)")
                         lines.append(f"# WARNING: {list_name}@{domain} - all recipients filtered (invalid emails)")
                     else:
                         recipients_str = ','.join(sorted(set(sanitized)))
