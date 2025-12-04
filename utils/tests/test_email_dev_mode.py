@@ -55,10 +55,10 @@ class DevModeEmailTests(TestCase):
         )
 
         mock_send.assert_called_once()
-        call_kwargs = mock_send.call_args
-        self.assertEqual(call_kwargs[1]["subject"], "Test Subject")
+        call_kwargs = mock_send.call_args.kwargs
+        self.assertEqual(call_kwargs["subject"], "Test Subject")
         self.assertEqual(
-            call_kwargs[1]["recipient_list"], ["user1@example.com", "user2@example.com"]
+            call_kwargs["recipient_list"], ["user1@example.com", "user2@example.com"]
         )
 
     @override_settings(
@@ -77,13 +77,13 @@ class DevModeEmailTests(TestCase):
         )
 
         mock_send.assert_called_once()
-        call_kwargs = mock_send.call_args
+        call_kwargs = mock_send.call_args.kwargs
         # Subject should include dev mode prefix and original recipients
-        self.assertIn("[DEV MODE]", call_kwargs[1]["subject"])
-        self.assertIn("user1@example.com", call_kwargs[1]["subject"])
-        self.assertIn("user2@example.com", call_kwargs[1]["subject"])
+        self.assertIn("[DEV MODE]", call_kwargs["subject"])
+        self.assertIn("user1@example.com", call_kwargs["subject"])
+        self.assertIn("user2@example.com", call_kwargs["subject"])
         # Should be redirected to dev address
-        self.assertEqual(call_kwargs[1]["recipient_list"], ["dev@example.com"])
+        self.assertEqual(call_kwargs["recipient_list"], ["dev@example.com"])
 
     @override_settings(EMAIL_DEV_MODE=True, EMAIL_DEV_MODE_REDIRECT_TO="")
     def test_send_mail_dev_mode_no_redirect_raises(self):
@@ -115,11 +115,33 @@ class DevModeEmailTests(TestCase):
         self.assertEqual(msg.to, ["dev@example.com"])
         self.assertEqual(msg.cc, [])
         self.assertEqual(msg.bcc, [])
-        # Subject should include original recipients
+        # Subject should include original recipients (first 3 shown, rest truncated)
         self.assertIn("[DEV MODE]", msg.subject)
         self.assertIn("user1@example.com", msg.subject)
+        self.assertIn("user2@example.com", msg.subject)
         self.assertIn("cc@example.com", msg.subject)
-        self.assertIn("bcc@example.com", msg.subject)
+        # With 4 total recipients, the 4th is truncated
+        self.assertIn("and 1 more", msg.subject)
+
+    @override_settings(EMAIL_DEV_MODE=False)
+    def test_dev_mode_email_message_normal_mode(self):
+        """DevModeEmailMessage should behave like normal EmailMessage when dev mode disabled."""
+        msg = DevModeEmailMessage(
+            subject="Test Subject",
+            body="Test body",
+            from_email="from@example.com",
+            to=["user1@example.com", "user2@example.com"],
+            cc=["cc@example.com"],
+            bcc=["bcc@example.com"],
+        )
+
+        # Should NOT be redirected - recipients unchanged
+        self.assertEqual(msg.to, ["user1@example.com", "user2@example.com"])
+        self.assertEqual(msg.cc, ["cc@example.com"])
+        self.assertEqual(msg.bcc, ["bcc@example.com"])
+        # Subject should NOT be modified
+        self.assertEqual(msg.subject, "Test Subject")
+        self.assertNotIn("[DEV MODE]", msg.subject)
 
 
 class SendMassMailTests(TestCase):

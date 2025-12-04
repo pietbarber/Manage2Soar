@@ -369,9 +369,11 @@ else:
 #   EMAIL_DEV_MODE=true
 #   EMAIL_DEV_MODE_REDIRECT_TO=developer@example.com[,other@example.com]
 #
-# Note: EMAIL_DEV_MODE only takes effect when DEBUG=False. When DEBUG=True,
-# Django uses the console email backend which doesn't actually send emails.
-# Use EMAIL_DEV_MODE in staging/production environments where real SMTP is used.
+# Note: EMAIL_DEV_MODE works regardless of the DEBUG setting. However, when
+# DEBUG=True, Django uses the console email backend which only prints emails
+# to console (not sending them), so dev mode redirection has no practical
+# effect in that case. EMAIL_DEV_MODE is primarily useful for staging/production
+# environments where real SMTP is configured.
 #
 # Works independently of the mail server dev mode (which only affects
 # mailing lists routed through Postfix). This catches ALL Django emails

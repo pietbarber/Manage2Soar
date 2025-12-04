@@ -21,11 +21,19 @@ class Command(BaseCommand):
         # Show dev mode status
         if settings.EMAIL_DEV_MODE:
             redirect_to = settings.EMAIL_DEV_MODE_REDIRECT_TO
-            self.stdout.write(
-                self.style.WARNING(
-                    f"⚠️  EMAIL DEV MODE ENABLED - All emails will be redirected to: {redirect_to}"
+            if redirect_to:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"⚠️  EMAIL DEV MODE ENABLED - All emails will be redirected to: {redirect_to}"
+                    )
                 )
-            )
+            else:
+                self.stdout.write(
+                    self.style.ERROR(
+                        "⚠️  EMAIL DEV MODE ENABLED but EMAIL_DEV_MODE_REDIRECT_TO is not set! "
+                        "Emails will fail to send."
+                    )
+                )
 
         if options["date"]:
             try:

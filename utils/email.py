@@ -4,8 +4,10 @@ Email utilities with dev mode support.
 This module provides email sending functions that respect EMAIL_DEV_MODE settings,
 redirecting all emails to configured address(es) during development/testing.
 
-Note: EMAIL_DEV_MODE only takes effect when DEBUG=False (production/staging).
-When DEBUG=True, Django uses the console email backend which doesn't send emails.
+Note: EMAIL_DEV_MODE works regardless of the DEBUG setting. However, when DEBUG=True,
+Django uses the console email backend which only prints emails to console (not sending
+them), so dev mode redirection has no practical effect in that case. EMAIL_DEV_MODE
+is primarily useful for staging/production environments where real SMTP is configured.
 """
 
 from django.conf import settings
@@ -67,7 +69,14 @@ def send_mail(
             )
 
         # Preserve original recipients in subject for debugging
-        original_recipients = ", ".join(recipient_list)
+        # Truncate long recipient lists to avoid email server subject line limits
+        MAX_RECIPIENTS_IN_SUBJECT = 3
+        if len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
+            shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
+            remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
+            original_recipients = ", ".join(shown) + f", ... and {remaining} more"
+        else:
+            original_recipients = ", ".join(recipient_list)
         subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
         recipient_list = redirect_list
 
@@ -111,9 +120,16 @@ def send_mass_mail(
             )
 
         # Redirect all emails
+        # Truncate long recipient lists to avoid email server subject line limits
+        MAX_RECIPIENTS_IN_SUBJECT = 3
         modified_datatuple = []
         for subject, message, from_email, recipient_list in datatuple:
-            original_recipients = ", ".join(recipient_list)
+            if len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
+                shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
+                remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
+                original_recipients = ", ".join(shown) + f", ... and {remaining} more"
+            else:
+                original_recipients = ", ".join(recipient_list)
             modified_subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
             modified_datatuple.append(
                 (modified_subject, message, from_email, redirect_list)
@@ -165,16 +181,34 @@ class DevModeEmailMessage(EmailMessage):
                     "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set."
                 )
 
-            # Preserve original recipients
-            original_to = ", ".join(self.to) if self.to else "none"
-            original_cc = ", ".join(self.cc) if self.cc else ""
-            original_bcc = ", ".join(self.bcc) if self.bcc else ""
+            # Collect all original recipients
+            all_recipients = (
+                list(self.to or []) + list(self.cc or []) + list(self.bcc or [])
+            )
 
-            recipients_info = f"TO: {original_to}"
-            if original_cc:
-                recipients_info += f", CC: {original_cc}"
-            if original_bcc:
-                recipients_info += f", BCC: {original_bcc}"
+            # Handle empty recipients case
+            if not all_recipients:
+                recipients_info = "TO: (no recipients)"
+            else:
+                # Truncate long recipient lists
+                MAX_RECIPIENTS_IN_SUBJECT = 3
+                if len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
+                    shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
+                    remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
+                    recipients_info = (
+                        f"TO: {', '.join(shown)}, ... and {remaining} more"
+                    )
+                else:
+                    # Build detailed recipient info for short lists
+                    original_to = ", ".join(self.to) if self.to else "none"
+                    original_cc = ", ".join(self.cc) if self.cc else ""
+                    original_bcc = ", ".join(self.bcc) if self.bcc else ""
+
+                    recipients_info = f"TO: {original_to}"
+                    if original_cc:
+                        recipients_info += f", CC: {original_cc}"
+                    if original_bcc:
+                        recipients_info += f", BCC: {original_bcc}"
 
             self.subject = f"[DEV MODE] {self.subject} ({recipients_info})"
             self.to = redirect_list
