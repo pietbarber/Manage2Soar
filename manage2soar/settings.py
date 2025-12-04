@@ -359,6 +359,23 @@ else:
     EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
     EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
+# =============================================================================
+# EMAIL DEV MODE - Safety valve for development/testing
+# =============================================================================
+# When enabled, ALL outgoing emails are redirected to a single address.
+# This prevents accidentally emailing real members during development.
+#
+# Set via environment variables:
+#   EMAIL_DEV_MODE=true
+#   EMAIL_DEV_MODE_REDIRECT_TO=developer@example.com
+#
+# Works independently of the mail server dev mode (which only affects
+# mailing lists routed through Postfix). This catches ALL Django emails
+# including direct send_mail() calls in management commands.
+# =============================================================================
+EMAIL_DEV_MODE = os.getenv("EMAIL_DEV_MODE", "false").lower() == "true"
+EMAIL_DEV_MODE_REDIRECT_TO = os.getenv("EMAIL_DEV_MODE_REDIRECT_TO", "")
+
 # Development vs Production URLs
 if DEBUG:
     CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
