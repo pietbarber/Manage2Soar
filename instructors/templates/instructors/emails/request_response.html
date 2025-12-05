@@ -19,19 +19,35 @@
                 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
                     <!-- Header with logo -->
+                    {% if is_accepted %}
                     <tr>
-                        <td style="background-color: {% if is_accepted %}#276749{% else %}#c53030{% endif %}; padding: 24px; text-align: center;">
+                        <td style="background-color: #276749; padding: 24px; text-align: center;">
                             {% if club_logo_url %}
                             <img src="{{ club_logo_url }}" alt="{{ club_name }}" width="200" height="60" style="max-height: 60px; max-width: 200px; margin-bottom: 12px;">
                             {% endif %}
                             <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
                                 Instruction Request {{ response_status }}
                             </h1>
-                            <p style="margin: 8px 0 0 0; color: {% if is_accepted %}#c6f6d5{% else %}#fed7d7{% endif %}; font-size: 16px;">
+                            <p style="margin: 8px 0 0 0; color: #c6f6d5; font-size: 16px;">
                                 {{ instruction_date|date:"l, F j, Y" }}
                             </p>
                         </td>
                     </tr>
+                    {% else %}
+                    <tr>
+                        <td style="background-color: #c53030; padding: 24px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" width="200" height="60" style="max-height: 60px; max-width: 200px; margin-bottom: 12px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                Instruction Request {{ response_status }}
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: #fed7d7; font-size: 16px;">
+                                {{ instruction_date|date:"l, F j, Y" }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
 
                     <!-- Main message -->
                     <tr>

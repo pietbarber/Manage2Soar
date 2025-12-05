@@ -60,7 +60,11 @@
                                         </h2>
 
                                         {% for student_info in students %}
-                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="{% if not forloop.last %}margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #bee3f8;{% endif %}">
+                                        {% if not forloop.last %}
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #bee3f8;">
+                                        {% else %}
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                        {% endif %}>
                                             <tr>
                                                 <td>
                                                     <p style="margin: 0 0 8px 0; color: #2d3748; font-size: 15px; font-weight: 600;">
@@ -82,19 +86,13 @@
                                                         <tr>
                                                             <td style="padding: 2px 0; color: #718096; font-size: 13px;">Solo Progress:</td>
                                                             <td style="padding: 2px 0; color: #2d3748; font-size: 13px;">
-                                                                <span style="display: inline-block; width: 60px; height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden; vertical-align: middle;">
-                                                                    <span style="display: block; width: {{ student_info.progress.solo_progress }}%; height: 100%; background-color: #48bb78;"></span>
-                                                                </span>
-                                                                {{ student_info.progress.solo_progress }}%
+                                                                <strong style="color: #48bb78;">{{ student_info.progress.solo_progress }}%</strong>
                                                             </td>
                                                         </tr>
                                                         <tr>
                                                             <td style="padding: 2px 0; color: #718096; font-size: 13px;">Checkride Progress:</td>
                                                             <td style="padding: 2px 0; color: #2d3748; font-size: 13px;">
-                                                                <span style="display: inline-block; width: 60px; height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden; vertical-align: middle;">
-                                                                    <span style="display: block; width: {{ student_info.progress.checkride_progress }}%; height: 100%; background-color: #4299e1;"></span>
-                                                                </span>
-                                                                {{ student_info.progress.checkride_progress }}%
+                                                                <strong style="color: #4299e1;">{{ student_info.progress.checkride_progress }}%</strong>
                                                             </td>
                                                         </tr>
                                                         {% endif %}

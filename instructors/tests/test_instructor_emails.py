@@ -198,7 +198,9 @@ class TestStudentSignupNotification:
         # Check notification was created for instructor
         notifications = Notification.objects.filter(user=instructor)
         assert notifications.exists()
-        assert "Sally" in notifications.first().message
+        notification = notifications.first()
+        assert notification is not None
+        assert "Sally" in notification.message
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -314,7 +316,9 @@ class TestAcceptRejectNotification:
         # Check notification was created for student
         notifications = Notification.objects.filter(user=student)
         assert notifications.exists()
-        assert "John" in notifications.first().message
+        notification = notifications.first()
+        assert notification is not None
+        assert "John" in notification.message
 
 
 @pytest.mark.django_db
