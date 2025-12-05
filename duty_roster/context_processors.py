@@ -35,20 +35,19 @@ def get_instructor_pending_count(user):
     # Import here to avoid circular imports
     from django.db import models
 
-    from duty_roster.models import DutyAssignment, InstructionSlot
+    from duty_roster.models import InstructionSlot
 
     today = date.today()
 
-    # Get assignments where this user is instructor or surge instructor
-    my_assignments = DutyAssignment.objects.filter(
-        date__gte=today,
-    ).filter(models.Q(instructor=user) | models.Q(surge_instructor=user))
-
-    # Count pending instruction slots
+    # Count pending instruction slots using a JOIN instead of a subquery
     pending_count = (
         InstructionSlot.objects.filter(
-            assignment__in=my_assignments,
+            assignment__date__gte=today,
             instructor_response="pending",
+        )
+        .filter(
+            models.Q(assignment__instructor=user)
+            | models.Q(assignment__surge_instructor=user)
         )
         .exclude(status="cancelled")
         .count()

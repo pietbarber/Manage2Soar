@@ -359,3 +359,35 @@ class TestCaching:
         # After invalidation, should get fresh count
         result2 = instructor_pending_requests(request)
         assert result2 == {"instructor_pending_count": 1}
+
+    def test_cache_invalidation_on_slot_delete(
+        self, request_factory, instructor_user, student_user
+    ):
+        """Cache should be invalidated when InstructionSlot is deleted."""
+        request = request_factory.get("/")
+        request.user = instructor_user
+
+        # Create a pending request
+        future_date = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future_date,
+            instructor=instructor_user,
+        )
+
+        slot = InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student_user,
+            status="pending",
+            instructor_response="pending",
+        )
+
+        # First call - should be 1
+        result1 = instructor_pending_requests(request)
+        assert result1 == {"instructor_pending_count": 1}
+
+        # Delete the slot (signal should invalidate cache)
+        slot.delete()
+
+        # After deletion, should get fresh count of 0
+        result2 = instructor_pending_requests(request)
+        assert result2 == {"instructor_pending_count": 0}
