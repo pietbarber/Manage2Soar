@@ -158,10 +158,11 @@ class Command(BaseCommand):
             towplane__isnull=False, grounded=True, resolved=False
         ).select_related("towplane")
 
-        # Get upcoming maintenance deadlines
+        # Get upcoming maintenance deadlines (next 30 days from target date)
         upcoming_deadlines = (
             MaintenanceDeadline.objects.filter(
-                due_date__lte=target_date + timedelta(days=30)
+                due_date__gte=target_date,
+                due_date__lte=target_date + timedelta(days=30),
             )
             .select_related("glider", "towplane")
             .order_by("due_date")
