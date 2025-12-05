@@ -106,6 +106,60 @@ spec:
                 secretName: gcp-sa-key
 
 ---
+# Daily: Instructor Summary Emails (6:00 AM UTC, 48 hours ahead)
+# Sends summary to instructors about students requesting instruction
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: send-instructor-summary-emails
+  namespace: default
+spec:
+  schedule: "0 6 * * *" # Daily at 6:00 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600 # 10 minute timeout
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: send-instructor-summary-emails
+              image: gcr.io/skyline-soaring-storage/skylinesoaring:latest
+              command:
+                - python
+                - manage.py
+                - send_instructor_summary_emails
+                - --hours-ahead=48
+                - --verbosity=1
+              workingDir: /app
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /app/skyline-soaring-storage.json
+              envFrom:
+                - secretRef:
+                    name: manage2soar-env
+              volumeMounts:
+                - name: gcp-sa-key
+                  mountPath: /app/skyline-soaring-storage.json
+                  subPath: skyline-soaring-storage.json
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+          volumes:
+            - name: gcp-sa-key
+              secret:
+                secretName: gcp-sa-key
+
+---
 # Daily: Expire Ad-hoc Days (6:00 PM UTC for tomorrow)
 apiVersion: batch/v1
 kind: CronJob
