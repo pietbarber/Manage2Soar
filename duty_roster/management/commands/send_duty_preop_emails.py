@@ -103,12 +103,16 @@ class Command(BaseCommand):
         html_message = render_to_string("duty_roster/emails/preop_email.html", context)
         text_message = render_to_string("duty_roster/emails/preop_email.txt", context)
 
-        # Send email
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
-        if not from_email:
-            from_email = (
-                f"noreply@{config.domain_name}" if config else "noreply@manage2soar.com"
-            )
+        # Send email - use noreply@ with domain extracted from DEFAULT_FROM_EMAIL
+        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+        if "@" in default_from:
+            # Extract domain from email like "members@skylinesoaring.org"
+            domain = default_from.split("@")[-1]
+            from_email = f"noreply@{domain}"
+        elif config and config.domain_name:
+            from_email = f"noreply@{config.domain_name}"
+        else:
+            from_email = "noreply@manage2soar.com"
 
         send_mail(
             subject=f"Pre-Ops Report for {target_date}",
@@ -189,6 +193,10 @@ class Command(BaseCommand):
     def _get_logo_url(self, config, site_url):
         """Get the club logo URL, or None if not configured."""
         if config and config.club_logo:
-            # Return absolute URL to the logo
-            return f"{site_url}{config.club_logo.url}"
+            logo_url = config.club_logo.url
+            # If it's already an absolute URL (e.g., from cloud storage), use as-is
+            if logo_url.startswith(("http://", "https://")):
+                return logo_url
+            # Otherwise, prepend site_url for relative paths
+            return f"{site_url}{logo_url}"
         return None
