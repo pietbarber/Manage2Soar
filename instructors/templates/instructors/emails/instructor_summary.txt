@@ -1,0 +1,33 @@
+Instruction Day Summary
+{{ club_name }}
+{{ instruction_date|date:"l, F j, Y" }}
+
+Hello {{ instructor.first_name }},
+
+{% if days_until == 2 %}This is a reminder that you are scheduled to instruct in 2 days on {{ instruction_date|date:"l, F j" }}.{% elif days_until == 1 %}This is a reminder that you are scheduled to instruct tomorrow, {{ instruction_date|date:"l, F j" }}.{% elif days_until == 0 %}This is a reminder that you are scheduled to instruct today.{% else %}This is a summary of your upcoming instruction day on {{ instruction_date|date:"l, F j" }} ({{ days_until }} days away).{% endif %}
+
+{% if students %}You have {{ students|length }} student{{ students|length|pluralize }} signed up for instruction.{% else %}Currently, no students have signed up for instruction on this day.{% endif %}
+
+{% if students %}
+STUDENTS SIGNED UP
+------------------
+{% for student_info in students %}
+{{ student_info.student.full_display_name }}{% if student_info.status == "confirmed" %} (confirmed){% elif student_info.status == "pending" %} (pending response){% elif student_info.status == "waitlist" %} (waitlist){% endif %}
+{% if student_info.progress %}  - Training Sessions: {{ student_info.progress.sessions }}
+  - Solo Progress: {{ student_info.progress.solo_progress|floatformat:0 }}%
+  - Checkride Progress: {{ student_info.progress.checkride_progress|floatformat:0 }}%
+{% endif %}{% if student_info.total_flights %}  - Total Flights: {{ student_info.total_flights }}
+{% endif %}{% if student_info.student.email %}  - Email: {{ student_info.student.email }}
+{% endif %}{% if student_info.student.phone %}  - Phone: {{ student_info.student.phone }}
+{% endif %}
+{% endfor %}{% else %}
+No students have signed up for instruction yet. Students may still sign up before the day of operations.
+{% endif %}
+
+{% if pending_count %}ACTION REQUIRED: You have {{ pending_count }} pending instruction request{{ pending_count|pluralize }} awaiting your response. Please accept or decline these requests.
+
+{% endif %}{% if calendar_url %}View the duty calendar: {{ calendar_url }}
+
+{% endif %}---
+This is an automated message from {{ club_name }}.
+{{ site_url }}

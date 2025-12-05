@@ -1,0 +1,32 @@
+Instruction Request {{ response_status }}
+{{ club_name }}
+
+Hello {{ student.first_name }},
+
+{% if is_accepted %}Great news! Your instruction request for {{ instruction_date|date:"l, F j, Y" }} has been ACCEPTED by {{ instructor.full_display_name }}.
+
+Please arrive at the field ready to fly. If you need to cancel, please do so as soon as possible so another student can take your slot.
+{% else %}Unfortunately, your instruction request for {{ instruction_date|date:"l, F j, Y" }} could not be accommodated.
+{% endif %}
+{% if instructor_note %}
+Note from {{ instructor.first_name }}:
+"{{ instructor_note }}"
+{% endif %}
+{% if is_accepted %}
+YOUR INSTRUCTION SESSION
+------------------------
+Date: {{ instruction_date|date:"l, F j, Y" }}
+Instructor: {{ instructor.full_display_name }}
+Status: Confirmed
+{% else %}
+DON'T GIVE UP!
+--------------
+Please check the duty roster for other available dates and try again. There may be another instructor scheduled on a day that works better for everyone.
+{% endif %}
+{% if calendar_url %}
+View the duty calendar: {{ calendar_url }}
+{% endif %}
+
+---
+This is an automated message from {{ club_name }}.
+{{ site_url }}

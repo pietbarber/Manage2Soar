@@ -523,6 +523,9 @@ class TestSendDutyPreopEmails:
             status="pending",
         )
 
+        # Clear outbox after slot creation (which may have triggered signals)
+        mail.outbox.clear()
+
         out = StringIO()
         call_command(
             "send_duty_preop_emails",

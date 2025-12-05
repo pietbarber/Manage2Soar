@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instruction Request {{ response_status }}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <!-- Main container -->
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with logo -->
+                    <tr>
+                        <td style="background-color: {% if is_accepted %}#276749{% else %}#c53030{% endif %}; padding: 24px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" width="200" height="60" style="max-height: 60px; max-width: 200px; margin-bottom: 12px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                Instruction Request {{ response_status }}
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: {% if is_accepted %}#c6f6d5{% else %}#fed7d7{% endif %}; font-size: 16px;">
+                                {{ instruction_date|date:"l, F j, Y" }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main message -->
+                    <tr>
+                        <td style="padding: 24px 24px 16px 24px;">
+                            <p style="margin: 0; color: #2d3748; font-size: 16px; line-height: 1.5;">
+                                Hello {{ student.first_name }},
+                            </p>
+                            {% if is_accepted %}
+                            <p style="margin: 12px 0 0 0; color: #4a5568; font-size: 15px; line-height: 1.5;">
+                                Great news! Your instruction request for <strong>{{ instruction_date|date:"l, F j, Y" }}</strong> has been <strong style="color: #276749;">accepted</strong> by {{ instructor.full_display_name }}.
+                            </p>
+                            <p style="margin: 12px 0 0 0; color: #4a5568; font-size: 15px; line-height: 1.5;">
+                                Please arrive at the field ready to fly. If you need to cancel, please do so as soon as possible so another student can take your slot.
+                            </p>
+                            {% else %}
+                            <p style="margin: 12px 0 0 0; color: #4a5568; font-size: 15px; line-height: 1.5;">
+                                Unfortunately, your instruction request for <strong>{{ instruction_date|date:"l, F j, Y" }}</strong> could not be accommodated.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if instructor_note %}
+                    <!-- Instructor's note -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #edf2f7; border-radius: 6px;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 8px 0; color: #2d3748; font-size: 16px; font-weight: 600;">
+                                            Note from {{ instructor.first_name }}:
+                                        </h2>
+                                        <p style="margin: 0; color: #4a5568; font-size: 14px; line-height: 1.5; font-style: italic;">
+                                            "{{ instructor_note }}"
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if is_accepted %}
+                    <!-- Confirmed details -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fff4; border-radius: 6px; border-left: 4px solid #38a169;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #276749; font-size: 18px; font-weight: 600;">
+                                            Your Instruction Session
+                                        </h2>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px; width: 120px;">Date:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ instruction_date|date:"l, F j, Y" }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Instructor:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ instructor.full_display_name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Status:</td>
+                                                <td style="padding: 4px 0; color: #38a169; font-size: 14px; font-weight: 600;">Confirmed</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <!-- Try another date -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffaf0; border-radius: 6px; border-left: 4px solid #ed8936;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 8px 0; color: #c05621; font-size: 16px; font-weight: 600;">
+                                            Don't Give Up!
+                                        </h2>
+                                        <p style="margin: 0; color: #4a5568; font-size: 14px; line-height: 1.5;">
+                                            Please check the duty roster for other available dates and try again. There may be another instructor scheduled on a day that works better for everyone.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if calendar_url %}
+                    <!-- Action button -->
+                    <tr>
+                        <td style="padding: 0 24px 24px 24px; text-align: center;">
+                            <a href="{{ calendar_url }}" style="display: inline-block; background-color: #3182ce; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">
+                                View Duty Calendar
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #edf2f7; padding: 16px 24px; text-align: center;">
+                            <p style="margin: 0; color: #718096; font-size: 12px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                            {% if site_url %}
+                            <p style="margin: 4px 0 0 0; color: #718096; font-size: 12px;">
+                                <a href="{{ site_url }}" style="color: #4a5568; text-decoration: none;">{{ site_url }}</a>
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

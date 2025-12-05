@@ -1,0 +1,30 @@
+New Instruction Request
+{{ club_name }}
+
+Hello {{ instructor.first_name }},
+
+A student has requested instruction for your upcoming duty day on {{ instruction_date|date:"l, F j, Y" }}.
+
+STUDENT DETAILS
+---------------
+Name: {{ student.full_display_name }}
+{% if student.email %}Email: {{ student.email }}
+{% endif %}{% if student.phone %}Phone: {{ student.phone }}
+{% endif %}
+{% if student_progress %}
+TRAINING PROGRESS
+-----------------
+Total Sessions: {{ student_progress.sessions }}
+Solo Progress: {{ student_progress.solo_progress|floatformat:0 }}%
+Checkride Progress: {{ student_progress.checkride_progress|floatformat:0 }}%
+{% if total_flights %}Total Flights: {{ total_flights }}
+{% endif %}{% endif %}
+
+Please review this request and respond at your earliest convenience.
+
+{% if review_url %}Review this request: {{ review_url }}
+{% endif %}
+
+---
+This is an automated message from {{ club_name }}.
+{{ site_url }}
