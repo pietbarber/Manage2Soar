@@ -154,8 +154,20 @@
             <a class="nav-link dropdown-toggle" href="#" id="instructorDropdown" role="button" data-bs-toggle="dropdown"
               aria-expanded="false">
               Instructor Tools
+              {% if instructor_pending_count %}
+                <span class="badge bg-warning text-dark" aria-label="{{ instructor_pending_count }} pending student requests">{{ instructor_pending_count }}</span>
+              {% endif %}
             </a>
             <ul class="dropdown-menu" aria-labelledby="instructorDropdown">
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:instructor_requests' %}">
+                  <i class="fas fa-user-graduate me-1"></i>Student Requests
+                  {% if instructor_pending_count %}
+                    <span class="badge bg-warning text-dark ms-1" aria-label="{{ instructor_pending_count }} pending student requests">{{ instructor_pending_count }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'instructors:instructors-dashboard' %}">🏠 Instructor Home</a>
               </li>

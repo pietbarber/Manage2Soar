@@ -11,7 +11,7 @@ import sys
 
 from django.apps import apps
 from django.conf import settings
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -289,15 +289,37 @@ def store_original_instructor_response(sender, instance, **kwargs):
             pass
 
 
+def _invalidate_instructor_cache_for_slot(instance):
+    """
+    Invalidate the instructor pending count cache for a slot's instructors.
+
+    Args:
+        instance: InstructionSlot instance
+    """
+    try:
+        from duty_roster.context_processors import invalidate_instructor_pending_cache
+
+        if instance.assignment.instructor:
+            invalidate_instructor_pending_cache(instance.assignment.instructor.id)
+        if instance.assignment.surge_instructor:
+            invalidate_instructor_pending_cache(instance.assignment.surge_instructor.id)
+    except (AttributeError, ImportError) as e:
+        logger.exception("Failed to invalidate instructor pending cache: %s", e)
+
+
 @receiver(post_save, sender="duty_roster.InstructionSlot")
 def handle_instruction_slot_save(sender, instance, created, **kwargs):
     """
     Handle InstructionSlot saves:
     - If created with status=pending, notify instructor(s)
     - If instructor_response changed to accepted/rejected, notify student
+    - Invalidate instructor pending count cache
     """
     if not is_safe_to_run_signals():
         return
+
+    # Invalidate cache for affected instructors
+    _invalidate_instructor_cache_for_slot(instance)
 
     try:
         if created and instance.status == "pending":
@@ -316,3 +338,16 @@ def handle_instruction_slot_save(sender, instance, created, **kwargs):
     except Exception:
         # Log error but don't re-raise to avoid breaking the save operation
         logger.exception("handle_instruction_slot_save failed")
+
+
+@receiver(post_delete, sender="duty_roster.InstructionSlot")
+def handle_instruction_slot_delete(sender, instance, **kwargs):
+    """
+    Handle InstructionSlot deletes:
+    - Invalidate instructor pending count cache
+    """
+    if not is_safe_to_run_signals():
+        return
+
+    # Invalidate cache for affected instructors
+    _invalidate_instructor_cache_for_slot(instance)

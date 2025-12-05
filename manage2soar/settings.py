@@ -542,3 +542,7 @@ TEMPLATES[0]["OPTIONS"]["context_processors"].append(
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
     "cms.context_processors.footer_content"
 )
+
+TEMPLATES[0]["OPTIONS"]["context_processors"].append(
+    "duty_roster.context_processors.instructor_pending_requests"
+)
