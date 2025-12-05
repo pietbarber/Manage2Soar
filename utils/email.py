@@ -36,6 +36,31 @@ def get_dev_mode_info():
     return enabled, redirect_list
 
 
+def _format_dev_mode_subject(subject, to_list, cc_list=None):
+    """Format subject line for dev mode, preserving original recipients.
+
+    Args:
+        subject: Original email subject
+        to_list: List of TO recipients
+        cc_list: List of CC recipients (optional)
+
+    Returns:
+        str: Subject with [DEV MODE] prefix and original recipients
+    """
+    all_recipients = list(to_list or []) + list(cc_list or [])
+    if not all_recipients:
+        original_recipients = "no recipients"
+    elif len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
+        shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
+        remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
+        original_recipients = ", ".join(shown) + f", ... and {remaining} more"
+    else:
+        original_recipients = ", ".join(to_list) if to_list else "none"
+        if cc_list:
+            original_recipients += f", CC: {', '.join(cc_list)}"
+    return f"[DEV MODE] {subject} (TO: {original_recipients})"
+
+
 def send_mail(
     subject,
     message,
@@ -66,6 +91,12 @@ def send_mail(
     """
     dev_mode, redirect_list = get_dev_mode_info()
 
+    if dev_mode and not redirect_list:
+        raise ValueError(
+            "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
+            "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
+        )
+
     # If CC is provided, we need to use EmailMultiAlternatives instead of django_send_mail
     if cc:
         email = EmailMultiAlternatives(
@@ -80,27 +111,7 @@ def send_mail(
             email.attach_alternative(html_message, "text/html")
 
         if dev_mode:
-            if not redirect_list:
-                raise ValueError(
-                    "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
-                    "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
-                )
-            # Preserve original recipients in subject
-            all_recipients = list(recipient_list or []) + list(cc or [])
-            if not all_recipients:
-                original_recipients = "no recipients"
-            elif len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
-                shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
-                remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
-                original_recipients = ", ".join(shown) + f", ... and {remaining} more"
-            else:
-                # Show TO and CC separately for clarity
-                original_recipients = (
-                    ", ".join(recipient_list) if recipient_list else "none"
-                )
-                if cc:
-                    original_recipients += f", CC: {', '.join(cc)}"
-            email.subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
+            email.subject = _format_dev_mode_subject(subject, recipient_list, cc)
             email.to = redirect_list
             email.cc = []
 
@@ -108,23 +119,7 @@ def send_mail(
 
     # No CC - use standard path
     if dev_mode:
-        if not redirect_list:
-            raise ValueError(
-                "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
-                "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
-            )
-
-        # Preserve original recipients in subject for debugging
-        # Truncate long recipient lists to avoid email server subject line limits
-        if not recipient_list:
-            original_recipients = "no recipients"
-        elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
-            shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
-            remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
-            original_recipients = ", ".join(shown) + f", ... and {remaining} more"
-        else:
-            original_recipients = ", ".join(recipient_list)
-        subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
+        subject = _format_dev_mode_subject(subject, recipient_list)
         recipient_list = redirect_list
 
     return django_send_mail(
