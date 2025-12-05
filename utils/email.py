@@ -94,7 +94,10 @@ def send_mail(
                 remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
                 original_recipients = ", ".join(shown) + f", ... and {remaining} more"
             else:
-                original_recipients = ", ".join(recipient_list)
+                # Show TO and CC separately for clarity
+                original_recipients = (
+                    ", ".join(recipient_list) if recipient_list else "none"
+                )
                 if cc:
                     original_recipients += f", CC: {', '.join(cc)}"
             email.subject = f"[DEV MODE] {subject} (TO: {original_recipients})"

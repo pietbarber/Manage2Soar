@@ -11,7 +11,6 @@ Tests the HTML email generation with all the new features:
 
 from datetime import date, timedelta
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
 from django.core import mail
@@ -443,3 +442,128 @@ class TestSendDutyPreopEmails:
 
             email = mail.outbox[0]
             assert "noreply@test.manage2soar.com" in email.from_email
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_students_requesting_instruction(
+        self, site_config, duty_assignment, members, tomorrow
+    ):
+        """Test that students requesting instruction are CC'd on the email."""
+        # Create an instruction slot for the student
+        InstructionSlot.objects.create(
+            assignment=duty_assignment,
+            student=members["student"],
+            status="confirmed",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        # Student should be CC'd
+        assert members["student"].email in email.cc
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_ops_intent_members(
+        self, site_config, duty_assignment, members, glider, tomorrow
+    ):
+        """Test that members with ops intent are CC'd on the email."""
+        # Create an ops intent
+        OpsIntent.objects.create(
+            member=members["private_owner"],
+            date=tomorrow,
+            available_as=["private"],
+            glider=glider,
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        # Private owner should be CC'd
+        assert members["private_owner"].email in email.cc
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_excludes_duplicates_and_duty_crew(
+        self, site_config, duty_assignment, members, tomorrow
+    ):
+        """Test that CC list excludes duplicates and members already in to_emails."""
+        # Create instruction slot for the instructor (who is already in duty crew)
+        InstructionSlot.objects.create(
+            assignment=duty_assignment,
+            student=members["instructor"],  # Instructor is already a TO recipient
+            status="confirmed",
+        )
+        # Also create a slot for a regular student
+        InstructionSlot.objects.create(
+            assignment=duty_assignment,
+            student=members["student"],
+            status="pending",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        # Instructor should NOT be in CC (already in TO)
+        assert members["instructor"].email not in email.cc
+        # Student should be in CC
+        assert members["student"].email in email.cc
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=True,
+        EMAIL_DEV_MODE_REDIRECT_TO="dev@example.com",
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_cc_in_dev_mode(self, site_config, duty_assignment, members, tomorrow):
+        """Test that CC functionality works correctly in dev mode."""
+        # Create an instruction slot
+        InstructionSlot.objects.create(
+            assignment=duty_assignment,
+            student=members["student"],
+            status="confirmed",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        # In dev mode, TO should be redirected
+        assert email.to == ["dev@example.com"]
+        # In dev mode, CC should be cleared (redirected to TO)
+        assert email.cc == []
+        # Subject should indicate dev mode and include original recipients info
+        assert "[DEV MODE]" in email.subject
+        assert "TO:" in email.subject
