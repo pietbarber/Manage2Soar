@@ -11,7 +11,7 @@ is primarily useful for staging/production environments where real SMTP is confi
 """
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.mail import send_mail as django_send_mail
 
 # Maximum recipients to show in subject line before truncating
@@ -36,6 +36,61 @@ def get_dev_mode_info():
     return enabled, redirect_list
 
 
+def _format_dev_mode_subject(subject, to_list, cc_list=None):
+    """Format subject line for dev mode, preserving original recipients.
+
+    Args:
+        subject: Original email subject
+        to_list: List of TO recipients
+        cc_list: List of CC recipients (optional)
+
+    Returns:
+        str: Subject with [DEV MODE] prefix and original recipients
+    """
+    to_list = list(to_list or [])
+    cc_list = list(cc_list or [])
+    total_recipients = len(to_list) + len(cc_list)
+
+    if total_recipients == 0:
+        original_recipients = "no recipients"
+    elif total_recipients > MAX_RECIPIENTS_IN_SUBJECT:
+        # Truncate: prioritize TO recipients, then CC
+        to_shown = to_list[:MAX_RECIPIENTS_IN_SUBJECT]
+        cc_slots = max(0, MAX_RECIPIENTS_IN_SUBJECT - len(to_shown))
+        cc_shown = cc_list[:cc_slots] if cc_slots > 0 else []
+        to_extra = len(to_list) - len(to_shown)
+        cc_extra = len(cc_list) - len(cc_shown)
+
+        # Build TO part
+        if to_shown:
+            to_part = ", ".join(to_shown)
+            if to_extra > 0:
+                to_part += f", +{to_extra} more"
+        else:
+            to_part = "none"
+
+        # Build CC part if any CC recipients
+        if cc_shown or cc_extra > 0:
+            if cc_shown:
+                cc_part = ", ".join(cc_shown)
+                if cc_extra > 0:
+                    cc_part += f", +{cc_extra} more"
+            else:
+                cc_part = f"+{cc_extra} more"
+            original_recipients = f"{to_part}, CC: {cc_part}"
+        else:
+            original_recipients = to_part
+    else:
+        # Show all recipients with TO/CC separation
+        to_part = ", ".join(to_list) if to_list else "none"
+        if cc_list:
+            original_recipients = f"{to_part}, CC: {', '.join(cc_list)}"
+        else:
+            original_recipients = to_part
+
+    return f"[DEV MODE] {subject} (TO: {original_recipients})"
+
+
 def send_mail(
     subject,
     message,
@@ -46,6 +101,7 @@ def send_mail(
     auth_password=None,
     connection=None,
     html_message=None,
+    cc=None,
 ):
     """Send email with dev mode support.
 
@@ -54,7 +110,8 @@ def send_mail(
     preserved in the subject line for debugging.
 
     Args:
-        Same as django.core.mail.send_mail
+        Same as django.core.mail.send_mail, plus:
+        cc: List of CC email addresses (optional)
 
     Returns:
         int: Number of successfully delivered messages (1 or 0)
@@ -64,24 +121,35 @@ def send_mail(
     """
     dev_mode, redirect_list = get_dev_mode_info()
 
-    if dev_mode:
-        if not redirect_list:
-            raise ValueError(
-                "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
-                "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
-            )
+    if dev_mode and not redirect_list:
+        raise ValueError(
+            "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set. "
+            "Set EMAIL_DEV_MODE_REDIRECT_TO or disable EMAIL_DEV_MODE."
+        )
 
-        # Preserve original recipients in subject for debugging
-        # Truncate long recipient lists to avoid email server subject line limits
-        if not recipient_list:
-            original_recipients = "no recipients"
-        elif len(recipient_list) > MAX_RECIPIENTS_IN_SUBJECT:
-            shown = recipient_list[:MAX_RECIPIENTS_IN_SUBJECT]
-            remaining = len(recipient_list) - MAX_RECIPIENTS_IN_SUBJECT
-            original_recipients = ", ".join(shown) + f", ... and {remaining} more"
-        else:
-            original_recipients = ", ".join(recipient_list)
-        subject = f"[DEV MODE] {subject} (TO: {original_recipients})"
+    # If CC is provided, we need to use EmailMultiAlternatives instead of django_send_mail
+    if cc:
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=message,
+            from_email=from_email,
+            to=recipient_list,
+            cc=cc,
+            connection=connection,
+        )
+        if html_message:
+            email.attach_alternative(html_message, "text/html")
+
+        if dev_mode:
+            email.subject = _format_dev_mode_subject(subject, recipient_list, cc)
+            email.to = redirect_list
+            email.cc = []
+
+        return email.send(fail_silently=fail_silently)
+
+    # No CC - use standard path
+    if dev_mode:
+        subject = _format_dev_mode_subject(subject, recipient_list)
         recipient_list = redirect_list
 
     return django_send_mail(

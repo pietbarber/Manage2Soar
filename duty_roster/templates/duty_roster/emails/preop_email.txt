@@ -1,0 +1,48 @@
+Pre-Operations Report for {{ target_date|date:"l, F j, Y" }}
+{{ club_name }}
+
+Hello {{ club_nickname|default:club_name }} Duty Crew,
+
+{% if days_until == 1 %}This is a friendly reminder that you are scheduled for duty tomorrow.{% elif days_until == 0 %}This is a reminder that you are scheduled for duty today.{% elif days_until < 0 %}This is a summary of duty operations for {{ target_date|date:"l, F j" }}.{% else %}This is an advance notice that you are scheduled for duty on {{ target_date|date:"l, F j" }} ({{ days_until }} days from now).{% endif %}
+Please review the information below and come prepared for a great day of flying!
+
+ASSIGNED DUTY CREW
+------------------
+{% if instructor %}{{ instructor_title }}: {{ instructor.full_display_name }}
+{% endif %}{% if surge_instructor %}{{ surge_instructor_title }}: {{ surge_instructor.full_display_name }}
+{% endif %}{% if tow_pilot %}{{ towpilot_title }}: {{ tow_pilot.full_display_name }}
+{% endif %}{% if surge_tow_pilot %}{{ surge_towpilot_title }}: {{ surge_tow_pilot.full_display_name }}
+{% endif %}{% if duty_officer %}{{ duty_officer_title }}: {{ duty_officer.full_display_name }}
+{% endif %}{% if assistant_duty_officer %}{{ assistant_duty_officer_title }}: {{ assistant_duty_officer.full_display_name }}
+{% endif %}
+{% if instruction_requests %}
+STUDENTS REQUESTING INSTRUCTION
+-------------------------------
+{% for slot in instruction_requests %}- {{ slot.student.full_display_name }}{% if slot.status == "confirmed" %} (confirmed){% elif slot.status == "pending" %} (pending){% elif slot.status == "waitlist" %} (waitlist){% endif %}
+{% endfor %}{% endif %}
+{% if ops_intents %}
+MEMBERS PLANNING TO FLY
+-----------------------
+{% for intent in ops_intents %}- {{ intent.member.full_display_name }}{% if intent.available_as_labels %} ({{ intent.available_as_labels|join:", " }}){% endif %}{% if intent.glider %} - {{ intent.glider }}{% endif %}
+{% endfor %}{% endif %}
+{% if grounded_gliders or grounded_towplanes %}
+GROUNDED AIRCRAFT
+-----------------
+{% if grounded_gliders %}Gliders:
+{% for issue in grounded_gliders %}- {{ issue.glider }}: {{ issue.description }}
+{% endfor %}{% endif %}{% if grounded_towplanes %}Towplanes:
+{% for issue in grounded_towplanes %}- {{ issue.towplane }}: {{ issue.description }}
+{% endfor %}{% endif %}{% else %}
+No grounded aircraft. All systems go!
+{% endif %}
+{% if upcoming_deadlines %}
+MAINTENANCE DEADLINES (NEXT 30 DAYS)
+------------------------------------
+{% for deadline in upcoming_deadlines %}- {% firstof deadline.glider deadline.towplane "Unknown" %}: {{ deadline.description }} (due {{ deadline.due_date|date:"M j, Y" }})
+{% endfor %}{% endif %}
+
+View the full duty roster: {{ duty_roster_url }}
+
+---
+This is an automated message from {{ club_name }}.
+{{ site_url }}
