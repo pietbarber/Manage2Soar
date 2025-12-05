@@ -120,11 +120,14 @@ def send_student_signup_notification(slot):
     site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
 
     # Determine which instructor(s) to notify
-    # Primary instructor on the assignment, and surge instructor if present
+    # Primary instructor on the assignment, and surge instructor if present (and different)
     instructors_to_notify = []
     if slot.assignment.instructor:
         instructors_to_notify.append(slot.assignment.instructor)
-    if slot.assignment.surge_instructor:
+    if (
+        slot.assignment.surge_instructor
+        and slot.assignment.surge_instructor != slot.assignment.instructor
+    ):
         instructors_to_notify.append(slot.assignment.surge_instructor)
 
     if not instructors_to_notify:

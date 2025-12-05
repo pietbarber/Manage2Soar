@@ -105,10 +105,14 @@ class Command(BaseCronJobCommand):
 
         for assignment in assignments:
             # Collect instructors for this assignment
+            # Avoid adding surge_instructor if same as primary instructor
             instructors = []
             if assignment.instructor:
                 instructors.append(assignment.instructor)
-            if assignment.surge_instructor:
+            if (
+                assignment.surge_instructor
+                and assignment.surge_instructor != assignment.instructor
+            ):
                 instructors.append(assignment.surge_instructor)
 
             if not instructors:
@@ -215,7 +219,7 @@ class Command(BaseCronJobCommand):
                 {
                     "student": student,
                     "slot": slot,
-                    "status": slot.get_status_display(),
+                    "status": slot.status,  # Raw value for template comparison
                     "progress": progress_data,
                     "total_flights": flight_counts.get(student.pk, 0),
                 }
@@ -234,11 +238,15 @@ class Command(BaseCronJobCommand):
             if not logo_url.startswith(("http://", "https://")):
                 logo_url = f"{site_url.rstrip('/')}{logo_url}"
 
+        # Count pending requests for action reminder
+        pending_count = sum(1 for s in students_data if s.get("status") == "pending")
+
         context = {
             "instructor": instructor,
             "instruction_date": target_date,
             "days_until": days_until,
             "students": students_data,
+            "pending_count": pending_count,
             "club_name": config.club_name if config else "Soaring Club",
             "club_logo_url": logo_url,
             "site_url": site_url,

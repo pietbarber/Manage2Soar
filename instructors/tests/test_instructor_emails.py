@@ -485,3 +485,36 @@ class TestInstructorSummaryCommand:
         email = mail.outbox[0]
         html_content = email.alternatives[0][0]
         assert "Test Soaring Club" in html_content
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_includes_pending_count_reminder(
+        self, site_config, duty_assignment_in_two_days, student, in_two_days
+    ):
+        """Test that summary email includes pending count action reminder."""
+        # Create a pending instruction slot
+        InstructionSlot.objects.create(
+            assignment=duty_assignment_in_two_days,
+            student=student,
+            status="pending",
+        )
+
+        mail.outbox.clear()
+
+        out = StringIO()
+        call_command(
+            "send_instructor_summary_emails",
+            date=in_two_days.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        email = mail.outbox[0]
+        html_content = email.alternatives[0][0]
+
+        # Check pending action reminder is shown
+        assert "Action Required" in html_content
+        assert "1 pending instruction request" in html_content
