@@ -47,17 +47,47 @@ def _format_dev_mode_subject(subject, to_list, cc_list=None):
     Returns:
         str: Subject with [DEV MODE] prefix and original recipients
     """
-    all_recipients = list(to_list or []) + list(cc_list or [])
-    if not all_recipients:
+    to_list = list(to_list or [])
+    cc_list = list(cc_list or [])
+    total_recipients = len(to_list) + len(cc_list)
+
+    if total_recipients == 0:
         original_recipients = "no recipients"
-    elif len(all_recipients) > MAX_RECIPIENTS_IN_SUBJECT:
-        shown = all_recipients[:MAX_RECIPIENTS_IN_SUBJECT]
-        remaining = len(all_recipients) - MAX_RECIPIENTS_IN_SUBJECT
-        original_recipients = ", ".join(shown) + f", ... and {remaining} more"
+    elif total_recipients > MAX_RECIPIENTS_IN_SUBJECT:
+        # Truncate: prioritize TO recipients, then CC
+        to_shown = to_list[:MAX_RECIPIENTS_IN_SUBJECT]
+        cc_slots = max(0, MAX_RECIPIENTS_IN_SUBJECT - len(to_shown))
+        cc_shown = cc_list[:cc_slots] if cc_slots > 0 else []
+        to_extra = len(to_list) - len(to_shown)
+        cc_extra = len(cc_list) - len(cc_shown)
+
+        # Build TO part
+        if to_shown:
+            to_part = ", ".join(to_shown)
+            if to_extra > 0:
+                to_part += f", +{to_extra} more"
+        else:
+            to_part = "none"
+
+        # Build CC part if any CC recipients
+        if cc_shown or cc_extra > 0:
+            if cc_shown:
+                cc_part = ", ".join(cc_shown)
+                if cc_extra > 0:
+                    cc_part += f", +{cc_extra} more"
+            else:
+                cc_part = f"+{cc_extra} more"
+            original_recipients = f"{to_part}, CC: {cc_part}"
+        else:
+            original_recipients = to_part
     else:
-        original_recipients = ", ".join(to_list) if to_list else "none"
+        # Show all recipients with TO/CC separation
+        to_part = ", ".join(to_list) if to_list else "none"
         if cc_list:
-            original_recipients += f", CC: {', '.join(cc_list)}"
+            original_recipients = f"{to_part}, CC: {', '.join(cc_list)}"
+        else:
+            original_recipients = to_part
+
     return f"[DEV MODE] {subject} (TO: {original_recipients})"
 
 

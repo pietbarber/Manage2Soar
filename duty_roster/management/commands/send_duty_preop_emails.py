@@ -8,6 +8,9 @@ with information about:
 - Members planning to fly (ops intent)
 - Grounded aircraft
 - Upcoming maintenance deadlines
+
+Students requesting instruction and members with ops intent are automatically
+CC'd on the email to keep them informed.
 """
 
 from datetime import datetime, timedelta
@@ -125,18 +128,23 @@ class Command(BaseCommand):
         else:
             from_email = "noreply@manage2soar.com"
 
-        send_mail(
-            subject=f"Pre-Ops Report for {target_date}",
-            message=text_message,
-            from_email=from_email,
-            recipient_list=to_emails,
-            cc=cc_emails if cc_emails else None,
-            html_message=html_message,
-        )
-
-        self.stdout.write(self.style.SUCCESS(f"Email sent to: {', '.join(to_emails)}"))
-        if cc_emails:
-            self.stdout.write(self.style.SUCCESS(f"CC'd: {', '.join(cc_emails)}"))
+        try:
+            send_mail(
+                subject=f"Pre-Ops Report for {target_date}",
+                message=text_message,
+                from_email=from_email,
+                recipient_list=to_emails,
+                cc=cc_emails if cc_emails else None,
+                html_message=html_message,
+            )
+            self.stdout.write(
+                self.style.SUCCESS(f"Email sent to: {', '.join(to_emails)}")
+            )
+            if cc_emails:
+                self.stdout.write(self.style.SUCCESS(f"CC'd: {', '.join(cc_emails)}"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Failed to send email: {e}"))
+            raise
 
     def _build_context(self, assignment, target_date, config, site_url):
         """Build the template context with all required data."""
@@ -217,5 +225,5 @@ class Command(BaseCommand):
             if logo_url.startswith(("http://", "https://")):
                 return logo_url
             # Otherwise, prepend site_url for relative paths
-            return f"{site_url}{logo_url}"
+            return f"{site_url.rstrip('/')}{logo_url}"
         return None
