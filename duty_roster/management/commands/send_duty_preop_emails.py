@@ -1,16 +1,31 @@
+"""
+Send pre-operation duty email with HTML formatting.
+
+This management command sends a nicely formatted HTML email to the duty crew
+with information about:
+- Assigned crew members
+- Students requesting instruction
+- Members planning to fly (ops intent)
+- Grounded aircraft
+- Upcoming maintenance deadlines
+"""
+
 from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from duty_roster.models import DutyAssignment
+from duty_roster.models import DutyAssignment, InstructionSlot, OpsIntent
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
+from siteconfig.models import SiteConfiguration
+from siteconfig.utils import get_role_title
 from utils.email import send_mail
 
 
 class Command(BaseCommand):
-    help = "Send pre-op duty email showing grounded aircraft and upcoming maintenance"
+    help = "Send pre-op duty email showing grounded aircraft, students, and upcoming maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -24,17 +39,18 @@ class Command(BaseCommand):
             if redirect_to:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"⚠️  EMAIL DEV MODE ENABLED - All emails will be redirected to: {redirect_to}"
+                        f"EMAIL DEV MODE ENABLED - All emails will be redirected to: {redirect_to}"
                     )
                 )
             else:
                 self.stdout.write(
                     self.style.ERROR(
-                        "⚠️  EMAIL DEV MODE ENABLED but EMAIL_DEV_MODE_REDIRECT_TO is not set! "
+                        "EMAIL DEV MODE ENABLED but EMAIL_DEV_MODE_REDIRECT_TO is not set! "
                         "Emails will fail to send."
                     )
                 )
 
+        # Determine target date
         if options["date"]:
             try:
                 target_date = datetime.strptime(options["date"], "%Y-%m-%d").date()
@@ -50,12 +66,14 @@ class Command(BaseCommand):
             self.style.NOTICE(f"Generating pre-op report for {target_date}")
         )
 
+        # Get the duty assignment
         try:
             assignment = DutyAssignment.objects.get(date=target_date, is_scheduled=True)
         except DutyAssignment.DoesNotExist:
-            self.stdout.write("❌ No scheduled ops for this date.")
+            self.stdout.write("No scheduled ops for this date.")
             return
 
+        # Collect duty crew emails
         crew_fields = [
             assignment.instructor,
             assignment.surge_instructor,
@@ -66,76 +84,111 @@ class Command(BaseCommand):
         ]
         to_emails = [m.email for m in crew_fields if m and m.email]
 
-        grounded_gliders = MaintenanceIssue.objects.filter(
-            glider__isnull=False, grounded=True, resolved=False
-        )
-        grounded_towplanes = MaintenanceIssue.objects.filter(
-            towplane__isnull=False, grounded=True, resolved=False
-        )
-        upcoming_deadlines = MaintenanceDeadline.objects.filter(
-            due_date__lte=target_date + timedelta(days=30)
-        )
-
-        lines = [f"🚨 Pre-Operations Summary for {target_date}", ""]
-
-        lines.append("👥 Assigned Duty Crew:")
-        lines.append(
-            f"🎓 Instructor: {assignment.instructor.full_display_name if assignment.instructor else '—'}"
-        )
-        lines.append(
-            f"🎓 Surge Instructor: {assignment.surge_instructor.full_display_name if assignment.surge_instructor else '—'}"
-        )
-        lines.append(
-            f"🛩️ Tow Pilot: {assignment.tow_pilot.full_display_name if assignment.tow_pilot else '—'}"
-        )
-        lines.append(
-            f"🛩️ Surge Tow Pilot: {assignment.surge_tow_pilot.full_display_name if assignment.surge_tow_pilot else '—'}"
-        )
-        lines.append(
-            f"📋 Duty Officer: {assignment.duty_officer.full_display_name if assignment.duty_officer else '—'}"
-        )
-        lines.append(
-            f"💪 Assistant DO: {assignment.assistant_duty_officer.full_display_name if assignment.assistant_duty_officer else '—'}"
-        )
-        lines.append("")
-
-        lines.append("🛑 Grounded Gliders:")
-        if grounded_gliders:
-            for issue in grounded_gliders:
-                lines.append(f"- {issue.glider} :: {issue.description}")
-        else:
-            lines.append("- None")
-
-        lines.append("\n🛑 Grounded Towplanes:")
-        if grounded_towplanes:
-            for issue in grounded_towplanes:
-                lines.append(f"- {issue.towplane} :: {issue.description}")
-        else:
-            lines.append("- None")
-
-        lines.append("\n🗓️ Maintenance Deadlines in Next 30 Days:")
-        if upcoming_deadlines:
-            for d in upcoming_deadlines:
-                aircraft = d.glider or d.towplane or "Unknown Aircraft"
-                lines.append(f"- {aircraft} :: {d.description} due {d.due_date}")
-        else:
-            lines.append("- None")
-
-        body = "\n".join(lines)
-
-        if to_emails:
-            send_mail(
-                subject=f"Pre-Ops Report for {assignment.date}",
-                message=body,
-                from_email="noreply@default.manage2soar.com",
-                recipient_list=to_emails,
-            )
-            self.stdout.write(
-                self.style.SUCCESS(f"✅ Email sent to: {', '.join(to_emails)}")
-            )
-        else:
+        if not to_emails:
             self.stdout.write(
                 self.style.WARNING(
-                    "⚠️ No valid email addresses for duty crew. Email not sent."
+                    "No valid email addresses for duty crew. Email not sent."
                 )
             )
+            return
+
+        # Get site configuration
+        config = SiteConfiguration.objects.first()
+        site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+
+        # Build context for templates
+        context = self._build_context(assignment, target_date, config, site_url)
+
+        # Render templates
+        html_message = render_to_string("duty_roster/emails/preop_email.html", context)
+        text_message = render_to_string("duty_roster/emails/preop_email.txt", context)
+
+        # Send email
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
+        if not from_email:
+            from_email = (
+                f"noreply@{config.domain_name}" if config else "noreply@manage2soar.com"
+            )
+
+        send_mail(
+            subject=f"Pre-Ops Report for {target_date}",
+            message=text_message,
+            from_email=from_email,
+            recipient_list=to_emails,
+            html_message=html_message,
+        )
+
+        self.stdout.write(self.style.SUCCESS(f"Email sent to: {', '.join(to_emails)}"))
+
+    def _build_context(self, assignment, target_date, config, site_url):
+        """Build the template context with all required data."""
+
+        # Get grounded aircraft
+        grounded_gliders = MaintenanceIssue.objects.filter(
+            glider__isnull=False, grounded=True, resolved=False
+        ).select_related("glider")
+
+        grounded_towplanes = MaintenanceIssue.objects.filter(
+            towplane__isnull=False, grounded=True, resolved=False
+        ).select_related("towplane")
+
+        # Get upcoming maintenance deadlines
+        upcoming_deadlines = (
+            MaintenanceDeadline.objects.filter(
+                due_date__lte=target_date + timedelta(days=30)
+            )
+            .select_related("glider", "towplane")
+            .order_by("due_date")
+        )
+
+        # Get students requesting instruction for this day
+        instruction_requests = InstructionSlot.objects.filter(
+            assignment=assignment,
+            status__in=["pending", "confirmed", "waitlist"],
+        ).select_related("student")
+
+        # Get members who indicated they want to fly (ops intent)
+        ops_intents = OpsIntent.objects.filter(date=target_date).select_related(
+            "member", "glider"
+        )
+
+        # Get role titles from site config
+        context = {
+            # Date and site info
+            "target_date": target_date,
+            "club_name": config.club_name if config else "Soaring Club",
+            "club_nickname": config.club_nickname if config else "",
+            "club_logo_url": self._get_logo_url(config, site_url),
+            "site_url": site_url,
+            "duty_roster_url": f"{site_url}/duty_roster/calendar/",
+            # Duty crew
+            "instructor": assignment.instructor,
+            "surge_instructor": assignment.surge_instructor,
+            "tow_pilot": assignment.tow_pilot,
+            "surge_tow_pilot": assignment.surge_tow_pilot,
+            "duty_officer": assignment.duty_officer,
+            "assistant_duty_officer": assignment.assistant_duty_officer,
+            # Role titles
+            "instructor_title": get_role_title("instructor"),
+            "surge_instructor_title": get_role_title("surge_instructor"),
+            "towpilot_title": get_role_title("towpilot"),
+            "surge_towpilot_title": get_role_title("surge_towpilot"),
+            "duty_officer_title": get_role_title("duty_officer"),
+            "assistant_duty_officer_title": get_role_title("assistant_duty_officer"),
+            # Students and members
+            "instruction_requests": instruction_requests,
+            "ops_intents": ops_intents,
+            # Maintenance
+            "grounded_gliders": grounded_gliders,
+            "grounded_towplanes": grounded_towplanes,
+            "upcoming_deadlines": upcoming_deadlines,
+        }
+
+        return context
+
+    def _get_logo_url(self, config, site_url):
+        """Get the club logo URL, or None if not configured."""
+        if config and config.club_logo:
+            # Return absolute URL to the logo
+            return f"{site_url}{config.club_logo.url}"
+        return None
