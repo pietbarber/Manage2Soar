@@ -295,9 +295,21 @@ def handle_instruction_slot_save(sender, instance, created, **kwargs):
     Handle InstructionSlot saves:
     - If created with status=pending, notify instructor(s)
     - If instructor_response changed to accepted/rejected, notify student
+    - Invalidate instructor pending count cache
     """
     if not is_safe_to_run_signals():
         return
+
+    # Invalidate cache for affected instructors
+    try:
+        from duty_roster.context_processors import invalidate_instructor_pending_cache
+
+        if instance.assignment.instructor:
+            invalidate_instructor_pending_cache(instance.assignment.instructor.id)
+        if instance.assignment.surge_instructor:
+            invalidate_instructor_pending_cache(instance.assignment.surge_instructor.id)
+    except Exception:
+        logger.exception("Failed to invalidate instructor pending cache")
 
     try:
         if created and instance.status == "pending":
