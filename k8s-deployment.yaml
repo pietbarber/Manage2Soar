@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: django
-          image: gcr.io/skyline-soaring-storage/skylinesoaring:20251204-2041-cafaedb
+          image: gcr.io/skyline-soaring-storage/skylinesoaring:20251204-2114-ffd1055
           ports:
             - containerPort: 8000
           env:
@@ -35,10 +35,10 @@ spec:
               readOnly: true
           resources:
             requests:
-              memory: "128Mi"
+              memory: "192Mi"
               cpu: "100m"
             limits:
-              memory: "256Mi"
+              memory: "384Mi"
               cpu: "250m"
       volumes:
         - name: static-files

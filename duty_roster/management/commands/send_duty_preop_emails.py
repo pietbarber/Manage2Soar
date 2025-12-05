@@ -99,6 +99,17 @@ class Command(BaseCommand):
         # Build context for templates
         context = self._build_context(assignment, target_date, config, site_url)
 
+        # Collect CC emails from students and ops intent members
+        cc_emails = []
+        for slot in context.get("instruction_requests", []):
+            if slot.student and slot.student.email:
+                cc_emails.append(slot.student.email)
+        for intent in context.get("ops_intents", []):
+            if intent.member and intent.member.email:
+                cc_emails.append(intent.member.email)
+        # Remove duplicates and any emails already in to_emails
+        cc_emails = list(set(cc_emails) - set(to_emails))
+
         # Render templates
         html_message = render_to_string("duty_roster/emails/preop_email.html", context)
         text_message = render_to_string("duty_roster/emails/preop_email.txt", context)
@@ -119,10 +130,13 @@ class Command(BaseCommand):
             message=text_message,
             from_email=from_email,
             recipient_list=to_emails,
+            cc=cc_emails if cc_emails else None,
             html_message=html_message,
         )
 
         self.stdout.write(self.style.SUCCESS(f"Email sent to: {', '.join(to_emails)}"))
+        if cc_emails:
+            self.stdout.write(self.style.SUCCESS(f"CC'd: {', '.join(cc_emails)}"))
 
     def _build_context(self, assignment, target_date, config, site_url):
         """Build the template context with all required data."""
@@ -156,10 +170,15 @@ class Command(BaseCommand):
             "member", "glider"
         )
 
+        # Calculate days until target date for dynamic wording
+        today = now().date()
+        days_until = (target_date - today).days
+
         # Get role titles from site config
         context = {
             # Date and site info
             "target_date": target_date,
+            "days_until": days_until,
             "club_name": config.club_name if config else "Soaring Club",
             "club_nickname": config.club_nickname if config else "",
             "club_logo_url": self._get_logo_url(config, site_url),

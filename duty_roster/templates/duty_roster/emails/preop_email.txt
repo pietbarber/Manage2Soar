@@ -3,7 +3,7 @@ Pre-Operations Report for {{ target_date|date:"l, F j, Y" }}
 
 Hello {{ club_nickname|default:club_name }} Duty Crew,
 
-This is a friendly reminder that you are scheduled for duty tomorrow.
+{% if days_until == 1 %}This is a friendly reminder that you are scheduled for duty tomorrow.{% elif days_until == 0 %}This is a reminder that you are scheduled for duty today.{% elif days_until < 0 %}This is a summary of duty operations for {{ target_date|date:"l, F j" }}.{% else %}This is an advance notice that you are scheduled for duty on {{ target_date|date:"l, F j" }} ({{ days_until }} days from now).{% endif %}
 Please review the information below and come prepared for a great day of flying!
 
 ASSIGNED DUTY CREW
