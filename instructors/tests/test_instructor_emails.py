@@ -9,7 +9,6 @@ Tests the email notifications for:
 
 from datetime import date, timedelta
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
 from django.core import mail
@@ -135,7 +134,7 @@ class TestStudentSignupNotification:
         mail.outbox.clear()
 
         # Create instruction slot - should trigger signal
-        slot = InstructionSlot.objects.create(
+        InstructionSlot.objects.create(
             assignment=duty_assignment,
             student=student,
             status="pending",

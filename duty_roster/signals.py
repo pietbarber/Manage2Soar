@@ -73,6 +73,7 @@ def _get_email_context(slot, config, site_url):
             "sessions": progress.sessions or 0,
         }
     except StudentProgressSnapshot.DoesNotExist:
+        # Student has no progress snapshot yet - this is expected for new students
         pass
 
     # Get logo URL
@@ -133,14 +134,7 @@ def send_student_signup_notification(slot):
         )
         return
 
-    # Get all students for this day (not just the new one)
-    all_slots = InstructionSlot.objects.filter(
-        assignment=slot.assignment,
-        status__in=["pending", "confirmed", "waitlist"],
-    ).select_related("student")
-
     context = _get_email_context(slot, config, site_url)
-    context["all_students"] = all_slots
     context["review_url"] = f"{site_url}{reverse('duty_roster:instructor_requests')}"
 
     from_email = _get_from_email(config)
@@ -212,10 +206,14 @@ def send_request_response_email(slot):
 
     context = _get_email_context(slot, config, site_url)
     context["is_accepted"] = slot.instructor_response == "accepted"
+    context["response_status"] = (
+        "Accepted" if slot.instructor_response == "accepted" else "Update"
+    )
     context["instructor_note"] = slot.instructor_note or ""
     context["my_requests_url"] = (
         f"{site_url}{reverse('duty_roster:my_instruction_requests')}"
     )
+    context["calendar_url"] = f"{site_url}{reverse('duty_roster:duty_calendar')}"
 
     from_email = _get_from_email(config)
 
@@ -261,17 +259,17 @@ def send_request_response_email(slot):
         url = reverse("duty_roster:my_instruction_requests")
         _create_notification_if_not_exists(slot.student, message, url=url)
     except Exception:
+        # Log the error but don't break the notification flow
         logger.exception("Failed to create in-system notification for student")
-
-
-# Store original instructor_response for comparison in post_save
-_original_responses = {}
 
 
 @receiver(pre_save, sender="duty_roster.InstructionSlot")
 def store_original_instructor_response(sender, instance, **kwargs):
     """
     Store the original instructor_response before save so we can detect changes.
+
+    Uses instance attribute instead of module-level dict to avoid concurrency
+    issues and potential memory leaks with long-running processes.
     """
     if not is_safe_to_run_signals():
         return
@@ -281,8 +279,10 @@ def store_original_instructor_response(sender, instance, **kwargs):
             from .models import InstructionSlot
 
             original = InstructionSlot.objects.get(pk=instance.pk)
-            _original_responses[instance.pk] = original.instructor_response
+            # Store on instance to avoid module-level state
+            instance._original_instructor_response = original.instructor_response
         except sender.DoesNotExist:
+            # Instance doesn't exist yet - this can happen during migrations
             pass
 
 
@@ -301,8 +301,8 @@ def handle_instruction_slot_save(sender, instance, created, **kwargs):
             # New request - notify instructor(s)
             send_student_signup_notification(instance)
         elif not created:
-            # Check if instructor_response changed
-            original_response = _original_responses.pop(instance.pk, None)
+            # Check if instructor_response changed (stored in pre_save)
+            original_response = getattr(instance, "_original_instructor_response", None)
             if (
                 original_response
                 and original_response != instance.instructor_response
@@ -311,5 +311,5 @@ def handle_instruction_slot_save(sender, instance, created, **kwargs):
                 # Response changed - notify student
                 send_request_response_email(instance)
     except Exception:
+        # Log error but don't re-raise to avoid breaking the save operation
         logger.exception("handle_instruction_slot_save failed")
-        # Don't re-raise from signal handlers to avoid breaking the save operation

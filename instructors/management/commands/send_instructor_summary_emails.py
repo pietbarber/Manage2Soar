@@ -175,7 +175,25 @@ class Command(BaseCronJobCommand):
 
     def _build_students_data(self, slots):
         """Build list of student data with progress info."""
+        from django.db.models import Count
+
+        from logsheet.models import Flight
+
         students_data = []
+
+        # Get all student IDs for bulk query
+        student_ids = [slot.student_id for slot in slots]
+
+        # Bulk query for flight counts to avoid N+1
+        # Students appear as 'pilot' in Flight records
+        flight_counts = {}
+        if student_ids:
+            counts = (
+                Flight.objects.filter(pilot_id__in=student_ids)
+                .values("pilot_id")
+                .annotate(count=Count("id"))
+            )
+            flight_counts = {item["pilot_id"]: item["count"] for item in counts}
 
         for slot in slots:
             student = slot.student
@@ -190,15 +208,7 @@ class Command(BaseCronJobCommand):
                     "sessions": progress.sessions or 0,
                 }
             except StudentProgressSnapshot.DoesNotExist:
-                pass
-
-            # Get total flight count
-            total_flights = 0
-            try:
-                from logsheet.models import FlightLog
-
-                total_flights = FlightLog.objects.filter(student=student).count()
-            except Exception:
+                # Student has no progress snapshot yet - expected for new students
                 pass
 
             students_data.append(
@@ -207,7 +217,7 @@ class Command(BaseCronJobCommand):
                     "slot": slot,
                     "status": slot.get_status_display(),
                     "progress": progress_data,
-                    "total_flights": total_flights,
+                    "total_flights": flight_counts.get(student.pk, 0),
                 }
             )
 
@@ -233,6 +243,7 @@ class Command(BaseCronJobCommand):
             "club_logo_url": logo_url,
             "site_url": site_url,
             "review_url": f"{site_url}{reverse('duty_roster:instructor_requests')}",
+            "calendar_url": f"{site_url}{reverse('duty_roster:duty_calendar')}",
         }
 
         html_message = render_to_string(
