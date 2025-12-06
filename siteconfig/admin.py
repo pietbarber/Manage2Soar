@@ -1,8 +1,58 @@
+from django import forms
 from django.contrib import admin
+from django.utils.html import format_html
 
 from utils.admin_helpers import AdminHelperMixin
 
-from .models import MembershipStatus, SiteConfiguration
+from .models import (
+    MailingList,
+    MailingListCriterion,
+    MembershipStatus,
+    SiteConfiguration,
+)
+
+
+class MailingListAdminForm(forms.ModelForm):
+    """Custom form with multi-select widget for criteria."""
+
+    criteria_select = forms.MultipleChoiceField(
+        choices=MailingListCriterion.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Membership Criteria",
+        help_text="Select criteria for list membership. Members matching ANY selected criterion will be included.",
+    )
+
+    class Meta:
+        model = MailingList
+        fields = [
+            "name",
+            "description",
+            "is_active",
+            "sort_order",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pre-populate criteria_select from the JSON field
+        if self.instance and self.instance.pk:
+            self.fields["criteria_select"].initial = self.instance.criteria or []
+
+    def _post_clean(self):
+        """Copy criteria_select to instance.criteria before model validation."""
+        # Copy criteria BEFORE super()._post_clean() runs full_clean()
+        if hasattr(self, "cleaned_data"):
+            self.instance.criteria = self.cleaned_data.get("criteria_select", [])
+        super()._post_clean()
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Criteria already copied in _post_clean, but ensure it's set
+        if hasattr(self, "cleaned_data"):
+            instance.criteria = self.cleaned_data.get("criteria_select", [])
+        if commit:
+            instance.save()
+        return instance
 
 
 @admin.register(SiteConfiguration)
@@ -243,4 +293,99 @@ class MembershipStatusAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Active statuses allow members to access member-only features. "
         "Sort order controls the display order in dropdowns (lower numbers first). "
         "⚠️ Be careful when deleting statuses - existing members may be using them!"
+    )
+
+
+@admin.register(MailingList)
+class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
+    """Admin interface for managing mailing lists."""
+
+    form = MailingListAdminForm
+    list_display = (
+        "name",
+        "description",
+        "is_active",
+        "criteria_display",
+        "subscriber_count",
+        "sort_order",
+    )
+    list_editable = ("is_active", "sort_order")
+    list_filter = ("is_active",)
+    search_fields = ("name", "description")
+    ordering = ("sort_order", "name")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "description",
+                    "is_active",
+                    "sort_order",
+                )
+            },
+        ),
+        (
+            "Membership Criteria",
+            {
+                "fields": ("criteria_select",),
+                "description": "Select which members should be included in this list. "
+                "Members matching ANY selected criterion will be subscribed.",
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Criteria")
+    def criteria_display(self, obj):
+        """Show criteria as comma-separated list."""
+        criteria = obj.get_criteria_display()
+        if not criteria:
+            return format_html('<span style="color: #999;">None</span>')
+        return ", ".join(criteria)
+
+    @admin.display(description="Subscribers")
+    def subscriber_count(self, obj):
+        """
+        Show count of subscribers with link to preview.
+
+        Note: This causes N+1 queries in the admin list view, but this is
+        acceptable because: (1) admin has low traffic, (2) mailing lists
+        are a small dataset, and (3) criteria are dynamic requiring
+        different queries for each list.
+        """
+        count = obj.get_subscriber_count()
+        return format_html(
+            '<span title="Click list name to see subscribers">{}</span>', count
+        )
+
+    def _has_webmaster_permission(self, request):
+        """Check if user has webmaster-level permission."""
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    admin_helper_message = (
+        "Mailing Lists: Configure email lists for your club's mail server. "
+        "Each list can include members matching one or more criteria (using OR logic). "
+        "The API at /members/api/email-lists/ returns subscriber emails for each active list."
     )

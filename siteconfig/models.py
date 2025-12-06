@@ -4,11 +4,168 @@ from io import BytesIO
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
+from django.db.models import Q
 from django.utils.crypto import get_random_string
 from tinymce.models import HTMLField
 
 from utils.favicon import generate_favicon_from_logo
 from utils.upload_entropy import upload_site_logo
+
+
+class MailingListCriterion(models.TextChoices):
+    """Available criteria for mailing list membership."""
+
+    # Active member status (the base criterion)
+    ACTIVE_MEMBER = "active_member", "Active Member"
+
+    # Club roles from Member model boolean fields
+    INSTRUCTOR = "instructor", "Instructor"
+    TOWPILOT = "towpilot", "Tow Pilot"
+    DUTY_OFFICER = "duty_officer", "Duty Officer"
+    ASSISTANT_DUTY_OFFICER = "assistant_duty_officer", "Assistant Duty Officer"
+
+    # Board & management roles
+    DIRECTOR = "director", "Director"
+    SECRETARY = "secretary", "Secretary"
+    TREASURER = "treasurer", "Treasurer"
+    WEBMASTER = "webmaster", "Webmaster"
+    MEMBER_MANAGER = "member_manager", "Member Manager"
+    ROSTERMEISTER = "rostermeister", "Rostermeister"
+
+    # Special computed criteria
+    PRIVATE_GLIDER_OWNER = "private_glider_owner", "Private Glider Owner"
+
+
+class MailingList(models.Model):
+    """
+    Configurable mailing list definitions for the club email system.
+
+    Each mailing list has a name (e.g., "instructors", "board")
+    and one or more criteria that determine who should be subscribed.
+    Members matching ANY of the criteria are included (OR logic).
+    """
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Unique identifier for this list (e.g., 'instructors', 'board')",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of this mailing list's purpose",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive lists are not included in API responses",
+    )
+    criteria = models.JSONField(
+        default=list,
+        help_text="List of criteria codes that determine membership (OR logic)",
+    )
+    sort_order = models.PositiveIntegerField(
+        default=100,
+        help_text="Sort order for display in admin (lower numbers first)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Mailing List"
+        verbose_name_plural = "Mailing Lists"
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        """Validate that criteria contains valid criterion codes."""
+        # Reject empty criteria - a mailing list must have at least one criterion
+        if not self.criteria:
+            raise ValidationError("At least one criterion must be selected.")
+
+        valid_codes = {c[0] for c in MailingListCriterion.choices}
+        invalid = [c for c in self.criteria if c not in valid_codes]
+        if invalid:
+            raise ValidationError(f"Invalid criteria codes: {', '.join(invalid)}")
+
+    def get_criteria_display(self):
+        """Return human-readable list of criteria."""
+        criterion_map = dict(MailingListCriterion.choices)
+        return [criterion_map.get(c, c) for c in self.criteria]
+
+    def get_subscribers(self):
+        """
+        Return queryset of Member objects matching this list's criteria.
+        Uses OR logic - members matching ANY criterion are included.
+        """
+        from members.models import Member
+
+        if not self.criteria:
+            return Member.objects.none()
+
+        # Cache active statuses for all criteria (avoid repeated DB queries)
+        active_statuses = list(MembershipStatus.get_active_statuses())
+
+        # Build OR query for all criteria
+        query = Q()
+        for criterion in self.criteria:
+            query |= self._criterion_to_query(criterion, active_statuses)
+
+        return (
+            Member.objects.filter(query).distinct().order_by("last_name", "first_name")
+        )
+
+    def _criterion_to_query(self, criterion, active_statuses):
+        """Convert a criterion code to a Django Q object."""
+        # Base filter: only active members with non-empty email addresses
+        # Note: is_active=True is included for defensive programming since
+        # Member.save() auto-syncs is_active with membership_status, but
+        # edge cases (manual DB updates, signal failures) could cause drift.
+        base_active = (
+            Q(membership_status__in=active_statuses)
+            & Q(is_active=True)
+            & ~Q(email="")
+            & ~Q(email__isnull=True)
+        )
+
+        if criterion == MailingListCriterion.ACTIVE_MEMBER:
+            return base_active
+
+        # Boolean role fields on Member model
+        boolean_fields = {
+            MailingListCriterion.INSTRUCTOR: "instructor",
+            MailingListCriterion.TOWPILOT: "towpilot",
+            MailingListCriterion.DUTY_OFFICER: "duty_officer",
+            MailingListCriterion.ASSISTANT_DUTY_OFFICER: "assistant_duty_officer",
+            MailingListCriterion.DIRECTOR: "director",
+            MailingListCriterion.SECRETARY: "secretary",
+            MailingListCriterion.TREASURER: "treasurer",
+            MailingListCriterion.WEBMASTER: "webmaster",
+            MailingListCriterion.MEMBER_MANAGER: "member_manager",
+            MailingListCriterion.ROSTERMEISTER: "rostermeister",
+        }
+
+        if criterion in boolean_fields:
+            field = boolean_fields[criterion]
+            return base_active & Q(**{field: True})
+
+        if criterion == MailingListCriterion.PRIVATE_GLIDER_OWNER:
+            # Members who own active private (non-club-owned) gliders
+            return base_active & Q(
+                gliders_owned__isnull=False,
+                gliders_owned__club_owned=False,
+                gliders_owned__is_active=True,
+            )
+
+        return Q(pk__in=[])  # No matches for unknown criteria
+
+    def get_subscriber_emails(self):
+        """Return list of email addresses for all subscribers."""
+        return list(self.get_subscribers().values_list("email", flat=True))
+
+    def get_subscriber_count(self):
+        """Return count of subscribers to this list."""
+        return self.get_subscribers().count()
 
 
 class SiteConfiguration(models.Model):
