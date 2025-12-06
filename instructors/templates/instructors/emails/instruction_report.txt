@@ -1,0 +1,35 @@
+{% if is_update %}UPDATED {% endif %}Instruction Report
+{{ club_name }}
+{{ report_date|date:"l, F j, Y" }}
+
+Hello {{ student.first_name }},
+
+{% if is_update %}This is an update to your instruction report from {% else %}Here is your instruction report from {% endif %}{{ report_date|date:"F j, Y" }} with {{ instructor.full_display_name }}{% if is_simulator %} (simulator session){% endif %}.
+
+{% if new_qualifications %}NEW QUALIFICATION{{ new_qualifications|length|pluralize|upper }} AWARDED!
+{% for qual in new_qualifications %}
+- {{ qual.qualification.name }}{% if qual.date_awarded %} (Awarded {{ qual.date_awarded|date:"F j, Y" }}){% endif %}{% if qual.expiration_date %} - Expires: {{ qual.expiration_date|date:"F j, Y" }}{% endif %}
+{% endfor %}
+
+{% endif %}{% if lesson_scores %}TRAINING ITEMS COVERED
+----------------------
+{% for ls in lesson_scores %}
+{{ ls.lesson.code }} - {{ ls.lesson.title }}: {{ ls.get_score_display }}
+{% endfor %}
+
+SCORE LEGEND:
+1 = Introduced (Discussed/Demonstrated)
+2 = Practiced
+3 = Solo Standard
+4 = Checkride Standard
+! = Needs Attention
+
+{% endif %}{% if report_text %}INSTRUCTOR NOTES
+----------------
+{{ report_text|striptags }}
+
+{% endif %}{% if logbook_url %}View your training logbook: {{ logbook_url }}
+
+{% endif %}---
+This is an automated message from {{ club_name }}.
+{{ site_url }}

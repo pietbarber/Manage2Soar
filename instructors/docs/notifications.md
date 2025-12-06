@@ -12,6 +12,44 @@ This document describes the notifications emitted by the `instructors` app.
 
 - MemberBadge awarded: when a badge is awarded, a notification is created for the member and links to the badge board.
 
+## Email Notifications (Issue #366)
+
+In addition to in-app notifications, instruction reports trigger email delivery:
+
+### When emails are sent
+
+- **After instruction report submission**: When an instructor submits an instruction report (new or updated), an email is sent to the student with the full report details.
+
+- **Update indicator**: If the report is an update to an existing report, the email subject includes "Updated:" prefix and a prominent banner in the email body indicates this is an update to a previously submitted report.
+
+### Email recipients
+
+- **TO**: The student receives the instruction report email
+- **CC**: If an "instructors" mailing list exists in SiteConfiguration (MailingList model), all subscribers are CC'd on the email. This allows the instructor team to stay informed of all instruction activities.
+
+### Email content
+
+The instruction report email includes:
+- Report date and instructor name
+- New qualifications awarded (if any) with expiration dates
+- Lesson scores with score descriptions
+- Instructor notes/essay
+- Link to the student's training logbook
+- Score legend explaining the rating system (1-4 and !)
+
+### Configuration
+
+Email delivery is automatic and requires no configuration beyond:
+1. Valid SiteConfiguration with `domain_name` set (used for from address and URLs)
+2. Optional: "instructors" MailingList for CC functionality
+
+### Implementation
+
+- **Utility function**: `instructors/utils.py::send_instruction_report_email()`
+- **Templates**: `instructors/templates/instructors/emails/instruction_report.html` and `.txt`
+- **View integration**: Called from `fill_instruction_report()` view after successful save
+- **Tests**: `instructors/tests/test_instruction_report_email.py` (13 tests)
+
 ## Deduplication rules
 
 Notifications use a simple message-based dedupe: if an undismissed notification exists for the same user with an identical message, a new notification is not created. Messages include instructor/date context so multiple instructors creating records for the same student on the same day will produce distinct messages.
