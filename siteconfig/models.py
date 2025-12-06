@@ -79,13 +79,14 @@ class MailingList(models.Model):
 
     def clean(self):
         """Validate that criteria contains valid criterion codes."""
-        if self.criteria:
-            valid_codes = {c[0] for c in MailingListCriterion.choices}
-            invalid = [c for c in self.criteria if c not in valid_codes]
-            if invalid:
-                raise ValidationError(
-                    {"criteria": f"Invalid criteria codes: {', '.join(invalid)}"}
-                )
+        # Reject empty criteria - a mailing list must have at least one criterion
+        if not self.criteria:
+            raise ValidationError("At least one criterion must be selected.")
+
+        valid_codes = {c[0] for c in MailingListCriterion.choices}
+        invalid = [c for c in self.criteria if c not in valid_codes]
+        if invalid:
+            raise ValidationError(f"Invalid criteria codes: {', '.join(invalid)}")
 
     def get_criteria_display(self):
         """Return human-readable list of criteria."""
@@ -116,8 +117,6 @@ class MailingList(models.Model):
 
     def _criterion_to_query(self, criterion, active_statuses):
         """Convert a criterion code to a Django Q object."""
-        # Note: Q is imported in get_subscribers() which always calls this method
-
         # Base filter: only active members with non-empty email addresses
         base_active = (
             Q(membership_status__in=active_statuses)

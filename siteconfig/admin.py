@@ -38,12 +38,18 @@ class MailingListAdminForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.fields["criteria_select"].initial = self.instance.criteria or []
 
+    def _post_clean(self):
+        """Copy criteria_select to instance.criteria before model validation."""
+        # Copy criteria BEFORE super()._post_clean() runs full_clean()
+        if hasattr(self, "cleaned_data"):
+            self.instance.criteria = self.cleaned_data.get("criteria_select", [])
+        super()._post_clean()
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        # Copy selected criteria to the JSON field
-        instance.criteria = self.cleaned_data.get("criteria_select", [])
-        # Validate criteria before saving
-        instance.full_clean()
+        # Criteria already copied in _post_clean, but ensure it's set
+        if hasattr(self, "cleaned_data"):
+            instance.criteria = self.cleaned_data.get("criteria_select", [])
         if commit:
             instance.save()
         return instance

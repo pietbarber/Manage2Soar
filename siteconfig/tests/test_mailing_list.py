@@ -582,11 +582,11 @@ class TestMailingListAdminForm:
         assert instance.pk is not None
 
     def test_form_empty_criteria_requires_validation_override(self):
-        """Test that empty criteria fails full_clean validation by default.
+        """Test that empty criteria fails validation during is_valid().
 
-        Empty criteria is allowed at the model level (default=list) but
-        full_clean validates that JSONField is not blank. This is intentional
-        to prevent creating mailing lists with no subscribers.
+        Empty criteria is rejected by the model's clean() method, which runs
+        during form validation. This prevents creating mailing lists with
+        no subscribers.
         """
         from siteconfig.admin import MailingListAdminForm
 
@@ -598,7 +598,7 @@ class TestMailingListAdminForm:
             "criteria_select": [],
         }
         form = MailingListAdminForm(data=form_data)
-        assert form.is_valid()
-        # Form save calls full_clean which rejects empty criteria
-        with pytest.raises(ValidationError):
-            form.save()
+        # Form validation should fail due to empty criteria
+        assert not form.is_valid()
+        assert "__all__" in form.errors
+        assert "criterion" in form.errors["__all__"][0].lower()
