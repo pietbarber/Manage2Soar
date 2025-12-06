@@ -42,14 +42,17 @@ def active_member(membership_status):
 
 @pytest.fixture
 def inactive_member(inactive_status):
-    """Create an inactive member for testing."""
+    """Create an inactive member for testing.
+
+    Note: is_active is automatically set to False by Member.save()
+    based on the inactive membership status.
+    """
     return Member.objects.create(
         username="inactive_member",
         email="inactive@example.com",
         first_name="Inactive",
         last_name="Member",
         membership_status="Inactive Member",
-        is_active=True,
     )
 
 
@@ -188,14 +191,20 @@ class TestMailingListModel:
         assert "Instructor" in display
         assert "Director" in display
 
-    def test_empty_criteria_display(self):
-        """Test get_criteria_display with no criteria."""
-        ml = MailingList.objects.create(name="empty-list", criteria=[])
-        assert ml.get_criteria_display() == []
+    def test_single_criteria_display(self):
+        """Test get_criteria_display with single criterion."""
+        ml = MailingList.objects.create(
+            name="single-list",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
+        assert ml.get_criteria_display() == ["Active Member"]
 
     def test_str_representation(self):
         """Test string representation of MailingList."""
-        ml = MailingList.objects.create(name="str-test", criteria=[])
+        ml = MailingList.objects.create(
+            name="str-test",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
         assert str(ml) == "str-test"
 
 
@@ -295,10 +304,12 @@ class TestMailingListSubscribers:
         )
         assert ml.get_subscriber_count() == 2
 
-    def test_empty_criteria_returns_none(self, active_member):
-        """Test that empty criteria returns no subscribers."""
-        ml = MailingList.objects.create(name="empty-list", criteria=[])
-        assert ml.get_subscriber_count() == 0
+    def test_empty_criteria_validation(self, active_member):
+        """Test that empty criteria fails validation."""
+        ml = MailingList(name="empty-list", criteria=[])
+        with pytest.raises(ValidationError) as exc_info:
+            ml.full_clean()
+        assert "criterion" in str(exc_info.value).lower()
 
     def test_member_without_email_excluded(self, membership_status):
         """Test that members without email are excluded from subscriber lists and counts."""

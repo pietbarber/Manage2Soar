@@ -118,8 +118,12 @@ class MailingList(models.Model):
     def _criterion_to_query(self, criterion, active_statuses):
         """Convert a criterion code to a Django Q object."""
         # Base filter: only active members with non-empty email addresses
+        # Note: is_active=True is included for defensive programming since
+        # Member.save() auto-syncs is_active with membership_status, but
+        # edge cases (manual DB updates, signal failures) could cause drift.
         base_active = (
             Q(membership_status__in=active_statuses)
+            & Q(is_active=True)
             & ~Q(email="")
             & ~Q(email__isnull=True)
         )
