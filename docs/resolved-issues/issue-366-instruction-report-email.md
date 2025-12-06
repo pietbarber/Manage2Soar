@@ -54,7 +54,7 @@ is_update = is_existing_report
 new_qualification = None  # Track newly awarded qualification
 
 # ... qualification processing ...
-if is_qualified:
+if created and is_qualified:
     new_qualification = mq
 
 # Send instruction report email to student (and CC instructors if configured)

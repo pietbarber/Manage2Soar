@@ -57,7 +57,7 @@
                                 Hello {{ student.first_name }},
                             </p>
                             <p style="margin: 12px 0 0 0; color: #4a5568; font-size: 15px; line-height: 1.5;">
-                                {% if is_update %}Your instruction report from {% else %}Here is your instruction report from {% endif %}<strong>{{ report_date|date:"F j, Y" }}</strong> with <strong>{{ instructor.full_display_name }}</strong>{% if is_simulator %} (simulator session){% endif %}.
+                                {% if is_update %}This is an update to your instruction report from {% else %}Here is your instruction report from {% endif %}<strong>{{ report_date|date:"F j, Y" }}</strong> with <strong>{{ instructor.full_display_name }}</strong>{% if is_simulator %} (simulator session){% endif %}.
                             </p>
                         </td>
                     </tr>
@@ -147,6 +147,7 @@
                     </tr>
                     {% endif %}
 
+                    {% if lesson_scores %}
                     <!-- Score Legend -->
                     <tr>
                         <td style="padding: 0 24px 16px 24px;">
@@ -168,6 +169,7 @@
                             </table>
                         </td>
                     </tr>
+                    {% endif %}
 
                     {% if logbook_url %}
                     <!-- Call to action -->
