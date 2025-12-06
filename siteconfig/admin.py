@@ -362,23 +362,21 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
             '<span title="Click list name to see subscribers">{}</span>', count
         )
 
-    def has_change_permission(self, request, obj=None):
+    def _has_webmaster_permission(self, request):
+        """Check if user has webmaster-level permission."""
         return (
             request.user.is_superuser
             or request.user.groups.filter(name="Webmasters").exists()
         )
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
 
     def has_add_permission(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-        )
+        return self._has_webmaster_permission(request)
 
     def has_delete_permission(self, request, obj=None):
-        return (
-            request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
-        )
+        return self._has_webmaster_permission(request)
 
     admin_helper_message = (
         "Mailing Lists: Configure email lists for your club's mail server. "
