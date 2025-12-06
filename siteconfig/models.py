@@ -4,6 +4,7 @@ from io import BytesIO
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
+from django.db.models import Q
 from django.utils.crypto import get_random_string
 from tinymce.models import HTMLField
 
@@ -96,8 +97,6 @@ class MailingList(models.Model):
         Return queryset of Member objects matching this list's criteria.
         Uses OR logic - members matching ANY criterion are included.
         """
-        from django.db.models import Q
-
         from members.models import Member
 
         if not self.criteria:
@@ -117,7 +116,7 @@ class MailingList(models.Model):
 
     def _criterion_to_query(self, criterion, active_statuses):
         """Convert a criterion code to a Django Q object."""
-        from django.db.models import Q
+        # Note: Q is imported in get_subscribers() which always calls this method
 
         # Base filter: only active members with non-empty email addresses
         base_active = (
