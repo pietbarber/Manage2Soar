@@ -338,9 +338,21 @@ class TestMailingListOrdering:
 
     def test_ordering_by_sort_order_then_name(self):
         """Test that mailing lists are ordered by sort_order then name."""
-        ml_c = MailingList.objects.create(name="charlie", sort_order=30, criteria=[])
-        ml_a = MailingList.objects.create(name="alpha", sort_order=10, criteria=[])
-        ml_b = MailingList.objects.create(name="bravo", sort_order=20, criteria=[])
+        ml_c = MailingList.objects.create(
+            name="charlie",
+            sort_order=30,
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
+        ml_a = MailingList.objects.create(
+            name="alpha",
+            sort_order=10,
+            criteria=[MailingListCriterion.INSTRUCTOR],
+        )
+        ml_b = MailingList.objects.create(
+            name="bravo",
+            sort_order=20,
+            criteria=[MailingListCriterion.TOWPILOT],
+        )
 
         lists = list(MailingList.objects.all())
         assert lists[0] == ml_a
@@ -349,8 +361,16 @@ class TestMailingListOrdering:
 
     def test_same_sort_order_ordered_by_name(self):
         """Test that lists with same sort_order are ordered by name."""
-        ml_z = MailingList.objects.create(name="zulu", sort_order=10, criteria=[])
-        ml_a = MailingList.objects.create(name="alpha", sort_order=10, criteria=[])
+        ml_z = MailingList.objects.create(
+            name="zulu",
+            sort_order=10,
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
+        ml_a = MailingList.objects.create(
+            name="alpha",
+            sort_order=10,
+            criteria=[MailingListCriterion.INSTRUCTOR],
+        )
 
         lists = list(MailingList.objects.all())
         assert lists[0] == ml_a
