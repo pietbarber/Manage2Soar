@@ -328,6 +328,13 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "Members matching ANY selected criterion will be subscribed.",
             },
         ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     readonly_fields = ("created_at", "updated_at")
