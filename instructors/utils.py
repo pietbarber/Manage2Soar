@@ -91,8 +91,8 @@ def get_flight_summary_for_member(member):
             data.setdefault(row["n_number"], {}).update(row)
 
     # Prepare totals accumulator
-    flights_summary = []
-    totals = {"n_number": "Totals"}
+    flights_summary: list[dict] = []
+    totals: dict = {"n_number": "Totals"}
     for field in ("solo", "with", "given", "total"):
         totals[f"{field}_count"] = 0
         totals[f"{field}_time"] = timedelta(0)
@@ -213,7 +213,8 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
     """Send instruction report email to student and optionally CC instructors."""
     if not report.student.email:
         logger.warning(
-            f"Cannot send instruction report email: student {report.student} has no email"
+            "Cannot send instruction report email: student %s has no email",
+            report.student,
         )
         return 0
 
@@ -283,7 +284,7 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
             if report.student.email in cc_emails:
                 cc_emails.remove(report.student.email)
     except Exception as e:
-        logger.warning(f"Could not get instructors mailing list: {e}")
+        logger.warning("Could not get instructors mailing list: %s", e)
 
     # Send the email
     try:
@@ -296,10 +297,11 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
             cc=cc_emails if cc_emails else None,
         )
         logger.info(
-            f"Sent instruction report email to {report.student.email}"
-            f"{' (CC: instructors)' if cc_emails else ''}"
+            "Sent instruction report email to %s%s",
+            report.student.email,
+            " (CC: instructors)" if cc_emails else "",
         )
         return 1
     except Exception as e:
-        logger.exception(f"Failed to send instruction report email: {e}")
+        logger.exception("Failed to send instruction report email: %s", e)
         return 0

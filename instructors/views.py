@@ -345,11 +345,16 @@ def fill_instruction_report(request, student_id, report_date):
 
             # Send instruction report email to student (and CC instructors if configured)
             new_qualifications = [new_qualification] if new_qualification else None
-            send_instruction_report_email(
+            email_sent = send_instruction_report_email(
                 report,
                 is_update=is_update,
                 new_qualifications=new_qualifications,
             )
+            if not email_sent:
+                messages.warning(
+                    request,
+                    "Instruction report saved, but email could not be sent to student.",
+                )
 
             return redirect(
                 "instructors:member_instruction_record", member_id=student.id

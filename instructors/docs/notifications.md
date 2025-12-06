@@ -25,7 +25,7 @@ In addition to in-app notifications, instruction reports trigger email delivery:
 ### Email recipients
 
 - **TO**: The student receives the instruction report email
-- **CC**: If an "instructors" mailing list exists in SiteConfiguration (MailingList model), all subscribers are CC'd on the email. This allows the instructor team to stay informed of all instruction activities.
+- **CC**: If an "instructors" mailing list exists (configured via the MailingList model in siteconfig), all subscribers are CC'd on the email. This allows the instructor team to stay informed of all instruction activities.
 
 ### Email content
 
