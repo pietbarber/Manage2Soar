@@ -5,7 +5,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 
 from members.models import Member
-from siteconfig.models import MembershipStatus
+from siteconfig.models import MailingList, MailingListCriterion, MembershipStatus
 
 
 @pytest.fixture
@@ -16,6 +16,47 @@ def membership_statuses(db):
     )
     MembershipStatus.objects.get_or_create(
         name="Non-Member", defaults={"is_active": False, "sort_order": 100}
+    )
+
+
+@pytest.fixture
+def default_mailing_lists(db):
+    """Create default mailing lists for API tests."""
+    MailingList.objects.get_or_create(
+        name="members",
+        defaults={
+            "criteria": [MailingListCriterion.ACTIVE_MEMBER],
+            "is_active": True,
+            "sort_order": 10,
+        },
+    )
+    MailingList.objects.get_or_create(
+        name="instructors",
+        defaults={
+            "criteria": [MailingListCriterion.INSTRUCTOR],
+            "is_active": True,
+            "sort_order": 20,
+        },
+    )
+    MailingList.objects.get_or_create(
+        name="towpilots",
+        defaults={
+            "criteria": [MailingListCriterion.TOWPILOT],
+            "is_active": True,
+            "sort_order": 30,
+        },
+    )
+    MailingList.objects.get_or_create(
+        name="board",
+        defaults={
+            "criteria": [
+                MailingListCriterion.DIRECTOR,
+                MailingListCriterion.SECRETARY,
+                MailingListCriterion.TREASURER,
+            ],
+            "is_active": True,
+            "sort_order": 40,
+        },
     )
 
 
@@ -93,7 +134,7 @@ class TestEmailListsAPI:
     """Tests for the /api/email-lists/ endpoint."""
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_requires_api_key(self, api_client):
+    def test_requires_api_key(self, api_client, default_mailing_lists):
         """Test that the endpoint requires an API key."""
         url = reverse("api_email_lists")
         response = api_client.get(url)
@@ -101,7 +142,7 @@ class TestEmailListsAPI:
         assert response.json()["error"] == "Invalid or missing API key"
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_rejects_wrong_api_key(self, api_client):
+    def test_rejects_wrong_api_key(self, api_client, default_mailing_lists):
         """Test that the endpoint rejects wrong API keys."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="wrong-key")
@@ -109,7 +150,9 @@ class TestEmailListsAPI:
         assert response.json()["error"] == "Invalid or missing API key"
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_accepts_valid_api_key(self, api_client, active_member):
+    def test_accepts_valid_api_key(
+        self, api_client, active_member, default_mailing_lists
+    ):
         """Test that the endpoint accepts a valid API key."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -119,7 +162,9 @@ class TestEmailListsAPI:
         assert "whitelist" in data
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_returns_active_members(self, api_client, active_member, inactive_member):
+    def test_returns_active_members(
+        self, api_client, active_member, inactive_member, default_mailing_lists
+    ):
         """Test that only active members are included."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -131,7 +176,9 @@ class TestEmailListsAPI:
         assert inactive_member.email not in data["whitelist"]
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_returns_instructors(self, api_client, active_member, instructor_member):
+    def test_returns_instructors(
+        self, api_client, active_member, instructor_member, default_mailing_lists
+    ):
         """Test that instructors are in the instructors list."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -141,7 +188,9 @@ class TestEmailListsAPI:
         assert active_member.email not in data["lists"]["instructors"]
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_returns_towpilots(self, api_client, active_member, towpilot_member):
+    def test_returns_towpilots(
+        self, api_client, active_member, towpilot_member, default_mailing_lists
+    ):
         """Test that towpilots are in the towpilots list."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -151,7 +200,9 @@ class TestEmailListsAPI:
         assert active_member.email not in data["lists"]["towpilots"]
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_returns_board_members(self, api_client, active_member, board_member):
+    def test_returns_board_members(
+        self, api_client, active_member, board_member, default_mailing_lists
+    ):
         """Test that board members (treasurer) are in the board list."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -161,7 +212,7 @@ class TestEmailListsAPI:
         assert active_member.email not in data["lists"]["board"]
 
     @override_settings(M2S_MAIL_API_KEY="")
-    def test_fails_when_api_key_not_configured(self, api_client):
+    def test_fails_when_api_key_not_configured(self, api_client, default_mailing_lists):
         """Test that the endpoint fails gracefully when API key is not set."""
         url = reverse("api_email_lists")
         response = api_client.get(url, HTTP_X_API_KEY="any-key")
@@ -169,7 +220,7 @@ class TestEmailListsAPI:
         assert "not configured" in response.json()["error"]
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
-    def test_post_not_allowed(self, api_client):
+    def test_post_not_allowed(self, api_client, default_mailing_lists):
         """Test that POST requests are not allowed."""
         url = reverse("api_email_lists")
         response = api_client.post(url, HTTP_X_API_KEY="test-api-key-12345")
@@ -177,7 +228,7 @@ class TestEmailListsAPI:
 
     @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
     def test_members_without_email_excluded(
-        self, api_client, active_member, membership_statuses
+        self, api_client, active_member, membership_statuses, default_mailing_lists
     ):
         """Test that members with empty email addresses are excluded from all lists."""
         # Create members with no email but various roles
@@ -226,3 +277,75 @@ class TestEmailListsAPI:
 
         # Active member with email should still be present
         assert active_member.email in data["lists"]["members"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_inactive_lists_not_returned(
+        self, api_client, active_member, membership_statuses
+    ):
+        """Test that inactive mailing lists are not included in API response."""
+        # Create one active and one inactive list
+        MailingList.objects.create(
+            name="active-list",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            is_active=True,
+        )
+        MailingList.objects.create(
+            name="inactive-list",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            is_active=False,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "active-list" in data["lists"]
+        assert "inactive-list" not in data["lists"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_custom_mailing_list(self, api_client, membership_statuses):
+        """Test that custom mailing lists with multiple criteria work correctly."""
+        # Create members
+        instructor = Member.objects.create_user(
+            username="custom_instructor",
+            email="custom_instructor@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            instructor=True,
+        )
+        do = Member.objects.create_user(
+            username="custom_do",
+            email="custom_do@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            duty_officer=True,
+        )
+        regular = Member.objects.create_user(
+            username="custom_regular",
+            email="custom_regular@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+        )
+
+        # Create a custom list with multiple criteria (OR logic)
+        MailingList.objects.create(
+            name="operations-team",
+            criteria=[
+                MailingListCriterion.INSTRUCTOR,
+                MailingListCriterion.DUTY_OFFICER,
+            ],
+            is_active=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        # Both instructor and duty officer should be in the custom list
+        assert instructor.email in data["lists"]["operations-team"]
+        assert do.email in data["lists"]["operations-team"]
+        # Regular member should not be
+        assert regular.email not in data["lists"]["operations-team"]
