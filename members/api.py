@@ -86,12 +86,12 @@ def email_lists(request):
     The whitelist contains all emails that are allowed to send to mailing lists
     (all active members).
     """
-    # Get all active mailing lists and build the response
+    # Get all active mailing lists
     mailing_lists = MailingList.objects.filter(is_active=True)
 
-    lists_data = {}
-    for mailing_list in mailing_lists:
-        lists_data[mailing_list.name] = mailing_list.get_subscriber_emails()
+    # Build lists data - each list requires a subscriber query, but this is
+    # unavoidable since criteria are dynamic and require different queries
+    lists_data = {ml.name: ml.get_subscriber_emails() for ml in mailing_lists}
 
     # Whitelist = all active member emails (only members can send to lists)
     active_members = get_active_members()

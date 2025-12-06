@@ -39,7 +39,7 @@ class MailingList(models.Model):
     """
     Configurable mailing list definitions for the club email system.
 
-    Each mailing list has a name (e.g., "instructors@skylinesoaring.org")
+    Each mailing list has a name (e.g., "instructors", "board")
     and one or more criteria that determine who should be subscribed.
     Members matching ANY of the criteria are included (OR logic).
     """
@@ -48,10 +48,6 @@ class MailingList(models.Model):
         max_length=100,
         unique=True,
         help_text="Unique identifier for this list (e.g., 'instructors', 'board')",
-    )
-    email_address = models.EmailField(
-        blank=True,
-        help_text="Full email address for this list (e.g., instructors@example.org). Optional - for documentation only.",
     )
     description = models.TextField(
         blank=True,
@@ -152,9 +148,11 @@ class MailingList(models.Model):
             return base_active & Q(**{field: True})
 
         if criterion == MailingListCriterion.PRIVATE_GLIDER_OWNER:
-            # Members who own private (non-club-owned) gliders
+            # Members who own active private (non-club-owned) gliders
             return base_active & Q(
-                gliders_owned__isnull=False, gliders_owned__club_owned=False
+                gliders_owned__isnull=False,
+                gliders_owned__club_owned=False,
+                gliders_owned__is_active=True,
             )
 
         return Q(pk__in=[])  # No matches for unknown criteria

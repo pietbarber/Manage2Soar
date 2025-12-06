@@ -27,7 +27,6 @@ class MailingListAdminForm(forms.ModelForm):
         model = MailingList
         fields = [
             "name",
-            "email_address",
             "description",
             "is_active",
             "sort_order",
@@ -43,6 +42,8 @@ class MailingListAdminForm(forms.ModelForm):
         instance = super().save(commit=False)
         # Copy selected criteria to the JSON field
         instance.criteria = self.cleaned_data.get("criteria_select", [])
+        # Validate criteria before saving
+        instance.full_clean()
         if commit:
             instance.save()
         return instance
@@ -296,7 +297,7 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
     form = MailingListAdminForm
     list_display = (
         "name",
-        "email_address",
+        "description",
         "is_active",
         "criteria_display",
         "subscriber_count",
@@ -304,7 +305,7 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
     )
     list_editable = ("is_active", "sort_order")
     list_filter = ("is_active",)
-    search_fields = ("name", "email_address", "description")
+    search_fields = ("name", "description")
     ordering = ("sort_order", "name")
 
     fieldsets = (
@@ -313,7 +314,6 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "name",
-                    "email_address",
                     "description",
                     "is_active",
                     "sort_order",
@@ -342,7 +342,14 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     @admin.display(description="Subscribers")
     def subscriber_count(self, obj):
-        """Show count of subscribers with link to preview."""
+        """
+        Show count of subscribers with link to preview.
+
+        Note: This causes N+1 queries in the admin list view, but this is
+        acceptable because: (1) admin has low traffic, (2) mailing lists
+        are a small dataset, and (3) criteria are dynamic requiring
+        different queries for each list.
+        """
         count = obj.get_subscriber_count()
         return format_html(
             '<span title="Click list name to see subscribers">{}</span>', count
