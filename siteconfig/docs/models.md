@@ -59,6 +59,19 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
+
+    MailingList {
+        int id PK
+        string name UK
+        text description
+        boolean is_active
+        json criteria
+        int sort_order
+        datetime created_at
+        datetime updated_at
+    }
+
+    MailingList ||--o{ Member : "subscribers (computed)"
 ```
 
 ## SiteConfiguration
@@ -76,6 +89,28 @@ erDiagram
 - **Fields:** name (unique), is_active, sort_order, description, timestamps
 - **Usage:** Referenced by Member model, managed via Django admin, provides flexible membership classification
 
+## MailingList
+- **Purpose:** Configurable mailing list definitions for the club email system (Issue #353).
+- **Key Features:** Flexible subscriber criteria using OR logic, admin interface with checkbox selection, JSON criteria storage
+- **Fields:** name (unique), description, is_active, criteria (JSONField), sort_order, timestamps
+- **Usage:** Powers the email_lists API for external mail systems (Google Groups, Mailman, etc.)
+
+### MailingListCriterion
+- **Purpose:** TextChoices enum defining available criteria for mailing list membership.
+- **Available Criteria:**
+  - `active_member` - Active club members with valid email
+  - `instructor` - Active instructors
+  - `towpilot` - Active tow pilots
+  - `duty_officer` - Active duty officers
+  - `assistant_duty_officer` - Active assistant duty officers
+  - `director` - Board directors
+  - `secretary` - Club secretary
+  - `treasurer` - Club treasurer
+  - `webmaster` - Club webmaster
+  - `member_manager` - Membership managers
+  - `rostermeister` - Roster managers
+  - `private_glider_owner` - Owners of active private (non-club) gliders
+
 ---
 
 ## Model Relationships
@@ -91,6 +126,12 @@ erDiagram
 - **Logical relationship**: Connected to members through string field matching, not foreign key
 - **Migration support**: Automatically populated from previous hardcoded values during upgrade
 
+### MailingList
+- **Computed relationship with Member**: `get_subscribers()` dynamically queries members matching criteria
+- **API integration**: Powers `email_lists` API endpoint in `members/api.py`
+- **Criteria logic**: Uses OR logic - members matching ANY selected criterion are included
+- **Active member filtering**: All criteria automatically filter for active membership status and valid email
+
 ---
 
 ## Key Methods
@@ -103,6 +144,14 @@ erDiagram
 - `get_active_statuses()`: Class method returning all active membership statuses
 - `get_membership_choices()`: Class method providing dynamic choices for Member model
 - `__str__()`: Returns the status name for admin display
+
+### MailingList
+- `clean()`: Validates that criteria contains at least one valid criterion code
+- `get_criteria_display()`: Returns human-readable list of selected criteria
+- `get_subscribers()`: Returns queryset of Member objects matching criteria (OR logic)
+- `_criterion_to_query()`: Converts criterion code to Django Q object with base active filter
+- `get_subscriber_emails()`: Returns list of email addresses for all subscribers
+- `get_subscriber_count()`: Returns count of subscribers to this list
 
 ---
 
@@ -144,6 +193,41 @@ MembershipStatus.objects.create(
     is_active=True,
     sort_order=15
 )
+```
+
+### MailingList
+```python
+from siteconfig.models import MailingList, MailingListCriterion
+
+# Create a mailing list for instructors
+instructors_list = MailingList.objects.create(
+    name="instructors",
+    description="All active club instructors",
+    criteria=[MailingListCriterion.INSTRUCTOR]
+)
+
+# Create a board mailing list with multiple criteria (OR logic)
+board_list = MailingList.objects.create(
+    name="board",
+    description="Board of directors and officers",
+    criteria=[
+        MailingListCriterion.DIRECTOR,
+        MailingListCriterion.SECRETARY,
+        MailingListCriterion.TREASURER
+    ]
+)
+
+# Get subscriber count and emails
+print(f"Board list has {board_list.get_subscriber_count()} members")
+emails = board_list.get_subscriber_emails()
+
+# Get full subscriber queryset for more processing
+subscribers = board_list.get_subscribers()
+for member in subscribers:
+    print(f"{member.first_name} {member.last_name}: {member.email}")
+
+# Display human-readable criteria
+print(board_list.get_criteria_display())  # ['Director', 'Secretary', 'Treasurer']
 ```
 
 ---
@@ -205,6 +289,58 @@ if config and config.allow_towplane_rental:
 ```
 
 This feature allows clubs to opt-in to towplane rental functionality for non-towing purposes (sightseeing flights, flight reviews, aircraft retrieval) while maintaining a clean interface for clubs that don't allow such usage.
+
+### Issue #353 - Mailing List Management
+The `MailingList` model (added in migration 0018) provides configurable mailing list definitions for external email systems:
+
+**Model Design:**
+- `MailingList`: Stores list name, description, active status, and criteria
+- `MailingListCriterion`: TextChoices enum with 12 available criteria types
+- `criteria`: JSONField storing list of criterion codes
+
+**Subscriber Selection Logic:**
+- Uses OR logic: members matching ANY selected criterion are included
+- All criteria automatically filter for active membership status
+- Excludes members with empty or null email addresses
+- Defensive `is_active=True` filter handles edge cases
+
+**Available Criteria:**
+- Role-based: instructor, towpilot, duty_officer, assistant_duty_officer
+- Board/management: director, secretary, treasurer, webmaster, member_manager, rostermeister
+- Special: active_member (base criterion), private_glider_owner
+
+**Admin Interface:**
+- Checkbox-based criteria selection using `MultipleChoiceField`
+- Permissions restricted to webmasters (user must have `webmaster=True`)
+- Real-time subscriber count display in admin list view
+
+**API Integration:**
+The `email_lists` API endpoint (`members/api.py`) dynamically generates mailing lists from the database:
+
+```python
+# API response format
+{
+    "lists": {
+        "instructors": {
+            "description": "All active club instructors",
+            "count": 12,
+            "emails": ["instructor1@example.com", ...]
+        },
+        ...
+    }
+}
+```
+
+**Usage:**
+```python
+from siteconfig.models import MailingList
+
+# Get all active mailing lists
+for ml in MailingList.objects.filter(is_active=True):
+    print(f"{ml.name}: {ml.get_subscriber_count()} subscribers")
+```
+
+This feature replaces hardcoded mailing list definitions with configurable database-driven lists, enabling clubs to customize their email distribution without code changes.
 
 ---
 
