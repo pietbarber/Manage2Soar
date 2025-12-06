@@ -3,7 +3,6 @@
 import logging
 from datetime import timedelta
 
-from django.conf import settings
 from django.db.models import Count, F, Max, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
@@ -302,5 +301,5 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
         )
         return 1
     except Exception as e:
-        logger.error(f"Failed to send instruction report email: {e}")
+        logger.exception(f"Failed to send instruction report email: {e}")
         return 0

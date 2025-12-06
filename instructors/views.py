@@ -328,7 +328,8 @@ def fill_instruction_report(request, student_id, report_date):
                         },
                     )
                     # Track the qualification for email notification
-                    if is_qualified:
+                    # Only include truly new qualifications, not updates
+                    if created and is_qualified:
                         new_qualification = mq
                     messages.success(
                         request,

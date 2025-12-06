@@ -8,7 +8,7 @@ Tests the email notifications sent after an instructor fills out an instruction 
 - Update vs new report distinction
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 from django.core import mail
