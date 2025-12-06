@@ -301,7 +301,7 @@ class TestMailingListSubscribers:
         assert ml.get_subscriber_count() == 0
 
     def test_member_without_email_excluded(self, membership_status):
-        """Test that members without email are excluded from subscriber lists."""
+        """Test that members without email are excluded from subscriber lists and counts."""
         Member.objects.create(
             username="no_email",
             email="",  # No email
@@ -317,6 +317,8 @@ class TestMailingListSubscribers:
         )
         emails = ml.get_subscriber_emails()
         assert "" not in emails
+        # Verify count also excludes members without valid emails
+        assert ml.get_subscriber_count() == 0
 
 
 @pytest.mark.django_db

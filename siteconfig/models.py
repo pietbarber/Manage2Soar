@@ -1,7 +1,6 @@
 import logging
 from io import BytesIO
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
@@ -108,24 +107,28 @@ class MailingList(models.Model):
         if not self.criteria:
             return Member.objects.none()
 
+        # Cache active statuses for all criteria (avoid repeated DB queries)
+        active_statuses = list(MembershipStatus.get_active_statuses())
+
         # Build OR query for all criteria
         query = Q()
         for criterion in self.criteria:
-            query |= self._criterion_to_query(criterion)
+            query |= self._criterion_to_query(criterion, active_statuses)
 
         return (
             Member.objects.filter(query).distinct().order_by("last_name", "first_name")
         )
 
-    def _criterion_to_query(self, criterion):
+    def _criterion_to_query(self, criterion, active_statuses):
         """Convert a criterion code to a Django Q object."""
         from django.db.models import Q
 
-        # Get active statuses from the MembershipStatus model
-        active_statuses = list(MembershipStatus.get_active_statuses())
-
-        # Base filter: only active members with email addresses
-        base_active = Q(membership_status__in=active_statuses, email__isnull=False)
+        # Base filter: only active members with non-empty email addresses
+        base_active = (
+            Q(membership_status__in=active_statuses)
+            & ~Q(email="")
+            & ~Q(email__isnull=True)
+        )
 
         if criterion == MailingListCriterion.ACTIVE_MEMBER:
             return base_active
@@ -158,9 +161,7 @@ class MailingList(models.Model):
 
     def get_subscriber_emails(self):
         """Return list of email addresses for all subscribers."""
-        return list(
-            self.get_subscribers().exclude(email="").values_list("email", flat=True)
-        )
+        return list(self.get_subscribers().values_list("email", flat=True))
 
     def get_subscriber_count(self):
         """Return count of subscribers to this list."""
