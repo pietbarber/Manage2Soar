@@ -82,6 +82,7 @@ sequenceDiagram
     participant System as Manage2Soar
     participant DO as Duty Officer
     participant Admin as Training Admin
+    participant Email as Email System
 
     Student->>System: Request Training
     System->>Instructor: Notify of Student Request
@@ -92,13 +93,21 @@ sequenceDiagram
 
     Instructor->>System: Conduct Pre-Flight Brief
     DO->>System: Log Training Flight
-    Instructor->>System: Complete Lesson Record
+    Instructor->>System: Complete Instruction Report
 
     System->>System: Link Flight to Lesson
     System->>System: Update Progress Tracking
+    System->>System: Track New Qualifications
+
+    alt Instruction Report Submitted
+        System->>Email: Send Report to Student
+        Email->>Student: Email with lesson scores, notes, qualifications
+        System->>Email: CC Instructors (if mailing list configured)
+        Email->>Instructor: Copy of instruction report
+        System->>Student: In-app notification
+    end
 
     alt Lesson Complete
-        System->>Student: Send Progress Update
         System->>Admin: Update Training Records
     else More Practice Needed
         System->>Instructor: Schedule Follow-up
@@ -240,12 +249,25 @@ flowchart LR
 ```
 
 ### **Notification Triggers**
+
 The system sends automated notifications for:
-- New student assignments to instructors
-- Lesson scheduling confirmations
-- Progress milestone achievements
-- Phase completion approvals needed
-- Check ride scheduling requirements
+
+**In-App Notifications:**
+- InstructionReport created/updated → Student notification with link to instruction record
+- GroundInstruction logged → Student notification with instructor/date details
+- MemberQualification awarded → Member notification with qualification details
+- MemberBadge awarded → Member notification with link to badge board
+
+**Email Notifications (Issue #366):**
+- **Instruction Report Submission** → Email sent to student with full report details
+  - **TO**: Student's email address
+  - **CC**: Instructors mailing list (if configured via MailingList model)
+  - **Content**: Report date, instructor, lesson scores, instructor notes, new qualifications
+  - **Update Detection**: "Updated:" prefix in subject and banner for modified reports
+  - **Qualifications**: Newly awarded qualifications highlighted with celebration styling
+  - **Call to Action**: Link to student's training logbook
+
+Email delivery is automatic when an instructor fills out an instruction report. The system detects both new reports and updates to existing reports, and intelligently tracks qualification status transitions (not just new qualifications, but also updates from unqualified to qualified status).
 
 ### **Analytics Integration**
 Training data feeds into analytics for:
@@ -296,25 +318,40 @@ flowchart LR
     C --> D[Training Flight]
     D --> E[Post-Flight Debrief]
 
-    E --> F[Lesson Record Creation]
+    E --> F[Instruction Report Creation]
     F --> G[Progress Assessment]
-    G --> H[Next Lesson Planning]
+    G --> H[Email Sent to Student]
+    H --> I[Next Lesson Planning]
 
     subgraph "Documentation Requirements"
-        I[Flight Time Logged]
-        J[Skills Practiced]
-        K[Areas for Improvement]
-        L[Student Performance]
-        M[Safety Issues]
-        N[Weather Conditions]
+        J[Flight Time Logged]
+        K[Skills Practiced]
+        L[Areas for Improvement]
+        M[Student Performance]
+        N[Safety Issues]
+        O[Weather Conditions]
+        P[New Qualifications]
     end
 
-    F --> I
     F --> J
     F --> K
     F --> L
     F --> M
     F --> N
+    F --> O
+    F --> P
+
+    subgraph "Email Content"
+        Q[Lesson Scores]
+        R[Instructor Notes]
+        S[Qualifications Awarded]
+        T[Logbook Link]
+    end
+
+    H --> Q
+    H --> R
+    H --> S
+    H --> T
 ```
 
 ### **Instructor Assignment Process**
@@ -354,6 +391,11 @@ flowchart TD
 - ✅ Integration with flight logging
 - ✅ Progress tracking and reporting
 - ✅ Instructor assignment management
+- ✅ **Automated email notifications to students** (Issue #366)
+- ✅ **Instructor team CC on instruction reports** (via MailingList)
+- ✅ **Qualification tracking and notifications** (new and status changes)
+- ✅ **Update detection for modified reports**
+- ✅ **In-app notifications for students** (InstructionReport, GroundInstruction, Qualifications, Badges)
 
 ### **Identified Gaps**
 - 🟡 **Calendar Integration**: No centralized scheduling system for lessons
@@ -380,6 +422,102 @@ flowchart TD
 - 🔄 **Report Automation**: Automated generation of training progress reports
 - 🔄 **Compliance Tracking**: Ensure training meets regulatory requirements
 - 🔄 **Resource Management**: Better allocation of aircraft and instructor time
+
+## Student Communication System
+
+### **Email Notification Flow**
+
+When an instructor submits an instruction report, the system automatically delivers a comprehensive email to the student:
+
+```mermaid
+flowchart TD
+    A[Instructor Fills Out Report] --> B{Report Type?}
+    B -->|New Report| C[Create InstructionReport]
+    B -->|Update| D[Update Existing Report]
+
+    C --> E[Track New Qualifications]
+    D --> E
+
+    E --> F{Qualifications Changed?}
+    F -->|Yes - New Record| G[Mark as New Qualification]
+    F -->|Yes - Status Changed| H[Mark as Newly Qualified]
+    F -->|No| I[No Qualifications to Report]
+
+    G --> J[Prepare Email Content]
+    H --> J
+    I --> J
+
+    J --> K[Render HTML Template]
+    J --> L[Render Text Template]
+
+    K --> M[Build Email Message]
+    L --> M
+
+    M --> N{Student Has Email?}
+    N -->|No| O[Log Warning, Skip Email]
+    N -->|Yes| P[Send to Student]
+
+    P --> Q{Instructors Mailing List Exists?}
+    Q -->|Yes| R[CC All Instructors]
+    Q -->|No| S[No CC]
+
+    R --> T[Remove Student from CC if Listed]
+    T --> U[Deliver Email]
+    S --> U
+
+    U --> V{Email Sent Successfully?}
+    V -->|Yes| W[Log Success, Continue]
+    V -->|No| X[Log Error, Show Warning to Instructor]
+
+    style A fill:#e1f5fe
+    style U fill:#e8f5e8
+    style O fill:#ffebee
+    style X fill:#fff3e0
+```
+
+### **Email Content Design**
+
+The instruction report email provides a professional, comprehensive summary of the training session:
+
+**Subject Line:**
+- New: `Instruction Report - [Student Name] - [Date]`
+- Update: `Updated: Instruction Report - [Student Name] - [Date]`
+
+**Visual Elements:**
+- Club logo and branding
+- Color-coded lesson scores:
+  - 🟣 ① Introduced (purple)
+  - 🔵 ② Practiced (blue)
+  - 🟢 ③ Solo Standard (green)
+  - 🟢 ④ Checkride Standard (dark green)
+  - 🔴 ⚠ Needs Attention (red)
+- Update banner for modified reports (yellow highlight)
+- Celebration section for new qualifications (green highlight)
+
+**Content Sections:**
+1. Greeting with report date and instructor name
+2. Update notice (if applicable)
+3. New qualifications with expiration dates (if any)
+4. Training items covered with color-coded scores
+5. Instructor notes (rich text from TinyMCE)
+6. Score legend for reference
+7. Call-to-action button linking to student's training logbook
+
+**Technical Implementation:**
+- Multipart email (HTML + plain text)
+- Responsive design for mobile devices
+- From: `noreply@[domain_name]`
+- Respects EMAIL_DEV_MODE for safe testing
+- Automatic deduplication of student from CC list
+
+### **Qualification Tracking Intelligence**
+
+The system intelligently tracks qualification status changes:
+- **New qualification**: Student didn't have this qualification before → Email includes it
+- **Status transition**: Student had unqualified record, now marked qualified → Email includes it
+- **Re-qualification**: Student already qualified, record updated → Not included (no change in status)
+
+This ensures students receive notifications when they actually achieve a new qualification, not just when database records are updated.
 
 ## Related Workflows
 
