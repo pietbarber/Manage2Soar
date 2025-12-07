@@ -316,6 +316,16 @@ def fill_instruction_report(request, student_id, report_date):
                             expiration_date = None
 
                     # Create or update qualification
+                    # First, check if there's an existing record and if it's currently unqualified
+                    was_previously_qualified = False
+                    try:
+                        existing = MemberQualification.objects.get(
+                            member=student, qualification=qualification
+                        )
+                        was_previously_qualified = existing.is_qualified
+                    except MemberQualification.DoesNotExist:
+                        pass
+
                     mq, created = MemberQualification.objects.update_or_create(
                         member=student,
                         qualification=qualification,
@@ -328,8 +338,11 @@ def fill_instruction_report(request, student_id, report_date):
                         },
                     )
                     # Track the qualification for email notification
-                    # Only include truly new qualifications, not updates
-                    if created and is_qualified:
+                    # Include if newly created OR if updated from unqualified to qualified
+                    newly_qualified = (created and is_qualified) or (
+                        not created and is_qualified and not was_previously_qualified
+                    )
+                    if newly_qualified:
                         new_qualification = mq
                     messages.success(
                         request,

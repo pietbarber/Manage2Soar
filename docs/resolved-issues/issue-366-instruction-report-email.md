@@ -54,7 +54,21 @@ is_update = is_existing_report
 new_qualification = None  # Track newly awarded qualification
 
 # ... qualification processing ...
-if created and is_qualified:
+# Check if there's an existing record and if it's currently unqualified
+was_previously_qualified = False
+try:
+    existing = MemberQualification.objects.get(member=student, qualification=qualification)
+    was_previously_qualified = existing.is_qualified
+except MemberQualification.DoesNotExist:
+    pass
+
+mq, created = MemberQualification.objects.update_or_create(...)
+
+# Include if newly created OR if updated from unqualified to qualified
+newly_qualified = (created and is_qualified) or (
+    not created and is_qualified and not was_previously_qualified
+)
+if newly_qualified:
     new_qualification = mq
 
 # Send instruction report email to student (and CC instructors if configured)
