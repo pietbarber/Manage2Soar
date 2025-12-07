@@ -1,0 +1,55 @@
+{% if highest_urgency == 'FINAL' %}🚨 FINAL NOTICE{% elif highest_urgency == 'URGENT' %}⚠️ URGENT{% elif highest_urgency == 'WARNING' %}⚠️ WARNING{% endif %}
+
+Student Progress Report Reminder
+================================================================================
+
+Hello {{ instructor_name }},
+
+The following Student Progress Reports (SPRs) are overdue:
+
+{% if escalation_groups.FINAL %}
+🚨 FINAL NOTICE (30+ days overdue)
+No SPRs will be allowed after deadline:
+{% for spr in escalation_groups.FINAL %}
+  - {{ spr.student_name }} on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+{% endfor %}
+
+{% endif %}
+{% if escalation_groups.URGENT %}
+⚠️ URGENT (25+ days overdue):
+{% for spr in escalation_groups.URGENT %}
+  - {{ spr.student_name }} on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+{% endfor %}
+
+{% endif %}
+{% if escalation_groups.WARNING %}
+⚠️ WARNING (21+ days overdue):
+{% for spr in escalation_groups.WARNING %}
+  - {{ spr.student_name }} on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+{% endfor %}
+
+{% endif %}
+{% if escalation_groups.REMINDER %}
+📝 REMINDER (14+ days overdue):
+{% for spr in escalation_groups.REMINDER %}
+  - {{ spr.student_name }} on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+{% endfor %}
+
+{% endif %}
+{% if escalation_groups.NOTICE %}
+📌 NOTICE (7+ days overdue):
+{% for spr in escalation_groups.NOTICE %}
+  - {{ spr.student_name }} on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+{% endfor %}
+
+{% endif %}
+Please log into Manage2Soar to file these Student Progress Reports as soon as
+possible. SPRs are essential for tracking student progress and maintaining
+training records.
+
+Instruction Reports: {{ instruction_reports_url }}
+
+Thank you for your prompt attention to this matter.
+
+- Manage2Soar Automated Notifications
+  {{ club_name }}

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Progress Report Reminder</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+        <tr>
+            <td style="padding: 20px 0;">
+                <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="padding: 30px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">Student Progress Report Reminder</h1>
+                        </td>
+                    </tr>
+
+                    <!-- Urgency Banner -->
+                    {% if highest_urgency == 'FINAL' %}
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #dc3545; text-align: center;">
+                            <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: bold;">🚨 FINAL NOTICE</p>
+                        </td>
+                    </tr>
+                    {% elif highest_urgency == 'URGENT' %}
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #fd7e14; text-align: center;">
+                            <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: bold;">⚠️ URGENT</p>
+                        </td>
+                    </tr>
+                    {% elif highest_urgency == 'WARNING' %}
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #ffc107; text-align: center;">
+                            <p style="margin: 0; color: #000000; font-size: 18px; font-weight: bold;">⚠️ WARNING</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Hello {{ instructor_name }},
+                            </p>
+
+                            <p style="margin: 0 0 25px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                The following Student Progress Reports (SPRs) are overdue:
+                            </p>
+
+                            <!-- FINAL NOTICE Section -->
+                            {% if escalation_groups.FINAL %}
+                            <div style="margin: 0 0 30px 0; padding: 20px; background-color: #f8d7da; border-left: 5px solid #dc3545; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #721c24; font-size: 18px; font-weight: bold;">
+                                    🚨 FINAL NOTICE (30+ days overdue)
+                                </h3>
+                                <p style="margin: 0 0 15px 0; color: #721c24; font-size: 14px; font-weight: bold;">
+                                    No SPRs will be allowed after deadline:
+                                </p>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #721c24;">
+                                    {% for spr in escalation_groups.FINAL %}
+                                    <li style="margin: 0 0 10px 0; font-size: 15px; line-height: 1.5;">
+                                        <strong>{{ spr.student_name }}</strong> on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- URGENT Section -->
+                            {% if escalation_groups.URGENT %}
+                            <div style="margin: 0 0 30px 0; padding: 20px; background-color: #fff3cd; border-left: 5px solid #fd7e14; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 18px; font-weight: bold;">
+                                    ⚠️ URGENT (25+ days overdue)
+                                </h3>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #856404;">
+                                    {% for spr in escalation_groups.URGENT %}
+                                    <li style="margin: 0 0 10px 0; font-size: 15px; line-height: 1.5;">
+                                        <strong>{{ spr.student_name }}</strong> on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- WARNING Section -->
+                            {% if escalation_groups.WARNING %}
+                            <div style="margin: 0 0 30px 0; padding: 20px; background-color: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 18px; font-weight: bold;">
+                                    ⚠️ WARNING (21+ days overdue)
+                                </h3>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #856404;">
+                                    {% for spr in escalation_groups.WARNING %}
+                                    <li style="margin: 0 0 10px 0; font-size: 15px; line-height: 1.5;">
+                                        <strong>{{ spr.student_name }}</strong> on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- REMINDER Section -->
+                            {% if escalation_groups.REMINDER %}
+                            <div style="margin: 0 0 30px 0; padding: 20px; background-color: #d1ecf1; border-left: 5px solid #17a2b8; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #0c5460; font-size: 18px; font-weight: bold;">
+                                    📝 REMINDER (14+ days overdue)
+                                </h3>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #0c5460;">
+                                    {% for spr in escalation_groups.REMINDER %}
+                                    <li style="margin: 0 0 10px 0; font-size: 15px; line-height: 1.5;">
+                                        <strong>{{ spr.student_name }}</strong> on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <!-- NOTICE Section -->
+                            {% if escalation_groups.NOTICE %}
+                            <div style="margin: 0 0 30px 0; padding: 20px; background-color: #e7f3ff; border-left: 5px solid #0066cc; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #004085; font-size: 18px; font-weight: bold;">
+                                    📌 NOTICE (7+ days overdue)
+                                </h3>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #004085;">
+                                    {% for spr in escalation_groups.NOTICE %}
+                                    <li style="margin: 0 0 10px 0; font-size: 15px; line-height: 1.5;">
+                                        <strong>{{ spr.student_name }}</strong> on {{ spr.flight_date }} ({{ spr.days_overdue }} days ago)
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <p style="margin: 25px 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Please log into Manage2Soar to file these Student Progress Reports as soon as possible.
+                                SPRs are essential for tracking student progress and maintaining training records.
+                            </p>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" style="margin: 30px auto; border-collapse: collapse;">
+                                <tr>
+                                    <td style="border-radius: 5px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
+                                        <a href="{{ instruction_reports_url }}" style="display: inline-block; padding: 15px 40px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold;">
+                                            File Student Progress Reports
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 25px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6; text-align: center;">
+                                Thank you for your prompt attention to this matter.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0; color: #6c757d; font-size: 12px; line-height: 1.5;">
+                                This is an automated notification from {{ club_name }}<br>
+                                Manage2Soar Automated Notifications
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
