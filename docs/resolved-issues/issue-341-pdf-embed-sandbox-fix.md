@@ -80,7 +80,7 @@ The fix preserves all existing security measures:
 3. **No Form Submission**: `allow-forms` is NOT enabled
 4. **No Popups**: `allow-popups` is NOT enabled
 5. **No Navigation**: `allow-top-navigation` is NOT enabled
-6. **Isolated Context**: Iframe content cannot access parent page
+6. **Isolated Context**: Cross-origin iframe content cannot access parent page (same-origin PDFs have limited access – see Known Limitations)
 
 ### What We're Protecting Against:
 
