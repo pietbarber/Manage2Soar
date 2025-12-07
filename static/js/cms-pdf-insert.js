@@ -90,7 +90,25 @@ function initializePdfInsert() {
             // Use sanitized URL directly - URL constructor already validates and sanitizes
             const sanitizedUrl = validationResult.sanitizedUrl;
 
-            // Create secure iframe with restrictive sandbox (SECURITY FIX)
+            // Security check: Warn about same-origin PDFs
+            // When allow-scripts and allow-same-origin are both enabled, same-origin PDFs
+            // could potentially access the parent page's DOM, cookies, and session storage
+            const urlObj = new URL(sanitizedUrl);
+            if (urlObj.origin === window.location.origin) {
+                const confirmSameOrigin = confirm(
+                    'Warning: Embedding PDFs from the same domain can pose security risks.\n\n' +
+                    'A malicious PDF could potentially access page content and user session.\n\n' +
+                    'Only embed PDFs that have been carefully reviewed.\n\n' +
+                    'Are you sure you want to embed this PDF?'
+                );
+                if (!confirmSameOrigin) {
+                    return;
+                }
+            }
+
+            // Create secure iframe with appropriate sandbox permissions for PDF display
+            // allow-scripts: Required for PDF.js and browser PDF viewers
+            // allow-same-origin: Required for PDF loading (must be combined with HTTPS validation)
             const iframe = `<div class="pdf-container">
     <iframe
         src="${sanitizedUrl}"
@@ -98,7 +116,7 @@ function initializePdfInsert() {
         height="600px"
         style="border: 1px solid #ddd; border-radius: 8px;"
         loading="lazy"
-        sandbox=""
+        sandbox="allow-scripts allow-same-origin"
         referrerpolicy="no-referrer"
         title="PDF Document">
         <p>Your browser does not support iframes. <a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Click here to view the PDF</a></p>
