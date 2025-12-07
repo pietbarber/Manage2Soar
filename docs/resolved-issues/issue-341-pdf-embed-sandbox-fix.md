@@ -76,7 +76,7 @@ The fix preserves all existing security measures:
 ### Why `allow-scripts` and `allow-same-origin` are Safe Here:
 
 1. **URL Validation**: Only HTTPS/HTTP URLs allowed (no `javascript:`, `data:`, etc.)
-2. **Read-Only Content**: PDFs are static documents, not interactive web pages
+2. **Typical PDF Content**: Most PDFs are static documents, though they can contain JavaScript
 3. **No Form Submission**: `allow-forms` is NOT enabled
 4. **No Popups**: `allow-popups` is NOT enabled
 5. **No Navigation**: `allow-top-navigation` is NOT enabled
@@ -128,4 +128,4 @@ After deploying this fix:
 
 ## Closed
 
-December 2025
+December 7, 2025
