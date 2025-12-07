@@ -46,7 +46,10 @@ from instructors.models import (
     TrainingLesson,
     TrainingPhase,
 )
-from instructors.utils import get_flight_summary_for_member
+from instructors.utils import (
+    get_flight_summary_for_member,
+    send_instruction_report_email,
+)
 from knowledgetest.forms import TestBuilderForm
 from knowledgetest.models import (
     Question,
@@ -246,10 +249,10 @@ def fill_instruction_report(request, student_id, report_date):
         report = InstructionReport.objects.get(
             student=student, instructor=instructor, report_date=report_date
         )
-        created = False
+        is_existing_report = True
     except InstructionReport.DoesNotExist:
         report = None
-        created = False
+        is_existing_report = False
 
     if report_date > now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
@@ -257,7 +260,11 @@ def fill_instruction_report(request, student_id, report_date):
     lessons = TrainingLesson.objects.all().order_by("code")
 
     if request.method == "POST":
-        # 2) Now *create* if it didn’t exist
+        # Track if this is an update to an existing report
+        is_update = is_existing_report
+        new_qualification = None  # Track newly awarded qualification
+
+        # 2) Now *create* if it didn't exist
         if report is None:
             report = InstructionReport(
                 student=student, instructor=instructor, report_date=report_date
@@ -309,7 +316,18 @@ def fill_instruction_report(request, student_id, report_date):
                             expiration_date = None
 
                     # Create or update qualification
-                    MemberQualification.objects.update_or_create(
+                    # First, check if there's an existing record and if it's currently unqualified
+                    was_previously_qualified = False
+                    try:
+                        existing = MemberQualification.objects.get(
+                            member=student, qualification=qualification
+                        )
+                        was_previously_qualified = existing.is_qualified
+                    except MemberQualification.DoesNotExist:
+                        # No existing qualification found; will create a new one below
+                        pass
+
+                    mq, created = MemberQualification.objects.update_or_create(
                         member=student,
                         qualification=qualification,
                         defaults={
@@ -320,6 +338,13 @@ def fill_instruction_report(request, student_id, report_date):
                             "notes": notes,
                         },
                     )
+                    # Track the qualification for email notification
+                    # Include if newly created OR if updated from unqualified to qualified
+                    newly_qualified = (created and is_qualified) or (
+                        not created and is_qualified and not was_previously_qualified
+                    )
+                    if newly_qualified:
+                        new_qualification = mq
                     messages.success(
                         request,
                         "Flight instruction and qualification saved successfully.",
@@ -331,6 +356,19 @@ def fill_instruction_report(request, student_id, report_date):
                     )
             else:
                 messages.success(request, "Flight instruction logged successfully.")
+
+            # Send instruction report email to student (and CC instructors if configured)
+            new_qualifications = [new_qualification] if new_qualification else None
+            email_sent = send_instruction_report_email(
+                report,
+                is_update=is_update,
+                new_qualifications=new_qualifications,
+            )
+            if not email_sent:
+                messages.warning(
+                    request,
+                    "Instruction report saved, but email could not be sent to student.",
+                )
 
             return redirect(
                 "instructors:member_instruction_record", member_id=student.id

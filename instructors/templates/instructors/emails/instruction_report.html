@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instruction Report - {{ report_date }}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <!-- Main container -->
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with logo -->
+                    <tr>
+                        <td style="background-color: #2c5282; padding: 24px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 12px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                {% if is_update %}Updated {% endif %}Instruction Report
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: #bee3f8; font-size: 16px;">
+                                {{ report_date|date:"l, F j, Y" }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if is_update %}
+                    <!-- Update notice banner -->
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fefcbf; border-bottom: 2px solid #d69e2e;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #744210; font-size: 14px; font-weight: 600;">
+                                            📝 This is an update to a previously submitted instruction report.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Greeting and summary -->
+                    <tr>
+                        <td style="padding: 24px 24px 16px 24px;">
+                            <p style="margin: 0; color: #2d3748; font-size: 16px; line-height: 1.5;">
+                                Hello {{ student.first_name }},
+                            </p>
+                            <p style="margin: 12px 0 0 0; color: #4a5568; font-size: 15px; line-height: 1.5;">
+                                {% if is_update %}This is an update to your instruction report from {% else %}Here is your instruction report from {% endif %}<strong>{{ report_date|date:"F j, Y" }}</strong> with <strong>{{ instructor.full_display_name }}</strong>{% if is_simulator %} (simulator session){% endif %}.
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if new_qualifications %}
+                    <!-- New Qualifications section -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #c6f6d5; border-radius: 6px; border-left: 4px solid #38a169;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #276749; font-size: 18px; font-weight: 600;">
+                                            🎉 New Qualification{{ new_qualifications|length|pluralize }} Awarded!
+                                        </h2>
+                                        {% for qual in new_qualifications %}
+                                        <p style="margin: 0 0 8px 0; color: #22543d; font-size: 15px;">
+                                            <strong>{{ qual.qualification.name }}</strong>
+                                            {% if qual.date_awarded %} - Awarded {{ qual.date_awarded|date:"F j, Y" }}{% endif %}
+                                            {% if qual.expiration_date %}<br><span style="font-size: 13px; color: #2f855a;">(Expires: {{ qual.expiration_date|date:"F j, Y" }})</span>{% endif %}
+                                        </p>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if lesson_scores %}
+                    <!-- Training Items section -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ebf8ff; border-radius: 6px; border-left: 4px solid #3182ce;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #2c5282; font-size: 18px; font-weight: 600;">
+                                            Training Items Covered
+                                        </h2>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            {% for ls in lesson_scores %}
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px; border-bottom: 1px solid #bee3f8;">
+                                                    <strong>{{ ls.lesson.code }}</strong> – {{ ls.lesson.title }}
+                                                </td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px; text-align: right; border-bottom: 1px solid #bee3f8; white-space: nowrap;">
+                                                    {% if ls.score == "1" %}
+                                                    <span style="color: #805ad5;">① Introduced</span>
+                                                    {% elif ls.score == "2" %}
+                                                    <span style="color: #3182ce;">② Practiced</span>
+                                                    {% elif ls.score == "3" %}
+                                                    <span style="color: #38a169;">③ Solo Standard</span>
+                                                    {% elif ls.score == "4" %}
+                                                    <span style="color: #2f855a;">④ Checkride Standard</span>
+                                                    {% elif ls.score == "!" %}
+                                                    <span style="color: #e53e3e;">⚠ Needs Attention</span>
+                                                    {% else %}
+                                                    {{ ls.get_score_display }}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if report_text %}
+                    <!-- Instructor Notes section -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #faf5ff; border-radius: 6px; border-left: 4px solid #805ad5;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #553c9a; font-size: 18px; font-weight: 600;">
+                                            Instructor Notes
+                                        </h2>
+                                        <div style="color: #4a5568; font-size: 15px; line-height: 1.6;">
+                                            {{ report_text|safe }}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if lesson_scores %}
+                    <!-- Score Legend -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7fafc; border-radius: 6px;">
+                                <tr>
+                                    <td style="padding: 12px 16px;">
+                                        <p style="margin: 0 0 8px 0; color: #718096; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                                            Score Legend
+                                        </p>
+                                        <p style="margin: 0; color: #718096; font-size: 12px; line-height: 1.6;">
+                                            <span style="color: #805ad5;">① Introduced</span> (Discussed/Demonstrated) •
+                                            <span style="color: #3182ce;">② Practiced</span> •
+                                            <span style="color: #38a169;">③ Solo Standard</span> •
+                                            <span style="color: #2f855a;">④ Checkride Standard</span> •
+                                            <span style="color: #e53e3e;">⚠ Needs Attention</span>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if logbook_url %}
+                    <!-- Call to action -->
+                    <tr>
+                        <td style="padding: 0 24px 24px 24px; text-align: center;">
+                            <a href="{{ logbook_url }}" style="display: inline-block; background-color: #3182ce; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px;">
+                                View Your Training Logbook
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f7fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; color: #718096; font-size: 13px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                            {% if site_url %}
+                            <p style="margin: 8px 0 0 0;">
+                                <a href="{{ site_url }}" style="color: #3182ce; text-decoration: none; font-size: 13px;">{{ site_url }}</a>
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

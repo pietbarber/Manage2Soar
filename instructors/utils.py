@@ -1,13 +1,17 @@
 # instructors/utils.py
 
+import logging
 from datetime import timedelta
 
 from django.db.models import Count, F, Max, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from logsheet.models import Flight
+from siteconfig.models import MailingList, SiteConfiguration
+from utils.email import send_mail
 
 from .models import (
     GroundInstruction,
@@ -17,6 +21,8 @@ from .models import (
     StudentProgressSnapshot,
     TrainingLesson,
 )
+
+logger = logging.getLogger(__name__)
 
 
 ####################################################
@@ -85,8 +91,8 @@ def get_flight_summary_for_member(member):
             data.setdefault(row["n_number"], {}).update(row)
 
     # Prepare totals accumulator
-    flights_summary = []
-    totals = {"n_number": "Totals"}
+    flights_summary: list[dict] = []
+    totals: dict = {"n_number": "Totals"}
     for field in ("solo", "with", "given", "total"):
         totals[f"{field}_count"] = 0
         totals[f"{field}_time"] = timedelta(0)
@@ -186,3 +192,114 @@ def update_student_progress_snapshot(student):
     snapshot.last_updated = timezone.now()
     snapshot.save()
     return snapshot
+
+
+####################################################
+# send_instruction_report_email
+#
+# Sends an email to the student with their instruction report.
+# Optionally CCs the instructors mailing list if configured.
+#
+# Parameters:
+# - report: InstructionReport instance
+# - is_update: Boolean indicating if this is an update to an existing report
+# - new_qualifications: Optional list of MemberQualification instances
+#   that were awarded during this instruction session
+#
+# Returns:
+# - int: Number of emails sent (0 or 1)
+####################################################
+def send_instruction_report_email(report, is_update=False, new_qualifications=None):
+    """Send instruction report email to student and optionally CC instructors."""
+    if not report.student.email:
+        logger.warning(
+            f"Cannot send instruction report email: student {report.student!s} has no email"
+        )
+        return 0
+
+    # Get site configuration
+    config = SiteConfiguration.objects.first()
+    club_name = config.club_name if config else "Manage2Soar"
+    domain_name = config.domain_name if config else "manage2soar.com"
+
+    # Build URLs
+    site_url = f"https://{domain_name}"
+    logbook_url = f"{site_url}/instructors/logbook/{report.student.id}/"
+
+    # Get club logo URL if available
+    club_logo_url = None
+    if config and config.club_logo:
+        club_logo_url = f"{site_url}{config.club_logo.url}"
+
+    # Get lesson scores for this report
+    lesson_scores = report.lesson_scores.select_related("lesson").order_by(
+        "lesson__code"
+    )
+
+    # Build email context
+    context = {
+        "student": report.student,
+        "instructor": report.instructor,
+        "report_date": report.report_date,
+        "report_text": report.report_text,
+        "is_simulator": report.simulator,
+        "is_update": is_update,
+        "lesson_scores": lesson_scores,
+        "new_qualifications": new_qualifications or [],
+        "club_name": club_name,
+        "club_logo_url": club_logo_url,
+        "site_url": site_url,
+        "logbook_url": logbook_url,
+    }
+
+    # Render email templates
+    html_message = render_to_string(
+        "instructors/emails/instruction_report.html", context
+    )
+    text_message = render_to_string(
+        "instructors/emails/instruction_report.txt", context
+    )
+
+    # Build subject line
+    subject_prefix = "Updated: " if is_update else ""
+    subject = (
+        f"{subject_prefix}Instruction Report - "
+        f"{report.student.first_name} {report.student.last_name} - "
+        f"{report.report_date.strftime('%B %d, %Y')}"
+    )
+
+    # Get from email
+    from_email = f"noreply@{domain_name}"
+
+    # Check for instructors mailing list to CC
+    cc_emails = []
+    try:
+        instructors_list = MailingList.objects.filter(
+            name__iexact="instructors", is_active=True
+        ).first()
+        if instructors_list:
+            cc_emails = instructors_list.get_subscriber_emails()
+            # Remove the student from CC if they happen to be on the list
+            if report.student.email in cc_emails:
+                cc_emails.remove(report.student.email)
+    except Exception as e:
+        logger.warning(f"Could not get instructors mailing list: {e!s}")
+
+    # Send the email
+    try:
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=from_email,
+            recipient_list=[report.student.email],
+            html_message=html_message,
+            cc=cc_emails if cc_emails else None,
+        )
+        logger.info(
+            f"Sent instruction report email to {report.student.email}"
+            f"{' (CC: instructors)' if cc_emails else ''}"
+        )
+        return 1
+    except Exception as e:
+        logger.exception(f"Failed to send instruction report email: {e!s}")
+        return 0
