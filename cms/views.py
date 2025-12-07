@@ -495,6 +495,18 @@ def _notify_member_managers_of_contact(contact_submission):
         # Prepare context for email templates
         config = SiteConfiguration.objects.first()
 
+        # Get absolute club logo URL for email
+        logo_url = None
+        if config and config.club_logo:
+            logo_url = config.club_logo.url
+            if not logo_url.startswith(("http://", "https://")):
+                site_url = (
+                    settings.SITE_URL
+                    if hasattr(settings, "SITE_URL")
+                    else "https://localhost:8000"
+                )
+                logo_url = f"{site_url.rstrip('/')}{logo_url}"
+
         context = {
             "contact": contact_submission,
             "submitted_at": contact_submission.submitted_at.strftime(
@@ -502,7 +514,7 @@ def _notify_member_managers_of_contact(contact_submission):
             ),
             "admin_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else f'https://{site_config.domain_name}' if site_config and site_config.domain_name else 'https://localhost:8000'}/admin/cms/visitorcontact/{contact_submission.pk}/change/",
             "club_name": config.club_name if config else "Club",
-            "club_logo_url": config.logo.url if config and config.logo else None,
+            "club_logo_url": logo_url,
             "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
         }
 

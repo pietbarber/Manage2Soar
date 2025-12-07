@@ -107,13 +107,23 @@ def _notify_member_managers_of_visiting_pilot(member):
                     "manage_member_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/admin/members/member/{member.pk}/change/",
                     "all_visiting_pilots_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/admin/members/member/?membership_status__exact={config.visiting_pilot_status}",
                     "club_name": config.club_name if config else "Club",
-                    "club_logo_url": (
-                        config.logo.url if config and config.logo else None
-                    ),
+                    "club_logo_url": None,
                     "site_url": (
                         settings.SITE_URL if hasattr(settings, "SITE_URL") else None
                     ),
                 }
+
+                # Get absolute club logo URL for email
+                if config and config.club_logo:
+                    logo_url = config.club_logo.url
+                    if not logo_url.startswith(("http://", "https://")):
+                        site_url = (
+                            settings.SITE_URL
+                            if hasattr(settings, "SITE_URL")
+                            else "https://localhost:8000"
+                        )
+                        logo_url = f"{site_url.rstrip('/')}{logo_url}"
+                    context["club_logo_url"] = logo_url
 
                 # Render HTML and plain text templates
                 html_message = render_to_string(
@@ -277,7 +287,6 @@ def notify_membership_managers_of_new_application(application):
                 ]
 
                 # Prepare context for email templates
-                config = SiteConfiguration.objects.first()
                 context = {
                     "application": application,
                     "submitted_at": application.submitted_at.strftime(
@@ -286,13 +295,23 @@ def notify_membership_managers_of_new_application(application):
                     "review_application_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
                     "all_applications_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/",
                     "club_name": config.club_name if config else "Club",
-                    "club_logo_url": (
-                        config.logo.url if config and config.logo else None
-                    ),
+                    "club_logo_url": None,
                     "site_url": (
                         settings.SITE_URL if hasattr(settings, "SITE_URL") else None
                     ),
                 }
+
+                # Get absolute club logo URL for email
+                if config and config.club_logo:
+                    logo_url = config.club_logo.url
+                    if not logo_url.startswith(("http://", "https://")):
+                        site_url = (
+                            settings.SITE_URL
+                            if hasattr(settings, "SITE_URL")
+                            else "https://localhost:8000"
+                        )
+                        logo_url = f"{site_url.rstrip('/')}{logo_url}"
+                    context["club_logo_url"] = logo_url
 
                 # Render HTML and plain text templates
                 html_message = render_to_string(
@@ -552,13 +571,23 @@ def notify_membership_managers_of_withdrawal(application):
                     ),
                     "view_application_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
                     "club_name": config.club_name if config else "Club",
-                    "club_logo_url": (
-                        config.logo.url if config and config.logo else None
-                    ),
+                    "club_logo_url": None,
                     "site_url": (
                         settings.SITE_URL if hasattr(settings, "SITE_URL") else None
                     ),
                 }
+
+                # Get absolute club logo URL for email
+                if config and config.club_logo:
+                    logo_url = config.club_logo.url
+                    if not logo_url.startswith(("http://", "https://")):
+                        site_url = (
+                            settings.SITE_URL
+                            if hasattr(settings, "SITE_URL")
+                            else "https://localhost:8000"
+                        )
+                        logo_url = f"{site_url.rstrip('/')}{logo_url}"
+                    context["club_logo_url"] = logo_url
 
                 # Render HTML and plain text templates
                 html_message = render_to_string(

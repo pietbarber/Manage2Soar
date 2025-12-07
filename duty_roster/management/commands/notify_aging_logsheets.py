@@ -125,12 +125,25 @@ Thank you for your attention to this matter.
 
         # Prepare context for email templates
         config = SiteConfiguration.objects.first()
+
+        # Get absolute club logo URL for email
+        logo_url = None
+        if config and config.club_logo:
+            logo_url = config.club_logo.url
+            if not logo_url.startswith(("http://", "https://")):
+                site_url = (
+                    settings.SITE_URL
+                    if hasattr(settings, "SITE_URL")
+                    else "https://localhost:8000"
+                )
+                logo_url = f"{site_url.rstrip('/')}{logo_url}"
+
         context = {
             "member": member,
             "logsheet_list": logsheet_list,
             "logsheet_url": f"{settings.SITE_URL}/logsheet/",
             "club_name": config.club_name if config else "Club",
-            "club_logo_url": config.logo.url if config and config.logo else None,
+            "club_logo_url": logo_url,
             "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
         }
 
