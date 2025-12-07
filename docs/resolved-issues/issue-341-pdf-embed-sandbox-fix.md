@@ -100,6 +100,18 @@ The fix preserves all existing security measures:
   - Administrators should be trained to only embed PDFs from trusted external sources or carefully reviewed same-origin PDFs
 - **Best Practice**: Prefer embedding PDFs from external trusted domains (club storage, official sources) over same-origin PDFs
 
+### Future Security Enhancements:
+
+While the current implementation provides adequate protection for a CMS with role-based admin access, the following defense-in-depth measures could be added:
+- **Server-Side Validation**: Add Django backend validation to reject same-origin PDF URLs entirely, preventing database-level bypasses
+- **Content Security Policy**: Implement CSP headers to restrict iframe sources at the HTTP layer
+- **Audit Logging**: Track all PDF embeds with URLs and embedding user for security review
+
+These enhancements would complement the current client-side validation but are not critical given that:
+1. Only trusted administrators have CMS edit permissions
+2. All admin actions are logged via Django admin audit trail
+3. Client-side validation provides immediate feedback during content creation
+
 ## Related Issues
 
 - **Issue #322**: Tables overflow fix - Must not regress when fixing PDF embedding
