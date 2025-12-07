@@ -20,6 +20,7 @@ from cms.forms import SiteFeedbackForm, VisitorContactForm
 from cms.models import HomePageContent
 from members.decorators import active_member_required
 from members.utils import is_active_member
+from utils.email_helpers import get_absolute_club_logo_url
 
 from .models import Document, Page
 
@@ -495,27 +496,23 @@ def _notify_member_managers_of_contact(contact_submission):
         # Prepare context for email templates
         config = SiteConfiguration.objects.first()
 
-        # Get absolute club logo URL for email
-        logo_url = None
-        if config and config.club_logo:
-            logo_url = config.club_logo.url
-            if not logo_url.startswith(("http://", "https://")):
-                site_url = (
-                    settings.SITE_URL
-                    if hasattr(settings, "SITE_URL")
-                    else "https://localhost:8000"
-                )
-                logo_url = f"{site_url.rstrip('/')}{logo_url}"
+        # Determine base URL for admin interface link
+        if hasattr(settings, "SITE_URL"):
+            base_url = settings.SITE_URL
+        elif site_config and site_config.domain_name:
+            base_url = f"https://{site_config.domain_name}"
+        else:
+            base_url = "https://localhost:8000"
 
         context = {
             "contact": contact_submission,
             "submitted_at": contact_submission.submitted_at.strftime(
                 "%Y-%m-%d %H:%M:%S"
             ),
-            "admin_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else f'https://{site_config.domain_name}' if site_config and site_config.domain_name else 'https://localhost:8000'}/admin/cms/visitorcontact/{contact_submission.pk}/change/",
+            "admin_url": f"{base_url}/admin/cms/visitorcontact/{contact_submission.pk}/change/",
             "club_name": config.club_name if config else "Club",
-            "club_logo_url": logo_url,
-            "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "site_url": getattr(settings, "SITE_URL", None),
         }
 
         # Render HTML and plain text templates

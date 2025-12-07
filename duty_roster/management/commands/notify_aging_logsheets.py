@@ -8,6 +8,7 @@ from logsheet.models import Logsheet
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -126,25 +127,13 @@ Thank you for your attention to this matter.
         # Prepare context for email templates
         config = SiteConfiguration.objects.first()
 
-        # Get absolute club logo URL for email
-        logo_url = None
-        if config and config.club_logo:
-            logo_url = config.club_logo.url
-            if not logo_url.startswith(("http://", "https://")):
-                site_url = (
-                    settings.SITE_URL
-                    if hasattr(settings, "SITE_URL")
-                    else "https://localhost:8000"
-                )
-                logo_url = f"{site_url.rstrip('/')}{logo_url}"
-
         context = {
             "member": member,
             "logsheet_list": logsheet_list,
-            "logsheet_url": f"{settings.SITE_URL}/logsheet/",
+            "logsheet_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/logsheet/",
             "club_name": config.club_name if config else "Club",
-            "club_logo_url": logo_url,
-            "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "site_url": getattr(settings, "SITE_URL", None),
         }
 
         # Render HTML and plain text templates
