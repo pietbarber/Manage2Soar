@@ -90,6 +90,22 @@ function initializePdfInsert() {
             // Use sanitized URL directly - URL constructor already validates and sanitizes
             const sanitizedUrl = validationResult.sanitizedUrl;
 
+            // Security check: Warn about same-origin PDFs
+            // When allow-scripts and allow-same-origin are both enabled, same-origin PDFs
+            // could potentially access the parent page's DOM, cookies, and session storage
+            const urlObj = new URL(sanitizedUrl);
+            if (urlObj.origin === window.location.origin) {
+                const confirmSameOrigin = confirm(
+                    'Warning: Embedding PDFs from the same domain can pose security risks.\n\n' +
+                    'A malicious PDF could potentially access page content and user session.\n\n' +
+                    'Only embed PDFs that have been carefully reviewed.\n\n' +
+                    'Are you sure you want to embed this PDF?'
+                );
+                if (!confirmSameOrigin) {
+                    return;
+                }
+            }
+
             // Create secure iframe with appropriate sandbox permissions for PDF display
             // allow-scripts: Required for PDF.js and browser PDF viewers
             // allow-same-origin: Required for PDF loading (must be combined with HTTPS validation)

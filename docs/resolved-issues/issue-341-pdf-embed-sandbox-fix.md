@@ -93,8 +93,12 @@ The fix preserves all existing security measures:
 ### Known Limitations:
 
 - PDFs from untrusted sources could contain malicious JavaScript
-- Mitigation: Only administrators can edit CMS content (role-based permissions)
-- Best Practice: Only embed PDFs from trusted domains (club storage, official sources)
+- **Same-Origin PDFs**: PDFs embedded from the same domain as the CMS could potentially access the parent page when both `allow-scripts` and `allow-same-origin` are enabled. This includes access to DOM, cookies, and session storage.
+- **Mitigation**:
+  - Only administrators can edit CMS content (role-based permissions)
+  - JavaScript validation warns administrators when embedding same-origin PDFs
+  - Administrators should be trained to only embed PDFs from trusted external sources or carefully reviewed same-origin PDFs
+- **Best Practice**: Prefer embedding PDFs from external trusted domains (club storage, official sources) over same-origin PDFs
 
 ## Related Issues
 
