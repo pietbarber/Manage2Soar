@@ -31,5 +31,5 @@ All Applications:    {{ all_applications_url }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-This message was sent automatically by the {{ club_name}} membership system.
+This message was sent automatically by the {{ club_name }} membership system.
 {% if site_url %}{{ site_url }}{% endif %}

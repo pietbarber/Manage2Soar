@@ -493,8 +493,6 @@ def _notify_member_managers_of_contact(contact_submission):
         )  # Keep original formatting for message content
 
         # Prepare context for email templates
-        from siteconfig.models import SiteConfiguration
-
         config = SiteConfiguration.objects.first()
 
         context = {
