@@ -324,6 +324,7 @@ def fill_instruction_report(request, student_id, report_date):
                         )
                         was_previously_qualified = existing.is_qualified
                     except MemberQualification.DoesNotExist:
+                        # No existing qualification found; will create a new one below
                         pass
 
                     mq, created = MemberQualification.objects.update_or_create(
