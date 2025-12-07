@@ -213,8 +213,7 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
     """Send instruction report email to student and optionally CC instructors."""
     if not report.student.email:
         logger.warning(
-            "Cannot send instruction report email: student %s has no email",
-            report.student,
+            f"Cannot send instruction report email: student {report.student!s} has no email"
         )
         return 0
 
@@ -284,7 +283,7 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
             if report.student.email in cc_emails:
                 cc_emails.remove(report.student.email)
     except Exception as e:
-        logger.warning("Could not get instructors mailing list: %s", e)
+        logger.warning(f"Could not get instructors mailing list: {e!s}")
 
     # Send the email
     try:
@@ -297,11 +296,10 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
             cc=cc_emails if cc_emails else None,
         )
         logger.info(
-            "Sent instruction report email to %s%s",
-            report.student.email,
-            " (CC: instructors)" if cc_emails else "",
+            f"Sent instruction report email to {report.student.email}"
+            f"{' (CC: instructors)' if cc_emails else ''}"
         )
         return 1
     except Exception as e:
-        logger.exception("Failed to send instruction report email: %s", e)
+        logger.exception(f"Failed to send instruction report email: {e!s}")
         return 0
