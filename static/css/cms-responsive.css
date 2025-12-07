@@ -62,7 +62,20 @@
 .cms-content object,
 .cms-content video {
     max-width: 100%;
+}
+
+/* Most media should scale height automatically */
+.cms-content embed,
+.cms-content object,
+.cms-content video {
     height: auto;
+}
+
+/* PDF iframes need fixed height to display properly */
+/* Don't override height for PDF containers */
+.cms-content .pdf-container iframe {
+    min-height: 600px;
+    /* Preserve the specified height for PDFs */
 }
 
 /* Pre and code blocks */
