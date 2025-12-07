@@ -1,0 +1,35 @@
+📝 NEW MEMBERSHIP APPLICATION
+
+{{ club_name }}
+
+STATUS: PENDING REVIEW
+
+APPLICANT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name:           {{ application.first_name }} {{ application.last_name }}
+Email:          {{ application.email }}
+Phone:          {{ application.phone|default:"Not provided" }}
+Location:       {{ application.city }}, {{ application.state }}
+Application ID: {{ application.application_id }}
+Submitted:      {{ submitted_at }}
+
+NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+To review this application:
+1. Log into the member management interface
+2. Navigate to Membership Applications
+3. Review the applicant's information and background
+4. Approve, reject, or request additional information
+
+MANAGEMENT LINKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Review Application:  {{ review_application_url }}
+All Applications:    {{ all_applications_url }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This message was sent automatically by the {{ club_name }} membership system.
+{% if site_url %}{{ site_url }}{% endif %}

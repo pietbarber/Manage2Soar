@@ -1,0 +1,22 @@
+📋 APPLICATION WITHDRAWN
+
+{{ club_name }}
+
+A membership applicant has withdrawn their application.
+
+APPLICANT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name:            {{ application.first_name }} {{ application.last_name }}
+Email:           {{ application.email }}
+Application ID:  {{ application.application_id }}
+
+VIEW APPLICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{ view_application_url }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This message was sent automatically by the {{ club_name }} membership system.
+{% if site_url %}{{ site_url }}{% endif %}

@@ -8,11 +8,13 @@ import logging
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 
 from .models import Member
 
@@ -93,53 +95,30 @@ def _notify_member_managers_of_visiting_pilot(member):
 
                 subject = f"New Visiting Pilot Registration: {safe_name[:50]}"
 
-                message_lines = [
-                    f"A new visiting pilot has registered through the club website.",
-                    "",
-                    "Visiting Pilot Details:",
-                    f"- Name: {safe_name}",
-                    f"- Email: {safe_email}",
-                    f"- Home Club: {safe_home_club}",
-                    f"- SSA Number: {safe_ssa}",
-                    f"- Glider Rating: {member.get_glider_rating_display() or 'Not specified'}",
-                    f"- Status: {status_text.title()}",
-                    f"- Registration Time: {member.date_joined.strftime('%Y-%m-%d %H:%M:%S')}",
-                    "",
-                ]
+                # Prepare context for email templates
+                context = {
+                    "member": member,
+                    "auto_approved": auto_approved,
+                    "status_text": status_text,
+                    "glider_rating": member.get_glider_rating_display()
+                    or "Not specified",
+                    "registration_time": member.date_joined.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    "manage_member_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/admin/members/member/{member.pk}/change/",
+                    "all_visiting_pilots_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/admin/members/member/?membership_status__exact={config.visiting_pilot_status}",
+                    "club_name": config.club_name if config else "Club",
+                    "club_logo_url": get_absolute_club_logo_url(config),
+                    "site_url": getattr(settings, "SITE_URL", None),
+                }
 
-                if auto_approved:
-                    message_lines.extend(
-                        [
-                            "This visiting pilot has been automatically approved and can now:",
-                            "- Be added to flight logs by duty officers",
-                            "- Appear in pilot/instructor/tow pilot dropdowns",
-                            "",
-                            "No further action required unless there are concerns.",
-                        ]
-                    )
-                else:
-                    message_lines.extend(
-                        [
-                            "This registration requires manual approval. To activate:",
-                            "1. Review the visiting pilot's information below",
-                            "2. Log into the admin interface",
-                            "3. Navigate to Members and find this visiting pilot",
-                            "4. Set 'Active' status to enable flight logging",
-                            "",
-                        ]
-                    )
-
-                message_lines.extend(
-                    [
-                        "Admin Interface Links:",
-                        f"- Manage Member: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/admin/members/member/{member.pk}/change/",
-                        f"- All Visiting Pilots: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/admin/members/member/?membership_status__exact={config.visiting_pilot_status}",
-                        "",
-                        "This message was sent automatically by the club website visiting pilot system.",
-                    ]
+                # Render HTML and plain text templates
+                html_message = render_to_string(
+                    "members/emails/visiting_pilot_notification.html", context
                 )
-
-                message = "\n".join(message_lines)
+                text_message = render_to_string(
+                    "members/emails/visiting_pilot_notification.txt", context
+                )
 
                 # Send email to each member manager
                 recipient_emails = [
@@ -149,9 +128,10 @@ def _notify_member_managers_of_visiting_pilot(member):
                 if recipient_emails:
                     send_mail(
                         subject=subject,
-                        message=message,
+                        message=text_message,
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=recipient_emails,
+                        html_message=html_message,
                         fail_silently=False,  # We want to know if email fails
                     )
 
@@ -293,7 +273,26 @@ def notify_membership_managers_of_new_application(application):
                     "This message was sent automatically by the club website membership system.",
                 ]
 
-                message = "\n".join(message_lines)
+                # Prepare context for email templates
+                context = {
+                    "application": application,
+                    "submitted_at": application.submitted_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    "review_application_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/{application.application_id}/",
+                    "all_applications_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/",
+                    "club_name": config.club_name if config else "Club",
+                    "club_logo_url": get_absolute_club_logo_url(config),
+                    "site_url": getattr(settings, "SITE_URL", None),
+                }
+
+                # Render HTML and plain text templates
+                html_message = render_to_string(
+                    "members/emails/application_submitted.html", context
+                )
+                text_message = render_to_string(
+                    "members/emails/application_submitted.txt", context
+                )
 
                 # Send email to each member manager
                 recipient_emails = [
@@ -303,9 +302,10 @@ def notify_membership_managers_of_new_application(application):
                 if recipient_emails:
                     send_mail(
                         subject=subject,
-                        message=message,
+                        message=text_message,
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=recipient_emails,
+                        html_message=html_message,
                         fail_silently=False,  # We want to know if email fails
                     )
 
@@ -536,30 +536,25 @@ def notify_membership_managers_of_withdrawal(application):
 
                 subject = f"Membership Application Withdrawn: {safe_name[:50]}"
 
-                # Calculate days since submission
-                days_since_submission = (timezone.now() - application.submitted_at).days
+                # Prepare context for email templates
+                context = {
+                    "application": application,
+                    "submitted_at": application.submitted_at.strftime(
+                        "%B %d, %Y at %I:%M %p"
+                    ),
+                    "view_application_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/{application.application_id}/",
+                    "club_name": config.club_name if config else "Club",
+                    "club_logo_url": get_absolute_club_logo_url(config),
+                    "site_url": getattr(settings, "SITE_URL", None),
+                }
 
-                message_lines = [
-                    f"A membership application has been withdrawn by the applicant.",
-                    "",
-                    "Application Details:",
-                    f"- Name: {safe_name}",
-                    f"- Email: {safe_email}",
-                    f"- Phone: {application.phone or 'Not provided'}",
-                    f"- City, State: {application.city}, {application.state}",
-                    f"- Application ID: {application.application_id}",
-                    f"- Originally submitted: {application.submitted_at.strftime('%B %d, %Y at %I:%M %p')}",
-                    f"- Days since submission: {days_since_submission}",
-                    "",
-                    "The application record has been marked as withdrawn and is retained for record-keeping purposes.",
-                    "",
-                    f"Review application details: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
-                    "",
-                    f"Regards,",
-                    f"{config.club_name} Membership System",
-                ]
-
-                message = "\n".join(message_lines)
+                # Render HTML and plain text templates
+                html_message = render_to_string(
+                    "members/emails/application_withdrawn.html", context
+                )
+                text_message = render_to_string(
+                    "members/emails/application_withdrawn.txt", context
+                )
 
                 # Send email to all member managers
                 for manager in member_managers:
@@ -567,9 +562,10 @@ def notify_membership_managers_of_withdrawal(application):
                         try:
                             send_mail(
                                 subject=subject,
-                                message=message,
+                                message=text_message,
                                 from_email=settings.DEFAULT_FROM_EMAIL,
                                 recipient_list=[manager.email],
+                                html_message=html_message,
                                 fail_silently=False,
                             )
                             logger.info(
