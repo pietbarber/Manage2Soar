@@ -1,0 +1,46 @@
+{% if auto_approved %}✅ NEW VISITING PILOT REGISTRATION - AUTO-APPROVED{% else %}⚠️ NEW VISITING PILOT REGISTRATION - APPROVAL REQUIRED{% endif %}
+
+{{ club_name }}
+
+PILOT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name:              {{ member.first_name }} {{ member.last_name }}
+Email:             {{ member.email|default:"Not provided" }}
+Home Club:         {{ member.home_club|default:"Not specified" }}
+SSA Number:        {{ member.ssa_number|default:"Not provided" }}
+Glider Rating:     {{ glider_rating|default:"Not specified" }}
+Status:            {{ status_text|title }}
+Registration Time: {{ registration_time }}
+
+{% if auto_approved %}
+STATUS: ACTIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This visiting pilot has been automatically approved and can now:
+- Be added to flight logs by duty officers
+- Appear in pilot/instructor/tow pilot dropdowns
+
+No further action required unless there are concerns.
+
+{% else %}
+ACTION REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This registration requires manual approval. To activate:
+1. Review the visiting pilot's information above
+2. Log into the admin interface
+3. Navigate to Members and find this visiting pilot
+4. Set 'Active' status to enable flight logging
+
+{% endif %}
+ADMIN INTERFACE LINKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Manage Member:        {{ manage_member_url }}
+All Visiting Pilots:  {{ all_visiting_pilots_url }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This message was sent automatically by the {{ club_name }} visiting pilot system.
+{% if site_url %}{{ site_url }}{% endif %}

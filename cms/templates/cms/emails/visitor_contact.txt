@@ -1,0 +1,27 @@
+📧 NEW CONTACT FORM SUBMISSION
+
+{{ club_name }}
+
+CONTACT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name:      {{ contact.name }}
+Email:     {{ contact.email }}
+Phone:     {{ contact.phone|default:"Not provided" }}
+Subject:   {{ contact.subject }}
+Submitted: {{ submitted_at }}
+
+MESSAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{ contact.message }}
+
+ADMIN INTERFACE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{ admin_url }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This message was sent automatically by the {{ club_name }} contact form.
+{% if site_url %}{{ site_url }}{% endif %}

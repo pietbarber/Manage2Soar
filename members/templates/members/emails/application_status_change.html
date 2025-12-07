@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Membership Application Status Change</title>
+    <!--[if mso]><style type="text/css">table { border-collapse: collapse; } td { padding: 0; }</style><![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="background-color: #2c5282; padding: 24px; text-align: center;">
+                            {% if club_logo_url %}<img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 12px;">{% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Application Status Update</h1>
+                        </td>
+                    </tr>
+                    {% if new_status == 'approved' %}
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #c6f6d5; border-bottom: 2px solid #38a169;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #22543d; font-size: 14px; font-weight: 600;">✅ Approved</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% elif new_status == 'rejected' %}
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fed7d7; border-bottom: 2px solid #e53e3e;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #742a2a; font-size: 14px; font-weight: 600;">❌ Rejected</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% elif new_status == 'waitlisted' %}
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fefcbf; border-bottom: 2px solid #d69e2e;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #744210; font-size: 14px; font-weight: 600;">⏸️ Waitlisted</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fefcbf; border-bottom: 2px solid #d69e2e;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #744210; font-size: 14px; font-weight: 600;">📝 {{ new_status|title }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td style="padding: 24px;">
+                            <h2 style="margin: 0 0 16px 0; color: #2c5282; font-size: 18px; font-weight: 600;">Applicant Information</h2>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7fafc; border-radius: 6px;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #718096; font-size: 14px; font-weight: 600; width: 140px;">Name:</td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px;">{{ application.first_name }} {{ application.last_name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #718096; font-size: 14px; font-weight: 600;">Email:</td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px;">{{ application.email }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #718096; font-size: 14px; font-weight: 600;">Application ID:</td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px;">{{ application.application_id }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #718096; font-size: 14px; font-weight: 600;">Previous Status:</td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px;">{{ old_status|title }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 6px 0; color: #718096; font-size: 14px; font-weight: 600;">New Status:</td>
+                                                <td style="padding: 6px 0; color: #2d3748; font-size: 14px; font-weight: 600;">{{ new_status|title }}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0 24px 24px 24px; text-align: center;">
+                            <a href="{{ view_application_url }}" style="display: inline-block; background-color: #3182ce; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px;">View Application Details</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f7fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; color: #718096; font-size: 13px;">This is an automated message from {{ club_name }}'s membership system.</p>
+                            {% if site_url %}<p style="margin: 8px 0 0 0;"><a href="{{ site_url }}" style="color: #3182ce; text-decoration: none; font-size: 13px;">{{ site_url }}</a></p>{% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

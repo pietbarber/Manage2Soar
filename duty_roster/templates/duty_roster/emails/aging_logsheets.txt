@@ -1,0 +1,22 @@
+⚠️ OVERDUE LOGSHEETS NEED FINALIZATION
+
+{{ club_name }}
+
+Hello {{ member.first_name }},
+
+The following logsheet(s) are overdue for finalization:
+
+{% for logsheet in logsheet_list %}• {{ logsheet }}
+{% endfor %}
+
+Please log into Manage2Soar to finalize these logsheets as soon as possible.
+Unfinalized logsheets prevent accurate reporting and billing.
+
+Logsheet Management: {{ logsheet_url }}
+
+Thank you for your attention to this matter.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is an automated reminder from {{ club_name }}.
+{% if site_url %}{{ site_url }}{% endif %}

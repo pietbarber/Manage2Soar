@@ -9,6 +9,7 @@ from django.db.models import Count, Max
 from django.forms import inlineformset_factory
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_protect
@@ -491,27 +492,25 @@ def _notify_member_managers_of_contact(contact_submission):
             contact_submission.message
         )  # Keep original formatting for message content
 
-        message = f"""
-A new visitor has contacted the club through the website.
+        # Prepare context for email templates
+        from siteconfig.models import SiteConfiguration
 
-Visitor Details:
-- Name: {safe_name}
-- Email: {safe_email}
-- Phone: {safe_phone}
-- Subject: {safe_user_subject}
-- Submitted: {contact_submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}
+        config = SiteConfiguration.objects.first()
 
-Message:
-{safe_message}
+        context = {
+            "contact": contact_submission,
+            "submitted_at": contact_submission.submitted_at.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+            "admin_url": f"{settings.SITE_URL if hasattr(settings, 'SITE_URL') else f'https://{site_config.domain_name}' if site_config and site_config.domain_name else 'https://localhost:8000'}/admin/cms/visitorcontact/{contact_submission.pk}/change/",
+            "club_name": config.club_name if config else "Club",
+            "club_logo_url": config.logo.url if config and config.logo else None,
+            "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
+        }
 
----
-You can respond directly to this visitor at: {safe_email}
-
-To manage this contact in the admin interface:
-{settings.SITE_URL if hasattr(settings, 'SITE_URL') else f'https://{site_config.domain_name}' if site_config and site_config.domain_name else 'https://localhost:8000'}/admin/cms/visitorcontact/{contact_submission.pk}/change/
-
-This message was sent automatically by the club website contact form.
-        """.strip()
+        # Render HTML and plain text templates
+        html_message = render_to_string("cms/emails/visitor_contact.html", context)
+        text_message = render_to_string("cms/emails/visitor_contact.txt", context)
 
         # Send email to each member manager
         recipient_emails = [
@@ -521,9 +520,10 @@ This message was sent automatically by the club website contact form.
         if recipient_emails:
             send_mail(
                 subject=subject,
-                message=message,
+                message=text_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=recipient_emails,
+                html_message=html_message,
                 fail_silently=False,  # We want to know if email fails
             )
 

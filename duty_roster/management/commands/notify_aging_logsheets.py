@@ -1,10 +1,12 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from logsheet.models import Logsheet
 from notifications.models import Notification
+from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
@@ -121,13 +123,33 @@ Thank you for your attention to this matter.
 
 - Manage2Soar Automated Notifications"""
 
+        # Prepare context for email templates
+        config = SiteConfiguration.objects.first()
+        context = {
+            "member": member,
+            "logsheet_list": logsheet_list,
+            "logsheet_url": f"{settings.SITE_URL}/logsheet/",
+            "club_name": config.club_name if config else "Club",
+            "club_logo_url": config.logo.url if config and config.logo else None,
+            "site_url": settings.SITE_URL if hasattr(settings, "SITE_URL") else None,
+        }
+
+        # Render HTML and plain text templates
+        html_message = render_to_string(
+            "duty_roster/emails/aging_logsheets.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/aging_logsheets.txt", context
+        )
+
         try:
             # Send email notification
             send_mail(
                 subject=subject,
-                message=message,
+                message=text_message,
                 from_email="noreply@default.manage2soar.com",
                 recipient_list=[member.email],
+                html_message=html_message,
                 fail_silently=False,
             )
 
