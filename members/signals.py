@@ -87,7 +87,7 @@ def _notify_member_managers_of_visiting_pilot(member):
                     .replace("\n", " ")
                 )
                 safe_ssa = (
-                    (member.ssa_number or "Not provided")
+                    (member.SSA_member_number or "Not provided")
                     .replace("\r", "")
                     .replace("\n", " ")
                 )

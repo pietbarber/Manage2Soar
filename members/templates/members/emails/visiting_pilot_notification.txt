@@ -8,7 +8,7 @@ PILOT INFORMATION
 Name:              {{ member.first_name }} {{ member.last_name }}
 Email:             {{ member.email|default:"Not provided" }}
 Home Club:         {{ member.home_club|default:"Not specified" }}
-SSA Number:        {{ member.ssa_number|default:"Not provided" }}
+SSA Number:        {{ member.SSA_member_number|default:"Not provided" }}
 Glider Rating:     {{ glider_rating|default:"Not specified" }}
 Status:            {{ status_text|title }}
 Registration Time: {{ registration_time }}
