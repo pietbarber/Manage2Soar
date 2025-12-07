@@ -75,7 +75,7 @@
 /* Don't override height for PDF containers */
 .cms-content .pdf-container iframe {
     min-height: 600px;
-    /* Preserve the specified height for PDFs */
+    /* Ensure minimum height for PDFs; actual height is set via inline style */
 }
 
 /* Pre and code blocks */
