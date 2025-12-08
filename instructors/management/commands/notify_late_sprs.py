@@ -181,7 +181,7 @@ class Command(BaseCronJobCommand):
             subject = f"URGENT: {subject}"
 
         # Prepare template context
-        config = SiteConfiguration.get_solo()
+        config = SiteConfiguration.objects.first()
         site_url = getattr(settings, "SITE_URL", "").rstrip("/")
         instruction_reports_url = (
             f"{site_url}/instructors/" if site_url else "/instructors/"
@@ -203,7 +203,7 @@ class Command(BaseCronJobCommand):
             "instructor_name": instructor.full_display_name,
             "escalation_groups": formatted_escalation_groups,
             "highest_urgency": highest_urgency,
-            "club_name": config.club_name,
+            "club_name": config.club_name if config else "Soaring Club",
             "club_logo_url": get_absolute_club_logo_url(config),
             "instruction_reports_url": instruction_reports_url,
         }
@@ -216,12 +216,22 @@ class Command(BaseCronJobCommand):
             "instructors/emails/late_sprs_notification.txt", context
         )
 
+        # Build from email
+        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+        if "@" in default_from:
+            domain = default_from.split("@")[-1]
+            from_email = f"noreply@{domain}"
+        elif config and config.domain_name:
+            from_email = f"noreply@{config.domain_name}"
+        else:
+            from_email = "noreply@manage2soar.com"
+
         try:
             # Send email notification
             send_mail(
                 subject=subject,
                 message=text_message,
-                from_email="noreply@default.manage2soar.com",
+                from_email=from_email,
                 recipient_list=[instructor.email] if instructor.email else [],
                 html_message=html_message,
                 fail_silently=False,
