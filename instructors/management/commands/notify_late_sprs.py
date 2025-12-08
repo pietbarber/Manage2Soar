@@ -2,13 +2,16 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.db.models import Q
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from instructors.models import InstructionReport
 from logsheet.models import Flight
 from members.models import Member
 from notifications.models import Notification
+from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -159,73 +162,78 @@ class Command(BaseCronJobCommand):
                 escalation_groups[level] = []
             escalation_groups[level].append(spr)
 
-        # Build email content
+        # Determine overall urgency for subject line
+        escalation_order = ["FINAL", "URGENT", "WARNING", "REMINDER", "NOTICE"]
+        highest_urgency = "NOTICE"  # Default
+        for level in escalation_order:
+            if level in escalation_groups:
+                highest_urgency = level
+                break
+
+        # Build subject with urgency prefix
         subject = (
             f"Student Progress Report Reminder - {len(spr_data)} Overdue Report(s)"
         )
 
-        # Determine overall urgency for subject line
-        if any(spr["escalation_level"] == "FINAL" for spr in spr_data):
+        if highest_urgency == "FINAL":
             subject = f"FINAL NOTICE: {subject}"
-        elif any(spr["escalation_level"] == "URGENT" for spr in spr_data):
+        elif highest_urgency == "URGENT":
             subject = f"URGENT: {subject}"
 
-        message_lines = [
-            f"Hello {instructor.full_display_name},",
-            "",
-            "The following Student Progress Reports (SPRs) are overdue:",
-        ]
-
-        # Process each escalation level in order of severity
-        escalation_order = ["FINAL", "URGENT", "WARNING", "REMINDER", "NOTICE"]
-
-        for level in escalation_order:
-            if level not in escalation_groups:
-                continue
-
-            sprs = escalation_groups[level]
-
-            # Add level-specific messaging
-            level_messages = {
-                "FINAL": "🚨 FINAL NOTICE (30+ days overdue) - No SPRs will be allowed after deadline:",
-                "URGENT": "⚠️ URGENT (25+ days overdue):",
-                "WARNING": "⚠️ WARNING (21+ days overdue):",
-                "REMINDER": "📝 REMINDER (14+ days overdue):",
-                "NOTICE": "📌 NOTICE (7+ days overdue):",
-            }
-
-            message_lines.append("")
-            message_lines.append(level_messages[level])
-
-            for spr in sprs:
-                flight_date_str = spr["flight_date"].strftime("%A, %B %d, %Y")
-                message_lines.append(
-                    f"- {spr['student'].full_display_name} on {flight_date_str} ({spr['days_overdue']} days ago)"
-                )
-
-        message_lines.extend(
-            [
-                "",
-                "Please log into Manage2Soar to file these Student Progress Reports as soon as possible.",
-                "SPRs are essential for tracking student progress and maintaining training records.",
-                "",
-                f"Instruction Reports: {settings.SITE_URL}/instructors/",
-                "",
-                "Thank you for your prompt attention to this matter.",
-                "",
-                "- Manage2Soar Automated Notifications",
-            ]
+        # Prepare template context
+        config = SiteConfiguration.objects.first()
+        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
+        instruction_reports_url = (
+            f"{site_url}/instructors/" if site_url else "/instructors/"
         )
 
-        message = "\n".join(message_lines)
+        # Format SPR data for templates
+        formatted_escalation_groups = {}
+        for level, sprs in escalation_groups.items():
+            formatted_escalation_groups[level] = [
+                {
+                    "student_name": spr["student"].full_display_name,
+                    "flight_date": spr["flight_date"].strftime("%A, %B %d, %Y"),
+                    "days_overdue": spr["days_overdue"],
+                }
+                for spr in sprs
+            ]
+
+        context = {
+            "instructor_name": instructor.full_display_name,
+            "escalation_groups": formatted_escalation_groups,
+            "highest_urgency": highest_urgency,
+            "club_name": config.club_name if config else "Soaring Club",
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "instruction_reports_url": instruction_reports_url,
+        }
+
+        # Render email templates
+        html_message = render_to_string(
+            "instructors/emails/late_sprs_notification.html", context
+        )
+        text_message = render_to_string(
+            "instructors/emails/late_sprs_notification.txt", context
+        )
+
+        # Build from email
+        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+        if "@" in default_from:
+            domain = default_from.split("@")[-1]
+            from_email = f"noreply@{domain}"
+        elif config and config.domain_name:
+            from_email = f"noreply@{config.domain_name}"
+        else:
+            from_email = "noreply@manage2soar.com"
 
         try:
             # Send email notification
             send_mail(
                 subject=subject,
-                message=message,
-                from_email="noreply@default.manage2soar.com",
+                message=text_message,
+                from_email=from_email,
                 recipient_list=[instructor.email] if instructor.email else [],
+                html_message=html_message,
                 fail_silently=False,
             )
 
@@ -237,13 +245,6 @@ class Command(BaseCronJobCommand):
                 "REMINDER": "📝",
                 "NOTICE": "📌",
             }
-
-            # Get the highest urgency level
-            highest_urgency = "NOTICE"  # Default
-            for level in escalation_order:
-                if level in escalation_groups:
-                    highest_urgency = level
-                    break
 
             emoji = urgency_emoji.get(highest_urgency, "📝")
 
