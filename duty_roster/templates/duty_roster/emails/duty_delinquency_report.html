@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>Monthly Duty Delinquency Report</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="padding: 30px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">Monthly Duty Delinquency Report</h1>
+                            <p style="margin: 10px 0 0 0; color: #e0e0e0; font-size: 16px;">{{ report_date }}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Summary Banner -->
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #fff3cd; border-left: 5px solid #ffc107;">
+                            <p style="margin: 0; color: #856404; font-size: 18px; font-weight: bold;">
+                                📊 {{ delinquent_count }} Member(s) Need Follow-Up
+                            </p>
+                            <p style="margin: 5px 0 0 0; color: #856404; font-size: 14px;">
+                                Active flyers who have not performed duty in the last {{ lookback_months }} month(s)
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 25px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                The following members have been actively flying but have not performed any duty in the last {{ lookback_months }} months:
+                            </p>
+
+                            <!-- Delinquent Members List -->
+                            {% for delinquent in delinquents %}
+                            <div style="margin: 0 0 25px 0; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #dc3545; border-radius: 4px;">
+                                <h3 style="margin: 0 0 15px 0; color: #dc3545; font-size: 18px; font-weight: bold;">
+                                    {{ forloop.counter }}. {{ delinquent.name }}
+                                </h3>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 4px 0; color: #666666; font-size: 14px; width: 180px;">
+                                            <strong>Email:</strong>
+                                        </td>
+                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                            {{ delinquent.email }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                            <strong>Membership Status:</strong>
+                                        </td>
+                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                            {{ delinquent.membership_status }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                            <strong>Member for:</strong>
+                                        </td>
+                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                            {{ delinquent.membership_duration }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                            <strong>Flights in period:</strong>
+                                        </td>
+                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                            {{ delinquent.flight_count }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                            <strong>Most recent flight:</strong>
+                                        </td>
+                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                            {{ delinquent.most_recent_flight }}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            {% endfor %}
+
+                            <p style="margin: 25px 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Please follow up with these members regarding their duty obligations.
+                            </p>
+
+                            <!-- CTA Buttons -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 30px 0; border-collapse: collapse; width: 100%;">
+                                <tr>
+                                    <td style="padding: 10px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="border-radius: 5px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
+                                                    <a href="{{ detail_report_url }}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold;">
+                                                        📊 View Detailed Report
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Report Criteria -->
+                            <div style="margin: 25px 0; padding: 20px; background-color: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 4px;">
+                                <h4 style="margin: 0 0 10px 0; color: #004085; font-size: 16px; font-weight: bold;">
+                                    Report Criteria
+                                </h4>
+                                <ul style="margin: 0; padding: 0 0 0 20px; color: #004085; font-size: 14px; line-height: 1.8;">
+                                    <li>Members with 3+ months of membership</li>
+                                    <li>Members who have flown 3+ times in the last {{ lookback_months }} months</li>
+                                    <li>Members who have NOT performed any duty in the last {{ lookback_months }} months</li>
+                                </ul>
+                            </div>
+
+                            <!-- Additional Resources -->
+                            <div style="margin: 25px 0 0 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                                <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; font-weight: bold;">Additional Resources:</p>
+                                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                    • <a href="{{ member_directory_url }}" style="color: #667eea; text-decoration: none;">Member Directory</a><br>
+                                    • <a href="{{ duty_roster_url }}" style="color: #667eea; text-decoration: none;">Duty Roster</a>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0; color: #6c757d; font-size: 12px; line-height: 1.5;">
+                                This is an automated monthly report from {{ club_name }}<br>
+                                Manage2Soar Automated Reports
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

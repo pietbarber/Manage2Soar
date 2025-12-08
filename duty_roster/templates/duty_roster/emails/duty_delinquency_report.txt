@@ -1,0 +1,36 @@
+Monthly Duty Delinquency Report
+{{ report_date }}
+================================================================================
+
+📊 {{ delinquent_count }} Member(s) Need Follow-Up
+
+Active flyers who have not performed duty in the last {{ lookback_months }} month(s)
+
+The following members have been actively flying but have not performed any
+duty in the last {{ lookback_months }} months:
+
+{% for delinquent in delinquents %}
+{{ forloop.counter }}. {{ delinquent.name }}
+   • Email: {{ delinquent.email }}
+   • Membership Status: {{ delinquent.membership_status }}
+   • Member for: {{ delinquent.membership_duration }}
+   • Flights in period: {{ delinquent.flight_count }}
+   • Most recent flight: {{ delinquent.most_recent_flight }}
+
+{% endfor %}
+Please follow up with these members regarding their duty obligations.
+
+📊 DETAILED REPORT WITH MEMBER PHOTOS AND CONTACT INFO:
+   {{ detail_report_url }}
+
+Criteria for this report:
+• Members with 3+ months of membership
+• Members who have flown 3+ times in the last {{ lookback_months }} months
+• Members who have NOT performed any duty in the last {{ lookback_months }} months
+
+Additional Resources:
+• Member Directory: {{ member_directory_url }}
+• Duty Roster: {{ duty_roster_url }}
+
+- Manage2Soar Automated Reports
+  {{ club_name }}
