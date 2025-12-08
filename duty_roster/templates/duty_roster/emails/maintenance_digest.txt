@@ -1,0 +1,15 @@
+🔧 Maintenance Summary for {{ report_date }}
+================================================================================
+
+{{ issue_count }} Open Maintenance Issue(s)
+
+{% for issue in issues %}
+- {{ issue.aircraft }}: {{ issue.description }} (Reported: {{ issue.report_date }}) [{% if issue.grounded %}GROUNDED{% else %}Operational{% endif %}]
+{% endfor %}
+
+Total Open Issues: {{ issue_count }}
+
+Maintenance Dashboard: {{ maintenance_dashboard_url }}
+
+- Manage2Soar Automated Reports
+  {{ club_name }}

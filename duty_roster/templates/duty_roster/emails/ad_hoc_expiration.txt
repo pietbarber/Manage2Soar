@@ -1,0 +1,18 @@
+⚠️ Operations Cancelled - Insufficient Crew
+================================================================================
+
+CANCELLED: Ad-Hoc Operations for {{ ops_date }}
+
+STATUS: CANCELLED - Insufficient Crew
+
+The ad-hoc operations scheduled for {{ ops_date }} have been automatically
+cancelled because the confirmation deadline has passed without achieving
+minimum crew requirements (at least one tow pilot and one duty officer).
+
+To schedule future ad-hoc operations, please ensure minimum crew commits
+before the deadline (typically 24 hours before the scheduled date).
+
+View Duty Roster: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

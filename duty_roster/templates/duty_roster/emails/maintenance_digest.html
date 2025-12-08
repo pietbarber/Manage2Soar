@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>Maintenance Summary</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 30px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}" style="max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">🔧 Maintenance Summary</h1>
+                            <p style="margin: 10px 0 0 0; color: #e0e0e0; font-size: 16px;">{{ report_date }}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Summary Banner -->
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #fff3cd; border-left: 5px solid #ffc107;">
+                            <p style="margin: 0; color: #856404; font-size: 18px; font-weight: bold;">
+                                {{ issue_count }} Open Maintenance Issue(s)
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            {% for issue in issues %}
+                            {% if issue.grounded %}
+                            <!-- Grounded Issue Card -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 20px 0; background-color: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <h3 style="margin: 0 0 10px 0; color: #721c24; font-size: 16px; font-weight: bold;">
+                                            {{ issue.aircraft }} <span style="color: #dc3545; margin-left: 10px;">⚠️ GROUNDED</span>
+                                        </h3>
+                                        <p style="margin: 0 0 8px 0; color: #333333; font-size: 14px;">{{ issue.description }}</p>
+                                        <p style="margin: 0; color: #666666; font-size: 13px;">Reported: {{ issue.report_date }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% else %}
+                            <!-- Operational Issue Card -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 20px 0; background-color: #f8f9fa; border-left: 4px solid #6c757d; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <h3 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">{{ issue.aircraft }}</h3>
+                                        <p style="margin: 0 0 8px 0; color: #333333; font-size: 14px;">{{ issue.description }}</p>
+                                        <p style="margin: 0; color: #666666; font-size: 13px;">Reported: {{ issue.report_date }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                            {% endfor %}
+
+                            <!-- CTA Button -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 30px auto; border-collapse: collapse;">
+                                <tr>
+                                    <td style="border-radius: 5px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
+                                        <a href="{{ maintenance_dashboard_url }}" style="display: inline-block; padding: 15px 30px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold;">
+                                            View Maintenance Dashboard
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="margin: 0; color: #6c757d; font-size: 12px; line-height: 1.5;">
+                                This is an automated weekly maintenance report from {{ club_name }}<br>
+                                Manage2Soar Automated Reports
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
