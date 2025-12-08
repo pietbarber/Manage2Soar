@@ -446,7 +446,6 @@ def ops_intent_toggle(request, year, month, day):
         surge_inst = assignment.surge_instructor
 
         # do we need surge? (you choose your own threshold)
-        need_surge = len(students) > 3
 
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
