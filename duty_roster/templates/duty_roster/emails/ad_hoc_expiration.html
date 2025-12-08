@@ -23,8 +23,8 @@
                             <tr>
                             <td align="center">
                             <![endif]-->
-                            {% if logo_url %}
-                            <img src="{{ logo_url }}" alt="{{ club_name }} Logo" width="80" height="80" style="display: block; margin-bottom: 15px; border-radius: 50%; background-color: white; padding: 10px;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }} Logo" width="80" height="80" style="display: block; margin-bottom: 15px; border-radius: 50%; background-color: white; padding: 10px;">
                             {% endif %}
                             <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">Operations Cancelled</h1>
                             <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">Insufficient crew for scheduled operations</p>
@@ -98,9 +98,9 @@
                                         <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">View Duty Roster</center>
                                         </v:roundrect>
                                         <![endif]-->
-                                        <![if !mso]>
+                                        <!--[if !mso]
                                         <a href="{{ roster_url }}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">View Duty Roster</a>
-                                        <![endif]>
+                                        <![endif]-->
                                     </td>
                                 </tr>
                             </table>
