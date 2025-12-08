@@ -29,33 +29,13 @@ class Command(BaseCronJobCommand):
 
         cancelled_count = 0
 
-        # Prepare configuration
-        config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-        roster_url = (
-            f"{site_url}/duty_roster/calendar/"
-            if site_url
-            else "/duty_roster/calendar/"
+        # Get configuration using helper functions
+        from duty_roster.utils.email import get_email_config, get_mailing_list
+
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "MEMBERS_MAILING_LIST", "members", email_config["config"]
         )
-
-        # Build from email
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
-
-        # Build recipient list
-        members_list = getattr(settings, "MEMBERS_MAILING_LIST", "") or ""
-        if "@" in members_list:
-            recipient_list = [members_list]
-        elif config and config.domain_name:
-            recipient_list = [f"members@{config.domain_name}"]
-        else:
-            recipient_list = ["members@manage2soar.com"]
 
         for assignment in assignments:
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
@@ -64,9 +44,9 @@ class Command(BaseCronJobCommand):
                 # Prepare template context
                 context = {
                     "ops_date": ops_date,
-                    "club_name": config.club_name if config else "Soaring Club",
-                    "club_logo_url": get_absolute_club_logo_url(config),
-                    "roster_url": roster_url,
+                    "club_name": email_config["club_name"],
+                    "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                    "roster_url": email_config["roster_url"],
                 }
 
                 # Render email templates
@@ -78,9 +58,9 @@ class Command(BaseCronJobCommand):
                 )
 
                 send_mail(
-                    subject=f"[{config.club_name if config else 'Soaring Club'}] Ad-Hoc Ops Cancelled - {ops_date}",
+                    subject=f"[{email_config['club_name']}] Ad-Hoc Ops Expired - {ops_date}",
                     message=text_message,
-                    from_email=from_email,
+                    from_email=email_config["from_email"],
                     recipient_list=recipient_list,
                     html_message=html_message,
                 )

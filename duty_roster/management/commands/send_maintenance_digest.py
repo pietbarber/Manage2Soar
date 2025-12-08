@@ -61,21 +61,20 @@ class Command(BaseCommand):
             )
             return
 
-        # Prepare template context
-        config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
+        # Prepare template context using helper function
+        from duty_roster.utils.email import get_email_config
+
+        email_config = get_email_config()
+        site_url = email_config["site_url"]
         maintenance_url = f"{site_url}/maintenance/" if site_url else "/maintenance/"
 
         context = {
             "report_date": today.strftime("%A, %B %d, %Y"),
-            "grounded_issues": grounded_issues,
-            "operational_issues": operational_issues,
-            "total_count": open_issues.count(),
-            "grounded_count": len(grounded_issues),
-            "operational_count": len(operational_issues),
-            "club_name": config.club_name if config else "Soaring Club",
-            "club_logo_url": get_absolute_club_logo_url(config),
-            "maintenance_url": maintenance_url,
+            "issues": grounded_issues + operational_issues,
+            "issue_count": open_issues.count(),
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+            "maintenance_dashboard_url": maintenance_url,
         }
 
         # Render email templates
@@ -86,22 +85,12 @@ class Command(BaseCommand):
             "duty_roster/emails/maintenance_digest.txt", context
         )
 
-        # Build from email
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
-
-        subject = f"[{config.club_name if config else 'Soaring Club'}] Maintenance Summary - {today.strftime('%B %d')}"
+        subject = f"[{email_config['club_name']}] Maintenance Summary - {today.strftime('%B %d')}"
 
         send_mail(
             subject=subject,
             message=text_message,
-            from_email=from_email,
+            from_email=email_config["from_email"],
             recipient_list=list(recipients),
             html_message=html_message,
         )
