@@ -48,6 +48,60 @@ from .roster_generator import generate_roster, is_within_operational_season
 logger = logging.getLogger("duty_roster.views")
 
 
+def get_email_config():
+    """Get common email configuration settings for all duty roster emails.
+
+    Returns:
+        dict: Configuration containing config, site_url, roster_url, from_email, and club_name
+    """
+    config = SiteConfiguration.objects.first()
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/")
+    roster_url = (
+        f"{site_url}/duty_roster/calendar/" if site_url else "/duty_roster/calendar/"
+    )
+
+    # Build from_email
+    default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+    if "@" in default_from:
+        domain = default_from.split("@")[-1]
+        from_email = f"noreply@{domain}"
+    elif config and config.domain_name:
+        from_email = f"noreply@{config.domain_name}"
+    else:
+        from_email = "noreply@manage2soar.com"
+
+    return {
+        "config": config,
+        "site_url": site_url,
+        "roster_url": roster_url,
+        "from_email": from_email,
+        "club_name": config.club_name if config else "Soaring Club",
+    }
+
+
+def get_mailing_list(setting_name, fallback_prefix, config=None):
+    """Get mailing list from settings or construct from config domain.
+
+    Args:
+        setting_name: Name of the settings variable (e.g., 'INSTRUCTORS_MAILING_LIST')
+        fallback_prefix: Email prefix to use (e.g., 'instructors')
+        config: SiteConfiguration object (optional, will fetch if not provided)
+
+    Returns:
+        list: List containing the mailing list address
+    """
+    if config is None:
+        config = SiteConfiguration.objects.first()
+
+    mailing_list = getattr(settings, setting_name, "") or ""
+    if "@" in mailing_list:
+        return [mailing_list]
+    elif config and config.domain_name:
+        return [f"{fallback_prefix}@{config.domain_name}"]
+    else:
+        return [f"{fallback_prefix}@manage2soar.com"]
+
+
 def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
     trigger_data = {"refreshCalendar": {"year": int(year), "month": int(month)}}
@@ -453,23 +507,7 @@ def ops_intent_toggle(request, year, month, day):
 
         if recipients:
             # Prepare template context
-            config = SiteConfiguration.objects.first()
-            site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-            roster_url = (
-                f"{site_url}/duty_roster/calendar/"
-                if site_url
-                else "/duty_roster/calendar/"
-            )
-
-            # Build from email
-            default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-            if "@" in default_from:
-                domain = default_from.split("@")[-1]
-                from_email = f"noreply@{domain}"
-            elif config and config.domain_name:
-                from_email = f"noreply@{config.domain_name}"
-            else:
-                from_email = "noreply@manage2soar.com"
+            email_config = get_email_config()
 
             context = {
                 "student_name": request.user.full_display_name,
@@ -477,9 +515,9 @@ def ops_intent_toggle(request, year, month, day):
                     duty_inst.full_display_name if duty_inst else "Instructor"
                 ),
                 "ops_date": day_date.strftime("%A, %B %d, %Y"),
-                "club_name": config.club_name if config else "Soaring Club",
-                "club_logo_url": get_absolute_club_logo_url(config),
-                "roster_url": roster_url,
+                "club_name": email_config["club_name"],
+                "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                "roster_url": email_config["roster_url"],
             }
 
             # Render email templates
@@ -491,9 +529,9 @@ def ops_intent_toggle(request, year, month, day):
             )
 
             send_mail(
-                subject=f"[{config.club_name if config else 'Soaring Club'}] Student Plans to Fly - {day_date:%b %d}",
+                subject=f"[{email_config['club_name']}] Student Plans to Fly - {day_date:%b %d}",
                 message=text_message,
-                from_email=from_email,
+                from_email=email_config["from_email"],
                 recipient_list=recipients,
                 html_message=html_message,
                 fail_silently=True,
@@ -516,31 +554,15 @@ def ops_intent_toggle(request, year, month, day):
             duty_inst = assignment.instructor
             if duty_inst and duty_inst.email:
                 # Prepare template context
-                config = SiteConfiguration.objects.first()
-                site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-                roster_url = (
-                    f"{site_url}/duty_roster/calendar/"
-                    if site_url
-                    else "/duty_roster/calendar/"
-                )
-
-                # Build from email
-                default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-                if "@" in default_from:
-                    domain = default_from.split("@")[-1]
-                    from_email = f"noreply@{domain}"
-                elif config and config.domain_name:
-                    from_email = f"noreply@{config.domain_name}"
-                else:
-                    from_email = "noreply@manage2soar.com"
+                email_config = get_email_config()
 
                 context = {
                     "student_name": request.user.full_display_name,
                     "instructor_name": duty_inst.full_display_name,
                     "ops_date": day_date.strftime("%A, %B %d, %Y"),
-                    "club_name": config.club_name if config else "Soaring Club",
-                    "club_logo_url": get_absolute_club_logo_url(config),
-                    "roster_url": roster_url,
+                    "club_name": email_config["club_name"],
+                    "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                    "roster_url": email_config["roster_url"],
                 }
 
                 # Render email templates
@@ -552,9 +574,9 @@ def ops_intent_toggle(request, year, month, day):
                 )
 
                 send_mail(
-                    subject=f"[{config.club_name if config else 'Soaring Club'}] Instruction Cancellation - {day_date:%b %d}",
+                    subject=f"[{email_config['club_name']}] Instruction Cancellation - {day_date:%b %d}",
                     message=text_message,
-                    from_email=from_email,
+                    from_email=email_config["from_email"],
                     recipient_list=[duty_inst.email],
                     html_message=html_message,
                     fail_silently=True,
@@ -601,39 +623,17 @@ def maybe_notify_surge_instructor(day_date):
 
     if instruction_count > 3:
         # Prepare template context
-        config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-        roster_url = (
-            f"{site_url}/duty_roster/calendar/"
-            if site_url
-            else "/duty_roster/calendar/"
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "INSTRUCTORS_MAILING_LIST", "instructors", email_config["config"]
         )
-
-        # Build from email
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
-
-        # Build recipient list
-        instructors_list = getattr(settings, "INSTRUCTORS_MAILING_LIST", "") or ""
-        if "@" in instructors_list:
-            recipient_list = [instructors_list]
-        elif config and config.domain_name:
-            recipient_list = [f"instructors@{config.domain_name}"]
-        else:
-            recipient_list = ["instructors@manage2soar.com"]
 
         context = {
             "student_count": instruction_count,
             "ops_date": day_date.strftime("%A, %B %d, %Y"),
-            "club_name": config.club_name if config else "Soaring Club",
-            "club_logo_url": get_absolute_club_logo_url(config),
-            "roster_url": roster_url,
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+            "roster_url": email_config["roster_url"],
         }
 
         # Render email templates
@@ -645,9 +645,9 @@ def maybe_notify_surge_instructor(day_date):
         )
 
         send_mail(
-            subject=f"[{config.club_name if config else 'Soaring Club'}] Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
+            subject=f"[{email_config['club_name']}] Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
             message=text_message,
-            from_email=from_email,
+            from_email=email_config["from_email"],
             recipient_list=recipient_list,
             html_message=html_message,
             fail_silently=True,
@@ -668,39 +668,17 @@ def maybe_notify_surge_towpilot(day_date):
 
     if tow_count >= 6:
         # Prepare template context
-        config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-        roster_url = (
-            f"{site_url}/duty_roster/calendar/"
-            if site_url
-            else "/duty_roster/calendar/"
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "TOWPILOTS_MAILING_LIST", "towpilots", email_config["config"]
         )
-
-        # Build from email
-        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-        if "@" in default_from:
-            domain = default_from.split("@")[-1]
-            from_email = f"noreply@{domain}"
-        elif config and config.domain_name:
-            from_email = f"noreply@{config.domain_name}"
-        else:
-            from_email = "noreply@manage2soar.com"
-
-        # Build recipient list
-        towpilots_list = getattr(settings, "TOWPILOTS_MAILING_LIST", "") or ""
-        if "@" in towpilots_list:
-            recipient_list = [towpilots_list]
-        elif config and config.domain_name:
-            recipient_list = [f"towpilots@{config.domain_name}"]
-        else:
-            recipient_list = ["towpilots@manage2soar.com"]
 
         context = {
             "tow_count": tow_count,
             "ops_date": day_date.strftime("%A, %B %d, %Y"),
-            "club_name": config.club_name if config else "Soaring Club",
-            "club_logo_url": get_absolute_club_logo_url(config),
-            "roster_url": roster_url,
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+            "roster_url": email_config["roster_url"],
         }
 
         # Render email templates
@@ -712,9 +690,9 @@ def maybe_notify_surge_towpilot(day_date):
         )
 
         send_mail(
-            subject=f"[{config.club_name if config else 'Soaring Club'}] Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
+            subject=f"[{email_config['club_name']}] Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
             message=text_message,
-            from_email=from_email,
+            from_email=email_config["from_email"],
             recipient_list=recipient_list,
             html_message=html_message,
             fail_silently=True,
@@ -934,38 +912,19 @@ def calendar_cancel_ops_day(request, year, month, day):
     canceller_name = request.user.full_display_name
 
     # Get configuration
-    config = SiteConfiguration.objects.first()
-    club_name = config.club_name if config else "Manage2Soar"
-    site_url = (
-        f"https://{config.domain_name}"
-        if config and config.domain_name
-        else "https://default.manage2soar.com"
+    email_config = get_email_config()
+    recipient_list = get_mailing_list(
+        "MEMBERS_MAILING_LIST", "members", email_config["config"]
     )
-    roster_url = f"{site_url}/duty_roster/"
-
-    # Build from_email
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
-    if not from_email and config and config.domain_name:
-        from_email = f"noreply@{config.domain_name}"
-    if not from_email:
-        from_email = "noreply@default.manage2soar.com"
-
-    # Build recipient_list
-    members_list = getattr(settings, "MEMBERS_MAILING_LIST", None)
-    if not members_list and config and config.domain_name:
-        members_list = f"members@{config.domain_name}"
-    if not members_list:
-        members_list = "members@default.manage2soar.com"
-    recipient_list = [members_list]
 
     # Render email
     context = {
-        "ops_date": ops_date,
+        "ops_date": ops_date.strftime("%A, %B %d, %Y"),
         "canceller_name": canceller_name,
         "cancel_reason": reason,
-        "club_name": club_name,
-        "club_logo_url": get_absolute_club_logo_url(config),
-        "roster_url": roster_url,
+        "club_name": email_config["club_name"],
+        "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+        "roster_url": email_config["roster_url"],
     }
     html_message = render_to_string(
         "duty_roster/emails/operations_cancelled.html", context
@@ -976,9 +935,9 @@ def calendar_cancel_ops_day(request, year, month, day):
 
     # Send email
     send_mail(
-        subject=f"[{club_name}] Operations Canceled - {ops_date.strftime('%B %d')}",
+        subject=f"[{email_config['club_name']}] Operations Canceled - {ops_date.strftime('%B %d')}",
         message=text_message,
-        from_email=from_email,
+        from_email=email_config["from_email"],
         recipient_list=recipient_list,
         html_message=html_message,
     )

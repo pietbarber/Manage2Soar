@@ -27,7 +27,7 @@ def notify_ops_status(assignment):
         site_url = (
             f"https://{config.domain_name}"
             if config and config.domain_name
-            else settings.SITE_URL
+            else getattr(settings, "SITE_URL", "").rstrip("/")
         )
         roster_url = f"{site_url}/duty_roster/"
 
@@ -60,7 +60,7 @@ def notify_ops_status(assignment):
         do_title = get_role_title("duty_officer") or "Duty Officer"
 
         context = {
-            "ops_date": assignment.date,
+            "ops_date": ops_date,
             "tow_title": tow_title,
             "do_title": do_title,
             "club_name": club_name,
@@ -94,10 +94,8 @@ def notify_ops_status(assignment):
             config = SiteConfiguration.objects.first()
             club_name = config.club_name if config else "Manage2Soar"
             site_url = (
-                f"https://{config.domain_name}"
-                if config and config.domain_name
-                else settings.SITE_URL
-            )
+                f"https://{config.domain_name}" if config and config.domain_name else ""
+            ).rstrip("/")
             roster_url = f"{site_url}/duty_roster/"
 
             # Build from_email
@@ -122,7 +120,7 @@ def notify_ops_status(assignment):
             do_title = get_role_title("duty_officer") or "Duty Officer"
 
             context = {
-                "ops_date": assignment.date,
+                "ops_date": ops_date,  # Use the formatted string from line 17
                 "tow_title": tow_title,
                 "do_title": do_title,
                 "club_name": club_name,
