@@ -1,0 +1,17 @@
+🚨 Surge Alert - High Student Demand on {{ ops_date }}
+================================================================================
+
+ALERT: Additional Instructors Needed
+
+{{ student_count }} students are planning to fly on {{ ops_date }}.
+
+We're experiencing high student demand and need additional instructors to ensure
+all students have the opportunity to fly. If you're available to instruct on
+this date, your help would be greatly appreciated.
+
+Please consider confirming your availability on the duty roster.
+
+Confirm Availability: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

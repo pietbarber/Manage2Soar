@@ -1,0 +1,18 @@
+✅ Ad-Hoc Operations Confirmed - {{ ops_date }}
+================================================================================
+
+Great news! Ad-hoc operations for {{ ops_date }} have been confirmed.
+
+MINIMUM CREW ACHIEVED:
+✓ Tow Pilot: Confirmed
+✓ Duty Officer: Confirmed
+
+We've achieved minimum crew and operations will proceed as scheduled.
+
+Check the duty roster to see the full crew list and add yourself if you'd
+like to join us for flying!
+
+View Duty Roster: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

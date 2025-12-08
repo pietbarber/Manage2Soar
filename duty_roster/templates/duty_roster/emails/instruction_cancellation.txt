@@ -1,0 +1,14 @@
+⚠️ Instruction Cancelled - {{ ops_date }}
+================================================================================
+
+Hi {{ instructor_name }},
+
+Your student {{ student_name }} has cancelled their flight intent for {{ ops_date }}.
+
+You may want to adjust your instructional availability or reach out to confirm
+alternate scheduling.
+
+View Duty Roster: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

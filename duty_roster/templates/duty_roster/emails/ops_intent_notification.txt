@@ -1,0 +1,15 @@
+👨‍🎓 Student Flight Intent - {{ ops_date }}
+================================================================================
+
+Hi {{ instructor_name }},
+
+Your student {{ student_name }} has indicated their intent to fly on {{ ops_date }}.
+
+This is a courtesy notification to help you plan your instructional availability.
+If you're available to instruct, please consider confirming your attendance to
+ensure {{ student_name }} can fly as planned.
+
+View Duty Roster: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

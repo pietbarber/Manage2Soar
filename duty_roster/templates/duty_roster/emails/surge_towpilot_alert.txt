@@ -1,0 +1,17 @@
+🚨 Surge Alert - High Tow Demand on {{ ops_date }}
+================================================================================
+
+ALERT: Additional Tow Pilots Needed
+
+{{ tow_count }} members are requesting tows on {{ ops_date }}.
+
+We're experiencing high tow demand and need additional tow pilots to ensure
+all members can fly. If you're available to tow on this date, your help would
+be greatly appreciated.
+
+Please consider confirming your availability on the duty roster.
+
+Confirm Availability: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

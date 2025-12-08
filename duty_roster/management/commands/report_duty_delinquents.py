@@ -2,13 +2,16 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Count, Q
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
 from logsheet.models import Flight
 from members.models import Member
 from notifications.models import Notification
+from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -231,59 +234,73 @@ class Command(BaseCronJobCommand):
         today = now().date()
         subject = f"Monthly Duty Delinquency Report - {len(duty_delinquents)} Member(s)"
 
-        report_lines = [
-            f"Monthly Duty Delinquency Report - {today.strftime('%B %Y')}",
-            "",
-            f"The following {len(duty_delinquents)} member(s) have been actively flying but have not performed any duty in the last {lookback_months} months:",
-            "",
-        ]
+        # Prepare template context
+        config = SiteConfiguration.objects.first()
+        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
+
+        # Build URLs
+        detail_report_url = (
+            f"{site_url}/duty_roster/duty-delinquents/detail/"
+            if site_url
+            else "/duty_roster/duty-delinquents/detail/"
+        )
+        member_directory_url = f"{site_url}/members/" if site_url else "/members/"
+        duty_roster_url = f"{site_url}/duty_roster/" if site_url else "/duty_roster/"
 
         # Sort by flight count (most active first)
         duty_delinquents.sort(key=lambda x: x["flight_count"], reverse=True)
 
-        for i, delinquent in enumerate(duty_delinquents, 1):
-            member = delinquent["member"]
-            report_lines.extend(
-                [
-                    f"{i}. {member.full_display_name}",
-                    f"   • Email: {member.email or 'No email on file'}",
-                    f"   • Membership Status: {member.membership_status}",
-                    f"   • Member for: {delinquent['membership_duration']}",
-                    f"   • Flights in period: {delinquent['flight_count']}",
-                    f"   • Most recent flight: {delinquent['most_recent_flight']}",
-                    "",
-                ]
-            )
+        # Format delinquent data for templates
+        formatted_delinquents = [
+            {
+                "name": delinquent["member"].full_display_name,
+                "email": delinquent["member"].email or "No email on file",
+                "membership_status": delinquent["member"].membership_status,
+                "membership_duration": delinquent["membership_duration"],
+                "flight_count": delinquent["flight_count"],
+                "most_recent_flight": delinquent["most_recent_flight"],
+            }
+            for delinquent in duty_delinquents
+        ]
 
-        report_lines.extend(
-            [
-                "Please follow up with these members regarding their duty obligations.",
-                "",
-                "📊 DETAILED REPORT WITH MEMBER PHOTOS AND CONTACT INFO:",
-                f"   {settings.SITE_URL}/duty_roster/duty-delinquents/detail/",
-                "",
-                "Criteria for this report:",
-                f"• Members with 3+ months of membership",
-                f"• Members who have flown 3+ times in the last {lookback_months} months",
-                f"• Members who have NOT performed any duty in the last {lookback_months} months",
-                "",
-                "Additional Resources:",
-                f"• Member Directory: {settings.SITE_URL}/members/",
-                f"• Duty Roster: {settings.SITE_URL}/duty_roster/",
-                "",
-                "- Manage2Soar Automated Reports",
-            ]
+        context = {
+            "report_date": today.strftime("%B %Y"),
+            "delinquent_count": len(duty_delinquents),
+            "lookback_months": lookback_months,
+            "delinquents": formatted_delinquents,
+            "club_name": config.club_name if config else "Soaring Club",
+            "club_logo_url": get_absolute_club_logo_url(config),
+            "detail_report_url": detail_report_url,
+            "member_directory_url": member_directory_url,
+            "duty_roster_url": duty_roster_url,
+        }
+
+        # Render email templates
+        html_message = render_to_string(
+            "duty_roster/emails/duty_delinquency_report.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/duty_delinquency_report.txt", context
         )
 
-        message = "\n".join(report_lines)
+        # Build from email
+        default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+        if "@" in default_from:
+            domain = default_from.split("@")[-1]
+            from_email = f"noreply@{domain}"
+        elif config and config.domain_name:
+            from_email = f"noreply@{config.domain_name}"
+        else:
+            from_email = "noreply@manage2soar.com"
 
         try:
             # Send email report
             send_mail(
                 subject=subject,
-                message=message,
-                from_email="noreply@default.manage2soar.com",
+                message=text_message,
+                from_email=from_email,
                 recipient_list=recipient_list,
+                html_message=html_message,
                 fail_silently=False,
             )
 

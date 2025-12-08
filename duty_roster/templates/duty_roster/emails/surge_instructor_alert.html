@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surge Alert - High Student Demand</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!--[if mso]>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600">
+                <tr>
+                <td>
+                <![endif]-->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header with gradient background -->
+                    <tr>
+                        <td align="center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px;">
+                            <!--[if mso]>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                            <td align="center">
+                            <![endif]-->
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }} Logo" width="80" height="80" style="display: block; margin-bottom: 15px; border-radius: 50%; background-color: white; padding: 10px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">🚨 Surge Alert</h1>
+                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">High student demand on {{ ops_date }}</p>
+                            <!--[if mso]>
+                            </td>
+                            </tr>
+                            </table>
+                            <![endif]-->
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px 20px;">
+                            <!--[if mso]>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                            <td>
+                            <![endif]-->
+
+                            <!-- Alert Banner -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px; color: #856404;">
+                                        <strong>⚠️ Additional Instructors Needed</strong>
+                                        <p style="margin: 5px 0 0 0; font-size: 14px;">{{ student_count }} students planning to fly</p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                We're experiencing high student demand on <strong>{{ ops_date }}</strong> with <strong>{{ student_count }} students</strong> indicating their intent to fly.
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                If you're available to instruct on this date, your help would be greatly appreciated to ensure all students have the opportunity to fly. Please consider confirming your availability on the duty roster.
+                            </p>
+
+                            <!-- Call to Action -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ roster_url }}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="10%" strokecolor="#667eea" fillcolor="#667eea">
+                                        <w:anchorlock/>
+                                        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Confirm Availability</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]>
+                                        <a href="{{ roster_url }}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">Confirm Availability</a>
+                                        <![endif]-->
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!--[if mso]>
+                            </td>
+                            </tr>
+                            </table>
+                            <![endif]-->
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 12px;">
+                                This is an automated notification from Manage2Soar
+                            </p>
+                            <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                                {{ club_name }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,17 @@
+❌ Operations Cancelled - {{ ops_date }}
+================================================================================
+
+CANCELLED: Operations for {{ ops_date }}
+
+Cancelled By: {{ canceller_name }}
+{% if cancel_reason %}Reason: {{ cancel_reason }}{% endif %}
+
+Operations scheduled for {{ ops_date }} have been cancelled. All duty
+assignments for this date have been removed.
+
+Please check the duty roster for upcoming flying opportunities.
+
+View Duty Roster: {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}
