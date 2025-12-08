@@ -48,53 +48,57 @@
 
                             <!-- Delinquent Members List -->
                             {% for delinquent in delinquents %}
-                            <div style="margin: 0 0 25px 0; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #dc3545; border-radius: 4px;">
-                                <h3 style="margin: 0 0 15px 0; color: #dc3545; font-size: 18px; font-weight: bold;">
-                                    {{ forloop.counter }}. {{ delinquent.name }}
-                                </h3>
-                                <table style="width: 100%; border-collapse: collapse;">
-                                    <tr>
-                                        <td style="padding: 4px 0; color: #666666; font-size: 14px; width: 180px;">
-                                            <strong>Email:</strong>
-                                        </td>
-                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
-                                            {{ delinquent.email }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
-                                            <strong>Membership Status:</strong>
-                                        </td>
-                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
-                                            {{ delinquent.membership_status }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
-                                            <strong>Member for:</strong>
-                                        </td>
-                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
-                                            {{ delinquent.membership_duration }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
-                                            <strong>Flights in period:</strong>
-                                        </td>
-                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
-                                            {{ delinquent.flight_count }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 4px 0; color: #666666; font-size: 14px;">
-                                            <strong>Most recent flight:</strong>
-                                        </td>
-                                        <td style="padding: 4px 0; color: #333333; font-size: 14px;">
-                                            {{ delinquent.most_recent_flight }}
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; background-color: #f8f9fa; border-left: 4px solid #dc3545; border-radius: 4px;">
+                                        <h3 style="margin: 0 0 15px 0; color: #dc3545; font-size: 18px; font-weight: bold;">
+                                            {{ forloop.counter }}. {{ delinquent.name }}
+                                        </h3>
+                                        <table style="width: 100%; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #666666; font-size: 14px; width: 180px;">
+                                                    <strong>Email:</strong>
+                                                </td>
+                                                <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                                    {{ delinquent.email }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                                    <strong>Membership Status:</strong>
+                                                </td>
+                                                <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                                    {{ delinquent.membership_status }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                                    <strong>Member for:</strong>
+                                                </td>
+                                                <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                                    {{ delinquent.membership_duration }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                                    <strong>Flights in period:</strong>
+                                                </td>
+                                                <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                                    {{ delinquent.flight_count }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #666666; font-size: 14px;">
+                                                    <strong>Most recent flight:</strong>
+                                                </td>
+                                                <td style="padding: 4px 0; color: #333333; font-size: 14px;">
+                                                    {{ delinquent.most_recent_flight }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
                             {% endfor %}
 
                             <p style="margin: 25px 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
@@ -119,25 +123,33 @@
                             </table>
 
                             <!-- Report Criteria -->
-                            <div style="margin: 25px 0; padding: 20px; background-color: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 4px;">
-                                <h4 style="margin: 0 0 10px 0; color: #004085; font-size: 16px; font-weight: bold;">
-                                    Report Criteria
-                                </h4>
-                                <ul style="margin: 0; padding: 0 0 0 20px; color: #004085; font-size: 14px; line-height: 1.8;">
-                                    <li>Members with 3+ months of membership</li>
-                                    <li>Members who have flown 3+ times in the last {{ lookback_months }} months</li>
-                                    <li>Members who have NOT performed any duty in the last {{ lookback_months }} months</li>
-                                </ul>
-                            </div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; background-color: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 4px;">
+                                        <h4 style="margin: 0 0 10px 0; color: #004085; font-size: 16px; font-weight: bold;">
+                                            Report Criteria
+                                        </h4>
+                                        <ul style="margin: 0; padding: 0 0 0 20px; color: #004085; font-size: 14px; line-height: 1.8;">
+                                            <li>Members with 3+ months of membership</li>
+                                            <li>Members who have flown 3+ times in the last {{ lookback_months }} months</li>
+                                            <li>Members who have NOT performed any duty in the last {{ lookback_months }} months</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
 
                             <!-- Additional Resources -->
-                            <div style="margin: 25px 0 0 0; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-                                <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; font-weight: bold;">Additional Resources:</p>
-                                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                                    • <a href="{{ member_directory_url }}" style="color: #667eea; text-decoration: none;">Member Directory</a><br>
-                                    • <a href="{{ duty_roster_url }}" style="color: #667eea; text-decoration: none;">Duty Roster</a>
-                                </p>
-                            </div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0 0 0;">
+                                <tr>
+                                    <td style="padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                                        <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; font-weight: bold;">Additional Resources:</p>
+                                        <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                            • <a href="{{ member_directory_url }}" style="color: #667eea; text-decoration: none;">Member Directory</a><br>
+                                            • <a href="{{ duty_roster_url }}" style="color: #667eea; text-decoration: none;">Duty Roster</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
 
