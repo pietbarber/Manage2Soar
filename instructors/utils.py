@@ -12,6 +12,7 @@ from django.utils import timezone
 from logsheet.models import Flight
 from siteconfig.models import MailingList, SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 
 from .models import (
     GroundInstruction,
@@ -224,12 +225,10 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
 
     # Build URLs
     site_url = f"https://{domain_name}"
-    logbook_url = f"{site_url}/instructors/logbook/{report.student.id}/"
+    logbook_url = f"{site_url}/instructors/instruction-record/{report.student.id}/"
 
-    # Get club logo URL if available
-    club_logo_url = None
-    if config and config.club_logo:
-        club_logo_url = f"{site_url}{config.club_logo.url}"
+    # Get club logo URL if available (uses helper for proper absolute URL)
+    club_logo_url = get_absolute_club_logo_url(config)
 
     # Get lesson scores for this report
     lesson_scores = report.lesson_scores.select_related("lesson").order_by(
