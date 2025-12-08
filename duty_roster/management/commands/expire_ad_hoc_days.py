@@ -1,10 +1,12 @@
 from datetime import timedelta
 
-from django.conf import settings
+from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
+from duty_roster.utils.email import get_email_config, get_mailing_list
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
@@ -26,17 +28,38 @@ class Command(BaseCronJobCommand):
 
         cancelled_count = 0
 
+        # Get configuration using helper functions
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "MEMBERS_MAILING_LIST", "members", email_config["config"]
+        )
+
         for assignment in assignments:
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
 
             if not options.get("dry_run"):
+                # Prepare template context
+                context = {
+                    "ops_date": ops_date,
+                    "club_name": email_config["club_name"],
+                    "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                    "roster_url": email_config["roster_url"],
+                }
+
+                # Render email templates
+                html_message = render_to_string(
+                    "duty_roster/emails/ad_hoc_expiration.html", context
+                )
+                text_message = render_to_string(
+                    "duty_roster/emails/ad_hoc_expiration.txt", context
+                )
+
                 send_mail(
-                    subject=f"Ad-Hoc Ops Cancelled - {ops_date}",
-                    message=f"""Ad-hoc ops on {ops_date} could not get sufficient interest to meet the minimum
-duty crew of tow pilot and duty officer. The deadline has passed and the ops
-have been cancelled for tomorrow.\n\nCalendar: {settings.SITE_URL}/duty_roster/calendar/""",
-                    from_email="noreply@default.manage2soar.com",
-                    recipient_list=["members@default.manage2soar.com"],
+                    subject=f"[{email_config['club_name']}] Ad-Hoc Ops Expired - {ops_date}",
+                    message=text_message,
+                    from_email=email_config["from_email"],
+                    recipient_list=recipient_list,
+                    html_message=html_message,
                 )
                 assignment.delete()
 

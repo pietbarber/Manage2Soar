@@ -23,7 +23,11 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from duty_roster.utils.email import notify_ops_status
+from duty_roster.utils.email import (
+    get_email_config,
+    get_mailing_list,
+    notify_ops_status,
+)
 from logsheet.models import Airfield
 from members.constants.membership import DEFAULT_ROLES, ROLE_FIELD_MAP
 from members.decorators import active_member_required
@@ -32,6 +36,7 @@ from members.utils.membership import get_active_membership_statuses
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
 
 from .forms import DutyAssignmentForm, DutyPreferenceForm
 from .models import (
@@ -440,19 +445,6 @@ def ops_intent_toggle(request, year, month, day):
         duty_inst = assignment.instructor
         surge_inst = assignment.surge_instructor
 
-        # do we need surge? (you choose your own threshold)
-        need_surge = len(students) > 3
-
-        # build the email
-        subject = f"Instruction Signup on {day_date:%b %d}"
-        body = (
-            f"Student {request.user.full_display_name} signed up for instruction on "
-            f"{day_date:%B %d, %Y}.\n"
-            "Others signed up: " + (", ".join(students) or "None") + "\n"
-        )
-        if need_surge:
-            body += "Surge instructor may be needed.\n"
-
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
         if duty_inst and duty_inst.email:
@@ -461,11 +453,34 @@ def ops_intent_toggle(request, year, month, day):
             recipients.append(surge_inst.email)
 
         if recipients:
+            # Prepare template context
+            email_config = get_email_config()
+
+            context = {
+                "student_name": request.user.full_display_name,
+                "instructor_name": (
+                    duty_inst.full_display_name if duty_inst else "Instructor"
+                ),
+                "ops_date": day_date.strftime("%A, %B %d, %Y"),
+                "club_name": email_config["club_name"],
+                "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                "roster_url": email_config["roster_url"],
+            }
+
+            # Render email templates
+            html_message = render_to_string(
+                "duty_roster/emails/ops_intent_notification.html", context
+            )
+            text_message = render_to_string(
+                "duty_roster/emails/ops_intent_notification.txt", context
+            )
+
             send_mail(
-                subject,
-                body,
-                settings.DEFAULT_FROM_EMAIL,
-                recipients,
+                subject=f"[{email_config['club_name']}] Student Plans to Fly - {day_date:%b %d}",
+                message=text_message,
+                from_email=email_config["from_email"],
+                recipient_list=recipients,
+                html_message=html_message,
                 fail_silently=True,
             )
 
@@ -485,16 +500,32 @@ def ops_intent_toggle(request, year, month, day):
             assignment, _ = DutyAssignment.objects.get_or_create(date=day_date)
             duty_inst = assignment.instructor
             if duty_inst and duty_inst.email:
-                subject = f"Instruction Cancellation on {day_date:%b %d}"
-                body = (
-                    f"Student {request.user.full_display_name} cancelled their instruction signup "
-                    f"for {day_date:%B %d, %Y}."
+                # Prepare template context
+                email_config = get_email_config()
+
+                context = {
+                    "student_name": request.user.full_display_name,
+                    "instructor_name": duty_inst.full_display_name,
+                    "ops_date": day_date.strftime("%A, %B %d, %Y"),
+                    "club_name": email_config["club_name"],
+                    "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+                    "roster_url": email_config["roster_url"],
+                }
+
+                # Render email templates
+                html_message = render_to_string(
+                    "duty_roster/emails/instruction_cancellation.html", context
                 )
+                text_message = render_to_string(
+                    "duty_roster/emails/instruction_cancellation.txt", context
+                )
+
                 send_mail(
-                    subject,
-                    body,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [duty_inst.email],
+                    subject=f"[{email_config['club_name']}] Instruction Cancellation - {day_date:%b %d}",
+                    message=text_message,
+                    from_email=email_config["from_email"],
+                    recipient_list=[duty_inst.email],
+                    html_message=html_message,
                     fail_silently=True,
                 )
 
@@ -538,11 +569,34 @@ def maybe_notify_surge_instructor(day_date):
     instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
 
     if instruction_count > 3:
+        # Prepare template context
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "INSTRUCTORS_MAILING_LIST", "instructors", email_config["config"]
+        )
+
+        context = {
+            "student_count": instruction_count,
+            "ops_date": day_date.strftime("%A, %B %d, %Y"),
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+            "roster_url": email_config["roster_url"],
+        }
+
+        # Render email templates
+        html_message = render_to_string(
+            "duty_roster/emails/surge_instructor_alert.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_instructor_alert.txt", context
+        )
+
         send_mail(
-            subject=f"Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
-            message=f"There are currently {instruction_count} pilots requesting instruction for {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge instructor.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=["instructors@default.manage2soar.com"],
+            subject=f"[{email_config['club_name']}] Surge Instructor May Be Needed - {day_date.strftime('%A, %B %d')}",
+            message=text_message,
+            from_email=email_config["from_email"],
+            recipient_list=recipient_list,
+            html_message=html_message,
             fail_silently=True,
         )
         assignment.surge_notified = True
@@ -560,11 +614,34 @@ def maybe_notify_surge_towpilot(day_date):
     )
 
     if tow_count >= 6:
+        # Prepare template context
+        email_config = get_email_config()
+        recipient_list = get_mailing_list(
+            "TOWPILOTS_MAILING_LIST", "towpilots", email_config["config"]
+        )
+
+        context = {
+            "tow_count": tow_count,
+            "ops_date": day_date.strftime("%A, %B %d, %Y"),
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+            "roster_url": email_config["roster_url"],
+        }
+
+        # Render email templates
+        html_message = render_to_string(
+            "duty_roster/emails/surge_towpilot_alert.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_towpilot_alert.txt", context
+        )
+
         send_mail(
-            subject=f"Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
-            message=f"There are currently {tow_count} pilots planning flights requiring tows on {day_date.strftime('%A, %B %d, %Y')}.\n\nYou may want to coordinate a surge tow pilot.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=["towpilots@default.manage2soar.com"],
+            subject=f"[{email_config['club_name']}] Surge Tow Pilot May Be Needed - {day_date.strftime('%A, %B %d')}",
+            message=text_message,
+            from_email=email_config["from_email"],
+            recipient_list=recipient_list,
+            html_message=html_message,
             fail_silently=True,
         )
         assignment.tow_surge_notified = True
@@ -781,19 +858,35 @@ def calendar_cancel_ops_day(request, year, month, day):
 
     canceller_name = request.user.full_display_name
 
-    body = (
-        f"Operations for {ops_date.strftime('%A, %B %d, %Y')} have been canceled.\n\n"
-        f"Canceled by: {canceller_name}\n\n"
-        f"Reason:\n{reason}\n\n"
-        f"Stay safe and we'll see you next time!"
+    # Get configuration
+    email_config = get_email_config()
+    recipient_list = get_mailing_list(
+        "MEMBERS_MAILING_LIST", "members", email_config["config"]
     )
 
-    # Send to members@default.manage2soar.com
+    # Render email
+    context = {
+        "ops_date": ops_date.strftime("%A, %B %d, %Y"),
+        "canceller_name": canceller_name,
+        "cancel_reason": reason,
+        "club_name": email_config["club_name"],
+        "club_logo_url": get_absolute_club_logo_url(email_config["config"]),
+        "roster_url": email_config["roster_url"],
+    }
+    html_message = render_to_string(
+        "duty_roster/emails/operations_cancelled.html", context
+    )
+    text_message = render_to_string(
+        "duty_roster/emails/operations_cancelled.txt", context
+    )
+
+    # Send email
     send_mail(
-        subject=f"[Manage2Soar] Operations Canceled - {ops_date.strftime('%B %d')}",
-        message=body,
-        from_email="noreply@default.manage2soar.com",
-        recipient_list=["members@default.manage2soar.com"],
+        subject=f"[{email_config['club_name']}] Operations Canceled - {ops_date.strftime('%B %d')}",
+        message=text_message,
+        from_email=email_config["from_email"],
+        recipient_list=recipient_list,
+        html_message=html_message,
     )
 
     # Delete the DutyAssignment entry
