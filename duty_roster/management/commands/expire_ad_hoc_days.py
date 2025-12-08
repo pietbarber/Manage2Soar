@@ -5,6 +5,7 @@ from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
+from duty_roster.utils.email import get_email_config, get_mailing_list
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
@@ -29,8 +30,6 @@ class Command(BaseCronJobCommand):
         cancelled_count = 0
 
         # Get configuration using helper functions
-        from duty_roster.utils.email import get_email_config, get_mailing_list
-
         email_config = get_email_config()
         recipient_list = get_mailing_list(
             "MEMBERS_MAILING_LIST", "members", email_config["config"]

@@ -445,8 +445,6 @@ def ops_intent_toggle(request, year, month, day):
         duty_inst = assignment.instructor
         surge_inst = assignment.surge_instructor
 
-        # do we need surge? (you choose your own threshold)
-
         # recipients: duty instructor plus (if exists) surge instructor
         recipients = []
         if duty_inst and duty_inst.email:

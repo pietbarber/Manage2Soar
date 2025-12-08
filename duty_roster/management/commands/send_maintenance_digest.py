@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
+from duty_roster.utils.email import get_email_config
 from logsheet.models import AircraftMeister, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
@@ -62,8 +63,6 @@ class Command(BaseCommand):
             return
 
         # Prepare template context using helper function
-        from duty_roster.utils.email import get_email_config
-
         email_config = get_email_config()
         site_url = email_config["site_url"]
         maintenance_url = f"{site_url}/maintenance/" if site_url else "/maintenance/"
