@@ -3,7 +3,7 @@ Tests for aging logsheet email notifications.
 Tests HTML/text email rendering for aging logsheets.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 from io import StringIO
 
 from django.core import mail
