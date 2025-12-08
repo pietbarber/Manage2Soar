@@ -65,6 +65,10 @@ class Command(BaseCommand):
         site_url = email_config["site_url"]
         maintenance_url = f"{site_url}/maintenance/" if site_url else "/maintenance/"
 
+        # NOTE: Grounded issues are intentionally listed before operational issues
+        # to prioritize critical maintenance items in the email digest. This changes
+        # the previous behavior, which showed all issues in chronological order.
+
         context = {
             "report_date": today.strftime("%A, %B %d, %Y"),
             "issues": grounded_issues + operational_issues,
