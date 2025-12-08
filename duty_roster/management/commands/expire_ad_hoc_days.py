@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 

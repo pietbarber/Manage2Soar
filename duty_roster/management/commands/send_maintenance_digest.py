@@ -1,11 +1,9 @@
-from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.utils.email import get_email_config
 from logsheet.models import AircraftMeister, MaintenanceIssue
-from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 
@@ -35,7 +33,7 @@ class Command(BaseCommand):
             issue_data = {
                 "aircraft": str(aircraft),
                 "description": issue.description,
-                "report_date": issue.report_date,
+                "report_date": issue.report_date.strftime("%Y-%m-%d"),
                 "grounded": issue.grounded,
             }
 
