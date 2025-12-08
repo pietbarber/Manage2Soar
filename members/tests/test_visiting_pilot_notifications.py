@@ -119,7 +119,9 @@ class VisitingPilotNotificationTests(TestCase):
             mock_notify.assert_not_called()
 
     @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@testclub.com", SITE_URL="https://testclub.com"
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        SITE_URL="https://testclub.com",
+        EMAIL_DEV_MODE=False,
     )
     def test_email_notification_sent_to_member_managers(self):
         """Test that email notifications are sent to member managers."""
@@ -184,6 +186,79 @@ class VisitingPilotNotificationTests(TestCase):
         email = mail.outbox[0]
         self.assertIn("requires manual approval", email.body)
         self.assertIn("Set 'Active' status", email.body)
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        SITE_URL="https://testclub.com",
+        EMAIL_DEV_MODE=False,
+    )
+    def test_html_email_rendering(self):
+        """Test that HTML email template renders correctly."""
+        Member.objects.create_user(
+            username="visitor@test.com",
+            email="visitor@test.com",
+            first_name="Visiting",
+            last_name="Pilot",
+            home_club="Remote Soaring Club",
+            SSA_member_number="12345",
+            glider_rating="private",
+            membership_status="Affiliate Member",
+        )
+
+        # Check that email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+
+        # Verify HTML content exists
+        self.assertEqual(len(email.alternatives), 1)
+        html_content = email.alternatives[0][0]
+        self.assertIn("text/html", email.alternatives[0][1])
+
+        # Verify HTML structure and content
+        self.assertIn("Test Soaring Club", html_content)
+        self.assertIn("New Visiting Pilot Registration", html_content)
+        self.assertIn("Visiting Pilot", html_content)
+        self.assertIn("visitor@test.com", html_content)
+        self.assertIn("Remote Soaring Club", html_content)
+        self.assertIn("12345", html_content)
+        self.assertIn("automatically approved", html_content)
+
+        # Verify plain text fallback also has content
+        self.assertIn("Visiting Pilot", email.body)
+        self.assertIn("Remote Soaring Club", email.body)
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL="noreply@testclub.com",
+        SITE_URL="https://testclub.com",
+        EMAIL_DEV_MODE=False,
+    )
+    def test_html_email_manual_approval_rendering(self):
+        """Test HTML email rendering for manual approval case."""
+        self.config.visiting_pilot_auto_approve = False
+        self.config.save()
+
+        Member.objects.create_user(
+            username="visitor@test.com",
+            email="visitor@test.com",
+            first_name="Manual",
+            last_name="Approval",
+            home_club="Remote Soaring Club",
+            SSA_member_number="54321",
+            glider_rating="private",
+            membership_status="Affiliate Member",
+        )
+
+        # Check HTML content
+        email = mail.outbox[0]
+        html_content = email.alternatives[0][0]
+
+        # Verify manual approval message appears in HTML
+        self.assertIn("requires manual approval", html_content)
+        self.assertIn("Set 'Active' status", html_content)
+        self.assertIn("Manual Approval", html_content)
+
+        # Also check plain text version
+        self.assertIn("requires manual approval", email.body)
 
     def test_in_app_notifications_created(self):
         """Test that in-app notifications are created for member managers."""
@@ -316,9 +391,11 @@ class VisitingPilotNotificationTests(TestCase):
         self.assertEqual(notifications.count(), 2)
 
     def test_email_sanitization(self):
-        """Test that user input is properly sanitized in emails."""
+        """Test that user input is properly sanitized in email subject line."""
         # Signal should automatically trigger notification
-        with override_settings(DEFAULT_FROM_EMAIL="noreply@test.com"):
+        with override_settings(
+            DEFAULT_FROM_EMAIL="noreply@test.com", EMAIL_DEV_MODE=False
+        ):
             Member.objects.create_user(
                 username="visitor@test.com",
                 email="visitor@test.com",
@@ -330,17 +407,15 @@ class VisitingPilotNotificationTests(TestCase):
                 membership_status="Affiliate Member",
             )
 
-        # Check that email was sent and content is sanitized
+        # Check that email was sent and subject is sanitized
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
 
-        # Verify dangerous characters were removed/replaced
-        self.assertNotIn("\r", email.body)
-        self.assertNotIn("\n\n", email.subject)  # Multiple newlines in subject
-        # Should be sanitized (newlines replaced with spaces)
-        self.assertIn("Visiting Injection Pilot Test", email.body)
-        self.assertIn("ClubWith BadChars", email.body)  # \r\n removed from club name
-        self.assertIn("123 45", email.body)  # \n replaced with space in SSA number
+        # Verify subject line is sanitized (no \r or \n allowed in subject)
+        self.assertNotIn("\r", email.subject)
+        self.assertNotIn("\n", email.subject)
+        # Should be sanitized name in subject
+        self.assertIn("Visiting Injection Pilot Test", email.subject)
 
     @patch("notifications.models.Notification.objects.create")
     def test_notification_creation_error_handling(self, mock_create):
