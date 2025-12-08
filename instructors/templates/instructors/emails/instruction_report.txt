@@ -28,7 +28,7 @@ SCORE LEGEND:
 ----------------
 {{ report_text|striptags }}
 
-{% endif %}{% if logbook_url %}View your training logbook: {{ logbook_url }}
+{% endif %}{% if logbook_url %}View your training record: {{ logbook_url }}
 
 {% endif %}---
 This is an automated message from {{ club_name }}.
