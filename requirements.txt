@@ -125,6 +125,6 @@ typer==0.20.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uritemplate==4.2.0
-urllib3==2.5.0
+urllib3==2.6.0
 virtualenv==20.35.4
 wheel==0.45.1
