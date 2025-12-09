@@ -504,7 +504,7 @@ function submitInstructionSession() {
   // Check if there's qualification data to include
   const qualFields = document.getElementById('qualificationFormFields');
 
-  if (qualFields && qualFields.querySelector('select[name="qualification"]').value) {e) {
+  if (qualFields && qualFields.querySelector('select[name="qualification"]').value) {
     // Copy qualification data to main form as hidden fields
     const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
     const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
