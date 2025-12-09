@@ -182,6 +182,9 @@ cython_debug/
 .github/conversations/
 *.copilot-chat
 
+# Email testing scripts - local development only
+email-tests/
+
 # Local scripts and sensitive data
 scripts/reset_spr_data.py
 membership.json
