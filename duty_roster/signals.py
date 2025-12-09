@@ -113,9 +113,12 @@ def _get_email_context(slot, config, site_url):
             last_instructor_flight_date = last_instructor_flight.logsheet.log_date
 
         # Get total flight count
-        total_flights = Flight.objects.filter(
-            pilot=slot.student, logsheet__finalized=True
-        ).count()
+        if last_flight:
+            total_flights = Flight.objects.filter(
+                pilot=slot.student, logsheet__finalized=True
+            ).count()
+        else:
+            total_flights = 0
 
     # Get logo URL
     logo_url = None
