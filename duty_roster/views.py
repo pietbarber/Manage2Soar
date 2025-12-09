@@ -1121,6 +1121,7 @@ def duty_delinquents_detail(request):
     from duty_roster.models import DutyAssignment, DutyPreference, MemberBlackout
     from logsheet.models import Flight
     from members.models import Member
+    from members.utils.membership import get_active_membership_statuses
 
     # Parameters (could be made configurable via URL params)
     lookback_months = 12
@@ -1134,10 +1135,13 @@ def duty_delinquents_detail(request):
     recent_flight_cutoff = today - timedelta(days=lookback_months * 30)
 
     # Step 1: Find all members who have been in the club for 3+ months
+    # Use centralized helper for active status filtering (matches email command)
+    active_status_names = get_active_membership_statuses()
+
     eligible_members = Member.objects.filter(
         Q(joined_club__lt=membership_cutoff_date) | Q(joined_club__isnull=True),
-        membership_status__in=["Full Member", "Student Member", "Life Member"],
-    ).exclude(membership_status__in=["Inactive", "Terminated", "Suspended"])
+        membership_status__in=active_status_names,  # Only active statuses
+    )
 
     # Step 2: Find members who have been actively flying
     active_flyers = (
