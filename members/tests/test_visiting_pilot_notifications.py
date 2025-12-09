@@ -161,7 +161,7 @@ class VisitingPilotNotificationTests(TestCase):
         actual_recipients = set(email.to)
         self.assertEqual(expected_recipients, actual_recipients)
 
-    @override_settings(DEFAULT_FROM_EMAIL="noreply@testclub.com")
+    @override_settings(DEFAULT_FROM_EMAIL="noreply@testclub.com", EMAIL_DEV_MODE=False)
     def test_email_notification_manual_approval_content(self):
         """Test email content when manual approval is required."""
         # Set manual approval
