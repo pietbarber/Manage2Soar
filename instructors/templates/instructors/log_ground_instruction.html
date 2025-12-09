@@ -457,8 +457,15 @@ function submitQualificationOnly() {
 }
 
 function submitInstructionSession() {
-  // Check if there's qualification data to include
   const mainForm = document.querySelector('form.needs-validation');
+
+  // Check form validity
+  if (!mainForm.checkValidity()) {
+    mainForm.classList.add('was-validated');
+    return false; // Prevent submission if invalid
+  }
+
+  // Check if there's qualification data to include
   const qualForm = document.getElementById('qualificationForm');
 
   if (qualForm && qualForm.querySelector('select[name="qualification"]').value) {
@@ -490,7 +497,9 @@ function submitInstructionSession() {
     });
   }
 
-  return true; // Allow form submission
+  // Explicitly submit the form
+  mainForm.submit();
+  return false; // Prevent default button action since we're calling submit() explicitly
 }
 
 // Enhanced qualification dropdown with icons
