@@ -78,7 +78,49 @@
                         </td>
                     </tr>
 
-                    {% if student_progress %}
+                    {% if is_rated_pilot %}
+                    <!-- Rated pilot currency card -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #edf2f7; border-radius: 6px; border-left: 4px solid #4299e1;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #2c5282; font-size: 18px; font-weight: 600;">
+                                            Flight Currency
+                                        </h2>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            {% if last_flight_date %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px; width: 180px;">Last Flight:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ last_flight_date|date:"M d, Y" }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if last_instructor_flight_date %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Last Instructor Flight:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ last_instructor_flight_date|date:"M d, Y" }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if total_flights %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Total Flights:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ total_flights }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if not last_flight_date and not last_instructor_flight_date and not total_flights %}
+                                            <tr>
+                                                <td colspan="2" style="padding: 4px 0; color: #718096; font-size: 14px; font-style: italic;">
+                                                    No flight history found in our records
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% elif student_progress %}
                     <!-- Student progress card -->
                     <tr>
                         <td style="padding: 0 24px 16px 24px;">
@@ -101,12 +143,6 @@
                                                 <td style="padding: 4px 0; color: #718096; font-size: 14px;">Checkride Progress:</td>
                                                 <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ student_progress.checkride_progress }}%</td>
                                             </tr>
-                                            {% if total_flights %}
-                                            <tr>
-                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Total Flights:</td>
-                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ total_flights }}</td>
-                                            </tr>
-                                            {% endif %}
                                         </table>
                                     </td>
                                 </tr>
