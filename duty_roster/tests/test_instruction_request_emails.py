@@ -446,7 +446,7 @@ class TestEmailContent:
         email = mail.outbox[0]
 
         # Format the date as it appears in the template
-        formatted_date = duty_assignment.date.strftime("%B %-d, %Y")
+        formatted_date = duty_assignment.date.strftime("%B %d, %Y").replace(" 0", " ")
 
         # Get HTML content
         html_content = None

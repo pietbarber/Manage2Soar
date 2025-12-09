@@ -93,6 +93,7 @@ def _get_email_context(slot, config, site_url):
         # Get last flight as pilot
         last_flight = (
             Flight.objects.filter(pilot=slot.student, logsheet__finalized=True)
+            .select_related("logsheet")
             .order_by("-logsheet__log_date")
             .first()
         )
@@ -104,6 +105,7 @@ def _get_email_context(slot, config, site_url):
             Flight.objects.filter(
                 pilot=slot.student, instructor__isnull=False, logsheet__finalized=True
             )
+            .select_related("logsheet")
             .order_by("-logsheet__log_date")
             .first()
         )
