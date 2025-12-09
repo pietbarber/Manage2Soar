@@ -210,7 +210,7 @@ def send_request_response_email(slot):
     context = _get_email_context(slot, config, site_url)
     context["is_accepted"] = slot.instructor_response == "accepted"
     context["response_status"] = (
-        "Accepted" if slot.instructor_response == "accepted" else "Update"
+        "Accepted" if slot.instructor_response == "accepted" else "Not Available"
     )
     context["instructor_note"] = slot.instructor_note or ""
     context["my_requests_url"] = (

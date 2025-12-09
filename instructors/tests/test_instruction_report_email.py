@@ -419,5 +419,7 @@ class TestInstructionReportEmail:
         send_instruction_report_email(instruction_report)
 
         email = mail.outbox[0]
-        expected_url = f"/instructors/instruction-record/{instruction_report.student.id}/"
+        expected_url = (
+            f"/instructors/instruction-record/{instruction_report.student.id}/"
+        )
         assert expected_url in email.alternatives[0][0]
