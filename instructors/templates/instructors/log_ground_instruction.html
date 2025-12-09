@@ -320,9 +320,7 @@
               <h6 class="fw-bold text-primary mb-3">
                 <i class="bi bi-plus-circle me-2"></i>Assign New Qualification
               </h6>
-              <form method="post" id="qualificationForm">
-                {% csrf_token %}
-                <input type="hidden" name="form_type" value="qualification">
+              <div id="qualificationFormFields">
                 <div class="row g-3">
                   <div class="col-md-4">
                     <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
@@ -365,7 +363,7 @@
                     {{ qualification_form.notes|add_class:"form-control" }}
                   </div>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         </div>
@@ -399,6 +397,15 @@
     </div>
   </div>
 </div>
+
+<!-- Standalone Qualification Form (hidden, for "Add Qualification Only" button) -->
+{% if student and qualification_form %}
+<form method="post" id="qualificationFormStandalone" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="qualification">
+  <!-- The actual form fields are in the UI above, we'll copy them here on submit -->
+</form>
+{% endif %}
 
 <!-- Back to top button following guide pattern -->
 <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="display: none;" id="backToTop">
@@ -449,8 +456,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Form submission handlers
 function submitQualificationOnly() {
-  const qualForm = document.getElementById('qualificationForm');
-  if (qualForm) {
+  const qualForm = document.getElementById('qualificationFormStandalone');
+  const qualFields = document.getElementById('qualificationFormFields');
+
+  if (qualForm && qualFields) {
+    // Copy all qualification field values to the standalone form
+    const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
+    const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
+    const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
+    const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
+    const notes = qualFields.querySelector('textarea[name="notes"]');
+
+    // Remove any existing fields
+    qualForm.querySelectorAll('input:not([name="form_type"]), select, textarea').forEach(field => field.remove());
+
+    // Create and append copies
+    const fieldsToClone = [
+      {name: 'qualification', value: qualificationSelect.value},
+      {name: 'is_qualified', value: isQualifiedCheck.checked ? 'on' : '', type: 'checkbox'},
+      {name: 'date_awarded', value: dateAwarded.value},
+      {name: 'expiration_date', value: expirationDate.value},
+      {name: 'notes', value: notes.value}
+    ];
+
+    fieldsToClone.forEach(field => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = field.name;
+      input.value = field.value;
+      qualForm.appendChild(input);
+    });
+
     qualForm.submit();
   }
   return false;
@@ -466,15 +502,15 @@ function submitInstructionSession() {
   }
 
   // Check if there's qualification data to include
-  const qualForm = document.getElementById('qualificationForm');
+  const qualFields = document.getElementById('qualificationFormFields');
 
-  if (qualForm && qualForm.querySelector('select[name="qualification"]').value) {
+  if (qualFields && qualFields.querySelector('select[name="qualification"]').value) {e) {
     // Copy qualification data to main form as hidden fields
-    const qualificationSelect = qualForm.querySelector('select[name="qualification"]');
-    const isQualifiedCheck = qualForm.querySelector('input[name="is_qualified"]');
-    const dateAwarded = qualForm.querySelector('input[name="date_awarded"]');
-    const expirationDate = qualForm.querySelector('input[name="expiration_date"]');
-    const notes = qualForm.querySelector('textarea[name="notes"]');
+    const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
+    const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
+    const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
+    const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
+    const notes = qualFields.querySelector('textarea[name="notes"]');
 
     // Remove any existing qualification fields
     mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
