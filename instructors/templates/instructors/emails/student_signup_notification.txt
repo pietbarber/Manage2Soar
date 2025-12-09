@@ -20,8 +20,7 @@ FLIGHT CURRENCY
 {% endif %}
 {% if total_flights is not None %}Total Flights: {{ total_flights }}
 {% endif %}
-{% if total_flights is None and not last_flight_date and not last_instructor_flight_date %}No flight history found in our records
-{% endif %}
+
 {% elif student_progress %}
 TRAINING PROGRESS
 -----------------
