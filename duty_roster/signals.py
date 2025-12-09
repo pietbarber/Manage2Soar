@@ -60,21 +60,59 @@ def _create_notification_if_not_exists(user, message, url=None):
 
 def _get_email_context(slot, config, site_url):
     """Build base context for email templates."""
-    from instructors.models import StudentProgressSnapshot
+    from instructors.models import MemberQualification, StudentProgressSnapshot
+    from logsheet.models import Flight
 
-    # Get student progress if available
+    # Check if member is a rated pilot (has qualifications that apply to 'rated' pilots)
+    is_rated_pilot = MemberQualification.objects.filter(
+        member=slot.student,
+        qualification__applies_to__in=["rated", "both"],
+        is_qualified=True,
+    ).exists()
+
+    # Get student progress if available (for students)
     student_progress = None
-    try:
-        progress = StudentProgressSnapshot.objects.get(student=slot.student)
-        # Create a simple dict that templates can access like an object
-        student_progress = {
-            "solo_progress": int((progress.solo_progress or 0) * 100),
-            "checkride_progress": int((progress.checkride_progress or 0) * 100),
-            "sessions": progress.sessions or 0,
-        }
-    except StudentProgressSnapshot.DoesNotExist:
-        # Student has no progress snapshot yet - this is expected for new students
-        pass
+    if not is_rated_pilot:
+        try:
+            progress = StudentProgressSnapshot.objects.get(student=slot.student)
+            # Create a simple dict that templates can access like an object
+            student_progress = {
+                "solo_progress": int((progress.solo_progress or 0) * 100),
+                "checkride_progress": int((progress.checkride_progress or 0) * 100),
+                "sessions": progress.sessions or 0,
+            }
+        except StudentProgressSnapshot.DoesNotExist:
+            # Student has no progress snapshot yet - this is expected for new students
+            pass
+
+    # Get flight currency information for rated pilots
+    last_flight_date = None
+    last_instructor_flight_date = None
+    total_flights = None
+    if is_rated_pilot:
+        from django.db import models
+
+        # Use aggregate to get count and last date in single query
+        flight_stats = Flight.objects.filter(
+            pilot=slot.student, logsheet__finalized=True
+        ).aggregate(
+            count=models.Count("id"), last_date=models.Max("logsheet__log_date")
+        )
+        total_flights = flight_stats["count"]
+        if flight_stats["last_date"]:
+            last_flight_date = flight_stats["last_date"]
+
+        # Get last flight with an instructor
+        last_instructor_flight = (
+            Flight.objects.filter(
+                pilot=slot.student, instructor__isnull=False, logsheet__finalized=True
+            )
+            .select_related("logsheet")
+            .order_by("-logsheet__log_date")
+            .first()
+        )
+        if last_instructor_flight:
+            last_instructor_flight_date = last_instructor_flight.logsheet.log_date
 
     # Get logo URL
     logo_url = None
@@ -91,6 +129,10 @@ def _get_email_context(slot, config, site_url):
         "club_logo_url": logo_url,
         "site_url": site_url,
         "student_progress": student_progress,
+        "is_rated_pilot": is_rated_pilot,
+        "last_flight_date": last_flight_date,
+        "last_instructor_flight_date": last_instructor_flight_date,
+        "total_flights": total_flights,
         "slot": slot,
     }
 
