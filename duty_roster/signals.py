@@ -90,15 +90,17 @@ def _get_email_context(slot, config, site_url):
     last_instructor_flight_date = None
     total_flights = None
     if is_rated_pilot:
-        # Get last flight as pilot
-        last_flight = (
-            Flight.objects.filter(pilot=slot.student, logsheet__finalized=True)
-            .select_related("logsheet")
-            .order_by("-logsheet__log_date")
-            .first()
+        from django.db import models
+
+        # Use aggregate to get count and last date in single query
+        flight_stats = Flight.objects.filter(
+            pilot=slot.student, logsheet__finalized=True
+        ).aggregate(
+            count=models.Count("id"), last_date=models.Max("logsheet__log_date")
         )
-        if last_flight:
-            last_flight_date = last_flight.logsheet.log_date
+        total_flights = flight_stats["count"]
+        if flight_stats["last_date"]:
+            last_flight_date = flight_stats["last_date"]
 
         # Get last flight with an instructor
         last_instructor_flight = (
@@ -111,14 +113,6 @@ def _get_email_context(slot, config, site_url):
         )
         if last_instructor_flight:
             last_instructor_flight_date = last_instructor_flight.logsheet.log_date
-
-        # Get total flight count
-        if last_flight:
-            total_flights = Flight.objects.filter(
-                pilot=slot.student, logsheet__finalized=True
-            ).count()
-        else:
-            total_flights = 0
 
     # Get logo URL
     logo_url = None

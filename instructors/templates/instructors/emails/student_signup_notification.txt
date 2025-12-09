@@ -18,9 +18,9 @@ FLIGHT CURRENCY
 {% endif %}
 {% if last_instructor_flight_date %}Last Instructor Flight: {{ last_instructor_flight_date|date:"M d, Y" }}
 {% endif %}
-{% if total_flights %}Total Flights: {{ total_flights }}
+{% if total_flights is not None %}Total Flights: {{ total_flights }}
 {% endif %}
-{% if not last_flight_date and not last_instructor_flight_date and not total_flights %}No flight history found in our records
+{% if total_flights is None and not last_flight_date and not last_instructor_flight_date %}No flight history found in our records
 {% endif %}
 {% elif student_progress %}
 TRAINING PROGRESS

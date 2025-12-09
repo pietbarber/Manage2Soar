@@ -343,13 +343,14 @@ class TestRatedPilotInstructionRequestEmail:
 
         assert html_content is not None
 
-        # Should show currency section with no history message
+        # Should show currency section with zero flights
         assert "Flight Currency" in html_content
-        assert "No flight history found" in html_content
+        assert "Total Flights:" in html_content
+        assert ">0<" in html_content  # Value in table cell
 
-        # Plain text should also show this
+        # Plain text should show it on one line
         assert "FLIGHT CURRENCY" in email.body
-        assert "No flight history found" in email.body
+        assert "Total Flights: 0" in email.body
 
     def test_both_qualification_type_treated_as_rated(
         self, site_config, duty_assignment, rated_pilot, db

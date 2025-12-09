@@ -101,13 +101,13 @@
                                                 <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ last_instructor_flight_date|date:"M d, Y" }}</td>
                                             </tr>
                                             {% endif %}
-                                            {% if total_flights %}
+                                            {% if total_flights is not None %}
                                             <tr>
                                                 <td style="padding: 4px 0; color: #718096; font-size: 14px;">Total Flights:</td>
                                                 <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">{{ total_flights }}</td>
                                             </tr>
                                             {% endif %}
-                                            {% if not last_flight_date and not last_instructor_flight_date and not total_flights %}
+                                            {% if total_flights is None and not last_flight_date and not last_instructor_flight_date %}
                                             <tr>
                                                 <td colspan="2" style="padding: 4px 0; color: #718096; font-size: 14px; font-style: italic;">
                                                     No flight history found in our records
