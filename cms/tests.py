@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import Client, RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from .admin import VisitorContactAdmin
@@ -172,8 +172,8 @@ class VisitorContactViewTests(TestCase):
         response = self.client.get(reverse("contact"))
         self.assertEqual(response.status_code, 200)
 
-    @patch("django.core.mail.send_mail")
-    def test_contact_form_submission_success(self, mock_send_mail):
+    @override_settings(EMAIL_DEV_MODE=False)
+    def test_contact_form_submission_success(self):
         """Test successful contact form submission."""
         # Create a member manager to receive the email
         manager = User.objects.create_user(
@@ -204,8 +204,10 @@ class VisitorContactViewTests(TestCase):
         self.assertEqual(contact.name, "John Doe")
         self.assertEqual(contact.email, "john@example.com")
 
-        # Check that email was sent
-        mock_send_mail.assert_called_once()
+        # Check that email was sent to member manager
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn(manager.email, email.to)
 
     def test_contact_form_submission_invalid(self):
         """Test contact form submission with invalid data."""
@@ -275,6 +277,7 @@ class VisitorContactEmailTests(TestCase):
         self.webmaster.webmaster = True
         self.webmaster.save()
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_email_sent_to_member_managers(self):
         """Test that emails are sent to member managers."""
         # Submit form to trigger email
@@ -296,6 +299,7 @@ class VisitorContactEmailTests(TestCase):
         self.assertIn("Test inquiry", email.body)
         self.assertIn(self.member_manager.email, email.to)
 
+    @override_settings(EMAIL_DEV_MODE=False)
     def test_fallback_to_webmasters(self):
         """Test fallback to webmasters when no member managers exist."""
         # Remove member manager privilege
