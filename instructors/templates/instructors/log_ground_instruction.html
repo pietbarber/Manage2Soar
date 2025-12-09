@@ -473,13 +473,19 @@ function submitQualificationOnly() {
     const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
     const notes = qualFields.querySelector('textarea[name="notes"]');
 
+    // Null checks for all required fields
+    if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
+      console.error('Missing qualification form fields');
+      return false;
+    }
+
     // Remove any existing fields
     qualForm.querySelectorAll('input:not([name="form_type"]), select, textarea').forEach(field => field.remove());
 
     // Create and append copies
     const fieldsToClone = [
       {name: 'qualification', value: qualificationSelect.value},
-      {name: 'is_qualified', value: isQualifiedCheck.checked ? 'on' : '', type: 'checkbox'},
+      {name: 'is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
       {name: 'date_awarded', value: dateAwarded.value},
       {name: 'expiration_date', value: expirationDate.value},
       {name: 'notes', value: notes.value}
@@ -517,6 +523,12 @@ function submitInstructionSession() {
     const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
     const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
     const notes = qualFields.querySelector('textarea[name="notes"]');
+
+    // Null checks for all qualification fields
+    if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
+      console.error('Missing qualification form fields');
+      return false;
+    }
 
     // Remove any existing qualification fields
     mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());

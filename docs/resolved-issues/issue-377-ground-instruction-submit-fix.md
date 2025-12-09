@@ -11,6 +11,12 @@ The "Save Complete Session" button on the ground instruction form (`/instructors
 ### Problem 2: Incorrect Qualification Validation Error (Follow-up Discovery)
 After fixing Problem 1, when submitting a ground instruction session WITHOUT any qualifications, the form showed a pink error message: "Please correct the qualification form errors." This error should only appear when explicitly submitting the qualification form via the "Add Qualification Only" button, not when submitting a ground instruction session without qualifications.
 
+### Problem 3: JavaScript Syntax Error Breaking Page Functionality
+After implementing Fix 2, the "Set first click to" dropdown feature stopped working. A JavaScript syntax error (`{e)` instead of `{`) in the `submitInstructionSession()` function caused all subsequent JavaScript on the page to fail silently, breaking multiple features including the lesson score quick-fill functionality.
+
+### Problem 4: Ground Instruction Notes Not Saving (Duplicate Field Names)
+When submitting a ground instruction session with essay notes, the notes content was not saved to the database. All other fields (date, location, duration, lesson scores) saved correctly, but the instructor's essay/notes field was empty in the database. This was discovered during testing after all previous fixes were implemented.
+
 ## Symptoms
 
 ### Problem 1 Symptoms:
@@ -330,10 +336,37 @@ function submitQualificationOnly() {
 6. **Main form submits with NO qualification data and NO `form_type` field**
 7. Server processes as ground instruction submission (correct!)
 8. Form submits successfully! ✅
-5. **If valid**: Processes qualification data
-6. Function calls `mainForm.submit()` to explicitly submit
-7. Function returns `false` to prevent any default button behavior
-8. Form submits successfully! ✅
+
+### Problem 3 - Before Fix:
+1. JavaScript syntax error `if (qualFields && qualFields.querySelector(...).value) {e) {` present in code
+2. Browser JavaScript parser encounters syntax error
+3. **All JavaScript after error stops executing**
+4. "Set first click to" functionality doesn't work
+5. Form submission still works (fixed in previous commits) but other features broken
+
+### Problem 3 - After Fix:
+1. Fixed syntax error to `if (qualFields && qualFields.querySelector(...).value) {`
+2. JavaScript parses and executes correctly
+3. All page functionality restored including "Set first click to" dropdown
+4. ✅ All features work correctly!
+
+### Problem 4 - Before Fix:
+1. Ground instruction form has `notes` field (TinyMCE HTMLField)
+2. Qualification section (inside main form) ALSO has `notes` field (regular textarea)
+3. Both fields have `name="notes"` in same form
+4. User enters essay in ground instruction notes field
+5. **Browser submits both fields with same name - last value (empty qualification notes) overwrites**
+6. Server receives only the qualification notes value (empty)
+7. Ground instruction notes lost!
+
+### Problem 4 - After Fix:
+1. Moved entire qualification section OUTSIDE main form
+2. Ground instruction `notes` field remains inside main form
+3. Qualification `notes` field now outside main form in separate div
+4. **No field name conflicts - each form has unique field names**
+5. User enters essay in ground instruction notes field
+6. Form submits only ground instruction notes
+7. ✅ Notes save correctly to database!
 
 ## Testing Verification
 
