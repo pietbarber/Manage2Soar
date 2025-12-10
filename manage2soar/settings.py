@@ -472,8 +472,9 @@ TINYMCE_DEFAULT_CONFIG = {
         "bullist numlist outdent indent | link image media | table | code | fullscreen | help"
     ),
     # Allow embedding PDFs and other content, but restrict attributes to prevent XSS
-    "extended_valid_elements": "iframe[src|width|height|style|class|loading|sandbox|title|referrerpolicy],object[classid|width|height|codebase|data|type],param[name|value],embed[type|width|height|src]",
-    "valid_children": "+body[iframe|object|embed]",
+    # div[class|style] allows pdf-container divs for PDF embedding
+    "extended_valid_elements": "iframe[src|width|height|style|class|loading|sandbox|title|referrerpolicy],div[class|style],object[classid|width|height|codebase|data|type],param[name|value],embed[type|width|height|src]",
+    "valid_children": "+body[iframe|object|embed|div],+div[iframe|p],+p[a|small]",
     "custom_elements": "embed,object,param",
     "image_caption": True,
     "automatic_uploads": True,

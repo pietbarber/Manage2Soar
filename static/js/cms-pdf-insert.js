@@ -124,10 +124,10 @@ function initializePdfInsert() {
     <p><small><a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Open PDF in new tab</a></small></p>
 </div><p>&nbsp;</p>`;
 
-            // Insert using insertContent instead of setContent (IMPROVEMENT)
+            // Insert using insertContent with format: 'raw' to prevent TinyMCE from filtering the HTML
             const editor = tinymce.activeEditor;
             if (editor) {
-                editor.insertContent(iframe);
+                editor.insertContent(iframe, { format: 'raw' });
             } else {
                 alert('Editor not found. Please try again.');
             }
