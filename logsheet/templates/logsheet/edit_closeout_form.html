@@ -487,11 +487,11 @@ function escapeHtml(unsafe) {
 // Convert newlines to HTML line breaks (Django linebreaks filter equivalent)
 function linebreaks(text) {
     if (!text) return '';
-    // Replace double newlines with paragraph breaks, single newlines with <br>
-    return text
+    // Replace double newlines with paragraph breaks, single newlines with <br>, and wrap in <p> tags
+    return '<p>' + text
         .replace(/\r\n/g, '\n')
         .replace(/\n\n+/g, '</p><p>')
-        .replace(/\n/g, '<br>');
+        .replace(/\n/g, '<br>') + '</p>';
 }
 
 // AJAX submission for maintenance issue form to preserve unsaved closeout data
@@ -629,14 +629,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const gliderIcon = document.createElement('i');
                                 gliderIcon.className = 'bi bi-airplane me-1';
                                 titleStrong.appendChild(gliderIcon);
-                                titleStrong.appendChild(document.createTextNode(`Glider: ${escapeHtml(data.issue.glider)}`));
+                                titleStrong.appendChild(document.createTextNode(`Glider: ${data.issue.glider}`));
                             }
 
                             if (data.issue.towplane) {
                                 const towplaneIcon = document.createElement('i');
                                 towplaneIcon.className = 'bi bi-airplane-engines me-1';
                                 titleStrong.appendChild(towplaneIcon);
-                                titleStrong.appendChild(document.createTextNode(`Towplane: ${escapeHtml(data.issue.towplane)}`));
+                                titleStrong.appendChild(document.createTextNode(`Towplane: ${data.issue.towplane}`));
                             }
 
                             headerDiv.appendChild(titleStrong);
@@ -673,7 +673,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                             const formattedDate = `${monthNames[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
 
-                            metaDiv.appendChild(document.createTextNode(`Reported by ${escapeHtml(data.issue.reported_by)} on ${formattedDate}`));
+                            metaDiv.appendChild(document.createTextNode(`Reported by ${data.issue.reported_by} on ${formattedDate}`));
                             issueDiv.appendChild(metaDiv);
 
                             issuesContainer.appendChild(issueDiv);
