@@ -514,14 +514,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('Submitting maintenance issue via AJAX');
             console.log('Form action:', maintenanceForm.action);
-            console.log('Headers will include X-Requested-With: XMLHttpRequest');
+
+            // Get CSRF token from the form
+            const csrfToken = formData.get('csrfmiddlewaretoken');
+            console.log('CSRF token found:', csrfToken ? 'yes' : 'no');
 
             fetch(maintenanceForm.action, {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                    'X-Requested-With': 'XMLHttpRequest',
+                    // Don't set Content-Type - let browser set it for FormData with boundary
+                },
+                credentials: 'same-origin'  // Include cookies
             })
             .then(response => {
                 console.log('Response status:', response.status);
@@ -701,7 +706,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('AJAX FAILED - Error caught:', error);
+                console.error('Error type:', error.name);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
                 alert('Failed to submit maintenance issue: ' + error.message);
             })
             .finally(() => {
