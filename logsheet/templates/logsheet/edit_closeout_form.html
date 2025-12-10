@@ -473,3 +473,91 @@
 </footer>
 
 {% endblock %}
+
+{% block extra_js %}
+<script>
+// AJAX submission for maintenance issue form to preserve unsaved closeout data
+document.addEventListener('DOMContentLoaded', function() {
+    const maintenanceForm = document.querySelector('#addIssueModal form');
+    const modal = document.getElementById('addIssueModal');
+    const bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+
+    if (maintenanceForm) {
+        maintenanceForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(maintenanceForm);
+            const submitBtn = maintenanceForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+
+            // Disable submit button and show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+
+            fetch(maintenanceForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                    alertDiv.innerHTML = `
+                        <i class="bi bi-check-circle me-2"></i>${data.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.closeout-form-container'));
+
+                    // Reset form and close modal
+                    maintenanceForm.reset();
+                    bsModal.hide();
+
+                    // Scroll to top to see success message
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    // Add new issue to the list if it exists
+                    const issuesList = document.querySelector('.maintenance-table');
+                    if (issuesList && data.issue) {
+                        const newIssueHtml = `
+                            <div class="maintenance-item-edit">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <strong class="text-primary">
+                                        ${data.issue.glider ? `<i class="bi bi-airplane me-1"></i>Glider: ${data.issue.glider}` : ''}
+                                        ${data.issue.towplane ? `<i class="bi bi-airplane-engines me-1"></i>Towplane: ${data.issue.towplane}` : ''}
+                                    </strong>
+                                    ${data.issue.grounded ? '<span class="badge bg-danger ms-2">GROUNDED</span>' : ''}
+                                </div>
+                                <div class="maintenance-item-description">${data.issue.description}</div>
+                                <div class="maintenance-item-meta text-muted mt-2">
+                                    <small><i class="bi bi-person me-1"></i>Reported by: ${data.issue.reported_by}</small>
+                                </div>
+                            </div>
+                        `;
+                        const issuesContainer = issuesList.querySelector('.p-3');
+                        issuesContainer.insertAdjacentHTML('beforeend', newIssueHtml);
+                    }
+                } else {
+                    // Show error message
+                    alert('Error: ' + (data.error || 'Failed to submit maintenance issue'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to submit maintenance issue. Please try again.');
+            })
+            .finally(() => {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

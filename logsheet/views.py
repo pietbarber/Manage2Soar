@@ -1431,18 +1431,51 @@ def add_maintenance_issue(request, logsheet_id):
     logsheet = get_object_or_404(Logsheet, pk=logsheet_id)
     form = MaintenanceIssueForm(request.POST)
 
+    # Support AJAX requests to avoid losing form data
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     if form.is_valid():
         issue = form.save(commit=False)
         if not issue.glider and not issue.towplane:
+            if is_ajax:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "Please select either a glider or a towplane.",
+                    },
+                    status=400,
+                )
             messages.error(request, "Please select either a glider or a towplane.")
             return redirect("logsheet:edit_logsheet_closeout", pk=logsheet_id)
 
         issue.reported_by = request.user
         issue.logsheet = logsheet
         issue.save()
+
+        if is_ajax:
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Maintenance issue submitted successfully.",
+                    "issue": {
+                        "id": issue.id,
+                        "glider": str(issue.glider) if issue.glider else None,
+                        "towplane": str(issue.towplane) if issue.towplane else None,
+                        "description": issue.description,
+                        "grounded": issue.grounded,
+                        "reported_by": issue.reported_by.full_display_name,
+                    },
+                }
+            )
         messages.success(request, "Maintenance issue submitted successfully.")
     else:
+        if is_ajax:
+            return JsonResponse(
+                {"success": False, "error": "Failed to submit maintenance issue."},
+                status=400,
+            )
         messages.error(request, "Failed to submit maintenance issue.")
+
     return redirect("logsheet:edit_logsheet_closeout", pk=logsheet.id)
 
 
