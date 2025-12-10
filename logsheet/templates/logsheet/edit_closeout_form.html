@@ -469,12 +469,12 @@
 </div> <!-- Close container -->
 
 <footer style="font-size: 0.8em; color: gray;">
-  Template: <code>logsheet/edit_closeout_form.html</code>
+  Template: <code>logsheet/edit_closeout_form.html</code> updated footer
 </footer>
 
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 // Utility function to escape HTML and prevent XSS
 function escapeHtml(unsafe) {
@@ -512,13 +512,6 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
 
-            console.log('Submitting maintenance issue via AJAX');
-            console.log('Form action:', maintenanceForm.action);
-
-            // Get CSRF token from the form
-            const csrfToken = formData.get('csrfmiddlewaretoken');
-            console.log('CSRF token found:', csrfToken ? 'yes' : 'no');
-
             fetch(maintenanceForm.action, {
                 method: 'POST',
                 body: formData,
@@ -529,8 +522,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 credentials: 'same-origin'  // Include cookies
             })
             .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
                 // Try to parse as JSON first (handles both success and error responses)
                 return response.json().then(data => {
                     if (!response.ok) {
@@ -549,9 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             })
             .then(data => {
-                console.log('AJAX Response data:', data);
                 if (data.success) {
-                    console.log('Success! Issue was added via AJAX');
                     // Create success alert with proper DOM manipulation to prevent XSS
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-success alert-dismissible fade show';
@@ -574,13 +563,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     closeBtn.setAttribute('aria-label', 'Close');
                     alertDiv.appendChild(closeBtn);
 
-                    // Insert alert with defensive DOM checking
+                    // Insert alert at the top of the container
                     const container = document.querySelector('.container');
-                    const formContainer = document.querySelector('.closeout-form-container');
-                    if (container && formContainer) {
-                        container.insertBefore(alertDiv, formContainer);
+                    if (container) {
+                        // Insert as first child of container
+                        container.insertBefore(alertDiv, container.firstChild);
                     } else {
-                        console.error('Expected DOM elements not found for alert insertion');
+                        console.error('Container not found for alert insertion');
                         alert(data.message); // Fallback
                     }
 
@@ -706,10 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('AJAX FAILED - Error caught:', error);
-                console.error('Error type:', error.name);
-                console.error('Error message:', error.message);
-                console.error('Error stack:', error.stack);
+                console.error('Error submitting maintenance issue:', error);
                 alert('Failed to submit maintenance issue: ' + error.message);
             })
             .finally(() => {
