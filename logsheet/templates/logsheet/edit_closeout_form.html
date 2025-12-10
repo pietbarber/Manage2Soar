@@ -571,8 +571,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert(data.message); // Fallback
                     }
 
-                    // Reset form and close modal
-                    maintenanceForm.reset();
+                    // Reset ONLY the modal form (not the main closeout form)
+                    // Verify we're resetting the correct form before doing so
+                    if (maintenanceForm && maintenanceForm.closest('#addIssueModal')) {
+                        maintenanceForm.reset();
+                    }
                     bsModal.hide();
 
                     // Scroll to top to see success message
