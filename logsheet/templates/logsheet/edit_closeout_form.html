@@ -469,12 +469,12 @@
 </div> <!-- Close container -->
 
 <footer style="font-size: 0.8em; color: gray;">
-  Template: <code>logsheet/edit_closeout_form.html</code>
+  Template: <code>logsheet/edit_closeout_form.html</code> updated footer
 </footer>
 
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 // Utility function to escape HTML and prevent XSS
 function escapeHtml(unsafe) {
@@ -516,8 +516,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                    'X-Requested-With': 'XMLHttpRequest',
+                    // Don't set Content-Type - let browser set it for FormData with boundary
+                },
+                credentials: 'same-origin'  // Include cookies
             })
             .then(response => {
                 // Try to parse as JSON first (handles both success and error responses)
@@ -561,18 +563,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     closeBtn.setAttribute('aria-label', 'Close');
                     alertDiv.appendChild(closeBtn);
 
-                    // Insert alert with defensive DOM checking
+                    // Insert alert at the top of the container
                     const container = document.querySelector('.container');
-                    const formContainer = document.querySelector('.closeout-form-container');
-                    if (container && formContainer) {
-                        container.insertBefore(alertDiv, formContainer);
+                    if (container) {
+                        // Insert as first child of container
+                        container.insertBefore(alertDiv, container.firstChild);
                     } else {
-                        console.error('Expected DOM elements not found for alert insertion');
+                        console.error('Container not found for alert insertion');
                         alert(data.message); // Fallback
                     }
 
-                    // Reset form and close modal
-                    maintenanceForm.reset();
+                    // Reset ONLY the modal form (not the main closeout form)
+                    // Verify we're resetting the correct form before doing so
+                    if (maintenanceForm && maintenanceForm.closest('#addIssueModal')) {
+                        maintenanceForm.reset();
+                    }
                     bsModal.hide();
 
                     // Scroll to top to see success message
@@ -690,7 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error submitting maintenance issue:', error);
                 alert('Failed to submit maintenance issue: ' + error.message);
             })
             .finally(() => {
