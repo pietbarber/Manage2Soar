@@ -476,6 +476,24 @@
 
 {% block extra_js %}
 <script>
+// Utility function to escape HTML and prevent XSS
+function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = unsafe;
+    return div.innerHTML;
+}
+
+// Convert newlines to HTML line breaks (Django linebreaks filter equivalent)
+function linebreaks(text) {
+    if (!text) return '';
+    // Replace double newlines with paragraph breaks, single newlines with <br>
+    return text
+        .replace(/\r\n/g, '\n')
+        .replace(/\n\n+/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+}
+
 // AJAX submission for maintenance issue form to preserve unsaved closeout data
 document.addEventListener('DOMContentLoaded', function() {
     const maintenanceForm = document.querySelector('#addIssueModal form');
@@ -499,20 +517,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
-                    // Show success message
+                    // Create success alert with proper DOM manipulation to prevent XSS
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                    alertDiv.innerHTML = `
-                        <i class="bi bi-check-circle me-2"></i>${data.message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    `;
-                    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.closeout-form-container'));
+                    alertDiv.setAttribute('role', 'alert');
+
+                    // Create icon element
+                    const icon = document.createElement('i');
+                    icon.className = 'bi bi-check-circle me-2';
+                    alertDiv.appendChild(icon);
+
+                    // Add the message as plain text (prevents XSS)
+                    const messageNode = document.createTextNode(data.message);
+                    alertDiv.appendChild(messageNode);
+
+                    // Create close button
+                    const closeBtn = document.createElement('button');
+                    closeBtn.type = 'button';
+                    closeBtn.className = 'btn-close';
+                    closeBtn.setAttribute('data-bs-dismiss', 'alert');
+                    closeBtn.setAttribute('aria-label', 'Close');
+                    alertDiv.appendChild(closeBtn);
+
+                    // Insert alert with defensive DOM checking
+                    const container = document.querySelector('.container');
+                    const formContainer = document.querySelector('.closeout-form-container');
+                    if (container && formContainer) {
+                        container.insertBefore(alertDiv, formContainer);
+                    } else {
+                        console.error('Expected DOM elements not found for alert insertion');
+                        alert(data.message); // Fallback
+                    }
 
                     // Reset form and close modal
                     maintenanceForm.reset();
@@ -521,35 +569,113 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Scroll to top to see success message
                     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                    // Add new issue to the list if it exists
-                    const issuesList = document.querySelector('.maintenance-table');
-                    if (issuesList && data.issue) {
-                        const newIssueHtml = `
-                            <div class="maintenance-item-edit">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <strong class="text-primary">
-                                        ${data.issue.glider ? `<i class="bi bi-airplane me-1"></i>Glider: ${data.issue.glider}` : ''}
-                                        ${data.issue.towplane ? `<i class="bi bi-airplane-engines me-1"></i>Towplane: ${data.issue.towplane}` : ''}
-                                    </strong>
-                                    ${data.issue.grounded ? '<span class="badge bg-danger ms-2">GROUNDED</span>' : ''}
-                                </div>
-                                <div class="maintenance-item-description">${data.issue.description}</div>
-                                <div class="maintenance-item-meta text-muted mt-2">
-                                    <small><i class="bi bi-person me-1"></i>Reported by: ${data.issue.reported_by}</small>
-                                </div>
-                            </div>
-                        `;
-                        const issuesContainer = issuesList.querySelector('.p-3');
-                        issuesContainer.insertAdjacentHTML('beforeend', newIssueHtml);
+                    // Add new issue to the list if it exists, or create the list if needed
+                    if (data.issue) {
+                        let issuesList = document.querySelector('.maintenance-table');
+                        let issuesContainer;
+
+                        if (!issuesList) {
+                            // Create the maintenance-table if it doesn't exist
+                            const equipmentIssuesTd = document.querySelector('textarea[name=\"equipment_issues\"]')?.closest('td');
+                            if (equipmentIssuesTd) {
+                                const maintenanceDiv = document.createElement('div');
+                                maintenanceDiv.className = 'maintenance-table mt-4';
+
+                                const innerDiv = document.createElement('div');
+                                innerDiv.className = 'p-3';
+
+                                const heading = document.createElement('h6');
+                                heading.className = 'mb-3';
+                                const headingIcon = document.createElement('i');
+                                headingIcon.className = 'bi bi-wrench me-2';
+                                heading.appendChild(headingIcon);
+                                heading.appendChild(document.createTextNode('Maintenance Issues Reported for This Day'));
+
+                                innerDiv.appendChild(heading);
+                                maintenanceDiv.appendChild(innerDiv);
+
+                                const addButton = equipmentIssuesTd.querySelector('.mt-3');
+                                if (addButton) {
+                                    addButton.insertAdjacentElement('afterend', maintenanceDiv);
+                                }
+                                issuesContainer = innerDiv;
+                            }
+                        } else {
+                            issuesContainer = issuesList.querySelector('.p-3');
+                        }
+
+                        if (issuesContainer) {
+                            // Create new issue item using DOM manipulation to prevent XSS
+                            const issueDiv = document.createElement('div');
+                            issueDiv.className = 'maintenance-item-edit';
+
+                            // Header row
+                            const headerDiv = document.createElement('div');
+                            headerDiv.className = 'd-flex justify-content-between align-items-start mb-2';
+
+                            const titleStrong = document.createElement('strong');
+                            titleStrong.className = 'text-primary';
+
+                            if (data.issue.glider) {
+                                const gliderIcon = document.createElement('i');
+                                gliderIcon.className = 'bi bi-airplane me-1';
+                                titleStrong.appendChild(gliderIcon);
+                                titleStrong.appendChild(document.createTextNode(`Glider: ${escapeHtml(data.issue.glider)}`));
+                            }
+
+                            if (data.issue.towplane) {
+                                const towplaneIcon = document.createElement('i');
+                                towplaneIcon.className = 'bi bi-airplane-engines me-1';
+                                titleStrong.appendChild(towplaneIcon);
+                                titleStrong.appendChild(document.createTextNode(`Towplane: ${escapeHtml(data.issue.towplane)}`));
+                            }
+
+                            headerDiv.appendChild(titleStrong);
+
+                            if (data.issue.grounded) {
+                                const groundedBadge = document.createElement('span');
+                                groundedBadge.className = 'badge bg-danger ms-2';
+                                groundedBadge.textContent = 'GROUNDED';
+                                headerDiv.appendChild(groundedBadge);
+                            }
+
+                            issueDiv.appendChild(headerDiv);
+
+                            // Description with linebreaks
+                            const descDiv = document.createElement('div');
+                            descDiv.className = 'maintenance-item-description';
+                            const descP = document.createElement('p');
+                            descP.innerHTML = linebreaks(escapeHtml(data.issue.description));
+                            descDiv.appendChild(descP);
+                            issueDiv.appendChild(descDiv);
+
+                            // Metadata
+                            const metaDiv = document.createElement('div');
+                            metaDiv.className = 'maintenance-item-meta text-muted mt-2';
+                            const metaSmall = document.createElement('small');
+                            const metaIcon = document.createElement('i');
+                            metaIcon.className = 'bi bi-person me-1';
+                            metaSmall.appendChild(metaIcon);
+                            metaSmall.appendChild(document.createTextNode(`Reported by: ${escapeHtml(data.issue.reported_by)}`));
+                            metaDiv.appendChild(metaSmall);
+                            issueDiv.appendChild(metaDiv);
+
+                            issuesContainer.appendChild(issueDiv);
+                        }
                     }
                 } else {
                     // Show error message
-                    alert('Error: ' + (data.error || 'Failed to submit maintenance issue'));
+                    let errorMsg = data.error || 'Failed to submit maintenance issue';
+                    if (data.errors) {
+                        // Log detailed errors for debugging
+                        console.error('Form validation errors:', data.errors);
+                    }
+                    alert('Error: ' + errorMsg);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to submit maintenance issue. Please try again.');
+                alert('Failed to submit maintenance issue: ' + error.message);
             })
             .finally(() => {
                 // Re-enable submit button

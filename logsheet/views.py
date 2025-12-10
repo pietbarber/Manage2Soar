@@ -1436,18 +1436,6 @@ def add_maintenance_issue(request, logsheet_id):
 
     if form.is_valid():
         issue = form.save(commit=False)
-        if not issue.glider and not issue.towplane:
-            if is_ajax:
-                return JsonResponse(
-                    {
-                        "success": False,
-                        "error": "Please select either a glider or a towplane.",
-                    },
-                    status=400,
-                )
-            messages.error(request, "Please select either a glider or a towplane.")
-            return redirect("logsheet:edit_logsheet_closeout", pk=logsheet_id)
-
         issue.reported_by = request.user
         issue.logsheet = logsheet
         issue.save()
@@ -1471,7 +1459,11 @@ def add_maintenance_issue(request, logsheet_id):
     else:
         if is_ajax:
             return JsonResponse(
-                {"success": False, "error": "Failed to submit maintenance issue."},
+                {
+                    "success": False,
+                    "error": "Form validation failed.",
+                    "errors": form.errors.get_json_data(),
+                },
                 status=400,
             )
         messages.error(request, "Failed to submit maintenance issue.")

@@ -49,6 +49,65 @@ def test_add_maintenance_issue_success(client, active_member, glider, logsheet):
 
 
 @pytest.mark.django_db
+def test_add_maintenance_issue_ajax_success(client, active_member, glider, logsheet):
+    """Test AJAX submission of maintenance issue returns JSON response"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue", args=[logsheet.pk]),
+        {"description": "Flat tire on main gear", "glider": glider.pk},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "issue" in data
+    assert data["issue"]["description"] == "Flat tire on main gear"
+    assert data["issue"]["glider"] == str(glider)
+    assert MaintenanceIssue.objects.filter(
+        description="Flat tire on main gear"
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_ajax_validation_error(client, active_member, logsheet):
+    """Test AJAX submission with missing aircraft returns error"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue", args=[logsheet.pk]),
+        {"description": "Issue without aircraft"},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["success"] is False
+    assert "error" in data
+    assert "errors" in data  # Should include detailed form errors
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_ajax_grounded_flag(
+    client, active_member, towplane, logsheet
+):
+    """Test AJAX submission with grounded flag"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue", args=[logsheet.pk]),
+        {
+            "description": "Engine failure",
+            "towplane": towplane.pk,
+            "grounded": True,
+        },
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["issue"]["grounded"] is True
+    issue = MaintenanceIssue.objects.get(description="Engine failure")
+    assert issue.grounded is True
+
+
+@pytest.mark.django_db
 def test_equipment_list_view(client, active_member):
     client.force_login(active_member)
     response = client.get(reverse("logsheet:equipment_list"))
