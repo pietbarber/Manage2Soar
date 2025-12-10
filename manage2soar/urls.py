@@ -126,7 +126,12 @@ urlpatterns = [
     path("oauth/", include("social_django.urls", namespace="social")),
     path("cms/", include("cms.urls")),
     path(
-        "password-reset/", auth_views.PasswordResetView.as_view(), name="password_reset"
+        "password-reset/",
+        auth_views.PasswordResetView.as_view(
+            html_email_template_name="registration/password_reset_email.html",
+            subject_template_name="registration/password_reset_subject.txt",
+        ),
+        name="password_reset",
     ),
     path(
         "password-reset/done/",
