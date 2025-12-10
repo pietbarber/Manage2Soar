@@ -476,6 +476,9 @@ TINYMCE_DEFAULT_CONFIG = {
     "extended_valid_elements": "iframe[src|width|height|style|class|loading|sandbox|title|referrerpolicy],div[class|style],object[classid|width|height|codebase|data|type],param[name|value],embed[type|width|height|src]",
     "valid_children": "+body[iframe|object|embed|div],+div[iframe|p],+p[a|small]",
     "custom_elements": "embed,object,param",
+    # Prevent TinyMCE from removing iframes (critical for PDF embedding)
+    "sandbox_iframes": False,  # Don't auto-add sandbox to iframes (we control it)
+    "sandbox_iframes_exceptions": ["*"],  # Allow all iframe sources
     "image_caption": True,
     "automatic_uploads": True,
     "file_picker_types": "image media",

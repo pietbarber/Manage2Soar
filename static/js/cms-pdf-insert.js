@@ -109,7 +109,7 @@ function initializePdfInsert() {
             // Create secure iframe with appropriate sandbox permissions for PDF display
             // allow-scripts: Required for PDF.js and browser PDF viewers
             // allow-same-origin: Required for PDF loading (must be combined with HTTPS validation)
-            const iframe = `<div class="pdf-container">
+            const iframeHtml = `<div class="pdf-container">
     <iframe
         src="${sanitizedUrl}"
         width="100%"
@@ -124,10 +124,17 @@ function initializePdfInsert() {
     <p><small><a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer">Open PDF in new tab</a></small></p>
 </div><p>&nbsp;</p>`;
 
-            // Insert using insertContent with format: 'raw' to prevent TinyMCE from filtering the HTML
+            // Insert using execCommand 'mceInsertRawHTML' to completely bypass TinyMCE filtering
+            // This is the most aggressive way to insert HTML without any parsing/filtering
             const editor = tinymce.activeEditor;
             if (editor) {
-                editor.insertContent(iframe, { format: 'raw' });
+                // Try mceInsertRawHTML first (bypasses all validation)
+                if (editor.execCommand('mceInsertRawHTML', false, iframeHtml)) {
+                    // Success
+                } else {
+                    // Fallback to insertContent with format: 'raw'
+                    editor.insertContent(iframeHtml, { format: 'raw' });
+                }
             } else {
                 alert('Editor not found. Please try again.');
             }
