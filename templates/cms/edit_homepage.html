@@ -125,14 +125,8 @@
 
 {% block extra_scripts %}
     <!-- Load shared CMS JavaScript functionality -->
-    <script src="{% static 'js/cms-pdf-insert.js' %}"></script>
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize PDF insert functionality (from shared file)
-            if (typeof initializeTinyMCEPdfInsert === 'function') {
-                initializeTinyMCEPdfInsert();
-            }
 
         });
     </script>
