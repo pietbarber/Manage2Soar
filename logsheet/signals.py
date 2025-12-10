@@ -35,7 +35,17 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
     # Notify assigned AircraftMeister members on creation and important updates.
     try:
         # On create: notify all meisters assigned to the affected aircraft
+        # ONLY if the logsheet is finalized (prevents premature notifications during editing)
         if created:
+            # Check if logsheet is finalized before sending notifications
+            if instance.logsheet and not instance.logsheet.finalized:
+                logger.debug(
+                    "notify_meisters_on_issue: skipped notification for issue %s because logsheet %s is not finalized",
+                    instance.pk,
+                    instance.logsheet.pk,
+                )
+                return
+
             if instance.glider:
                 meisters = instance.glider.aircraftmeister_set.select_related(
                     "member"

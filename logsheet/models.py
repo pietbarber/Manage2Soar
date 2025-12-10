@@ -739,6 +739,52 @@ class Logsheet(models.Model):
                         resolved=False,
                     )
 
+            # --- Notify maintenance officers about all unresolved issues on this logsheet ---
+            # This handles issues created before finalization that didn't send notifications
+            from notifications.models import Notification
+
+            unresolved_issues = MaintenanceIssue.objects.filter(
+                logsheet=self, resolved=False
+            ).select_related("glider", "towplane")
+
+            for issue in unresolved_issues:
+                # Get the aircraft meisters
+                if issue.glider:
+                    meisters = issue.glider.aircraftmeister_set.select_related(
+                        "member"
+                    ).all()
+                elif issue.towplane:
+                    meisters = issue.towplane.aircraftmeister_set.select_related(
+                        "member"
+                    ).all()
+                else:
+                    meisters = []
+
+                if not meisters:
+                    continue
+
+                # Create notification message
+                message = f"Maintenance issue reported for {issue.glider or issue.towplane}: {issue.description[:100]}"
+                try:
+                    from django.urls import reverse
+
+                    url = reverse("logsheet:maintenance_issues")
+                except Exception:
+                    url = None
+
+                # Notify each meister (with deduplication)
+                for meister in meisters:
+                    try:
+                        existing = Notification.objects.filter(
+                            user=meister.member, dismissed=False, message=message
+                        )
+                        if not existing.exists():
+                            Notification.objects.create(
+                                user=meister.member, message=message, url=url
+                            )
+                    except Exception:
+                        pass  # Don't break finalization if notification fails
+
 
 ####################################################
 # TowplaneChargeScheme model
