@@ -479,8 +479,8 @@ TINYMCE_DEFAULT_CONFIG = {
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain
     # NOTE: These callbacks cannot be defined here as they require JavaScript functions.
-    # They are defined in the template where TinyMCE is initialized.
-    # See: templates/includes/tinymce_init.html for the actual implementation
+    # They are defined in JavaScript that extends TinyMCE initialization.
+    # See: static/js/tinymce-youtube-fix.js for the actual implementation
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
     # Issue #322: Force tables to use responsive CSS by default
@@ -490,7 +490,8 @@ TINYMCE_DEFAULT_CONFIG = {
         "max-width": "100%",
         "table-layout": "fixed",
     },
-    "table_sizing_mode": "responsive",  # Use responsive sizing mode (replaces deprecated table_responsive_width)
+    # Use responsive sizing mode (replaces deprecated table_responsive_width)
+    "table_sizing_mode": "responsive",
     "table_toolbar": (
         "tableprops cellprops | "
         "tableinsertrowbefore tableinsertrowafter tabledeleterow | "

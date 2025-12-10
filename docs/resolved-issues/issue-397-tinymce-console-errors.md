@@ -85,6 +85,7 @@ Added script tag after `{{ form.media }}` in all forms using TinyMCE:
 - `members/templates/members/biography.html`
 - `cms/templates/cms/feedback_form.html`
 - `instructors/templates/instructors/log_ground_instruction.html`
+- `instructors/templates/instructors/fill_instruction_report.html`
 - `logsheet/templates/logsheet/edit_closeout_form.html`
 
 **Pattern**:
@@ -199,6 +200,7 @@ Alternative approaches that were **not** used:
 - `members/templates/members/biography.html`
 - `cms/templates/cms/feedback_form.html`
 - `instructors/templates/instructors/log_ground_instruction.html`
+- `instructors/templates/instructors/fill_instruction_report.html`
 - `logsheet/templates/logsheet/edit_closeout_form.html`
 
 ## Compatibility Notes
