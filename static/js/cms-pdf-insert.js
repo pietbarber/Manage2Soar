@@ -129,10 +129,10 @@ function initializePdfInsert() {
             const editor = tinymce.activeEditor;
             if (editor) {
                 // Try mceInsertRawHTML first (bypasses all validation)
-                if (editor.execCommand('mceInsertRawHTML', false, iframeHtml)) {
-                    // Success
-                } else {
-                    // Fallback to insertContent with format: 'raw'
+                try {
+                    editor.execCommand('mceInsertRawHTML', false, iframeHtml);
+                } catch (e) {
+                    // If mceInsertRawHTML doesn't exist, fall back to insertContent with raw format
                     editor.insertContent(iframeHtml, { format: 'raw' });
                 }
             } else {
