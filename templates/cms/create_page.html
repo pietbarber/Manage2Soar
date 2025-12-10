@@ -51,6 +51,8 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.media }}
+                {# Issue #397: TinyMCE YouTube fix must load after form.media #}
+                <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 
                 <div class="row">
                     <div class="col-md-8">

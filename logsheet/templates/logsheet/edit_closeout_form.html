@@ -6,6 +6,8 @@
 {% block head_extra %}
 {{ form.media }}
 {{ formset.media }}
+{# Issue #397: TinyMCE YouTube fix must load after form.media #}
+<script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/logsheet.css' %}">
 {% endblock %}
 
