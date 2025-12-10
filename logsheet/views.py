@@ -1428,11 +1428,18 @@ def view_logsheet_closeout(request, pk):
 @require_POST
 @active_member_required
 def add_maintenance_issue(request, logsheet_id):
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     logsheet = get_object_or_404(Logsheet, pk=logsheet_id)
     form = MaintenanceIssueForm(request.POST)
 
     # Support AJAX requests to avoid losing form data
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    logger.info(f"add_maintenance_issue called. is_ajax={is_ajax}")
+    logger.info(f"X-Requested-With header: {request.headers.get('X-Requested-With')}")
+    logger.info(f"All headers: {dict(request.headers)}")
 
     if form.is_valid():
         issue = form.save(commit=False)
