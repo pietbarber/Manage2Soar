@@ -516,17 +516,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
             })
             .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
-                    });
-                }
-                return response.json();
+                // Try to parse as JSON first (handles both success and error responses)
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        // JSON parsed successfully but response wasn't OK
+                        return Promise.reject(data);
+                    }
+                    return data;
+                }).catch(err => {
+                    // If JSON parsing fails, fall back to text error
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
+                        });
+                    }
+                    throw err;
+                });
             })
             .then(data => {
                 if (data.success) {
@@ -635,7 +644,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.issue.grounded) {
                                 const groundedBadge = document.createElement('span');
                                 groundedBadge.className = 'badge bg-danger ms-2';
-                                groundedBadge.textContent = 'GROUNDED';
+
+                                const icon = document.createElement('i');
+                                icon.className = 'bi bi-exclamation-triangle me-1';
+                                groundedBadge.appendChild(icon);
+                                groundedBadge.appendChild(document.createTextNode('Grounded'));
+
                                 headerDiv.appendChild(groundedBadge);
                             }
 
@@ -643,21 +657,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             // Description with linebreaks
                             const descDiv = document.createElement('div');
-                            descDiv.className = 'maintenance-item-description';
-                            const descP = document.createElement('p');
-                            descP.innerHTML = linebreaks(escapeHtml(data.issue.description));
-                            descDiv.appendChild(descP);
+                            descDiv.className = 'mb-2';
+                            descDiv.innerHTML = linebreaks(escapeHtml(data.issue.description));
                             issueDiv.appendChild(descDiv);
 
-                            // Metadata
+                            // Metadata with report date
                             const metaDiv = document.createElement('div');
-                            metaDiv.className = 'maintenance-item-meta text-muted mt-2';
-                            const metaSmall = document.createElement('small');
+                            metaDiv.className = 'text-muted small mb-2';
                             const metaIcon = document.createElement('i');
                             metaIcon.className = 'bi bi-person me-1';
-                            metaSmall.appendChild(metaIcon);
-                            metaSmall.appendChild(document.createTextNode(`Reported by: ${escapeHtml(data.issue.reported_by)}`));
-                            metaDiv.appendChild(metaSmall);
+                            metaDiv.appendChild(metaIcon);
+
+                            // Format current date as "Mon DD, YYYY" to match Django's date:"M j, Y" filter
+                            const today = new Date();
+                            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                            const formattedDate = `${monthNames[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+
+                            metaDiv.appendChild(document.createTextNode(`Reported by ${escapeHtml(data.issue.reported_by)} on ${formattedDate}`));
                             issueDiv.appendChild(metaDiv);
 
                             issuesContainer.appendChild(issueDiv);
