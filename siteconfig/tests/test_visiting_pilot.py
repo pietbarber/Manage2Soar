@@ -575,7 +575,7 @@ def test_visiting_pilot_glider_creation_with_ownership(visiting_pilot_config):
     setattr(request, "_messages", FallbackStorage(request))
 
     response = visiting_pilot_signup(request, token)
-
+    assert response.status_code == 302  # Expect redirect after successful signup
     # Verify member was created
     member = Member.objects.get(email="janepilot@example.com")
     assert member.first_name == "Jane"
