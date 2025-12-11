@@ -80,6 +80,41 @@ class VisitingPilotSignupForm(forms.Form):
         ),
     )
 
+    # Optional glider information
+    glider_n_number = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "N-Number (e.g., N12345) - optional",
+            }
+        ),
+        help_text="If you're bringing your own glider, please provide its N-number",
+    )
+
+    glider_make = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Make (e.g., Schleicher) - optional",
+            }
+        ),
+    )
+
+    glider_model = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Model (e.g., ASK-21) - optional",
+            }
+        ),
+    )
+
     def clean_email(self):
         """Check if email is already in use."""
         email = self.cleaned_data.get("email")
@@ -175,6 +210,31 @@ class VisitingPilotSignupForm(forms.Form):
                             f"Please provide your SSA member number to help us distinguish between members, "
                             f"or contact the duty officer if you need assistance."
                         )
+
+            # Validate glider information if provided
+            glider_n_number = cleaned_data.get("glider_n_number")
+            glider_make = cleaned_data.get("glider_make")
+            glider_model = cleaned_data.get("glider_model")
+
+            # If any glider field is provided, require all three
+            glider_fields_provided = [glider_n_number, glider_make, glider_model]
+            glider_fields_count = sum(1 for field in glider_fields_provided if field)
+
+            if glider_fields_count > 0 and glider_fields_count < 3:
+                errors.append(
+                    "If you're providing glider information, please fill in all glider fields (N-Number, Make, and Model)."
+                )
+
+            # Check if glider N-number already exists
+            if glider_n_number:
+                from logsheet.models import Glider
+
+                # Normalize N-number for comparison
+                normalized_n = glider_n_number.strip().upper()
+                if Glider.objects.filter(n_number__iexact=normalized_n).exists():
+                    errors.append(
+                        f"A glider with N-number {normalized_n} is already registered in the system."
+                    )
 
             if errors:
                 raise ValidationError(errors)

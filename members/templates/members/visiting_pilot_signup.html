@@ -189,6 +189,86 @@
                             {% endif %}
                         </div>
 
+                        <!-- Optional Glider Information Section -->
+                        <div class="card mb-4 border-info">
+                            <div class="card-header bg-info bg-opacity-10">
+                                <h6 class="mb-0 text-info">
+                                    <i class="fas fa-plane-departure me-2"></i>
+                                    Glider Information (Optional)
+                                </h6>
+                                <small class="text-muted">
+                                    If you're bringing your own glider, please provide its details below.
+                                    This helps our duty officer select the correct glider in the flight log.
+                                </small>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <label for="{{ form.glider_n_number.id_for_label }}" class="form-label">
+                                                N-Number (Registration)
+                                            </label>
+                                            <input type="text"
+                                                   class="form-control{% if form.glider_n_number.errors %} is-invalid{% endif %}"
+                                                   id="{{ form.glider_n_number.id_for_label }}"
+                                                   name="{{ form.glider_n_number.name }}"
+                                                   value="{{ form.glider_n_number.value|default:'' }}"
+                                                   placeholder="e.g., N12345">
+                                            {% if form.glider_n_number.errors %}
+                                                <div class="invalid-feedback">
+                                                    {% for error in form.glider_n_number.errors %}
+                                                        {{ error }}
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.glider_make.id_for_label }}" class="form-label">
+                                                Make/Manufacturer
+                                            </label>
+                                            <input type="text"
+                                                   class="form-control{% if form.glider_make.errors %} is-invalid{% endif %}"
+                                                   id="{{ form.glider_make.id_for_label }}"
+                                                   name="{{ form.glider_make.name }}"
+                                                   value="{{ form.glider_make.value|default:'' }}"
+                                                   placeholder="e.g., Schleicher">
+                                            {% if form.glider_make.errors %}
+                                                <div class="invalid-feedback">
+                                                    {% for error in form.glider_make.errors %}
+                                                        {{ error }}
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.glider_model.id_for_label }}" class="form-label">
+                                                Model
+                                            </label>
+                                            <input type="text"
+                                                   class="form-control{% if form.glider_model.errors %} is-invalid{% endif %}"
+                                                   id="{{ form.glider_model.id_for_label }}"
+                                                   name="{{ form.glider_model.name }}"
+                                                   value="{{ form.glider_model.value|default:'' }}"
+                                                   placeholder="e.g., ASK-21">
+                                            {% if form.glider_model.errors %}
+                                                <div class="invalid-feedback">
+                                                    {% for error in form.glider_model.errors %}
+                                                        {{ error }}
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {% if form.non_field_errors %}
                             <div class="alert alert-danger">
                                 {% for error in form.non_field_errors %}

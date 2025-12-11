@@ -592,21 +592,61 @@ def visiting_pilot_signup(request, token):
                 member.is_active = config.visiting_pilot_auto_approve
                 member.save()
 
+                # Create glider if glider information was provided
+                glider_created = False
+                glider = None
+                if (
+                    form.cleaned_data.get("glider_n_number")
+                    and form.cleaned_data.get("glider_make")
+                    and form.cleaned_data.get("glider_model")
+                ):
+                    from logsheet.models import Glider
+
+                    try:
+                        glider = Glider.objects.create(
+                            n_number=form.cleaned_data["glider_n_number"]
+                            .strip()
+                            .upper(),
+                            make=form.cleaned_data["glider_make"].strip(),
+                            model=form.cleaned_data["glider_model"].strip(),
+                            club_owned=False,
+                            is_active=True,
+                            seats=1,  # Default to single-seat, can be updated later
+                        )
+                        # Link the glider to the visiting pilot as owner
+                        glider.owners.add(member)
+                        glider_created = True
+                        logger.info(
+                            f"Created glider {glider.n_number} for visiting pilot {member.email}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error creating glider for visiting pilot {member.email}: {e}"
+                        )
+                        # Don't fail the whole registration if glider creation fails
+                        # The member account is still created successfully
+
                 logger.info(
                     f"Visiting pilot registered: {member.email} ({member.first_name} {member.last_name})"
+                    + (f" with glider {glider.n_number}" if glider_created else "")
                 )
 
                 # Show success message with different content based on auto-approval
+                glider_msg = (
+                    f" Your glider ({glider.n_number}) has been added to the system."
+                    if glider_created
+                    else ""
+                )
                 if config.visiting_pilot_auto_approve:
                     messages.success(
                         request,
-                        f"Welcome {member.first_name}! Your account has been created and activated. "
+                        f"Welcome {member.first_name}! Your account has been created and activated.{glider_msg} "
                         f"You can now be added to flight logs. Please check in with the duty officer.",
                     )
                 else:
                     messages.success(
                         request,
-                        f"Thank you {member.first_name}! Your registration has been submitted for approval. "
+                        f"Thank you {member.first_name}! Your registration has been submitted for approval.{glider_msg} "
                         f"Please check in with the duty officer who will activate your account.",
                     )
 
@@ -617,6 +657,7 @@ def visiting_pilot_signup(request, token):
                         "member": member,
                         "config": config,
                         "auto_approved": config.visiting_pilot_auto_approve,
+                        "glider": glider if glider_created else None,
                     },
                 )
 
