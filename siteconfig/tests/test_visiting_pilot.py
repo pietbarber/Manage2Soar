@@ -599,7 +599,7 @@ def test_visiting_pilot_registration_succeeds_without_glider(visiting_pilot_conf
     setattr(request, "session", {})
     setattr(request, "_messages", FallbackStorage(request))
 
-    response = visiting_pilot_signup(request, token)
+    visiting_pilot_signup(request, token)
 
     # Verify member was created
     member = Member.objects.get(email="johnsmith@example.com")
@@ -634,8 +634,6 @@ def test_visiting_pilot_glider_creation_handles_integrity_error(
     }
 
     # Mock Glider.objects.create to simulate a race condition (IntegrityError)
-    original_create = Glider.objects.create
-
     def mock_create(*args, **kwargs):
         # Raise IntegrityError to simulate duplicate N-number from race condition
         raise IntegrityError("duplicate key value violates unique constraint")
@@ -652,7 +650,7 @@ def test_visiting_pilot_glider_creation_handles_integrity_error(
     messages = FallbackStorage(request)
     setattr(request, "_messages", messages)
 
-    response = visiting_pilot_signup(request, token)
+    visiting_pilot_signup(request, token)
 
     # Verify member was still created despite glider IntegrityError
     member = Member.objects.get(email="race@example.com")

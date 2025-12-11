@@ -224,9 +224,8 @@ class VisitingPilotSignupForm(forms.Form):
                 errors.append(
                     "If you're providing glider information, please fill in all glider fields (N-Number, Make, and Model)."
                 )
-
-            # Check if glider N-number already exists
-            if glider_n_number:
+            # Only check for duplicate N-number if all three fields are provided
+            elif glider_fields_count == 3:
                 from logsheet.models import Glider
 
                 # Normalize N-number for comparison and save back to cleaned_data

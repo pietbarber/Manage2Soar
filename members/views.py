@@ -635,6 +635,10 @@ def visiting_pilot_signup(request, token):
                         logger.error(
                             f"Error creating glider for visiting pilot {member.email}: {e}"
                         )
+                        messages.warning(
+                            request,
+                            "An error occurred while adding your glider. Your account was created, but the glider was not added.",
+                        )
                         # Don't fail the whole registration if glider creation fails
                         # The member account is still created successfully
 
