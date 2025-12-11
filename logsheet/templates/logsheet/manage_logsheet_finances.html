@@ -412,11 +412,11 @@
 <!-- Action buttons at the bottom of the page -->
 <div class="action-buttons mb-4">
   {% if not logsheet.finalized %}
-    <button type="submit" form="finance-form" class="btn btn-success btn-lg me-3">
+    <button type="submit" form="finance-form" class="btn btn-success me-3">
       <i class="bi bi-check-circle me-2"></i>Save Changes
     </button>
   {% endif %}
-  <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary btn-lg">
+  <a href="{% url 'logsheet:manage' pk=logsheet.pk %}" class="btn btn-secondary">
     <i class="bi bi-x-circle me-2"></i>Cancel
   </a>
 </div>
