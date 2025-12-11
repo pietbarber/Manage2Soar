@@ -38,6 +38,8 @@
             <form method="post" enctype="multipart/form-data" novalidate>
               {% csrf_token %}
               {{ form.media }}
+              {# Issue #397: TinyMCE YouTube fix must load after form.media #}
+              <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 
               <!-- Biography content field -->
               <div class="mb-4">

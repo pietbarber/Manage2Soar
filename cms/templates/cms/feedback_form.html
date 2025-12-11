@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 
 {% block title %}Submit Feedback{% endblock %}
@@ -26,6 +27,8 @@
                         {% csrf_token %}
                         <input type="hidden" name="referring_url" value="{{ referring_url }}">
                         {{ form.media }}
+                        {# Issue #397: TinyMCE YouTube fix must load after form.media #}
+                        <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 
                         <div class="mb-3">
                             {{ form.feedback_type.label_tag }}

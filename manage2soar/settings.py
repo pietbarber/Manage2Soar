@@ -478,34 +478,9 @@ TINYMCE_DEFAULT_CONFIG = {
     # FIX FOR ISSUE #277 - YOUTUBE ERROR 153: Multiple approaches to ensure proper referrer policy
     # YouTube Error 153 occurs when referrer policy is too restrictive (e.g., 'no-referrer')
     # Using 'strict-origin-when-cross-origin' allows YouTube to verify the embedding domain
-    "media_url_resolver": r"""function(url, resolve, reject) {
-        if (url.indexOf('youtube.com') !== -1 || url.indexOf('youtu.be') !== -1) {
-            // Convert YouTube URLs to embed format with proper referrer policy
-            var videoId = null;
-            if (url.indexOf('youtube.com/watch') !== -1) {
-                var match = url.match(/v=([a-zA-Z0-9_-]+)/);
-                if (match) videoId = match[1];
-            } else if (url.indexOf('youtu.be/') !== -1) {
-                var match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
-                if (match) videoId = match[1];
-            }
-
-            if (videoId) {
-                resolve({
-                    type: 'video',
-                    source: 'https://www.youtube.com/embed/' + videoId,
-                    width: 560,
-                    height: 315
-                });
-                return;
-            }
-        }
-        // Let TinyMCE handle other URLs
-        reject();
-    }""",
-    "video_template_callback": """function(data) {
-        return '<iframe src="' + data.source + '" width="' + (data.width || 560) + '" height="' + (data.height || 315) + '" frameborder="0" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
-    }""",
+    # NOTE: These callbacks cannot be defined here as they require JavaScript functions.
+    # They are defined in JavaScript that extends TinyMCE initialization.
+    # See: static/js/tinymce-youtube-fix.js for the actual implementation
     "images_upload_url": "/members/tinymce-upload/",
     "images_upload_credentials": True,  # include CSRF token
     # Issue #322: Force tables to use responsive CSS by default
@@ -515,8 +490,8 @@ TINYMCE_DEFAULT_CONFIG = {
         "max-width": "100%",
         "table-layout": "fixed",
     },
-    "table_sizing_mode": "responsive",  # Use responsive sizing mode
-    "table_responsive_width": True,  # Enable responsive table widths
+    # Use responsive sizing mode (replaces deprecated table_responsive_width)
+    "table_sizing_mode": "responsive",
     "table_toolbar": (
         "tableprops cellprops | "
         "tableinsertrowbefore tableinsertrowafter tabledeleterow | "
