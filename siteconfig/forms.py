@@ -221,6 +221,11 @@ class VisitingPilotSignupForm(forms.Form):
             glider_make = glider_make.strip() if glider_make else ""
             glider_model = glider_model.strip() if glider_model else ""
 
+            # Always update cleaned_data with stripped values for consistency
+            cleaned_data["glider_n_number"] = glider_n_number
+            cleaned_data["glider_make"] = glider_make
+            cleaned_data["glider_model"] = glider_model
+
             # Count non-empty fields after stripping
             glider_fields_provided = [glider_n_number, glider_make, glider_model]
             glider_fields_count = sum(1 for field in glider_fields_provided if field)

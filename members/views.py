@@ -631,7 +631,7 @@ def visiting_pilot_signup(request, token):
                         # Don't fail the whole registration if glider creation fails
                         # The member account is still created successfully
                     except Exception as e:
-                        # Catch any unexpected exceptions during glider creation (e.g., database errors, validation issues)
+                        # Catch any unexpected exceptions during glider creation (e.g., database errors, other runtime exceptions)
                         # We use a broad exception handler here because glider registration is optional and should not
                         # prevent member account creation. IntegrityError is handled separately above.
                         logger.error(
