@@ -238,14 +238,12 @@ class VisitingPilotSignupForm(forms.Form):
             elif glider_fields_count == 3:
                 from logsheet.models import Glider
 
-                # Normalize N-number to uppercase and save all normalized values
+                # Normalize N-number to uppercase and update cleaned_data
                 normalized_n = glider_n_number.upper()
                 cleaned_data["glider_n_number"] = normalized_n
-                cleaned_data["glider_make"] = glider_make
-                cleaned_data["glider_model"] = glider_model
 
-                # Use exact comparison since we've already normalized to uppercase
-                if Glider.objects.filter(n_number=normalized_n).exists():
+                # Use case-insensitive comparison to catch duplicates regardless of case
+                if Glider.objects.filter(n_number__iexact=normalized_n).exists():
                     errors.append(
                         f"A glider with N-number {normalized_n} is already registered in the system."
                     )

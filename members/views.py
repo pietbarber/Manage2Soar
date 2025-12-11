@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db import IntegrityError
 from django.db.models import F, Func, Prefetch
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -599,15 +600,12 @@ def visiting_pilot_signup(request, token):
                     form.cleaned_data.get(field)
                     for field in ["glider_n_number", "glider_make", "glider_model"]
                 ):
-                    from django.db import IntegrityError
-
                     from logsheet.models import Glider
 
                     try:
+                        # N-number is already normalized to uppercase in form validation
                         glider = Glider.objects.create(
-                            n_number=form.cleaned_data[
-                                "glider_n_number"
-                            ],  # N-number is already normalized to uppercase in form validation
+                            n_number=form.cleaned_data["glider_n_number"],
                             make=form.cleaned_data["glider_make"],
                             model=form.cleaned_data["glider_model"],
                             club_owned=False,
@@ -656,20 +654,20 @@ def visiting_pilot_signup(request, token):
 
                 # Show success message with different content based on auto-approval
                 glider_msg = (
-                    f" Your glider ({glider.n_number}) has been added to the system."
+                    f"Your glider ({glider.n_number}) has been added to the system. "
                     if glider_created and glider
                     else ""
                 )
                 if config.visiting_pilot_auto_approve:
                     messages.success(
                         request,
-                        f"Welcome {member.first_name}! Your account has been created and activated.{glider_msg} "
+                        f"Welcome {member.first_name}! Your account has been created and activated. {glider_msg}"
                         f"You can now be added to flight logs. Please check in with the duty officer.",
                     )
                 else:
                     messages.success(
                         request,
-                        f"Thank you {member.first_name}! Your registration has been submitted for approval.{glider_msg} "
+                        f"Thank you {member.first_name}! Your registration has been submitted for approval. {glider_msg}"
                         f"Please check in with the duty officer who will activate your account.",
                     )
 

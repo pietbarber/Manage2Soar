@@ -1,5 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import reverse
 
@@ -566,11 +568,7 @@ def test_visiting_pilot_glider_creation_with_ownership(visiting_pilot_config):
     }
 
     request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
-    from django.contrib.auth.models import AnonymousUser
-
     request.user = AnonymousUser()
-    from django.contrib.messages.storage.fallback import FallbackStorage
-
     setattr(request, "session", {})
     setattr(request, "_messages", FallbackStorage(request))
 
@@ -612,11 +610,7 @@ def test_visiting_pilot_registration_succeeds_without_glider(visiting_pilot_conf
     }
 
     request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
-    from django.contrib.auth.models import AnonymousUser
-
     request.user = AnonymousUser()
-    from django.contrib.messages.storage.fallback import FallbackStorage
-
     setattr(request, "session", {})
     setattr(request, "_messages", FallbackStorage(request))
 
@@ -664,11 +658,7 @@ def test_visiting_pilot_glider_creation_handles_integrity_error(
     monkeypatch.setattr("logsheet.models.Glider.objects.create", mock_create)
 
     request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
-    from django.contrib.auth.models import AnonymousUser
-
     request.user = AnonymousUser()
-    from django.contrib.messages.storage.fallback import FallbackStorage
-
     setattr(request, "session", {})
     messages = FallbackStorage(request)
     setattr(request, "_messages", messages)
@@ -710,11 +700,7 @@ def test_visiting_pilot_success_message_includes_glider(visiting_pilot_config):
     }
 
     request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
-    from django.contrib.auth.models import AnonymousUser
-
     request.user = AnonymousUser()
-    from django.contrib.messages.storage.fallback import FallbackStorage
-
     setattr(request, "session", {})
     messages = FallbackStorage(request)
     setattr(request, "_messages", messages)
