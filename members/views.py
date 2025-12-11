@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db import IntegrityError
 from django.db.models import F, Func, Prefetch
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -592,21 +593,81 @@ def visiting_pilot_signup(request, token):
                 member.is_active = config.visiting_pilot_auto_approve
                 member.save()
 
+                # Create glider if glider information was provided
+                glider_created = False
+                glider = None
+                if all(
+                    form.cleaned_data.get(field)
+                    for field in ["glider_n_number", "glider_make", "glider_model"]
+                ):
+                    from logsheet.models import Glider
+
+                    try:
+                        # N-number is already normalized to uppercase in form validation
+                        glider = Glider.objects.create(
+                            n_number=form.cleaned_data["glider_n_number"],
+                            make=form.cleaned_data["glider_make"],
+                            model=form.cleaned_data["glider_model"],
+                            club_owned=False,
+                            is_active=True,
+                            seats=1,  # Default to single-seat, can be updated later
+                        )
+                        # Link the glider to the visiting pilot as owner
+                        glider.owners.add(member)
+                        glider_created = True
+                        logger.info(
+                            f"Created glider {glider.n_number} for visiting pilot {member.email}"
+                        )
+                    except IntegrityError:
+                        logger.warning(
+                            f"IntegrityError: Duplicate N-number when creating glider for visiting pilot {member.email} (N-number: {form.cleaned_data['glider_n_number']})"
+                        )
+                        messages.warning(
+                            request,
+                            "A glider with this N-number already exists in the system. Your account was created, but the glider was not added.",
+                        )
+                        # Don't fail the whole registration if glider creation fails
+                        # The member account is still created successfully
+                    except Exception as e:
+                        # Catch any unexpected exceptions during glider creation (e.g., database errors, other runtime exceptions)
+                        # We use a broad exception handler here because glider registration is optional and should not
+                        # prevent member account creation. IntegrityError is handled separately above.
+                        logger.error(
+                            f"Error creating glider for visiting pilot {member.email}: {type(e).__name__}: {e}",
+                            exc_info=True,
+                        )
+                        messages.warning(
+                            request,
+                            "An error occurred while adding your glider. Your account was created, but the glider was not added.",
+                        )
+                        # Don't fail the whole registration if glider creation fails
+                        # The member account is still created successfully
+
                 logger.info(
                     f"Visiting pilot registered: {member.email} ({member.first_name} {member.last_name})"
+                    + (
+                        f" with glider {glider.n_number}"
+                        if glider_created and glider
+                        else ""
+                    )
                 )
 
                 # Show success message with different content based on auto-approval
+                glider_msg = (
+                    f"Your glider ({glider.n_number}) has been added to the system. "
+                    if glider_created and glider
+                    else ""
+                )
                 if config.visiting_pilot_auto_approve:
                     messages.success(
                         request,
-                        f"Welcome {member.first_name}! Your account has been created and activated. "
+                        f"Welcome {member.first_name}! Your account has been created and activated. {glider_msg}"
                         f"You can now be added to flight logs. Please check in with the duty officer.",
                     )
                 else:
                     messages.success(
                         request,
-                        f"Thank you {member.first_name}! Your registration has been submitted for approval. "
+                        f"Thank you {member.first_name}! Your registration has been submitted for approval. {glider_msg}"
                         f"Please check in with the duty officer who will activate your account.",
                     )
 
@@ -617,6 +678,7 @@ def visiting_pilot_signup(request, token):
                         "member": member,
                         "config": config,
                         "auto_approved": config.visiting_pilot_auto_approve,
+                        "glider": glider if glider_created else None,
                     },
                 )
 

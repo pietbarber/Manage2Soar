@@ -52,8 +52,17 @@
                             {% if member.phone %}{{ member.phone }}<br>{% endif %}
                             {% if member.SSA_member_number %}SSA #{{ member.SSA_member_number }}<br>{% endif %}
                             {% if member.glider_rating %}{{ member.glider_rating }}<br>{% endif %}
-                            {% if member.home_club %}{{ member.home_club }}{% endif %}
+                            {% if member.home_club %}{{ member.home_club }}{% if glider %}<br>{% endif %}{% endif %}
                         </p>
+
+                        {% if glider %}
+                            <p class="text-muted">
+                                <strong>Your Glider:</strong><br>
+                                <i class="fas fa-plane-departure text-info"></i>
+                                {{ glider.make }} {{ glider.model }}<br>
+                                N-Number: {{ glider.n_number }}
+                            </p>
+                        {% endif %}
                     </div>
 
                     <div class="mt-4">
