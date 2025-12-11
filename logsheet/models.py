@@ -782,8 +782,15 @@ class Logsheet(models.Model):
                             Notification.objects.create(
                                 user=meister.member, message=message, url=url
                             )
-                    except Exception:
-                        pass  # Don't break finalization if notification fails
+                    except Exception as e:
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.exception(
+                            "Failed to create maintenance notification for meister %s: %s",
+                            meister.member.pk if meister and meister.member else None,
+                            str(e),
+                        )
 
 
 ####################################################

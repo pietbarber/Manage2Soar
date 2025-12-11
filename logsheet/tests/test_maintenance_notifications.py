@@ -125,11 +125,8 @@ def test_maintenance_notification_dedupe():
     notes = Notification.objects.filter(
         user=meister, dismissed=False, message__contains="battery low"
     )
-    # Dedupe should create at most one undismissed notification with identical message
-    # (Note: With 2 separate issues, there may be 2 notifications, one per issue)
-    # The deduplication is based on identical message content, so if both issues
-    # have the same description, only one notification should be created
-    assert notes.count() >= 1  # At least one notification
-    # If descriptions are identical, dedupe should prevent duplicate notifications
-    messages = set(n.message for n in notes)
-    assert len(messages) == 1  # Only one unique message despite 2 issues
+    # Dedupe should create exactly one notification despite two issues with identical descriptions
+    # The deduplication check in models.py (line 778-780) prevents duplicate notifications
+    assert (
+        notes.count() == 1
+    ), f"Expected 1 notification due to deduplication, got {notes.count()}"

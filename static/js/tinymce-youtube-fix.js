@@ -71,9 +71,9 @@
                         }
 
                         if (videoId) {
-                            // Video ID is validated by regex, safe to use
+                            // Video ID is validated by regex, escape for defense-in-depth
                             resolve({
-                                html: '<iframe src="https://www.youtube.com/embed/' + videoId +
+                                html: '<iframe src="https://www.youtube.com/embed/' + escapeHtml(videoId) +
                                     '" width="560" height="315" frameborder="0" allowfullscreen ' +
                                     'referrerpolicy="strict-origin-when-cross-origin"></iframe>'
                             });
