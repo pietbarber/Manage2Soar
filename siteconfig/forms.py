@@ -229,9 +229,12 @@ class VisitingPilotSignupForm(forms.Form):
             if glider_n_number:
                 from logsheet.models import Glider
 
-                # Normalize N-number for comparison
+                # Normalize N-number for comparison and save back to cleaned_data
                 normalized_n = glider_n_number.strip().upper()
-                if Glider.objects.filter(n_number__iexact=normalized_n).exists():
+                cleaned_data["glider_n_number"] = normalized_n
+
+                # Use exact comparison since we've already normalized to uppercase
+                if Glider.objects.filter(n_number=normalized_n).exists():
                     errors.append(
                         f"A glider with N-number {normalized_n} is already registered in the system."
                     )

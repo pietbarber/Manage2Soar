@@ -418,3 +418,289 @@ def test_visiting_pilot_security_token_validation(visiting_pilot_config):
     new_token = visiting_pilot_config.refresh_visiting_pilot_token()
     assert new_token != old_token
     assert len(new_token) == 12
+
+
+# ============================================================================
+# Glider Registration Tests (Issue #379)
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_form_valid_with_complete_glider_info(visiting_pilot_config):
+    """Test that form validates when all glider fields are provided."""
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "phone": "555-1234",
+        "ssa_member_number": "123456",
+        "glider_rating": "private",
+        "home_club": "Example Soaring",
+        "glider_n_number": "n12345",  # lowercase to test normalization
+        "glider_make": "Schleicher",
+        "glider_model": "ASK-21",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert form.is_valid()
+    # Verify N-number was normalized
+    assert form.cleaned_data["glider_n_number"] == "N12345"
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_form_partial_glider_fields_fails(visiting_pilot_config):
+    """Test that form validation fails when only some glider fields are provided."""
+    # Test with only N-number
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "glider_n_number": "N12345",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert not form.is_valid()
+    assert any(
+        "all glider fields" in error for error in form.non_field_errors()
+    ), "Should require all glider fields when any are provided"
+
+    # Test with N-number and make but no model
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "glider_n_number": "N12345",
+        "glider_make": "Schleicher",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert not form.is_valid()
+    assert any("all glider fields" in error for error in form.non_field_errors())
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_form_duplicate_glider_n_number(visiting_pilot_config):
+    """Test that form validation detects duplicate glider N-numbers."""
+    from logsheet.models import Glider
+
+    # Create an existing glider
+    Glider.objects.create(
+        n_number="N12345", make="Schleicher", model="ASK-21", club_owned=False
+    )
+
+    # Try to register with same N-number
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "glider_n_number": "N12345",
+        "glider_make": "Grob",
+        "glider_model": "G103",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert not form.is_valid()
+    assert any(
+        "already registered" in error for error in form.non_field_errors()
+    ), "Should detect duplicate N-number"
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_form_glider_n_number_case_insensitive(visiting_pilot_config):
+    """Test that N-number comparison is case-insensitive."""
+    from logsheet.models import Glider
+
+    # Create glider with uppercase N-number
+    Glider.objects.create(
+        n_number="N12345", make="Schleicher", model="ASK-21", club_owned=False
+    )
+
+    # Try to register with lowercase n-number
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "glider_n_number": "n12345",  # lowercase
+        "glider_make": "Grob",
+        "glider_model": "G103",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert not form.is_valid()
+    assert any(
+        "already registered" in error for error in form.non_field_errors()
+    ), "Should detect duplicate regardless of case"
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_glider_creation_with_ownership(visiting_pilot_config):
+    """Test that glider is created and linked to visiting pilot as owner."""
+    from logsheet.models import Glider
+
+    factory = RequestFactory()
+    token = visiting_pilot_config.get_or_create_daily_token()
+
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Pilot",
+        "email": "janepilot@example.com",
+        "ssa_member_number": "987654",
+        "glider_rating": "private",
+        "glider_n_number": "N54321",
+        "glider_make": "Schleicher",
+        "glider_model": "ASW-27",
+    }
+
+    request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
+    from django.contrib.auth.models import AnonymousUser
+
+    request.user = AnonymousUser()
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    setattr(request, "session", {})
+    setattr(request, "_messages", FallbackStorage(request))
+
+    response = visiting_pilot_signup(request, token)
+
+    # Verify member was created
+    member = Member.objects.get(email="janepilot@example.com")
+    assert member.first_name == "Jane"
+
+    # Verify glider was created
+    glider = Glider.objects.get(n_number="N54321")
+    assert glider.make == "Schleicher"
+    assert glider.model == "ASW-27"
+    assert glider.club_owned is False
+    assert glider.is_active is True
+    assert glider.seats == 1
+
+    # Verify ownership link
+    assert member in glider.owners.all()
+    assert glider in member.gliders_owned.all()
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_registration_succeeds_without_glider(visiting_pilot_config):
+    """Test that visiting pilot can register without providing glider info."""
+    from logsheet.models import Glider
+
+    factory = RequestFactory()
+    token = visiting_pilot_config.get_or_create_daily_token()
+
+    form_data = {
+        "first_name": "John",
+        "last_name": "Smith",
+        "email": "johnsmith@example.com",
+        "ssa_member_number": "111222",
+        "glider_rating": "commercial",
+    }
+
+    request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
+    from django.contrib.auth.models import AnonymousUser
+
+    request.user = AnonymousUser()
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    setattr(request, "session", {})
+    setattr(request, "_messages", FallbackStorage(request))
+
+    response = visiting_pilot_signup(request, token)
+
+    # Verify member was created
+    member = Member.objects.get(email="johnsmith@example.com")
+    assert member.first_name == "John"
+
+    # Verify no gliders were created for this member
+    assert member.gliders_owned.count() == 0
+    assert Glider.objects.filter(owners=member).count() == 0
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_glider_creation_handles_integrity_error(
+    visiting_pilot_config, monkeypatch
+):
+    """Test that registration succeeds even if glider creation fails due to IntegrityError (race condition)."""
+    from django.db import IntegrityError
+
+    from logsheet.models import Glider
+
+    factory = RequestFactory()
+    token = visiting_pilot_config.get_or_create_daily_token()
+
+    form_data = {
+        "first_name": "Race",
+        "last_name": "Condition",
+        "email": "race@example.com",
+        "ssa_member_number": "555555",
+        "glider_rating": "private",
+        "glider_n_number": "N88888",  # Use different N-number to pass form validation
+        "glider_make": "RaceTest",
+        "glider_model": "Model",
+    }
+
+    # Mock Glider.objects.create to simulate a race condition (IntegrityError)
+    original_create = Glider.objects.create
+
+    def mock_create(*args, **kwargs):
+        # Raise IntegrityError to simulate duplicate N-number from race condition
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(Glider.objects, "create", mock_create)
+
+    request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
+    from django.contrib.auth.models import AnonymousUser
+
+    request.user = AnonymousUser()
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    setattr(request, "session", {})
+    messages = FallbackStorage(request)
+    setattr(request, "_messages", messages)
+
+    response = visiting_pilot_signup(request, token)
+
+    # Verify member was still created despite glider IntegrityError
+    member = Member.objects.get(email="race@example.com")
+    assert member.first_name == "Race"
+
+    # Verify no glider was created
+    assert Glider.objects.filter(n_number="N88888").count() == 0
+
+    # Verify warning message was added
+    message_list = list(messages)
+    assert any(
+        "already exists in the system" in str(m) and "glider was not added" in str(m)
+        for m in message_list
+    ), "Should show warning about duplicate glider"
+
+
+@pytest.mark.django_db
+def test_visiting_pilot_success_message_includes_glider(visiting_pilot_config):
+    """Test that success message mentions glider N-number when glider is created."""
+    from logsheet.models import Glider
+
+    factory = RequestFactory()
+    token = visiting_pilot_config.get_or_create_daily_token()
+
+    form_data = {
+        "first_name": "Success",
+        "last_name": "Test",
+        "email": "success@example.com",
+        "ssa_member_number": "777777",
+        "glider_rating": "private",
+        "glider_n_number": "N77777",
+        "glider_make": "Success",
+        "glider_model": "Glider",
+    }
+
+    request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
+    from django.contrib.auth.models import AnonymousUser
+
+    request.user = AnonymousUser()
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    setattr(request, "session", {})
+    messages = FallbackStorage(request)
+    setattr(request, "_messages", messages)
+
+    response = visiting_pilot_signup(request, token)
+
+    # Check that response contains glider info
+    assert b"N77777" in response.content or any(
+        "N77777" in str(message) for message in messages
+    ), "Success message should include glider N-number"

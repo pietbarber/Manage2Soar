@@ -600,13 +600,15 @@ def visiting_pilot_signup(request, token):
                     and form.cleaned_data.get("glider_make")
                     and form.cleaned_data.get("glider_model")
                 ):
+                    from django.db import IntegrityError
+
                     from logsheet.models import Glider
 
                     try:
                         glider = Glider.objects.create(
-                            n_number=form.cleaned_data["glider_n_number"]
-                            .strip()
-                            .upper(),
+                            n_number=form.cleaned_data[
+                                "glider_n_number"
+                            ],  # Already normalized in form
                             make=form.cleaned_data["glider_make"].strip(),
                             model=form.cleaned_data["glider_model"].strip(),
                             club_owned=False,
@@ -619,6 +621,16 @@ def visiting_pilot_signup(request, token):
                         logger.info(
                             f"Created glider {glider.n_number} for visiting pilot {member.email}"
                         )
+                    except IntegrityError:
+                        logger.warning(
+                            f"IntegrityError: Duplicate N-number when creating glider for visiting pilot {member.email} (N-number: {form.cleaned_data['glider_n_number']})"
+                        )
+                        messages.warning(
+                            request,
+                            "A glider with this N-number already exists in the system. Your account was created, but the glider was not added.",
+                        )
+                        # Don't fail the whole registration if glider creation fails
+                        # The member account is still created successfully
                     except Exception as e:
                         logger.error(
                             f"Error creating glider for visiting pilot {member.email}: {e}"
