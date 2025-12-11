@@ -52,7 +52,7 @@
                             {% if member.phone %}{{ member.phone }}<br>{% endif %}
                             {% if member.SSA_member_number %}SSA #{{ member.SSA_member_number }}<br>{% endif %}
                             {% if member.glider_rating %}{{ member.glider_rating }}<br>{% endif %}
-                            {% if member.home_club %}{{ member.home_club }}<br>{% endif %}
+                            {% if member.home_club %}{{ member.home_club }}{% if glider %}<br>{% endif %}{% endif %}
                         </p>
 
                         {% if glider %}

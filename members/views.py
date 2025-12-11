@@ -608,7 +608,7 @@ def visiting_pilot_signup(request, token):
                         glider = Glider.objects.create(
                             n_number=form.cleaned_data[
                                 "glider_n_number"
-                            ],  # Already normalized in form
+                            ],  # N-number is already normalized to uppercase in form validation
                             make=form.cleaned_data["glider_make"],
                             model=form.cleaned_data["glider_model"],
                             club_owned=False,
@@ -632,6 +632,9 @@ def visiting_pilot_signup(request, token):
                         # Don't fail the whole registration if glider creation fails
                         # The member account is still created successfully
                     except Exception as e:
+                        # Catch any unexpected exceptions during glider creation (e.g., database errors, validation issues)
+                        # We use a broad exception handler here because glider registration is optional and should not
+                        # prevent member account creation. IntegrityError is handled separately above.
                         logger.error(
                             f"Error creating glider for visiting pilot {member.email}: {e}"
                         )
