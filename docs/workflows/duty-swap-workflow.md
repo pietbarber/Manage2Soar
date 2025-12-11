@@ -111,7 +111,7 @@ graph TB
     MustCancel2 --> CancelOps
 
     DOAssigns --> MarkFulfilled
-    OpsWithout --> NotifyMembers[Email members:<br/>'No [role] Saturday,<br/>ops still happening']
+    OpsWithout --> NotifyMembers[Email members:<br/>'No role Saturday,<br/>ops still happening']
     NotifyMembers --> End
     CancelOps --> NotifyAll[Email all members:<br/>'Ops cancelled Saturday']
     NotifyAll --> End
