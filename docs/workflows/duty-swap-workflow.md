@@ -100,12 +100,22 @@ graph TB
     TimeCheck -->|<24 hours| EscalateEmergency[Auto-escalate to<br/>EMERGENCY status]
 
     EscalateEmergency --> NotifyDO[Email Duty Officer:<br/>'No coverage for Saturday']
-    NotifyDO --> DODecision{Duty Officer<br/>Decision}
+    NotifyDO --> RoleCheck{What role<br/>is missing?}
 
-    DODecision -->|Find someone| DOAssigns[DO manually assigns<br/>someone to duty]
-    DODecision -->|Cancel ops| CancelOps[DO cancels operations<br/>for Saturday]
+    RoleCheck -->|Tow Pilot| MustCancel[CRITICAL: No tow pilot<br/>= No operations possible]
+    RoleCheck -->|Instructor| OptionalCancel{Duty Officer<br/>Decision}
+    RoleCheck -->|Duty Officer| OptionalCancel
+    RoleCheck -->|ADO| OptionalCancel
+
+    MustCancel --> CancelOps[DO cancels operations<br/>for Saturday]
+
+    OptionalCancel -->|Find someone| DOAssigns[DO manually assigns<br/>someone to duty]
+    OptionalCancel -->|Ops without role| OpsWithout[Operations proceed<br/>without this role]
+    OptionalCancel -->|Cancel anyway| CancelOps
 
     DOAssigns --> MarkFulfilled
+    OpsWithout --> NotifyMembers[Email members:<br/>'No [role] Saturday,<br/>ops still happening']
+    NotifyMembers --> End
     CancelOps --> NotifyAll[Email all members:<br/>'Ops cancelled Saturday']
     NotifyAll --> End
 
@@ -145,7 +155,9 @@ graph TB
 ### 4. Resolution Paths
 - Requester accepts an offer → swap/cover completed
 - Requester cancels request → all offerers notified
-- No offers by deadline → Duty Officer decides (assign someone or cancel ops)
+- No offers by deadline → Duty Officer decides based on role:
+  - **Tow Pilot missing**: Operations MUST be cancelled (can't fly without tow pilot)
+  - **Instructor/DO/ADO missing**: Operations can proceed without role, or DO can cancel, or DO can manually assign someone
 - Request stays open until resolved or duty day arrives
 
 ### 5. Roles Covered
@@ -199,7 +211,8 @@ graph TB
 - Critical: No coverage for [Role] on [Date]
 - Requester: Alice
 - Time remaining: <24 hours
-- Available actions: Assign someone or cancel ops
+- **If Tow Pilot**: Operations MUST be cancelled (no tow = no flying)
+- **If Instructor/DO/ADO**: Options available (proceed without role, find someone, or cancel)
 - Link to duty assignment editor
 
 ### Operations Cancelled
@@ -207,7 +220,17 @@ graph TB
 **Content:**
 - Operations cancelled for [Date]
 - Reason: No [Role] coverage available
+- **Critical roles**: Tow Pilot (required for operations)
+- **Optional roles**: Instructor/DO/ADO (ops can proceed without, but better to have)
 - Contact Duty Officer with questions
+
+### Operations Proceeding Without Role
+**To:** All active members
+**Content:**
+- Operations happening on [Date]
+- Note: No [Role] available this day
+- Example: "No instructor available Saturday - club gliders only, no instruction"
+- Contact Duty Officer if you can help fill the role
 
 ## Open Questions
 
