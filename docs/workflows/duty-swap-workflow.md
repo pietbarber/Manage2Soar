@@ -26,11 +26,9 @@ graph TB
 
     RequestType -->|General| GeneralReq[Broadcast to all<br/>eligible instructors]
     RequestType -->|Direct| DirectReq[Direct to specific<br/>member Bob]
-    RequestType -->|Cover Only| CoverReq[Just need coverage,<br/>no swap needed]
 
     GeneralReq --> EmailAll[Email sent to:<br/>Bob, Charlie, all instructors]
     DirectReq --> EmailBob[Email sent to:<br/>Bob only]
-    CoverReq --> EmailAll
 
     EmailAll --> ViewRequest1[Bob receives email]
     EmailAll --> ViewRequest2[Charlie receives email]
@@ -61,13 +59,23 @@ graph TB
     OfferType1 -->|Swap| BobSwapDate[Bob proposes:<br/>Next Saturday]
     OfferType1 -->|Cover| BobCover[Bob: I'll just take it<br/>no swap needed]
 
+    BobSwapDate --> CheckBlackout1{Is Bob's date in<br/>Alice's blackout?}
+    CheckBlackout1 -->|Yes| WarnAlice1[⚠️ Warning to Alice:<br/>'Bob's date is in your<br/>blackout period']
+    CheckBlackout1 -->|No| OffersExist
+
+    WarnAlice1 --> OffersExist
+
     CharlieOffer --> OfferType2{Charlie's Offer Type}
     OfferType2 -->|Swap| CharlieSwapDate[Charlie proposes:<br/>2 weeks Saturday]
     OfferType2 -->|Cover| CharlieCover[Charlie: I'll take it<br/>no swap needed]
 
-    BobSwapDate --> OffersExist[Alice has 2 offers]
-    BobCover --> OffersExist
-    CharlieSwapDate --> OffersExist
+    CharlieSwapDate --> CheckBlackout2{Is Charlie's date in<br/>Alice's blackout?}
+    CheckBlackout2 -->|Yes| WarnAlice2[⚠️ Warning to Alice:<br/>'Charlie's date is in your<br/>blackout period']
+    CheckBlackout2 -->|No| OffersExist
+
+    WarnAlice2 --> OffersExist
+
+    BobCover --> OffersExist[Alice has offers]
     CharlieCover --> OffersExist
 
     OffersExist --> AliceNotified[Email to Alice:<br/>'You have offers!']
@@ -151,18 +159,28 @@ graph TB
 - **General Broadcast**: Request sent to all eligible members for that role
 - **Direct Request**: Request sent to a specific member only
   - If the member declines, Alice can broadcast to all eligible members
-- **Cover Only**: Someone just takes the duty, no swap needed
+
+Note: Alice doesn't specify whether she wants a swap or cover - that's Bob's choice when he makes his offer.
 
 ### 2. Offer Types
-- **Swap**: Trade duties on two different dates
-- **Cover**: Take the duty with no expectation of return
+When Bob responds to Alice's request, he chooses:
+- **Swap**: "I'll take your Saturday if you take my [proposed date]"
+- **Cover**: "I'll just take your Saturday, no swap needed"
 
-### 3. Time-based Escalation
+Note: Alice accepts or declines based on Bob's offer, but Bob decides what type of help to offer.
+
+### 3. Blackout Date Checking
+When someone offers a **swap** (not a cover), the system checks if the proposed swap date falls within Alice's blackout dates:
+- **Warning shown**: "⚠️ This date is in your blackout period"
+- **Alice can still accept**: But she's warned before committing
+- **Cover offers**: No blackout check needed (Alice isn't taking a date)
+
+### 4. Time-based Escalation
 - **Normal** (>48 hours): Request stays open, normal priority
 - **Warning** (24-48 hours): Reminder email sent to eligible members
 - **Emergency** (<24 hours): Auto-escalate, notify Duty Officer
 
-### 4. Resolution Paths
+### 5. Resolution Paths
 - Requester accepts an offer → swap/cover completed
 - Requester cancels request → all offerers notified
 - No offers by deadline → Duty Officer decides based on role:
@@ -172,13 +190,13 @@ graph TB
   - **Optional roles (Instructor, ADO)**: Operations can proceed without role, or DO can cancel, or DO can manually assign someone
 - Request stays open until resolved or duty day arrives
 
-### 5. Roles Covered
+### 6. Roles Covered
 - Instructor
 - Tow Pilot
 - Duty Officer
 - Assistant Duty Officer
 
-### 6. Site Configuration Constraints
+### 7. Site Configuration Constraints
 **Critical**: Swap requests are only available for roles that are **scheduled** ahead of time.
 
 From `SiteConfiguration`:
@@ -214,7 +232,10 @@ From `SiteConfiguration`:
 **To:** Requester (Alice)
 **Content:**
 - Who made offer (Bob)
-- What type (swap for next Saturday, or cover)
+- What type of offer:
+  - **Swap**: Bob will take Saturday if Alice takes [proposed date]
+  - **Cover**: Bob will just take Saturday, no swap needed
+- **Blackout warning** (if swap date is in Alice's blackout period): "\u26a0\ufe0f Warning: This date is in your blackout period"
 - Link to review and accept/decline
 
 ### Request Declined by Member
