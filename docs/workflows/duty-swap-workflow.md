@@ -40,10 +40,22 @@ graph TB
     ViewRequest2 --> CharlieDecision{Charlie's Action}
 
     BobDecision -->|Ignore| WaitMore[Request stays open]
+    BobDecision -->|Decline| BobDeclines[Bob explicitly declines]
     BobDecision -->|Make Offer| BobOffer[Bob creates offer]
 
     CharlieDecision -->|Ignore| WaitMore
+    CharlieDecision -->|Decline| CharlieDeclines[Charlie explicitly declines]
     CharlieDecision -->|Make Offer| CharlieOffer[Charlie creates offer]
+
+    BobDeclines --> NotifyAliceDecline[Email Alice:<br/>'Bob declined your request']
+    CharlieDeclines --> NotifyAliceDecline
+
+    NotifyAliceDecline --> AliceAfterDecline{Alice's Decision}
+    AliceAfterDecline -->|Cancel Request| CancelRequest
+    AliceAfterDecline -->|Broadcast to All| ConvertToGeneral[Convert to General Request]
+    AliceAfterDecline -->|Wait for Others| WaitMore
+
+    ConvertToGeneral --> EmailAll
 
     BobOffer --> OfferType1{Bob's Offer Type}
     OfferType1 -->|Swap| BobSwapDate[Bob proposes:<br/>Next Saturday]
@@ -138,6 +150,7 @@ graph TB
 ### 1. Request Types
 - **General Broadcast**: Request sent to all eligible members for that role
 - **Direct Request**: Request sent to a specific member only
+  - If the member declines, Alice can broadcast to all eligible members
 - **Cover Only**: Someone just takes the duty, no swap needed
 
 ### 2. Offer Types
@@ -203,6 +216,17 @@ From `SiteConfiguration`:
 - Who made offer (Bob)
 - What type (swap for next Saturday, or cover)
 - Link to review and accept/decline
+
+### Request Declined by Member
+**To:** Requester (Alice)
+**Content:**
+- Who declined (Bob)
+- Optional: Bob's reason for declining
+- Options for Alice:
+  - Cancel the request
+  - Broadcast to all eligible members (if it was a direct request)
+  - Wait for other offers
+- Link to manage request
 
 ### Offer Accepted
 **To:** Both parties (Alice and Bob)
