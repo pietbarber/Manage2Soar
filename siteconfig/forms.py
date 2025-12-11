@@ -216,7 +216,12 @@ class VisitingPilotSignupForm(forms.Form):
             glider_make = cleaned_data.get("glider_make")
             glider_model = cleaned_data.get("glider_model")
 
-            # If any glider field is provided, require all three
+            # Strip whitespace from all glider fields and check if they're non-empty
+            glider_n_number = glider_n_number.strip() if glider_n_number else ""
+            glider_make = glider_make.strip() if glider_make else ""
+            glider_model = glider_model.strip() if glider_model else ""
+
+            # Count non-empty fields after stripping
             glider_fields_provided = [glider_n_number, glider_make, glider_model]
             glider_fields_count = sum(1 for field in glider_fields_provided if field)
 
@@ -228,9 +233,11 @@ class VisitingPilotSignupForm(forms.Form):
             elif glider_fields_count == 3:
                 from logsheet.models import Glider
 
-                # Normalize N-number for comparison and save back to cleaned_data
-                normalized_n = glider_n_number.strip().upper()
+                # Normalize N-number to uppercase and save all normalized values
+                normalized_n = glider_n_number.upper()
                 cleaned_data["glider_n_number"] = normalized_n
+                cleaned_data["glider_make"] = glider_make
+                cleaned_data["glider_model"] = glider_model
 
                 # Use exact comparison since we've already normalized to uppercase
                 if Glider.objects.filter(n_number=normalized_n).exists():

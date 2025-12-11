@@ -476,6 +476,25 @@ def test_visiting_pilot_form_partial_glider_fields_fails(visiting_pilot_config):
 
 
 @pytest.mark.django_db
+def test_visiting_pilot_form_whitespace_only_glider_fields(visiting_pilot_config):
+    """Test that form validation handles whitespace-only glider field values correctly."""
+    # Test with whitespace-only N-number - should be treated as not provided
+    form_data = {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "email": "jane@example.com",
+        "glider_n_number": "   ",  # Whitespace only
+        "glider_make": "Schleicher",
+        "glider_model": "",
+    }
+    form = VisitingPilotSignupForm(data=form_data)
+    assert not form.is_valid()
+    assert any(
+        "all glider fields" in error for error in form.non_field_errors()
+    ), "Should require all glider fields when whitespace-stripped values are partial"
+
+
+@pytest.mark.django_db
 def test_visiting_pilot_form_duplicate_glider_n_number(visiting_pilot_config):
     """Test that form validation detects duplicate glider N-numbers."""
     from logsheet.models import Glider
@@ -599,7 +618,9 @@ def test_visiting_pilot_registration_succeeds_without_glider(visiting_pilot_conf
     setattr(request, "session", {})
     setattr(request, "_messages", FallbackStorage(request))
 
-    visiting_pilot_signup(request, token)
+    response = visiting_pilot_signup(request, token)
+    # Verify response is successful
+    assert response.status_code in (200, 302)
 
     # Verify member was created
     member = Member.objects.get(email="johnsmith@example.com")

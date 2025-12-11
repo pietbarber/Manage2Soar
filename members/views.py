@@ -609,8 +609,8 @@ def visiting_pilot_signup(request, token):
                             n_number=form.cleaned_data[
                                 "glider_n_number"
                             ],  # Already normalized in form
-                            make=form.cleaned_data["glider_make"].strip(),
-                            model=form.cleaned_data["glider_model"].strip(),
+                            make=form.cleaned_data["glider_make"],
+                            model=form.cleaned_data["glider_model"],
                             club_owned=False,
                             is_active=True,
                             seats=1,  # Default to single-seat, can be updated later
@@ -644,13 +644,17 @@ def visiting_pilot_signup(request, token):
 
                 logger.info(
                     f"Visiting pilot registered: {member.email} ({member.first_name} {member.last_name})"
-                    + (f" with glider {glider.n_number}" if glider_created else "")
+                    + (
+                        f" with glider {glider.n_number}"
+                        if glider_created and glider
+                        else ""
+                    )
                 )
 
                 # Show success message with different content based on auto-approval
                 glider_msg = (
                     f" Your glider ({glider.n_number}) has been added to the system."
-                    if glider_created
+                    if glider_created and glider
                     else ""
                 )
                 if config.visiting_pilot_auto_approve:
