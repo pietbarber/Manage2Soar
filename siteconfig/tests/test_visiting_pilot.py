@@ -659,7 +659,7 @@ def test_visiting_pilot_glider_creation_handles_integrity_error(
         # Raise IntegrityError to simulate duplicate N-number from race condition
         raise IntegrityError("duplicate key value violates unique constraint")
 
-    monkeypatch.setattr(Glider.objects, "create", mock_create)
+    monkeypatch.setattr("logsheet.models.Glider.objects.create", mock_create)
 
     request = factory.post(f"/members/visiting-pilot/signup/{token}/", data=form_data)
     from django.contrib.auth.models import AnonymousUser

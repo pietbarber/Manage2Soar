@@ -595,10 +595,9 @@ def visiting_pilot_signup(request, token):
                 # Create glider if glider information was provided
                 glider_created = False
                 glider = None
-                if (
-                    form.cleaned_data.get("glider_n_number")
-                    and form.cleaned_data.get("glider_make")
-                    and form.cleaned_data.get("glider_model")
+                if all(
+                    form.cleaned_data.get(field)
+                    for field in ["glider_n_number", "glider_make", "glider_model"]
                 ):
                     from django.db import IntegrityError
 
@@ -636,7 +635,8 @@ def visiting_pilot_signup(request, token):
                         # We use a broad exception handler here because glider registration is optional and should not
                         # prevent member account creation. IntegrityError is handled separately above.
                         logger.error(
-                            f"Error creating glider for visiting pilot {member.email}: {e}"
+                            f"Error creating glider for visiting pilot {member.email}: {type(e).__name__}: {e}",
+                            exc_info=True,
                         )
                         messages.warning(
                             request,
