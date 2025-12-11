@@ -165,6 +165,27 @@ graph TB
 - Duty Officer
 - Assistant Duty Officer
 
+### 6. Site Configuration Constraints
+**Critical**: Swap requests are only available for roles that are **scheduled** ahead of time.
+
+From `SiteConfiguration`:
+- `schedule_instructors` (default=False): "We schedule Instructors ahead of time"
+- `schedule_tow_pilots` (default=False): "We schedule tow pilots ahead of time"
+- `schedule_duty_officers` (default=False): "We schedule Duty Officers ahead of time"
+- `schedule_assistant_duty_officers` (default=False): "We schedule Assistant Duty Officers ahead of time"
+
+**Business Rules:**
+- If a role is NOT scheduled (flag=False), swap requests cannot be created for that role
+- Example: If `schedule_tow_pilots=False`, tow pilots show up ad-hoc, so there's no scheduled assignment to swap
+- UI should hide "Request Swap" button for unscheduled roles
+- Form validation should check scheduling config before accepting requests
+
+**Critical Role Fallback:**
+- If **Tow Pilot** or **Duty Officer** are NOT scheduled (ad-hoc model), the club must have a fallback plan:
+  - Rely on self-volunteers showing up
+  - Cancel operations if no one appears
+  - This is outside the swap system's scope (no scheduled assignment = nothing to swap)
+
 ## Email Notifications
 
 ### Request Created
@@ -250,6 +271,10 @@ If Bob "covers" Alice with no swap expected, should we:
 When DO gets emergency notification, should they have UI to:
 - Manually assign someone (requires their permission)?
 - Or just email/call and manually update the calendar in admin?
+
+### Q4: Mixed Scheduling Models - ANSWERED
+**Question:** What if some roles are scheduled and others are ad-hoc?
+**Answer:** Swap system only operates on scheduled roles (those with `schedule_[role]=True`). Unscheduled roles operate outside this system on self-volunteer basis.
 
 ## Technical Implementation Notes
 
