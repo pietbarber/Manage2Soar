@@ -132,7 +132,11 @@ def create_swap_request(request, year, month, day, role):
             "INSTRUCTOR": "instructor",
             "TOW": "tow_pilot",
         }
-        assigned_member = getattr(assignment, role_field_map.get(role), None)
+        role_field = role_field_map.get(role)
+        if not role_field:
+            messages.error(request, "Invalid role specified.")
+            return redirect("duty_roster:duty_calendar")
+        assigned_member = getattr(assignment, role_field, None)
         if assigned_member != request.user:
             messages.error(request, "You are not assigned this role on this date.")
             return redirect("duty_roster:duty_calendar")
