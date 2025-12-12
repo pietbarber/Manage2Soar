@@ -2,7 +2,14 @@ from django import forms
 
 from members.models import Member
 
-from .models import DutyAssignment, DutyPreference, InstructionSlot, MemberBlackout
+from .models import (
+    DutyAssignment,
+    DutyPreference,
+    DutySwapOffer,
+    DutySwapRequest,
+    InstructionSlot,
+    MemberBlackout,
+)
 
 # Maps member role attributes to their corresponding form field names
 DUTY_ROLE_FIELDS = [
@@ -278,3 +285,159 @@ class InstructorResponseForm(forms.ModelForm):
             self.instance.reject(note=note)
             return self.instance
         return None
+
+
+class DutySwapRequestForm(forms.ModelForm):
+    """Form for creating a swap/coverage request."""
+
+    class Meta:
+        model = DutySwapRequest
+        fields = ["request_type", "direct_request_to", "notes", "is_emergency"]
+        widgets = {
+            "request_type": forms.RadioSelect(
+                attrs={"class": "form-check-input"},
+                choices=[
+                    ("general", "Broadcast to all eligible members"),
+                    ("direct", "Request specific member"),
+                ],
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Reason for needing coverage (e.g., 'Bar mitzvah', 'Out of town')",
+                }
+            ),
+            "is_emergency": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "request_type": "Who should receive this request?",
+            "direct_request_to": "Specific member",
+            "notes": "Reason (optional but helpful)",
+            "is_emergency": "This is urgent (less than 48 hours notice)",
+        }
+
+    def __init__(self, *args, role=None, date=None, requester=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.role = role
+        self.date = date
+        self.requester = requester
+
+        # Filter direct_request_to to only show eligible members for this role
+        if role:
+            role_attr_map = {
+                "DO": "duty_officer",
+                "ADO": "assistant_duty_officer",
+                "INSTRUCTOR": "instructor",
+                "TOW": "towpilot",
+            }
+            role_attr = role_attr_map.get(role)
+
+            if role_attr:
+                eligible = Member.objects.filter(
+                    **{role_attr: True}, membership_status__in=["Full Member", "Family"]
+                ).exclude(pk=requester.pk if requester else None)
+                self.fields["direct_request_to"].queryset = eligible
+            else:
+                self.fields["direct_request_to"].queryset = Member.objects.none()
+
+        self.fields["direct_request_to"].required = False
+        self.fields["direct_request_to"].widget.attrs["class"] = "form-select"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        request_type = cleaned_data.get("request_type")
+        direct_to = cleaned_data.get("direct_request_to")
+
+        if request_type == "direct" and not direct_to:
+            self.add_error(
+                "direct_request_to",
+                "Please select a specific member for a direct request.",
+            )
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.role = self.role
+        instance.original_date = self.date
+        instance.requester = self.requester
+
+        # If not direct, clear the direct_request_to field
+        if instance.request_type != "direct":
+            instance.direct_request_to = None
+
+        if commit:
+            instance.save()
+        return instance
+
+
+class DutySwapOfferForm(forms.ModelForm):
+    """Form for making an offer to help with a swap request."""
+
+    class Meta:
+        model = DutySwapOffer
+        fields = ["offer_type", "proposed_swap_date", "notes"]
+        widgets = {
+            "offer_type": forms.RadioSelect(
+                attrs={"class": "form-check-input"},
+                choices=[
+                    ("cover", "I'll cover this duty (no swap needed)"),
+                    ("swap", "I'll swap - I take this duty, you take my date"),
+                ],
+            ),
+            "proposed_swap_date": forms.DateInput(
+                attrs={"type": "date", "class": "form-control"}
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "placeholder": "Optional note (e.g., 'I can only do morning shift')",
+                }
+            ),
+        }
+        labels = {
+            "offer_type": "How would you like to help?",
+            "proposed_swap_date": "If swapping, which date should they take?",
+            "notes": "Note (optional)",
+        }
+
+    def __init__(self, *args, swap_request=None, offered_by=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.swap_request = swap_request
+        self.offered_by = offered_by
+        self.fields["proposed_swap_date"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        offer_type = cleaned_data.get("offer_type")
+        proposed_date = cleaned_data.get("proposed_swap_date")
+
+        if offer_type == "swap" and not proposed_date:
+            self.add_error(
+                "proposed_swap_date",
+                "Please select a date for the swap.",
+            )
+
+        if proposed_date and self.swap_request:
+            if proposed_date <= self.swap_request.original_date:
+                self.add_error(
+                    "proposed_swap_date",
+                    "Swap date must be after the original duty date.",
+                )
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.swap_request = self.swap_request
+        instance.offered_by = self.offered_by
+
+        # Clear proposed_swap_date if not a swap
+        if instance.offer_type != "swap":
+            instance.proposed_swap_date = None
+
+        if commit:
+            instance.save()
+        return instance

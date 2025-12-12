@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>New Offer on Your Swap Request</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                       style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}"
+                                 style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                📨 You Have an Offer!
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: #e0e0e0; font-size: 16px;">
+                                {{ role_title }} - {{ swap_request.original_date|date:"F j, Y" }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Hi {{ swap_request.requester.first_name }},
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Great news! <strong>{{ offer.offered_by.full_display_name }}</strong> has offered to help
+                                with your {{ role_title }} duty on <strong>{{ swap_request.original_date|date:"l, F j" }}</strong>.
+                            </p>
+
+                            <!-- Offer Details -->
+                            <div style="background-color: #f0fff4; border: 1px solid #38a169; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #276749; font-size: 18px;">
+                                    {% if offer.offer_type == "swap" %}
+                                    🔄 Swap Offer
+                                    {% else %}
+                                    ❤️ Cover Offer
+                                    {% endif %}
+                                </h3>
+                                {% if offer.offer_type == "swap" %}
+                                <p style="margin: 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                    {{ offer.offered_by.first_name }} will take your <strong>{{ swap_request.original_date|date:"M j" }}</strong>
+                                    duty if you take their duty on <strong>{{ offer.proposed_swap_date|date:"l, F j, Y" }}</strong>.
+                                </p>
+                                {% if offer.is_blackout_conflict %}
+                                <p style="margin: 10px 0 0 0; color: #c53030; font-size: 14px;">
+                                    ⚠️ <strong>Note:</strong> {{ offer.proposed_swap_date|date:"M j" }} is in your blackout period.
+                                </p>
+                                {% endif %}
+                                {% else %}
+                                <p style="margin: 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                    {{ offer.offered_by.first_name }} will take your <strong>{{ swap_request.original_date|date:"M j" }}</strong>
+                                    duty - no swap needed!
+                                </p>
+                                {% endif %}
+
+                                {% if offer.notes %}
+                                <p style="margin: 15px 0 0 0; color: #4a5568; font-size: 14px; font-style: italic;">
+                                    "{{ offer.notes }}"
+                                </p>
+                                {% endif %}
+                            </div>
+
+                            <!-- CTA Button -->
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="{{ request_url }}" style="display: inline-block;
+                                   background-color: #38a169;
+                                   color: #ffffff; text-decoration: none;
+                                   padding: 14px 35px; border-radius: 6px;
+                                   font-weight: bold; font-size: 16px;">
+                                    Review & Accept
+                                </a>
+                            </div>
+
+                            <p style="margin: 20px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+                                You can accept this offer, decline it, or wait for more offers. Log in to review all options.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f4f4f4; padding: 20px; text-align: center;">
+                            <p style="margin: 0; color: #666666; font-size: 12px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

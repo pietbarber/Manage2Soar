@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>Swap Offer Declined</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                       style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}"
+                                 style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                Swap Offer Update
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Hi {{ offer.offered_by.first_name }},
+                            </p>
+
+                            {% if is_auto_declined %}
+                            <!-- Auto-declined due to blackout conflict -->
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Your offer to help with <strong>{{ swap_request.requester.first_name }}'s</strong>
+                                {{ role_title }} duty has been automatically declined.
+                            </p>
+
+                            <div style="background-color: #fffbeb; border: 1px solid #f6ad55; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #c05621; font-size: 16px;">
+                                    ⚠️ Blackout Date Conflict
+                                </h3>
+                                <p style="margin: 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                    The proposed swap date (<strong>{{ offer.proposed_swap_date|date:"F j, Y" }}</strong>) falls
+                                    within {{ swap_request.requester.first_name }}'s blackout period, so the swap cannot be completed.
+                                </p>
+                            </div>
+
+                            <p style="margin: 20px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+                                If you'd still like to help, consider offering a different date or a "cover only" option (no swap required).
+                            </p>
+
+                            {% else %}
+                            <!-- Manually declined by requester -->
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Unfortunately, <strong>{{ swap_request.requester.first_name }}</strong> has declined your
+                                offer to help with their {{ role_title }} duty on
+                                <strong>{{ swap_request.original_date|date:"l, F j" }}</strong>.
+                            </p>
+
+                            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                                <p style="margin: 0; color: #4a5568; font-size: 15px; line-height: 1.6;">
+                                    This could be because they received another offer that better fits their schedule, or
+                                    they resolved the conflict another way. Either way, thanks for offering to help!
+                                </p>
+                            </div>
+                            {% endif %}
+
+                            <p style="margin: 20px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+                                Thank you for being a helpful member of the club! 🙏
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f4f4f4; padding: 20px; text-align: center;">
+                            <p style="margin: 0; color: #666666; font-size: 12px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Make an Offer{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Back Link -->
+            <div class="mb-3">
+                <a href="{% url 'duty_roster:swap_request_detail' request_id=swap_request.pk %}" class="text-decoration-none">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Request
+                </a>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-hand-paper me-2"></i>Make an Offer
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Request Summary -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Helping {{ swap_request.requester.first_name }}
+                        </h5>
+                        <hr>
+                        <p class="mb-1"><strong>Role:</strong> {{ swap_request.get_role_title }}</p>
+                        <p class="mb-1"><strong>Date:</strong> {{ swap_request.original_date|date:"l, F j, Y" }}</p>
+                        {% if swap_request.notes %}
+                        <p class="mb-0"><strong>Reason:</strong> "{{ swap_request.notes }}"</p>
+                        {% endif %}
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <!-- Offer Type -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">{{ form.offer_type.label }}</label>
+                            <div class="ms-2">
+                                {% for radio in form.offer_type %}
+                                <div class="form-check mb-3">
+                                    {{ radio.tag }}
+                                    <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                        {% if radio.choice_value == "cover" %}
+                                            <i class="fas fa-hand-holding-heart me-1 text-success"></i>
+                                            <strong>Cover</strong> - I'll take {{ swap_request.original_date|date:"M j" }}, no swap needed
+                                            <br>
+                                            <small class="text-muted ms-4">
+                                                Just helping out - {{ swap_request.requester.first_name }} doesn't need to take a date from you
+                                            </small>
+                                        {% else %}
+                                            <i class="fas fa-exchange-alt me-1 text-primary"></i>
+                                            <strong>Swap</strong> - I'll take {{ swap_request.original_date|date:"M j" }} if they take my date
+                                            <br>
+                                            <small class="text-muted ms-4">
+                                                Trade duties - {{ swap_request.requester.first_name }} takes one of your scheduled dates
+                                            </small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.offer_type.errors %}
+                            <div class="invalid-feedback d-block">{{ form.offer_type.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Swap Date Selection -->
+                        <div class="mb-4" id="swap-date-section" style="display: none;">
+                            <label class="form-label fw-bold" for="{{ form.proposed_swap_date.id_for_label }}">
+                                {{ form.proposed_swap_date.label }}
+                            </label>
+                            {{ form.proposed_swap_date }}
+                            {% if form.proposed_swap_date.errors %}
+                            <div class="invalid-feedback d-block">{{ form.proposed_swap_date.errors.0 }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Pick a date when you're scheduled but {{ swap_request.requester.first_name }} could take over.
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="{{ form.notes.id_for_label }}">
+                                {{ form.notes.label }}
+                            </label>
+                            {{ form.notes }}
+                            <div class="form-text">
+                                Add any conditions or notes (e.g., "I can only do morning shift").
+                            </div>
+                        </div>
+
+                        <!-- Submit -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane me-1"></i>Send Offer
+                            </button>
+                            <a href="{% url 'duty_roster:swap_request_detail' request_id=swap_request.pk %}"
+                               class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const offerTypeRadios = document.querySelectorAll('input[name="offer_type"]');
+    const swapDateSection = document.getElementById('swap-date-section');
+
+    function toggleSwapSection() {
+        const selected = document.querySelector('input[name="offer_type"]:checked');
+        if (selected && selected.value === 'swap') {
+            swapDateSection.style.display = 'block';
+        } else {
+            swapDateSection.style.display = 'none';
+        }
+    }
+
+    offerTypeRadios.forEach(radio => {
+        radio.addEventListener('change', toggleSwapSection);
+    });
+
+    // Initial state
+    toggleSwapSection();
+});
+</script>
+{% endblock %}

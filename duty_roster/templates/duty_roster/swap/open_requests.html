@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Open Swap Requests{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-hands-helping me-2"></i>Help a Fellow Member</h1>
+        <a href="{% url 'duty_roster:my_swap_requests' %}" class="btn btn-outline-primary">
+            <i class="fas fa-exchange-alt me-1"></i>My Requests
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-life-ring me-2"></i>Open Requests
+                {% if open_requests %}
+                <span class="badge bg-light text-dark ms-2">{{ open_requests|length }}</span>
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if open_requests %}
+                {% for req in open_requests %}
+                <div class="card mb-3 {% if req.is_emergency %}border-danger{% elif req.get_urgency_level == 'warning' %}border-warning{% endif %}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-1">
+                                    {% if req.is_emergency %}
+                                    <span class="badge bg-danger me-2">URGENT</span>
+                                    {% elif req.get_urgency_level == "warning" %}
+                                    <span class="badge bg-warning text-dark me-2">SOON</span>
+                                    {% endif %}
+                                    {{ req.get_role_title }} needed
+                                </h5>
+                                <p class="mb-2">
+                                    <i class="fas fa-calendar me-1 text-primary"></i>
+                                    <strong>{{ req.original_date|date:"l, F j, Y" }}</strong>
+                                    <span class="text-muted">({{ req.days_until_duty }} day{{ req.days_until_duty|pluralize }} away)</span>
+                                </p>
+                                <p class="mb-2">
+                                    <i class="fas fa-user me-1 text-secondary"></i>
+                                    <strong>{{ req.requester.full_display_name }}</strong> needs coverage
+                                </p>
+                                {% if req.notes %}
+                                <p class="mb-0 text-muted">
+                                    <i class="fas fa-comment me-1"></i>
+                                    "{{ req.notes }}"
+                                </p>
+                                {% endif %}
+
+                                {% if req.request_type == "direct" %}
+                                <p class="mb-0 mt-2">
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-user-check me-1"></i>Direct request to you
+                                    </span>
+                                </p>
+                                {% endif %}
+
+                                <!-- Show existing offers count -->
+                                {% with offer_count=req.offers.count %}
+                                {% if offer_count > 0 %}
+                                <p class="text-muted mb-0 mt-2">
+                                    <i class="fas fa-hand-paper me-1"></i>
+                                    {{ offer_count }} offer{{ offer_count|pluralize }} already received
+                                </p>
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <a href="{% url 'duty_roster:make_offer' request_id=req.pk %}"
+                                   class="btn btn-success me-1">
+                                    <i class="fas fa-hand-paper me-1"></i>Make Offer
+                                </a>
+                                {% if req.request_type == "direct" %}
+                                <form method="post" action="{% url 'duty_roster:decline_swap_request' request_id=req.pk %}"
+                                      class="d-inline mt-2 mt-md-0"
+                                      onsubmit="return confirm('Decline this request? {{ req.requester.first_name }} will be notified.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Decline
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <p class="text-muted mb-0">
+                    No open requests right now. Everyone's duties are covered!
+                </p>
+                <p class="text-muted">
+                    Check back later if you'd like to help a fellow member.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

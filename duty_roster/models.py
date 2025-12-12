@@ -230,6 +230,17 @@ class InstructionSlot(models.Model):
 
 
 class DutySwapRequest(models.Model):
+    """
+    Represents a request from a duty crew member who needs coverage for their assigned duty.
+
+    Workflow:
+    1. Member sees they're scheduled, clicks "Request Swap" (status=open)
+    2. Request goes to all eligible members OR a specific member (request_type)
+    3. Other members can make offers (DutySwapOffer)
+    4. Requester accepts an offer → swap/cover completed (status=fulfilled)
+    5. If no offers by deadline → escalates to Duty Officer
+    """
+
     # Static role keys; display titles are resolved at runtime
     ROLE_CHOICES = [
         ("DO", "Duty Officer"),
@@ -238,16 +249,69 @@ class DutySwapRequest(models.Model):
         ("TOW", "Tow Pilot"),
     ]
 
+    REQUEST_TYPE_CHOICES = [
+        ("general", "General Broadcast"),  # Sent to all eligible members
+        ("direct", "Direct Request"),  # Sent to specific member only
+    ]
+
+    STATUS_CHOICES = [
+        ("open", "Open"),  # Request is active, accepting offers
+        ("fulfilled", "Fulfilled"),  # An offer was accepted, swap complete
+        ("cancelled", "Cancelled"),  # Requester cancelled the request
+        ("expired", "Expired"),  # Duty day passed without resolution
+    ]
+
     requester = models.ForeignKey(
         Member, on_delete=models.CASCADE, related_name="swap_requests"
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     original_date = models.DateField()
-    is_emergency = models.BooleanField(default=False)  # IMSAFE, medical, etc.
-    is_fulfilled = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    request_type = models.CharField(
+        max_length=10, choices=REQUEST_TYPE_CHOICES, default="general"
+    )
+    # For direct requests, who was specifically asked
+    direct_request_to = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="swap_requests_received",
+        help_text="If direct request, the specific member asked",
+    )
+
+    # Note from requester explaining why they need coverage
+    notes = models.TextField(blank=True, help_text="Reason for needing coverage")
+
+    is_emergency = models.BooleanField(
+        default=False, help_text="Urgent request (IMSAFE, medical, etc.)"
+    )
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="open")
+
+    # Which offer was accepted (if fulfilled)
+    accepted_offer = models.OneToOneField(
+        "DutySwapOffer",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="fulfilled_request",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    fulfilled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    # Legacy compatibility
+    @property
+    def is_fulfilled(self):
+        return self.status == "fulfilled"
+
+    def get_role_title(self):
+        """Get the display title for this role from site config."""
         from siteconfig.utils import get_role_title
 
         role_map = {
@@ -256,35 +320,112 @@ class DutySwapRequest(models.Model):
             "INSTRUCTOR": "instructor",
             "TOW": "towpilot",
         }
-        role_title = get_role_title(role_map.get(self.role, self.role))
+        return get_role_title(role_map.get(self.role, self.role))
+
+    def is_critical_role(self):
+        """Returns True if this role is critical for operations (Tow Pilot or DO)."""
+        return self.role in ("DO", "TOW")
+
+    def days_until_duty(self):
+        """Returns the number of days until the duty date."""
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        return (self.original_date - today).days
+
+    def get_urgency_level(self):
+        """Returns urgency level: 'normal', 'soon', 'urgent', or 'emergency'."""
+        if self.is_emergency:
+            return "emergency"
+        days = self.days_until_duty()
+        if days < 3:
+            return "emergency"
+        elif days <= 7:
+            return "urgent"
+        elif days <= 14:
+            return "soon"
+        else:
+            return "normal"
+
+    def __str__(self):
+        role_title = self.get_role_title()
         return f"{role_title} swap for {self.original_date} by {self.requester.full_display_name}"
 
 
 class DutySwapOffer(models.Model):
+    """
+    Represents an offer from a member to help with a swap request.
+
+    Workflow:
+    1. Member sees open swap request
+    2. Member creates offer (cover or swap with proposed date)
+    3. Requester reviews offers, accepts one
+    4. Accepted offer triggers duty assignment updates
+    5. Other pending offers are auto-declined
+    """
+
     swap_request = models.ForeignKey(
         "DutySwapRequest", on_delete=models.CASCADE, related_name="offers"
     )
-    offered_by = models.ForeignKey(Member, on_delete=models.CASCADE)
+    offered_by = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="swap_offers_made"
+    )
 
     OFFER_TYPE_CHOICES = [
         ("cover", "Cover (I'll take your shift)"),
         ("swap", "Swap (I'll take yours if you take mine)"),
     ]
     offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES)
+
     # Used only if offer_type == 'swap'
-    proposed_swap_date = models.DateField(null=True, blank=True)
+    proposed_swap_date = models.DateField(
+        null=True, blank=True, help_text="Date offerer wants requester to take"
+    )
+
+    # Note from offerer (optional)
+    notes = models.TextField(blank=True, help_text="Optional note about the offer")
 
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("accepted", "Accepted"),
         ("declined", "Declined"),
+        ("auto_declined", "Auto-declined"),  # When another offer was accepted
+        ("withdrawn", "Withdrawn"),  # Offerer withdrew their offer
     ]
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="pending")
+
+    # Track if proposed date is in requester's blackout
+    is_blackout_conflict = models.BooleanField(
+        default=False, help_text="True if proposed swap date is in requester's blackout"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        ordering = ["-created_at"]
+
+    def check_blackout_conflict(self):
+        """Check if proposed swap date conflicts with requester's blackout dates."""
+        if self.offer_type != "swap" or not self.proposed_swap_date:
+            return False
+
+        from duty_roster.models import MemberBlackout
+
+        return MemberBlackout.objects.filter(
+            member=self.swap_request.requester, date=self.proposed_swap_date
+        ).exists()
+
+    def save(self, *args, **kwargs):
+        # Auto-check blackout conflict before saving
+        if self.offer_type == "swap" and self.proposed_swap_date:
+            self.is_blackout_conflict = self.check_blackout_conflict()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.offered_by.full_display_name} → {self.swap_request.role} on {self.swap_request.original_date}"
+        if self.offer_type == "swap" and self.proposed_swap_date:
+            return f"{self.offered_by.full_display_name} offers swap ({self.proposed_swap_date}) for {self.swap_request.original_date}"
+        return f"{self.offered_by.full_display_name} offers to cover {self.swap_request.original_date}"
 
 
 class OpsIntent(models.Model):
