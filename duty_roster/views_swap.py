@@ -11,12 +11,11 @@ from datetime import date
 from django.conf import settings
 from django.contrib import messages
 from django.db import models, transaction
-from django.http import HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
-from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_POST
 
 from members.decorators import active_member_required
 from members.models import Member
@@ -618,8 +617,6 @@ def get_from_email():
 
 def send_swap_request_notifications(swap_request):
     """Send notification emails when a swap request is created."""
-    config = SiteConfiguration.objects.first()
-
     if swap_request.request_type == "direct" and swap_request.direct_request_to:
         # Send only to the specific member
         recipients = [swap_request.direct_request_to]
@@ -645,10 +642,6 @@ def send_swap_request_notifications(swap_request):
     )
 
     subject = f"🔄 {swap_request.requester.first_name} needs {role_title} coverage on {swap_request.original_date.strftime('%b %d')}"
-
-    html_content = render_to_string(
-        "duty_roster/emails/swap_request_created.html", context
-    )
 
     for recipient in recipients:
         if recipient.email:
@@ -676,17 +669,17 @@ def send_swap_request_notifications(swap_request):
 
 def send_offer_made_notification(offer):
     """Notify requester that someone made an offer."""
-    config = SiteConfiguration.objects.first()
     swap_request = offer.swap_request
 
     role_title = swap_request.get_role_title()
     context = get_email_context_base()
+    base_url = context.get("base_url", "http://localhost:8001")
     context.update(
         {
             "offer": offer,
             "swap_request": swap_request,
             "role_title": role_title,
-            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty_roster/swap/request/{swap_request.pk}/",
+            "request_url": f"{base_url}/duty_roster/swap/request/{swap_request.pk}/",
         }
     )
 
@@ -713,16 +706,17 @@ def send_offer_made_notification(offer):
 
 def send_offer_accepted_notifications(offer):
     """Notify both parties when an offer is accepted."""
-    config = SiteConfiguration.objects.first()
     swap_request = offer.swap_request
 
     role_title = swap_request.get_role_title()
     context = get_email_context_base()
+    base_url = context.get("base_url", "http://localhost:8001")
     context.update(
         {
             "offer": offer,
             "swap_request": swap_request,
             "role_title": role_title,
+            "roster_url": f"{base_url}/duty_roster/duty-calendar/",
         }
     )
 
@@ -752,7 +746,6 @@ def send_offer_accepted_notifications(offer):
 
 def send_offer_declined_notification(offer, auto=False):
     """Notify offerer that their offer was declined (or auto-declined)."""
-    config = SiteConfiguration.objects.first()
     swap_request = offer.swap_request
 
     role_title = swap_request.get_role_title()
@@ -762,7 +755,7 @@ def send_offer_declined_notification(offer, auto=False):
             "offer": offer,
             "swap_request": swap_request,
             "role_title": role_title,
-            "auto_declined": auto,
+            "is_auto_declined": auto,
         }
     )
 
@@ -789,8 +782,6 @@ def send_offer_declined_notification(offer, auto=False):
 
 def send_request_cancelled_notifications(swap_request):
     """Notify all originally notified members that the request was cancelled."""
-    config = SiteConfiguration.objects.first()
-
     # Get the same recipients who were originally notified
     if swap_request.request_type == "direct" and swap_request.direct_request_to:
         # For direct requests, only notify the specific member
@@ -846,7 +837,6 @@ def send_request_cancelled_notifications(swap_request):
 
 def send_request_declined_by_member_notification(swap_request, declining_member):
     """Notify requester that a specific member declined their direct request."""
-    config = SiteConfiguration.objects.first()
 
     role_title = swap_request.get_role_title()
     context = get_email_context_base()

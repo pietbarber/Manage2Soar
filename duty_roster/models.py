@@ -410,7 +410,7 @@ class DutySwapOffer(models.Model):
         if self.offer_type != "swap" or not self.proposed_swap_date:
             return False
 
-        from duty_roster.models import MemberBlackout
+        # MemberBlackout is already defined in this module, no import needed
 
         return MemberBlackout.objects.filter(
             member=self.swap_request.requester, date=self.proposed_swap_date
