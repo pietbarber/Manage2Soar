@@ -27,6 +27,38 @@
   <p><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ assignment.duty_officer|default:"—" }}</p>
   <p><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ assignment.assistant_duty_officer|default:"—" }}</p>
 
+  {# Request Swap/Coverage buttons for assigned members #}
+  {% if user.is_authenticated and day >= today %}
+    <hr>
+    <h6><i class="fas fa-exchange-alt me-1"></i>Need Coverage?</h6>
+    <div class="d-grid gap-2">
+      {% if config.schedule_instructors and user == assignment.instructor %}
+        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='INSTRUCTOR' %}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-user-graduate me-1"></i>Request {{ config.instructor_title|default:'Instructor' }} Swap
+        </a>
+      {% endif %}
+      {% if config.schedule_tow_pilots and user == assignment.tow_pilot %}
+        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='TOW' %}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-plane me-1"></i>Request {{ config.towpilot_title|default:'Tow Pilot' }} Swap
+        </a>
+      {% endif %}
+      {% if config.schedule_duty_officers and user == assignment.duty_officer %}
+        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DO' %}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-user-tie me-1"></i>Request {{ config.duty_officer_title|default:'Duty Officer' }} Swap
+        </a>
+      {% endif %}
+      {% if config.schedule_assistant_duty_officers and user == assignment.assistant_duty_officer %}
+        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='ADO' %}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-user-check me-1"></i>Request {{ config.assistant_duty_officer_title|default:'Assistant DO' }} Swap
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {# Show students signed up for instruction #}
   {% if assignment.instruction_slots.all %}
     <hr>
