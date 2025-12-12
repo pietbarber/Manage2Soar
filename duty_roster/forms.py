@@ -342,7 +342,7 @@ class DutySwapRequestForm(forms.ModelForm):
             if role_attr:
                 eligible = Member.objects.filter(
                     **{role_attr: True},
-                    membership_status__in=["Full Member", "Family Member"]
+                    membership_status__in=["Full Member", "Family Member"],
                 ).exclude(pk=requester.pk if requester else None)
                 self.fields["direct_request_to"].queryset = eligible
             else:
@@ -386,13 +386,7 @@ class DutySwapOfferForm(forms.ModelForm):
         model = DutySwapOffer
         fields = ["offer_type", "proposed_swap_date", "notes"]
         widgets = {
-            "offer_type": forms.RadioSelect(
-                attrs={"class": "form-check-input"},
-                choices=[
-                    ("cover", "I'll cover this duty (no swap needed)"),
-                    ("swap", "I'll swap - I take this duty, you take my date"),
-                ],
-            ),
+            "offer_type": forms.RadioSelect(attrs={"class": "form-check-input"}),
             "proposed_swap_date": forms.DateInput(
                 attrs={"type": "date", "class": "form-control"}
             ),
@@ -415,6 +409,18 @@ class DutySwapOfferForm(forms.ModelForm):
         self.swap_request = swap_request
         self.offered_by = offered_by
         self.fields["proposed_swap_date"].required = False
+
+        # Set choices on the field, not the widget
+        # Make the swap option dynamic based on the request date
+        swap_date_str = (
+            swap_request.original_date.strftime("%b %d")
+            if swap_request
+            else "their date"
+        )
+        self.fields["offer_type"].choices = [
+            ("cover", "Cover - I'll take this duty (no swap needed)"),
+            ("swap", f"Swap - I'll take {swap_date_str} if they take my date"),
+        ]
 
     def clean(self):
         from django.utils import timezone
