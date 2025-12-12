@@ -173,14 +173,14 @@
 
                                     <div class="col-md-4 text-md-end mt-3 mt-md-0">
                                         {% if is_requester and swap_request.status == "open" and offer.status == "pending" %}
-                                        <form method="post" action="{% url 'duty_roster:accept_offer' offer_id=offer.pk %}" class="d-inline">
+                                        <form method="post" action="{% url 'duty_roster:accept_swap_offer' offer_id=offer.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-success btn-sm me-1"
                                                     onclick="return confirm('Accept this offer? Other pending offers will be auto-declined.');">
                                                 <i class="fas fa-check me-1"></i>Accept
                                             </button>
                                         </form>
-                                        <form method="post" action="{% url 'duty_roster:decline_offer' offer_id=offer.pk %}" class="d-inline">
+                                        <form method="post" action="{% url 'duty_roster:decline_swap_offer' offer_id=offer.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-outline-secondary btn-sm">
                                                 <i class="fas fa-times me-1"></i>Decline
@@ -189,7 +189,7 @@
                                         {% endif %}
 
                                         {% if offer.offered_by == user and offer.status == "pending" %}
-                                        <form method="post" action="{% url 'duty_roster:withdraw_offer' offer_id=offer.pk %}" class="d-inline">
+                                        <form method="post" action="{% url 'duty_roster:withdraw_swap_offer' offer_id=offer.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-outline-warning btn-sm"
                                                     onclick="return confirm('Withdraw your offer?');">
