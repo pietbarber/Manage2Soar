@@ -341,7 +341,8 @@ class DutySwapRequestForm(forms.ModelForm):
 
             if role_attr:
                 eligible = Member.objects.filter(
-                    **{role_attr: True}, membership_status__in=["Full Member", "Family"]
+                    **{role_attr: True},
+                    membership_status__in=["Full Member", "Family Member"]
                 ).exclude(pk=requester.pk if requester else None)
                 self.fields["direct_request_to"].queryset = eligible
             else:

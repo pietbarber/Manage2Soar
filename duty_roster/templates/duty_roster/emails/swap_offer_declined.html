@@ -38,7 +38,7 @@
                                 Hi {{ offer.offered_by.first_name }},
                             </p>
 
-                            {% if is_auto_declined %}
+                            {% if auto_declined %}
                             <!-- Auto-declined due to blackout conflict -->
                             <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
                                 Your offer to help with <strong>{{ swap_request.requester.first_name }}'s</strong>

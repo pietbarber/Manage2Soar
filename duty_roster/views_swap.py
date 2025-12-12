@@ -67,7 +67,7 @@ def get_eligible_members_for_role(role, exclude_member=None):
         return Member.objects.none()
 
     queryset = Member.objects.filter(
-        **{role_attr: True}, membership_status__in=["Full Member", "Family"]
+        **{role_attr: True}, membership_status__in=["Full Member", "Family Member"]
     )
 
     if exclude_member:
@@ -756,7 +756,7 @@ def send_offer_declined_notification(offer, auto=False):
             "offer": offer,
             "swap_request": swap_request,
             "role_title": role_title,
-            "is_auto_declined": auto,
+            "auto_declined": auto,
         }
     )
 
