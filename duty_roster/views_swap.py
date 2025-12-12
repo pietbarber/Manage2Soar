@@ -640,7 +640,7 @@ def send_swap_request_notifications(swap_request):
         {
             "swap_request": swap_request,
             "role_title": role_title,
-            "request_url": f"{base_url}/duty/swap/request/{swap_request.pk}/",
+            "request_url": f"{base_url}/duty_roster/swap/request/{swap_request.pk}/",
         }
     )
 
@@ -686,7 +686,7 @@ def send_offer_made_notification(offer):
             "offer": offer,
             "swap_request": swap_request,
             "role_title": role_title,
-            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty/swap/request/{swap_request.pk}/",
+            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty_roster/swap/request/{swap_request.pk}/",
         }
     )
 
@@ -855,7 +855,7 @@ def send_request_declined_by_member_notification(swap_request, declining_member)
             "swap_request": swap_request,
             "role_title": role_title,
             "declining_member": declining_member,
-            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty/swap/request/{swap_request.pk}/",
+            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty_roster/swap/request/{swap_request.pk}/",
         }
     )
 
