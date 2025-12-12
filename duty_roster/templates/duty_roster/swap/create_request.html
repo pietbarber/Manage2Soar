@@ -53,12 +53,12 @@
                                 <div class="form-check mb-2">
                                     {{ radio.tag }}
                                     <label class="form-check-label" for="{{ radio.id_for_label }}">
-                                        {% if radio.choice_label == "Broadcast to all eligible members" %}
+                                        {% if radio.choice_value == "general" %}
                                             <i class="fas fa-broadcast-tower me-1 text-primary"></i>
                                             Broadcast to all eligible {{ role_title|lower }}s
                                         {% else %}
                                             <i class="fas fa-user me-1 text-secondary"></i>
-                                            Request a specific member
+                                            Request a specific {{ role_title|lower }}
                                         {% endif %}
                                     </label>
                                 </div>
