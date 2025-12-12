@@ -104,7 +104,7 @@
                     <!-- Action for Eligible Non-Offerer -->
                     {% if can_make_offer %}
                     <div class="mt-4">
-                        <a href="{% url 'duty_roster:make_offer' request_id=swap_request.pk %}" class="btn btn-success">
+                        <a href="{% url 'duty_roster:make_swap_offer' request_id=swap_request.pk %}" class="btn btn-success">
                             <i class="fas fa-hand-paper me-1"></i>Make an Offer
                         </a>
                     </div>
