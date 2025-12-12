@@ -46,7 +46,7 @@
                                 <div class="form-check mb-3">
                                     {{ radio.tag }}
                                     <label class="form-check-label" for="{{ radio.id_for_label }}">
-                                        {% if radio.choice_value == "cover" %}
+                                        {% if radio.data.value == "cover" %}
                                             <i class="fas fa-hand-holding-heart me-1 text-success"></i>
                                             <strong>Cover</strong> - I'll take {{ swap_request.original_date|date:"M j" }}, no swap needed
                                             <br>
