@@ -323,6 +323,12 @@ class DutySwapRequestForm(forms.ModelForm):
         self.date = date
         self.requester = requester
 
+        # Ensure labels are set (sometimes Meta labels don't apply correctly)
+        self.fields["request_type"].label = "Who should receive this request?"
+        self.fields["direct_request_to"].label = "Specific member"
+        self.fields["notes"].label = "Reason (optional but helpful)"
+        self.fields["is_emergency"].label = "This is urgent (less than 48 hours notice)"
+
         # Filter direct_request_to to only show eligible members for this role
         if role:
             role_attr_map = {
