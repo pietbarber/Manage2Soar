@@ -163,7 +163,7 @@ def create_swap_request(request, year, month, day, role):
     else:
         # Pre-check if this is less than 48 hours out
         days_until = (duty_date - today).days
-        initial = {"is_emergency": days_until < 2}
+        initial = {"is_emergency": days_until <= 2}
         form = DutySwapRequestForm(
             role=role, date=duty_date, requester=request.user, initial=initial
         )
