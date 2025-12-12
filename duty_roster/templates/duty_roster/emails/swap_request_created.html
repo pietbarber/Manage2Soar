@@ -49,11 +49,23 @@
                     <tr>
                         <td style="padding: 40px;">
                             <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
-                                Hello,
+                                Hello{% if recipient %} {{ recipient.first_name }}{% endif %},
                             </p>
 
+                            {% if is_direct_request %}
+                            <div style="background-color: #e6f3ff; border-left: 4px solid #667eea; padding: 15px 20px; margin: 0 0 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #2d3748; font-size: 16px; line-height: 1.6; font-weight: bold;">
+                                    <strong>{{ swap_request.requester.full_display_name }}</strong> is specifically asking <strong>you</strong> for coverage.
+                                </p>
+                            </div>
+                            {% endif %}
+
                             <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                {% if is_direct_request %}
+                                They need coverage for their
+                                {% else %}
                                 <strong>{{ swap_request.requester.full_display_name }}</strong> needs coverage for their
+                                {% endif %}
                                 <strong>{{ role_title }}</strong> duty on
                                 <strong>{{ swap_request.original_date|date:"l, F j, Y" }}</strong>.
                             </p>

@@ -652,6 +652,17 @@ def send_swap_request_notifications(swap_request):
 
     for recipient in recipients:
         if recipient.email:
+            # Personalize context for each recipient
+            recipient_context = context.copy()
+            recipient_context["recipient"] = recipient
+            recipient_context["is_direct_request"] = (
+                swap_request.request_type == "direct"
+            )
+
+            html_content = render_to_string(
+                "duty_roster/emails/swap_request_created.html", recipient_context
+            )
+
             send_mail(
                 subject=subject,
                 message="",  # Plain text fallback
