@@ -108,8 +108,8 @@ graph TB
     NotifyBoth --> UpdateCalendar[Update duty calendar<br/>visible to all members]
     UpdateCalendar --> Complete[✅ Swap Complete]
 
-    CancelRequest --> NotifyOfferers[Email Bob & Charlie:<br/>'Alice cancelled request']
-    NotifyOfferers --> ArchiveRequest[Archive cancelled request]
+    CancelRequest --> NotifyAllRecipients[Email ALL originally notified:<br/>'Alice cancelled - you're off the hook']
+    NotifyAllRecipients --> ArchiveRequest[Archive cancelled request]
     ArchiveRequest --> End[End]
 
     KeepOpen --> TimeCheck{Time until duty}
@@ -182,7 +182,7 @@ When someone offers a **swap** (not a cover), the system checks if the proposed 
 
 ### 5. Resolution Paths
 - Requester accepts an offer → swap/cover completed
-- Requester cancels request → all offerers notified
+- Requester cancels request → **all originally notified members** get "all clear" email (whether they made an offer or not)
 - No offers by deadline → Duty Officer decides based on role:
   - **Critical roles (Tow Pilot, Duty Officer)**: Operations MUST be cancelled
     - No tow pilot = can't fly

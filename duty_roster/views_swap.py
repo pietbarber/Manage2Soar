@@ -10,7 +10,7 @@ from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
-from django.db import transaction
+from django.db import models, transaction
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -788,37 +788,60 @@ def send_offer_declined_notification(offer, auto=False):
 
 
 def send_request_cancelled_notifications(swap_request):
-    """Notify all offerers that the request was cancelled."""
+    """Notify all originally notified members that the request was cancelled."""
     config = SiteConfiguration.objects.first()
+
+    # Get the same recipients who were originally notified
+    if swap_request.request_type == "direct" and swap_request.direct_request_to:
+        # For direct requests, only notify the specific member
+        recipients = [swap_request.direct_request_to]
+    else:
+        # For broadcast requests, notify all eligible members
+        recipients = get_eligible_members_for_role(
+            swap_request.role, exclude_member=swap_request.requester
+        )
+
+    if not recipients:
+        logger.warning(
+            f"No recipients to notify for cancelled swap request {swap_request.pk}"
+        )
+        return
+
+    # Get list of members who made offers (to customize message)
+    offerers_ids = set(swap_request.offers.values_list("offered_by_id", flat=True))
 
     role_title = swap_request.get_role_title()
     context = get_email_context_base()
-    context.update(
-        {
-            "swap_request": swap_request,
-            "role_title": role_title,
-        }
-    )
-
     subject = f"ℹ️ {swap_request.requester.first_name} cancelled their {role_title} swap request"
 
-    html_content = render_to_string(
-        "duty_roster/emails/swap_request_cancelled.html", context
-    )
+    for recipient in recipients:
+        if recipient.email:
+            # Personalize context for each recipient
+            recipient_context = context.copy()
+            recipient_context.update(
+                {
+                    "recipient": recipient,
+                    "swap_request": swap_request,
+                    "role_title": role_title,
+                    "had_offer": recipient.id in offerers_ids,
+                }
+            )
 
-    offerers = swap_request.offers.values_list("offered_by__email", flat=True)
-    recipients = [email for email in offerers if email]
+            html_content = render_to_string(
+                "duty_roster/emails/swap_request_cancelled.html", recipient_context
+            )
 
-    if recipients:
-        send_mail(
-            subject=subject,
-            message="",
-            html_message=html_content,
-            from_email=get_from_email(),
-            recipient_list=recipients,
-            fail_silently=True,
-        )
-        logger.info(f"Sent cancellation notification to {recipients}")
+            send_mail(
+                subject=subject,
+                message="",
+                html_message=html_content,
+                from_email=get_from_email(),
+                recipient_list=[recipient.email],
+                fail_silently=True,
+            )
+            logger.info(
+                f"Sent cancellation notification to {recipient.email} (had_offer={recipient.id in offerers_ids})"
+            )
 
 
 def send_request_declined_by_member_notification(swap_request, declining_member):
@@ -857,4 +880,3 @@ def send_request_declined_by_member_notification(swap_request, declining_member)
 
 
 # Import models at function level to avoid circular imports
-from django.db import models
