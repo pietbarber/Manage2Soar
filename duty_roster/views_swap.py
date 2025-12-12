@@ -514,13 +514,21 @@ def decline_swap_request(request, request_id):
         messages.error(request, "This request is no longer open.")
         return redirect("duty_roster:open_swap_requests")
 
+    # Automatically convert to general request so others can see it
+    swap_request.direct_request_to = None
+    swap_request.request_type = "general"
+    swap_request.save()
+
     # Notify the requester that this member declined
     send_request_declined_by_member_notification(swap_request, member)
+
+    # Notify all other eligible members about the now-general request
+    send_swap_request_notifications(swap_request)
 
     messages.success(
         request,
         f"You have declined {swap_request.requester.first_name}'s request. "
-        "They will be notified.",
+        "It has been converted to a general request so other members can help.",
     )
     return redirect("duty_roster:open_swap_requests")
 

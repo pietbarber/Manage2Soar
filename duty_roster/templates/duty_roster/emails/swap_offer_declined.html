@@ -39,24 +39,24 @@
                             </p>
 
                             {% if auto_declined %}
-                            <!-- Auto-declined due to blackout conflict -->
+                            <!-- Auto-declined because another offer was accepted -->
                             <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
                                 Your offer to help with <strong>{{ swap_request.requester.first_name }}'s</strong>
-                                {{ role_title }} duty has been automatically declined.
+                                {{ role_title }} duty has been automatically declined because they accepted another offer.
                             </p>
 
-                            <div style="background-color: #fffbeb; border: 1px solid #f6ad55; border-radius: 6px; padding: 20px; margin: 20px 0;">
-                                <h3 style="margin: 0 0 10px 0; color: #c05621; font-size: 16px;">
-                                    ⚠️ Blackout Date Conflict
+                            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #4a5568; font-size: 16px;">
+                                    ℹ️ Another Offer Accepted
                                 </h3>
                                 <p style="margin: 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
-                                    The proposed swap date (<strong>{{ offer.proposed_swap_date|date:"F j, Y" }}</strong>) falls
-                                    within {{ swap_request.requester.first_name }}'s blackout period, so the swap cannot be completed.
+                                    {{ swap_request.requester.first_name }} received multiple offers and accepted one from another member.
+                                    Your willingness to help is greatly appreciated!
                                 </p>
                             </div>
 
                             <p style="margin: 20px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
-                                If you'd still like to help, consider offering a different date or a "cover only" option (no swap required).
+                                Keep an eye out for other requests where you can help - your flexibility is valuable to the club!
                             </p>
 
                             {% else %}

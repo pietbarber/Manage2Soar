@@ -39,15 +39,7 @@
                             </p>
 
                             <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
-                                Unfortunately, <strong>
-                                    {% if declining_member %}
-                                        {{ declining_member.full_display_name }}
-                                    {% elif swap_request.direct_request_to %}
-                                        {{ swap_request.direct_request_to.full_display_name }}
-                                    {% else %}
-                                        the member you requested
-                                    {% endif %}
-                                </strong>
+                                Unfortunately, <strong>{{ declining_member.full_display_name }}</strong>
                                 is unable to help with your {{ role_title }} duty on
                                 <strong>{{ swap_request.original_date|date:"l, F j, Y" }}</strong>.
                             </p>
