@@ -86,7 +86,7 @@
                                     {% endif %}
                                     <tr>
                                         <td style="padding: 8px 0; color: #4a5568; font-size: 14px;">
-                                            <strong>{{ original_duty_holder_label }}:</strong>
+                                            <strong>{% if is_swap %}Original Member:{% else %}Member Needing Coverage:{% endif %}</strong>
                                         </td>
                                         <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right;">
                                             {{ swap_request.requester.full_display_name }}
@@ -94,7 +94,7 @@
                                     </tr>
                                     <tr>
                                         <td style="padding: 8px 0; color: #4a5568; font-size: 14px;">
-                                            <strong>{{ replacement_label }}:</strong>
+                                            <strong>{% if is_swap %}Swap Partner:{% else %}Covering Member:{% endif %}</strong>
                                         </td>
                                         <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right;">
                                             {{ offer.offered_by.full_display_name }}

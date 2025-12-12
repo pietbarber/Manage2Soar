@@ -416,6 +416,8 @@ class DutySwapOfferForm(forms.ModelForm):
         self.fields["proposed_swap_date"].required = False
 
     def clean(self):
+        from django.utils import timezone
+
         cleaned_data = super().clean()
         offer_type = cleaned_data.get("offer_type")
         proposed_date = cleaned_data.get("proposed_swap_date")
@@ -426,11 +428,12 @@ class DutySwapOfferForm(forms.ModelForm):
                 "Please select a date for the swap.",
             )
 
-        if proposed_date and self.swap_request:
-            if proposed_date <= self.swap_request.original_date:
+        if proposed_date:
+            today = timezone.now().date()
+            if proposed_date < today:
                 self.add_error(
                     "proposed_swap_date",
-                    "Swap date must be after the original duty date.",
+                    "Swap date must be in the future.",
                 )
 
         return cleaned_data

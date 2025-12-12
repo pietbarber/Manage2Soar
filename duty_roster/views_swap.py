@@ -709,39 +709,40 @@ def send_offer_accepted_notifications(offer):
     swap_request = offer.swap_request
 
     role_title = swap_request.get_role_title()
-    context = get_email_context_base()
-    base_url = context.get("base_url", "http://localhost:8001")
-    context.update(
-        {
-            "offer": offer,
-            "swap_request": swap_request,
-            "role_title": role_title,
-            "roster_url": f"{base_url}/duty_roster/duty-calendar/",
-        }
-    )
+    is_swap = offer.offer_type == "swap"
 
-    subject = f"✅ {role_title} duty swap confirmed for {swap_request.original_date.strftime('%b %d')}"
+    for recipient in [swap_request.requester, offer.offered_by]:
+        if not recipient.email:
+            continue
 
-    html_content = render_to_string(
-        "duty_roster/emails/swap_offer_accepted.html", context
-    )
+        context = get_email_context_base()
+        base_url = context.get("base_url", "http://localhost:8001")
+        context.update(
+            {
+                "offer": offer,
+                "swap_request": swap_request,
+                "role_title": role_title,
+                "roster_url": f"{base_url}/duty_roster/duty-calendar/",
+                "recipient": recipient,
+                "is_swap": is_swap,
+            }
+        )
 
-    recipients = []
-    if swap_request.requester.email:
-        recipients.append(swap_request.requester.email)
-    if offer.offered_by.email:
-        recipients.append(offer.offered_by.email)
+        subject = f"✅ {role_title} duty swap confirmed for {swap_request.original_date.strftime('%b %d')}"
 
-    if recipients:
+        html_content = render_to_string(
+            "duty_roster/emails/swap_offer_accepted.html", context
+        )
+
         send_mail(
             subject=subject,
             message="",
             html_message=html_content,
             from_email=get_from_email(),
-            recipient_list=recipients,
+            recipient_list=[recipient.email],
             fail_silently=True,
         )
-        logger.info(f"Sent acceptance notification to {recipients}")
+        logger.info(f"Sent acceptance notification to {recipient.email}")
 
 
 def send_offer_declined_notification(offer, auto=False):
@@ -840,12 +841,13 @@ def send_request_declined_by_member_notification(swap_request, declining_member)
 
     role_title = swap_request.get_role_title()
     context = get_email_context_base()
+    base_url = context.get("base_url", "http://localhost:8001")
     context.update(
         {
             "swap_request": swap_request,
             "role_title": role_title,
             "declining_member": declining_member,
-            "request_url": f"{context.get("base_url", "http://localhost:8001")}/duty_roster/swap/request/{swap_request.pk}/",
+            "request_url": f"{base_url}/duty_roster/swap/request/{swap_request.pk}/",
         }
     )
 
@@ -867,6 +869,3 @@ def send_request_declined_by_member_notification(swap_request, declining_member)
         logger.info(
             f"Sent member declined notification to {swap_request.requester.email}"
         )
-
-
-# Import models at function level to avoid circular imports
