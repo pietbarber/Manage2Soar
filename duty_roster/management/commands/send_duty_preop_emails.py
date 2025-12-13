@@ -162,6 +162,13 @@ class Command(BaseCommand):
                     email.subject = f"[DEV MODE] {subject} ({recipients_info})"
                     email.to = redirect_list
                     email.cc = []
+                elif dev_mode and not redirect_list:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"DEV MODE is enabled but redirect_list is empty. Skipping email to {member.email} ({role_title}) for safety."
+                        )
+                    )
+                    continue
 
                 email.send(fail_silently=False)
                 self.stdout.write(
