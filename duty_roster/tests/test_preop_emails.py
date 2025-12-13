@@ -134,7 +134,12 @@ class TestSendDutyPreopEmails:
         SITE_URL="https://test.manage2soar.com",
     )
     def test_sends_html_email(self, site_config, duty_assignment, tomorrow):
-        """Test that command sends HTML email with proper structure."""
+        """Test that command sends HTML email with proper structure.
+
+        Each crew member receives an individual email with their personalized
+        ICS calendar attachment. All emails have the same content but different
+        recipients and ICS files.
+        """
         out = StringIO()
         call_command(
             "send_duty_preop_emails",
@@ -142,14 +147,24 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        # Check email was sent
-        assert len(mail.outbox) == 1
+        # Check individual emails were sent to each crew member
+        assert (
+            len(mail.outbox) == 3
+        )  # One per crew member (instructor, tow_pilot, duty_officer)
+
+        # Verify all recipients received an email
+        all_recipients = [email.to[0] for email in mail.outbox]
+        assert "john@example.com" in all_recipients  # instructor
+        assert "jane@example.com" in all_recipients  # tow_pilot
+        assert "bob@example.com" in all_recipients  # duty_officer
+
+        # Check the first email for proper structure
         email = mail.outbox[0]
 
         # Check basic email properties
         assert f"Pre-Ops Report for {tomorrow}" in email.subject
         assert email.from_email == "noreply@test.com"
-        assert len(email.to) == 3  # instructor, tow_pilot, duty_officer
+        assert len(email.to) == 1  # Individual recipient
 
         # Check HTML content exists
         assert len(email.alternatives) == 1
@@ -160,6 +175,14 @@ class TestSendDutyPreopEmails:
         assert "Pre-Operations Report" in html_content
         assert "Test Soaring Club" in html_content
         assert "Assigned Duty Crew" in html_content
+
+        # Check ICS attachment is present
+        assert len(email.attachments) == 1
+        attachment = email.attachments[0]
+        assert attachment[0].startswith("duty-")
+        assert attachment[0].endswith(".ics")
+        assert "text/calendar" in attachment[2]
+        assert "BEGIN:VCALENDAR" in attachment[1]
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
