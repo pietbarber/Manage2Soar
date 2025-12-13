@@ -9,22 +9,25 @@ with information about:
 - Grounded aircraft
 - Upcoming maintenance deadlines
 
-Students requesting instruction and members with ops intent are automatically
-CC'd on the email to keep them informed.
+Each duty crew member receives an individual email with an ICS calendar attachment
+for their specific duty role. Students requesting instruction and members with ops
+intent are CC'd on each email to keep them informed.
 """
 
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment, InstructionSlot, OpsIntent
+from duty_roster.utils.ics import generate_preop_ics
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
-from utils.email import send_mail
+from utils.email import get_dev_mode_info
 
 
 class Command(BaseCommand):
@@ -76,18 +79,10 @@ class Command(BaseCommand):
             self.stdout.write("No scheduled ops for this date.")
             return
 
-        # Collect duty crew emails
-        crew_fields = [
-            assignment.instructor,
-            assignment.surge_instructor,
-            assignment.tow_pilot,
-            assignment.surge_tow_pilot,
-            assignment.duty_officer,
-            assignment.assistant_duty_officer,
-        ]
-        to_emails = [m.email for m in crew_fields if m and m.email]
+        # Build crew list with role information for personalized emails
+        crew_with_roles = self._get_crew_with_roles(assignment)
 
-        if not to_emails:
+        if not crew_with_roles:
             self.stdout.write(
                 self.style.WARNING(
                     "No valid email addresses for duty crew. Email not sent."
@@ -103,6 +98,7 @@ class Command(BaseCommand):
         context = self._build_context(assignment, target_date, config, site_url)
 
         # Collect CC emails from students and ops intent members
+        crew_emails = [member.email for member, _ in crew_with_roles]
         cc_emails = []
         for slot in context.get("instruction_requests", []):
             if slot.student and slot.student.email:
@@ -110,8 +106,8 @@ class Command(BaseCommand):
         for intent in context.get("ops_intents", []):
             if intent.member and intent.member.email:
                 cc_emails.append(intent.member.email)
-        # Remove duplicates and any emails already in to_emails
-        cc_emails = list(set(cc_emails) - set(to_emails))
+        # Remove duplicates and any emails already in crew_emails
+        cc_emails = list(set(cc_emails) - set(crew_emails))
 
         # Render templates
         html_message = render_to_string("duty_roster/emails/preop_email.html", context)
@@ -128,23 +124,76 @@ class Command(BaseCommand):
         else:
             from_email = "noreply@manage2soar.com"
 
+        subject = f"Pre-Ops Report for {target_date}"
+
+        # Check dev mode
+        dev_mode, redirect_list = get_dev_mode_info()
+
         try:
-            send_mail(
-                subject=f"Pre-Ops Report for {target_date}",
-                message=text_message,
-                from_email=from_email,
-                recipient_list=to_emails,
-                cc=cc_emails if cc_emails else None,
-                html_message=html_message,
-            )
-            self.stdout.write(
-                self.style.SUCCESS(f"Email sent to: {', '.join(to_emails)}")
-            )
-            if cc_emails:
-                self.stdout.write(self.style.SUCCESS(f"CC'd: {', '.join(cc_emails)}"))
+            # Send individual emails to each crew member with personalized ICS attachment
+            for member, role_title in crew_with_roles:
+                if not member.email:
+                    continue
+
+                # Generate ICS for this crew member's duty
+                ics_content = generate_preop_ics(assignment, member, role_title)
+                ics_filename = f"duty-{target_date.isoformat()}-{role_title.lower().replace(' ', '-')}.ics"
+
+                # Create email with attachment
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_message,
+                    from_email=from_email,
+                    to=[member.email],
+                    cc=cc_emails if cc_emails else None,
+                )
+                email.attach_alternative(html_message, "text/html")
+                email.attach(ics_filename, ics_content, "text/calendar")
+
+                # Apply dev mode if enabled
+                if dev_mode:
+                    if not redirect_list:
+                        raise ValueError(
+                            "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set."
+                        )
+                    original_to = ", ".join(email.to)
+                    original_cc = ", ".join(email.cc) if email.cc else ""
+                    recipients_info = f"TO: {original_to}"
+                    if original_cc:
+                        recipients_info += f", CC: {original_cc}"
+                    email.subject = f"[DEV MODE] {subject} ({recipients_info})"
+                    email.to = redirect_list
+                    email.cc = []
+
+                email.send(fail_silently=False)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Email sent to {member.email} ({role_title}) with ICS attachment"
+                    )
+                )
+                # Only CC on the first email to avoid spamming students/ops intent members
+                cc_emails = []
+
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Failed to send email: {e}"))
             raise
+
+    def _get_crew_with_roles(self, assignment):
+        """Get list of (member, role_title) tuples for crew members with emails."""
+        crew_roles = [
+            (assignment.instructor, get_role_title("instructor")),
+            (assignment.surge_instructor, get_role_title("surge_instructor")),
+            (assignment.tow_pilot, get_role_title("towpilot")),
+            (assignment.surge_tow_pilot, get_role_title("surge_towpilot")),
+            (assignment.duty_officer, get_role_title("duty_officer")),
+            (
+                assignment.assistant_duty_officer,
+                get_role_title("assistant_duty_officer"),
+            ),
+        ]
+        return [
+            (member, role) for member, role in crew_roles if member and member.email
+        ]
 
     def _build_context(self, assignment, target_date, config, site_url):
         """Build the template context with all required data."""

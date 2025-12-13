@@ -45,6 +45,7 @@ h11==0.16.0
 httpcore==1.0.9
 httplib2==0.31.0
 httpx==0.28.1
+icalendar==6.3.2
 identify==2.6.15
 idna==3.10
 iniconfig==2.1.0
@@ -124,6 +125,7 @@ tqdm==4.67.1
 typer==0.20.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
+tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.6.0
 virtualenv==20.35.4
