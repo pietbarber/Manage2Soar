@@ -230,3 +230,6 @@ def test_surge_threshold_positive_integers():
         config.full_clean()
 
     # After failed validation, values should remain unchanged in DB
+    config.refresh_from_db()
+    assert config.tow_surge_threshold == 1
+    assert config.instruction_surge_threshold == 1
