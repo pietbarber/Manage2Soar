@@ -266,6 +266,11 @@ def get_surge_thresholds():
     """
     Get surge thresholds from SiteConfiguration with sensible defaults.
     Returns tuple: (tow_surge_threshold, instruction_surge_threshold)
+
+    Note: While this function is called multiple times per request, Django's
+    QuerySet caching and database query caching will prevent redundant queries
+    in most cases. For production, consider using Django's cache framework
+    with a short TTL (e.g., 60 seconds) if this becomes a bottleneck.
     """
     config = SiteConfiguration.objects.first()
     tow_surge_threshold = config.tow_surge_threshold if config else 6

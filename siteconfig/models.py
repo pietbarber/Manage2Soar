@@ -441,6 +441,20 @@ class SiteConfiguration(models.Model):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
             raise ValidationError("Only one SiteConfiguration instance allowed.")
 
+        # Validate surge thresholds are at least 1 (Issue #403)
+        errors = {}
+        if self.tow_surge_threshold is not None and self.tow_surge_threshold < 1:
+            errors["tow_surge_threshold"] = "Tow surge threshold must be at least 1."
+        if (
+            self.instruction_surge_threshold is not None
+            and self.instruction_surge_threshold < 1
+        ):
+            errors["instruction_surge_threshold"] = (
+                "Instruction surge threshold must be at least 1."
+            )
+        if errors:
+            raise ValidationError(errors)
+
         # Don't auto-generate tokens - they're created on-demand when duty officer needs them
 
         # Validate operational period formats
