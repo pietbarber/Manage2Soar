@@ -10,6 +10,7 @@ from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.mail import EmailMultiAlternatives
 from django.db import models, transaction
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,11 +22,12 @@ from members.decorators import active_member_required
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
-from utils.email import send_mail
+from utils.email import get_dev_mode_info, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 
 from .forms import DutySwapOfferForm, DutySwapRequestForm
 from .models import DutyAssignment, DutySwapOffer, DutySwapRequest, MemberBlackout
+from .utils.ics import generate_swap_ics
 
 logger = logging.getLogger("duty_roster.views_swap")
 
@@ -723,9 +725,15 @@ def send_offer_accepted_notifications(offer):
     role_title = swap_request.get_role_title()
     is_swap = offer.offer_type == "swap"
 
+    # Check dev mode
+    dev_mode, redirect_list = get_dev_mode_info()
+
     for recipient in [swap_request.requester, offer.offered_by]:
         if not recipient.email:
             continue
+
+        # Determine if this is the original requester or the person who offered
+        is_original_requester = recipient == swap_request.requester
 
         context = get_email_context_base()
         base_url = context.get("base_url", "http://localhost:8001")
@@ -746,14 +754,48 @@ def send_offer_accepted_notifications(offer):
             "duty_roster/emails/swap_offer_accepted.html", context
         )
 
-        send_mail(
-            subject=subject,
-            message="",
-            html_message=html_content,
-            from_email=get_from_email(),
-            recipient_list=[recipient.email],
-            fail_silently=True,
+        # Generate ICS attachment for the recipient
+        ics_content = generate_swap_ics(
+            swap_request,
+            for_member=recipient,
+            is_original_requester=is_original_requester,
         )
+
+        # Determine date for filename
+        if is_original_requester and is_swap and offer.proposed_swap_date:
+            ics_date = offer.proposed_swap_date.isoformat()
+        elif not is_original_requester:
+            ics_date = swap_request.original_date.isoformat()
+        else:
+            ics_date = swap_request.original_date.isoformat()
+
+        ics_filename = f"duty-{ics_date}-{role_title.lower().replace(' ', '-')}.ics"
+
+        # Create email with ICS attachment
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body="",
+            from_email=get_from_email(),
+            to=[recipient.email],
+        )
+        email.attach_alternative(html_content, "text/html")
+
+        # Only attach ICS if there's actual content (e.g., requester in cover scenario gets no new duty)
+        if ics_content:
+            email.attach(ics_filename, ics_content, "text/calendar")
+
+        # Apply dev mode if enabled
+        if dev_mode:
+            if redirect_list:
+                email.subject = f"[DEV MODE] {subject} (TO: {recipient.email})"
+                email.to = redirect_list
+            else:
+                logger.error(
+                    "Dev mode is enabled but redirect_list is empty. Refusing to send real email."
+                )
+                return  # Don't send ANY emails if dev mode misconfigured
+
+        email.send(fail_silently=True)
         logger.info(f"Sent acceptance notification to {recipient.email}")
 
 
