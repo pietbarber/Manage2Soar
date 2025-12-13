@@ -4,7 +4,7 @@
 {# Bootstrap 5 styled modal header with date #}
 <div class="modal-header-content mb-3">
   <h5 class="text-primary fw-bold mb-0">
-    <i class="bi bi-calendar-event me-2"></i>{{ day|date:"l, F j, Y" }}
+    <i class="bi bi-calendar-event me-2" aria-hidden="true"></i>{{ day|date:"l, F j, Y" }}
   </h5>
 </div>
 
@@ -13,7 +13,7 @@
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-primary text-white py-2">
       <h6 class="mb-0 fw-semibold">
-        <i class="bi bi-people-fill me-2"></i>Assigned Duty Crew
+        <i class="bi bi-people-fill me-2" aria-hidden="true"></i>Assigned Duty Crew
       </h6>
     </div>
     <div class="card-body p-3">
@@ -21,7 +21,7 @@
         {% if config.schedule_instructors or assignment.instructor %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-success me-2"><i class="bi bi-mortarboard"></i></span>
+            <span class="badge bg-success me-2"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.instructor_title|default:'Instructor' }}</small>
               <span class="fw-medium">{{ assignment.instructor.full_display_name|default:"—" }}</span>
@@ -33,7 +33,7 @@
         {% if assignment.surge_instructor %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-success me-2"><i class="bi bi-mortarboard"></i></span>
+            <span class="badge bg-success me-2"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.surge_instructor_title|default:'Surge Instructor' }}</small>
               <span class="fw-medium">{{ assignment.surge_instructor.full_display_name }}</span>
@@ -45,7 +45,7 @@
         {% if config.schedule_tow_pilots or assignment.tow_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-danger me-2"><i class="bi bi-airplane"></i></span>
+            <span class="badge bg-danger me-2"><i class="bi bi-airplane" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.towpilot_title|default:'Tow Pilot' }}</small>
               <span class="fw-medium">{{ assignment.tow_pilot.full_display_name|default:"—" }}</span>
@@ -57,7 +57,7 @@
         {% if assignment.surge_tow_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-danger me-2"><i class="bi bi-airplane"></i></span>
+            <span class="badge bg-danger me-2"><i class="bi bi-airplane" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}</small>
               <span class="fw-medium">{{ assignment.surge_tow_pilot.full_display_name }}</span>
@@ -69,7 +69,7 @@
         {% if config.schedule_duty_officers or assignment.duty_officer %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-warning text-dark me-2"><i class="bi bi-clipboard-check"></i></span>
+            <span class="badge bg-warning text-dark me-2"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.duty_officer_title|default:'Duty Officer' }}</small>
               <span class="fw-medium">{{ assignment.duty_officer.full_display_name|default:"—" }}</span>
@@ -81,7 +81,7 @@
         {% if config.schedule_assistant_duty_officers or assignment.assistant_duty_officer %}
         <div class="col-6">
           <div class="d-flex align-items-center">
-            <span class="badge bg-secondary me-2"><i class="bi bi-person-badge"></i></span>
+            <span class="badge bg-secondary me-2"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.assistant_duty_officer_title|default:'Assistant DO' }}</small>
               <span class="fw-medium">{{ assignment.assistant_duty_officer.full_display_name|default:"—" }}</span>
@@ -96,7 +96,7 @@
   {# Surge Alerts #}
   {% if show_surge_alert %}
   <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
-    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
     <div>
       <strong>Surge Instructor Recommended:</strong>
       At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} want instruction.
@@ -106,7 +106,7 @@
 
   {% if show_tow_surge_alert %}
   <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
-    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
     <div>
       <strong>Surge Tow Pilot Recommended:</strong>
       At least {{ tow_count }} pilots plan to fly gliders requiring a tow.
@@ -120,7 +120,7 @@
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-info text-white py-2">
         <h6 class="mb-0 fw-semibold">
-          <i class="bi bi-arrow-left-right me-2"></i>Need Coverage?
+          <i class="bi bi-arrow-left-right me-2" aria-hidden="true"></i>Need Coverage?
         </h6>
       </div>
       <div class="card-body p-3">
@@ -128,25 +128,25 @@
           {% if config.schedule_instructors and user == assignment.instructor %}
           <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='INSTRUCTOR' %}"
              class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-mortarboard me-2"></i>Request {{ config.instructor_title|default:'Instructor' }} Swap
+            <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>Request {{ config.instructor_title|default:'Instructor' }} Swap
           </a>
           {% endif %}
           {% if config.schedule_tow_pilots and user == assignment.tow_pilot %}
           <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='TOW' %}"
              class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-airplane me-2"></i>Request {{ config.towpilot_title|default:'Tow Pilot' }} Swap
+            <i class="bi bi-airplane me-2" aria-hidden="true"></i>Request {{ config.towpilot_title|default:'Tow Pilot' }} Swap
           </a>
           {% endif %}
           {% if config.schedule_duty_officers and user == assignment.duty_officer %}
           <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DO' %}"
              class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-clipboard-check me-2"></i>Request {{ config.duty_officer_title|default:'Duty Officer' }} Swap
+            <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>Request {{ config.duty_officer_title|default:'Duty Officer' }} Swap
           </a>
           {% endif %}
           {% if config.schedule_assistant_duty_officers and user == assignment.assistant_duty_officer %}
           <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='ADO' %}"
              class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-person-badge me-2"></i>Request {{ config.assistant_duty_officer_title|default:'Assistant DO' }} Swap
+            <i class="bi bi-person-badge me-2" aria-hidden="true"></i>Request {{ config.assistant_duty_officer_title|default:'Assistant DO' }} Swap
           </a>
           {% endif %}
         </div>
@@ -160,7 +160,7 @@
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-success text-white py-2">
       <h6 class="mb-0 fw-semibold">
-        <i class="bi bi-person-raised-hand me-2"></i>Students Requesting Instruction
+        <i class="bi bi-person-raised-hand me-2" aria-hidden="true"></i>Students Requesting Instruction
       </h6>
     </div>
     <div class="card-body p-3">
@@ -170,11 +170,11 @@
           <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
             <div class="d-flex align-items-center">
               {% if slot.instructor_response == "accepted" %}
-                <span class="badge bg-success me-2"><i class="bi bi-check-circle"></i></span>
+                <span class="badge bg-success me-2"><i class="bi bi-check-circle" aria-hidden="true"></i></span>
               {% elif slot.instructor_response == "pending" %}
-                <span class="badge bg-warning text-dark me-2"><i class="bi bi-clock"></i></span>
+                <span class="badge bg-warning text-dark me-2"><i class="bi bi-clock" aria-hidden="true"></i></span>
               {% elif slot.instructor_response == "rejected" %}
-                <span class="badge bg-danger me-2"><i class="bi bi-x-circle"></i></span>
+                <span class="badge bg-danger me-2"><i class="bi bi-x-circle" aria-hidden="true"></i></span>
               {% endif %}
               <span>{{ slot.student.full_display_name }}</span>
             </div>
@@ -190,7 +190,7 @@
         {% if user == assignment.instructor or user == assignment.surge_instructor %}
         <div class="mt-3">
           <a href="{% url 'duty_roster:instructor_requests' %}" class="btn btn-primary btn-sm w-100">
-            <i class="bi bi-clipboard-check me-2"></i>Review Student Requests
+            <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>Review Student Requests
           </a>
         </div>
         {% endif %}
@@ -203,7 +203,7 @@
   {% if user.is_authenticated and assignment.instructor and day >= today %}
     {% if user_has_instruction_request %}
     <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
-      <i class="bi bi-check-circle-fill me-2"></i>
+      <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
       <div>
         <strong>Instruction Requested</strong>
         {% for slot in assignment.instruction_slots.all %}
@@ -221,7 +221,7 @@
     <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}" class="mb-3">
       {% csrf_token %}
       <button type="submit" class="btn btn-success w-100">
-        <i class="bi bi-hand-index me-2"></i>Request Instruction
+        <i class="bi bi-hand-index me-2" aria-hidden="true"></i>Request Instruction
       </button>
     </form>
     {% endif %}
@@ -230,7 +230,7 @@
 {% else %}
   {# No Assignment #}
   <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-    <i class="bi bi-info-circle me-2"></i>
+    <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
     No duty crew assigned for this date.
   </div>
 {% endif %}
@@ -240,14 +240,14 @@
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-primary text-white py-2">
     <h6 class="mb-0 fw-semibold">
-      <i class="bi bi-airplane-engines me-2"></i>Flight Plans
+      <i class="bi bi-airplane-engines me-2" aria-hidden="true"></i>Flight Plans
     </h6>
   </div>
   <div class="card-body p-3">
     <div id="ops-intent-response">
       {% if intent_exists %}
       <div class="alert alert-success d-flex align-items-center mb-2" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i>
+        <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
         <span>You're already marked as planning to fly this day.</span>
       </div>
       <form
@@ -257,7 +257,7 @@
       >
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-x-circle me-2"></i>Cancel Intent
+          <i class="bi bi-x-circle me-2" aria-hidden="true"></i>Cancel Intent
         </button>
       </form>
       {% elif can_submit_intent %}
@@ -267,12 +267,12 @@
         hx-swap="innerHTML"
       >
         <button type="submit" class="btn btn-primary w-100">
-          <i class="bi bi-airplane-engines me-2"></i>I Plan to Fly This Day
+          <i class="bi bi-airplane-engines me-2" aria-hidden="true"></i>I Plan to Fly This Day
         </button>
       </form>
       {% else %}
       <div class="text-muted">
-        <i class="bi bi-clock me-2"></i>This date is in the past. You can no longer declare intent.
+        <i class="bi bi-clock me-2" aria-hidden="true"></i>This date is in the past. You can no longer declare intent.
       </div>
       {% endif %}
     </div>
@@ -281,7 +281,7 @@
     {% if assignment and not assignment.is_scheduled and not assignment.is_confirmed %}
     <hr class="my-3">
     <h6 class="fw-semibold text-secondary mb-2">
-      <i class="bi bi-hand-thumbs-up me-2"></i>Volunteer for Duty:
+      <i class="bi bi-hand-thumbs-up me-2" aria-hidden="true"></i>Volunteer for Duty:
     </h6>
     <div class="d-grid gap-2">
       {% if user.towpilot and not assignment.tow_pilot %}
@@ -289,7 +289,7 @@
             hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-danger w-100">
-          <i class="bi bi-airplane me-2"></i>I am willing to tow
+          <i class="bi bi-airplane me-2" aria-hidden="true"></i>I am willing to tow
         </button>
       </form>
       {% endif %}
@@ -299,7 +299,7 @@
             hx-post="{% url 'duty_roster:calendar_dutyofficer_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-warning w-100">
-          <i class="bi bi-clipboard-check me-2"></i>I will serve as Duty Officer
+          <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>I will serve as Duty Officer
         </button>
       </form>
       {% endif %}
@@ -309,7 +309,7 @@
             hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-success w-100">
-          <i class="bi bi-mortarboard me-2"></i>I am willing to instruct today
+          <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>I am willing to instruct today
         </button>
       </form>
       {% endif %}
@@ -319,7 +319,7 @@
             hx-post="{% url 'duty_roster:calendar_ado_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-secondary w-100">
-          <i class="bi bi-person-badge me-2"></i>I can serve as Assistant Duty Officer
+          <i class="bi bi-person-badge me-2" aria-hidden="true"></i>I can serve as Assistant Duty Officer
         </button>
       </form>
       {% endif %}
@@ -330,19 +330,19 @@
     {% if intents %}
     <hr class="my-3">
     <h6 class="fw-semibold text-primary mb-2">
-      <i class="bi bi-people me-2"></i>Pilots Planning to Fly:
+      <i class="bi bi-people me-2" aria-hidden="true"></i>Pilots Planning to Fly:
     </h6>
     <ul class="list-group list-group-flush">
       {% for intent in intents %}
       <li class="list-group-item px-0 py-1">
-        <i class="bi bi-person me-2 text-muted"></i>{{ intent.member.full_display_name }}
+        <i class="bi bi-person me-2 text-muted" aria-hidden="true"></i>{{ intent.member.full_display_name }}
       </li>
       {% endfor %}
     </ul>
     {% else %}
     <hr class="my-3">
     <p class="text-muted mb-0">
-      <i class="bi bi-info-circle me-2"></i>No one has declared intent yet.
+      <i class="bi bi-info-circle me-2" aria-hidden="true"></i>No one has declared intent yet.
     </p>
     {% endif %}
   </div>
@@ -354,7 +354,7 @@
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-dark text-white py-2">
     <h6 class="mb-0 fw-semibold">
-      <i class="bi bi-gear me-2"></i>Admin Options
+      <i class="bi bi-gear me-2" aria-hidden="true"></i>Admin Options
     </h6>
   </div>
   <div class="card-body p-3">
@@ -365,7 +365,7 @@
         hx-swap="innerHTML"
       >
         <button type="submit" class="btn btn-outline-secondary w-100">
-          <i class="bi bi-pencil me-2"></i>Edit Duty Crew
+          <i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Duty Crew
         </button>
       </form>
     </div>
@@ -378,7 +378,7 @@
         hx-target="#modal-body"
         hx-swap="innerHTML"
       >
-        <i class="bi bi-x-octagon me-2"></i>Cancel Operations for this day
+        <i class="bi bi-x-octagon me-2" aria-hidden="true"></i>Cancel Operations for this day
       </button>
     </div>
     {% endif %}

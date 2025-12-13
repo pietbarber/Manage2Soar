@@ -4,7 +4,7 @@
     {% if config.duty_roster_announcement %}
     <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
       <div class="d-flex align-items-start">
-        <i class="bi bi-megaphone-fill me-2 fs-5 text-info"></i>
+        <i class="bi bi-megaphone-fill me-2 fs-5 text-info" aria-hidden="true"></i>
         <div>
           <strong class="d-block mb-1">Roster Manager Announcement:</strong>
           <span class="announcement-text">{{ config.duty_roster_announcement|linebreaksbr }}</span>
