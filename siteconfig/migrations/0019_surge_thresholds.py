@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name="instruction_surge_threshold",
             field=models.PositiveIntegerField(
                 default=4,
-                help_text="Number of instruction requests that triggers surge alerts (default: 4)",
+                help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
             ),
         ),
         migrations.AddField(
@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
             name="tow_surge_threshold",
             field=models.PositiveIntegerField(
                 default=6,
-                help_text="Number of tow requests that triggers 'high demand' surge alerts (default: 6)",
+                help_text="Surge alerts trigger when tow requests are AT or ABOVE this value (default: 6)",
             ),
         ),
     ]

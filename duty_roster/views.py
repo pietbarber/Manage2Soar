@@ -278,10 +278,10 @@ def get_surge_thresholds():
     > 3 (triggering at 4+), while tow used >= 6. The new defaults (instruction=4, tow=6)
     maintain backward compatibility while providing more intuitive threshold behavior.
     """
-    config = cache.get("siteconfig_first")
+    config = cache.get("siteconfig_instance")
     if config is None:
         config = SiteConfiguration.objects.first()
-        cache.set("siteconfig_first", config, timeout=60)
+        cache.set("siteconfig_instance", config, timeout=60)
     tow_surge_threshold = config.tow_surge_threshold if config else 6
     instruction_surge_threshold = config.instruction_surge_threshold if config else 4
     return tow_surge_threshold, instruction_surge_threshold
