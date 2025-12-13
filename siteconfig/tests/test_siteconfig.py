@@ -182,3 +182,54 @@ def test_membership_status_deletion_success():
 
     # Status should be gone
     assert not MembershipStatus.objects.filter(name="Unused Status").exists()
+
+
+@pytest.mark.django_db
+def test_surge_threshold_defaults():
+    """Test that surge thresholds have correct default values (Issue #403)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.org", club_abbreviation="TC"
+    )
+    assert config.tow_surge_threshold == 6
+    assert config.instruction_surge_threshold == 4
+
+
+@pytest.mark.django_db
+def test_surge_threshold_custom_values():
+    """Test setting custom surge threshold values (Issue #403)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        tow_surge_threshold=10,
+        instruction_surge_threshold=5,
+    )
+    assert config.tow_surge_threshold == 10
+    assert config.instruction_surge_threshold == 5
+
+
+@pytest.mark.django_db
+def test_surge_threshold_positive_integers():
+    """Test that surge thresholds must be positive integers (Issue #403)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.org", club_abbreviation="TC"
+    )
+
+    # Should accept positive values
+    config.tow_surge_threshold = 1
+    config.instruction_surge_threshold = 1
+    config.save()
+    config.refresh_from_db()
+    assert config.tow_surge_threshold == 1
+    assert config.instruction_surge_threshold == 1
+
+    # Zero should NOT work (business logic: minimum is 1)
+    config.tow_surge_threshold = 0
+    config.instruction_surge_threshold = 0
+    with pytest.raises(ValidationError):
+        config.full_clean()
+
+    # After failed validation, values should remain unchanged in DB
+    config.refresh_from_db()
+    assert config.tow_surge_threshold == 1
+    assert config.instruction_surge_threshold == 1

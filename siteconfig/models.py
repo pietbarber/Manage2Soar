@@ -266,6 +266,20 @@ class SiteConfiguration(models.Model):
         blank=True,
         help_text="We refer to the position of Surge Instructor as ... (optional)",
     )
+
+    # Surge thresholds (Issue #403)
+    # Note: Both thresholds trigger AT or ABOVE the specified value (e.g., threshold=4 triggers at 4+)
+    # This makes both thresholds semantically consistent. Previously, instruction used > 3 (triggering
+    # at 4+), while tow used >= 6. Now both use >= logic for clarity and consistency.
+    tow_surge_threshold = models.PositiveIntegerField(
+        default=6,
+        help_text="Surge alerts trigger when tow requests are AT or ABOVE this value (default: 6)",
+    )
+    instruction_surge_threshold = models.PositiveIntegerField(
+        default=4,
+        help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
+    )
+
     membership_manager_title = models.CharField(
         max_length=40,
         default="Membership Manager",
@@ -429,6 +443,20 @@ class SiteConfiguration(models.Model):
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():
             raise ValidationError("Only one SiteConfiguration instance allowed.")
+
+        # Validate surge thresholds are at least 1 (Issue #403)
+        errors = {}
+        if self.tow_surge_threshold is not None and self.tow_surge_threshold < 1:
+            errors["tow_surge_threshold"] = "Tow surge threshold must be at least 1."
+        if (
+            self.instruction_surge_threshold is not None
+            and self.instruction_surge_threshold < 1
+        ):
+            errors["instruction_surge_threshold"] = (
+                "Instruction surge threshold must be at least 1."
+            )
+        if errors:
+            raise ValidationError(errors)
 
         # Don't auto-generate tokens - they're created on-demand when duty officer needs them
 
