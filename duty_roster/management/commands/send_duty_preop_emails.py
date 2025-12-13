@@ -137,7 +137,9 @@ class Command(BaseCommand):
 
                 # Generate ICS for this crew member's duty
                 ics_content = generate_preop_ics(assignment, member, role_title)
-                ics_filename = f"duty-{target_date.isoformat()}-{role_title.lower().replace(' ', '-')}.ics"
+                # Fallback to "crew" if role_title is None
+                role_slug = (role_title or "Crew").lower().replace(" ", "-")
+                ics_filename = f"duty-{target_date.isoformat()}-{role_slug}.ics"
 
                 # Create email with attachment
                 email = EmailMultiAlternatives(
@@ -151,11 +153,7 @@ class Command(BaseCommand):
                 email.attach(ics_filename, ics_content, "text/calendar")
 
                 # Apply dev mode if enabled
-                if dev_mode:
-                    if not redirect_list:
-                        raise ValueError(
-                            "EMAIL_DEV_MODE is enabled but EMAIL_DEV_MODE_REDIRECT_TO is not set."
-                        )
+                if dev_mode and redirect_list:
                     original_to = ", ".join(email.to)
                     original_cc = ", ".join(email.cc) if email.cc else ""
                     recipients_info = f"TO: {original_to}"
@@ -172,6 +170,7 @@ class Command(BaseCommand):
                     )
                 )
                 # Only CC on the first email to avoid spamming students/ops intent members
+                # with duplicate emails. They only need to see the duty roster once.
                 cc_emails = []
 
         except Exception as e:

@@ -9,7 +9,8 @@ to easily add their duty assignments to their personal calendars.
 from datetime import datetime, timedelta
 
 from django.conf import settings
-from icalendar import Calendar, Event, vText
+from django.utils import timezone
+from icalendar import Calendar, Event
 
 from siteconfig.models import SiteConfiguration
 
@@ -82,15 +83,16 @@ def generate_duty_ics(
         event.add("location", club_name)
 
     # Unique ID for the event
-    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    now = timezone.now()
+    timestamp = now.strftime("%Y%m%dT%H%M%S")
     role_slug = role_title.lower().replace(" ", "-")
     uid_base = f"{duty_date.isoformat()}-{role_slug}"
     if uid_suffix:
         uid_base += f"-{uid_suffix}"
     event.add("uid", f"{uid_base}-{timestamp}@{domain_name}")
 
-    # Add timestamp
-    event.add("dtstamp", datetime.now())
+    # Add timestamp (must be UTC per RFC 5545)
+    event.add("dtstamp", now)
 
     # Add organizer (club email)
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "")
@@ -152,13 +154,14 @@ def generate_swap_ics(
             )
             event.add("dtstart", offer.proposed_swap_date)
             event.add("dtend", offer.proposed_swap_date + timedelta(days=1))
-            timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+            now = timezone.now()
+            timestamp = now.strftime("%Y%m%dT%H%M%S")
             event.add(
                 "uid",
                 f"{offer.proposed_swap_date.isoformat()}-{role_title.lower().replace(' ', '-')}"
                 f"-swap-{swap_request.pk}-{timestamp}@{domain_name}",
             )
-            event.add("dtstamp", datetime.now())
+            event.add("dtstamp", now)
             event.add("status", "CONFIRMED")
             events_to_add.append(event)
     else:
@@ -181,13 +184,14 @@ def generate_swap_ics(
 
         event.add("dtstart", swap_request.original_date)
         event.add("dtend", swap_request.original_date + timedelta(days=1))
-        timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        now = timezone.now()
+        timestamp = now.strftime("%Y%m%dT%H%M%S")
         event.add(
             "uid",
             f"{swap_request.original_date.isoformat()}-{role_title.lower().replace(' ', '-')}"
             f"-cover-{swap_request.pk}-{timestamp}@{domain_name}",
         )
-        event.add("dtstamp", datetime.now())
+        event.add("dtstamp", now)
         event.add("status", "CONFIRMED")
         events_to_add.append(event)
 
@@ -197,6 +201,10 @@ def generate_swap_ics(
         location = config.club_address
     else:
         location = club_name
+
+    # Return None if no events (e.g., requester in cover scenario has no new duty)
+    if not events_to_add:
+        return None
 
     for event in events_to_add:
         event.add("location", location)

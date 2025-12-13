@@ -322,7 +322,7 @@ class TestGenerateSwapIcs:
         assert "Covering for" in description or "covering" in description.lower()
 
     def test_cover_for_requester_no_new_duty(self, cover_swap_request, members):
-        """Requester in cover scenario doesn't get a new duty."""
+        """Requester in cover scenario doesn't get a new duty - should return None."""
         requester, offerer = members
 
         ics_content = generate_swap_ics(
@@ -331,9 +331,9 @@ class TestGenerateSwapIcs:
             is_original_requester=True,
         )
 
-        # For cover scenario, requester has no new duty, so ICS may be empty
-        # The function should still return valid content
-        assert isinstance(ics_content, bytes)
+        # For cover scenario, requester has no new duty assignment
+        # Function should return None (no calendar events to add)
+        assert ics_content is None
 
     def test_swap_for_requester(self, exchange_swap_request, members):
         """Requester in swap scenario gets ICS for proposed swap date."""
