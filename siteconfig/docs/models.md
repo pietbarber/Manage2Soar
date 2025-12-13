@@ -35,6 +35,8 @@ erDiagram
         string surge_towpilot_title
         string instructor_title
         string surge_instructor_title
+        int tow_surge_threshold
+        int instruction_surge_threshold
         string membership_manager_title
         string equipment_manager_title
         boolean allow_glider_reservations
@@ -76,10 +78,11 @@ erDiagram
 
 ## SiteConfiguration
 - **Purpose:** Stores site-wide configuration settings for multi-club support, including branding, contact information, operational preferences, and visiting pilot workflow.
-- **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle
+- **Key Features:** Singleton model (only one instance allowed), complete contact form customization, configurable role titles, scheduling toggles, club address/location management, visiting pilot security token lifecycle, surge threshold configuration
 - **Contact Fields:** `contact_welcome_text`, `contact_response_info`, complete address fields, `club_phone`, `operations_info`
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
 - **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
+- **Surge Thresholds:** Configurable thresholds for tow and instruction demand alerts (Issue #403). Both thresholds trigger AT or ABOVE the specified value (e.g., threshold=4 triggers at 4+ requests). This ensures consistent behavior across both threshold types.
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 

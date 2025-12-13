@@ -268,13 +268,16 @@ class SiteConfiguration(models.Model):
     )
 
     # Surge thresholds (Issue #403)
+    # Note: Both thresholds trigger AT or ABOVE the specified value (e.g., threshold=4 triggers at 4+)
+    # This makes both thresholds semantically consistent. Previously, instruction used > 3 (triggering
+    # at 4+), while tow used >= 6. Now both use >= logic for clarity and consistency.
     tow_surge_threshold = models.PositiveIntegerField(
         default=6,
-        help_text="Number of tow requests that triggers 'high demand' surge alerts (default: 6)",
+        help_text="Surge alerts trigger when tow requests are AT or ABOVE this value (default: 6)",
     )
     instruction_surge_threshold = models.PositiveIntegerField(
         default=4,
-        help_text="Number of instruction requests that triggers surge alerts (default: 4)",
+        help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
     )
 
     membership_manager_title = models.CharField(

@@ -271,6 +271,12 @@ def get_surge_thresholds():
     This function uses Django's cache framework to avoid redundant database queries.
     The SiteConfiguration is cached for 60 seconds. If not present, it is fetched
     from the database and then cached. Adjust the TTL as needed for your use case.
+
+    Note on threshold semantics (Issue #403):
+    Both thresholds trigger AT or ABOVE the specified value (using >= comparison).
+    This makes both thresholds semantically consistent. Previously, instruction used
+    > 3 (triggering at 4+), while tow used >= 6. The new defaults (instruction=4, tow=6)
+    maintain backward compatibility while providing more intuitive threshold behavior.
     """
     config = cache.get("siteconfig_first")
     if config is None:
