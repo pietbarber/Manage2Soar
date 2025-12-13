@@ -3,12 +3,17 @@ Tests for configurable surge thresholds (Issue #403).
 """
 
 from datetime import date, timedelta
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, OpsIntent
-from duty_roster.views import get_surge_thresholds
+from duty_roster.views import (
+    get_surge_thresholds,
+    maybe_notify_surge_instructor,
+    maybe_notify_surge_towpilot,
+)
 from siteconfig.models import SiteConfiguration
 
 
@@ -24,7 +29,7 @@ def test_get_surge_thresholds_defaults():
 @pytest.mark.django_db
 def test_get_surge_thresholds_from_config():
     """Test get_surge_thresholds uses values from SiteConfiguration."""
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
@@ -40,7 +45,7 @@ def test_get_surge_thresholds_from_config():
 def test_calendar_view_uses_custom_thresholds(client, django_user_model):
     """Test that calendar view uses custom surge thresholds in context."""
     # Create config with custom thresholds
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
@@ -70,7 +75,7 @@ def test_calendar_view_uses_custom_thresholds(client, django_user_model):
 def test_surge_alert_with_custom_instruction_threshold(client, django_user_model):
     """Test that surge alerts trigger at custom instruction threshold."""
     # Create config with lower instruction threshold
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
@@ -123,7 +128,7 @@ def test_surge_alert_with_custom_instruction_threshold(client, django_user_model
 def test_tow_surge_alert_with_custom_threshold(client, django_user_model):
     """Test that tow surge alerts trigger at custom threshold."""
     # Create config with lower tow threshold
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
@@ -163,7 +168,7 @@ def test_tow_surge_alert_with_custom_threshold(client, django_user_model):
 def test_calendar_view_surge_indicator_respects_threshold(client, django_user_model):
     """Test that calendar view marks days with surge when threshold is met."""
     # Create config with custom threshold
-    config = SiteConfiguration.objects.create(
+    SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
@@ -206,3 +211,172 @@ def test_calendar_view_surge_indicator_respects_threshold(client, django_user_mo
     surge_data = response.context["surge_needed_by_date"]
     # Should show instruction surge on test_date
     assert surge_data[test_date]["instructor"] is True
+
+
+@pytest.mark.django_db
+def test_maybe_notify_surge_instructor_respects_custom_threshold(django_user_model):
+    """Test that maybe_notify_surge_instructor uses custom threshold (Issue #403)."""
+    # Create config with custom instruction threshold
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instruction_surge_threshold=2,  # Lower threshold for testing
+    )
+
+    # Create test date and users
+    test_date = date.today() + timedelta(days=7)
+    user1 = django_user_model.objects.create_user(
+        username="student1",
+        email="student1@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    user2 = django_user_model.objects.create_user(
+        username="student2",
+        email="student2@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+
+    # Create exactly 2 instruction intents (meets custom threshold=2)
+    OpsIntent.objects.create(
+        member=user1, date=test_date, available_as=["instruction"], notes="Test 1"
+    )
+    OpsIntent.objects.create(
+        member=user2, date=test_date, available_as=["instruction"], notes="Test 2"
+    )
+
+    # Mock send_mail to verify it's called
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_instructor(test_date)
+
+        # Email should be sent because we met the custom threshold of 2
+        mock_send_mail.assert_called_once()
+
+        # Verify subject contains surge alert
+        call_kwargs = mock_send_mail.call_args[1]
+        assert "Surge Instructor May Be Needed" in call_kwargs["subject"]
+
+        # Verify assignment is marked as notified
+        assignment = DutyAssignment.objects.get(date=test_date)
+        assert assignment.surge_notified is True
+
+
+@pytest.mark.django_db
+def test_maybe_notify_surge_instructor_does_not_send_below_threshold(
+    django_user_model,
+):
+    """Test that surge instructor notification isn't sent below threshold."""
+    # Create config with custom instruction threshold
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instruction_surge_threshold=5,  # Higher threshold
+    )
+
+    # Create test date and users
+    test_date = date.today() + timedelta(days=7)
+    user1 = django_user_model.objects.create_user(
+        username="student1",
+        email="student1@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+
+    # Create only 1 instruction intent (below threshold=5)
+    OpsIntent.objects.create(
+        member=user1, date=test_date, available_as=["instruction"], notes="Test 1"
+    )
+
+    # Mock send_mail to verify it's NOT called
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_instructor(test_date)
+
+        # Email should NOT be sent because we're below threshold
+        mock_send_mail.assert_not_called()
+
+        # Assignment should not be marked as notified
+        assignment = DutyAssignment.objects.get(date=test_date)
+        assert assignment.surge_notified is False
+
+
+@pytest.mark.django_db
+def test_maybe_notify_surge_towpilot_respects_custom_threshold(django_user_model):
+    """Test that maybe_notify_surge_towpilot uses custom threshold (Issue #403)."""
+    # Create config with custom tow threshold
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        tow_surge_threshold=3,  # Lower threshold for testing
+    )
+
+    # Create test date and users
+    test_date = date.today() + timedelta(days=7)
+    users = []
+    for i in range(3):
+        user = django_user_model.objects.create_user(
+            username=f"pilot{i}",
+            email=f"pilot{i}@example.com",
+            password="password",
+            membership_status="Full Member",
+        )
+        users.append(user)
+        # Create tow intent (club or private)
+        OpsIntent.objects.create(
+            member=user, date=test_date, available_as=["club"], notes=f"Tow {i}"
+        )
+
+    # Mock send_mail to verify it's called
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_towpilot(test_date)
+
+        # Email should be sent because we met the custom threshold of 3
+        mock_send_mail.assert_called_once()
+
+        # Verify subject contains surge alert
+        call_kwargs = mock_send_mail.call_args[1]
+        assert "Surge Tow Pilot May Be Needed" in call_kwargs["subject"]
+
+        # Verify assignment is marked as notified
+        assignment = DutyAssignment.objects.get(date=test_date)
+        assert assignment.tow_surge_notified is True
+
+
+@pytest.mark.django_db
+def test_maybe_notify_surge_towpilot_does_not_send_below_threshold(django_user_model):
+    """Test that surge towpilot notification isn't sent below threshold."""
+    # Create config with custom tow threshold
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        tow_surge_threshold=10,  # High threshold
+    )
+
+    # Create test date and users
+    test_date = date.today() + timedelta(days=7)
+    user1 = django_user_model.objects.create_user(
+        username="pilot1",
+        email="pilot1@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+
+    # Create only 1 tow intent (below threshold=10)
+    OpsIntent.objects.create(
+        member=user1, date=test_date, available_as=["club"], notes="Tow 1"
+    )
+
+    # Mock send_mail to verify it's NOT called
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        maybe_notify_surge_towpilot(test_date)
+
+        # Email should NOT be sent because we're below threshold
+        mock_send_mail.assert_not_called()
+
+        # Assignment should not be marked as notified
+        assignment = DutyAssignment.objects.get(date=test_date)
+        assert assignment.tow_surge_notified is False

@@ -223,10 +223,10 @@ def test_surge_threshold_positive_integers():
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
 
-    # Zero should work (PositiveIntegerField allows 0)
+    # Zero should NOT work (business logic: minimum is 1)
     config.tow_surge_threshold = 0
     config.instruction_surge_threshold = 0
-    config.save()
-    config.refresh_from_db()
-    assert config.tow_surge_threshold == 0
-    assert config.instruction_surge_threshold == 0
+    with pytest.raises(ValidationError):
+        config.full_clean()
+
+    # After failed validation, values should remain unchanged in DB
