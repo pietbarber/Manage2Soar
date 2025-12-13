@@ -262,15 +262,24 @@ def get_adjacent_months(year, month):
     return prev_year, prev_month, next_year, next_month
 
 
+def get_surge_thresholds():
+    """
+    Get surge thresholds from SiteConfiguration with sensible defaults.
+    Returns tuple: (tow_surge_threshold, instruction_surge_threshold)
+    """
+    config = SiteConfiguration.objects.first()
+    tow_surge_threshold = config.tow_surge_threshold if config else 6
+    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+    return tow_surge_threshold, instruction_surge_threshold
+
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
     year = int(year) if year else today.year
     month = int(month) if month else today.month
 
     # Get site config for surge thresholds
-    config = SiteConfiguration.objects.first()
-    tow_surge_threshold = config.tow_surge_threshold if config else 6
-    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+    tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
 
     cal = calendar.Calendar(firstweekday=6)
     weeks = cal.monthdatescalendar(year, month)
@@ -346,9 +355,7 @@ def calendar_day_detail(request, year, month, day):
     assignment = DutyAssignment.objects.filter(date=day_date).first()
 
     # Get site config for surge thresholds
-    config = SiteConfiguration.objects.first()
-    tow_surge_threshold = config.tow_surge_threshold if config else 6
-    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+    tow_surge_threshold, instruction_surge_threshold = get_surge_thresholds()
 
     # Show current user intent status
     intent_exists = False
@@ -577,9 +584,8 @@ def maybe_notify_surge_instructor(day_date):
     if assignment.surge_notified:
         return
 
-    # Get site config for surge threshold
-    config = SiteConfiguration.objects.first()
-    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+    # Get surge threshold
+    _, instruction_surge_threshold = get_surge_thresholds()
 
     intents = OpsIntent.objects.filter(date=day_date)
     instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
@@ -624,9 +630,8 @@ def maybe_notify_surge_towpilot(day_date):
     if assignment.tow_surge_notified:
         return
 
-    # Get site config for surge threshold
-    config = SiteConfiguration.objects.first()
-    tow_surge_threshold = config.tow_surge_threshold if config else 6
+    # Get surge threshold
+    tow_surge_threshold, _ = get_surge_thresholds()
 
     intents = OpsIntent.objects.filter(date=day_date)
     tow_count = sum(
