@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>{{ role_title }} Coverage Needed</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                       style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}"
+                                 style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                🔄 {{ role_title }} Coverage Needed
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: #e0e0e0; font-size: 16px;">
+                                {{ swap_request.original_date|date:"l, F j, Y" }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if swap_request.is_emergency %}
+                    <!-- Urgent Banner -->
+                    <tr>
+                        <td style="padding: 15px 40px; background-color: #dc3545; text-align: center;">
+                            <p style="margin: 0; color: #ffffff; font-size: 16px; font-weight: bold;">
+                                🚨 URGENT - Less than 48 hours notice
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Hello{% if recipient %} {{ recipient.first_name }}{% endif %},
+                            </p>
+
+                            {% if is_direct_request %}
+                            <div style="background-color: #e6f3ff; border-left: 4px solid #667eea; padding: 15px 20px; margin: 0 0 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #2d3748; font-size: 16px; line-height: 1.6; font-weight: bold;">
+                                    <strong>{{ swap_request.requester.full_display_name }}</strong> is specifically asking <strong>you</strong> for coverage.
+                                </p>
+                            </div>
+                            {% endif %}
+
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                {% if is_direct_request %}
+                                They need coverage for their
+                                {% else %}
+                                <strong>{{ swap_request.requester.full_display_name }}</strong> needs coverage for their
+                                {% endif %}
+                                <strong>{{ role_title }}</strong> duty on
+                                <strong>{{ swap_request.original_date|date:"l, F j, Y" }}</strong>.
+                            </p>
+
+                            {% if swap_request.notes %}
+                            <div style="background-color: #f7fafc; border-left: 4px solid #667eea; padding: 15px 20px; margin: 20px 0;">
+                                <p style="margin: 0; color: #4a5568; font-size: 15px; font-style: italic;">
+                                    "{{ swap_request.notes }}"
+                                </p>
+                            </div>
+                            {% endif %}
+
+                            <p style="margin: 20px 0; color: #4a5568; font-size: 15px; line-height: 1.6;">
+                                You can help by:
+                            </p>
+                            <ul style="margin: 0 0 20px 0; padding-left: 20px; color: #4a5568; font-size: 15px; line-height: 1.8;">
+                                <li><strong>Covering</strong> - Just take the duty, no swap needed</li>
+                                <li><strong>Swapping</strong> - Take this duty if they take one of yours</li>
+                            </ul>
+
+                            <!-- CTA Button -->
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="{{ request_url }}" style="display: inline-block;
+                                   background-color: #667eea;
+                                   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                   color: #ffffff; text-decoration: none;
+                                   padding: 14px 35px; border-radius: 6px;
+                                   font-weight: bold; font-size: 16px;">
+                                    Make an Offer
+                                </a>
+                            </div>
+
+                            <p style="margin: 20px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+                                If you can't help this time, no action is needed. Thanks for being part of the team!
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f4f4f4; padding: 20px; text-align: center;">
+                            <p style="margin: 0; color: #666666; font-size: 12px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

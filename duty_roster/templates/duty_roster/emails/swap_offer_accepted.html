@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+    <title>Swap Confirmed!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                       style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td style="background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }}"
+                                 style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                ✅ Swap Confirmed!
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Success Banner -->
+                    <tr>
+                        <td style="background-color: #38a169; padding: 15px 40px; text-align: center;">
+                            <p style="margin: 0; color: #ffffff; font-size: 16px; font-weight: bold;">
+                                {{ role_title }} Duty Successfully Swapped
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                Hi {{ recipient.first_name }},
+                            </p>
+
+                            <p style="margin: 0 0 25px 0; color: #2d3748; font-size: 16px; line-height: 1.6;">
+                                The duty swap has been confirmed. The duty roster has been updated automatically.
+                            </p>
+
+                            <!-- Summary Box -->
+                            <div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin: 20px 0;">
+                                <h3 style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                                    Summary
+                                </h3>
+
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #4a5568; font-size: 14px; border-bottom: 1px dashed #e2e8f0;">
+                                            <strong>Role:</strong>
+                                        </td>
+                                        <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right; border-bottom: 1px dashed #e2e8f0;">
+                                            {{ role_title }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #4a5568; font-size: 14px; border-bottom: 1px dashed #e2e8f0;">
+                                            <strong>Original Date:</strong>
+                                        </td>
+                                        <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right; border-bottom: 1px dashed #e2e8f0;">
+                                            {{ swap_request.original_date|date:"l, F j, Y" }}
+                                        </td>
+                                    </tr>
+                                    {% if is_swap %}
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #4a5568; font-size: 14px; border-bottom: 1px dashed #e2e8f0;">
+                                            <strong>Swap Date:</strong>
+                                        </td>
+                                        <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right; border-bottom: 1px dashed #e2e8f0;">
+                                            {{ offer.proposed_swap_date|date:"l, F j, Y" }}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #4a5568; font-size: 14px;">
+                                            <strong>{% if is_swap %}Original Member:{% else %}Member Needing Coverage:{% endif %}</strong>
+                                        </td>
+                                        <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right;">
+                                            {{ swap_request.requester.full_display_name }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; color: #4a5568; font-size: 14px;">
+                                            <strong>{% if is_swap %}Swap Partner:{% else %}Covering Member:{% endif %}</strong>
+                                        </td>
+                                        <td style="padding: 8px 0; color: #2d3748; font-size: 14px; text-align: right;">
+                                            {{ offer.offered_by.full_display_name }}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- What Changed Section -->
+                            <div style="margin: 25px 0;">
+                                <h3 style="margin: 0 0 10px 0; color: #2d3748; font-size: 16px;">
+                                    📅 Your Updated Schedule:
+                                </h3>
+                                {% if recipient == swap_request.requester %}
+                                    {% if is_swap %}
+                                    <p style="margin: 5px 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                        • <strong>Removed:</strong> {{ role_title }} on {{ swap_request.original_date|date:"M j" }}<br>
+                                        • <strong>Added:</strong> {{ role_title }} on {{ offer.proposed_swap_date|date:"M j" }}
+                                    </p>
+                                    {% else %}
+                                    <p style="margin: 5px 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                        • <strong>Removed:</strong> {{ role_title }} on {{ swap_request.original_date|date:"M j" }}
+                                    </p>
+                                    {% endif %}
+                                {% else %}
+                                    {% if is_swap %}
+                                    <p style="margin: 5px 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                        • <strong>Added:</strong> {{ role_title }} on {{ swap_request.original_date|date:"M j" }}<br>
+                                        • <strong>Removed:</strong> {{ role_title }} on {{ offer.proposed_swap_date|date:"M j" }}
+                                    </p>
+                                    {% else %}
+                                    <p style="margin: 5px 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+                                        • <strong>Added:</strong> {{ role_title }} on {{ swap_request.original_date|date:"M j" }}
+                                    </p>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+
+                            <!-- CTA Button -->
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="{{ roster_url }}" style="display: inline-block;
+                                   background-color: #667eea;
+                                   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                   color: #ffffff; text-decoration: none;
+                                   padding: 14px 35px; border-radius: 6px;
+                                   font-weight: bold; font-size: 16px;">
+                                    View Full Roster
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f4f4f4; padding: 20px; text-align: center;">
+                            <p style="margin: 0; color: #666666; font-size: 12px;">
+                                This is an automated message from {{ club_name }}.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

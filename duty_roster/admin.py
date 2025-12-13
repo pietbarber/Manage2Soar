@@ -96,12 +96,14 @@ class DutySwapRequestAdmin(AdminHelperMixin, admin.ModelAdmin):
         "original_date",
         "role",
         "requester",
+        "request_type",
         "is_emergency",
-        "is_fulfilled",
+        "status",
         "created_at",
     )
-    list_filter = ("role", "is_emergency", "is_fulfilled")
-    search_fields = ("requester__first_name", "requester__last_name")
+    list_filter = ("role", "is_emergency", "status", "request_type")
+    search_fields = ("requester__first_name", "requester__last_name", "notes")
+    readonly_fields = ("created_at", "updated_at", "fulfilled_at")
     admin_helper_message = "<b>Swap Requests:</b> Members requesting coverage or swaps. Review offers and coordinate responses here."
 
 
@@ -112,16 +114,18 @@ class DutySwapOfferAdmin(AdminHelperMixin, admin.ModelAdmin):
         "offered_by",
         "offer_type",
         "proposed_swap_date",
+        "is_blackout_conflict",
         "status",
         "created_at",
     )
-    list_filter = ("offer_type", "status")
+    list_filter = ("offer_type", "status", "is_blackout_conflict")
     search_fields = (
         "offered_by__first_name",
         "offered_by__last_name",
         "swap_request__requester__first_name",
         "swap_request__requester__last_name",
     )
+    readonly_fields = ("created_at", "responded_at", "is_blackout_conflict")
     admin_helper_message = "<b>Swap Offers:</b> Offers responding to swap requests; accept and track offers here."
 
 

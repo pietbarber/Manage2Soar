@@ -13,6 +13,18 @@
       <div class="text-center">
         <h3 class="mb-2 text-primary fw-bold">📅 {{ formatted_date }}</h3>
 
+        <!-- Swap Navigation Links -->
+        {% if user.is_authenticated %}
+        <div class="mb-2">
+          <a href="{% url 'duty_roster:my_swap_requests' %}" class="btn btn-sm btn-outline-primary me-1">
+            <i class="fas fa-exchange-alt me-1"></i>My Swap Requests
+          </a>
+          <a href="{% url 'duty_roster:open_swap_requests' %}" class="btn btn-sm btn-outline-success">
+            <i class="fas fa-hands-helping me-1"></i>Help Others
+          </a>
+        </div>
+        {% endif %}
+
         <!-- View Toggle -->
         <div class="btn-group btn-group-sm" role="group" aria-label="Calendar View Toggle">
           <input type="radio" class="btn-check" name="view-toggle" id="calendar-view" autocomplete="off"

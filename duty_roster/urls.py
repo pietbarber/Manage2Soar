@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_swap
 
 app_name = "duty_roster"
 
@@ -110,5 +110,61 @@ urlpatterns = [
         "instruction/respond/<int:slot_id>/",
         views.instructor_respond,
         name="instructor_respond",
+    ),
+    # Duty Swap URLs
+    path(
+        "swap/request/create/<int:year>/<int:month>/<int:day>/<str:role>/",
+        views_swap.create_swap_request,
+        name="create_swap_request",
+    ),
+    path(
+        "swap/my-requests/",
+        views_swap.my_swap_requests,
+        name="my_swap_requests",
+    ),
+    path(
+        "swap/open-requests/",
+        views_swap.open_swap_requests,
+        name="open_swap_requests",
+    ),
+    path(
+        "swap/request/<int:request_id>/",
+        views_swap.swap_request_detail,
+        name="swap_request_detail",
+    ),
+    path(
+        "swap/request/<int:request_id>/cancel/",
+        views_swap.cancel_swap_request,
+        name="cancel_swap_request",
+    ),
+    path(
+        "swap/request/<int:request_id>/convert/",
+        views_swap.convert_to_general,
+        name="convert_to_general",
+    ),
+    path(
+        "swap/request/<int:request_id>/offer/",
+        views_swap.make_offer,
+        name="make_swap_offer",
+    ),
+    path(
+        "swap/request/<int:request_id>/decline/",
+        views_swap.decline_swap_request,
+        name="decline_swap_request",
+    ),
+    path(
+        "swap/offer/<int:offer_id>/accept/",
+        views_swap.accept_offer,
+        name="accept_swap_offer",
+    ),
+    path(
+        "swap/offer/<int:offer_id>/decline/",
+        views_swap.decline_offer,
+        name="decline_swap_offer",
+    ),
+    path(
+        "swap/offer/<int:offer_id>/withdraw/",
+        views_swap.withdraw_offer,
+        name="withdraw_swap_offer",
     ),
 ]

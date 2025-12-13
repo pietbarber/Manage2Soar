@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Swap Request - {{ swap_request.original_date|date:"M j" }}{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Back Link -->
+            <div class="mb-3">
+                {% if is_requester %}
+                <a href="{% url 'duty_roster:my_swap_requests' %}" class="text-decoration-none">
+                    <i class="fas fa-arrow-left me-1"></i>Back to My Requests
+                </a>
+                {% else %}
+                <a href="{% url 'duty_roster:open_swap_requests' %}" class="text-decoration-none">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Open Requests
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Request Header Card -->
+            <div class="card shadow-sm mb-4 {% if swap_request.is_emergency %}border-danger{% endif %}">
+                <div class="card-header {% if swap_request.status == 'fulfilled' %}bg-success{% elif swap_request.status == 'cancelled' %}bg-secondary{% elif swap_request.is_emergency %}bg-danger{% else %}bg-primary{% endif %} text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            {% if swap_request.is_emergency %}
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            {% else %}
+                            <i class="fas fa-exchange-alt me-2"></i>
+                            {% endif %}
+                            {{ swap_request.get_role_title }} - {{ swap_request.original_date|date:"l, F j, Y" }}
+                        </h4>
+                        <span class="badge bg-light text-dark">
+                            {% if swap_request.status == "open" %}Open{% elif swap_request.status == "fulfilled" %}Fulfilled{% elif swap_request.status == "cancelled" %}Cancelled{% else %}{{ swap_request.status }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Requester:</strong> {{ swap_request.requester.full_display_name }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Role:</strong> {{ swap_request.get_role_title }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Duty Date:</strong> {{ swap_request.original_date|date:"l, F j, Y" }}
+                                <span class="text-muted">({{ swap_request.days_until_duty }} day{{ swap_request.days_until_duty|pluralize }} away)</span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Request Type:</strong>
+                                {% if swap_request.request_type == "direct" %}
+                                <i class="fas fa-user me-1"></i>Direct (to {{ swap_request.direct_request_to.first_name }})
+                                {% else %}
+                                <i class="fas fa-broadcast-tower me-1"></i>General Broadcast
+                                {% endif %}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Created:</strong> {{ swap_request.created_at|date:"M j, Y g:i a" }}
+                            </p>
+                            {% if swap_request.is_emergency %}
+                            <p class="mb-2">
+                                <span class="badge bg-danger">URGENT</span>
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if swap_request.notes %}
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <strong><i class="fas fa-comment me-1"></i>Reason:</strong>
+                        <p class="mb-0 mt-1">{{ swap_request.notes }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions for Requester -->
+                    {% if is_requester and swap_request.status == "open" %}
+                    <div class="mt-4 d-flex gap-2 flex-wrap">
+                        {% if swap_request.request_type == "direct" %}
+                        <form method="post" action="{% url 'duty_roster:convert_to_general' request_id=swap_request.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-broadcast-tower me-1"></i>Broadcast to All
+                            </button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="{% url 'duty_roster:cancel_swap_request' request_id=swap_request.pk %}"
+                              class="d-inline"
+                              onsubmit="return confirm('Are you sure you want to cancel this request?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="fas fa-times me-1"></i>Cancel Request
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    <!-- Action for Eligible Non-Offerer -->
+                    {% if can_make_offer %}
+                    <div class="mt-4">
+                        <a href="{% url 'duty_roster:make_swap_offer' request_id=swap_request.pk %}" class="btn btn-success">
+                            <i class="fas fa-hand-paper me-1"></i>Make an Offer
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Offers Section -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-hands me-2"></i>Offers
+                        <span class="badge bg-light text-dark ms-2">{{ swap_request.offers.count }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if swap_request.offers.all %}
+                        {% for offer in swap_request.offers.all %}
+                        <div class="card mb-3 {% if offer.status == 'accepted' %}border-success{% elif offer.status == 'pending' %}border-primary{% else %}border-secondary{% endif %}">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-8">
+                                        <h5 class="mb-1">
+                                            {% if offer.status == "pending" %}
+                                            <span class="badge bg-primary me-2">PENDING</span>
+                                            {% elif offer.status == "accepted" %}
+                                            <span class="badge bg-success me-2">ACCEPTED</span>
+                                            {% elif offer.status == "declined" %}
+                                            <span class="badge bg-secondary me-2">DECLINED</span>
+                                            {% elif offer.status == "auto_declined" %}
+                                            <span class="badge bg-secondary me-2">AUTO-DECLINED</span>
+                                            {% elif offer.status == "withdrawn" %}
+                                            <span class="badge bg-warning text-dark me-2">WITHDRAWN</span>
+                                            {% endif %}
+                                            {{ offer.offered_by.full_display_name }}
+                                        </h5>
+
+                                        <p class="mb-2">
+                                            {% if offer.offer_type == "swap" %}
+                                            <i class="fas fa-exchange-alt me-1 text-primary"></i>
+                                            <strong>Swap:</strong> Will take {{ swap_request.original_date|date:"M j" }}
+                                            if you take <strong>{{ offer.proposed_swap_date|date:"l, M j, Y" }}</strong>
+                                            {% if offer.is_blackout_conflict %}
+                                            <br>
+                                            <span class="text-warning">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                                <strong>Warning:</strong> This date is in your blackout period!
+                                            </span>
+                                            {% endif %}
+                                            {% else %}
+                                            <i class="fas fa-hand-holding-heart me-1 text-success"></i>
+                                            <strong>Cover:</strong> Will take {{ swap_request.original_date|date:"M j" }} - no swap needed
+                                            {% endif %}
+                                        </p>
+
+                                        {% if offer.notes %}
+                                        <p class="text-muted mb-0">
+                                            <i class="fas fa-comment me-1"></i>"{{ offer.notes }}"
+                                        </p>
+                                        {% endif %}
+
+                                        <p class="text-muted mb-0 mt-2">
+                                            <small>Offered {{ offer.created_at|timesince }} ago</small>
+                                        </p>
+                                    </div>
+
+                                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                        {% if is_requester and swap_request.status == "open" and offer.status == "pending" %}
+                                        <form method="post" action="{% url 'duty_roster:accept_swap_offer' offer_id=offer.pk %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-success btn-sm me-1"
+                                                    onclick="return confirm('Accept this offer? Other pending offers will be auto-declined.');">
+                                                <i class="fas fa-check me-1"></i>Accept
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{% url 'duty_roster:decline_swap_offer' offer_id=offer.pk %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                                <i class="fas fa-times me-1"></i>Decline
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if offer.offered_by == user and offer.status == "pending" %}
+                                        <form method="post" action="{% url 'duty_roster:withdraw_swap_offer' offer_id=offer.pk %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-warning btn-sm"
+                                                    onclick="return confirm('Withdraw your offer?');">
+                                                <i class="fas fa-undo me-1"></i>Withdraw
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-hourglass-half fa-2x text-muted mb-3"></i>
+                        <p class="text-muted mb-0">No offers yet. Waiting for responses...</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Fulfilled Info -->
+            {% if swap_request.status == "fulfilled" and swap_request.accepted_offer %}
+            <div class="alert alert-success mt-4">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Resolved!</strong>
+                {{ swap_request.accepted_offer.offered_by.first_name }} is
+                {% if swap_request.accepted_offer.offer_type == "swap" %}
+                swapping with you - they take {{ swap_request.original_date|date:"M j" }},
+                you take {{ swap_request.accepted_offer.proposed_swap_date|date:"M j" }}.
+                {% else %}
+                covering your duty on {{ swap_request.original_date|date:"M j" }}.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

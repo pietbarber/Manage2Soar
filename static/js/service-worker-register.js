@@ -10,8 +10,6 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
             .then((registration) => {
-                console.log('[PWA] Service Worker registered with scope:', registration.scope);
-
                 // Check for updates periodically (every hour)
                 setInterval(() => {
                     registration.update();
@@ -20,12 +18,10 @@ if ('serviceWorker' in navigator) {
                 // Handle updates
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    console.log('[PWA] New Service Worker installing...');
 
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             // New version available - could show update prompt here
-                            console.log('[PWA] New version available');
                         }
                     });
                 });
