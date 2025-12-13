@@ -52,10 +52,10 @@
                     <div>
                       <strong>High Demand Alert</strong>
                       {% if surge.instructor %}
-                        <br>Exceptional instruction demand (4+ students)
+                        <br>Exceptional instruction demand ({{ instruction_surge_threshold }}+ students)
                       {% endif %}
                       {% if surge.towpilot %}
-                        <br>High tow demand (6+ requests)
+                        <br>High tow demand ({{ tow_surge_threshold }}+ requests)
                       {% endif %}
                     </div>
                   </div>

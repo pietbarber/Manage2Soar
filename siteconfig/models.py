@@ -266,6 +266,17 @@ class SiteConfiguration(models.Model):
         blank=True,
         help_text="We refer to the position of Surge Instructor as ... (optional)",
     )
+
+    # Surge thresholds (Issue #403)
+    tow_surge_threshold = models.PositiveIntegerField(
+        default=6,
+        help_text="Number of tow requests that triggers 'high demand' surge alerts (default: 6)",
+    )
+    instruction_surge_threshold = models.PositiveIntegerField(
+        default=4,
+        help_text="Number of instruction requests that triggers surge alerts (default: 4)",
+    )
+
     membership_manager_title = models.CharField(
         max_length=40,
         default="Membership Manager",

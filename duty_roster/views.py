@@ -267,6 +267,11 @@ def duty_calendar_view(request, year=None, month=None):
     year = int(year) if year else today.year
     month = int(month) if month else today.month
 
+    # Get site config for surge thresholds
+    config = SiteConfiguration.objects.first()
+    tow_surge_threshold = config.tow_surge_threshold if config else 6
+    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+
     cal = calendar.Calendar(firstweekday=6)
     weeks = cal.monthdatescalendar(year, month)
     first_visible_day = weeks[0][0]
@@ -300,8 +305,8 @@ def duty_calendar_view(request, year=None, month=None):
     for day in visible_dates:
         day_date = day if isinstance(day, date) else day.date()
         surge_needed_by_date[day_date] = {
-            "instructor": instruction_count[day_date] > 3,
-            "towpilot": tow_count[day_date] >= 6,
+            "instructor": instruction_count[day_date] >= instruction_surge_threshold,
+            "towpilot": tow_count[day_date] >= tow_surge_threshold,
         }
 
     # Add formatted month and date context
@@ -327,6 +332,8 @@ def duty_calendar_view(request, year=None, month=None):
         "next_month": next_month,
         "today": today,
         "surge_needed_by_date": surge_needed_by_date,
+        "tow_surge_threshold": tow_surge_threshold,
+        "instruction_surge_threshold": instruction_surge_threshold,
     }
 
     if request.htmx:
@@ -337,6 +344,11 @@ def duty_calendar_view(request, year=None, month=None):
 def calendar_day_detail(request, year, month, day):
     day_date = date(year, month, day)
     assignment = DutyAssignment.objects.filter(date=day_date).first()
+
+    # Get site config for surge thresholds
+    config = SiteConfiguration.objects.first()
+    tow_surge_threshold = config.tow_surge_threshold if config else 6
+    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
 
     # Show current user intent status
     intent_exists = False
@@ -361,8 +373,8 @@ def calendar_day_detail(request, year, month, day):
         1 for i in intents if "club" in i.available_as or "private" in i.available_as
     )
 
-    show_surge_alert = instruction_intent_count > 3
-    show_tow_surge_alert = tow_count >= 6
+    show_surge_alert = instruction_intent_count >= instruction_surge_threshold
+    show_tow_surge_alert = tow_count >= tow_surge_threshold
 
     # Check if user already has a non-cancelled instruction request for this day
     user_has_instruction_request = False
@@ -565,10 +577,14 @@ def maybe_notify_surge_instructor(day_date):
     if assignment.surge_notified:
         return
 
+    # Get site config for surge threshold
+    config = SiteConfiguration.objects.first()
+    instruction_surge_threshold = config.instruction_surge_threshold if config else 4
+
     intents = OpsIntent.objects.filter(date=day_date)
     instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
 
-    if instruction_count > 3:
+    if instruction_count >= instruction_surge_threshold:
         # Prepare template context
         email_config = get_email_config()
         recipient_list = get_mailing_list(
@@ -608,12 +624,16 @@ def maybe_notify_surge_towpilot(day_date):
     if assignment.tow_surge_notified:
         return
 
+    # Get site config for surge threshold
+    config = SiteConfiguration.objects.first()
+    tow_surge_threshold = config.tow_surge_threshold if config else 6
+
     intents = OpsIntent.objects.filter(date=day_date)
     tow_count = sum(
         1 for i in intents if "club" in i.available_as or "private" in i.available_as
     )
 
-    if tow_count >= 6:
+    if tow_count >= tow_surge_threshold:
         # Prepare template context
         email_config = get_email_config()
         recipient_list = get_mailing_list(

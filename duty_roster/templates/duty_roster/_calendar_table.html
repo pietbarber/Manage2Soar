@@ -44,12 +44,12 @@
               {% if surge.instructor or surge.towpilot %}
                 <div class="surge-alert-container">
                   {% if surge.instructor %}
-                    <span class="duty-badge badge-surge" title="At least 4 students requesting instruction">
+                    <span class="duty-badge badge-surge" title="At least {{ instruction_surge_threshold }} students requesting instruction">
                       HIGH INSTRUCTION DEMAND
                     </span>
                   {% endif %}
                   {% if surge.towpilot %}
-                    <span class="duty-badge badge-surge" title="High demand for tows">
+                    <span class="duty-badge badge-surge" title="At least {{ tow_surge_threshold }} requests for tows">
                       HIGH TOW DEMAND
                     </span>
                   {% endif %}
