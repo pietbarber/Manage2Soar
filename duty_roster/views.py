@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
+from django.core.cache import cache
 from django.db import models
 from django.http import (
     HttpResponse,
@@ -267,12 +268,14 @@ def get_surge_thresholds():
     Get surge thresholds from SiteConfiguration with sensible defaults.
     Returns tuple: (tow_surge_threshold, instruction_surge_threshold)
 
-    Note: While this function is called multiple times per request, Django's
-    QuerySet caching and database query caching will prevent redundant queries
-    in most cases. For production, consider using Django's cache framework
-    with a short TTL (e.g., 60 seconds) if this becomes a bottleneck.
+    This function uses Django's cache framework to avoid redundant database queries.
+    The SiteConfiguration is cached for 60 seconds. If not present, it is fetched
+    from the database and then cached. Adjust the TTL as needed for your use case.
     """
-    config = SiteConfiguration.objects.first()
+    config = cache.get("siteconfig_first")
+    if config is None:
+        config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_first", config, timeout=60)
     tow_surge_threshold = config.tow_surge_threshold if config else 6
     instruction_surge_threshold = config.instruction_surge_threshold if config else 4
     return tow_surge_threshold, instruction_surge_threshold

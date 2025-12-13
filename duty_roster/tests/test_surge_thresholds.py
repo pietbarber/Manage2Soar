@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
+from django.core.cache import cache
 from django.urls import reverse
 
 from duty_roster.models import DutyAssignment, OpsIntent
@@ -15,6 +16,14 @@ from duty_roster.views import (
     maybe_notify_surge_towpilot,
 )
 from siteconfig.models import SiteConfiguration
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Clear Django cache before each test to prevent test contamination."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.mark.django_db
