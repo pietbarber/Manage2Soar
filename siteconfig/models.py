@@ -233,6 +233,12 @@ class SiteConfiguration(models.Model):
         default=False, help_text="We schedule Assistant Duty Officers ahead of time"
     )
 
+    # Duty Roster Announcement (Issue #333)
+    duty_roster_announcement = models.TextField(
+        blank=True,
+        help_text="Optional announcement from the Roster Manager displayed on the duty calendar. Visible to all members.",
+    )
+
     # Terminology (customizable titles for all roles)
     duty_officer_title = models.CharField(
         max_length=40,

@@ -1,4 +1,18 @@
+{% load siteconfig_tags %}
+{% get_siteconfig as config %}
 <div id="calendar-body" data-current-year="{{ year }}" data-current-month="{{ month }}">
+    {% if config.duty_roster_announcement %}
+    <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+      <div class="d-flex align-items-start">
+        <i class="bi bi-megaphone-fill me-2 fs-5 text-info"></i>
+        <div>
+          <strong class="d-block mb-1">Roster Manager Announcement:</strong>
+          <span class="announcement-text">{{ config.duty_roster_announcement|linebreaksbr }}</span>
+        </div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
     <div class="d-flex justify-content-between align-items-center mb-4">
       <button
         hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
