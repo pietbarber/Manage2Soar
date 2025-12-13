@@ -793,7 +793,7 @@ def send_offer_accepted_notifications(offer):
                 logger.error(
                     "Dev mode is enabled but redirect_list is empty. Refusing to send real email."
                 )
-                return  # Don't send email if dev mode misconfigured
+                return  # Don't send ANY emails if dev mode misconfigured
 
         email.send(fail_silently=True)
         logger.info(f"Sent acceptance notification to {recipient.email}")

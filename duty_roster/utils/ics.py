@@ -6,7 +6,7 @@ assignments, which can be attached to notification emails to allow members
 to easily add their duty assignments to their personal calendars.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
