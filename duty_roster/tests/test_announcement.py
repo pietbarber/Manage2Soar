@@ -20,24 +20,19 @@ def membership_statuses(db):
 
 @pytest.fixture
 def siteconfig(db):
-    """Create SiteConfiguration for testing."""
-    return SiteConfiguration.objects.create(
-        club_name="Test Club",
-        domain_name="test.org",
-        club_abbreviation="TC",
-        duty_roster_announcement="",
+    """Get or create SiteConfiguration for testing."""
+    config, _ = SiteConfiguration.objects.get_or_create(
+        defaults={
+            "club_name": "Test Club",
+            "domain_name": "test.org",
+            "club_abbreviation": "TC",
+            "duty_roster_announcement": "",
+        }
     )
-
-
-@pytest.fixture
-def siteconfig_with_announcement(db):
-    """Create SiteConfiguration with an announcement."""
-    return SiteConfiguration.objects.create(
-        club_name="Test Club",
-        domain_name="test.org",
-        club_abbreviation="TC",
-        duty_roster_announcement="Important: Schedule change for next weekend!",
-    )
+    # Always reset announcement to blank for test isolation
+    config.duty_roster_announcement = ""
+    config.save()
+    return config
 
 
 @pytest.fixture
