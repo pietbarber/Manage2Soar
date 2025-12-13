@@ -15,6 +15,7 @@ class Migration(migrations.Migration):
             name="duty_roster_announcement",
             field=models.TextField(
                 blank=True,
+                default="",
                 help_text="Optional announcement from the Roster Manager displayed on the duty calendar. Visible to all members.",
             ),
         ),

@@ -236,6 +236,7 @@ class SiteConfiguration(models.Model):
     # Duty Roster Announcement (Issue #333)
     duty_roster_announcement = models.TextField(
         blank=True,
+        default="",
         help_text="Optional announcement from the Roster Manager displayed on the duty calendar. Visible to all members.",
     )
 
