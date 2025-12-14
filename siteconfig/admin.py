@@ -151,6 +151,17 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Duty Roster Announcements",
+            {
+                "fields": ("duty_roster_announcement",),
+                "description": (
+                    "Optional announcement that will be displayed at the top of the duty roster calendar. "
+                    "Use this for Rostermeister updates, schedule changes, or important notices for members."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Advanced Options",
             {
                 "fields": (

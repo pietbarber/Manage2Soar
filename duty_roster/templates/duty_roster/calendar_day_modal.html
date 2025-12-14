@@ -1,247 +1,387 @@
-
 {% load siteconfig_tags %}
-<h5>{{ day|date:"l, F j, Y" }}</h5>
+{% get_siteconfig as config %}
 
-{% if user.is_authenticated %}
-  {% if assignment and not assignment.is_scheduled and assignment.date >= today %}
-    <div class="mt-4 p-2 border-t">
-      <h3 class="text-md font-semibold mb-2">Admin Options</h3>
-      <button
-        class="btn btn-danger w-full"
-        hx-get="{% url 'duty_roster:calendar_cancel_ops_modal' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-        hx-target="#modal-body"
-        hx-swap="innerHTML"
-      >
-       ✋ Cancel Operations for this day ✋
-      </button>
-    </div>
-  {% endif %}
-{% endif %}
+{# Bootstrap 5 styled modal header with date #}
+<div class="modal-header-content mb-3">
+  <h5 class="text-primary fw-bold mb-0">
+    <i class="bi bi-calendar-event me-2" aria-hidden="true"></i>{{ day|date:"l, F j, Y" }}
+  </h5>
+</div>
 
 {% if assignment %}
-  {% get_siteconfig as config %}
-  <p><strong>{{ config.instructor_title|default:'Instructor' }}:</strong> {{ assignment.instructor|default:"—" }}</p>
-  <p><strong>{{ config.surge_instructor_title|default:'Surge Instructor' }}:</strong> {{ assignment.surge_instructor|default:"—" }}</p>
-  <p><strong>{{ config.towpilot_title|default:'Tow Pilot' }}:</strong> {{ assignment.tow_pilot|default:"—" }}</p>
-  <p><strong>{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}:</strong> {{ assignment.surge_tow_pilot|default:"—" }}</p>
-  <p><strong>{{ config.duty_officer_title|default:'Duty Officer' }}:</strong> {{ assignment.duty_officer|default:"—" }}</p>
-  <p><strong>{{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}:</strong> {{ assignment.assistant_duty_officer|default:"—" }}</p>
+  {# Duty Crew Section #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-primary text-white py-2">
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-people-fill me-2" aria-hidden="true"></i>Assigned Duty Crew
+      </h6>
+    </div>
+    <div class="card-body p-3">
+      <div class="row g-2">
+        {% if config.schedule_instructors or assignment.instructor %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-success me-2"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.instructor_title|default:'Instructor' }}</small>
+              <span class="fw-medium">{{ assignment.instructor.full_display_name|default:"—" }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if assignment.surge_instructor %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-success me-2"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.surge_instructor_title|default:'Surge Instructor' }}</small>
+              <span class="fw-medium">{{ assignment.surge_instructor.full_display_name }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if config.schedule_tow_pilots or assignment.tow_pilot %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-danger me-2"><i class="bi bi-airplane" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.towpilot_title|default:'Tow Pilot' }}</small>
+              <span class="fw-medium">{{ assignment.tow_pilot.full_display_name|default:"—" }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if assignment.surge_tow_pilot %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-danger me-2"><i class="bi bi-airplane" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}</small>
+              <span class="fw-medium">{{ assignment.surge_tow_pilot.full_display_name }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if config.schedule_duty_officers or assignment.duty_officer %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-warning text-dark me-2"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.duty_officer_title|default:'Duty Officer' }}</small>
+              <span class="fw-medium">{{ assignment.duty_officer.full_display_name|default:"—" }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if config.schedule_assistant_duty_officers or assignment.assistant_duty_officer %}
+        <div class="col-6">
+          <div class="d-flex align-items-center">
+            <span class="badge bg-secondary me-2"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
+            <div>
+              <small class="text-muted d-block">{{ config.assistant_duty_officer_title|default:'Assistant DO' }}</small>
+              <span class="fw-medium">{{ assignment.assistant_duty_officer.full_display_name|default:"—" }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Surge Alerts #}
+  {% if show_surge_alert %}
+  <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+    <div>
+      <strong>Surge Instructor Recommended:</strong>
+      At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} want instruction.
+    </div>
+  </div>
+  {% endif %}
+
+  {% if show_tow_surge_alert %}
+  <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+    <div>
+      <strong>Surge Tow Pilot Recommended:</strong>
+      At least {{ tow_count }} pilots plan to fly gliders requiring a tow.
+    </div>
+  </div>
+  {% endif %}
 
   {# Request Swap/Coverage buttons for assigned members #}
   {% if user.is_authenticated and day >= today %}
-    <hr>
-    <h6><i class="fas fa-exchange-alt me-1"></i>Need Coverage?</h6>
-    <div class="d-grid gap-2">
-      {% if config.schedule_instructors and user == assignment.instructor %}
-        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='INSTRUCTOR' %}"
-           class="btn btn-sm btn-outline-primary">
-          <i class="fas fa-user-graduate me-1"></i>Request {{ config.instructor_title|default:'Instructor' }} Swap
-        </a>
-      {% endif %}
-      {% if config.schedule_tow_pilots and user == assignment.tow_pilot %}
-        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='TOW' %}"
-           class="btn btn-sm btn-outline-primary">
-          <i class="fas fa-plane me-1"></i>Request {{ config.towpilot_title|default:'Tow Pilot' }} Swap
-        </a>
-      {% endif %}
-      {% if config.schedule_duty_officers and user == assignment.duty_officer %}
-        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DO' %}"
-           class="btn btn-sm btn-outline-primary">
-          <i class="fas fa-user-tie me-1"></i>Request {{ config.duty_officer_title|default:'Duty Officer' }} Swap
-        </a>
-      {% endif %}
-      {% if config.schedule_assistant_duty_officers and user == assignment.assistant_duty_officer %}
-        <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='ADO' %}"
-           class="btn btn-sm btn-outline-primary">
-          <i class="fas fa-user-check me-1"></i>Request {{ config.assistant_duty_officer_title|default:'Assistant DO' }} Swap
-        </a>
-      {% endif %}
+    {% if user == assignment.instructor or user == assignment.tow_pilot or user == assignment.duty_officer or user == assignment.assistant_duty_officer %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-info text-white py-2">
+        <h6 class="mb-0 fw-semibold">
+          <i class="bi bi-arrow-left-right me-2" aria-hidden="true"></i>Need Coverage?
+        </h6>
+      </div>
+      <div class="card-body p-3">
+        <div class="d-grid gap-2">
+          {% if config.schedule_instructors and user == assignment.instructor %}
+          <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='INSTRUCTOR' %}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>Request {{ config.instructor_title|default:'Instructor' }} Swap
+          </a>
+          {% endif %}
+          {% if config.schedule_tow_pilots and user == assignment.tow_pilot %}
+          <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='TOW' %}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-airplane me-2" aria-hidden="true"></i>Request {{ config.towpilot_title|default:'Tow Pilot' }} Swap
+          </a>
+          {% endif %}
+          {% if config.schedule_duty_officers and user == assignment.duty_officer %}
+          <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='DO' %}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>Request {{ config.duty_officer_title|default:'Duty Officer' }} Swap
+          </a>
+          {% endif %}
+          {% if config.schedule_assistant_duty_officers and user == assignment.assistant_duty_officer %}
+          <a href="{% url 'duty_roster:create_swap_request' year=day.year month=day.month day=day.day role='ADO' %}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person-badge me-2" aria-hidden="true"></i>Request {{ config.assistant_duty_officer_title|default:'Assistant DO' }} Swap
+          </a>
+          {% endif %}
+        </div>
+      </div>
     </div>
-  {% endif %}
-
-  {# Show students signed up for instruction #}
-  {% if assignment.instruction_slots.all %}
-    <hr>
-    <h6><i class="fas fa-users me-1"></i>Students Requesting Instruction:</h6>
-    <ul class="list-unstyled ps-2">
-      {% for slot in assignment.instruction_slots.all %}
-        {% if slot.status != "cancelled" %}
-          <li class="py-1">
-            {% if slot.instructor_response == "accepted" %}
-              <i class="fas fa-check-circle text-success me-1" title="Confirmed"></i>
-            {% elif slot.instructor_response == "pending" %}
-              <i class="fas fa-clock text-warning me-1" title="Pending"></i>
-            {% elif slot.instructor_response == "rejected" %}
-              <i class="fas fa-times-circle text-danger me-1" title="Declined"></i>
-            {% endif %}
-            {{ slot.student.full_display_name }}
-            {% if slot.student == user %}
-              <span class="badge bg-info ms-1">You</span>
-            {% endif %}
-          </li>
-        {% endif %}
-      {% endfor %}
-    </ul>
-    {# Show Review Requests button for instructors assigned to this day #}
-    {% if user.is_authenticated and user.instructor %}
-      {% if user == assignment.instructor or user == assignment.surge_instructor %}
-        <a href="{% url 'duty_roster:instructor_requests' %}" class="btn btn-primary btn-sm w-100 mt-2">
-          <i class="fas fa-clipboard-check me-1"></i>Review Student Requests
-        </a>
-      {% endif %}
     {% endif %}
   {% endif %}
 
-  {# Student instruction request button #}
+  {# Students Requesting Instruction Section #}
+  {% if assignment.instruction_slots.all %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-success text-white py-2">
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-person-raised-hand me-2" aria-hidden="true"></i>Students Requesting Instruction
+      </h6>
+    </div>
+    <div class="card-body p-3">
+      <ul class="list-group list-group-flush">
+        {% for slot in assignment.instruction_slots.all %}
+          {% if slot.status != "cancelled" %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+            <div class="d-flex align-items-center">
+              {% if slot.instructor_response == "accepted" %}
+                <span class="badge bg-success me-2"><i class="bi bi-check-circle" aria-hidden="true"></i></span>
+              {% elif slot.instructor_response == "pending" %}
+                <span class="badge bg-warning text-dark me-2"><i class="bi bi-clock" aria-hidden="true"></i></span>
+              {% elif slot.instructor_response == "rejected" %}
+                <span class="badge bg-danger me-2"><i class="bi bi-x-circle" aria-hidden="true"></i></span>
+              {% endif %}
+              <span>{{ slot.student.full_display_name }}</span>
+            </div>
+            {% if slot.student == user %}
+              <span class="badge bg-info">You</span>
+            {% endif %}
+          </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+      {# Show Review Requests button for instructors assigned to this day #}
+      {% if user.is_authenticated and user.instructor %}
+        {% if user == assignment.instructor or user == assignment.surge_instructor %}
+        <div class="mt-3">
+          <a href="{% url 'duty_roster:instructor_requests' %}" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>Review Student Requests
+          </a>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Student Instruction Request Button - NO checkbox, just the button #}
   {% if user.is_authenticated and assignment.instructor and day >= today %}
     {% if user_has_instruction_request %}
-      <hr>
-      <div class="alert alert-info mb-0">
-        <i class="fas fa-check-circle me-1"></i>
-        You have already requested instruction for this day.
+    <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
+      <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
+      <div>
+        <strong>Instruction Requested</strong>
         {% for slot in assignment.instruction_slots.all %}
           {% if slot.student == user and slot.status != "cancelled" %}
             {% if slot.instructor_response == "accepted" %}
-              <strong>Confirmed!</strong>
+              — <span class="badge bg-success">Confirmed!</span>
             {% elif slot.instructor_response == "pending" %}
-              <em>Awaiting instructor response.</em>
+              — <span class="text-muted">Awaiting instructor response</span>
             {% endif %}
           {% endif %}
         {% endfor %}
       </div>
+    </div>
     {% else %}
-      <hr>
-      <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-primary w-100">
-          <i class="fas fa-hand-paper me-1"></i>Request Instruction
-        </button>
-      </form>
-    {% endif %}
-  {% endif %}
-{% else %}
-  <p>No duty crew assigned for this date.</p>
-{% endif %}
-
-{% if show_surge_alert %}
-  <div class="alert alert-warning mb-3">
-    ⚠️ <strong>Surge Instructor Recommended:</strong>
-    At least {{ intents|length }} pilots have declared intent to fly, and {{ instruction_intent_count }} of them want instruction.
-  </div>
-{% endif %}
-
-{% if show_tow_surge_alert %}
-  <div class="alert alert-warning mb-3">
-    ⚠️ <strong>Surge Tow Pilot Recommended:</strong> At least {{ tow_count }} pilots plan to fly gliders requiring a tow.
-  </div>
-{% endif %}
-
-{% if user.is_authenticated and user.rostermeister %}
-  <hr>
-  <div id="assignment-edit-slot">
-    <form
-      hx-get="{% url 'duty_roster:assignment_edit_form' year=day.year month=day.month day=day.day %}"
-      hx-target="#assignment-edit-slot"
-      hx-swap="innerHTML"
-    >
-      <button type="submit" class="btn btn-sm btn-outline-secondary">
-        ✏️ Edit Duty Crew
+    <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}" class="mb-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-success w-100">
+        <i class="bi bi-hand-index me-2" aria-hidden="true"></i>Request Instruction
       </button>
     </form>
+    {% endif %}
+  {% endif %}
+
+{% else %}
+  {# No Assignment #}
+  <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+    <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+    No duty crew assigned for this date.
   </div>
 {% endif %}
-<hr>
+
+{# Flight Intent Section #}
 {% if user.is_authenticated %}
-  <div id="ops-intent-response">
-    {% if intent_exists %}
-      <p class="text-green-700">✅ You're already marked as planning to fly this day.</p>
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-primary text-white py-2">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-airplane-engines me-2" aria-hidden="true"></i>Flight Plans
+    </h6>
+  </div>
+  <div class="card-body p-3">
+    <div id="ops-intent-response">
+      {% if intent_exists %}
+      <div class="alert alert-success d-flex align-items-center mb-2" role="alert">
+        <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
+        <span>You're already marked as planning to fly this day.</span>
+      </div>
       <form
         hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}"
         hx-target="#ops-intent-response"
         hx-swap="innerHTML"
       >
-      {% csrf_token %}
-      <button
-        hx-post="{% url 'duty_roster:ops_intent_toggle' year=day.year month=day.month day=day.day %}"
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-x-circle me-2" aria-hidden="true"></i>Cancel Intent
+        </button>
+      </form>
+      {% elif can_submit_intent %}
+      <form
+        hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}"
         hx-target="#ops-intent-response"
         hx-swap="innerHTML"
-        class="btn btn-sm btn-danger"
       >
-        Cancel Intent
-      </button>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-airplane-engines me-2" aria-hidden="true"></i>I Plan to Fly This Day
+        </button>
       </form>
-    {% else %}
+      {% else %}
+      <div class="text-muted">
+        <i class="bi bi-clock me-2" aria-hidden="true"></i>This date is in the past. You can no longer declare intent.
+      </div>
+      {% endif %}
+    </div>
 
-      {% if user.towpilot and not assignment.tow_pilot and not assignment.is_confirmed and not assignment.is_scheduled %}
+    {# Volunteer Signup Buttons (for ad-hoc days) #}
+    {% if assignment and not assignment.is_scheduled and not assignment.is_confirmed %}
+    <hr class="my-3">
+    <h6 class="fw-semibold text-secondary mb-2">
+      <i class="bi bi-hand-thumbs-up me-2" aria-hidden="true"></i>Volunteer for Duty:
+    </h6>
+    <div class="d-grid gap-2">
+      {% if user.towpilot and not assignment.tow_pilot %}
       <form method="post"
-            hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-            class="mt-3">
+            hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger w-full">
-          🛩️ I am willing to tow
+        <button type="submit" class="btn btn-outline-danger w-100">
+          <i class="bi bi-airplane me-2" aria-hidden="true"></i>I am willing to tow
         </button>
       </form>
       {% endif %}
-      {% if user.duty_officer and not assignment.duty_officer and not assignment.is_confirmed and not assignment.is_scheduled %}
+
+      {% if user.duty_officer and not assignment.duty_officer %}
       <form method="post"
-            hx-post="{% url 'duty_roster:calendar_dutyofficer_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-            class="mt-3">
+            hx-post="{% url 'duty_roster:calendar_dutyofficer_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-warning w-full">
-          📋 I will serve as Duty Officer
+        <button type="submit" class="btn btn-outline-warning w-100">
+          <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>I will serve as Duty Officer
         </button>
       </form>
+      {% endif %}
+
+      {% if user.instructor and not assignment.instructor %}
+      <form method="post"
+            hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-success w-100">
+          <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>I am willing to instruct today
+        </button>
+      </form>
+      {% endif %}
+
+      {% if user.assistant_duty_officer and not assignment.assistant_duty_officer %}
+      <form method="post"
+            hx-post="{% url 'duty_roster:calendar_ado_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-secondary w-100">
+          <i class="bi bi-person-badge me-2" aria-hidden="true"></i>I can serve as Assistant Duty Officer
+        </button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
 
-    {% if user.instructor and not assignment.instructor and not assignment.is_scheduled %}
-    <form method="post"
-        hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-        class="mt-3">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-success w-full">
-      🎓 I am willing to instruct today
-    </button>
-    </form>
-    {% endif %}
-
-    {% if user.assistant_duty_officer and not assignment.assistant_duty_officer and not assignment.is_scheduled %}
-    <form method="post"
-        hx-post="{% url 'duty_roster:calendar_ado_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
-        class="mt-3">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-secondary w-full">
-      💪 I can serve as Assistant Duty Officer
-    </button>
-    </form>
-    {% endif %}
-
-    {% if can_submit_intent %}
-    <form
-      hx-get="{% url 'duty_roster:ops_intent_form' year=day.year month=day.month day=day.day %}"
-      hx-target="#ops-intent-response"
-      hx-swap="innerHTML"
-    >
-    <button type="submit" class="btn btn-sm btn-primary">
-    🛩️ I Plan to Fly This Day
-    </button>
-    </form>
-
+    {# List of pilots planning to fly #}
+    {% if intents %}
+    <hr class="my-3">
+    <h6 class="fw-semibold text-primary mb-2">
+      <i class="bi bi-people me-2" aria-hidden="true"></i>Pilots Planning to Fly:
+    </h6>
+    <ul class="list-group list-group-flush">
+      {% for intent in intents %}
+      <li class="list-group-item px-0 py-1">
+        <i class="bi bi-person me-2 text-muted" aria-hidden="true"></i>{{ intent.member.full_display_name }}
+      </li>
+      {% endfor %}
+    </ul>
     {% else %}
-      <p class="text-gray-500 italic">🕓 This date is in the past. You can no longer declare intent.</p>
+    <hr class="my-3">
+    <p class="text-muted mb-0">
+      <i class="bi bi-info-circle me-2" aria-hidden="true"></i>No one has declared intent yet.
+    </p>
     {% endif %}
-  {% endif %}
   </div>
+</div>
 {% endif %}
 
-{% if intents %}
-  <hr>
-  <h6 class="font-semibold">🛫 Pilots Planning to Fly:</h6>
-  <ul class="list-disc ps-4">
-    {% for intent in intents %}
-      <li>{{ intent.member.full_display_name }}</li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <hr>
-  <p class="text-gray-600 italic">No one has declared intent yet.</p>
+{# Admin Section: Edit Duty Crew #}
+{% if user.is_authenticated and user.rostermeister %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-dark text-white py-2">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-gear me-2" aria-hidden="true"></i>Admin Options
+    </h6>
+  </div>
+  <div class="card-body p-3">
+    <div id="assignment-edit-slot">
+      <form
+        hx-get="{% url 'duty_roster:assignment_edit_form' year=day.year month=day.month day=day.day %}"
+        hx-target="#assignment-edit-slot"
+        hx-swap="innerHTML"
+      >
+        <button type="submit" class="btn btn-outline-secondary w-100">
+          <i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit Duty Crew
+        </button>
+      </form>
+    </div>
+
+    {% if assignment and not assignment.is_scheduled and assignment.date >= today %}
+    <div class="mt-2">
+      <button
+        class="btn btn-outline-danger w-100"
+        hx-get="{% url 'duty_roster:calendar_cancel_ops_modal' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}"
+        hx-target="#modal-body"
+        hx-swap="innerHTML"
+      >
+        <i class="bi bi-x-octagon me-2" aria-hidden="true"></i>Cancel Operations for this day
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endif %}
