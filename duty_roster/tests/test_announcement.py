@@ -148,6 +148,67 @@ class TestDutyRosterCalendarWithAnnouncement:
         assert response.status_code == 200
         assert b"Roster Manager Announcement" in response.content
 
+    def test_multiline_announcement_renders_with_line_breaks(
+        self, client, membership_statuses, siteconfig
+    ):
+        """Test that multiline announcements render with <br> tags."""
+        # Set multiline announcement
+        siteconfig.duty_roster_announcement = "Line 1\nLine 2\nLine 3"
+        siteconfig.save()
+
+        user = Member.objects.create_user(
+            username="testmember_multiline",
+            email="multiline@test.org",
+            password="testpass123",
+            first_name="Test",
+            last_name="Multiline",
+            membership_status="Full Member",
+        )
+
+        client.force_login(user)
+        url = reverse("duty_roster:duty_calendar")
+        response = client.get(url)
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        # Should contain line breaks converted by linebreaksbr filter
+        assert "<br" in content or "<br>" in content
+        # Should contain all three lines
+        assert "Line 1" in content
+        assert "Line 2" in content
+        assert "Line 3" in content
+
+    def test_announcement_escapes_html_to_prevent_xss(
+        self, client, membership_statuses, siteconfig
+    ):
+        """Test that HTML/JavaScript in announcements is properly escaped."""
+        # Set announcement with malicious HTML/JavaScript
+        siteconfig.duty_roster_announcement = (
+            "<script>alert('XSS')</script><img src=x onerror=alert(1)>"
+        )
+        siteconfig.save()
+
+        user = Member.objects.create_user(
+            username="testmember_xss",
+            email="xss@test.org",
+            password="testpass123",
+            first_name="Test",
+            last_name="XSS",
+            membership_status="Full Member",
+        )
+
+        client.force_login(user)
+        url = reverse("duty_roster:duty_calendar")
+        response = client.get(url)
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        # Should contain escaped HTML entities for angle brackets
+        assert "&lt;script&gt;" in content
+        assert "&lt;img" in content
+        # Should NOT contain the dangerous payload in an executable form
+        # The key test: ensure the malicious string is escaped in the announcement span
+        assert 'announcement-text">&lt;script&gt;alert' in content
+        assert not ("<script>alert" in content and "'XSS')</script>" in content)
+
 
 @pytest.mark.django_db
 class TestCalendarDayModal:
