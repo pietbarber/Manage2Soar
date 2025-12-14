@@ -147,7 +147,7 @@
                   {% else %}
                     <span class="badge bg-secondary" title="Single-seater">1S</span>
                   {% endif %}
-                  {% if glider.is_grounded %}
+                  {% if glider.id in grounded_glider_ids %}
                     <span class="badge bg-danger">Grounded</span>
                   {% endif %}
                 </li>

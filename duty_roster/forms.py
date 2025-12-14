@@ -1,6 +1,9 @@
 from django import forms
+from django.db.models import Exists, OuterRef, Q
 
+from logsheet.models import Glider, MaintenanceIssue
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 from .models import (
     DutyAssignment,
@@ -499,25 +502,28 @@ class GliderReservationForm(forms.ModelForm):
         self.member = member
 
         # Filter gliders to only show club-owned, active, non-grounded gliders
-        from logsheet.models import Glider
-        from siteconfig.models import SiteConfiguration
-
         config = SiteConfiguration.objects.first()
 
-        available_gliders = Glider.objects.filter(
-            is_active=True,
-            club_owned=True,
-        ).order_by("competition_number")
+        # Efficiently filter out grounded gliders using a database query
+        # rather than loading all gliders and checking the is_grounded property
+        grounded_subquery = MaintenanceIssue.objects.filter(
+            glider=OuterRef("pk"), grounded=True, resolved=False
+        )
+
+        available_gliders = (
+            Glider.objects.filter(
+                is_active=True,
+                club_owned=True,
+            )
+            .exclude(Exists(grounded_subquery))
+            .order_by("competition_number")
+        )
 
         # If two-seater reservations are not allowed, filter them out
         if config and not config.allow_two_seater_reservations:
             available_gliders = available_gliders.filter(seats=1)
 
-        # Exclude grounded gliders (is_grounded is a property, so filter in Python)
-        available_gliders = [g for g in available_gliders if not g.is_grounded]
-        self.fields["glider"].queryset = Glider.objects.filter(
-            pk__in=[g.pk for g in available_gliders]
-        )
+        self.fields["glider"].queryset = available_gliders
 
         # Make start_time and end_time not required (they're only for specific time preference)
         self.fields["start_time"].required = False
@@ -581,8 +587,6 @@ class GliderReservationForm(forms.ModelForm):
 
     def clean_glider(self):
         """Additional validation for the glider field."""
-        from siteconfig.models import SiteConfiguration
-
         glider = self.cleaned_data.get("glider")
         if not glider:
             return glider
@@ -598,9 +602,8 @@ class GliderReservationForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        if commit:
-            instance.full_clean()
-            instance.member = self.member
+        instance.member = self.member
+        instance.full_clean()
         if commit:
             instance.save()
         return instance

@@ -1,6 +1,9 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from members.models import Member
+from siteconfig.models import SiteConfiguration
 
 
 class MemberBlackout(models.Model):
@@ -209,8 +212,6 @@ class InstructionSlot(models.Model):
 
     def accept(self, instructor, note=""):
         """Instructor accepts this student's request."""
-        from django.utils import timezone
-
         self.instructor = instructor
         self.instructor_response = "accepted"
         self.status = "confirmed"
@@ -220,8 +221,6 @@ class InstructionSlot(models.Model):
 
     def reject(self, note=""):
         """Instructor rejects this student's request."""
-        from django.utils import timezone
-
         self.instructor_response = "rejected"
         self.status = "cancelled"
         self.instructor_note = note
@@ -328,8 +327,6 @@ class DutySwapRequest(models.Model):
 
     def days_until_duty(self):
         """Returns the number of days until the duty date."""
-        from django.utils import timezone
-
         today = timezone.now().date()
         return (self.original_date - today).days
 
@@ -583,13 +580,16 @@ class GliderReservation(models.Model):
 
     def __str__(self):
         glider_str = str(self.glider) if self.glider else "Unknown Glider"
-        return f"{self.member.full_display_name} - {glider_str} on {self.date}"
+        member_str = (
+            self.member.full_display_name
+            if self.member and hasattr(self.member, "full_display_name")
+            else "Unknown Member"
+        )
+        return f"{member_str} - {glider_str} on {self.date}"
 
     @property
     def is_active(self):
         """Check if this reservation is still active (confirmed and in the future)."""
-        from django.utils import timezone
-
         return self.status == "confirmed" and self.date >= timezone.now().date()
 
     @property
@@ -603,8 +603,6 @@ class GliderReservation(models.Model):
         Get the count of reservations a member has made for a given year.
         Used to enforce max_reservations_per_year limit.
         """
-        from django.utils import timezone
-
         if year is None:
             year = timezone.now().year
 
@@ -647,8 +645,6 @@ class GliderReservation(models.Model):
         Check if a member can make a new reservation based on yearly limits.
         Returns tuple: (can_reserve: bool, message: str)
         """
-        from siteconfig.models import SiteConfiguration
-
         config = SiteConfiguration.objects.first()
         if not config:
             return False, "Site configuration is not available."
@@ -671,8 +667,6 @@ class GliderReservation(models.Model):
 
     def clean(self):
         """Validate the reservation before saving."""
-        from django.core.exceptions import ValidationError
-
         # Check if glider is grounded
         if self.glider and self.glider.is_grounded:
             raise ValidationError(
@@ -691,8 +685,6 @@ class GliderReservation(models.Model):
 
         # For two-seater reservations, check site config
         if self.glider and self.glider.seats >= 2:
-            from siteconfig.models import SiteConfiguration
-
             config = SiteConfiguration.objects.first()
             if config and not config.allow_two_seater_reservations:
                 raise ValidationError(
@@ -734,8 +726,6 @@ class GliderReservation(models.Model):
 
     def cancel(self, reason=""):
         """Cancel this reservation."""
-        from django.utils import timezone
-
         self.status = "cancelled"
         self.cancelled_at = timezone.now()
         self.cancellation_reason = reason

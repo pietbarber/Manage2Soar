@@ -186,14 +186,16 @@ def reservation_cancel(request, reservation_id):
             )
             return redirect("duty_roster:reservation_list")
         else:
-            # Show specific form errors to help with debugging
+            # Show non-field errors first
+            for error in form.non_field_errors():
+                messages.error(request, str(error))
+            # Then show field-specific errors
             for field, errors in form.errors.items():
+                if field == "__all__":
+                    continue
                 for error in errors:
                     error_msg = str(error)
-                    messages.error(
-                        request,
-                        f"{field}: {error_msg}" if field != "__all__" else error_msg,
-                    )
+                    messages.error(request, f"{field}: {error_msg}")
     else:
         form = GliderReservationCancelForm()
 
