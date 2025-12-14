@@ -539,6 +539,7 @@ class GliderReservationForm(forms.ModelForm):
         )
 
     def clean(self):
+        from django.db import transaction
         from django.utils import timezone
 
         cleaned_data = super().clean()
@@ -562,26 +563,29 @@ class GliderReservationForm(forms.ModelForm):
                 "End time must be after start time.",
             )
 
-        # Validate date is in the future
+        # Validate date is in the future (or today)
         if date:
             today = timezone.now().date()
             if date < today:
-                self.add_error("date", "Reservation date must be in the future.")
+                self.add_error(
+                    "date", "Reservation date must be today or in the future."
+                )
 
-        # Check if glider is grounded
-        if glider and glider.is_grounded:
-            self.add_error(
-                "glider",
-                f"This glider is currently grounded and cannot be reserved.",
-            )
-
-        # Check for yearly reservation limits
+        # Check for yearly reservation limits (use transaction to prevent race conditions)
         if self.member and date:
-            can_reserve, message = GliderReservation.can_member_reserve(
-                self.member, year=date.year
-            )
-            if not can_reserve:
-                self.add_error(None, message)
+            with transaction.atomic():
+                # Lock the member's reservations for this year to prevent concurrent modifications
+                GliderReservation.objects.filter(
+                    member=self.member,
+                    date__year=date.year,
+                    status__in=["confirmed", "completed"],
+                ).select_for_update().exists()
+
+                can_reserve, message = GliderReservation.can_member_reserve(
+                    self.member, year=date.year
+                )
+                if not can_reserve:
+                    self.add_error(None, message)
 
         return cleaned_data
 

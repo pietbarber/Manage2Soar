@@ -667,6 +667,8 @@ class GliderReservation(models.Model):
 
     def clean(self):
         """Validate the reservation before saving."""
+        from django.db import transaction
+
         # Check if glider is grounded
         if self.glider and self.glider.is_grounded:
             raise ValidationError(
@@ -698,31 +700,37 @@ class GliderReservation(models.Model):
                     "Start time is required when using specific time preference."
                 )
 
-        # Check for existing reservation conflicts
+        # Check for existing reservation conflicts (use transaction and locking to prevent race conditions)
         if self.status == "confirmed":
-            conflicts = GliderReservation.objects.filter(
-                glider=self.glider,
-                date=self.date,
-                status="confirmed",
-            ).exclude(pk=self.pk if self.pk else None)
+            with transaction.atomic():
+                # Lock existing reservations for this glider/date to prevent concurrent modifications
+                conflicts = (
+                    GliderReservation.objects.filter(
+                        glider=self.glider,
+                        date=self.date,
+                        status="confirmed",
+                    )
+                    .exclude(pk=self.pk if self.pk else None)
+                    .select_for_update()
+                )
 
-            # Same time preference or full day conflicts
-            if self.time_preference == "full_day":
-                # Full day conflicts with any other reservation
-                if conflicts.exists():
-                    raise ValidationError(
-                        f"Glider {self.glider} already has a reservation on {self.date}."
-                    )
-            else:
-                # Check for overlapping time preferences
-                if conflicts.filter(time_preference="full_day").exists():
-                    raise ValidationError(
-                        f"Glider {self.glider} is reserved for the full day on {self.date}."
-                    )
-                if conflicts.filter(time_preference=self.time_preference).exists():
-                    raise ValidationError(
-                        f"Glider {self.glider} is already reserved for {self.get_time_preference_display()} on {self.date}."
-                    )
+                # Same time preference or full day conflicts
+                if self.time_preference == "full_day":
+                    # Full day conflicts with any other reservation
+                    if conflicts.exists():
+                        raise ValidationError(
+                            f"Glider {self.glider} already has a reservation on {self.date}."
+                        )
+                else:
+                    # Check for overlapping time preferences
+                    if conflicts.filter(time_preference="full_day").exists():
+                        raise ValidationError(
+                            f"Glider {self.glider} is reserved for the full day on {self.date}."
+                        )
+                    if conflicts.filter(time_preference=self.time_preference).exists():
+                        raise ValidationError(
+                            f"Glider {self.glider} is already reserved for {self.get_time_preference_display()} on {self.date}."
+                        )
 
     def cancel(self, reason=""):
         """Cancel this reservation."""

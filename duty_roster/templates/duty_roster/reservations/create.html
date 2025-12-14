@@ -84,7 +84,7 @@
               <div class="form-text">{{ form.time_preference.help_text }}</div>
             </div>
 
-            <div id="specific-time-fields" class="row mb-3" style="display: none;">
+            <div id="specific-time-fields" class="row mb-3 d-none" aria-hidden="true">
               <div class="col-md-6">
                 <label for="id_start_time" class="form-label">Start Time</label>
                 {{ form.start_time }}
@@ -186,9 +186,13 @@
 
     function toggleSpecificTimeFields() {
       if (timePreference.value === 'specific') {
-        specificTimeFields.style.display = 'flex';
+        specificTimeFields.classList.remove('d-none');
+        specificTimeFields.classList.add('d-flex');
+        specificTimeFields.setAttribute('aria-hidden', 'false');
       } else {
-        specificTimeFields.style.display = 'none';
+        specificTimeFields.classList.remove('d-flex');
+        specificTimeFields.classList.add('d-none');
+        specificTimeFields.setAttribute('aria-hidden', 'true');
       }
     }
 
