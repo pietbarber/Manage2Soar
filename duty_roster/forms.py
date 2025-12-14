@@ -534,6 +534,7 @@ class GliderReservationForm(forms.ModelForm):
         cleaned_data = super().clean()
         time_preference = cleaned_data.get("time_preference")
         start_time = cleaned_data.get("start_time")
+        end_time = cleaned_data.get("end_time")
         date = cleaned_data.get("date")
         glider = cleaned_data.get("glider")
 
@@ -542,6 +543,13 @@ class GliderReservationForm(forms.ModelForm):
             self.add_error(
                 "start_time",
                 "Start time is required when using specific time preference.",
+            )
+
+        # Validate end_time is after start_time if both provided
+        if start_time and end_time and end_time <= start_time:
+            self.add_error(
+                "end_time",
+                "End time must be after start time.",
             )
 
         # Validate date is in the future
@@ -585,37 +593,11 @@ class GliderReservationForm(forms.ModelForm):
         return glider
 
     def save(self, commit=True):
-        from django.core.exceptions import ValidationError
-        from django.db import IntegrityError
-
         instance = super().save(commit=False)
         if self.member:
             instance.member = self.member
         if commit:
-            try:
-                instance.full_clean()  # Run model validation
-                instance.save()
-            except ValidationError as e:
-                # Convert model validation errors to form errors
-                if hasattr(e, "error_dict"):
-                    for field, errors in e.error_dict.items():
-                        for error in errors:
-                            if field == "__all__":
-                                self.add_error(None, error)
-                            else:
-                                self.add_error(field, error)
-                else:
-                    self.add_error(None, e.message)
-                # Do not re-raise; errors have been added to the form
-                return instance
-            except IntegrityError:
-                # Handle race condition where another reservation was created between validation and save
-                self.add_error(
-                    None,
-                    "This glider is no longer available for the selected time. Please try again.",
-                )
-                # Do not re-raise; error has been added to the form
-                return instance
+            instance.save()
         return instance
 
 
