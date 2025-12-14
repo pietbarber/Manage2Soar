@@ -513,7 +513,11 @@ class GliderReservationForm(forms.ModelForm):
         if config and not config.allow_two_seater_reservations:
             available_gliders = available_gliders.filter(seats=1)
 
-        self.fields["glider"].queryset = available_gliders
+        # Exclude grounded gliders (is_grounded is a property, so filter in Python)
+        available_gliders = [g for g in available_gliders if not g.is_grounded]
+        self.fields["glider"].queryset = Glider.objects.filter(
+            pk__in=[g.pk for g in available_gliders]
+        )
 
         # Make start_time and end_time not required (they're only for specific time preference)
         self.fields["start_time"].required = False
@@ -594,7 +598,8 @@ class GliderReservationForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        if self.member:
+        if commit:
+            instance.full_clean()
             instance.member = self.member
         if commit:
             instance.save()
