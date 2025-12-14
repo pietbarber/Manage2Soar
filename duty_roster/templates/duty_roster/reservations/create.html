@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Reserve a Glider{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-plane me-2"></i>Reserve a Glider</h1>
+    <a href="{% url 'duty_roster:reservation_list' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i>Back to My Reservations
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-calendar-plus me-2"></i>New Reservation</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <p class="mb-0">{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="mb-3">
+              <label for="id_date" class="form-label">Date <span class="text-danger">*</span></label>
+              {{ form.date }}
+              {% if form.date.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.date.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+              <div class="form-text">Select the date you want to reserve the glider.</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="id_glider" class="form-label">Glider <span class="text-danger">*</span></label>
+              {{ form.glider }}
+              {% if form.glider.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.glider.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+              <div class="form-text">Choose an available club glider.</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="id_reservation_type" class="form-label">Flight Type <span class="text-danger">*</span></label>
+              {{ form.reservation_type }}
+              {% if form.reservation_type.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.reservation_type.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+              <div class="form-text">{{ form.reservation_type.help_text }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="id_time_preference" class="form-label">Time Preference <span class="text-danger">*</span></label>
+              {{ form.time_preference }}
+              {% if form.time_preference.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.time_preference.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+              <div class="form-text">{{ form.time_preference.help_text }}</div>
+            </div>
+
+            <div id="specific-time-fields" class="row mb-3" style="display: none;">
+              <div class="col-md-6">
+                <label for="id_start_time" class="form-label">Start Time</label>
+                {{ form.start_time }}
+                {% if form.start_time.errors %}
+                  <div class="invalid-feedback d-block">
+                    {% for error in form.start_time.errors %}{{ error }}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="id_end_time" class="form-label">End Time (optional)</label>
+                {{ form.end_time }}
+                {% if form.end_time.errors %}
+                  <div class="invalid-feedback d-block">
+                    {% for error in form.end_time.errors %}{{ error }}{% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="id_purpose" class="form-label">Additional Details (optional)</label>
+              {{ form.purpose }}
+              {% if form.purpose.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.purpose.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-between">
+              <a href="{% url 'duty_roster:reservation_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-1"></i>Cancel
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check me-1"></i>Confirm Reservation
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <!-- Available Gliders Info -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Available Gliders</h6>
+        </div>
+        <div class="card-body">
+          {% if available_gliders %}
+            <ul class="list-unstyled mb-0">
+              {% for glider in available_gliders %}
+                <li class="mb-2">
+                  <strong>{{ glider }}</strong>
+                  {% if glider.seats >= 2 %}
+                    <span class="badge bg-info" title="Two-seater">2S</span>
+                  {% else %}
+                    <span class="badge bg-secondary" title="Single-seater">1S</span>
+                  {% endif %}
+                  {% if glider.is_grounded %}
+                    <span class="badge bg-danger">Grounded</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted mb-0">No gliders available for reservation.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Reservation Rules -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="fas fa-book me-2"></i>Reservation Guidelines</h6>
+        </div>
+        <div class="card-body">
+          <ul class="small mb-0">
+            <li>Reservations are for fun flying only (solo, badge flights, guest flying).</li>
+            <li>Maximum of <strong>{{ max_per_year }}</strong> reservations per year{% if max_per_year == 0 %} (unlimited){% endif %}.</li>
+            <li>Grounded aircraft cannot be reserved.</li>
+            <li>Please cancel promptly if your plans change.</li>
+            <li>The duty officer may contact you on the day of your reservation.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Show/hide specific time fields based on time preference selection
+  document.addEventListener('DOMContentLoaded', function() {
+    const timePreference = document.getElementById('id_time_preference');
+    const specificTimeFields = document.getElementById('specific-time-fields');
+
+    function toggleSpecificTimeFields() {
+      if (timePreference.value === 'specific') {
+        specificTimeFields.style.display = 'flex';
+      } else {
+        specificTimeFields.style.display = 'none';
+      }
+    }
+
+    timePreference.addEventListener('change', toggleSpecificTimeFields);
+    toggleSpecificTimeFields(); // Run on page load
+  });
+</script>
+{% endblock %}

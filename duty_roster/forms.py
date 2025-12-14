@@ -7,6 +7,7 @@ from .models import (
     DutyPreference,
     DutySwapOffer,
     DutySwapRequest,
+    GliderReservation,
     InstructionSlot,
     MemberBlackout,
 )
@@ -457,3 +458,153 @@ class DutySwapOfferForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class GliderReservationForm(forms.ModelForm):
+    """Form for members to create glider reservations."""
+
+    class Meta:
+        model = GliderReservation
+        fields = [
+            "glider",
+            "date",
+            "reservation_type",
+            "time_preference",
+            "start_time",
+            "end_time",
+            "purpose",
+        ]
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "start_time": forms.TimeInput(
+                attrs={"type": "time", "class": "form-control"}
+            ),
+            "end_time": forms.TimeInput(
+                attrs={"type": "time", "class": "form-control"}
+            ),
+            "reservation_type": forms.Select(attrs={"class": "form-select"}),
+            "time_preference": forms.Select(attrs={"class": "form-select"}),
+            "glider": forms.Select(attrs={"class": "form-select"}),
+            "purpose": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Optional: Additional details about your planned flight (badge attempt, guest info, etc.)",
+                }
+            ),
+        }
+
+    def __init__(self, *args, member=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.member = member
+
+        # Filter gliders to only show club-owned, active, non-grounded gliders
+        from logsheet.models import Glider
+        from siteconfig.models import SiteConfiguration
+
+        config = SiteConfiguration.objects.first()
+
+        available_gliders = Glider.objects.filter(
+            is_active=True,
+            club_owned=True,
+        ).order_by("competition_number")
+
+        # If two-seater reservations are not allowed, filter them out
+        if config and not config.allow_two_seater_reservations:
+            available_gliders = available_gliders.filter(seats=1)
+
+        self.fields["glider"].queryset = available_gliders
+
+        # Make start_time and end_time not required (they're only for specific time preference)
+        self.fields["start_time"].required = False
+        self.fields["end_time"].required = False
+        self.fields["purpose"].required = False
+
+        # Add helpful labels
+        self.fields["reservation_type"].help_text = (
+            "Select the type of flight you're planning."
+        )
+        self.fields["time_preference"].help_text = (
+            "Choose when you'd like to fly. Select 'Specific Time' for exact times."
+        )
+
+    def clean(self):
+        from django.utils import timezone
+
+        cleaned_data = super().clean()
+        time_preference = cleaned_data.get("time_preference")
+        start_time = cleaned_data.get("start_time")
+        date = cleaned_data.get("date")
+        glider = cleaned_data.get("glider")
+
+        # Validate time requirement for specific time preference
+        if time_preference == "specific" and not start_time:
+            self.add_error(
+                "start_time",
+                "Start time is required when using specific time preference.",
+            )
+
+        # Validate date is in the future
+        if date:
+            today = timezone.now().date()
+            if date < today:
+                self.add_error("date", "Reservation date must be in the future.")
+
+        # Check if glider is grounded
+        if glider and glider.is_grounded:
+            self.add_error(
+                "glider",
+                f"This glider is currently grounded and cannot be reserved.",
+            )
+
+        # Check for yearly reservation limits
+        if self.member and date:
+            can_reserve, message = GliderReservation.can_member_reserve(
+                self.member, year=date.year
+            )
+            if not can_reserve:
+                self.add_error(None, message)
+
+        return cleaned_data
+
+    def clean_glider(self):
+        """Additional validation for the glider field."""
+        from siteconfig.models import SiteConfiguration
+
+        glider = self.cleaned_data.get("glider")
+        if not glider:
+            return glider
+
+        # Check two-seater reservation permission
+        config = SiteConfiguration.objects.first()
+        if glider.seats >= 2 and config and not config.allow_two_seater_reservations:
+            raise forms.ValidationError(
+                "Two-seater glider reservations are not currently allowed."
+            )
+
+        return glider
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.member:
+            instance.member = self.member
+        if commit:
+            instance.full_clean()  # Run model validation
+            instance.save()
+        return instance
+
+
+class GliderReservationCancelForm(forms.Form):
+    """Form for cancelling a glider reservation."""
+
+    cancellation_reason = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Optional: Reason for cancellation",
+            }
+        ),
+        label="Reason for cancellation",
+    )

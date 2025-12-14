@@ -22,7 +22,12 @@ from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from duty_roster.models import DutyAssignment, InstructionSlot, OpsIntent
+from duty_roster.models import (
+    DutyAssignment,
+    GliderReservation,
+    InstructionSlot,
+    OpsIntent,
+)
 from duty_roster.utils.ics import generate_preop_ics
 from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
@@ -234,6 +239,9 @@ class Command(BaseCommand):
             "member", "glider"
         )
 
+        # Get glider reservations for this day (Issue #410)
+        reservations = GliderReservation.get_reservations_for_date(target_date)
+
         # Calculate days until target date for dynamic wording
         today = now().date()
         days_until = (target_date - today).days
@@ -265,6 +273,7 @@ class Command(BaseCommand):
             # Students and members
             "instruction_requests": instruction_requests,
             "ops_intents": ops_intents,
+            "reservations": reservations,
             # Maintenance
             "grounded_gliders": grounded_gliders,
             "grounded_towplanes": grounded_towplanes,

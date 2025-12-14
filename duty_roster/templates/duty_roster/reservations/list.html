@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}My Glider Reservations{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-plane me-2"></i>My Glider Reservations</h1>
+    <div>
+      <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary me-2">
+        <i class="fas fa-calendar me-1"></i>Calendar
+      </a>
+      {% if reservations_enabled and can_reserve %}
+        <a href="{% url 'duty_roster:reservation_create' %}" class="btn btn-primary">
+          <i class="fas fa-plus me-1"></i>New Reservation
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Reservation Limits Info -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h6 class="mb-1">Reservation Status for {{ current_year }}</h6>
+          <p class="mb-0 text-muted">
+            {% if max_per_year > 0 %}
+              You have used <strong>{{ current_year_count }}</strong> of <strong>{{ max_per_year }}</strong> reservations this year.
+            {% else %}
+              Unlimited reservations available.
+            {% endif %}
+          </p>
+        </div>
+        <div class="col-md-4 text-md-end">
+          {% if not reservations_enabled %}
+            <span class="badge bg-secondary fs-6">Reservations Disabled</span>
+          {% elif not can_reserve %}
+            <span class="badge bg-warning text-dark fs-6">Limit Reached</span>
+          {% else %}
+            <span class="badge bg-success fs-6">Available</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Reservations -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Upcoming Reservations</h5>
+    </div>
+    <div class="card-body">
+      {% if upcoming %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Glider</th>
+                <th>Type</th>
+                <th>Time</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for res in upcoming %}
+                <tr>
+                  <td>
+                    <strong>{{ res.date|date:"l, F j, Y" }}</strong>
+                    {% if res.is_trainer %}
+                      <span class="badge bg-info ms-1" title="Two-seater">2S</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ res.glider }}</td>
+                  <td>
+                    <span class="badge bg-secondary">{{ res.get_reservation_type_display }}</span>
+                  </td>
+                  <td>
+                    {% if res.time_preference == "specific" and res.start_time %}
+                      {{ res.start_time|time:"g:i A" }}
+                      {% if res.end_time %} - {{ res.end_time|time:"g:i A" }}{% endif %}
+                    {% else %}
+                      {{ res.get_time_preference_display }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'duty_roster:reservation_detail' res.id %}" class="btn btn-sm btn-outline-primary">
+                      <i class="fas fa-eye"></i>
+                    </a>
+                    <a href="{% url 'duty_roster:reservation_cancel_confirm' res.id %}" class="btn btn-sm btn-outline-danger">
+                      <i class="fas fa-times"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">
+          <i class="fas fa-info-circle me-1"></i>No upcoming reservations.
+          {% if reservations_enabled and can_reserve %}
+            <a href="{% url 'duty_roster:reservation_create' %}">Make a reservation</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Past Reservations -->
+  {% if past %}
+  <div class="card shadow-sm">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent History</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Glider</th>
+              <th>Type</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for res in past %}
+              <tr class="{% if res.status == 'cancelled' or res.status == 'no_show' %}text-muted{% endif %}">
+                <td>{{ res.date|date:"M j, Y" }}</td>
+                <td>{{ res.glider }}</td>
+                <td>{{ res.get_reservation_type_display }}</td>
+                <td>
+                  {% if res.status == "completed" %}
+                    <span class="badge bg-success">Completed</span>
+                  {% elif res.status == "cancelled" %}
+                    <span class="badge bg-secondary">Cancelled</span>
+                  {% elif res.status == "no_show" %}
+                    <span class="badge bg-warning text-dark">No Show</span>
+                  {% else %}
+                    <span class="badge bg-info">{{ res.get_status_display }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Yearly Statistics -->
+  {% if yearly_counts %}
+  <div class="card shadow-sm mt-4">
+    <div class="card-header">
+      <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Yearly Statistics</h5>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        {% for year, count in yearly_counts.items %}
+          <div class="col-md-3 col-6 text-center mb-3">
+            <div class="border rounded p-3">
+              <h3 class="mb-0">{{ count }}</h3>
+              <small class="text-muted">{{ year }}</small>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

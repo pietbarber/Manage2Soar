@@ -9,6 +9,7 @@ from .models import (
     DutyPreference,
     DutySwapOffer,
     DutySwapRequest,
+    GliderReservation,
     InstructionSlot,
     MemberBlackout,
     OpsIntent,
@@ -142,3 +143,77 @@ class OpsIntentAdmin(AdminHelperMixin, admin.ModelAdmin):
     @admin.display(description="Planned activities")
     def available_as_labels(self, obj):
         return ", ".join(obj.available_as_labels())
+
+
+@admin.register(GliderReservation)
+class GliderReservationAdmin(AdminHelperMixin, admin.ModelAdmin):
+    list_display = (
+        "date",
+        "member",
+        "glider",
+        "reservation_type",
+        "time_preference",
+        "status",
+        "is_trainer_display",
+        "created_at",
+    )
+    list_filter = ("status", "reservation_type", "time_preference", "date")
+    search_fields = (
+        "member__first_name",
+        "member__last_name",
+        "glider__competition_number",
+        "glider__n_number",
+        "purpose",
+    )
+    autocomplete_fields = ("member", "glider")
+    readonly_fields = ("created_at", "updated_at", "cancelled_at")
+    date_hierarchy = "date"
+    ordering = ("-date",)
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("member", "glider", "date", "status"),
+            },
+        ),
+        (
+            "Reservation Details",
+            {
+                "fields": (
+                    "reservation_type",
+                    "time_preference",
+                    "start_time",
+                    "end_time",
+                    "purpose",
+                ),
+            },
+        ),
+        (
+            "Cancellation",
+            {
+                "fields": ("cancelled_at", "cancellation_reason"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    admin_helper_message = (
+        "<b>Glider Reservations:</b> Members can reserve club gliders ahead of time. "
+        "Control reservation settings in SiteConfiguration (max per year, enable/disable). "
+        "Reservations appear on the duty calendar and in daily ops emails."
+    )
+
+    @admin.display(description="Trainer?", boolean=True)
+    def is_trainer_display(self, obj):
+        return obj.is_trainer
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("member", "glider")

@@ -459,3 +459,296 @@ class OpsIntent(models.Model):
         """Return a list of human-friendly labels for the stored activity keys."""
         mapping = dict(self.AVAILABLE_ACTIVITIES)
         return [mapping.get(k, k) for k in (self.available_as or [])]
+
+
+class GliderReservation(models.Model):
+    """
+    Glider reservation system for members to reserve club gliders ahead of time.
+
+    Key features:
+    - Members can reserve gliders for specific dates and time slots
+    - Tracks yearly reservation count per member
+    - SiteConfiguration controls enable/disable and max reservations per year
+    - Considers whether glider is a trainer (2-seater)
+    - Integrated with logsheet reminders and daily ops email
+
+    See Issue #410 and docs/workflows/issue-190-glider-reservation-design.md
+    """
+
+    # Core reservation data
+    member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.CASCADE,
+        related_name="glider_reservations",
+    )
+    glider = models.ForeignKey(
+        "logsheet.Glider",
+        on_delete=models.CASCADE,
+        related_name="reservations",
+    )
+    date = models.DateField(
+        db_index=True,
+        help_text="Date of the reserved flight",
+    )
+    start_time = models.TimeField(
+        blank=True,
+        null=True,
+        help_text="Preferred start time (optional, can be general 'morning' or 'afternoon')",
+    )
+    end_time = models.TimeField(
+        blank=True,
+        null=True,
+        help_text="Expected end time (optional)",
+    )
+
+    # Reservation type
+    RESERVATION_TYPE_CHOICES = [
+        ("solo", "Solo Flight"),
+        ("badge", "Badge Flight"),
+        ("guest", "Guest Flying"),
+        ("other", "Other"),
+    ]
+    reservation_type = models.CharField(
+        max_length=20,
+        choices=RESERVATION_TYPE_CHOICES,
+        default="solo",
+        help_text="Type of flight operation planned",
+    )
+
+    # Time preference (simpler than specific times)
+    TIME_PREFERENCE_CHOICES = [
+        ("morning", "Morning (first flights)"),
+        ("midday", "Midday"),
+        ("afternoon", "Afternoon"),
+        ("full_day", "Full Day"),
+        ("specific", "Specific Time"),
+    ]
+    time_preference = models.CharField(
+        max_length=20,
+        choices=TIME_PREFERENCE_CHOICES,
+        default="morning",
+        help_text="General time preference for the reservation",
+    )
+
+    # Status tracking
+    STATUS_CHOICES = [
+        ("confirmed", "Confirmed"),
+        ("cancelled", "Cancelled"),
+        ("completed", "Completed"),
+        ("no_show", "No Show"),
+    ]
+    status = models.CharField(
+        max_length=15,
+        choices=STATUS_CHOICES,
+        default="confirmed",
+        db_index=True,
+    )
+
+    # Additional details
+    purpose = models.TextField(
+        blank=True,
+        help_text="Additional details about the planned flight (badge attempt details, guest info, etc.)",
+    )
+
+    # Cancellation tracking
+    cancelled_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the reservation was cancelled",
+    )
+    cancellation_reason = models.TextField(
+        blank=True,
+        help_text="Reason for cancellation",
+    )
+
+    # Administrative tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["date", "time_preference", "start_time"]
+        indexes = [
+            models.Index(fields=["date", "glider"]),
+            models.Index(fields=["member", "date"]),
+            models.Index(fields=["date", "status"]),
+        ]
+        # Prevent double-booking: one glider can have one active reservation per day/time
+        constraints = [
+            models.UniqueConstraint(
+                fields=["glider", "date", "time_preference"],
+                condition=models.Q(status="confirmed"),
+                name="unique_active_reservation_per_slot",
+            ),
+        ]
+
+    def __str__(self):
+        glider_str = str(self.glider) if self.glider else "Unknown Glider"
+        return f"{self.member.full_display_name} - {glider_str} on {self.date}"
+
+    @property
+    def is_active(self):
+        """Check if this reservation is still active (confirmed and in the future)."""
+        from datetime import date as today_date
+
+        from django.utils import timezone
+
+        return self.status == "confirmed" and self.date >= timezone.now().date()
+
+    @property
+    def is_trainer(self):
+        """Check if the reserved glider is a trainer (2-seater)."""
+        return self.glider and self.glider.seats >= 2
+
+    @classmethod
+    def get_member_yearly_count(cls, member, year=None):
+        """
+        Get the count of reservations a member has made for a given year.
+        Used to enforce max_reservations_per_year limit.
+        """
+        from django.utils import timezone
+
+        if year is None:
+            year = timezone.now().year
+
+        return cls.objects.filter(
+            member=member,
+            date__year=year,
+            status__in=["confirmed", "completed"],  # Don't count cancelled/no-show
+        ).count()
+
+    @classmethod
+    def get_reservations_by_year(cls, member):
+        """
+        Return reservation counts grouped by year for a member.
+        Returns a dict like {2024: 3, 2025: 1}
+        """
+        from django.db.models import Count
+        from django.db.models.functions import ExtractYear
+
+        return dict(
+            cls.objects.filter(
+                member=member,
+                status__in=["confirmed", "completed"],
+            )
+            .annotate(year=ExtractYear("date"))
+            .values("year")
+            .annotate(count=Count("id"))
+            .values_list("year", "count")
+        )
+
+    @classmethod
+    def get_reservations_for_date(cls, date):
+        """Get all confirmed reservations for a specific date."""
+        return cls.objects.filter(date=date, status="confirmed").select_related(
+            "member", "glider"
+        )
+
+    @classmethod
+    def can_member_reserve(cls, member, year=None):
+        """
+        Check if a member can make a new reservation based on yearly limits.
+        Returns tuple: (can_reserve: bool, message: str)
+        """
+        from siteconfig.models import SiteConfiguration
+
+        config = SiteConfiguration.objects.first()
+        if not config:
+            return False, "Site configuration is not available."
+
+        # Check if reservations are enabled
+        if not config.allow_glider_reservations:
+            return False, "Glider reservations are currently disabled."
+
+        # Check yearly limit (0 = unlimited)
+        max_per_year = config.max_reservations_per_year
+        if max_per_year > 0:
+            current_count = cls.get_member_yearly_count(member, year)
+            if current_count >= max_per_year:
+                return (
+                    False,
+                    f"You have reached your limit of {max_per_year} reservations for this year.",
+                )
+
+        return True, "OK"
+
+    def clean(self):
+        """Validate the reservation before saving."""
+        from django.core.exceptions import ValidationError
+
+        # Check if glider is grounded
+        if self.glider and self.glider.is_grounded:
+            raise ValidationError(
+                f"Glider {self.glider} is currently grounded and cannot be reserved."
+            )
+
+        # Check if glider is club-owned (private gliders shouldn't be reservable)
+        if self.glider and not self.glider.club_owned:
+            raise ValidationError(
+                f"Glider {self.glider} is privately owned and cannot be reserved through this system."
+            )
+
+        # Check if glider is active
+        if self.glider and not self.glider.is_active:
+            raise ValidationError(f"Glider {self.glider} is not currently active.")
+
+        # For two-seater reservations, check site config
+        if self.glider and self.glider.seats >= 2:
+            from siteconfig.models import SiteConfiguration
+
+            config = SiteConfiguration.objects.first()
+            if config and not config.allow_two_seater_reservations:
+                raise ValidationError(
+                    "Two-seater glider reservations are not currently allowed."
+                )
+
+        # Validate times if specific time preference
+        if self.time_preference == "specific":
+            if not self.start_time:
+                raise ValidationError(
+                    "Start time is required when using specific time preference."
+                )
+
+        # Check for existing reservation conflicts
+        if self.status == "confirmed":
+            conflicts = GliderReservation.objects.filter(
+                glider=self.glider,
+                date=self.date,
+                status="confirmed",
+            ).exclude(pk=self.pk if self.pk else None)
+
+            # Same time preference or full day conflicts
+            if self.time_preference == "full_day":
+                # Full day conflicts with any other reservation
+                if conflicts.exists():
+                    raise ValidationError(
+                        f"Glider {self.glider} already has a reservation on {self.date}."
+                    )
+            else:
+                # Check for overlapping time preferences
+                if conflicts.filter(time_preference="full_day").exists():
+                    raise ValidationError(
+                        f"Glider {self.glider} is reserved for the full day on {self.date}."
+                    )
+                if conflicts.filter(time_preference=self.time_preference).exists():
+                    raise ValidationError(
+                        f"Glider {self.glider} is already reserved for {self.get_time_preference_display()} on {self.date}."
+                    )
+
+    def cancel(self, reason=""):
+        """Cancel this reservation."""
+        from django.utils import timezone
+
+        self.status = "cancelled"
+        self.cancelled_at = timezone.now()
+        self.cancellation_reason = reason
+        self.save()
+
+    def mark_completed(self):
+        """Mark this reservation as completed (flight happened)."""
+        self.status = "completed"
+        self.save()
+
+    def mark_no_show(self):
+        """Mark this reservation as no-show (member didn't show up)."""
+        self.status = "no_show"
+        self.save()

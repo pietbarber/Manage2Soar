@@ -13,6 +13,7 @@ from django.utils.dateparse import parse_time
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST
 
+from duty_roster.models import GliderReservation
 from members.decorators import active_member_required
 from members.models import Member
 from siteconfig.models import SiteConfiguration
@@ -509,6 +510,9 @@ def manage_logsheet(request, pk):
 
     from logsheet.utils.permissions import can_edit_logsheet
 
+    # Get glider reservations for this day (Issue #410)
+    reservations = GliderReservation.get_reservations_for_date(logsheet.log_date)
+
     context = {
         "logsheet": logsheet,
         "flights": flights,
@@ -518,6 +522,7 @@ def manage_logsheet(request, pk):
         "flight_landed": flight_landed,
         "flight_flying": flight_flying,
         "flight_pending": flight_pending,
+        "reservations": reservations,
     }
     # Find previous logsheet
     previous_logsheet = (

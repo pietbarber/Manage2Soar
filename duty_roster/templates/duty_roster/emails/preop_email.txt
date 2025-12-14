@@ -20,6 +20,11 @@ STUDENTS REQUESTING INSTRUCTION
 -------------------------------
 {% for slot in instruction_requests %}- {{ slot.student.full_display_name }}{% if slot.status == "confirmed" %} (confirmed){% elif slot.status == "pending" %} (pending){% elif slot.status == "waitlist" %} (waitlist){% endif %}
 {% endfor %}{% endif %}
+{% if reservations %}
+GLIDER RESERVATIONS
+-------------------
+{% for res in reservations %}- {{ res.glider }} - {{ res.member.full_display_name }} ({{ res.get_reservation_type_display }} - {% if res.time_preference == "specific" and res.start_time %}{{ res.start_time|time:"g:i A" }}{% else %}{{ res.get_time_preference_display }}{% endif %}){% if res.is_trainer %} [2-seater]{% endif %}
+{% endfor %}{% endif %}
 {% if ops_intents %}
 MEMBERS PLANNING TO FLY
 -----------------------

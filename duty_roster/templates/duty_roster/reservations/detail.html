@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Reservation Details{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-plane me-2"></i>Reservation Details</h1>
+    <a href="{% url 'duty_roster:reservation_list' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i>Back to My Reservations
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-calendar-check me-2"></i>{{ reservation.date|date:"l, F j, Y" }}
+          </h5>
+          {% if reservation.status == "confirmed" %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif reservation.status == "cancelled" %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% elif reservation.status == "completed" %}
+            <span class="badge bg-info">Completed</span>
+          {% elif reservation.status == "no_show" %}
+            <span class="badge bg-warning text-dark">No Show</span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Glider</dt>
+            <dd class="col-sm-8">
+              <strong>{{ reservation.glider }}</strong>
+              {% if reservation.is_trainer %}
+                <span class="badge bg-info ms-1" title="Two-seater trainer">Two-Seater</span>
+              {% else %}
+                <span class="badge bg-secondary ms-1" title="Single-seater">Single-Seater</span>
+              {% endif %}
+            </dd>
+
+            <dt class="col-sm-4">Flight Type</dt>
+            <dd class="col-sm-8">{{ reservation.get_reservation_type_display }}</dd>
+
+            <dt class="col-sm-4">Time Preference</dt>
+            <dd class="col-sm-8">
+              {% if reservation.time_preference == "specific" and reservation.start_time %}
+                {{ reservation.start_time|time:"g:i A" }}
+                {% if reservation.end_time %} - {{ reservation.end_time|time:"g:i A" }}{% endif %}
+              {% else %}
+                {{ reservation.get_time_preference_display }}
+              {% endif %}
+            </dd>
+
+            {% if reservation.purpose %}
+              <dt class="col-sm-4">Details</dt>
+              <dd class="col-sm-8">{{ reservation.purpose }}</dd>
+            {% endif %}
+
+            <dt class="col-sm-4">Created</dt>
+            <dd class="col-sm-8">{{ reservation.created_at|date:"M j, Y g:i A" }}</dd>
+
+            {% if reservation.cancelled_at %}
+              <dt class="col-sm-4">Cancelled</dt>
+              <dd class="col-sm-8">{{ reservation.cancelled_at|date:"M j, Y g:i A" }}</dd>
+
+              {% if reservation.cancellation_reason %}
+                <dt class="col-sm-4">Reason</dt>
+                <dd class="col-sm-8">{{ reservation.cancellation_reason }}</dd>
+              {% endif %}
+            {% endif %}
+          </dl>
+        </div>
+        {% if can_cancel %}
+          <div class="card-footer bg-light">
+            <a href="{% url 'duty_roster:reservation_cancel_confirm' reservation.id %}" class="btn btn-outline-danger">
+              <i class="fas fa-times me-1"></i>Cancel Reservation
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <!-- Glider Info -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="fas fa-plane me-2"></i>Glider Information</h6>
+        </div>
+        <div class="card-body">
+          {% if reservation.glider.photo_url_medium %}
+            <img src="{{ reservation.glider.photo_url_medium }}" alt="{{ reservation.glider }}" class="img-fluid rounded mb-3">
+          {% endif %}
+          <dl class="mb-0 small">
+            <dt>Make/Model</dt>
+            <dd>{{ reservation.glider.make }} {{ reservation.glider.model }}</dd>
+
+            <dt>N-Number</dt>
+            <dd>{{ reservation.glider.n_number }}</dd>
+
+            {% if reservation.glider.competition_number %}
+              <dt>Competition #</dt>
+              <dd>{{ reservation.glider.competition_number }}</dd>
+            {% endif %}
+
+            <dt>Seats</dt>
+            <dd>{{ reservation.glider.seats }}</dd>
+
+            {% if reservation.glider.is_grounded %}
+              <dt>Status</dt>
+              <dd><span class="badge bg-danger">Grounded</span></dd>
+            {% endif %}
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

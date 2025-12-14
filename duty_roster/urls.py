@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_swap
+from . import views, views_reservation, views_swap
 
 app_name = "duty_roster"
 
@@ -77,6 +77,42 @@ urlpatterns = [
         "calendar/ad-hoc/cancel/confirm/<int:year>/<int:month>/<int:day>/",
         views.calendar_cancel_ops_day,
         name="calendar_cancel_ops_day",
+    ),
+    # Glider Reservation URLs (Issue #410)
+    path(
+        "reservations/",
+        views_reservation.reservation_list,
+        name="reservation_list",
+    ),
+    path(
+        "reservations/create/",
+        views_reservation.reservation_create,
+        name="reservation_create",
+    ),
+    path(
+        "reservations/create/<int:year>/<int:month>/<int:day>/",
+        views_reservation.reservation_create_for_day,
+        name="reservation_create_for_day",
+    ),
+    path(
+        "reservations/<int:reservation_id>/",
+        views_reservation.reservation_detail,
+        name="reservation_detail",
+    ),
+    path(
+        "reservations/<int:reservation_id>/cancel/",
+        views_reservation.reservation_cancel,
+        name="reservation_cancel",
+    ),
+    path(
+        "reservations/<int:reservation_id>/cancel/confirm/",
+        views_reservation.reservation_cancel_confirm,
+        name="reservation_cancel_confirm",
+    ),
+    path(
+        "reservations/day/<int:year>/<int:month>/<int:day>/",
+        views_reservation.day_reservations,
+        name="day_reservations",
     ),
     path("propose-roster/", views.propose_roster, name="propose_roster"),
     path(
