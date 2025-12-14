@@ -10,18 +10,16 @@ Tests cover:
 - Views and URLs
 """
 
-from datetime import date, timedelta
-from unittest.mock import patch
+from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 
-from duty_roster.forms import GliderReservationCancelForm, GliderReservationForm
+from duty_roster.forms import GliderReservationForm
 from duty_roster.models import GliderReservation
 from logsheet.models import Glider, MaintenanceIssue
-from members.models import Member
 from siteconfig.models import SiteConfiguration
 
 
@@ -179,7 +177,7 @@ class TestGliderReservationModel:
         assert GliderReservation.get_member_yearly_count(member) == 1
 
         # Cancelled reservations don't count
-        cancelled_res = GliderReservation.objects.create(
+        GliderReservation.objects.create(
             member=member,
             glider=glider,
             date=future_date + timedelta(days=1),

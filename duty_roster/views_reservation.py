@@ -14,12 +14,10 @@ import logging
 from datetime import date, timedelta
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_POST
 
 from logsheet.models import Glider
 from members.decorators import active_member_required
@@ -76,6 +74,7 @@ def reservation_list(request):
         "past": past,
         "yearly_counts": yearly_counts,
         "current_year_count": current_year_count,
+        "current_year": today.year,
         "max_per_year": max_per_year,
         "can_reserve": can_reserve,
         "reservations_enabled": config.allow_glider_reservations if config else False,
@@ -124,6 +123,7 @@ def reservation_create(request, year=None, month=None, day=None):
             try:
                 initial["date"] = date(int(year), int(month), int(day))
             except (ValueError, TypeError):
+                # Ignore invalid date parameters; form will not be pre-filled if parsing fails.
                 pass
 
         form = GliderReservationForm(member=member, initial=initial)
@@ -244,40 +244,3 @@ def reservation_create_for_day(request, year, month, day):
     This is a shortcut that pre-fills the date.
     """
     return reservation_create(request, year, month, day)
-
-
-def get_reservations_for_logsheet(logsheet_date):
-    """
-    Utility function to get reservations for a specific date.
-    Used by logsheet views to show reservation reminders.
-    """
-    return GliderReservation.get_reservations_for_date(logsheet_date)
-
-
-def get_reservation_summary_for_email(target_date):
-    """
-    Get a summary of reservations for inclusion in daily ops emails.
-    Returns a list of formatted reservation strings.
-    """
-    reservations = GliderReservation.get_reservations_for_date(target_date)
-
-    if not reservations:
-        return []
-
-    summary = []
-    for res in reservations:
-        time_str = res.get_time_preference_display()
-        if res.time_preference == "specific" and res.start_time:
-            time_str = res.start_time.strftime("%H:%M")
-
-        summary.append(
-            {
-                "member": res.member.full_display_name,
-                "glider": str(res.glider),
-                "time": time_str,
-                "type": res.get_reservation_type_display(),
-                "is_trainer": res.is_trainer,
-            }
-        )
-
-    return summary

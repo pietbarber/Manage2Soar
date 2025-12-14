@@ -588,8 +588,6 @@ class GliderReservation(models.Model):
     @property
     def is_active(self):
         """Check if this reservation is still active (confirmed and in the future)."""
-        from datetime import date as today_date
-
         from django.utils import timezone
 
         return self.status == "confirmed" and self.date >= timezone.now().date()
