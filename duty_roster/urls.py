@@ -105,11 +105,6 @@ urlpatterns = [
         name="reservation_cancel",
     ),
     path(
-        "reservations/<int:reservation_id>/cancel/confirm/",
-        views_reservation.reservation_cancel_confirm,
-        name="reservation_cancel_confirm",
-    ),
-    path(
         "reservations/day/<int:year>/<int:month>/<int:day>/",
         views_reservation.day_reservations,
         name="day_reservations",

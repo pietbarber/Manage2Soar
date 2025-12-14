@@ -17,9 +17,7 @@ from django.contrib import messages
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
 
-from logsheet.models import Glider
 from members.decorators import active_member_required
 from siteconfig.models import SiteConfiguration
 
@@ -128,14 +126,8 @@ def reservation_create(request, year=None, month=None, day=None):
 
         form = GliderReservationForm(member=member, initial=initial)
 
-    # Get available gliders for display
-    available_gliders = Glider.objects.filter(
-        is_active=True,
-        club_owned=True,
-    ).order_by("competition_number")
-
-    if not config.allow_two_seater_reservations:
-        available_gliders = available_gliders.filter(seats=1)
+    # Get available gliders for display (use the same queryset as the form to ensure consistency)
+    available_gliders = form.fields["glider"].queryset
 
     context = {
         "form": form,
@@ -165,38 +157,12 @@ def reservation_detail(request, reservation_id):
 
 
 @active_member_required
-@require_POST
 def reservation_cancel(request, reservation_id):
-    """Cancel a reservation."""
-    member = request.user
-    reservation = get_object_or_404(
-        GliderReservation,
-        pk=reservation_id,
-        member=member,
-        status="confirmed",
-    )
-
-    form = GliderReservationCancelForm(request.POST)
-    if form.is_valid():
-        reason = form.cleaned_data.get("cancellation_reason", "")
-        reservation.cancel(reason=reason)
-        messages.success(
-            request,
-            f"Reservation for {reservation.glider} on {reservation.date} has been cancelled.",
-        )
-        logger.info(
-            f"Reservation cancelled: {member.full_display_name} cancelled "
-            f"{reservation.glider} reservation for {reservation.date}"
-        )
-    else:
-        messages.error(request, "Unable to cancel reservation.")
-
-    return redirect("duty_roster:reservation_list")
-
-
-@active_member_required
-def reservation_cancel_confirm(request, reservation_id):
-    """Show cancellation confirmation modal/page."""
+    """
+    Handle reservation cancellation.
+    - GET: Show cancellation confirmation form.
+    - POST: Process cancellation.
+    """
     member = request.user
     reservation = get_object_or_404(
         GliderReservation.objects.select_related("glider"),
@@ -205,7 +171,29 @@ def reservation_cancel_confirm(request, reservation_id):
         status="confirmed",
     )
 
-    form = GliderReservationCancelForm()
+    if request.method == "POST":
+        form = GliderReservationCancelForm(request.POST)
+        if form.is_valid():
+            reason = form.cleaned_data.get("cancellation_reason", "")
+            reservation.cancel(reason=reason)
+            messages.success(
+                request,
+                f"Reservation for {reservation.glider} on {reservation.date} has been cancelled.",
+            )
+            logger.info(
+                f"Reservation cancelled: {member.full_display_name} cancelled "
+                f"{reservation.glider} reservation for {reservation.date}"
+            )
+            return redirect("duty_roster:reservation_list")
+        else:
+            # Show specific form errors to help with debugging
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(
+                        request, f"{field}: {error}" if field != "__all__" else error
+                    )
+    else:
+        form = GliderReservationCancelForm()
 
     context = {
         "reservation": reservation,

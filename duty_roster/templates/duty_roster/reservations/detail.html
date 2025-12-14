@@ -85,7 +85,7 @@
         </div>
         {% if can_cancel %}
           <div class="card-footer bg-light">
-            <a href="{% url 'duty_roster:reservation_cancel_confirm' reservation.id %}" class="btn btn-outline-danger">
+            <a href="{% url 'duty_roster:reservation_cancel' reservation.id %}" class="btn btn-outline-danger">
               <i class="fas fa-times me-1"></i>Cancel Reservation
             </a>
           </div>
