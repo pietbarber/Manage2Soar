@@ -105,9 +105,13 @@ def reservation_create(request, year=None, month=None, day=None):
         form = GliderReservationForm(request.POST, member=member)
         if form.is_valid():
             reservation = form.save()
+            # Defensive programming: ensure glider exists before displaying
+            glider_display = (
+                str(reservation.glider) if reservation.glider else "Unknown glider"
+            )
             messages.success(
                 request,
-                f"Reservation confirmed for {reservation.glider} on {reservation.date}.",
+                f"Reservation confirmed for {glider_display} on {reservation.date}.",
             )
             logger.info(
                 f"Reservation created: {member.full_display_name} reserved "
@@ -129,9 +133,21 @@ def reservation_create(request, year=None, month=None, day=None):
     # Get available gliders for display (use the same queryset as the form to ensure consistency)
     available_gliders = form.fields["glider"].queryset
 
+    # Prefetch grounded status to avoid N+1 queries in template
+    from logsheet.models import MaintenanceIssue
+
+    grounded_glider_ids = set(
+        MaintenanceIssue.objects.filter(
+            glider__in=available_gliders,
+            grounded=True,
+            resolved=False,
+        ).values_list("glider_id", flat=True)
+    )
+
     context = {
         "form": form,
         "available_gliders": available_gliders,
+        "grounded_glider_ids": grounded_glider_ids,
         "max_per_year": config.max_reservations_per_year,
     }
 
@@ -186,16 +202,15 @@ def reservation_cancel(request, reservation_id):
             )
             return redirect("duty_roster:reservation_list")
         else:
-            # Show non-field errors first
-            for error in form.non_field_errors():
-                messages.error(request, str(error))
-            # Then show field-specific errors
+            # Show field-specific errors only (non-field errors already shown via form.non_field_errors)
             for field, errors in form.errors.items():
+                # Skip non-field errors as they're handled separately
                 if field == "__all__":
-                    continue
-                for error in errors:
-                    error_msg = str(error)
-                    messages.error(request, f"{field}: {error_msg}")
+                    for error in errors:
+                        messages.error(request, str(error))
+                else:
+                    for error in errors:
+                        messages.error(request, f"{field}: {str(error)}")
     else:
         form = GliderReservationCancelForm()
 

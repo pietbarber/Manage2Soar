@@ -601,11 +601,37 @@ class GliderReservationForm(forms.ModelForm):
         return glider
 
     def save(self, commit=True):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import IntegrityError
+
         instance = super().save(commit=False)
         instance.member = self.member
-        instance.full_clean()
+
         if commit:
-            instance.save()
+            try:
+                instance.full_clean()
+                instance.save()
+            except DjangoValidationError as e:
+                # Re-add validation errors to the form for proper display
+                if hasattr(e, "error_dict") and e.error_dict:
+                    for field, errors in e.error_dict.items():
+                        for error in errors:
+                            if field == "__all__":
+                                self.add_error(None, error)
+                            else:
+                                self.add_error(field, error)
+                else:
+                    self.add_error(None, str(e))
+                # Don't save, return unsaved instance
+                return instance
+            except IntegrityError:
+                # Handle race condition where another reservation was created
+                self.add_error(
+                    None,
+                    "This glider is no longer available for the selected time. Please try again.",
+                )
+                return instance
+
         return instance
 
 
