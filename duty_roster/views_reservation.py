@@ -189,8 +189,10 @@ def reservation_cancel(request, reservation_id):
             # Show specific form errors to help with debugging
             for field, errors in form.errors.items():
                 for error in errors:
+                    error_msg = str(error)
                     messages.error(
-                        request, f"{field}: {error}" if field != "__all__" else error
+                        request,
+                        f"{field}: {error_msg}" if field != "__all__" else error_msg,
                     )
     else:
         form = GliderReservationCancelForm()

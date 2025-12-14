@@ -606,16 +606,16 @@ class GliderReservationForm(forms.ModelForm):
                                 self.add_error(field, error)
                 else:
                     self.add_error(None, e.message)
-                raise
+                # Do not re-raise; errors have been added to the form
+                return instance
             except IntegrityError:
                 # Handle race condition where another reservation was created between validation and save
                 self.add_error(
                     None,
-                    f"This glider is no longer available for the selected time. Please try again.",
+                    "This glider is no longer available for the selected time. Please try again.",
                 )
-                raise ValidationError(
-                    "Reservation conflict - glider already reserved for this time slot."
-                )
+                # Do not re-raise; error has been added to the form
+                return instance
         return instance
 
 
