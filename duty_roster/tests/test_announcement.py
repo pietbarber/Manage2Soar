@@ -97,9 +97,15 @@ class TestDutyRosterCalendarWithAnnouncement:
         assert b"bi-megaphone" not in response.content
 
     def test_calendar_displays_announcement(
-        self, client, membership_statuses, siteconfig_with_announcement
+        self, client, membership_statuses, siteconfig
     ):
         """Test that calendar displays announcement when set."""
+        # Set announcement on existing siteconfig
+        siteconfig.duty_roster_announcement = (
+            "Important: Schedule change for next weekend!"
+        )
+        siteconfig.save()
+
         # Create active member
         user = Member.objects.create_user(
             username="testmember2",
@@ -120,9 +126,13 @@ class TestDutyRosterCalendarWithAnnouncement:
         assert b"bi-megaphone" in response.content
 
     def test_announcement_has_roster_manager_label(
-        self, client, membership_statuses, siteconfig_with_announcement
+        self, client, membership_statuses, siteconfig
     ):
         """Test that announcement shows 'Roster Manager Announcement' label."""
+        # Set announcement on existing siteconfig
+        siteconfig.duty_roster_announcement = "Test announcement"
+        siteconfig.save()
+
         user = Member.objects.create_user(
             username="testmember3",
             email="member3@test.org",

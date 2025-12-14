@@ -7,7 +7,7 @@
         <i class="bi bi-megaphone-fill me-2 fs-5 text-info" aria-hidden="true"></i>
         <div>
           <strong class="d-block mb-1">Roster Manager Announcement:</strong>
-          <span class="announcement-text">{{ config.duty_roster_announcement|linebreaksbr }}</span>
+          <span class="announcement-text">{{ config.duty_roster_announcement|escape|linebreaksbr }}</span>
         </div>
       </div>
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
