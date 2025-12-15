@@ -22,6 +22,8 @@ def test_edit_logsheet_closeout_view(client, active_member, logsheet):
     )
     assert response.status_code == 200
     assert "form" in response.context
+    # Issue #411: Verify tow_pilots_data is in context
+    assert "tow_pilots_data" in response.context
 
 
 @pytest.mark.django_db

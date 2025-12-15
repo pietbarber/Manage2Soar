@@ -274,6 +274,44 @@
         </div>
       </div>
 
+      <!-- Tow Pilot Summary Section -->
+      {% if tow_pilots_data %}
+      <div class="form-section">
+        <h4><i class="bi bi-person-badge"></i> Tow Pilot Summary</h4>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Tow Pilot</th>
+                <th>Towplane</th>
+                <th class="text-end">Tows</th>
+                <th class="text-end">Total Feet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pilot_name, data in tow_pilots_data.items %}
+                {% for tp in data.towplanes %}
+                <tr>
+                  {% if forloop.first %}
+                  <td rowspan="{{ data.towplanes|length }}"><strong>{{ pilot_name }}</strong></td>
+                  {% endif %}
+                  <td>{{ tp.n_number }}</td>
+                  <td class="text-end">{{ tp.tow_count }}</td>
+                  <td class="text-end">{{ tp.total_feet|default:0|intcomma }} ft</td>
+                </tr>
+                {% endfor %}
+                <tr class="table-secondary">
+                  <td colspan="2"><em>{{ pilot_name }} Total</em></td>
+                  <td class="text-end"><strong>{{ data.total_tows }}</strong></td>
+                  <td class="text-end"><strong>{{ data.total_feet|intcomma }} ft</strong></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
       {% if formset %}
         <div class="form-section">
         <h4><i class="bi bi-airplane-engines"></i>Towplane Closeout</h4>

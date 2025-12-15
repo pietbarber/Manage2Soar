@@ -1299,6 +1299,43 @@ def edit_logsheet_closeout(request, pk):
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
 
+    # Build tow pilot summary for this logsheet's flights
+    # Shows tow count per pilot, per towplane, with total feet towed
+    tow_pilot_summary = (
+        Flight.objects.filter(logsheet=logsheet, tow_pilot__isnull=False)
+        .values(
+            "tow_pilot__first_name",
+            "tow_pilot__last_name",
+            "tow_pilot__id",
+            "towplane__n_number",
+        )
+        .annotate(
+            tow_count=Count("id"),
+            total_feet=Sum("release_altitude"),
+        )
+        .order_by("tow_pilot__last_name", "tow_pilot__first_name", "towplane__n_number")
+    )
+
+    # Group by tow pilot for easier template rendering
+    tow_pilots_data = {}
+    for row in tow_pilot_summary:
+        pilot_name = f"{row['tow_pilot__first_name']} {row['tow_pilot__last_name']}"
+        if pilot_name not in tow_pilots_data:
+            tow_pilots_data[pilot_name] = {
+                "towplanes": [],
+                "total_tows": 0,
+                "total_feet": 0,
+            }
+        tow_pilots_data[pilot_name]["towplanes"].append(
+            {
+                "n_number": row["towplane__n_number"] or "Unknown",
+                "tow_count": row["tow_count"],
+                "total_feet": row["total_feet"] or 0,
+            }
+        )
+        tow_pilots_data[pilot_name]["total_tows"] += row["tow_count"]
+        tow_pilots_data[pilot_name]["total_feet"] += row["total_feet"] or 0
+
     return render(
         request,
         "logsheet/edit_closeout_form.html",
@@ -1314,6 +1351,7 @@ def edit_logsheet_closeout(request, pk):
             "maintenance_issues": maintenance_issues,
             "available_towplanes": available_towplanes,
             "towplane_rental_enabled": towplane_rental_enabled,
+            "tow_pilots_data": tow_pilots_data,
         },
     )
 
