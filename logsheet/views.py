@@ -1319,7 +1319,16 @@ def edit_logsheet_closeout(request, pk):
     # Group by tow pilot for easier template rendering
     tow_pilots_data = {}
     for row in tow_pilot_summary:
-        pilot_name = f"{row['tow_pilot__first_name']} {row['tow_pilot__last_name']}"
+        # Safely handle None/empty first_name or last_name
+        pilot_name = " ".join(
+            filter(
+                None,
+                [
+                    (row.get("tow_pilot__first_name") or "").strip(),
+                    (row.get("tow_pilot__last_name") or "").strip(),
+                ],
+            )
+        )
         if pilot_name not in tow_pilots_data:
             tow_pilots_data[pilot_name] = {
                 "towplanes": [],
