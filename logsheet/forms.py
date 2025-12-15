@@ -489,17 +489,10 @@ class FlightForm(forms.ModelForm):
         )
         self.fields["glider"].choices = [(g.pk, str(g)) for g in gliders_sorted]
 
-        COMMON_ALTITUDES = [3000, 1500, 2000, 2500, 4000]
-        ALL_ALTITUDES = list(range(0, 7100, 100))
-
-        # Remove common ones from the base list to avoid duplicates
-        remaining = [alt for alt in ALL_ALTITUDES if alt not in COMMON_ALTITUDES]
-
-        self.fields["release_altitude"].choices = (
-            [(alt, f"{alt} ft") for alt in COMMON_ALTITUDES]
-            + [("", "──────────")]  # Optional visual divider
-            + [(alt, f"{alt} ft") for alt in remaining]
-        )
+        # Simple sequential altitude choices (0-7000 in 100ft steps)
+        self.fields["release_altitude"].choices = [
+            (alt, f"{alt} ft") for alt in range(0, 7100, 100)
+        ]
 
         # Always use: active by last name, then inactive by last name
         active_statuses = get_active_membership_statuses()

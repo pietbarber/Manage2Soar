@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models import Count, F, Q, Sum, Value
+from django.db.models.functions import Coalesce, TruncDate
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -1299,6 +1299,64 @@ def edit_logsheet_closeout(request, pk):
     config = SiteConfiguration.objects.first()
     towplane_rental_enabled = config.allow_towplane_rental if config else False
 
+    # Build tow pilot summary for this logsheet's flights
+    # Shows tow count per pilot, per towplane, with total feet towed
+    tow_pilot_summary = (
+        Flight.objects.filter(logsheet=logsheet, tow_pilot__isnull=False)
+        .values(
+            "tow_pilot__first_name",
+            "tow_pilot__last_name",
+            "tow_pilot__id",
+            "towplane__n_number",
+        )
+        .annotate(
+            tow_count=Count("id"),
+            total_feet=Sum("release_altitude"),
+        )
+        .order_by(
+            Coalesce("tow_pilot__last_name", Value("")),
+            Coalesce("tow_pilot__first_name", Value("")),
+            "towplane__n_number",
+        )
+    )
+
+    # Group by tow pilot for easier template rendering
+    # Use pilot_id + name as key to prevent grouping multiple unnamed pilots together
+    tow_pilots_data = {}
+    for row in tow_pilot_summary:
+        # Safely handle None/empty first_name or last_name
+        pilot_name = " ".join(
+            filter(
+                None,
+                [
+                    (row.get("tow_pilot__first_name") or "").strip(),
+                    (row.get("tow_pilot__last_name") or "").strip(),
+                ],
+            )
+        )
+        if not pilot_name:
+            pilot_name = "Unknown Pilot"
+
+        # Use pilot_id + name as unique key to prevent grouping unnamed pilots
+        pilot_key = f"{row['tow_pilot__id']}:{pilot_name}"
+
+        if pilot_key not in tow_pilots_data:
+            tow_pilots_data[pilot_key] = {
+                "name": pilot_name,
+                "towplanes": [],
+                "total_tows": 0,
+                "total_feet": 0,
+            }
+        tow_pilots_data[pilot_key]["towplanes"].append(
+            {
+                "n_number": row["towplane__n_number"] or "Unknown",
+                "tow_count": row["tow_count"],
+                "total_feet": row["total_feet"] or 0,
+            }
+        )
+        tow_pilots_data[pilot_key]["total_tows"] += row["tow_count"]
+        tow_pilots_data[pilot_key]["total_feet"] += row["total_feet"] or 0
+
     return render(
         request,
         "logsheet/edit_closeout_form.html",
@@ -1314,6 +1372,7 @@ def edit_logsheet_closeout(request, pk):
             "maintenance_issues": maintenance_issues,
             "available_towplanes": available_towplanes,
             "towplane_rental_enabled": towplane_rental_enabled,
+            "tow_pilots_data": tow_pilots_data,
         },
     )
 

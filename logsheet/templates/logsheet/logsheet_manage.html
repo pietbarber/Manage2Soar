@@ -660,6 +660,63 @@ window.showOfflineToast = window.showOfflineToast || function(message) {
   toast.show();
 };
 
+// Shared function to attach NOW and 2K/3K button handlers to flight modal form
+// This must be called after any modal content is loaded (normal open, clone, etc.)
+// Uses clone-and-replace pattern to prevent duplicate event listeners
+window.attachModalButtonHandlers = function() {
+  function getNowTime24() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  // Helper to clone button and remove all event listeners
+  function cloneButton(btn) {
+    if (!btn) return null;
+    const clone = btn.cloneNode(true);
+    btn.parentNode.replaceChild(clone, btn);
+    return clone;
+  }
+
+  // NOW buttons for launch/landing time
+  const launchInput = document.getElementById('id_launch_time');
+  const landingInput = document.getElementById('id_landing_time');
+  const launchBtn = cloneButton(document.getElementById('now-launch-btn'));
+  const landingBtn = cloneButton(document.getElementById('now-landing-btn'));
+
+  if (launchBtn && launchInput) {
+    launchBtn.addEventListener('click', function() {
+      launchInput.value = getNowTime24();
+      launchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+  if (landingBtn && landingInput) {
+    landingBtn.addEventListener('click', function() {
+      landingInput.value = getNowTime24();
+      landingInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  // 2K/3K buttons for release altitude
+  const altSelect = document.getElementById('id_release_altitude');
+  const alt2kBtn = cloneButton(document.getElementById('alt-2k-btn'));
+  const alt3kBtn = cloneButton(document.getElementById('alt-3k-btn'));
+
+  if (alt2kBtn && altSelect) {
+    alt2kBtn.addEventListener('click', function() {
+      altSelect.value = '2000';
+      altSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  if (alt3kBtn && altSelect) {
+    alt3kBtn.addEventListener('click', function() {
+      altSelect.value = '3000';
+      altSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+};
+
 // Handle "Launch them now" and "Landing now" button clicks
 document.addEventListener("click", async function(e) {
   if (e.target && e.target.classList.contains("launch-now-btn")) {
@@ -1033,10 +1090,14 @@ document.addEventListener("click", async function(e) {
         const modalElement = document.getElementById('flightModal');
         modalElement.classList.add('cloned-flight-modal');
 
-        // Add clone notice and pre-fill form
+        // Add clone notice, pre-fill form, and attach button handlers
         setTimeout(() => {
           addCloneNotice();
           prefillCopyForm();
+          // Attach NOW and 2K/3K button handlers
+          if (window.attachModalButtonHandlers) {
+            window.attachModalButtonHandlers();
+          }
         }, 100);
 
         // Show the modal
@@ -1919,45 +1980,8 @@ document.addEventListener("click", async function(e) {
       towPilotField && promoteTowPilots();
 
       // Attach NOW and 2K/3K button logic after modal content is loaded
-      const launchBtn = document.getElementById('now-launch-btn');
-      const landingBtn = document.getElementById('now-landing-btn');
-      const launchInput = document.getElementById('id_launch_time');
-      const landingInput = document.getElementById('id_landing_time');
-      // Always clear launch time field when modal loads
-      function getNowTime24() {
-        const now = new Date();
-        const h = now.getHours();
-        const m = now.getMinutes();
-        return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-      }
-      if (launchBtn && launchInput) {
-        launchBtn.addEventListener('click', function() {
-          launchInput.value = getNowTime24();
-          launchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-      }
-      if (landingBtn && landingInput) {
-        landingBtn.addEventListener('click', function() {
-          landingInput.value = getNowTime24();
-          landingInput.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-      }
-
-      // 2K/3K buttons for release altitude
-      const alt2kBtn = document.getElementById('alt-2k-btn');
-      const alt3kBtn = document.getElementById('alt-3k-btn');
-      const altSelect = document.getElementById('id_release_altitude');
-      if (alt2kBtn && altSelect) {
-        alt2kBtn.addEventListener('click', function() {
-          altSelect.value = '2000';
-          altSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      }
-      if (alt3kBtn && altSelect) {
-        alt3kBtn.addEventListener('click', function() {
-          altSelect.value = '3000';
-          altSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+      if (window.attachModalButtonHandlers) {
+        window.attachModalButtonHandlers();
       }
     })
     .catch(async error => {

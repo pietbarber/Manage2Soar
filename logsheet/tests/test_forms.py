@@ -527,3 +527,37 @@ def test_flight_form_no_warning_no_scheduled_pilots(member_towpilot, glider, log
 
     assert form.is_valid(), f"Form errors: {form.errors}"
     assert not hasattr(form, "warnings") or len(form.warnings) == 0
+
+
+@pytest.mark.django_db
+def test_flight_form_release_altitude_sequential_ordering(
+    member_towpilot, glider, logsheet
+):
+    """Issue #411: Test that release altitude choices are in simple sequential order (0-7000).
+
+    Previously, common altitudes (3000, 1500, 2000, 2500, 4000) were placed at the top
+    with a divider, causing confusing keyboard navigation.
+    """
+    from logsheet.forms import FlightForm
+    from siteconfig.models import SiteConfiguration
+
+    # Create required site configuration
+    SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="test.example.com", club_abbreviation="TC"
+    )
+
+    form = FlightForm(logsheet=logsheet)
+
+    # Get altitude choices (excluding empty/placeholder options)
+    altitude_choices = [
+        choice[0]
+        for choice in form.fields["release_altitude"].choices
+        if choice[0] != ""
+    ]
+
+    # Should be sequential from 0 to 7000 in 100ft steps
+    expected = list(range(0, 7100, 100))
+    assert altitude_choices == expected, (
+        f"Release altitude choices should be sequential 0-7000. "
+        f"Got first 10: {altitude_choices[:10]}"
+    )

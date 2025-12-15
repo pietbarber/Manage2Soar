@@ -22,6 +22,242 @@ def test_edit_logsheet_closeout_view(client, active_member, logsheet):
     )
     assert response.status_code == 200
     assert "form" in response.context
+    # Issue #411: Verify tow_pilots_data is in context
+    assert "tow_pilots_data" in response.context
+    # Should be a dict (empty if no flights with tow pilots)
+    assert isinstance(response.context["tow_pilots_data"], dict)
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_tow_pilot_summary(
+    client, active_member, logsheet, member_towpilot, towplane, glider
+):
+    """Issue #411: Test tow pilot summary data structure and aggregation"""
+    from datetime import time
+
+    from logsheet.models import Flight
+
+    client.force_login(active_member)
+
+    # Create flights with same pilot, same towplane - should aggregate
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=2000,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=3000,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+
+    tow_pilots_data = response.context["tow_pilots_data"]
+    assert len(tow_pilots_data) == 1
+
+    # Get the pilot's data (dict keys are pilot names)
+    pilot_data = list(tow_pilots_data.values())[0]
+
+    # Verify structure
+    assert "towplanes" in pilot_data
+    assert "total_tows" in pilot_data
+    assert "total_feet" in pilot_data
+
+    # Verify aggregation: 2 tows, 5000 total feet
+    assert pilot_data["total_tows"] == 2
+    assert pilot_data["total_feet"] == 5000
+
+    # Verify towplane breakdown
+    assert len(pilot_data["towplanes"]) == 1
+    assert pilot_data["towplanes"][0]["tow_count"] == 2
+    assert pilot_data["towplanes"][0]["total_feet"] == 5000
+
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
+    assert b"Total" in response.content
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_tow_pilot_multiple_towplanes(
+    client, active_member, logsheet, member_towpilot, glider
+):
+    """Issue #411: Test tow pilot with multiple towplanes - verify grouping"""
+    from datetime import time
+
+    from logsheet.models import Flight, Towplane
+
+    client.force_login(active_member)
+
+    # Create two different towplanes
+    towplane1 = Towplane.objects.create(n_number="N123AB", make="Piper", model="Pawnee")
+    towplane2 = Towplane.objects.create(n_number="N456CD", make="Cessna", model="L-19")
+
+    # Same pilot, different towplanes
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane1,
+        release_altitude=2000,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane2,
+        release_altitude=3000,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+
+    tow_pilots_data = response.context["tow_pilots_data"]
+    assert len(tow_pilots_data) == 1
+
+    pilot_data = list(tow_pilots_data.values())[0]
+    assert pilot_data["total_tows"] == 2
+    assert pilot_data["total_feet"] == 5000
+
+    # Should have 2 towplane entries
+    assert len(pilot_data["towplanes"]) == 2
+    towplane_n_numbers = {tp["n_number"] for tp in pilot_data["towplanes"]}
+    assert "N123AB" in towplane_n_numbers
+    assert "N456CD" in towplane_n_numbers
+
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
+    assert b"N123AB" in response.content
+    assert b"N456CD" in response.content
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_tow_pilot_null_release_altitude(
+    client, active_member, logsheet, member_towpilot, towplane, glider
+):
+    """Issue #411: Test NULL release_altitude - verify Sum handles nulls correctly"""
+    from datetime import time
+
+    from logsheet.models import Flight
+
+    client.force_login(active_member)
+
+    # Flight with null release_altitude
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=None,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
+    # Flight with valid release_altitude
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=2000,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+
+    tow_pilots_data = response.context["tow_pilots_data"]
+    pilot_data = list(tow_pilots_data.values())[0]
+
+    # Should count both tows, total_feet should handle NULL correctly (0 + 2000)
+    assert pilot_data["total_tows"] == 2
+    assert pilot_data["total_feet"] == 2000
+
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_tow_pilot_empty_names(
+    client, active_member, logsheet, towplane, glider
+):
+    """Issue #411: Test pilots with empty names - verify unique keys and fallback"""
+    from datetime import time
+
+    from logsheet.models import Flight
+    from members.models import Member
+
+    client.force_login(active_member)
+
+    # Create two pilots with empty names (different IDs)
+    pilot1 = Member.objects.create(username="pilot1", first_name="", last_name="")
+    pilot2 = Member.objects.create(username="pilot2", first_name="", last_name="")
+
+    # Create flights with different unnamed pilots
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=pilot1,
+        towplane=towplane,
+        release_altitude=2000,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=pilot2,
+        towplane=towplane,
+        release_altitude=3000,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+
+    tow_pilots_data = response.context["tow_pilots_data"]
+
+    # Should have 2 separate entries (not grouped together)
+    assert len(tow_pilots_data) == 2
+
+    # Both should be named "Unknown Pilot"
+    for pilot_data in tow_pilots_data.values():
+        assert pilot_data["name"] == "Unknown Pilot"
+        assert pilot_data["total_tows"] == 1
+
+    # Verify template renders without errors and shows "Unknown Pilot"
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Unknown Pilot" in response.content
+    assert b"Unknown Pilot Total" in response.content
 
 
 @pytest.mark.django_db
