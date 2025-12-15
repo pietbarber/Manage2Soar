@@ -145,7 +145,7 @@ class Migration(migrations.Migration):
                 ],
                 "constraints": [
                     models.UniqueConstraint(
-                        condition=models.Q(("status", "confirmed")),
+                        condition=models.Q(status="confirmed"),
                         fields=("glider", "date", "time_preference"),
                         name="unique_active_reservation_per_slot",
                     )

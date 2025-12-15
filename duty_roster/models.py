@@ -701,6 +701,10 @@ class GliderReservation(models.Model):
                 )
 
         # Check for existing reservation conflicts (use transaction and locking to prevent race conditions)
+        # NOTE: select_for_update() only provides effective locking if the entire validation-save
+        # cycle is within a transaction. The form's clean() method wraps the yearly limit check
+        # in transaction.atomic() for that specific query. The UniqueConstraint at the database
+        # level provides the final safety net against race conditions.
         if self.status == "confirmed":
             with transaction.atomic():
                 # Lock existing reservations for this glider/date to prevent concurrent modifications
@@ -719,7 +723,7 @@ class GliderReservation(models.Model):
                     # Full day conflicts with any other reservation
                     if conflicts.exists():
                         raise ValidationError(
-                            f"Glider {self.glider} already has a reservation on {self.date}."
+                            f"Glider {self.glider} is reserved for the full day on {self.date}."
                         )
                 else:
                     # Check for overlapping time preferences

@@ -117,7 +117,7 @@ def reservation_create(request, year=None, month=None, day=None):
                 )
                 logger.info(
                     f"Reservation created: {member.full_display_name} reserved "
-                    f"{reservation.glider} for {reservation.date}"
+                    f"{glider_display} for {reservation.date}"
                 )
                 return redirect("duty_roster:reservation_list")
             # If save failed (pk is None), form has errors - fall through to re-render
