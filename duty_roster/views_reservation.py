@@ -105,19 +105,22 @@ def reservation_create(request, year=None, month=None, day=None):
         form = GliderReservationForm(request.POST, member=member)
         if form.is_valid():
             reservation = form.save()
-            # Defensive programming: ensure glider exists before displaying
-            glider_display = (
-                str(reservation.glider) if reservation.glider else "Unknown glider"
-            )
-            messages.success(
-                request,
-                f"Reservation confirmed for {glider_display} on {reservation.date}.",
-            )
-            logger.info(
-                f"Reservation created: {member.full_display_name} reserved "
-                f"{reservation.glider} for {reservation.date}"
-            )
-            return redirect("duty_roster:reservation_list")
+            # Check if save was actually successful (form.save() may add errors without raising)
+            if reservation.pk:
+                # Defensive programming: ensure glider exists before displaying
+                glider_display = (
+                    str(reservation.glider) if reservation.glider else "Unknown glider"
+                )
+                messages.success(
+                    request,
+                    f"Reservation confirmed for {glider_display} on {reservation.date}.",
+                )
+                logger.info(
+                    f"Reservation created: {member.full_display_name} reserved "
+                    f"{reservation.glider} for {reservation.date}"
+                )
+                return redirect("duty_roster:reservation_list")
+            # If save failed (pk is None), form has errors - fall through to re-render
     else:
         # Pre-fill date if provided in URL
         initial = {}

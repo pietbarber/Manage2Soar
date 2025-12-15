@@ -592,3 +592,353 @@ class TestGetReservationsForDate:
         """Test returns empty queryset when no reservations."""
         reservations = GliderReservation.get_reservations_for_date(future_date)
         assert list(reservations) == []
+
+
+class TestConcurrentReservations:
+    """Tests for concurrent reservation creation and race condition handling."""
+
+    def test_duplicate_reservation_raises_integrity_error(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that creating duplicate reservations raises IntegrityError."""
+        from django.db import IntegrityError
+
+        # Create first reservation
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+            status="confirmed",
+        )
+
+        # Try to create duplicate (same glider, date, time_preference, status)
+        with pytest.raises(IntegrityError):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date,
+                reservation_type="solo",
+                time_preference="morning",
+                status="confirmed",
+            )
+
+    def test_form_handles_integrity_error(
+        self, site_config, member, glider, single_seat_glider, future_date
+    ):
+        """Test that form gracefully handles IntegrityError during save."""
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        # Create form with valid data
+        form = GliderReservationForm(
+            data={
+                "glider": single_seat_glider.pk,
+                "date": future_date,
+                "reservation_type": "solo",
+                "time_preference": "morning",
+            },
+            member=member,
+        )
+
+        # Form should validate successfully
+        assert form.is_valid()
+
+        # Mock save() to raise IntegrityError (simulating race condition)
+        original_save = GliderReservation.save
+
+        def mock_save(self, *args, **kwargs):
+            if not self.pk:  # Only raise on first save
+                raise IntegrityError("unique constraint violated")
+            return original_save(self, *args, **kwargs)
+
+        with patch.object(GliderReservation, "save", mock_save):
+            # Save should not raise exception, but should add error to form
+            result = form.save()
+
+            # Form should have non-field error about unavailability
+            assert "no longer available" in str(form.non_field_errors()).lower()
+
+    def test_view_rerenders_form_on_integrity_error(
+        self, client, site_config, member, glider, single_seat_glider, future_date
+    ):
+        """Test that view re-renders form (doesn't redirect) when save fails."""
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        client.force_login(member)
+        url = reverse("duty_roster:reservation_create")
+
+        # Mock GliderReservation.save to raise IntegrityError
+        original_save = GliderReservation.save
+
+        def mock_save(self, *args, **kwargs):
+            if not self.pk:  # Only raise on first save
+                raise IntegrityError("unique constraint violated")
+            return original_save(self, *args, **kwargs)
+
+        with patch.object(GliderReservation, "save", mock_save):
+            response = client.post(
+                url,
+                {
+                    "glider": single_seat_glider.pk,
+                    "date": future_date.isoformat(),
+                    "reservation_type": "solo",
+                    "time_preference": "morning",
+                },
+            )
+
+            # Should re-render form (200) not redirect (302)
+            assert response.status_code == 200
+
+            # Form should be in context
+            assert "form" in response.context
+
+            # Form should have errors
+            form = response.context["form"]
+            assert len(form.non_field_errors()) > 0
+
+    def test_concurrent_yearly_limit_race_condition(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that yearly limit check uses database locking to prevent race conditions."""
+        from django.db import transaction
+
+        # Create reservations up to one below the limit (use different days to avoid conflicts)
+        for i in range(site_config.max_reservations_per_year - 1):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i * 2),  # Space them out
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        # Verify member can still make one more reservation
+        count_before = GliderReservation.get_member_yearly_count(member)
+        assert count_before == site_config.max_reservations_per_year - 1
+
+        # Create and validate a form (use a different day in the same year)
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": (
+                    future_date + timedelta(days=5)
+                ).isoformat(),  # Stay in same year
+                "reservation_type": "solo",
+                "time_preference": "afternoon",  # Different time to avoid any conflicts
+            },
+            member=member,
+        )
+
+        # Form should validate (member has one spot left)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        # Save should succeed
+        reservation = form.save()
+        assert (
+            reservation.pk is not None
+        ), f"Reservation not saved. Form errors: {form.errors}"
+
+        # Check if reservation actually exists in database
+        db_reservation = GliderReservation.objects.filter(pk=reservation.pk).first()
+        assert (
+            db_reservation is not None
+        ), f"Reservation {reservation.pk} not found in database"
+
+        # Verify member is now at limit
+        count_after = GliderReservation.get_member_yearly_count(member)
+        all_reservations = list(
+            GliderReservation.objects.filter(
+                member=member, status__in=["confirmed", "completed"]
+            ).values_list("date", "time_preference", "status")
+        )
+        assert (
+            count_after == site_config.max_reservations_per_year
+        ), f"Expected {site_config.max_reservations_per_year}, got {count_after}. All reservations: {all_reservations}. Form errors: {form.errors}"
+
+        # Try to create another reservation - should fail validation
+        form2 = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": (future_date + timedelta(days=6)).isoformat(),  # Same year
+                "reservation_type": "solo",
+                "time_preference": "midday",
+            },
+            member=member,
+        )
+
+        # This form should fail validation due to limit
+        assert not form2.is_valid()
+        error_text = str(form2.non_field_errors()).lower()
+        assert (
+            "reached" in error_text or "limit" in error_text or "maximum" in error_text
+        )
+
+    def test_cancelled_reservations_dont_count_toward_limit(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that cancelled reservations don't count toward yearly limit."""
+        # Create and cancel max reservations
+        for i in range(site_config.max_reservations_per_year):
+            res = GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+            res.cancel(reason="Testing")
+
+        # Should still be able to create new reservation
+        can_reserve, message = GliderReservation.can_member_reserve(member)
+        assert can_reserve is True
+
+        # Create new reservation should succeed
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": future_date + timedelta(days=20),
+                "reservation_type": "solo",
+                "time_preference": "morning",
+            },
+            member=member,
+        )
+        assert form.is_valid()
+        reservation = form.save()
+        assert reservation.pk is not None
+
+
+class TestMarkCompletedAndNoShow:
+    """Tests for mark_completed() and mark_no_show() methods."""
+
+    def test_mark_completed(self, site_config, member, glider, future_date):
+        """Test marking a reservation as completed."""
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        assert reservation.status == "confirmed"
+
+        reservation.mark_completed()
+        reservation.refresh_from_db()
+
+        assert reservation.status == "completed"
+
+    def test_mark_no_show(self, site_config, member, glider, future_date):
+        """Test marking a reservation as no-show."""
+        reservation = GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+        assert reservation.status == "confirmed"
+
+        reservation.mark_no_show()
+        reservation.refresh_from_db()
+
+        assert reservation.status == "no_show"
+
+    def test_completed_counts_toward_yearly_limit(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that completed reservations count toward yearly limit."""
+        # Create and mark as completed
+        for i in range(site_config.max_reservations_per_year):
+            res = GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+            res.mark_completed()
+
+        # Should be at limit
+        can_reserve, message = GliderReservation.can_member_reserve(member)
+        assert can_reserve is False
+        assert "limit" in message.lower()
+
+    def test_no_show_does_not_count_toward_limit(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that no-show reservations don't count toward yearly limit."""
+        # Create and mark as no-show
+        for i in range(site_config.max_reservations_per_year):
+            res = GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+            res.mark_no_show()
+
+        # Should still be able to reserve (no-shows don't count)
+        can_reserve, message = GliderReservation.can_member_reserve(member)
+        assert can_reserve is True
+
+
+class TestTimePreferenceConflicts:
+    """Tests for time preference conflict detection."""
+
+    def test_same_time_preference_conflicts(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that reservations with same time preference conflict."""
+        # Create morning reservation
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Try to create another morning reservation
+        reservation = GliderReservation(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            reservation.clean()
+        assert "already reserved" in str(exc_info.value).lower()
+
+    def test_different_time_preferences_allowed(
+        self, site_config, member, glider, single_seat_glider, future_date
+    ):
+        """Test that different time preferences on same day are allowed."""
+        # Create morning reservation
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Afternoon reservation should be allowed
+        afternoon_res = GliderReservation(
+            member=member,
+            glider=glider,
+            date=future_date,
+            reservation_type="solo",
+            time_preference="afternoon",
+        )
+
+        # Should not raise ValidationError
+        afternoon_res.clean()
+        afternoon_res.save()
+        assert afternoon_res.pk is not None

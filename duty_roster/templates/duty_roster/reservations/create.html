@@ -184,6 +184,9 @@
     const timePreference = document.getElementById('id_time_preference');
     const specificTimeFields = document.getElementById('specific-time-fields');
 
+    if (!timePreference || !specificTimeFields) {
+      return; // Exit gracefully if elements don't exist
+    }
     function toggleSpecificTimeFields() {
       if (timePreference.value === 'specific') {
         specificTimeFields.classList.remove('d-none');

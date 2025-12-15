@@ -547,7 +547,7 @@ class GliderReservationForm(forms.ModelForm):
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         date = cleaned_data.get("date")
-        glider = cleaned_data.get("glider")
+        # glider = cleaned_data.get("glider")  # Removed unused variable
 
         # Validate time requirement for specific time preference
         if time_preference == "specific" and not start_time:
@@ -575,17 +575,21 @@ class GliderReservationForm(forms.ModelForm):
         if self.member and date:
             with transaction.atomic():
                 # Lock the member's reservations for this year to prevent concurrent modifications
-                GliderReservation.objects.filter(
+                reservations_qs = GliderReservation.objects.filter(
                     member=self.member,
                     date__year=date.year,
                     status__in=["confirmed", "completed"],
-                ).select_for_update().exists()
+                ).select_for_update()
 
-                can_reserve, message = GliderReservation.can_member_reserve(
-                    self.member, year=date.year
-                )
-                if not can_reserve:
-                    self.add_error(None, message)
+                # Get the reservation limit from SiteConfiguration or set a sensible default
+                config = SiteConfiguration.objects.first()
+                reservation_limit = getattr(config, "max_reservations_per_year", 3)
+                current_count = reservations_qs.count()
+                if current_count >= reservation_limit:
+                    self.add_error(
+                        None,
+                        f"You have reached the maximum of {reservation_limit} reservations for {date.year}.",
+                    )
 
         return cleaned_data
 
