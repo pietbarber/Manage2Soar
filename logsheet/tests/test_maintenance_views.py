@@ -85,6 +85,11 @@ def test_edit_logsheet_closeout_tow_pilot_summary(
     assert pilot_data["towplanes"][0]["tow_count"] == 2
     assert pilot_data["towplanes"][0]["total_feet"] == 5000
 
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
+    assert b"Total" in response.content
+
 
 @pytest.mark.django_db
 def test_edit_logsheet_closeout_tow_pilot_multiple_towplanes(
@@ -140,6 +145,12 @@ def test_edit_logsheet_closeout_tow_pilot_multiple_towplanes(
     assert "N123AB" in towplane_n_numbers
     assert "N456CD" in towplane_n_numbers
 
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
+    assert b"N123AB" in response.content
+    assert b"N456CD" in response.content
+
 
 @pytest.mark.django_db
 def test_edit_logsheet_closeout_tow_pilot_null_release_altitude(
@@ -185,6 +196,10 @@ def test_edit_logsheet_closeout_tow_pilot_null_release_altitude(
     # Should count both tows, total_feet should handle NULL correctly (0 + 2000)
     assert pilot_data["total_tows"] == 2
     assert pilot_data["total_feet"] == 2000
+
+    # Verify template renders without errors
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Towpilot Jones" in response.content
 
 
 @pytest.mark.django_db
@@ -238,6 +253,11 @@ def test_edit_logsheet_closeout_tow_pilot_empty_names(
     for pilot_data in tow_pilots_data.values():
         assert pilot_data["name"] == "Unknown Pilot"
         assert pilot_data["total_tows"] == 1
+
+    # Verify template renders without errors and shows "Unknown Pilot"
+    assert b"Tow Pilot Summary" in response.content
+    assert b"Unknown Pilot" in response.content
+    assert b"Unknown Pilot Total" in response.content
 
 
 @pytest.mark.django_db
