@@ -656,7 +656,7 @@ class TestConcurrentReservations:
 
         with patch.object(GliderReservation, "save", mock_save):
             # Save should not raise exception, but should add error to form
-            result = form.save()
+            form.save()
 
             # Form should have non-field error about unavailability
             assert "no longer available" in str(form.non_field_errors()).lower()
