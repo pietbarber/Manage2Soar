@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models import Count, F, Q, Sum, Value
+from django.db.models.functions import Coalesce, TruncDate
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -1313,10 +1313,15 @@ def edit_logsheet_closeout(request, pk):
             tow_count=Count("id"),
             total_feet=Sum("release_altitude"),
         )
-        .order_by("tow_pilot__last_name", "tow_pilot__first_name", "towplane__n_number")
+        .order_by(
+            Coalesce("tow_pilot__last_name", Value("")),
+            Coalesce("tow_pilot__first_name", Value("")),
+            "towplane__n_number",
+        )
     )
 
     # Group by tow pilot for easier template rendering
+    # Use pilot_id + name as key to prevent grouping multiple unnamed pilots together
     tow_pilots_data = {}
     for row in tow_pilot_summary:
         # Safely handle None/empty first_name or last_name
@@ -1329,21 +1334,28 @@ def edit_logsheet_closeout(request, pk):
                 ],
             )
         )
-        if pilot_name not in tow_pilots_data:
-            tow_pilots_data[pilot_name] = {
+        if not pilot_name:
+            pilot_name = "Unknown Pilot"
+
+        # Use pilot_id + name as unique key to prevent grouping unnamed pilots
+        pilot_key = f"{row['tow_pilot__id']}:{pilot_name}"
+
+        if pilot_key not in tow_pilots_data:
+            tow_pilots_data[pilot_key] = {
+                "name": pilot_name,
                 "towplanes": [],
                 "total_tows": 0,
                 "total_feet": 0,
             }
-        tow_pilots_data[pilot_name]["towplanes"].append(
+        tow_pilots_data[pilot_key]["towplanes"].append(
             {
                 "n_number": row["towplane__n_number"] or "Unknown",
                 "tow_count": row["tow_count"],
                 "total_feet": row["total_feet"] or 0,
             }
         )
-        tow_pilots_data[pilot_name]["total_tows"] += row["tow_count"]
-        tow_pilots_data[pilot_name]["total_feet"] += row["total_feet"] or 0
+        tow_pilots_data[pilot_key]["total_tows"] += row["tow_count"]
+        tow_pilots_data[pilot_key]["total_feet"] += row["total_feet"] or 0
 
     return render(
         request,

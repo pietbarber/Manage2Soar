@@ -289,11 +289,11 @@
               </tr>
             </thead>
             <tbody>
-              {% for pilot_name, data in tow_pilots_data.items %}
+              {% for pilot_key, data in tow_pilots_data.items %}
                 {% for tp in data.towplanes %}
                 <tr>
                   {% if forloop.first %}
-                  <td rowspan="{{ data.towplanes|length }}"><strong>{{ pilot_name }}</strong></td>
+                  <td rowspan="{{ data.towplanes|length }}"><strong>{{ data.name }}</strong></td>
                   {% endif %}
                   <td>{{ tp.n_number }}</td>
                   <td class="text-end">{{ tp.tow_count }}</td>
