@@ -121,6 +121,35 @@
                     </tr>
                     {% endif %}
 
+                    {% if reservations %}
+                    <!-- Glider Reservations (Issue #410) -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #e6fffa; border-radius: 6px; border-left: 4px solid #319795;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #234e52; font-size: 18px; font-weight: 600;">
+                                            Glider Reservations
+                                        </h2>
+                                        <ul style="margin: 0; padding-left: 20px; color: #2d3748; font-size: 14px; line-height: 1.6;">
+                                            {% for res in reservations %}
+                                            <li>
+                                                <strong>{{ res.glider }}</strong> - {{ res.member.full_display_name }}
+                                                <span style="color: #718096;">
+                                                    ({{ res.get_reservation_type_display }} -
+                                                    {% if res.time_preference == "specific" and res.start_time %}{{ res.start_time|time:"g:i A" }}{% else %}{{ res.get_time_preference_display }}{% endif %})
+                                                </span>
+                                                {% if res.is_trainer %}<span style="color: #319795;"> [2-seater]</span>{% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
                     {% if ops_intents %}
                     <!-- Members planning to fly -->
                     <tr>

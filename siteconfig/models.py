@@ -307,6 +307,10 @@ class SiteConfiguration(models.Model):
         default=False,
         help_text="We allow members to reserve club two seaters ahead of time.",
     )
+    max_reservations_per_year = models.PositiveIntegerField(
+        default=3,
+        help_text="Maximum number of glider reservations a member can make per calendar year (default: 3). Set to 0 for unlimited.",
+    )
 
     # Towplane rental options
     allow_towplane_rental = models.BooleanField(

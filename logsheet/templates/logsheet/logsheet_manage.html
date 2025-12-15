@@ -198,6 +198,42 @@
 </div>
 
 
+<!-- Glider Reservations Alert (Issue #410) -->
+{% if reservations %}
+<div class="container-fluid">
+  <div class="alert alert-info mb-4 shadow-sm">
+    <div class="d-flex align-items-start">
+      <i class="bi bi-calendar-check text-info me-3" style="font-size: 1.5rem;"></i>
+      <div class="flex-grow-1">
+        <h6 class="alert-heading mb-2">
+          <strong>Glider Reservations Today</strong>
+          <span class="badge bg-info ms-2">{{ reservations|length }}</span>
+        </h6>
+        <ul class="mb-0 list-unstyled">
+          {% for res in reservations %}
+            <li class="mb-1">
+              <strong>{{ res.glider }}</strong>
+              reserved by {{ res.member.full_display_name }}
+              <span class="text-muted">
+                ({{ res.get_reservation_type_display }} -
+                {% if res.time_preference == "specific" and res.start_time %}
+                  {{ res.start_time|time:"g:i A" }}
+                {% else %}
+                  {{ res.get_time_preference_display }}
+                {% endif %})
+              </span>
+              {% if res.is_trainer %}
+                <span class="badge bg-secondary" title="Two-seater">2S</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Flights Section -->
 <div class="flights-section" id="logsheetContainer" data-logsheet-date="{{ logsheet.log_date|date:'Y-m-d' }}">
   <div class="flights-header">
