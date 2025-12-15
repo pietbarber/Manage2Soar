@@ -24,6 +24,66 @@ def test_edit_logsheet_closeout_view(client, active_member, logsheet):
     assert "form" in response.context
     # Issue #411: Verify tow_pilots_data is in context
     assert "tow_pilots_data" in response.context
+    # Should be a dict (empty if no flights with tow pilots)
+    assert isinstance(response.context["tow_pilots_data"], dict)
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_tow_pilot_summary(
+    client, active_member, logsheet, member_towpilot, towplane, glider
+):
+    """Issue #411: Test tow pilot summary data structure and aggregation"""
+    from datetime import time
+
+    from logsheet.models import Flight
+
+    client.force_login(active_member)
+
+    # Create flights with same pilot, same towplane - should aggregate
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=2000,
+        launch_time=time(10, 0),
+        landing_time=time(11, 0),
+    )
+    Flight.objects.create(
+        logsheet=logsheet,
+        pilot=active_member,
+        glider=glider,
+        tow_pilot=member_towpilot,
+        towplane=towplane,
+        release_altitude=3000,
+        launch_time=time(12, 0),
+        landing_time=time(13, 0),
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+
+    tow_pilots_data = response.context["tow_pilots_data"]
+    assert len(tow_pilots_data) == 1
+
+    # Get the pilot's data (dict keys are pilot names)
+    pilot_data = list(tow_pilots_data.values())[0]
+
+    # Verify structure
+    assert "towplanes" in pilot_data
+    assert "total_tows" in pilot_data
+    assert "total_feet" in pilot_data
+
+    # Verify aggregation: 2 tows, 5000 total feet
+    assert pilot_data["total_tows"] == 2
+    assert pilot_data["total_feet"] == 5000
+
+    # Verify towplane breakdown
+    assert len(pilot_data["towplanes"]) == 1
+    assert pilot_data["towplanes"][0]["tow_count"] == 2
+    assert pilot_data["towplanes"][0]["total_feet"] == 5000
 
 
 @pytest.mark.django_db
