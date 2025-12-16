@@ -119,8 +119,6 @@ def test_misc_charges_integration(client, active_member, logsheet_with_flights):
     2. Charge is included in member's total in Member Charges table
     3. Misc column is conditionally displayed when misc charges exist
     """
-    from decimal import Decimal
-
     from logsheet.models import MemberCharge
     from members.models import Member
     from siteconfig.models import ChargeableItem
@@ -138,7 +136,7 @@ def test_misc_charges_integration(client, active_member, logsheet_with_flights):
     member = flight.pilot if flight else active_member
 
     # Create a member charge linked to the logsheet
-    charge = MemberCharge.objects.create(
+    MemberCharge.objects.create(
         member=member,
         chargeable_item=item,
         quantity=Decimal("2.00"),
@@ -154,19 +152,22 @@ def test_misc_charges_integration(client, active_member, logsheet_with_flights):
     response = client.get(url)
 
     assert response.status_code == 200
-    content = response.content.decode("utf-8")
 
     # Verify misc charge appears in Miscellaneous Charges section
-    assert "Miscellaneous Charges" in content
-    assert "T-Shirt" in content
-    assert "50.00" in content  # 2 × $25.00
-    assert "Test merchandise purchase" in content
+    assert "Miscellaneous Charges" in response.content.decode("utf-8")
+    assert "T-Shirt" in response.content.decode("utf-8")
+    assert "50.00" in response.content.decode("utf-8")  # 2 × $25.00
+    assert "Test merchandise purchase" in response.content.decode("utf-8")
 
     # Verify Misc column is displayed in Member Charges table
-    assert ">Misc</th>" in content or ">Misc<" in content
+    assert ">Misc</th>" in response.content.decode(
+        "utf-8"
+    ) or ">Misc<" in response.content.decode("utf-8")
 
     # Verify charge is included in member's row
-    assert member.get_full_name() in content or str(member) in content
+    assert member.get_full_name() in response.content.decode("utf-8") or str(
+        member
+    ) in response.content.decode("utf-8")
 
     # Verify context data
     assert "misc_charges_data" in response.context
@@ -184,7 +185,6 @@ def test_misc_charges_column_not_shown_when_empty(
     response = client.get(url)
 
     assert response.status_code == 200
-    content = response.content.decode("utf-8")
 
     # Misc column should not appear when no charges exist
     # (The template should conditionally hide it)

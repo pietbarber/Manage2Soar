@@ -1499,6 +1499,8 @@ class MemberCharge(models.Model):
             self.total_price = (self.quantity * self.unit_price).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
+        else:
+            self.total_price = Decimal("0.00")
 
         super().save(*args, **kwargs)
 

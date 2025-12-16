@@ -35,6 +35,7 @@ from .models import (
     LogsheetPayment,
     MaintenanceDeadline,
     MaintenanceIssue,
+    MemberCharge,
     RevisionLog,
     Towplane,
     TowplaneCloseout,
@@ -1049,8 +1050,6 @@ def manage_logsheet_finances(request, pk):
             )
 
     # Add miscellaneous charges (Issue #66, #413)
-    from .models import MemberCharge
-
     misc_charges_qs = MemberCharge.objects.filter(logsheet=logsheet).select_related(
         "member", "chargeable_item"
     )
