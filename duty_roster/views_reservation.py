@@ -66,7 +66,7 @@ def reservation_list(request):
 
     config = SiteConfiguration.objects.first()
     max_per_year = config.max_reservations_per_year if config else 3
-    max_per_month = getattr(config, "max_reservations_per_month", 0) if config else 0
+    max_per_month = config.max_reservations_per_month if config else 0
     can_reserve, message = GliderReservation.can_member_reserve(member)
 
     context = {

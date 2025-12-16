@@ -682,7 +682,7 @@ class GliderReservation(models.Model):
                 )
 
         # Check monthly limit (0 = unlimited)
-        max_per_month = getattr(config, "max_reservations_per_month", 0)
+        max_per_month = config.max_reservations_per_month
         if max_per_month > 0:
             monthly_count = cls.get_member_monthly_count(member, year, month)
             if monthly_count >= max_per_month:
