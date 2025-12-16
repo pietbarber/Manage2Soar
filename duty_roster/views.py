@@ -340,6 +340,11 @@ def duty_calendar_view(request, year=None, month=None):
     prev_month_name = calendar.month_name[prev_month]
     next_month_name = calendar.month_name[next_month]
 
+    # Check if there are any upcoming assignments for the agenda view
+    has_upcoming_assignments = any(
+        day.month == month and day >= today for day in assignments_by_date.keys()
+    )
+
     context = {
         "year": year,
         "month": month,
@@ -349,6 +354,7 @@ def duty_calendar_view(request, year=None, month=None):
         "next_month_name": next_month_name,
         "weeks": weeks,
         "assignments_by_date": assignments_by_date,
+        "has_upcoming_assignments": has_upcoming_assignments,
         "prev_year": prev_year,
         "prev_month": prev_month,
         "next_year": next_year,

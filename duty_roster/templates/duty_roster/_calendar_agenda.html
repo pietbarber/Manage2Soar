@@ -12,7 +12,7 @@
 {% endif %}
 
 <div class="container-fluid my-4">
-  {% if assignments_by_date %}
+  {% if assignments_by_date and has_upcoming_assignments %}
     {% for day, assignment in assignments_by_date.items %}
       {% if day.month == month and day >= today %}
         <div class="duty-agenda-item mb-4">
@@ -203,8 +203,9 @@
       <div class="mb-4">
         <i class="fas fa-calendar-times fa-4x text-muted"></i>
       </div>
-      <h4 class="text-muted">No Duty Assignments</h4>
-      <p class="text-muted">There are no duty assignments scheduled for {{ formatted_date }}.</p>
+      <h4 class="text-muted">No Upcoming Flight Operations</h4>
+      <p class="text-muted">There are no scheduled operations for the remainder of {{ formatted_date }}.</p>
+      <p class="text-muted small">Use the calendar view to see past operations, or check back later for new scheduling.</p>
       {% if user.rostermeister %}
         <a href="{% url 'duty_roster:propose_roster' %}?year={{ year }}&month={{ month }}"
            class="btn btn-primary">
