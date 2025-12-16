@@ -1441,14 +1441,18 @@ class MemberCharge(models.Model):
     unit_price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
+        null=True,
+        blank=True,
         help_text="Price per unit at time of charge (snapshot, won't change if catalog price updates)",
     )
     total_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        default=Decimal("0.00"),
         help_text="Total charge (quantity × unit_price)",
     )
     date = models.DateField(
+        default=date.today,
         help_text="Date the charge was applied",
     )
     logsheet = models.ForeignKey(

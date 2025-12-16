@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
@@ -640,7 +641,7 @@ class ChargeableItem(models.Model):
     price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal("0"))],
         help_text="Unit price in dollars",
     )
     unit = models.CharField(

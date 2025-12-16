@@ -487,6 +487,5 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
     admin_helper_message = (
         "Chargeable Items: Catalog of merchandise and service charges. "
         "Add items like t-shirts, logbooks, or service fees like aerotow retrieves. "
-        "For time-based charges (like retrieve tach time), set unit to 'Per Hour' and enable decimal quantities. "
-        "Duty officers can apply these charges to members from the logsheet finances page."
+        "For time-based charges (like retrieve tach time), set unit to 'Per Hour' and enable decimal quantities."
     )
