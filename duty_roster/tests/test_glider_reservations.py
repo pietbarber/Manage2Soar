@@ -254,6 +254,95 @@ class TestGliderReservationModel:
         assert can_reserve is False
         assert "disabled" in message.lower()
 
+    def test_monthly_count(self, site_config, member, glider, future_date):
+        """Test getting monthly reservation count for a member."""
+        # Create some reservations in the current month
+        for i in range(2):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        count = GliderReservation.get_member_monthly_count(
+            member, future_date.year, future_date.month
+        )
+        assert count == 2
+
+    def test_can_member_reserve_with_monthly_limit(
+        self, site_config, member, glider, future_date
+    ):
+        """Test monthly reservation limit enforcement."""
+        site_config.max_reservations_per_month = 2
+        site_config.max_reservations_per_year = 0  # Unlimited yearly
+        site_config.save()
+
+        # Create reservations up to the monthly limit
+        for i in range(2):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        # Now at monthly limit
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member, future_date.year, future_date.month
+        )
+        assert can_reserve is False
+        assert "month" in message.lower()
+
+    def test_monthly_limit_unlimited(self, site_config, member, glider, future_date):
+        """Test unlimited monthly reservations when max_per_month is 0."""
+        site_config.max_reservations_per_month = 0  # Unlimited monthly
+        site_config.max_reservations_per_year = 0  # Unlimited yearly
+        site_config.save()
+
+        # Create many reservations in same month
+        for i in range(5):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        # Can still reserve
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member, future_date.year, future_date.month
+        )
+        assert can_reserve is True
+
+    def test_both_yearly_and_monthly_limits(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that both yearly and monthly limits are enforced."""
+        site_config.max_reservations_per_month = 2
+        site_config.max_reservations_per_year = 10
+        site_config.save()
+
+        # Create 2 reservations this month (at monthly limit)
+        for i in range(2):
+            GliderReservation.objects.create(
+                member=member,
+                glider=glider,
+                date=future_date + timedelta(days=i),
+                reservation_type="solo",
+                time_preference="morning",
+            )
+
+        # Should be blocked by monthly limit even though yearly limit not reached
+        can_reserve, message = GliderReservation.can_member_reserve(
+            member, future_date.year, future_date.month
+        )
+        assert can_reserve is False
+        assert "month" in message.lower()
+
     def test_cancel_reservation(self, site_config, member, glider, future_date):
         """Test cancelling a reservation."""
         reservation = GliderReservation.objects.create(
@@ -557,6 +646,49 @@ class TestGliderReservationViews:
         response = client.get(url)
         # Should redirect with message
         assert response.status_code == 302
+
+    def test_reservation_form_blocks_monthly_limit(
+        self, site_config, member, glider, future_date
+    ):
+        """Test that form validation blocks reservations at monthly limit."""
+        site_config.max_reservations_per_month = 1
+        site_config.max_reservations_per_year = 10
+        site_config.save()
+
+        # Use a date in the future that's within the same month as future_date
+        first_date = future_date
+        second_date = future_date + timedelta(days=1)
+
+        # Ensure both dates are in the same month (for test validity)
+        if second_date.month != first_date.month:
+            # Adjust if dates span months
+            second_date = first_date
+
+        # Create 1 reservation in the test month
+        GliderReservation.objects.create(
+            member=member,
+            glider=glider,
+            date=first_date,
+            reservation_type="solo",
+            time_preference="morning",
+        )
+
+        # Try to create another reservation in the same month via form
+        form = GliderReservationForm(
+            data={
+                "glider": glider.pk,
+                "date": second_date,
+                "reservation_type": "solo",
+                "time_preference": "afternoon",
+            },
+            member=member,
+        )
+
+        # Form should be invalid due to monthly limit
+        assert form.is_valid() is False
+        # Check that error message mentions month
+        errors_str = str(form.errors)
+        assert "month" in errors_str.lower() or "maximum" in errors_str.lower()
 
 
 class TestGetReservationsForDate:

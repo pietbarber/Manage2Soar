@@ -39,7 +39,10 @@
             {% if max_per_year > 0 %}
               You have used <strong>{{ current_year_count }}</strong> of <strong>{{ max_per_year }}</strong> reservations this year.
             {% else %}
-              Unlimited reservations available.
+              Unlimited yearly reservations available.
+            {% endif %}
+            {% if max_per_month > 0 %}
+              <br>You have used <strong>{{ current_month_count }}</strong> of <strong>{{ max_per_month }}</strong> reservations this month.
             {% endif %}
           </p>
         </div>

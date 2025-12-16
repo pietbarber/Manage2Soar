@@ -595,6 +595,32 @@ class GliderReservationForm(forms.ModelForm):
                         f"You have reached the maximum of {reservation_limit} reservations for {date.year}.",
                     )
 
+                # Check for monthly reservation limits
+                monthly_limit = getattr(config, "max_reservations_per_month", 0)
+                if monthly_limit > 0:
+                    monthly_reservations = GliderReservation.objects.filter(
+                        member=self.member,
+                        date__year=date.year,
+                        date__month=date.month,
+                        status__in=["confirmed", "completed"],
+                    ).select_for_update()
+
+                    # Exclude the current instance if editing
+                    if self.instance and self.instance.pk:
+                        monthly_reservations = monthly_reservations.exclude(
+                            pk=self.instance.pk
+                        )
+
+                    monthly_count = monthly_reservations.count()
+                    if monthly_count >= monthly_limit:
+                        import calendar
+
+                        month_name = calendar.month_name[date.month]
+                        self.add_error(
+                            None,
+                            f"You have reached the maximum of {monthly_limit} reservations for {month_name} {date.year}.",
+                        )
+
         return cleaned_data
 
     def clean_glider(self):
