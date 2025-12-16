@@ -167,6 +167,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "allow_glider_reservations",
                     "allow_two_seater_reservations",
+                    "max_reservations_per_year",
+                    "max_reservations_per_month",
                     "allow_towplane_rental",
                     "redaction_notification_dedupe_minutes",
                 ),

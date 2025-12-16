@@ -62,9 +62,11 @@ def reservation_list(request):
     # Get yearly reservation counts
     yearly_counts = GliderReservation.get_reservations_by_year(member)
     current_year_count = yearly_counts.get(today.year, 0)
+    current_month_count = GliderReservation.get_member_monthly_count(member)
 
     config = SiteConfiguration.objects.first()
     max_per_year = config.max_reservations_per_year if config else 3
+    max_per_month = config.max_reservations_per_month if config else 0
     can_reserve, message = GliderReservation.can_member_reserve(member)
 
     context = {
@@ -72,8 +74,11 @@ def reservation_list(request):
         "past": past,
         "yearly_counts": yearly_counts,
         "current_year_count": current_year_count,
+        "current_month_count": current_month_count,
         "current_year": today.year,
+        "current_month": today.month,
         "max_per_year": max_per_year,
+        "max_per_month": max_per_month,
         "can_reserve": can_reserve,
         "reservations_enabled": config.allow_glider_reservations if config else False,
     }

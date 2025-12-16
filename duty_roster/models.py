@@ -613,6 +613,24 @@ class GliderReservation(models.Model):
         ).count()
 
     @classmethod
+    def get_member_monthly_count(cls, member, year=None, month=None):
+        """
+        Get the count of reservations a member has made for a given month.
+        Used to enforce max_reservations_per_month limit.
+        """
+        if year is None:
+            year = timezone.now().year
+        if month is None:
+            month = timezone.now().month
+
+        return cls.objects.filter(
+            member=member,
+            date__year=year,
+            date__month=month,
+            status__in=["confirmed", "completed"],  # Don't count cancelled/no-show
+        ).count()
+
+    @classmethod
     def get_reservations_by_year(cls, member):
         """
         Return reservation counts grouped by year for a member.
@@ -640,9 +658,9 @@ class GliderReservation(models.Model):
         )
 
     @classmethod
-    def can_member_reserve(cls, member, year=None):
+    def can_member_reserve(cls, member, year=None, month=None):
         """
-        Check if a member can make a new reservation based on yearly limits.
+        Check if a member can make a new reservation based on yearly and monthly limits.
         Returns tuple: (can_reserve: bool, message: str)
         """
         config = SiteConfiguration.objects.first()
@@ -661,6 +679,16 @@ class GliderReservation(models.Model):
                 return (
                     False,
                     f"You have reached your limit of {max_per_year} reservations for this year.",
+                )
+
+        # Check monthly limit (0 = unlimited)
+        max_per_month = config.max_reservations_per_month
+        if max_per_month > 0:
+            monthly_count = cls.get_member_monthly_count(member, year, month)
+            if monthly_count >= max_per_month:
+                return (
+                    False,
+                    f"You have reached your limit of {max_per_month} reservations for this month.",
                 )
 
         return True, "OK"
