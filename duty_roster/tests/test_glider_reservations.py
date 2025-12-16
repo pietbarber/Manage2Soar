@@ -661,8 +661,8 @@ class TestGliderReservationViews:
 
         # Ensure both dates are in the same month (for test validity)
         if second_date.month != first_date.month:
-            # Adjust if dates span months
-            second_date = first_date
+            # Adjust if dates span months: pick a safe day within the same month
+            second_date = first_date.replace(day=min(first_date.day + 1, 28))
 
         # Create 1 reservation in the test month
         GliderReservation.objects.create(

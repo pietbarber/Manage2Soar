@@ -1,3 +1,5 @@
+import calendar
+
 from django import forms
 from django.db.models import Exists, OuterRef, Q
 
@@ -613,8 +615,6 @@ class GliderReservationForm(forms.ModelForm):
 
                     monthly_count = monthly_reservations.count()
                     if monthly_count >= monthly_limit:
-                        import calendar
-
                         month_name = calendar.month_name[date.month]
                         self.add_error(
                             None,
