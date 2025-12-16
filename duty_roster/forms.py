@@ -598,7 +598,7 @@ class GliderReservationForm(forms.ModelForm):
                     )
 
                 # Check for monthly reservation limits
-                monthly_limit = config.max_reservations_per_month
+                monthly_limit = config.max_reservations_per_month if config else 0
                 if monthly_limit > 0:
                     monthly_reservations = GliderReservation.objects.filter(
                         member=self.member,
