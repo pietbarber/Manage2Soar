@@ -205,18 +205,20 @@ class MemberChargeModelTestCase(TestCase):
         self.assertTrue(charge.is_locked)
 
     def test_save_validation_when_no_chargeable_item_or_unit_price(self):
-        """Test that save raises ValidationError when both unit_price and chargeable_item are None."""
+        """Test that clean() raises ValidationError when both unit_price and chargeable_item are None."""
         from django.core.exceptions import ValidationError
 
+        charge = MemberCharge(
+            member=self.member1,
+            chargeable_item=None,
+            quantity=Decimal("1.00"),
+            unit_price=None,  # No unit_price
+            date=date.today(),
+            entered_by=self.member2,
+        )
+
         with self.assertRaises(ValidationError) as context:
-            MemberCharge.objects.create(
-                member=self.member1,
-                chargeable_item=None,
-                quantity=Decimal("1.00"),
-                unit_price=None,  # No unit_price
-                date=date.today(),
-                entered_by=self.member2,
-            )
+            charge.full_clean()
 
         self.assertIn(
             "Either unit_price must be provided or chargeable_item must be set",

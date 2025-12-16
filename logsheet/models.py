@@ -174,9 +174,17 @@ class Flight(models.Model):
         """
         Calculate tow cost using towplane-specific charging scheme.
 
-        Returns $0 if:
-        - free_tow is True (explicitly marked as free)
-        - is_retrieve is True AND site config waive_tow_fee_on_retrieve is True
+        Returns:
+            Decimal: The calculated tow cost, or Decimal("0.00") if:
+                - free_tow is True (explicitly marked as free)
+                - is_retrieve is True AND site config waive_tow_fee_on_retrieve is True
+            None: If release_altitude is None or no towplane charge scheme is available.
+
+        Note:
+            Instance-level caching of SiteConfiguration via _site_config_cache helps
+            reduce queries when this property is accessed multiple times on the same
+            Flight instance. For views processing many flights, consider prefetching
+            config once and reusing across all instances.
         """
         # Check for free tow flag
         if self.free_tow:
@@ -210,7 +218,21 @@ class Flight(models.Model):
 
     @property
     def rental_cost_calculated(self):
-        """Calculate rental cost, respecting free flags."""
+        """
+        Calculate rental cost, respecting free flags and waivers.
+
+        Returns:
+            Decimal: The calculated rental cost or Decimal("0.00") if:
+                - free_rental is True (explicitly marked as free)
+                - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
+                - glider has no rental rate
+            None: If glider or duration is not set.
+
+        Note:
+            Instance-level caching of SiteConfiguration via _site_config_cache helps
+            reduce queries when this property is accessed multiple times on the same
+            Flight instance.
+        """
         # Check for free rental flag
         if self.free_rental:
             return Decimal("0.00")
@@ -250,11 +272,14 @@ class Flight(models.Model):
     @property
     def rental_cost(self):
         """
-        Calculate rental cost, respecting free flags and max rental cap.
+        Calculate rental cost with max rental cap applied.
 
-        Returns $0 if:
-        - free_rental is True (explicitly marked as free)
-        - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
+        Delegates free flag and waiver checks to rental_cost_calculated,
+        then applies glider's max rental cap if configured.
+
+        Returns:
+            Decimal: Final rental cost with cap applied, or Decimal("0.00") if free.
+            None: If glider or duration is not set.
         """
         # Get base rental cost (handles free flags and waivers)
         cost = self.rental_cost_calculated
@@ -1486,16 +1511,19 @@ class MemberCharge(models.Model):
             models.Index(fields=["logsheet"]),
         ]
 
-    def save(self, *args, **kwargs):
-        """Auto-calculate total_price and snapshot unit_price if not set."""
+    def clean(self):
+        """Validate that either unit_price is provided or chargeable_item is set."""
         from django.core.exceptions import ValidationError
 
+        if self.unit_price is None and not self.chargeable_item_id:
+            raise ValidationError(
+                "Either unit_price must be provided or chargeable_item must be set."
+            )
+
+    def save(self, *args, **kwargs):
+        """Auto-calculate total_price and snapshot unit_price if not set."""
         # Snapshot the price from the catalog item if not already set
-        if self.unit_price is None:
-            if not self.chargeable_item_id:
-                raise ValidationError(
-                    "Either unit_price must be provided or chargeable_item must be set."
-                )
+        if self.unit_price is None and self.chargeable_item:
             self.unit_price = self.chargeable_item.price
 
         # Calculate total
