@@ -116,6 +116,7 @@
         <th class="text-end" data-sort-method="number">Tow</th>
         <th class="text-end" data-sort-method="number">Rental</th>
         {% if towplane_rental_enabled %}<th class="text-end" data-sort-method="number">Towplane Rental</th>{% endif %}
+        {% if misc_charges_data %}<th class="text-end" data-sort-method="number">Misc</th>{% endif %}
         <th class="text-end" data-sort-method="number">Total</th>
       </tr>
     </thead>
@@ -126,12 +127,48 @@
       <td class="text-end">${{ summary.tow|floatformat:2 }}</td>
       <td class="text-end">${{ summary.rental|floatformat:2 }}</td>
       {% if towplane_rental_enabled %}<td class="text-end">${{ summary.towplane_rental|floatformat:2 }}</td>{% endif %}
+      {% if misc_charges_data %}<td class="text-end">${{ summary.misc_charges|floatformat:2 }}</td>{% endif %}
       <td class="text-end fw-bold">${{ summary.total|floatformat:2 }}</td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+
+{% if misc_charges_data %}
+<h4 class="mb-3 mt-5">
+  <i class="bi bi-bag text-info me-2"></i>
+  Miscellaneous Charges
+</h4>
+<p class="text-muted mb-4">Merchandise, aerotow retrieves, and other fees</p>
+
+<div class="finance-table-container">
+  <table class="table finance-table align-middle" data-sort>
+    <thead>
+      <tr>
+        <th data-sort-method="string">Member</th>
+        <th data-sort-method="string">Item</th>
+        <th class="text-end" data-sort-method="number">Qty</th>
+        <th class="text-end" data-sort-method="number">Unit Price</th>
+        <th class="text-end" data-sort-method="number">Total</th>
+        <th data-sort-method="string">Notes</th>
+      </tr>
+    </thead>
+  <tbody>
+    {% for charge in misc_charges_data %}
+    <tr>
+      <td data-sort-value="{{ charge.member.last_name|default:'' }}">{{ charge.member|full_display_name }}</td>
+      <td>{{ charge.chargeable_item.name }}</td>
+      <td class="text-end">{{ charge.quantity|floatformat:2 }}{% if charge.chargeable_item.unit == 'hour' %} hrs{% endif %}</td>
+      <td class="text-end">${{ charge.unit_price|floatformat:2 }}</td>
+      <td class="text-end fw-bold">${{ charge.total_price|floatformat:2 }}</td>
+      <td>{{ charge.notes|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 
 {% if towplane_data and towplane_rental_enabled %}
 <h4 class="mb-3 mt-5">

@@ -263,6 +263,70 @@
         </div>
       </div>
     </div>
+
+  <!-- Special Flight Flags Section (Issue #66) -->
+  <div class="flight-form-section flight-form-section--info p-3 mb-4">
+      <h6 class="text-info mb-3">
+        <i class="bi bi-flag me-2"></i>Special Flight Flags
+      </h6>
+      <p class="text-muted small mb-3">
+        Mark special circumstances that affect billing. Retrieve flights are ferrying a glider back after a landout.
+        Free flags waive the corresponding charges (e.g., for post-maintenance check flights).
+      </p>
+
+      <div class="row g-3">
+        <!-- Is Retrieve -->
+        <div class="col-md-4">
+          <div class="form-check">
+            <input type="checkbox"
+                   name="{{ form.is_retrieve.name }}"
+                   id="{{ form.is_retrieve.id_for_label }}"
+                   class="form-check-input"
+                   {% if form.is_retrieve.value %}checked{% endif %}>
+            <label for="{{ form.is_retrieve.id_for_label }}" class="form-check-label">
+              <i class="bi bi-arrow-return-left me-1"></i>Retrieve Flight
+            </label>
+          </div>
+          <div class="form-text">
+            Ferrying a glider back after landout
+          </div>
+        </div>
+
+        <!-- Free Tow -->
+        <div class="col-md-4">
+          <div class="form-check">
+            <input type="checkbox"
+                   name="{{ form.free_tow.name }}"
+                   id="{{ form.free_tow.id_for_label }}"
+                   class="form-check-input"
+                   {% if form.free_tow.value %}checked{% endif %}>
+            <label for="{{ form.free_tow.id_for_label }}" class="form-check-label">
+              <i class="bi bi-gift me-1"></i>Free Tow
+            </label>
+          </div>
+          <div class="form-text">
+            No charge for aerotow
+          </div>
+        </div>
+
+        <!-- Free Rental -->
+        <div class="col-md-4">
+          <div class="form-check">
+            <input type="checkbox"
+                   name="{{ form.free_rental.name }}"
+                   id="{{ form.free_rental.id_for_label }}"
+                   class="form-check-input"
+                   {% if form.free_rental.value %}checked{% endif %}>
+            <label for="{{ form.free_rental.id_for_label }}" class="form-check-label">
+              <i class="bi bi-gift me-1"></i>Free Rental
+            </label>
+          </div>
+          <div class="form-text">
+            No charge for glider rental
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="modal-footer">

@@ -3,6 +3,7 @@ from io import BytesIO
 
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils.crypto import get_random_string
@@ -322,6 +323,16 @@ class SiteConfiguration(models.Model):
         help_text="We allow towplanes to be rented for non-towing purposes (sightseeing flights, flight reviews, aircraft retrieval, etc.).",
     )
 
+    # Retrieve flight fee waivers (Issue #66)
+    waive_tow_fee_on_retrieve = models.BooleanField(
+        default=False,
+        help_text="Don't charge for the aerotow on retrieve flights (some clubs waive the tow fee when retrieving a landed-out glider).",
+    )
+    waive_rental_fee_on_retrieve = models.BooleanField(
+        default=False,
+        help_text="Don't charge for glider rental on retrieve flights (some clubs don't charge rental for the ferry flight back).",
+    )
+
     # Notification dedupe: number of minutes to suppress duplicate redaction
     # notifications for the same member URL. Editable by the Webmaster in the
     # admin SiteConfiguration UI. If blank/zero, falls back to settings or
@@ -604,3 +615,64 @@ class MembershipStatus(models.Model):
             (status.name, status.name)
             for status in cls.objects.all().order_by("sort_order", "name")
         ]
+
+
+class ChargeableItem(models.Model):
+    """
+    Catalog of purchasable items and service charges.
+
+    Used for both merchandise (t-shirts, logbooks) and service charges
+    (aerotow retrieves, instruction materials, etc.). Webmaster maintains
+    the catalog; duty officers can add charges to members.
+
+    Issue #66: Aerotow retrieve fees
+    Issue #413: Miscellaneous charges
+    """
+
+    class UnitType(models.TextChoices):
+        EACH = "each", "Each"
+        HOUR = "hour", "Per Hour"
+
+    name = models.CharField(
+        max_length=100,
+        help_text="Display name for the item (e.g., 'T-Shirt Large', 'Aerotow Retrieve')",
+    )
+    price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        help_text="Unit price in dollars",
+    )
+    unit = models.CharField(
+        max_length=10,
+        choices=UnitType.choices,
+        default=UnitType.EACH,
+        help_text="Pricing unit - 'Each' for items, 'Per Hour' for time-based charges like retrieve tach time",
+    )
+    allows_decimal_quantity = models.BooleanField(
+        default=False,
+        help_text="Allow decimal quantities (e.g., 1.8 hours for tach time). Leave unchecked for whole-number items like t-shirts.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive items won't appear in the charge dropdown",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description or notes about this item",
+    )
+    sort_order = models.PositiveIntegerField(
+        default=100,
+        help_text="Sort order for display (lower numbers appear first)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Chargeable Item"
+        verbose_name_plural = "Chargeable Items"
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        unit_display = "/hour" if self.unit == self.UnitType.HOUR else ""
+        return f"{self.name} (${self.price}{unit_display})"
