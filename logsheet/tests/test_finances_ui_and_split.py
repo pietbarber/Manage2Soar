@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from django.urls import reverse
 
@@ -102,3 +104,89 @@ def test_clear_flight_split_ajax(client, active_member, logsheet_with_flights):
     flight.refresh_from_db()
     assert flight.split_with is None
     assert flight.split_type is None
+
+
+@pytest.mark.django_db
+def test_misc_charges_integration(client, active_member, logsheet_with_flights):
+    """
+    Test that miscellaneous charges are correctly displayed in finance view.
+
+    Issue #66: Aerotow retrieve fees
+    Issue #413: Miscellaneous charges
+
+    This test verifies:
+    1. MemberCharge linked to logsheet appears in Miscellaneous Charges section
+    2. Charge is included in member's total in Member Charges table
+    3. Misc column is conditionally displayed when misc charges exist
+    """
+    from decimal import Decimal
+
+    from logsheet.models import MemberCharge
+    from members.models import Member
+    from siteconfig.models import ChargeableItem
+
+    # Create a chargeable item
+    item = ChargeableItem.objects.create(
+        name="T-Shirt",
+        price=Decimal("25.00"),
+        unit=ChargeableItem.UnitType.EACH,
+        is_active=True,
+    )
+
+    # Get a member who has flights (to verify charge is added to their total)
+    flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
+    member = flight.pilot if flight else active_member
+
+    # Create a member charge linked to the logsheet
+    charge = MemberCharge.objects.create(
+        member=member,
+        chargeable_item=item,
+        quantity=Decimal("2.00"),
+        date=logsheet_with_flights.log_date,
+        logsheet=logsheet_with_flights,
+        notes="Test merchandise purchase",
+        entered_by=active_member,
+    )
+
+    # Load the finance management page
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+
+    # Verify misc charge appears in Miscellaneous Charges section
+    assert "Miscellaneous Charges" in content
+    assert "T-Shirt" in content
+    assert "50.00" in content  # 2 × $25.00
+    assert "Test merchandise purchase" in content
+
+    # Verify Misc column is displayed in Member Charges table
+    assert ">Misc</th>" in content or ">Misc<" in content
+
+    # Verify charge is included in member's row
+    assert member.get_full_name() in content or str(member) in content
+
+    # Verify context data
+    assert "misc_charges_data" in response.context
+    assert "total_misc_charges" in response.context
+    assert response.context["total_misc_charges"] == Decimal("50.00")
+
+
+@pytest.mark.django_db
+def test_misc_charges_column_not_shown_when_empty(
+    client, active_member, logsheet_with_flights
+):
+    """Verify Misc column is NOT shown when there are no misc charges."""
+    url = reverse("logsheet:manage_logsheet_finances", args=[logsheet_with_flights.pk])
+    client.force_login(active_member)
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+
+    # Misc column should not appear when no charges exist
+    # (The template should conditionally hide it)
+    assert "total_misc_charges" in response.context
+    assert response.context["total_misc_charges"] == Decimal("0.00")

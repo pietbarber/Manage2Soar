@@ -1502,8 +1502,14 @@ class MemberCharge(models.Model):
 
     def save(self, *args, **kwargs):
         """Auto-calculate total_price and snapshot unit_price if not set."""
+        from django.core.exceptions import ValidationError
+
         # Snapshot the price from the catalog item if not already set
-        if self.unit_price is None and self.chargeable_item:
+        if self.unit_price is None:
+            if not self.chargeable_item_id:
+                raise ValidationError(
+                    "Either unit_price must be provided or chargeable_item must be set."
+                )
             self.unit_price = self.chargeable_item.price
 
         # Calculate total
