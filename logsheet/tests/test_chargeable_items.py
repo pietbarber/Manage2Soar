@@ -5,7 +5,7 @@ Issue #66: Aerotow retrieve fees
 Issue #413: Miscellaneous charges
 """
 
-from datetime import date, time, timedelta
+from datetime import date, time
 from decimal import Decimal
 
 from django.test import TestCase

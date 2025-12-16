@@ -472,7 +472,7 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
         """Check if user has webmaster-level permission."""
         return (
             request.user.is_superuser
-            or request.user.groups.filter(name="Webmasters").exists()
+            or request.user.groups.filter(name="Webmaster").exists()
         )
 
     def has_change_permission(self, request, obj=None):

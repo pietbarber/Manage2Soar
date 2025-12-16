@@ -186,7 +186,10 @@ class Flight(models.Model):
         if self.is_retrieve:
             from siteconfig.models import SiteConfiguration
 
-            config = SiteConfiguration.objects.first()
+            config = getattr(self, "_site_config_cache", None)
+            if config is None:
+                config = SiteConfiguration.objects.first()
+                self._site_config_cache = config
             if config and config.waive_tow_fee_on_retrieve:
                 return Decimal("0.00")
 
@@ -216,7 +219,10 @@ class Flight(models.Model):
         if self.is_retrieve:
             from siteconfig.models import SiteConfiguration
 
-            config = SiteConfiguration.objects.first()
+            config = getattr(self, "_site_config_cache", None)
+            if config is None:
+                config = SiteConfiguration.objects.first()
+                self._site_config_cache = config
             if config and config.waive_rental_fee_on_retrieve:
                 return Decimal("0.00")
 
@@ -258,7 +264,10 @@ class Flight(models.Model):
         if self.is_retrieve:
             from siteconfig.models import SiteConfiguration
 
-            config = SiteConfiguration.objects.first()
+            config = getattr(self, "_site_config_cache", None)
+            if config is None:
+                config = SiteConfiguration.objects.first()
+                self._site_config_cache = config
             if config and config.waive_rental_fee_on_retrieve:
                 return Decimal("0.00")
 
