@@ -256,34 +256,16 @@ class Flight(models.Model):
         - free_rental is True (explicitly marked as free)
         - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
         """
-        # Check for free rental flag
-        if self.free_rental:
-            return Decimal("0.00")
+        # Get base rental cost (handles free flags and waivers)
+        cost = self.rental_cost_calculated
 
-        # Check for retrieve waiver (requires config lookup)
-        if self.is_retrieve:
-            from siteconfig.models import SiteConfiguration
+        # If None or $0, return as-is
+        if cost is None or cost == Decimal("0.00"):
+            return cost
 
-            config = getattr(self, "_site_config_cache", None)
-            if config is None:
-                config = SiteConfiguration.objects.first()
-                self._site_config_cache = config
-            if config and config.waive_rental_fee_on_retrieve:
-                return Decimal("0.00")
-
-        if not self.glider or not self.duration:
-            return None
-        if not self.glider.rental_rate:
-            return Decimal("0.00")
-
-        hours = Decimal(self.duration.total_seconds()) / Decimal("3600")
-        rate = Decimal(str(self.glider.rental_rate))
-        cost = rate * hours
-
-        # Cap at max_rental_rate if set
-        max_rate = self.glider.max_rental_rate
-        if max_rate is not None:
-            max_rate = Decimal(str(max_rate))
+        # Apply max rental cap if set
+        if self.glider and self.glider.max_rental_rate is not None:
+            max_rate = Decimal(str(self.glider.max_rental_rate))
             cost = min(cost, max_rate)
 
         return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
