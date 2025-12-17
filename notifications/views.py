@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404, redirect, render
 
 from members.decorators import active_member_required
+from utils.security import get_safe_redirect_url
 
 from .models import Notification
 
@@ -22,4 +23,6 @@ def dismiss_notification(request, pk):
     notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.dismissed = True
     notification.save()
-    return redirect(request.headers.get("referer", "/"))
+    # Validate referer header to prevent open redirect attacks
+    referer = request.headers.get("referer")
+    return redirect(get_safe_redirect_url(referer, default="/", request=request))

@@ -88,10 +88,13 @@ def update_flight_split(request, flight_id):
 @active_member_required
 def land_flight_now(request, flight_id):
     import json
+    import logging
 
     from django.core.exceptions import ValidationError
 
     from .forms import validate_glider_availability
+
+    logger = logging.getLogger(__name__)
 
     try:
         flight = get_object_or_404(Flight, pk=flight_id)
@@ -127,17 +130,24 @@ def land_flight_now(request, flight_id):
         flight.save(update_fields=["landing_time"])
         return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
+        logger.exception("Error landing flight %s", flight_id)
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred."},
+            status=500,
+        )
 
 
 @require_POST
 @active_member_required
 def launch_flight_now(request, flight_id):
     import json
+    import logging
 
     from django.core.exceptions import ValidationError
 
     from .forms import validate_glider_availability
+
+    logger = logging.getLogger(__name__)
 
     try:
         flight = get_object_or_404(Flight, pk=flight_id)
@@ -169,7 +179,11 @@ def launch_flight_now(request, flight_id):
         flight.save(update_fields=["launch_time"])
         return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
+        logger.exception("Error launching flight %s", flight_id)
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred."},
+            status=500,
+        )
 
 
 # Delete logsheet if empty (no flights, no closeout, no payments)
