@@ -551,6 +551,17 @@ class MemberChargeAdmin(AdminHelperMixin, admin.ModelAdmin):
         """Display lock status as a boolean icon."""
         return obj.is_locked
 
+    def has_add_permission(self, request):
+        """Allow duty officers and staff to add charges."""
+        if request.user.is_superuser:
+            return True
+        # Check if user is a duty officer or has standard add permission
+        return (
+            hasattr(request.user, "duty_officer")
+            and request.user.duty_officer
+            or super().has_add_permission(request)
+        )
+
     def has_delete_permission(self, request, obj=None):
         """Prevent deletion of charges linked to finalized logsheets."""
         if obj and obj.is_locked:

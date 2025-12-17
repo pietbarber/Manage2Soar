@@ -1545,6 +1545,8 @@ class MemberCharge(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
+        # Use getattr to safely handle edge cases where chargeable_item might be None
+        # (e.g., during deletion cascades or inconsistent model states)
         item_name = getattr(self.chargeable_item, "name", "Unknown Item")
         return f"{self.member} - {item_name} (${self.total_price})"
 

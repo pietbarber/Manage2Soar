@@ -190,3 +190,8 @@ def test_misc_charges_column_not_shown_when_empty(
     # (The template should conditionally hide it)
     assert "total_misc_charges" in response.context
     assert response.context["total_misc_charges"] == Decimal("0.00")
+
+    # Verify Misc column header is actually hidden from HTML
+    assert ">Misc</th>" not in response.content.decode(
+        "utf-8"
+    ) and ">Misc<" not in response.content.decode("utf-8")

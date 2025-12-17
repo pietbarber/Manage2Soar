@@ -676,4 +676,4 @@ class ChargeableItem(models.Model):
 
     def __str__(self):
         unit_display = "/hour" if self.unit == self.UnitType.HOUR else ""
-        return f"{self.name} (${self.price}{unit_display})"
+        return f"{self.name} (${self.price:.2f}{unit_display})"
