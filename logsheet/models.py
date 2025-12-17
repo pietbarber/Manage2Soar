@@ -192,12 +192,7 @@ class Flight(models.Model):
 
         # Check for retrieve waiver (requires config lookup)
         if self.is_retrieve:
-            from siteconfig.models import SiteConfiguration
-
-            config = getattr(self, "_site_config_cache", None)
-            if config is None:
-                config = SiteConfiguration.objects.first()
-                self._site_config_cache = config
+            config = self._get_site_config()
             if config and config.waive_tow_fee_on_retrieve:
                 return Decimal("0.00")
 
@@ -239,12 +234,7 @@ class Flight(models.Model):
 
         # Check for retrieve waiver (requires config lookup)
         if self.is_retrieve:
-            from siteconfig.models import SiteConfiguration
-
-            config = getattr(self, "_site_config_cache", None)
-            if config is None:
-                config = SiteConfiguration.objects.first()
-                self._site_config_cache = config
+            config = self._get_site_config()
             if config and config.waive_rental_fee_on_retrieve:
                 return Decimal("0.00")
 
@@ -366,6 +356,21 @@ class Flight(models.Model):
         default=False,
         help_text="No charge for glider rental (e.g., post-maintenance check flight, club-authorized free flight)",
     )
+
+    def _get_site_config(self):
+        """
+        Get SiteConfiguration with instance-level caching.
+
+        Returns cached config from _site_config_cache if available,
+        otherwise fetches from database and caches for future use.
+        """
+        config = getattr(self, "_site_config_cache", None)
+        if config is None:
+            from siteconfig.models import SiteConfiguration
+
+            config = SiteConfiguration.objects.first()
+            self._site_config_cache = config
+        return config
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
@@ -1540,7 +1545,8 @@ class MemberCharge(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.member} - {self.chargeable_item.name} (${self.total_price})"
+        item_name = getattr(self.chargeable_item, "name", "Unknown Item")
+        return f"{self.member} - {item_name} (${self.total_price})"
 
     @property
     def is_locked(self):

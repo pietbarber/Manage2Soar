@@ -231,6 +231,68 @@ class MemberChargeModelTestCase(TestCase):
         charge.refresh_from_db()
         self.assertTrue(charge.is_locked)
 
+    def test_admin_prevents_editing_locked_charges(self):
+        """Test that MemberChargeAdmin prevents editing locked charges."""
+        from unittest.mock import Mock
+
+        from django.contrib.admin.sites import site
+
+        from logsheet.admin import MemberChargeAdmin
+
+        # Create a locked charge
+        charge = MemberCharge.objects.create(
+            member=self.member1,
+            chargeable_item=self.tshirt,
+            quantity=Decimal("1.00"),
+            unit_price=self.tshirt.price,
+            date=date.today(),
+            logsheet=self.logsheet,
+            entered_by=self.member2,
+        )
+        self.logsheet.finalized = True
+        self.logsheet.save()
+        charge.refresh_from_db()
+
+        # Test admin permissions
+        admin = MemberChargeAdmin(MemberCharge, site)
+        request = Mock()
+
+        # Locked charge should not be editable
+        self.assertFalse(admin.has_change_permission(request, charge))
+
+        # Locked charge should not be deletable
+        self.assertFalse(admin.has_delete_permission(request, charge))
+
+    def test_admin_allows_editing_unlocked_charges(self):
+        """Test that MemberChargeAdmin allows editing unlocked charges."""
+        from unittest.mock import Mock
+
+        from django.contrib.admin.sites import site
+
+        from logsheet.admin import MemberChargeAdmin
+
+        # Create an unlocked charge (no logsheet or unfinal logsheet)
+        charge = MemberCharge.objects.create(
+            member=self.member1,
+            chargeable_item=self.tshirt,
+            quantity=Decimal("1.00"),
+            unit_price=self.tshirt.price,
+            date=date.today(),
+            entered_by=self.member2,
+        )
+
+        # Test admin permissions
+        admin = MemberChargeAdmin(MemberCharge, site)
+        request = Mock()
+        request.user = self.member2  # Need a user for base permission checks
+        request.user.is_superuser = True
+
+        # Unlocked charge should be editable
+        self.assertTrue(admin.has_change_permission(request, charge))
+
+        # Unlocked charge should be deletable
+        self.assertTrue(admin.has_delete_permission(request, charge))
+
 
 class FlightFreeFlagsTestCase(TestCase):
     """Test free_tow, free_rental, and is_retrieve flags on flights."""

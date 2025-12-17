@@ -133,7 +133,7 @@ def test_misc_charges_integration(client, active_member, logsheet_with_flights):
 
     # Get a member who has flights (to verify charge is added to their total)
     flight = Flight.objects.filter(logsheet=logsheet_with_flights).first()
-    member = flight.pilot if flight else active_member
+    member = flight.pilot if (flight and flight.pilot) else active_member
 
     # Create a member charge linked to the logsheet
     MemberCharge.objects.create(
