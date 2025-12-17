@@ -1368,13 +1368,6 @@ document.addEventListener("click", async function(e) {
           btn.removeAttribute('aria-disabled');
           btn.style.pointerEvents = '';
           btn.style.opacity = '';
-          // Restore title using textContent to avoid XSS
-          const originalTitle = btn.getAttribute('data-original-title');
-          if (originalTitle !== null) {
-            btn.title = originalTitle;
-          } else {
-            btn.title = '';
-          }
           // Restore href for links (validate URL is safe first)
           if (btn.tagName === 'A' && btn.hasAttribute('data-original-href')) {
             const originalHref = btn.getAttribute('data-original-href');
@@ -1387,11 +1380,6 @@ document.addEventListener("click", async function(e) {
           btn.setAttribute('aria-disabled', 'true');
           btn.style.pointerEvents = 'none';
           btn.style.opacity = '0.5';
-          // Save original title and set offline message
-          if (!btn.hasAttribute('data-original-title')) {
-            btn.setAttribute('data-original-title', btn.title || '');
-          }
-          btn.title = 'Available when online';
           // For links, save and remove href to prevent navigation
           if (btn.tagName === 'A' && !btn.hasAttribute('data-original-href')) {
             btn.setAttribute('data-original-href', btn.href);
