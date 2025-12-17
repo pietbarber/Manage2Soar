@@ -123,7 +123,6 @@
     <div class="management-actions">
       <div class="actions-grid">
         <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
-           data-original-href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
            class="action-card online-only-btn {% if logsheet.finalized %}action-card-view{% else %}action-card-edit{% endif %}">
           <div class="action-icon">
             <i class="bi bi-graph-up"></i>
@@ -137,7 +136,7 @@
         </a>
 
         {% if logsheet.finalized %}
-          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" data-original-href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view online-only-btn">
+          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -147,7 +146,7 @@
             </div>
           </a>
         {% else %}
-          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" data-original-href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit online-only-btn">
+          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -1350,16 +1349,6 @@ document.addEventListener("click", async function(e) {
       updateOnlineOnlyButtons(false);
     });
 
-    // Validate URL is safe for href assignment
-    function isSafeHref(url) {
-      if (!url) return false;
-      // Allow relative paths
-      if (url.startsWith('/') || url.startsWith('./') || url.startsWith('#')) return true;
-      // Allow http/https URLs
-      if (url.startsWith('http://') || url.startsWith('https://')) return true;
-      return false;
-    }
-
     // Manage buttons that only work online (View, Register Visiting Pilot, Finances, Closeout, Finalize)
     function updateOnlineOnlyButtons(isOnline) {
       const buttons = document.querySelectorAll('.online-only-btn');
@@ -1369,22 +1358,11 @@ document.addEventListener("click", async function(e) {
           btn.removeAttribute('aria-disabled');
           btn.style.pointerEvents = '';
           btn.style.opacity = '';
-          // Restore href for links (validate URL is safe first)
-          if (btn.tagName === 'A' && btn.hasAttribute('data-original-href')) {
-            const originalHref = btn.getAttribute('data-original-href');
-            if (isSafeHref(originalHref)) {
-              btn.href = originalHref;
-            }
-          }
         } else {
           btn.classList.add('disabled');
           btn.setAttribute('aria-disabled', 'true');
           btn.style.pointerEvents = 'none';
           btn.style.opacity = '0.5';
-          // For links, set href to prevent navigation (data-original-href already set in HTML)
-          if (btn.tagName === 'A') {
-            btn.href = 'javascript:void(0)';
-          }
         }
       });
     }
