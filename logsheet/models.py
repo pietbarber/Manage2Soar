@@ -173,7 +173,29 @@ class Flight(models.Model):
     def tow_cost_calculated(self):
         """
         Calculate tow cost using towplane-specific charging scheme.
+
+        Returns:
+            Decimal: The calculated tow cost, or Decimal("0.00") if:
+                - free_tow is True (explicitly marked as free)
+                - is_retrieve is True AND site config waive_tow_fee_on_retrieve is True
+            None: If release_altitude is None or no towplane charge scheme is available.
+
+        Note:
+            Instance-level caching of SiteConfiguration via _site_config_cache helps
+            reduce queries when this property is accessed multiple times on the same
+            Flight instance. For views processing many flights, consider prefetching
+            config once and reusing across all instances.
         """
+        # Check for free tow flag
+        if self.free_tow:
+            return Decimal("0.00")
+
+        # Check for retrieve waiver (requires config lookup)
+        if self.is_retrieve:
+            config = self._get_site_config()
+            if config and config.waive_tow_fee_on_retrieve:
+                return Decimal("0.00")
+
         if self.release_altitude is None:
             return None
 
@@ -191,6 +213,31 @@ class Flight(models.Model):
 
     @property
     def rental_cost_calculated(self):
+        """
+        Calculate rental cost, respecting free flags and waivers.
+
+        Returns:
+            Decimal: The calculated rental cost or Decimal("0.00") if:
+                - free_rental is True (explicitly marked as free)
+                - is_retrieve is True AND site config waive_rental_fee_on_retrieve is True
+                - glider has no rental rate
+            None: If glider or duration is not set.
+
+        Note:
+            Instance-level caching of SiteConfiguration via _site_config_cache helps
+            reduce queries when this property is accessed multiple times on the same
+            Flight instance.
+        """
+        # Check for free rental flag
+        if self.free_rental:
+            return Decimal("0.00")
+
+        # Check for retrieve waiver (requires config lookup)
+        if self.is_retrieve:
+            config = self._get_site_config()
+            if config and config.waive_rental_fee_on_retrieve:
+                return Decimal("0.00")
+
         if not self.glider or not self.duration:
             return None
         if not self.glider.rental_rate:
@@ -214,19 +261,26 @@ class Flight(models.Model):
 
     @property
     def rental_cost(self):
-        if not self.glider or not self.duration:
-            return None
-        if not self.glider.rental_rate:
-            return Decimal("0.00")
+        """
+        Calculate rental cost with max rental cap applied.
 
-        hours = Decimal(self.duration.total_seconds()) / Decimal("3600")
-        rate = Decimal(str(self.glider.rental_rate))
-        cost = rate * hours
+        Delegates free flag and waiver checks to rental_cost_calculated,
+        then applies glider's max rental cap if configured.
 
-        # Cap at max_rental_rate if set
-        max_rate = self.glider.max_rental_rate
-        if max_rate is not None:
-            max_rate = Decimal(str(max_rate))
+        Returns:
+            Decimal: Final rental cost with cap applied, or Decimal("0.00") if free.
+            None: If glider or duration is not set.
+        """
+        # Get base rental cost (handles free flags and waivers)
+        cost = self.rental_cost_calculated
+
+        # If None or $0, return as-is
+        if cost is None or cost == Decimal("0.00"):
+            return cost
+
+        # Apply max rental cap if set
+        if self.glider and self.glider.max_rental_rate is not None:
+            max_rate = Decimal(str(self.glider.max_rental_rate))
             cost = min(cost, max_rate)
 
         return cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -288,6 +342,35 @@ class Flight(models.Model):
         null=True,
         blank=True,
     )
+
+    # Special flight type flags (Issue #66)
+    is_retrieve = models.BooleanField(
+        default=False,
+        help_text="This is a retrieve flight (ferrying a glider back after a landout)",
+    )
+    free_tow = models.BooleanField(
+        default=False,
+        help_text="No charge for the aerotow (e.g., post-maintenance check flight, club-authorized free flight)",
+    )
+    free_rental = models.BooleanField(
+        default=False,
+        help_text="No charge for glider rental (e.g., post-maintenance check flight, club-authorized free flight)",
+    )
+
+    def _get_site_config(self):
+        """
+        Get SiteConfiguration with instance-level caching.
+
+        Returns cached config from _site_config_cache if available,
+        otherwise fetches from database and caches for future use.
+        """
+        config = getattr(self, "_site_config_cache", None)
+        if config is None:
+            from siteconfig.models import SiteConfiguration
+
+            config = SiteConfiguration.objects.first()
+            self._site_config_cache = config
+        return config
 
     def __str__(self):
         return f"{self.pilot} in {self.glider} at {self.launch_time}"
@@ -1338,3 +1421,136 @@ class AircraftMeister(models.Model):
     def __str__(self):
         aircraft = self.glider or self.towplane
         return f"{self.member} – {aircraft}"
+
+
+####################################################
+# MemberCharge model
+#
+# Records miscellaneous charges applied to members for merchandise,
+# services, or fees not captured by flight costs.
+#
+# Issue #66: Aerotow retrieve fees (tach time charges)
+# Issue #413: Miscellaneous charges (t-shirts, logbooks, etc.)
+#
+# Fields:
+# - member: The member being charged.
+# - chargeable_item: Reference to the ChargeableItem catalog.
+# - quantity: Amount purchased (supports decimals for tach time).
+# - unit_price: Snapshot of price at time of charge (immutable).
+# - total_price: Computed total (quantity × unit_price).
+# - date: Date the charge was applied.
+# - logsheet: Optional link to logsheet (for finalization logic).
+# - notes: Optional notes about the charge.
+# - entered_by: Member who entered the charge.
+#
+# Methods:
+# - save: Auto-calculates total_price on save.
+# - __str__: Returns a readable summary of the charge.
+#
+
+
+class MemberCharge(models.Model):
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="misc_charges",
+        help_text="Member being charged",
+    )
+    chargeable_item = models.ForeignKey(
+        "siteconfig.ChargeableItem",
+        on_delete=models.PROTECT,
+        help_text="Item or service being charged",
+    )
+    quantity = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal("1.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Quantity (supports decimals for tach time, e.g., 1.8 hours)",
+    )
+    unit_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Price per unit at time of charge (snapshot, won't change if catalog price updates)",
+    )
+    total_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Total charge (quantity × unit_price)",
+    )
+    date = models.DateField(
+        default=date.today,
+        help_text="Date the charge was applied",
+    )
+    logsheet = models.ForeignKey(
+        "Logsheet",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="member_charges",
+        help_text="Optional link to logsheet (charges tied to finalized logsheets are locked)",
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Optional notes about this charge",
+    )
+    entered_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="charges_entered",
+        help_text="Member who entered this charge",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Member Charge"
+        verbose_name_plural = "Member Charges"
+        ordering = ["-date", "-created_at"]
+        indexes = [
+            models.Index(fields=["member", "date"]),
+            models.Index(fields=["logsheet"]),
+        ]
+
+    # clean() method removed as validation is redundant with required field constraints.
+    def save(self, *args, **kwargs):
+        """Auto-calculate total_price and snapshot unit_price if not set."""
+        # Snapshot the price from the catalog item if not already set
+        if self.unit_price is None and self.chargeable_item:
+            self.unit_price = self.chargeable_item.price
+
+        # Validate decimal quantity constraint (Issue #66, #413)
+        if self.chargeable_item and not self.chargeable_item.allows_decimal_quantity:
+            # Check if quantity has decimal places
+            if self.quantity % 1 != 0:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    f"Decimal quantities are not allowed for {self.chargeable_item.name}. "
+                    f"Please enter a whole number."
+                )
+
+        # Calculate total
+        if self.quantity and self.unit_price:
+            self.total_price = (self.quantity * self.unit_price).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        else:
+            self.total_price = Decimal("0.00")
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        # Use getattr to safely handle edge cases where chargeable_item might be None
+        # (e.g., during deletion cascades or inconsistent model states)
+        item_name = getattr(self.chargeable_item, "name", "Unknown Item")
+        return f"{self.member} - {item_name} (${self.total_price})"
+
+    @property
+    def is_locked(self):
+        """Charges tied to finalized logsheets cannot be edited."""
+        return self.logsheet and self.logsheet.finalized

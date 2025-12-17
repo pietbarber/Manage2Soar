@@ -35,6 +35,7 @@ from .models import (
     LogsheetPayment,
     MaintenanceDeadline,
     MaintenanceIssue,
+    MemberCharge,
     RevisionLog,
     Towplane,
     TowplaneCloseout,
@@ -951,6 +952,16 @@ def manage_logsheet_finances(request, pk):
         "towplane", "rental_charged_to"
     ).all()
 
+    # OPTIMIZATION: Cache SiteConfiguration to avoid N+1 queries when processing retrieve flights
+    # (Issue #66 - retrieve flights may query SiteConfiguration to check waiver settings)
+    from siteconfig.models import SiteConfiguration
+
+    site_config = SiteConfiguration.objects.first()
+
+    # Pre-cache config on all Flight instances to avoid repeated DB lookups
+    for flight in flights:
+        flight._site_config_cache = site_config
+
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
         return {
@@ -1004,6 +1015,7 @@ def manage_logsheet_finances(request, pk):
             "tow": Decimal("0.00"),
             "rental": Decimal("0.00"),
             "towplane_rental": Decimal("0.00"),
+            "misc_charges": Decimal("0.00"),
             "total": Decimal("0.00"),
         }
     )
@@ -1047,10 +1059,23 @@ def manage_logsheet_finances(request, pk):
                 str(rental_cost)
             )
 
+    # Add miscellaneous charges (Issue #66, #413)
+    misc_charges_qs = MemberCharge.objects.filter(logsheet=logsheet).select_related(
+        "member", "chargeable_item"
+    )
+    misc_charges_data = list(misc_charges_qs)  # Store for template display
+    total_misc_charges = Decimal("0.00")
+    for charge in misc_charges_data:
+        member_charges[charge.member]["misc_charges"] += charge.total_price
+        total_misc_charges += charge.total_price
+
     # Add combined totals
     for summary in member_charges.values():
         summary["total"] = (
-            summary["tow"] + summary["rental"] + summary["towplane_rental"]
+            summary["tow"]
+            + summary["rental"]
+            + summary["towplane_rental"]
+            + summary["misc_charges"]
         )
 
     # OPTIMIZATION: Bulk fetch existing payments to avoid N+1 queries
@@ -1109,6 +1134,10 @@ def manage_logsheet_finances(request, pk):
             for closeout in towplane_closeouts:
                 if closeout.rental_charged_to and closeout.rental_cost:
                     responsible_members.add(closeout.rental_charged_to)
+
+            # Add members responsible for miscellaneous charges (Issue #66, #413)
+            for charge in misc_charges_data:
+                responsible_members.add(charge.member)
 
             missing = []
             for member in responsible_members:
@@ -1205,10 +1234,12 @@ def manage_logsheet_finances(request, pk):
         "total_tow": total_tow,
         "total_rental": total_rental,
         "total_towplane_rental": total_towplane_rental,
-        "total_sum": total_sum,
+        "total_misc_charges": total_misc_charges,
+        "total_sum": total_sum + total_misc_charges,
         "pilot_summary_sorted": pilot_summary_sorted,
         "member_charges_sorted": member_charges_sorted,
         "member_payment_data_sorted": member_payment_data_sorted,
+        "misc_charges_data": misc_charges_data,
         "active_members": active_members,
         "inactive_members": inactive_members,
         "towplane_rental_enabled": rental_enabled,

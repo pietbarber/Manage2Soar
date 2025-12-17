@@ -198,6 +198,9 @@ class FlightForm(forms.ModelForm):
             "release_altitude",
             "passenger",
             "passenger_name",
+            "is_retrieve",
+            "free_tow",
+            "free_rental",
         ]
         widgets = {
             "launch_time": forms.TimeInput(
@@ -222,6 +225,9 @@ class FlightForm(forms.ModelForm):
             "passenger_name": forms.TextInput(
                 attrs={"placeholder": "If not a member", "class": "form-control"}
             ),
+            "is_retrieve": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "free_tow": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "free_rental": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):

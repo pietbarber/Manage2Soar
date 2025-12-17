@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from utils.admin_helpers import AdminHelperMixin
 
 from .models import (
+    ChargeableItem,
     MailingList,
     MailingListCriterion,
     MembershipStatus,
@@ -69,7 +70,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         # Only allow Webmaster (superuser or group) to edit
         return (
             request.user.is_superuser
-            or request.user.groups.filter(name="Webmaster").exists()
+            or request.user.groups.filter(name="Webmasters").exists()
         )
 
     readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
@@ -170,6 +171,8 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "max_reservations_per_year",
                     "max_reservations_per_month",
                     "allow_towplane_rental",
+                    "waive_tow_fee_on_retrieve",
+                    "waive_rental_fee_on_retrieve",
                     "redaction_notification_dedupe_minutes",
                 ),
                 "classes": ("collapse",),
@@ -401,4 +404,88 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
         "Mailing Lists: Configure email lists for your club's mail server. "
         "Each list can include members matching one or more criteria (using OR logic). "
         "The API at /members/api/email-lists/ returns subscriber emails for each active list."
+    )
+
+
+@admin.register(ChargeableItem)
+class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
+    """
+    Admin interface for managing chargeable items catalog.
+
+    Issue #66: Aerotow retrieve fees
+    Issue #413: Miscellaneous charges
+    """
+
+    list_display = (
+        "name",
+        "price_display",
+        "unit",
+        "allows_decimal_quantity",
+        "is_active",
+        "sort_order",
+    )
+    list_editable = ("is_active", "sort_order")
+    list_filter = ("is_active", "unit")
+    search_fields = ("name", "description")
+    ordering = ("sort_order", "name")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "price",
+                    "unit",
+                    "allows_decimal_quantity",
+                    "is_active",
+                    "sort_order",
+                )
+            },
+        ),
+        (
+            "Details",
+            {
+                "fields": ("description",),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Price")
+    def price_display(self, obj):
+        """Display price with unit."""
+        if obj.unit == ChargeableItem.UnitType.HOUR:
+            return format_html("${:.2f}/hour", obj.price)
+        return format_html("${:.2f}", obj.price)
+
+    def _has_webmaster_permission(self, request):
+        """Check if user has webmaster-level permission."""
+        return (
+            request.user.is_superuser
+            or request.user.groups.filter(name="Webmasters").exists()
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    def has_add_permission(self, request):
+        return self._has_webmaster_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._has_webmaster_permission(request)
+
+    admin_helper_message = (
+        "Chargeable Items: Catalog of merchandise and service charges. "
+        "Add items like t-shirts, logbooks, or service fees like aerotow retrieves. "
+        "For time-based charges (like retrieve tach time), set unit to 'Per Hour' and enable decimal quantities."
     )
