@@ -17,6 +17,9 @@ from playwright.sync_api import sync_playwright
 from members.models import Member
 from siteconfig.models import MembershipStatus
 
+# Test password used across all E2E tests
+TEST_PASSWORD = "testpass123"
+
 
 class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
     """
@@ -84,19 +87,29 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
 
         member = Member.objects.create_user(
             username=username,
-            password="testpass123",
+            password=TEST_PASSWORD,
             **defaults,
         )
         return member
 
-    def login(self, username="testuser", password="testpass123"):
-        """Log in the user via the browser."""
+    def login(self, username="testuser", password=TEST_PASSWORD):
+        """Log in the user via the browser.
+
+        Raises:
+            AssertionError: If login fails or redirect doesn't occur.
+        """
         self.page.goto(f"{self.live_server_url}/login/")
         self.page.fill('input[name="username"]', username)
         self.page.fill('input[name="password"]', password)
         self.page.click('button[type="submit"]')
         # Wait for redirect after login
         self.page.wait_for_url(f"{self.live_server_url}/**")
+
+        # Verify login was successful - check we're not still on login page
+        current_url = self.page.url
+        assert (
+            "/login/" not in current_url
+        ), f"Login failed - still on login page: {current_url}"
 
 
 # Pytest fixtures for standalone Playwright tests (without Django test case)
@@ -123,21 +136,12 @@ def browser_context_args():
 
 
 @pytest.fixture
-def live_server(live_server):
-    """
-    Provide the Django live server URL to Playwright tests.
-
-    This uses pytest-django's live_server fixture.
-    """
-    return live_server
-
-
-@pytest.fixture
 def authenticated_page(page, live_server, django_user_model):
     """
     Provide a Playwright page with an authenticated user session.
 
     Creates a test user and logs in before returning the page.
+    Uses get_or_create to avoid IntegrityError in parallel test execution.
     """
     from siteconfig.models import MembershipStatus
 
@@ -150,20 +154,25 @@ def authenticated_page(page, live_server, django_user_model):
         },
     )
 
-    # Create test user
-    django_user_model.objects.create_user(
+    # Create or get test user - use get_or_create to avoid IntegrityError
+    user, created = django_user_model.objects.get_or_create(
         username="e2e_testuser",
-        password="testpass123",
-        email="e2e_test@example.com",
-        first_name="E2E",
-        last_name="Tester",
-        membership_status=status.name,
+        defaults={
+            "password": TEST_PASSWORD,
+            "email": "e2e_test@example.com",
+            "first_name": "E2E",
+            "last_name": "Tester",
+            "membership_status": status.name,
+        },
     )
+    if created:
+        user.set_password(TEST_PASSWORD)
+        user.save()
 
     # Login via browser
     page.goto(f"{live_server.url}/login/")
     page.fill('input[name="username"]', "e2e_testuser")
-    page.fill('input[name="password"]', "testpass123")
+    page.fill('input[name="password"]', TEST_PASSWORD)
     page.click('button[type="submit"]')
 
     # Wait for login to complete
@@ -178,6 +187,7 @@ def admin_page(page, live_server, django_user_model):
     Provide a Playwright page with an admin user session.
 
     Creates a superuser and logs in before returning the page.
+    Uses get_or_create to avoid IntegrityError in parallel test execution.
     """
     from siteconfig.models import MembershipStatus
 
@@ -190,20 +200,27 @@ def admin_page(page, live_server, django_user_model):
         },
     )
 
-    # Create admin user
-    django_user_model.objects.create_superuser(
+    # Create or get admin user - use get_or_create to avoid IntegrityError
+    admin, created = django_user_model.objects.get_or_create(
         username="e2e_admin",
-        password="adminpass123",
-        email="e2e_admin@example.com",
-        first_name="Admin",
-        last_name="User",
-        membership_status=status.name,
+        defaults={
+            "password": TEST_PASSWORD,
+            "email": "e2e_admin@example.com",
+            "first_name": "Admin",
+            "last_name": "User",
+            "membership_status": status.name,
+            "is_superuser": True,
+            "is_staff": True,
+        },
     )
+    if created:
+        admin.set_password(TEST_PASSWORD)
+        admin.save()
 
     # Login via browser
     page.goto(f"{live_server.url}/login/")
     page.fill('input[name="username"]', "e2e_admin")
-    page.fill('input[name="password"]', "adminpass123")
+    page.fill('input[name="password"]', TEST_PASSWORD)
     page.click('button[type="submit"]')
 
     # Wait for login to complete

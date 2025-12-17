@@ -154,8 +154,8 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
 
     def test_youtube_url_resolver_short_url(self):
         """Test that youtu.be short URLs are resolved correctly."""
-        self.create_test_member(username="youtube_admin2", is_superuser=True)
-        self.login(username="youtube_admin2")
+        self.create_test_member(username="youtube_short_url_admin", is_superuser=True)
+        self.login(username="youtube_short_url_admin")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
