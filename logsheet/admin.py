@@ -16,6 +16,7 @@ from .models import (
     Logsheet,
     LogsheetCloseout,
     LogsheetPayment,
+    MemberCharge,
     RevisionLog,
     Towplane,
     TowplaneChargeScheme,
@@ -482,6 +483,91 @@ class LogsheetPaymentAdmin(AdminHelperMixin, admin.ModelAdmin):
     # list_select_related on this admin avoids the need for a custom get_queryset.
 
     admin_helper_message = "Payments: attach payment methods to charges. Use autocomplete for members and logsheets."
+
+
+@admin.register(MemberCharge)
+class MemberChargeAdmin(AdminHelperMixin, admin.ModelAdmin):
+    """
+    Admin interface for managing member charges.
+
+    Issue #66: Aerotow retrieve fees
+    Issue #413: Miscellaneous charges
+    """
+
+    list_display = (
+        "member",
+        "chargeable_item",
+        "quantity",
+        "unit_price",
+        "total_price",
+        "date",
+        "logsheet",
+        "is_locked",
+    )
+    list_filter = ("date", "chargeable_item", RecentLogsheetFilter)
+    search_fields = (
+        "member__first_name",
+        "member__last_name",
+        "chargeable_item__name",
+        "notes",
+    )
+    autocomplete_fields = ("member", "chargeable_item", "logsheet", "entered_by")
+    list_select_related = ("member", "chargeable_item", "logsheet", "entered_by")
+    readonly_fields = ("total_price", "created_at", "updated_at", "is_locked")
+    list_per_page = 50
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "member",
+                    "chargeable_item",
+                    "quantity",
+                    "unit_price",
+                    "total_price",
+                    "date",
+                )
+            },
+        ),
+        (
+            "Logsheet Linkage",
+            {
+                "fields": ("logsheet", "is_locked"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Notes & Metadata",
+            {
+                "fields": ("notes", "entered_by", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    @admin.display(description="Locked", boolean=True)
+    def is_locked(self, obj):
+        """Display lock status as a boolean icon."""
+        return obj.is_locked
+
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deletion of charges linked to finalized logsheets."""
+        if obj and obj.is_locked:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        """Prevent editing of charges linked to finalized logsheets."""
+        if obj and obj.is_locked:
+            return False
+        return super().has_change_permission(request, obj)
+
+    admin_helper_message = (
+        "Member Charges: Track miscellaneous charges for merchandise, aerotow retrieves, and services. "
+        "Charges linked to finalized logsheets are locked and cannot be edited or deleted. "
+        "Use autocomplete for members, items, and logsheets."
+    )
 
 
 # RecentLogsheetFilter is defined above so it can be referenced directly by LogsheetPaymentAdmin
