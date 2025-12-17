@@ -1518,6 +1518,17 @@ class MemberCharge(models.Model):
         if self.unit_price is None and self.chargeable_item:
             self.unit_price = self.chargeable_item.price
 
+        # Validate decimal quantity constraint (Issue #66, #413)
+        if self.chargeable_item and not self.chargeable_item.allows_decimal_quantity:
+            # Check if quantity has decimal places
+            if self.quantity % 1 != 0:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    f"Decimal quantities are not allowed for {self.chargeable_item.name}. "
+                    f"Please enter a whole number."
+                )
+
         # Calculate total
         if self.quantity and self.unit_price:
             self.total_price = (self.quantity * self.unit_price).quantize(

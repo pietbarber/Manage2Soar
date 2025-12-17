@@ -952,6 +952,16 @@ def manage_logsheet_finances(request, pk):
         "towplane", "rental_charged_to"
     ).all()
 
+    # OPTIMIZATION: Cache SiteConfiguration to avoid N+1 queries when processing retrieve flights
+    # (Issue #66 - retrieve flights may query SiteConfiguration to check waiver settings)
+    from siteconfig.models import SiteConfiguration
+
+    site_config = SiteConfiguration.objects.first()
+
+    # Pre-cache config on all Flight instances to avoid repeated DB lookups
+    for flight in flights:
+        flight._site_config_cache = site_config
+
     # Use locked-in values if finalized, else use capped property
     def flight_costs(f):
         return {

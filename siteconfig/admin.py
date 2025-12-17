@@ -70,7 +70,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
         # Only allow Webmaster (superuser or group) to edit
         return (
             request.user.is_superuser
-            or request.user.groups.filter(name="Webmaster").exists()
+            or request.user.groups.filter(name="Webmasters").exists()
         )
 
     readonly_fields = ("visiting_pilot_token", "visiting_pilot_token_created")
@@ -472,7 +472,7 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
         """Check if user has webmaster-level permission."""
         return (
             request.user.is_superuser
-            or request.user.groups.filter(name="Webmaster").exists()
+            or request.user.groups.filter(name="Webmasters").exists()
         )
 
     def has_change_permission(self, request, obj=None):

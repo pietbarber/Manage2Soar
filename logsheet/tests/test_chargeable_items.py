@@ -184,6 +184,33 @@ class MemberChargeModelTestCase(TestCase):
         # 1.8 * 120 = 216
         self.assertEqual(charge.total_price, Decimal("216.00"))
 
+    def test_decimal_quantity_validation(self):
+        """Test that decimal quantities are rejected when not allowed."""
+        from django.core.exceptions import ValidationError
+
+        # T-shirt doesn't allow decimal quantities
+        with self.assertRaises(ValidationError) as context:
+            MemberCharge.objects.create(
+                member=self.member1,
+                chargeable_item=self.tshirt,
+                quantity=Decimal("1.50"),  # Invalid - can't buy 1.5 t-shirts
+                unit_price=self.tshirt.price,
+                date=date.today(),
+                entered_by=self.member2,
+            )
+        self.assertIn("Decimal quantities are not allowed", str(context.exception))
+
+        # Retrieve allows decimal quantities - should work fine
+        charge = MemberCharge.objects.create(
+            member=self.member1,
+            chargeable_item=self.retrieve,
+            quantity=Decimal("1.50"),  # Valid - 1.5 hours tach time
+            unit_price=self.retrieve.price,
+            date=date.today(),
+            entered_by=self.member2,
+        )
+        self.assertEqual(charge.quantity, Decimal("1.50"))
+
     def test_is_locked_property(self):
         """Test that charges tied to finalized logsheets are locked."""
         charge = MemberCharge.objects.create(
