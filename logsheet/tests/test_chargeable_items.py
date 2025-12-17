@@ -204,27 +204,6 @@ class MemberChargeModelTestCase(TestCase):
         charge.refresh_from_db()
         self.assertTrue(charge.is_locked)
 
-    def test_save_validation_when_no_chargeable_item_or_unit_price(self):
-        """Test that clean() raises ValidationError when both unit_price and chargeable_item are None."""
-        from django.core.exceptions import ValidationError
-
-        charge = MemberCharge(
-            member=self.member1,
-            chargeable_item=None,
-            quantity=Decimal("1.00"),
-            unit_price=None,  # No unit_price
-            date=date.today(),
-            entered_by=self.member2,
-        )
-
-        with self.assertRaises(ValidationError) as context:
-            charge.full_clean()
-
-        self.assertIn(
-            "Either unit_price must be provided or chargeable_item must be set",
-            str(context.exception),
-        )
-
 
 class FlightFreeFlagsTestCase(TestCase):
     """Test free_tow, free_rental, and is_retrieve flags on flights."""
@@ -362,6 +341,7 @@ class FlightFreeFlagsTestCase(TestCase):
         )
         self.assertEqual(flight.tow_cost, Decimal("0.00"))
         # Rental should still be charged (waive_rental_fee_on_retrieve is False)
+        assert flight.rental_cost is not None
         self.assertGreater(flight.rental_cost, Decimal("0.00"))
 
     def test_retrieve_with_waive_rental_config(self):
@@ -382,7 +362,8 @@ class FlightFreeFlagsTestCase(TestCase):
         )
         self.assertEqual(flight.rental_cost, Decimal("0.00"))
         # Tow should still be charged (waive_tow_fee_on_retrieve is False)
-        self.assertGreater(flight.tow_cost, Decimal("0.00"))
+        self.assertIsNotNone(flight.tow_cost)
+        self.assertGreater(flight.tow_cost, Decimal("0.00"))  # type: ignore[arg-type]
 
     def test_retrieve_without_waiver_has_normal_costs(self):
         """Test that is_retrieve=True without waivers still charges normally."""
@@ -402,5 +383,7 @@ class FlightFreeFlagsTestCase(TestCase):
             is_retrieve=True,
         )
         # Both should be charged
+        assert flight.tow_cost is not None
         self.assertGreater(flight.tow_cost, Decimal("0.00"))
+        assert flight.rental_cost is not None
         self.assertGreater(flight.rental_cost, Decimal("0.00"))

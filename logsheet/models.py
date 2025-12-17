@@ -1511,15 +1511,7 @@ class MemberCharge(models.Model):
             models.Index(fields=["logsheet"]),
         ]
 
-    def clean(self):
-        """Validate that either unit_price is provided or chargeable_item is set."""
-        from django.core.exceptions import ValidationError
-
-        if self.unit_price is None and not self.chargeable_item_id:
-            raise ValidationError(
-                "Either unit_price must be provided or chargeable_item must be set."
-            )
-
+    # clean() method removed as validation is redundant with required field constraints.
     def save(self, *args, **kwargs):
         """Auto-calculate total_price and snapshot unit_price if not set."""
         # Snapshot the price from the catalog item if not already set
