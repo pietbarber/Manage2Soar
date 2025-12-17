@@ -1150,3 +1150,46 @@ class DutyPreferenceFormTests(TestCase):
         form = DutyPreferenceForm(data=form_data, member=self.partial_role_member)
         # All zeros (or empty) should be valid
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+
+    def test_view_saves_none_values_as_zero(self):
+        """
+        Integration test: Verify blackout_manage view handles None percentage values.
+
+        Issue #424 redux: Even after form validation passes, the view must
+        ensure None values are converted to 0 before saving to the database,
+        as the DutyPreference model fields don't allow NULL values.
+        """
+        from duty_roster.models import DutyPreference
+
+        # Log in as the member
+        self.client.login(username="towpilot", password="testpass123")
+
+        # Create valid form data with 100% tow pilot (the only role this member has)
+        # Other percentages are empty (None), which should be converted to 0
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "",  # Empty - will be None, should become 0
+            "duty_officer_percent": "",  # Empty - will be None, should become 0
+            "ado_percent": "",  # Empty - will be None, should become 0
+            "towpilot_percent": "100",  # Member is a tow pilot at 100%
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        # POST to the blackout_manage view
+        url = reverse("duty_roster:blackout_manage")
+        response = self.client.post(url, data=form_data, follow=True)
+
+        # Should succeed without IntegrityError (200 or 302 redirect)
+        self.assertIn(response.status_code, [200, 302])
+
+        # Verify the saved values: None values should be 0, tow pilot should be 100
+        pref = DutyPreference.objects.get(member=self.partial_role_member)
+        self.assertEqual(pref.instructor_percent, 0)
+        self.assertEqual(pref.duty_officer_percent, 0)
+        self.assertEqual(pref.ado_percent, 0)
+        self.assertEqual(pref.towpilot_percent, 100)
