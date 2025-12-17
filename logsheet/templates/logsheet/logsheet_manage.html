@@ -1368,7 +1368,13 @@ document.addEventListener("click", async function(e) {
           btn.removeAttribute('aria-disabled');
           btn.style.pointerEvents = '';
           btn.style.opacity = '';
-          btn.title = btn.getAttribute('data-original-title') || '';
+          // Restore title using textContent to avoid XSS
+          const originalTitle = btn.getAttribute('data-original-title');
+          if (originalTitle !== null) {
+            btn.title = originalTitle;
+          } else {
+            btn.title = '';
+          }
           // Restore href for links (validate URL is safe first)
           if (btn.tagName === 'A' && btn.hasAttribute('data-original-href')) {
             const originalHref = btn.getAttribute('data-original-href');
