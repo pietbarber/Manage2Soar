@@ -497,22 +497,24 @@ def pydenticon_view(request, username):
         raise Http404("Invalid username")
 
     # Generate the file path where the identicon should be
+    from pathlib import Path
+
     filename = f"profile_{username}.png"
-    avatar_dir = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
-    full_path = os.path.join(avatar_dir, filename)
+    avatar_dir = Path(settings.MEDIA_ROOT) / "generated_avatars"
+    full_path = avatar_dir / filename
 
     # Security: Ensure the resolved path is within the expected directory
     # This is a defense-in-depth check against path traversal
-    real_avatar_dir = os.path.realpath(avatar_dir)
-    real_full_path = os.path.realpath(full_path)
-    if not real_full_path.startswith(real_avatar_dir + os.sep):
+    try:
+        full_path.resolve().relative_to(avatar_dir.resolve())
+    except ValueError:
         raise Http404("Invalid path")
 
     # If file doesn't exist, generate it
-    file_path = os.path.join("generated_avatars", filename)
-    if not os.path.exists(full_path):
+    if not full_path.exists():
         try:
-            generate_identicon(username, file_path)
+            file_path_str = f"generated_avatars/{filename}"
+            generate_identicon(username, file_path_str)
         except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
 

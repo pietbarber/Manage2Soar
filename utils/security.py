@@ -32,6 +32,7 @@ def is_safe_redirect_url(url: str | None, request=None) -> bool:
         try:
             allowed_hosts = {request.get_host()}
         except Exception:
+            # Silently handle any errors getting host (request may be mocked or incomplete)
             pass
 
     return url_has_allowed_host_and_scheme(url, allowed_hosts=allowed_hosts)
