@@ -53,34 +53,3 @@ def get_safe_redirect_url(url: str | None, default: str = "/", request=None) -> 
     if is_safe_redirect_url(url, request):
         return url  # type: ignore[return-value]
     return default
-
-
-def sanitize_exception_message(exception: Exception) -> str:
-    """
-    Sanitize an exception message for safe display to users.
-
-    This prevents exposing sensitive internal information like file paths,
-    database queries, or stack traces in error responses.
-
-    Args:
-        exception: The exception to sanitize
-
-    Returns:
-        A generic error message safe for user display
-    """
-    # Map of known safe exception types to their user-facing messages
-    safe_exceptions = {
-        "ValidationError": "Validation failed. Please check your input.",
-        "PermissionDenied": "You don't have permission to perform this action.",
-        "ObjectDoesNotExist": "The requested resource was not found.",
-        "IntegrityError": "A database constraint was violated.",
-    }
-
-    exception_type = type(exception).__name__
-
-    if exception_type in safe_exceptions:
-        return safe_exceptions[exception_type]
-
-    # For all other exceptions, return a generic message
-    # The actual exception is already logged, so we don't lose information
-    return "An unexpected error occurred. Please try again."

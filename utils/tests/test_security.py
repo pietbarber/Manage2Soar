@@ -3,14 +3,9 @@ Tests for security utility functions.
 """
 
 import pytest
-from django.http import HttpRequest
 from django.test import RequestFactory
 
-from utils.security import (
-    get_safe_redirect_url,
-    is_safe_redirect_url,
-    sanitize_exception_message,
-)
+from utils.security import get_safe_redirect_url, is_safe_redirect_url
 
 
 @pytest.fixture
@@ -125,79 +120,6 @@ class TestGetSafeRedirectUrl:
     def test_unsafe_url_with_request_object(self, mock_request):
         """Unsafe URL with request should return default."""
         assert get_safe_redirect_url("http://evil.com", request=mock_request) == "/"
-
-
-class TestSanitizeExceptionMessage:
-    """Tests for sanitize_exception_message function."""
-
-    def test_validation_error_message(self):
-        """ValidationError should return user-friendly message."""
-        from django.core.exceptions import ValidationError
-
-        exc = ValidationError("Invalid input")
-        assert (
-            sanitize_exception_message(exc)
-            == "Validation failed. Please check your input."
-        )
-
-    def test_permission_denied_message(self):
-        """PermissionDenied should return user-friendly message."""
-        from django.core.exceptions import PermissionDenied
-
-        exc = PermissionDenied("You don't have access")
-        assert (
-            sanitize_exception_message(exc)
-            == "You don't have permission to perform this action."
-        )
-
-    def test_object_does_not_exist_message(self):
-        """ObjectDoesNotExist should return user-friendly message."""
-        from django.core.exceptions import ObjectDoesNotExist
-
-        exc = ObjectDoesNotExist("Flight not found")
-        assert (
-            sanitize_exception_message(exc) == "The requested resource was not found."
-        )
-
-    def test_integrity_error_message(self):
-        """IntegrityError should return user-friendly message."""
-        from django.db import IntegrityError
-
-        exc = IntegrityError("UNIQUE constraint failed")
-        assert sanitize_exception_message(exc) == "A database constraint was violated."
-
-    def test_unknown_exception_returns_generic_message(self):
-        """Unknown exception types should return generic message."""
-        exc = RuntimeError("Detailed error with /path/to/file.py line 42")
-        assert (
-            sanitize_exception_message(exc)
-            == "An unexpected error occurred. Please try again."
-        )
-
-    def test_custom_exception_returns_generic_message(self):
-        """Custom exception types should return generic message."""
-
-        class CustomException(Exception):
-            pass
-
-        exc = CustomException("Custom error details")
-        assert (
-            sanitize_exception_message(exc)
-            == "An unexpected error occurred. Please try again."
-        )
-
-    def test_sanitize_prevents_information_leakage(self):
-        """Verify that detailed error info doesn't leak through."""
-        exc = Exception(
-            "Database connection failed: host=db.internal.com, "
-            "database=manage2soar_prod, user=admin"
-        )
-        result = sanitize_exception_message(exc)
-        # Should not contain any internal details
-        assert "db.internal.com" not in result
-        assert "manage2soar_prod" not in result
-        assert "admin" not in result
-        assert result == "An unexpected error occurred. Please try again."
 
 
 class TestSecurityEdgeCases:

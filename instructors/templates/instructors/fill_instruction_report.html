@@ -422,7 +422,7 @@ function isSafeImageUrl(url) {
     ];
 
     for (const prefix of allowedDataPrefixes) {
-      if (lowerUrl.startswith(prefix)) {
+      if (lowerUrl.startsWith(prefix)) {
         return true;
       }
     }
