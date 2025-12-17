@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: django
-          image: gcr.io/skyline-soaring-storage/skylinesoaring:20251215-1909-10b07e1
+          image: gcr.io/skyline-soaring-storage/skylinesoaring:20251217-0020-0d903d4
           ports:
             - containerPort: 8000
           env:
