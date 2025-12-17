@@ -21,7 +21,7 @@ class TestTinyMCEEditorLoads(DjangoPlaywrightTestCase):
     def test_tinymce_initializes_on_cms_create_page(self):
         """Verify TinyMCE initializes when creating a CMS page."""
         # Create admin user and login
-        admin = self.create_test_member(username="cms_admin", is_superuser=True)
+        self.create_test_member(username="cms_admin", is_superuser=True)
         self.login(username="cms_admin")
 
         # Navigate to CMS page creation
@@ -73,7 +73,7 @@ class TestTinyMCEEditorLoads(DjangoPlaywrightTestCase):
 
     def test_tinymce_media_plugin_available(self):
         """Verify the media plugin is loaded for video embedding."""
-        admin = self.create_test_member(username="cms_admin2", is_superuser=True)
+        self.create_test_member(username="cms_admin2", is_superuser=True)
         self.login(username="cms_admin2")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -93,7 +93,7 @@ class TestTinyMCEEditorLoads(DjangoPlaywrightTestCase):
 
     def test_tinymce_youtube_fix_script_loaded(self):
         """Verify the YouTube fix script is loaded."""
-        admin = self.create_test_member(username="cms_admin3", is_superuser=True)
+        self.create_test_member(username="cms_admin3", is_superuser=True)
         self.login(username="cms_admin3")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -119,7 +119,7 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
 
     def test_youtube_url_resolver_standard_url(self):
         """Test that standard YouTube URLs are resolved correctly."""
-        admin = self.create_test_member(username="youtube_admin", is_superuser=True)
+        self.create_test_member(username="youtube_admin2", is_superuser=True)
         self.login(username="youtube_admin")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -154,7 +154,7 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
 
     def test_youtube_url_resolver_short_url(self):
         """Test that youtu.be short URLs are resolved correctly."""
-        admin = self.create_test_member(username="youtube_admin2", is_superuser=True)
+        self.create_test_member(username="youtube_admin2", is_superuser=True)
         self.login(username="youtube_admin2")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -187,7 +187,7 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
 
     def test_non_youtube_url_rejected(self):
         """Test that non-YouTube URLs are passed through to default handler."""
-        admin = self.create_test_member(username="youtube_admin3", is_superuser=True)
+        self.create_test_member(username="youtube_admin3", is_superuser=True)
         self.login(username="youtube_admin3")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -219,7 +219,7 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
 
     def test_media_button_opens_dialog(self):
         """Test that clicking the media button opens the insert media dialog."""
-        admin = self.create_test_member(username="media_admin", is_superuser=True)
+        self.create_test_member(username="media_admin", is_superuser=True)
         self.login(username="media_admin")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
@@ -351,7 +351,7 @@ class TestTinyMCEScriptIntegrity(DjangoPlaywrightTestCase):
 
     def test_no_javascript_errors_on_page_load(self):
         """Verify no JavaScript errors occur when loading TinyMCE pages."""
-        self.create_test_member(username="js_admin", is_superuser=True)
+        self.create_test_member(username="xss_admin", is_superuser=True)
         self.login(username="js_admin")
 
         # Collect console errors
@@ -377,7 +377,7 @@ class TestTinyMCEScriptIntegrity(DjangoPlaywrightTestCase):
 
     def test_escape_html_function_exists(self):
         """Verify the XSS prevention function is defined."""
-        admin = self.create_test_member(username="xss_admin", is_superuser=True)
+        self.create_test_member(username="xss_admin", is_superuser=True)
         self.login(username="xss_admin")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
