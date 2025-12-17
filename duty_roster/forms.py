@@ -140,10 +140,10 @@ class DutyPreferenceForm(forms.ModelForm):
             )
 
         total = (
-            cleaned_data.get("instructor_percent", 0)
-            + cleaned_data.get("duty_officer_percent", 0)
-            + cleaned_data.get("ado_percent", 0)
-            + cleaned_data.get("towpilot_percent", 0)
+            (cleaned_data.get("instructor_percent") or 0)
+            + (cleaned_data.get("duty_officer_percent") or 0)
+            + (cleaned_data.get("ado_percent") or 0)
+            + (cleaned_data.get("towpilot_percent") or 0)
         )
         if total not in (0, 100):
             raise forms.ValidationError(
