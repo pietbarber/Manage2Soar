@@ -123,6 +123,7 @@
     <div class="management-actions">
       <div class="actions-grid">
         <a href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
+           data-original-href="{% url 'logsheet:manage_logsheet_finances' pk=logsheet.pk %}"
            class="action-card online-only-btn {% if logsheet.finalized %}action-card-view{% else %}action-card-edit{% endif %}">
           <div class="action-icon">
             <i class="bi bi-graph-up"></i>
@@ -136,7 +137,7 @@
         </a>
 
         {% if logsheet.finalized %}
-          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view online-only-btn">
+          <a href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" data-original-href="{% url 'logsheet:view_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-view online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -146,7 +147,7 @@
             </div>
           </a>
         {% else %}
-          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit online-only-btn">
+          <a href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" data-original-href="{% url 'logsheet:edit_logsheet_closeout' pk=logsheet.pk %}" class="action-card action-card-edit online-only-btn">
             <div class="action-icon">
               <i class="bi bi-file-text"></i>
             </div>
@@ -1380,9 +1381,8 @@ document.addEventListener("click", async function(e) {
           btn.setAttribute('aria-disabled', 'true');
           btn.style.pointerEvents = 'none';
           btn.style.opacity = '0.5';
-          // For links, save and remove href to prevent navigation
-          if (btn.tagName === 'A' && !btn.hasAttribute('data-original-href')) {
-            btn.setAttribute('data-original-href', btn.href);
+          // For links, set href to prevent navigation (data-original-href already set in HTML)
+          if (btn.tagName === 'A') {
             btn.href = 'javascript:void(0)';
           }
         }
