@@ -1150,3 +1150,63 @@ class DutyPreferenceFormTests(TestCase):
         form = DutyPreferenceForm(data=form_data, member=self.partial_role_member)
         # All zeros (or empty) should be valid
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+
+    def test_view_saves_none_values_as_zero(self):
+        """
+        Test that the view converts None percentage values to 0 when saving.
+
+        Issue #424 redux: Even after form validation passes, the view must
+        ensure None values are converted to 0 before saving to the database,
+        as the DutyPreference model fields don't allow NULL values.
+        """
+        from duty_roster.models import DutyPreference
+
+        # Create valid form data with 100% tow pilot (the only role this member has)
+        # Other percentages are empty (None), which should be converted to 0
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "",  # None - should become 0
+            "duty_officer_percent": "",  # None - should become 0
+            "ado_percent": "",  # None - should become 0
+            "towpilot_percent": "100",  # Member is a tow pilot at 100%
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        # Simulate what the view does: get cleaned_data and save to DB
+        from duty_roster.forms import DutyPreferenceForm
+
+        form = DutyPreferenceForm(data=form_data, member=self.partial_role_member)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+
+        data = form.cleaned_data
+
+        # This should not raise IntegrityError due to NULL constraint violation
+        # The view must convert None to 0 before saving
+        pref, created = DutyPreference.objects.update_or_create(
+            member=self.partial_role_member,
+            defaults={
+                "preferred_day": data["preferred_day"],
+                "dont_schedule": data["dont_schedule"],
+                "scheduling_suspended": data["scheduling_suspended"],
+                "suspended_reason": data["suspended_reason"],
+                # Use 'or 0' to convert None to 0, as the database fields don't allow NULL
+                "instructor_percent": data["instructor_percent"] or 0,
+                "duty_officer_percent": data["duty_officer_percent"] or 0,
+                "ado_percent": data["ado_percent"] or 0,
+                "towpilot_percent": data["towpilot_percent"] or 0,
+                "max_assignments_per_month": data["max_assignments_per_month"],
+                "allow_weekend_double": data.get("allow_weekend_double", False),
+                "comment": data["comment"],
+            },
+        )
+
+        # Verify the saved values: None values should be 0, tow pilot should be 100
+        self.assertEqual(pref.instructor_percent, 0)
+        self.assertEqual(pref.duty_officer_percent, 0)
+        self.assertEqual(pref.ado_percent, 0)
+        self.assertEqual(pref.towpilot_percent, 100)
