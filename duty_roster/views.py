@@ -20,6 +20,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
@@ -457,13 +458,16 @@ def ops_intent_toggle(request, year, month, day):
     if "instruction" in available_as:
         days_until = (day_date - timezone.now().date()).days
         if days_until > 14:
-            response = '<p class="text-red-700">⏰ You can only request instruction within 14 days of your duty date.</p>'
-            response += (
-                f'<form hx-get="{request.path}form/" '
-                'hx-post="{request.path}"'
+            response = format_html(
+                '<p class="text-red-700">⏰ You can only request instruction '
+                "within 14 days of your duty date.</p>"
+                '<form hx-get="{}form/" '
+                'hx-post="{}" '
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
                 '<button type="submit" class="btn btn-sm btn-primary">'
-                "🛩️ I Plan to Fly This Day</button></form>"
+                "🛩️ I Plan to Fly This Day</button></form>",
+                request.path,
+                request.path,
             )
             return HttpResponse(response)
 
@@ -524,13 +528,15 @@ def ops_intent_toggle(request, year, month, day):
                 fail_silently=True,
             )
 
-        response = '<p class="text-green-700">✅ You’re now marked as planning to fly this day.</p>'
-        response += (
-            f'<button hx-post="{request.path}" '
+        response = format_html(
+            '<p class="text-green-700">✅ You\'re now marked as planning to fly '
+            "this day.</p>"
+            '<button hx-post="{}" '
             'hx-target="#ops-intent-response" '
             'hx-swap="innerHTML" '
             'class="btn btn-sm btn-danger">'
-            "Cancel Intent</button>"
+            "Cancel Intent</button>",
+            request.path,
         )
 
     # CANCELLATION FLOW
@@ -570,12 +576,13 @@ def ops_intent_toggle(request, year, month, day):
                 )
 
         OpsIntent.objects.filter(member=request.user, date=day_date).delete()
-        response = '<p class="text-gray-700">❌ You’ve removed your intent to fly.</p>'
-        response += (
-            f'<form hx-get="{request.path}form/" '
+        response = format_html(
+            '<p class="text-gray-700">❌ You\'ve removed your intent to fly.</p>'
+            '<form hx-get="{}form/" '
             'hx-target="#ops-intent-response" hx-swap="innerHTML">'
             '<button type="submit" class="btn btn-sm btn-primary">'
-            "🛩️ I Plan to Fly This Day</button></form>"
+            "🛩️ I Plan to Fly This Day</button></form>",
+            request.path,
         )
 
     # still check for surges across the board

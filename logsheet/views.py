@@ -127,7 +127,11 @@ def land_flight_now(request, flight_id):
         flight.save(update_fields=["landing_time"])
         return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
+        logger.exception("Error landing flight %s", flight_id)
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred."},
+            status=500,
+        )
 
 
 @require_POST
@@ -169,7 +173,11 @@ def launch_flight_now(request, flight_id):
         flight.save(update_fields=["launch_time"])
         return JsonResponse({"success": True})
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
+        logger.exception("Error launching flight %s", flight_id)
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred."},
+            status=500,
+        )
 
 
 # Delete logsheet if empty (no flights, no closeout, no payments)

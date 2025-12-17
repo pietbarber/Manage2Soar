@@ -9,6 +9,11 @@ on:
     # Weekly security scan on Sundays at 2 AM UTC
     - cron: "0 2 * * 0"
 
+# Explicit permissions to follow principle of least privilege
+permissions:
+  contents: read
+  pull-requests: write  # For PR comments
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest

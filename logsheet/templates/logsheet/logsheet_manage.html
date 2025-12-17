@@ -1004,6 +1004,14 @@ document.addEventListener("click", async function(e) {
       }
     }
 
+    // Helper function to escape HTML special characters
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     // Helper to add clone notice to modal
     function addCloneNotice() {
       const modalContent = document.getElementById('flightModalContent');
@@ -1011,9 +1019,12 @@ document.addEventListener("click", async function(e) {
       if (existingHeader && !modalContent.querySelector('.clone-notice')) {
         const cloneNotice = document.createElement('div');
         cloneNotice.className = 'alert alert-success clone-notice mb-0';
+        const pilotName = escapeHtml(flightData.pilot_name || 'pilot');
+        const instructorName = flightData.instructor_name ? ` & ${escapeHtml(flightData.instructor_name)}` : '';
+        const gliderName = escapeHtml(flightData.glider_name || 'glider');
         cloneNotice.innerHTML = `
           <i class="bi bi-copy me-2"></i>
-          <strong>Cloned Flight:</strong> Pre-filled from ${flightData.pilot_name || 'pilot'}${flightData.instructor_name ? ` & ${flightData.instructor_name}` : ''} in ${flightData.glider_name || 'glider'}
+          <strong>Cloned Flight:</strong> Pre-filled from ${pilotName}${instructorName} in ${gliderName}
         `;
         existingHeader.insertAdjacentElement('afterend', cloneNotice);
       }
@@ -1347,26 +1358,11 @@ document.addEventListener("click", async function(e) {
           btn.removeAttribute('aria-disabled');
           btn.style.pointerEvents = '';
           btn.style.opacity = '';
-          btn.title = btn.getAttribute('data-original-title') || '';
-          // Restore href for links
-          if (btn.tagName === 'A' && btn.hasAttribute('data-original-href')) {
-            btn.href = btn.getAttribute('data-original-href');
-          }
         } else {
           btn.classList.add('disabled');
           btn.setAttribute('aria-disabled', 'true');
           btn.style.pointerEvents = 'none';
           btn.style.opacity = '0.5';
-          // Save original title and set offline message
-          if (!btn.hasAttribute('data-original-title')) {
-            btn.setAttribute('data-original-title', btn.title || '');
-          }
-          btn.title = 'Available when online';
-          // For links, save and remove href to prevent navigation
-          if (btn.tagName === 'A' && !btn.hasAttribute('data-original-href')) {
-            btn.setAttribute('data-original-href', btn.href);
-            btn.href = 'javascript:void(0)';
-          }
         }
       });
     }

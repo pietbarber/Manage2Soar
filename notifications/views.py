@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from members.decorators import active_member_required
 
@@ -22,4 +23,10 @@ def dismiss_notification(request, pk):
     notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.dismissed = True
     notification.save()
-    return redirect(request.headers.get("referer", "/"))
+    # Validate referer to prevent open redirect - inlined for CodeQL visibility
+    referer = request.headers.get("referer")
+    if referer and url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}
+    ):
+        return redirect(referer)
+    return redirect("/")

@@ -185,7 +185,7 @@ def reference_data(request):
     except Exception as e:
         logger.exception("Error fetching reference data")
         return JsonResponse(
-            {"success": False, "error": str(e)},
+            {"success": False, "error": "An error occurred fetching reference data."},
             status=500,
         )
 
@@ -316,7 +316,7 @@ def flights_sync(request):
     except Exception as e:
         logger.exception("Error in flights sync")
         return JsonResponse(
-            {"success": False, "error": str(e)},
+            {"success": False, "error": "An error occurred syncing flights."},
             status=500,
         )
 
@@ -421,7 +421,7 @@ def _create_flight_from_offline(flight_data, user):
 
     except Exception as e:
         logger.exception("Error creating flight from offline data")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "An error occurred creating the flight."}
 
 
 def _update_flight_from_offline(flight_data, user):
@@ -530,7 +530,7 @@ def _update_flight_from_offline(flight_data, user):
         return {"success": False, "error": "Towplane not found"}
     except Exception as e:
         logger.exception("Error updating flight from offline data")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "An error occurred updating the flight."}
 
 
 def _flight_to_dict(flight):
