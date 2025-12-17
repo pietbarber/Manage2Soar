@@ -39,8 +39,12 @@ class TestTinyMCEEditorLoads(DjangoPlaywrightTestCase):
         # Also wait for the edit area iframe
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=5000)
 
-        # Wait a bit more for TinyMCE to fully initialize its editors array
-        self.page.wait_for_timeout(2000)
+        # Wait for TinyMCE to fully initialize using smart waiting
+        self.page.wait_for_function(
+            "() => typeof tinymce !== 'undefined' && "
+            "(!!tinymce.activeEditor || (tinymce.editors && tinymce.editors.length > 0))",
+            timeout=10000,
+        )
 
         # Verify TinyMCE is defined in JavaScript
         tinymce_info = self.page.evaluate(
@@ -266,28 +270,60 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
         When Issue #422 is fixed, this test should start passing and the xfail marker
         can be removed.
         """
-        admin = self.create_test_member(username="embed_admin", is_superuser=True)
+        self.create_test_member(username="embed_admin", is_superuser=True)
         self.login(username="embed_admin")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Insert YouTube video via TinyMCE command
-        result = self.page.evaluate(
+        self.page.evaluate(
             """
-            async () => {
+            () => {
                 const editor = tinymce.activeEditor;
 
                 // Use insertMedia command with YouTube URL
                 editor.execCommand('mceMedia', false, {
                     source: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
                 });
+            }
+        """
+        )
 
-                // Wait a bit for processing
-                await new Promise(resolve => setTimeout(resolve, 500));
+        # Wait until the editor content reflects the inserted media
+        try:
+            self.page.wait_for_function(
+                """
+                () => {
+                    const editor = tinymce.activeEditor;
+                    if (!editor) {
+                        return false;
+                    }
+                    const content = editor.getContent();
+                    if (!content) {
+                        return false;
+                    }
+                    const lower = content.toLowerCase();
+                    return (
+                        lower.includes("iframe") ||
+                        lower.includes("video") ||
+                        lower.includes("youtube") ||
+                        lower.includes("media")
+                    );
+                }
+            """,
+                timeout=5000,
+            )
+        except Exception:
+            # Expected to fail - this is Issue #422
+            pass
 
-                // Get the editor content
-                const content = editor.getContent();
+        # Once the condition is satisfied (or timeout), retrieve the content
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const content = editor ? editor.getContent() : "";
                 return { content: content };
             }
         """
@@ -304,9 +340,9 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
         )
 
         # Assert that media was inserted - this will fail (xfail) until Issue #422 is fixed
-        self.assertTrue(
-            has_media,
-            f"YouTube video was not inserted into editor (Issue #422). Content: '{content[:200]}'",
+        assert has_media, (
+            f"YouTube video was not inserted into editor (Issue #422). "
+            f"Content: '{content[:200]}'"
         )
 
 
@@ -315,7 +351,7 @@ class TestTinyMCEScriptIntegrity(DjangoPlaywrightTestCase):
 
     def test_no_javascript_errors_on_page_load(self):
         """Verify no JavaScript errors occur when loading TinyMCE pages."""
-        admin = self.create_test_member(username="js_admin", is_superuser=True)
+        self.create_test_member(username="js_admin", is_superuser=True)
         self.login(username="js_admin")
 
         # Collect console errors

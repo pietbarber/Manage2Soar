@@ -61,8 +61,9 @@ class TestPlaywrightSetup(DjangoPlaywrightTestCase):
             # Click the toggler
             toggler.click()
 
-            # Wait for animation
-            self.page.wait_for_timeout(500)
+            # Wait for the navbar collapse to become visible (if it was hidden)
+            if not initial_visible:
+                navbar_collapse.wait_for(state="visible")
 
             # After clicking, visibility should change
             # (Either it becomes visible if collapsed, or stays visible)

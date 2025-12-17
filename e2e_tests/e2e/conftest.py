@@ -17,9 +17,6 @@ from playwright.sync_api import sync_playwright
 from members.models import Member
 from siteconfig.models import MembershipStatus
 
-# Allow Django ORM operations in Playwright's async context
-os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
-
 
 class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
     """
@@ -27,10 +24,17 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
 
     This allows testing JavaScript and browser-based interactions
     against a running Django server with static files served correctly.
+
+    Note: Sets DJANGO_ALLOW_ASYNC_UNSAFE in setUpClass to allow Django ORM
+    operations in Playwright's async context. This is scoped to E2E tests only.
     """
 
     @classmethod
     def setUpClass(cls):
+        # Allow Django ORM operations in Playwright's async context
+        # Scoped to this test class to avoid affecting other tests
+        os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+
         super().setUpClass()
         # Start Playwright once for the test class
         cls.playwright = sync_playwright().start()
@@ -40,6 +44,10 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
     def tearDownClass(cls):
         cls.browser.close()
         cls.playwright.stop()
+
+        # Clean up the environment variable
+        os.environ.pop("DJANGO_ALLOW_ASYNC_UNSAFE", None)
+
         super().tearDownClass()
 
     def setUp(self):
@@ -102,10 +110,15 @@ def browser_type_launch_args():
 
 @pytest.fixture(scope="session")
 def browser_context_args():
-    """Configure Playwright browser context arguments."""
+    """Configure Playwright browser context arguments.
+
+    Note: ignore_https_errors is set to True because Django's StaticLiveServerTestCase
+    runs a local development server without SSL certificates. This is safe for E2E tests
+    as they run against localhost only, not production environments.
+    """
     return {
         "viewport": {"width": 1280, "height": 720},
-        "ignore_https_errors": True,
+        "ignore_https_errors": True,  # Safe for local test server without SSL
     }
 
 
@@ -138,7 +151,7 @@ def authenticated_page(page, live_server, django_user_model):
     )
 
     # Create test user
-    user = django_user_model.objects.create_user(
+    django_user_model.objects.create_user(
         username="e2e_testuser",
         password="testpass123",
         email="e2e_test@example.com",
