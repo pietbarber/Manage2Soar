@@ -78,7 +78,7 @@ class TestPlaywrightSetup(DjangoPlaywrightTestCase):
     def test_authenticated_user_can_access_members(self):
         """Test that authenticated users can access member pages."""
         # Create a test member and login
-        member = self.create_test_member(username="playwright_user")
+        self.create_test_member(username="playwright_user")
         self.login(username="playwright_user")
 
         # Navigate to members page

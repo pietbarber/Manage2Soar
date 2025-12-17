@@ -120,7 +120,7 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
     def test_youtube_url_resolver_standard_url(self):
         """Test that standard YouTube URLs are resolved correctly."""
         self.create_test_member(username="youtube_admin2", is_superuser=True)
-        self.login(username="youtube_admin")
+        self.login(username="youtube_admin2")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
@@ -352,7 +352,7 @@ class TestTinyMCEScriptIntegrity(DjangoPlaywrightTestCase):
     def test_no_javascript_errors_on_page_load(self):
         """Verify no JavaScript errors occur when loading TinyMCE pages."""
         self.create_test_member(username="xss_admin", is_superuser=True)
-        self.login(username="js_admin")
+        self.login(username="xss_admin")
 
         # Collect console errors
         errors = []
