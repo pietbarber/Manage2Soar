@@ -58,6 +58,36 @@
 - Do not write tests for public endpoints that do not exist (e.g., `/siteconfig/edit/`); admin-only models should be tested via model logic or Django admin, not via public URLs.
 - When updating models or URLs, always update or remove affected tests to prevent false failures.
 
+### JavaScript & E2E Testing (CRITICAL)
+- **MANDATORY**: When updating any HTML page or template that contains JavaScript functionality, you MUST write a Playwright E2E test to verify that JavaScript works correctly.
+- **Location**: Add E2E tests to `e2e_tests/e2e/` directory
+- **Framework**: Use `DjangoPlaywrightTestCase` from `e2e_tests.e2e.conftest` which combines Django's `StaticLiveServerTestCase` with Playwright
+- **What to test**:
+  - User interactions (button clicks, form submissions, AJAX calls)
+  - DOM manipulation and dynamic content updates
+  - JavaScript libraries (Bootstrap, Chart.js, TinyMCE, etc.)
+  - Error handling and validation
+  - Browser-specific functionality
+- **Example pattern**:
+  ```python
+  from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
+
+  class TestMyFeature(DjangoPlaywrightTestCase):
+      def test_button_click_updates_content(self):
+          admin = self.create_test_member(username="admin", is_superuser=True)
+          self.login(username="admin")
+
+          self.page.goto(f"{self.live_server_url}/my-page/")
+          self.page.click("#my-button")
+
+          # Verify JavaScript updated the DOM
+          content = self.page.text_content("#result")
+          assert "Expected Text" in content
+  ```
+- **Running E2E tests**: `pytest e2e_tests/e2e/test_my_feature.py -v`
+- **Why**: JavaScript bugs are not caught by standard Django unit tests. E2E tests prevent regressions like Issue #422 (TinyMCE YouTube insertion) and Issue #377 (Bootstrap navbar toggle).
+- **When to skip**: Only skip E2E tests for purely server-side rendered pages with no JavaScript interactivity.
+
 ## URL & View Patterns
 - The homepage (`/`) dynamically serves either public or member content based on user status. Do not use redirects for this; render the correct content in-place.
 - Use slugs like `"home"` for public content and `"member-home"` for member content in the CMS.
