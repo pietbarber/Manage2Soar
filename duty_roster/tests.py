@@ -1041,3 +1041,112 @@ class InstructionRequestEdgeCaseTests(TestCase):
         # Should succeed and use surge instructor
         slot = InstructionSlot.objects.get(assignment=assignment, student=self.student)
         self.assertEqual(slot.instructor, surge_instructor)
+
+
+class DutyPreferenceFormTests(TestCase):
+    """Tests for DutyPreferenceForm validation (Issue #424)."""
+
+    def setUp(self):
+        """Set up test data."""
+        # Create a member with only some duty roles (not all)
+        self.partial_role_member = Member.objects.create(
+            username="towpilot",
+            email="towpilot@test.com",
+            first_name="Tow",
+            last_name="Pilot",
+            membership_status="Full Member",
+            towpilot=True,
+            instructor=False,
+            duty_officer=False,
+        )
+        self.partial_role_member.set_password("testpass123")
+        self.partial_role_member.save()
+
+        # Create a member with all duty roles
+        self.full_role_member = Member.objects.create(
+            username="fullrole",
+            email="fullrole@test.com",
+            first_name="Full",
+            last_name="Role",
+            membership_status="Full Member",
+            towpilot=True,
+            instructor=True,
+            duty_officer=True,
+        )
+        self.full_role_member.set_password("testpass123")
+        self.full_role_member.save()
+
+    def test_form_handles_none_percent_values(self):
+        """
+        Test that form validation handles None values in percentage fields.
+
+        Issue #424: When a member doesn't have all duty roles, the percentage
+        fields for roles they don't have may be submitted as None. The form's
+        clean() method should handle this gracefully without TypeError.
+        """
+        from duty_roster.forms import DutyPreferenceForm
+
+        # Simulate form data where non-applicable role percentages are empty/None
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "",  # Empty - will be None
+            "duty_officer_percent": "",  # Empty - will be None
+            "ado_percent": "",  # Empty - will be None
+            "towpilot_percent": "100",  # Member is a tow pilot
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.partial_role_member)
+        # This should not raise TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'
+        is_valid = form.is_valid()
+        # Form should be valid since tow pilot is at 100%
+        self.assertTrue(is_valid, f"Form errors: {form.errors}")
+
+    def test_form_validates_total_percent_equals_100(self):
+        """Test that form requires percentages to total 100% (or all 0)."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "30",
+            "duty_officer_percent": "30",
+            "ado_percent": "20",
+            "towpilot_percent": "30",  # Total = 110%, invalid
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
+        self.assertFalse(form.is_valid())
+        self.assertIn("total duty percentages must add up to 100%", str(form.errors))
+
+    def test_form_allows_all_zeros(self):
+        """Test that form accepts all zeros for percentages."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "",
+            "duty_officer_percent": "",
+            "ado_percent": "",
+            "towpilot_percent": "",
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.partial_role_member)
+        # All zeros (or empty) should be valid
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
