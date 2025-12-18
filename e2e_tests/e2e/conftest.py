@@ -28,14 +28,21 @@ class DjangoPlaywrightTestCase(StaticLiveServerTestCase):
     This allows testing JavaScript and browser-based interactions
     against a running Django server with static files served correctly.
 
-    Note: Sets DJANGO_ALLOW_ASYNC_UNSAFE in setUpClass to allow Django ORM
-    operations in Playwright's async context. This is scoped to E2E tests only.
+    IMPORTANT: Sets DJANGO_ALLOW_ASYNC_UNSAFE in setUpClass to allow Django ORM
+    operations in Playwright's async context. While cleaned up in tearDownClass,
+    this affects the entire Python process during test execution. E2E tests using
+    this base class MUST NOT be run in parallel to avoid race conditions and
+    unintended side effects.
+
+    When running E2E tests, use: pytest e2e_tests/ -n 0 (or omit -n flag)
     """
 
     @classmethod
     def setUpClass(cls):
-        # Allow Django ORM operations in Playwright's async context
-        # Scoped to this test class to avoid affecting other tests
+        # CRITICAL: Allow Django ORM operations in Playwright's async context
+        # This affects the entire Python process, not just this test class.
+        # WARNING: Do NOT run E2E tests in parallel - use pytest without -n flag
+        # or explicitly set -n 0 to prevent race conditions.
         os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
         super().setUpClass()
