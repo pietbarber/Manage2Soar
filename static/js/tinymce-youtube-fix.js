@@ -39,8 +39,8 @@
                         urlObj = new URL(url);
                         hostname = urlObj.hostname.toLowerCase();
                     } catch (e) {
-                        // Invalid URL, reject to let TinyMCE's default resolver try
-                        reject();
+                        // Invalid URL, let TinyMCE's default resolver handle it
+                        resolve({ html: '' });
                         return;
                     }
 
@@ -81,8 +81,9 @@
                         }
                     }
 
-                    // Let TinyMCE handle other URLs by rejecting the promise
-                    reject();
+                    // Let TinyMCE handle other URLs with default embed logic
+                    // Per TinyMCE docs: resolve with empty html to fall back to default
+                    resolve({ html: '' });
                 });
             };
 
