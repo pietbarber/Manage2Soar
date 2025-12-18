@@ -11,6 +11,17 @@ import re
 # YouTube allow attribute required for proper embedding
 YOUTUBE_ALLOW_ATTR = 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"'
 
+# Required permissions for YouTube embeds
+REQUIRED_YOUTUBE_PERMISSIONS = [
+    "accelerometer",
+    "autoplay",
+    "clipboard-write",
+    "encrypted-media",
+    "gyroscope",
+    "picture-in-picture",
+    "web-share",
+]
+
 
 def fix_youtube_embeds(content):
     """
@@ -54,8 +65,28 @@ def fix_youtube_embeds(content):
                 f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"'
             )
 
-        # Check if allow attribute is present with the right content
-        if 'allow="' not in iframe_attrs.lower():
+        # Check and normalize allow attribute
+        allow_match = re.search(
+            r'\sallow=["\']([^"\']*)["\']', iframe_attrs, flags=re.IGNORECASE
+        )
+
+        if allow_match:
+            existing_permissions = allow_match.group(1).lower()
+            # Check if all required permissions are present
+            if not all(
+                perm in existing_permissions for perm in REQUIRED_YOUTUBE_PERMISSIONS
+            ):
+                needs_update = True
+                # Remove existing allow and add canonical YouTube allow attribute
+                iframe_attrs = re.sub(
+                    r'\s*allow=["\'][^"\']*["\']',
+                    "",
+                    iframe_attrs,
+                    flags=re.IGNORECASE,
+                )
+                iframe_attrs = f"{iframe_attrs} {YOUTUBE_ALLOW_ATTR}"
+        else:
+            # No allow attribute present
             needs_update = True
             iframe_attrs = f"{iframe_attrs} {YOUTUBE_ALLOW_ATTR}"
 

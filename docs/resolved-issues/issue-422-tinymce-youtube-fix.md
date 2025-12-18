@@ -11,7 +11,7 @@ The issue was in `static/js/tinymce-youtube-fix.js`. The `media_url_resolver` ca
 ### Problem Code
 
 ```javascript
-// OLD CODE - INCORRECT
+// OLD CODE - INCORRECT (Promise-style)
 media_url_resolver = function(data) {
     return new Promise(function(resolve, reject) {
         // ... YouTube URL handling ...
@@ -22,30 +22,41 @@ media_url_resolver = function(data) {
 };
 ```
 
-### TinyMCE Documentation States
+### TinyMCE 6.x Documentation States
 
-Per [TinyMCE media plugin documentation](https://www.tiny.cloud/docs/tinymce/latest/media/):
+Per [TinyMCE 6 media plugin documentation](https://www.tiny.cloud/docs/tinymce/6/media/):
 
+> **TinyMCE 6.x uses CALLBACK-STYLE API, not Promise-based!**
+>
+> Signature: `(data, resolve, reject) => { resolve({ html: '...' }); }`
+>
 > "If, in your handler, you would like to **fall back to the default media embed logic**, call the `resolve` callback with an object where the `html` property is set to an **empty string**, like this: `resolve({ html: '' })`."
 
-The `reject()` call was breaking TinyMCE's internal promise chain, preventing ANY media from being inserted—including the properly resolved YouTube embed HTML.
+The code was using Promise-style API when TinyMCE 6.x requires callback-style. This was preventing ANY media from being inserted.
 
 ## Solution Implemented
 
-Changed all `reject()` calls to `resolve({ html: '' })`:
+Changed to callback-style API per TinyMCE 6.x requirements:
 
 **File**: `static/js/tinymce-youtube-fix.js`
 
 ```javascript
-// NEW CODE - CORRECT
-media_url_resolver = function(data) {
-    return new Promise(function(resolve, reject) {
-        // ... YouTube URL handling returns resolve({ html: '<iframe...>' })
+// NEW CODE - CORRECT (Callback-style for TinyMCE 6.x)
+function youtubeMediaUrlResolver(data, resolve, reject) {
+    var url = data.url;
 
-        // For non-YouTube or invalid URLs:
-        resolve({ html: '' });  // ✅ CORRECT: Falls back to TinyMCE default
-    });
-};
+    // ... YouTube URL parsing ...
+
+    if (videoId) {
+        // YouTube URL - return iframe HTML
+        var embedHtml = '<iframe src="https://www.youtube.com/embed/' + videoId + '" ...></iframe>';
+        resolve({ html: embedHtml });
+        return;
+    }
+
+    // For non-YouTube or invalid URLs, fall back to TinyMCE default
+    resolve({ html: '' });  // ✅ CORRECT: Callback-style fallback
+}
 ```
 
 ### Changes Made

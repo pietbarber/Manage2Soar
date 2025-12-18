@@ -291,10 +291,10 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Use media_url_resolver to get the embed HTML, then insert it
-        # This simulates what TinyMCE should do when the user enters a URL in the dialog
+        # TinyMCE 6.x uses callback-style API: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
+            () => {
                 const editor = tinymce.activeEditor;
                 const resolver = editor.options.get('media_url_resolver');
 
@@ -302,22 +302,30 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
                     return { error: 'No resolver found' };
                 }
 
-                try {
-                    // Get the embed HTML from our resolver
-                    const data = await resolver({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+                let result = null;
 
-                    if (data && data.html) {
-                        // Insert the HTML into the editor
-                        editor.insertContent(data.html);
-                        // Get content right after insertion
-                        const content = editor.getContent();
-                        return { success: true, inserted: data.html, contentAfter: content };
-                    } else {
-                        return { error: 'Resolver returned empty html', data: JSON.stringify(data) };
+                // Use callback-style API
+                resolver(
+                    { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+                    (data) => {
+                        // Success callback
+                        if (data && data.html) {
+                            // Insert the HTML into the editor
+                            editor.insertContent(data.html);
+                            // Get content right after insertion
+                            const content = editor.getContent();
+                            result = { success: true, inserted: data.html, contentAfter: content };
+                        } else {
+                            result = { error: 'Resolver returned empty html', data: JSON.stringify(data) };
+                        }
+                    },
+                    (error) => {
+                        // Reject callback
+                        result = { error: 'Resolver rejected', message: error.msg };
                     }
-                } catch (e) {
-                    return { error: 'Resolver rejected', message: String(e) };
-                }
+                );
+
+                return result || { error: 'Callback was not called synchronously' };
             }
         """
         )
