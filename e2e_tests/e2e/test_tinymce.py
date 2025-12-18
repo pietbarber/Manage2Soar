@@ -291,6 +291,8 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
         )
 
         # Wait until the editor content reflects the inserted media
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
         try:
             self.page.wait_for_function(
                 """
@@ -314,8 +316,8 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
             """,
                 timeout=5000,
             )
-        except Exception:
-            # Expected to fail - this is Issue #422
+        except PlaywrightTimeoutError:
+            # Expected to timeout - this is Issue #422 (media not inserting)
             pass
 
         # Once the condition is satisfied (or timeout), retrieve the content

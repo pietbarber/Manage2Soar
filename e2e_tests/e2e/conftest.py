@@ -112,13 +112,19 @@ def browser_type_launch_args():
 def browser_context_args():
     """Configure Playwright browser context arguments.
 
-    Note: ignore_https_errors is set to True because Django's StaticLiveServerTestCase
-    runs a local development server without SSL certificates. This is safe for E2E tests
-    as they run against localhost only, not production environments.
+    Note: ``ignore_https_errors`` disables SSL certificate validation for *all* HTTPS
+    requests in this Playwright context. We enable it here only because Django's
+    ``StaticLiveServerTestCase`` runs a local development server without SSL
+    certificates and our E2E tests are intended to interact with that localhost
+    server only, never external HTTPS services or production environments.
+
+    If you add tests that navigate to or make AJAX requests against external HTTPS
+    endpoints, you must remove this flag (or use proper test certificates) to avoid
+    masking real SSL certificate validation errors.
     """
     return {
         "viewport": {"width": 1280, "height": 720},
-        "ignore_https_errors": True,  # Safe for local test server without SSL
+        "ignore_https_errors": True,  # Acceptable only while tests are limited to localhost
     }
 
 

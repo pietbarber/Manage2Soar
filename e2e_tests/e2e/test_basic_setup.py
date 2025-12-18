@@ -51,29 +51,31 @@ class TestPlaywrightSetup(DjangoPlaywrightTestCase):
         # Look for navbar toggler button (hamburger menu)
         toggler = self.page.locator(".navbar-toggler")
 
-        if toggler.count() > 0:
-            # On mobile, the navbar should be collapsed
-            navbar_collapse = self.page.locator(".navbar-collapse")
+        # Ensure the navbar toggler exists - fail if missing
+        assert (
+            toggler.count() > 0
+        ), "Navbar toggler should exist on mobile viewport - if missing, navbar structure has changed"
 
-            # Check initial state - should be collapsed
-            initial_visible = navbar_collapse.is_visible()
+        # On mobile, the navbar should be collapsed
+        navbar_collapse = self.page.locator(".navbar-collapse")
 
-            # Click the toggler
-            toggler.click()
+        # Check initial state - should be collapsed
+        initial_visible = navbar_collapse.is_visible()
 
-            # Wait for the navbar collapse to become visible (if it was hidden)
-            if not initial_visible:
-                navbar_collapse.wait_for(state="visible")
+        # Click the toggler
+        toggler.click()
 
-            # After clicking, visibility should change
-            # (Either it becomes visible if collapsed, or stays visible)
-            after_click_visible = navbar_collapse.is_visible()
+        # Wait for the navbar collapse to become visible (if it was hidden)
+        if not initial_visible:
+            navbar_collapse.wait_for(state="visible")
 
-            # If initially hidden, should now be visible
-            if not initial_visible:
-                assert (
-                    after_click_visible
-                ), "Navbar should expand after clicking toggler"
+        # After clicking, visibility should change
+        # (Either it becomes visible if collapsed, or stays visible)
+        after_click_visible = navbar_collapse.is_visible()
+
+        # If initially hidden, should now be visible
+        if not initial_visible:
+            assert after_click_visible, "Navbar should expand after clicking toggler"
 
     def test_authenticated_user_can_access_members(self):
         """Test that authenticated users can access member pages."""
