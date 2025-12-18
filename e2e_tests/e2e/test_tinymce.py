@@ -126,19 +126,24 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Test the media_url_resolver function directly with a YouTube URL
+        # TinyMCE 6.x uses callback style: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
-                const editor = tinymce.activeEditor;
-                const resolver = editor.options.get('media_url_resolver');
-                if (!resolver) return { error: 'No resolver found' };
+            () => {
+                return new Promise((testResolve) => {
+                    const editor = tinymce.activeEditor;
+                    const resolver = editor.options.get('media_url_resolver');
+                    if (!resolver) {
+                        testResolve({ error: 'No resolver found' });
+                        return;
+                    }
 
-                try {
-                    const data = await resolver({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true, message: String(e) };
-                }
+                    const data = { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+                    resolver(data,
+                        (result) => testResolve({ success: true, html: result.html }),
+                        (error) => testResolve({ rejected: true, message: error.msg })
+                    );
+                });
             }
         """
         )
@@ -161,19 +166,24 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Test with youtu.be short URL
+        # TinyMCE 6.x uses callback style: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
-                const editor = tinymce.activeEditor;
-                const resolver = editor.options.get('media_url_resolver');
-                if (!resolver) return { error: 'No resolver found' };
+            () => {
+                return new Promise((testResolve) => {
+                    const editor = tinymce.activeEditor;
+                    const resolver = editor.options.get('media_url_resolver');
+                    if (!resolver) {
+                        testResolve({ error: 'No resolver found' });
+                        return;
+                    }
 
-                try {
-                    const data = await resolver({ url: 'https://youtu.be/dQw4w9WgXcQ' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true, message: String(e) };
-                }
+                    const data = { url: 'https://youtu.be/dQw4w9WgXcQ' };
+                    resolver(data,
+                        (result) => testResolve({ success: true, html: result.html }),
+                        (error) => testResolve({ rejected: true, message: error.msg })
+                    );
+                });
             }
         """
         )
@@ -194,19 +204,21 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Test with non-YouTube URL (should resolve with empty html to fall back to default)
+        # TinyMCE 6.x uses callback-style API: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
+            () => {
                 const editor = tinymce.activeEditor;
                 const resolver = editor.options.get('media_url_resolver');
                 if (!resolver) return { error: 'No resolver found' };
 
-                try {
-                    const data = await resolver({ url: 'https://vimeo.com/123456' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true };
-                }
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver({ url: 'https://vimeo.com/123456' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
             }
         """
         )
