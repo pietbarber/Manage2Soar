@@ -59,7 +59,7 @@
 - When updating models or URLs, always update or remove affected tests to prevent false failures.
 
 ### JavaScript & E2E Testing (CRITICAL)
-- **MANDATORY**: When updating any HTML page or template that contains JavaScript functionality, you MUST write a Playwright E2E test to verify that JavaScript works correctly.
+- **STRONGLY RECOMMENDED**: When updating any HTML page or template that contains non-trivial JavaScript functionality (user interactions, dynamic content, AJAX, etc.), you should add or update a Playwright E2E test to verify that the JavaScript works correctly. Trivial changes (e.g., analytics/tracking-only scripts, simple show/hide toggles without business logic, copy-only/template text changes) may be exempt, but use judgment and prefer tests for anything user-visible or business-critical.
 - **Location**: Add E2E tests to `e2e_tests/e2e/` directory
 - **Framework**: Use `DjangoPlaywrightTestCase` from `e2e_tests.e2e.conftest` which combines Django's `StaticLiveServerTestCase` with Playwright
 - **What to test**:
