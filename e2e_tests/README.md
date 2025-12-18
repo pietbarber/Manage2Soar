@@ -59,7 +59,7 @@ class TestMyFeature(DjangoPlaywrightTestCase):
 1. **Use smart waiting**: Prefer `wait_for_selector()`, `wait_for_function()`, or `wait_for(state="visible")` over `wait_for_timeout()`
 2. **Unique usernames**: Create unique test users per test method to improve isolation
 3. **Verify login**: The `login()` helper automatically verifies successful authentication
-4. **Use TEST_PASSWORD**: Import `TEST_PASSWORD` constant from `conftest.py` instead of hardcoding passwords
+4. **Keep credentials consistent**: Ensure usernames and passwords used in tests match those created by your fixtures or helper methods
 
 ### Coverage
 

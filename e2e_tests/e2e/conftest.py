@@ -197,7 +197,7 @@ def admin_page(page, live_server, django_user_model):
     )
 
     # Create admin user
-    user = django_user_model.objects.create_superuser(
+    django_user_model.objects.create_superuser(
         username="e2e_admin",
         password="adminpass123",
         email="e2e_admin@example.com",
