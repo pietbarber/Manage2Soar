@@ -195,16 +195,15 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
             "html", ""
         ), "Should contain video ID in embed URL"
 
-    def test_non_youtube_url_falls_back_to_default(self):
-        """Test that non-YouTube URLs fall back to TinyMCE's default handler."""
-        self.create_test_member(username="youtube_admin3", is_superuser=True)
-        self.login(username="youtube_admin3")
+    def test_youtube_url_with_missing_video_id(self):
+        """Test YouTube URLs with missing video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin4", is_superuser=True)
+        self.login(username="youtube_admin4")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
-        # Test with non-YouTube URL (should resolve with empty html to fall back to default)
-        # TinyMCE 6.x uses callback-style API: resolver(data, resolve, reject)
+        # Test with YouTube URL missing video ID
         result = self.page.evaluate(
             """
             () => {
@@ -216,18 +215,81 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
                 const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
                 const reject = () => { callbackResult = { rejected: true }; };
 
-                resolver({ url: 'https://vimeo.com/123456' }, resolve, reject);
+                resolver({ url: 'https://www.youtube.com/watch' }, resolve, reject);
 
                 return callbackResult || { error: 'Callback was not called' };
             }
         """
         )
 
-        # Per TinyMCE docs: resolve with empty html to fall back to default
         assert result.get("success") is True, "Resolver should resolve (not reject)"
         assert (
             result.get("html") == ""
-        ), "Non-YouTube URLs should return empty html for fallback"
+        ), "YouTube URLs with missing video ID should return empty html for fallback"
+
+    def test_youtube_url_with_invalid_video_id(self):
+        """Test YouTube URLs with invalid video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin5", is_superuser=True)
+        self.login(username="youtube_admin5")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with YouTube URL having invalid video ID
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const resolver = editor.options.get('media_url_resolver');
+                if (!resolver) return { error: 'No resolver found' };
+
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver({ url: 'https://www.youtube.com/watch?v=invalid***chars' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
+            }
+        """
+        )
+
+        assert result.get("success") is True, "Resolver should resolve (not reject)"
+        assert (
+            result.get("html") == ""
+        ), "YouTube URLs with invalid video ID should return empty html for fallback"
+
+    def test_youtube_short_url_with_missing_video_id(self):
+        """Test short YouTube URLs with missing video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin6", is_superuser=True)
+        self.login(username="youtube_admin6")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with short YouTube URL missing video ID
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const resolver = editor.options.get('media_url_resolver');
+                if (!resolver) return { error: 'No resolver found' };
+
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver({ url: 'https://youtu.be/' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
+            }
+        """
+        )
+
+        assert result.get("success") is True, "Resolver should resolve (not reject)"
+        assert (
+            result.get("html") == ""
+        ), "Short YouTube URLs with missing video ID should return empty html for fallback"
 
 
 class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):

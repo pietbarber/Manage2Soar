@@ -26,15 +26,23 @@ media_url_resolver = function(data) {
 
 Per [TinyMCE 6 media plugin documentation](https://www.tiny.cloud/docs/tinymce/6/media/):
 
-> **TinyMCE 6.x uses CALLBACK-STYLE API, not Promise-based!**
+> **TinyMCE 6.x uses a callback-style handler function; it does not consume a returned Promise.**
 >
 > Signature: `(data, resolve, reject) => { resolve({ html: '...' }); }`
 >
 > "If, in your handler, you would like to **fall back to the default media embed logic**, call the `resolve` callback with an object where the `html` property is set to an **empty string**, like this: `resolve({ html: '' })`."
 
-The code was using Promise-style API when TinyMCE 6.x requires callback-style. This was preventing ANY media from being inserted.
+In our old code, `media_url_resolver` was implemented as `function (data) { return new Promise((resolve, reject) => { ... }); }`, i.e. it **returned a Promise**. TinyMCE 6.x, however, calls the handler as `function (data, resolve, reject) { ... }` and expects you to use those callback parameters directly. Because TinyMCE does not wait on a returned Promise, this signature mismatch prevented ANY media from being inserted.
 
 ## Solution Implemented
+
+The issue was resolved by updating the `media_url_resolver` function to use the correct TinyMCE 6.x callback-style API. The old implementation incorrectly used a Promise-based approach, which is incompatible with TinyMCE 6.x. The new implementation adheres to the documented callback signature, ensuring proper handling of YouTube URLs and fallback behavior for non-YouTube URLs.
+
+### Key Changes
+1. **Updated API**: Replaced the Promise-based `media_url_resolver` with a callback-style implementation.
+2. **Fallback Behavior**: For non-YouTube or invalid URLs, the resolver now calls `resolve({ html: '' })` to fall back to TinyMCE's default behavior.
+
+This change ensures compatibility with TinyMCE 6.x and restores the ability to insert YouTube videos via the media dialog.
 
 Changed to callback-style API per TinyMCE 6.x requirements:
 
