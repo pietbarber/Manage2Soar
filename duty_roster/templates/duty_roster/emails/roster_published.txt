@@ -1,0 +1,27 @@
+Duty Roster Published: {{ month_name }}
+{{ club_name }}
+
+Hello {{ member.first_name|default:member.full_display_name }},
+
+The duty roster for {{ month_name }} has been published.
+You have been assigned {{ duty_count }} duty assignment{{ duty_count|pluralize }}.
+
+YOUR DUTY ASSIGNMENTS
+---------------------
+{% for duty in duties %}
+{{ duty.date|date:"l, F j, Y" }} - {{ duty.role }}
+{% endfor %}
+
+CALENDAR INVITES
+----------------
+Calendar invite (.ics) file{{ duty_count|pluralize }} {{ duty_count|pluralize:"is,are" }} attached to this email.
+Open the file{{ duty_count|pluralize }} to add your duty assignment{{ duty_count|pluralize }} to your calendar.
+
+CAN'T MAKE IT?
+--------------
+You can request a duty swap from the duty roster calendar page:
+{{ duty_roster_url }}
+
+---
+This is an automated message from {{ club_name }}.
+{{ site_url }}

@@ -225,11 +225,33 @@ def generate_preop_ics(assignment, for_member, role_title):
     Returns:
         bytes: ICS file content as bytes
     """
-    notes = f"Assignment confirmed via pre-op notification."
+    notes = "Assignment confirmed via pre-op notification."
     return generate_duty_ics(
         duty_date=assignment.date,
         role_title=role_title,
         member_name=for_member.full_display_name,
         notes=notes,
         uid_suffix=f"preop-{assignment.pk}",
+    )
+
+
+def generate_roster_ics(duty_date, role_title, member_name):
+    """
+    Generate ICS file for a newly established roster duty assignment.
+
+    Args:
+        duty_date: date object for the duty assignment
+        role_title: The role assigned (e.g., "Duty Officer")
+        member_name: Name of the assigned member
+
+    Returns:
+        bytes: ICS file content as bytes
+    """
+    notes = "Duty assignment from newly published roster."
+    return generate_duty_ics(
+        duty_date=duty_date,
+        role_title=role_title,
+        member_name=member_name,
+        notes=notes,
+        uid_suffix="roster",
     )

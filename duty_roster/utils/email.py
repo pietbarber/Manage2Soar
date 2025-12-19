@@ -146,3 +146,130 @@ def notify_ops_status(assignment):
                 recipient_list=recipient_list,
                 html_message=html_message,
             )
+
+
+def send_roster_published_notifications(year, month, assignments):
+    """
+    Send ICS calendar invites to all members who have duty assignments
+    for a newly published roster month.
+
+    Args:
+        year: The year of the roster
+        month: The month of the roster
+        assignments: List of DutyAssignment objects for the month
+
+    Returns:
+        dict: Summary with 'sent_count', 'member_count', and 'errors'
+    """
+    from collections import defaultdict
+    from datetime import date
+
+    from django.core.mail import EmailMultiAlternatives
+
+    from duty_roster.utils.ics import generate_roster_ics
+    from utils.email_helpers import get_absolute_club_logo_url
+
+    # Get configuration
+    email_config = get_email_config()
+    config = email_config["config"]
+
+    # Group assignments by member
+    member_assignments = defaultdict(list)
+
+    # Role field mapping
+    role_fields = [
+        ("duty_officer", "duty_officer"),
+        ("assistant_duty_officer", "assistant_duty_officer"),
+        ("instructor", "instructor"),
+        ("tow_pilot", "towpilot"),
+        ("surge_instructor", "surge_instructor"),
+        ("surge_tow_pilot", "surge_towpilot"),
+    ]
+
+    for assignment in assignments:
+        for field_name, role_key in role_fields:
+            member = getattr(assignment, field_name, None)
+            if member and member.email:
+                role_title = get_role_title(role_key)
+                member_assignments[member].append(
+                    {
+                        "date": assignment.date,
+                        "role": role_title,
+                        "assignment": assignment,
+                    }
+                )
+
+    if not member_assignments:
+        return {"sent_count": 0, "member_count": 0, "errors": []}
+
+    # Format month name
+    month_name = date(year, month, 1).strftime("%B %Y")
+
+    # Build context for templates
+    context = {
+        "month_name": month_name,
+        "year": year,
+        "month": month,
+        "club_name": email_config["club_name"],
+        "club_nickname": config.club_nickname if config else None,
+        "club_logo_url": get_absolute_club_logo_url(config),
+        "site_url": email_config["site_url"],
+        "duty_roster_url": email_config["roster_url"],
+    }
+
+    sent_count = 0
+    errors = []
+
+    for member, duty_list in member_assignments.items():
+        # Sort duties by date
+        duty_list.sort(key=lambda x: x["date"])
+
+        # Build member-specific context
+        member_context = context.copy()
+        member_context["member"] = member
+        member_context["duties"] = duty_list
+        member_context["duty_count"] = len(duty_list)
+
+        # Render email templates
+        html_message = render_to_string(
+            "duty_roster/emails/roster_published.html", member_context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/roster_published.txt", member_context
+        )
+
+        # Create email
+        subject = (
+            f"[{email_config['club_name']}] Your Duty Assignments for {month_name}"
+        )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_message,
+            from_email=email_config["from_email"],
+            to=[member.email],
+        )
+        email.attach_alternative(html_message, "text/html")
+
+        # Attach ICS files for each duty
+        for duty in duty_list:
+            ics_content = generate_roster_ics(
+                duty_date=duty["date"],
+                role_title=duty["role"],
+                member_name=member.full_display_name,
+            )
+            role_slug = duty["role"].lower().replace(" ", "-")
+            ics_filename = f"duty-{duty['date'].isoformat()}-{role_slug}.ics"
+            email.attach(ics_filename, ics_content, "text/calendar")
+
+        try:
+            email.send(fail_silently=False)
+            sent_count += 1
+        except Exception as e:
+            errors.append(f"Failed to send to {member.email}: {str(e)}")
+
+    return {
+        "sent_count": sent_count,
+        "member_count": len(member_assignments),
+        "errors": errors,
+    }
