@@ -9,9 +9,12 @@ Usage:
 """
 
 import os
+import re
 
 # Basic Django settings
 from pathlib import Path
+
+from django.contrib.messages import constants as messages
 
 # Import all base settings first
 # We'll override the storage-related ones below
@@ -183,7 +186,6 @@ SOCIAL_AUTH_PIPELINE = (
 CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")
 
 # Validate CLUB_PREFIX to prevent path traversal attacks
-import re
 
 if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
     raise Exception(
@@ -256,7 +258,6 @@ LOGGING = {
 }
 
 # Django messages framework tags
-from django.contrib.messages import constants as messages
 
 MESSAGE_TAGS = {
     messages.ERROR: "danger",
