@@ -130,20 +130,20 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         result = self.page.evaluate(
             """
             () => {
-                return new Promise((testResolve) => {
-                    const editor = tinymce.activeEditor;
-                    const resolver = editor.options.get('media_url_resolver');
-                    if (!resolver) {
-                        testResolve({ error: 'No resolver found' });
-                        return;
-                    }
+            return new Promise((testResolve) => {
+                const editor = tinymce.activeEditor;
+                const resolver = editor.options.get('media_url_resolver');
+                if (!resolver) {
+                testResolve({ error: 'No resolver found' });
+                return;
+                }
 
-                    const data = { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
-                    resolver(data,
-                        (result) => testResolve({ success: true, html: result.html }),
-                        (error) => testResolve({ rejected: true, message: error.msg })
-                    );
-                });
+                const data = { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+                resolver(data,
+                (result) => testResolve({ success: true, html: result.html }),
+                (error) => testResolve({ rejected: true, message: error.msg })
+                );
+            });
             }
         """
         )
@@ -156,6 +156,45 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         assert (
             "referrerpolicy" in result.get("html", "").lower()
         ), "Should include referrerpolicy"
+        assert (
+            'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"'
+            in result.get("html", "")
+        ), "Should include allow attribute with required permissions"
+
+    def test_non_youtube_url_falls_back_to_default(self):
+        """Test that non-YouTube URLs fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_fallback_admin", is_superuser=True)
+        self.login(username="youtube_fallback_admin")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with Vimeo URL (non-YouTube)
+        result = self.page.evaluate(
+            """
+            () => {
+                return new Promise((testResolve) => {
+                    const editor = tinymce.activeEditor;
+                    const resolver = editor.options.get('media_url_resolver');
+                    if (!resolver) {
+                        testResolve({ error: 'No resolver found' });
+                        return;
+                    }
+
+                    const data = { url: 'https://vimeo.com/123456789' };
+                    resolver(data,
+                        (result) => testResolve({ success: true, html: result.html }),
+                        (error) => testResolve({ rejected: true, message: error.msg })
+                    );
+                });
+            }
+        """
+        )
+
+        assert "success" in result, "Non-YouTube URL should resolve"
+        assert (
+            result.get("html") == ""
+        ), "Non-YouTube URLs should return empty html for fallback"
 
     def test_youtube_url_resolver_short_url(self):
         """Test that youtu.be short URLs are resolved correctly."""
@@ -247,7 +286,8 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
                 const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
                 const reject = () => { callbackResult = { rejected: true }; };
 
-                resolver({ url: 'https://www.youtube.com/watch?v=invalid***chars' }, resolve, reject);
+                resolver(
+                    { url: 'https://www.youtube.com/watch?v=invalid***chars' }, resolve, reject);
 
                 return callbackResult || { error: 'Callback was not called' };
             }
@@ -376,9 +416,11 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
                             editor.insertContent(data.html);
                             // Get content right after insertion
                             const content = editor.getContent();
-                            result = { success: true, inserted: data.html, contentAfter: content };
+                            result = { success: true, inserted: data.html,
+                                contentAfter: content };
                         } else {
-                            result = { error: 'Resolver returned empty html', data: JSON.stringify(data) };
+                            result = { error: 'Resolver returned empty html',
+                                data: JSON.stringify(data) };
                         }
                     },
                     (error) => {
