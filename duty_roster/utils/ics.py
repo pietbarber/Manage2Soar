@@ -248,10 +248,15 @@ def generate_roster_ics(duty_date, role_title, member_name):
         bytes: ICS file content as bytes
     """
     notes = "Duty assignment from newly published roster."
+    # Include date, role, and member in UID suffix to ensure uniqueness
+    # across different roster publications
+    role_slug = role_title.lower().replace(" ", "-")
+    member_slug = member_name.lower().replace(" ", "-")
+    uid_suffix = f"roster-{duty_date.isoformat()}-{role_slug}-{member_slug}"
     return generate_duty_ics(
         duty_date=duty_date,
         role_title=role_title,
         member_name=member_name,
         notes=notes,
-        uid_suffix="roster",
+        uid_suffix=uid_suffix,
     )

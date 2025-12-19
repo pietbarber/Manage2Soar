@@ -331,7 +331,8 @@ class TestRosterPublishedEmailTemplates:
         assert "February 2025" in html
         assert "Duty Officer" in html
         assert "2 duty assignments" in html
-        assert "testsoaring.org" in html
+        # Check site URL is rendered (using href to avoid false positive security scan)
+        assert 'href="https://testsoaring.org' in html
 
     def test_text_template_renders(self, site_config, test_members):
         """Text template should render without errors."""
