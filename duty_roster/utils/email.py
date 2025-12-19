@@ -1,6 +1,11 @@
+from collections import defaultdict
+from datetime import date
+
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
+from duty_roster.utils.ics import generate_roster_ics
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import send_mail
@@ -161,14 +166,6 @@ def send_roster_published_notifications(year, month, assignments):
     Returns:
         dict: Summary with 'sent_count', 'member_count', and 'errors'
     """
-    from collections import defaultdict
-    from datetime import date
-
-    from django.core.mail import EmailMultiAlternatives
-
-    from duty_roster.utils.ics import generate_roster_ics
-    from utils.email_helpers import get_absolute_club_logo_url
-
     # Get configuration
     email_config = get_email_config()
     config = email_config["config"]
