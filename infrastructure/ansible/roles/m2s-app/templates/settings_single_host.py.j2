@@ -174,7 +174,7 @@ SOCIAL_AUTH_PIPELINE = (
 )
 
 # Club prefix for multi-tenant support
-CLUB_PREFIX = os.getenv("CLUB_PREFIX", "{{ club_prefix | default('tsc') }}")
+CLUB_PREFIX = os.getenv("CLUB_PREFIX", "tsc")
 
 # Validate CLUB_PREFIX to prevent path traversal attacks
 if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):

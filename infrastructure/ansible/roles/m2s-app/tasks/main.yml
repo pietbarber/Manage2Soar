@@ -83,7 +83,7 @@
       - pip
       - setuptools
       - wheel
-    state: latest
+    state: present
     virtualenv: "{{ m2s_venv_path }}"
   become: true
   become_user: "{{ m2s_app_user }}"
