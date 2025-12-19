@@ -194,6 +194,9 @@ def send_roster_published_notifications(year, month, assignments):
             member = getattr(assignment, field_name, None)
             if member and member.email:
                 role_title = role_titles.get(role_key)
+                # Skip if role title is None or empty
+                if not role_title:
+                    continue
                 member_assignments[member].append(
                     {
                         "date": assignment.date,
