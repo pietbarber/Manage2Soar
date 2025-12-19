@@ -151,7 +151,7 @@ graph TB
 - Latest PostgreSQL 17 from official repo
 - MD5 password authentication for local connections
 - Automated daily backups to `/var/backups/postgresql/`
-- 30-day backup retention policy
+- 7-day backup retention policy
 - Performance tuning via `postgresql.conf`
 
 ### NGINX Reverse Proxy
@@ -337,7 +337,7 @@ graph TB
 
 ```
 /var/backups/postgresql/
-└── m2s_YYYYMMDD.sql.gz    # Daily database backups
+└── DB_NAME_YYYY-MM-DD_HHMMSS.pgdump   # Daily PostgreSQL custom-format backups (pg_dump -Fc)
 ```
 
 ## Operational Commands

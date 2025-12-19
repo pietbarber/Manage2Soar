@@ -191,9 +191,8 @@ postfix.service        - Mail server (pre-existing)
     ├── member_photos/
     └── documents/
 
-/var/backups/m2s/
-├── daily/                  # Daily database backups
-└── weekly/                 # Weekly full backups
+/var/backups/postgresql/
+└── daily/                  # Daily PostgreSQL custom-format backups (.pgdump)
 
 /etc/nginx/sites-available/
 └── m2s.conf               # NGINX configuration
