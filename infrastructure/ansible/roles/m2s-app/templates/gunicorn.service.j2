@@ -12,7 +12,6 @@ User={{ m2s_app_user }}
 Group={{ m2s_app_group }}
 WorkingDirectory={{ m2s_app_home }}/app
 Environment="PATH={{ m2s_venv_path }}/bin:/usr/bin:/bin"
-Environment="DJANGO_SETTINGS_MODULE={{ m2s_django_settings_module }}"
 EnvironmentFile={{ m2s_app_home }}/app/.env
 ExecStart={{ m2s_venv_path }}/bin/gunicorn \
     --config {{ m2s_app_home }}/gunicorn.conf.py \
