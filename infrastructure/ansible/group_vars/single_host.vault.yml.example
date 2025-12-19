@@ -1,0 +1,43 @@
+# Single-Host Deployment Secrets - vault.yml Example
+#
+# This file should be encrypted with ansible-vault.
+#
+# SETUP INSTRUCTIONS:
+# 1. Create vault password file:
+#      echo "your-secure-vault-password" > ~/.ansible_vault_pass
+#      chmod 600 ~/.ansible_vault_pass
+#
+# 2. Create the encrypted vault file:
+#      ansible-vault create group_vars/single_host/vault.yml \
+#        --vault-password-file ~/.ansible_vault_pass
+#
+# 3. Paste the contents below and customize:
+#
+# 4. To edit later:
+#      ansible-vault edit group_vars/single_host/vault.yml \
+#        --vault-password-file ~/.ansible_vault_pass
+#
+# GENERATE SECRETS:
+#   PostgreSQL password: openssl rand -base64 32
+#   Django secret key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+---
+# Sudo password for target servers (used with become: true)
+ansible_become_password: "your-sudo-password-here"
+
+# PostgreSQL database password
+vault_postgresql_password: "CHANGE_ME_generate-with-openssl-rand"
+
+# Django secret key (50+ characters)
+vault_django_secret_key: "CHANGE_ME_generate-with-django-utils"
+
+# Optional: Google OAuth credentials.
+# - If these remain commented out / unset, Google OAuth is DISABLED and the site will
+#   fall back to the standard Django username/password login.
+# - If you enable Google login in settings, you MUST set both values below.
+# vault_google_oauth_client_id: "your-google-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret: "your-google-client-secret"
+
+# Optional: Email credentials (if using authenticated SMTP)
+# vault_email_host_user: "smtp-username"
+# vault_email_host_password: "smtp-password"

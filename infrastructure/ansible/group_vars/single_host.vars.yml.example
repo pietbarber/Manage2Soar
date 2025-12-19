@@ -1,0 +1,161 @@
+# Single-Host Deployment Variables - vars.yml Example
+#
+# SETUP INSTRUCTIONS:
+# 1. Create the group_vars directory structure:
+#      mkdir -p group_vars/single_host/
+#
+# 2. Copy this file:
+#      cp single_host.yml.example group_vars/single_host/vars.yml
+#
+# 3. Create an encrypted vault file for secrets:
+#      ansible-vault create group_vars/single_host/vault.yml
+#
+# 4. The vault.yml should contain:
+#      ---
+#      ansible_become_password: "your-sudo-password"
+#      vault_postgresql_password: "your-db-password"
+#      vault_django_secret_key: "your-50-char-secret"
+#
+# 5. Create a vault password file (recommended):
+#      echo "your-vault-password" > ~/.ansible_vault_pass
+#      chmod 600 ~/.ansible_vault_pass
+#
+# 6. Run playbook:
+#      ansible-playbook -i inventory/single_host.yml \
+#        --vault-password-file ~/.ansible_vault_pass \
+#        -e "@group_vars/single_host/vault.yml" \
+#        -e "@group_vars/single_host/vars.yml" \
+#        playbooks/single-host.yml
+#
+# NOTE: group_vars/single_host/ is gitignored - NEVER commit secrets!
+
+---
+# ============================================================
+# CLUB CONFIGURATION
+# ============================================================
+
+# Your club's name (displayed in the application)
+club_name: "Your Soaring Club"
+
+# Short prefix for the club (used in URLs, email, etc.)
+club_prefix: "ysc"
+
+# Primary domain for this M2S instance
+m2s_domain: "m2s.your-club.com"
+
+# ============================================================
+# POSTGRESQL DATABASE
+# ============================================================
+
+# Database name and user
+postgresql_database: "m2s"
+postgresql_user: "m2s"
+
+# Password from vault
+postgresql_password: "{{ vault_postgresql_password }}"
+
+# PostgreSQL version
+postgresql_version: "17"
+
+# Memory settings - adjust based on your server RAM
+# These defaults are for a 2GB RAM server
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "768MB"
+
+# Backup settings
+postgresql_backup_enabled: true
+postgresql_backup_retention_days: 7
+
+# ============================================================
+# DJANGO / M2S APPLICATION
+# ============================================================
+
+# Application user and paths
+m2s_app_user: "m2s"
+m2s_app_group: "m2s"
+m2s_app_home: "/opt/m2s"
+
+# Repository settings
+m2s_git_repo: "https://github.com/pietbarber/Manage2Soar.git"
+m2s_git_branch: "main"
+
+# Python version
+m2s_python_version: "python3.12"
+m2s_venv_path: "{{ m2s_app_home }}/venv"
+
+# Django settings
+m2s_django_settings_module: "manage2soar.settings_single_host"
+m2s_django_debug: false  # MUST be false in production!
+m2s_django_allowed_hosts: "{{ m2s_domain }},localhost,127.0.0.1"
+m2s_django_static_root: "/var/www/m2s/static"
+m2s_django_media_root: "/var/www/m2s/media"
+
+# Logging
+m2s_log_dir: "/var/log/m2s"
+m2s_django_log_file: "{{ m2s_log_dir }}/django.log"
+
+# ============================================================
+# GUNICORN SETTINGS
+# ============================================================
+
+m2s_gunicorn_bind: "127.0.0.1:8000"
+m2s_gunicorn_workers: 3  # (2 * CPU cores) + 1
+m2s_gunicorn_timeout: 120
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+m2s_db_host: "localhost"
+m2s_db_port: 5432
+m2s_db_name: "{{ postgresql_database }}"
+m2s_db_user: "{{ postgresql_user }}"
+
+# ============================================================
+# NGINX SETTINGS
+# ============================================================
+
+# SSL configuration
+nginx_ssl_enabled: true  # Enable for production
+letsencrypt_email: "admin@your-club.com"
+
+nginx_http2_enabled: true
+nginx_rate_limit_enabled: true
+
+# ============================================================
+# EMAIL CONFIGURATION
+# ============================================================
+
+m2s_email_backend: "django.core.mail.backends.smtp.EmailBackend"
+m2s_email_host: "localhost"
+m2s_email_port: 25
+m2s_email_use_tls: false
+m2s_default_from_email: "noreply@{{ m2s_domain }}"
+
+# Google OAuth (optional - leave disabled if not using)
+m2s_google_oauth_enabled: false
+# If enabling OAuth, add to vault.yml:
+#   vault_google_oauth_client_id: "your-client-id"
+#   vault_google_oauth_client_secret: "your-secret"
+
+# ============================================================
+# MAIL SERVER (optional)
+# ============================================================
+
+mail_server_enabled: false  # Set true to deploy Postfix
+
+# ============================================================
+# SECURITY SETTINGS
+# ============================================================
+
+firewall_enabled: true
+ssh_port: 22
+fail2ban_enabled: true
+
+# ============================================================
+# BACKUP SETTINGS
+# ============================================================
+
+backup_enabled: true
+backup_retention_days: 7
+backup_dir: "/var/backups/m2s"

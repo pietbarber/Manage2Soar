@@ -1,0 +1,25 @@
+# M2S NGINX Configuration - HTTP Only (for initial SSL setup)
+# Managed by Ansible - do not edit manually
+
+upstream {{ nginx_upstream_name }} {
+    server {{ nginx_upstream_server }};
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ nginx_server_name }};
+
+    # For Let's Encrypt certificate verification
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    # Serve content normally during initial setup
+    # This configuration is only used before SSL certificate is obtained
+    # After certificate acquisition, this will be replaced by m2s-ssl.conf
+    location / {
+        include /etc/nginx/proxy_params;
+        proxy_pass http://{{ nginx_upstream_name }};
+    }
+}

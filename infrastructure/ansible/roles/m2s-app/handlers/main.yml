@@ -1,0 +1,19 @@
+---
+# M2S Application handlers
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart gunicorn
+  ansible.builtin.systemd:
+    name: gunicorn
+    state: restarted
+
+- name: Collect static files
+  ansible.builtin.command:
+    cmd: "{{ m2s_venv_path }}/bin/python manage.py collectstatic --noinput"
+    chdir: "{{ m2s_app_home }}/app"
+    environment: "{{ lookup('community.general.envfile', m2s_app_home + '/app/.env', errors='ignore') | default({}) }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"

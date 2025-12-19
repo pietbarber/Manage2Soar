@@ -1,0 +1,40 @@
+# Cleanup PostgreSQL 16 and reinstall with version 17
+# One-time migration playbook
+---
+- name: Migrate PostgreSQL 16 to 17
+  hosts: single_host
+  become: true
+
+  tasks:
+    - name: Stop PostgreSQL service
+      ansible.builtin.systemd:
+        name: postgresql
+        state: stopped
+      ignore_errors: true
+
+    - name: Remove PostgreSQL 16 packages
+      ansible.builtin.apt:
+        name:
+          - postgresql-16
+          - postgresql-client-16
+          - postgresql-contrib-16
+        state: absent
+        purge: true
+
+    - name: Remove PostgreSQL 16 data directory
+      ansible.builtin.file:
+        path: /var/lib/postgresql/16
+        state: absent
+
+    - name: Remove old M2S config
+      ansible.builtin.file:
+        path: /etc/postgresql/16
+        state: absent
+
+    - name: Autoremove unused packages
+      ansible.builtin.apt:
+        autoremove: true
+
+    - name: Display status
+      ansible.builtin.debug:
+        msg: "PostgreSQL 16 removed. Run test-postgresql.yml to install PostgreSQL 17."

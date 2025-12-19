@@ -1,0 +1,61 @@
+# NGINX Role Defaults
+# These can be overridden in group_vars or host_vars
+---
+# Domain configuration
+nginx_server_name: "{{ m2s_domain | default('localhost') }}"
+
+# SSL/TLS Configuration
+nginx_ssl_enabled: true
+nginx_ssl_certificate: "/etc/letsencrypt/live/{{ nginx_server_name }}/fullchain.pem"
+nginx_ssl_certificate_key: "/etc/letsencrypt/live/{{ nginx_server_name }}/privkey.pem"
+
+# Let's Encrypt
+letsencrypt_email: "admin@{{ nginx_server_name }}"
+
+# HTTP/2
+nginx_http2_enabled: true
+
+# Upstream (Gunicorn)
+nginx_upstream_name: "m2s_app"
+nginx_upstream_server: "127.0.0.1:8000"
+
+# Static and media files
+nginx_static_root: "/var/www/m2s/static"
+nginx_media_root: "/var/www/m2s/media"
+nginx_static_url: "/static/"
+nginx_media_url: "/media/"
+
+# Logging
+nginx_access_log: "/var/log/nginx/m2s_access.log"
+nginx_error_log: "/var/log/nginx/m2s_error.log"
+
+# Rate limiting
+nginx_rate_limit_enabled: true
+nginx_rate_limit_zone: "m2s_limit"
+nginx_rate_limit: "10r/s"
+nginx_rate_limit_burst: 20
+
+# Client settings
+nginx_client_max_body_size: "50M"
+
+# Security headers
+nginx_security_headers_enabled: true
+
+# Worker settings (auto = number of CPU cores)
+nginx_worker_processes: "auto"
+nginx_worker_connections: 1024
+
+# Gzip compression
+nginx_gzip_enabled: true
+nginx_gzip_types:
+  - text/plain
+  - text/css
+  - text/javascript
+  - application/javascript
+  - application/json
+  - application/xml
+  - image/svg+xml
+
+# Cache settings for static files
+nginx_static_cache_time: "30d"
+nginx_media_cache_time: "7d"

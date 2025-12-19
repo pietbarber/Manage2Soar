@@ -1,0 +1,63 @@
+# NGINX Role - SSL Certificate Tasks
+---
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: cert_check_before
+  become: true
+
+- name: Obtain Let's Encrypt certificate
+  ansible.builtin.command: >
+    certbot certonly --nginx --non-interactive --agree-tos
+    --email {{ letsencrypt_email }}
+    --domains {{ nginx_server_name }}
+  become: true
+  register: certbot_result
+  when: not cert_check_before.stat.exists
+  failed_when:
+    - certbot_result.rc != 0
+    - "'Certificate not yet due for renewal' not in certbot_result.stdout | default('')"
+
+- name: Verify certificate was obtained
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: cert_check_after
+  become: true
+  when: not cert_check_before.stat.exists
+
+- name: Fail if certificate acquisition failed
+  ansible.builtin.fail:
+    msg: |
+      Failed to obtain SSL certificate from Let's Encrypt.
+      Certbot output: {{ certbot_result.stdout | default('No output') }}
+      Error: {{ certbot_result.stderr | default('No error output') }}
+      Please check:
+      1. DNS records are correct for {{ nginx_server_name }}
+      2. Port 80 is accessible from the internet
+      3. No firewall blocking Let's Encrypt validation
+  when:
+    - not cert_check_before.stat.exists
+    - not cert_check_after.stat.exists
+
+- name: Deploy SSL site configuration after certificate obtained
+  ansible.builtin.template:
+    src: m2s-ssl.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: cert_check_after.stat.exists | default(cert_check_before.stat.exists)
+  notify: Reload NGINX
+
+- name: Set up automatic certificate renewal
+  ansible.builtin.cron:
+    name: "Certbot renewal"
+    minute: "0"
+    hour: "3"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
+    user: root
+  become: true

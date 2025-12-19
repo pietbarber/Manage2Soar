@@ -1,0 +1,197 @@
+---
+# M2S Django Application deployment tasks
+
+- name: Create application group
+  ansible.builtin.group:
+    name: "{{ m2s_app_group }}"
+    state: present
+
+- name: Create application user
+  ansible.builtin.user:
+    name: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    home: "{{ m2s_app_home }}"
+    shell: /bin/bash
+    system: true
+    createhome: true
+
+- name: Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - "{{ m2s_python_version }}"
+      - "{{ m2s_python_version }}-venv"
+      - "{{ m2s_python_version }}-dev"
+      - python3-pip
+      - libpq-dev
+      - gcc
+      - git
+      - libffi-dev
+      - libjpeg-dev
+      - libpng-dev
+      - zlib1g-dev
+      - libxml2-dev
+      - libxslt1-dev
+    state: present
+    update_cache: true
+
+- name: Create required directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0755"
+  loop:
+    - "{{ m2s_app_home }}"
+    - "{{ m2s_log_dir }}"
+    - "{{ m2s_django_static_root }}"
+    - "{{ m2s_django_media_root }}"
+
+- name: Clone or update application repository
+  ansible.builtin.git:
+    repo: "{{ m2s_git_repo }}"
+    dest: "{{ m2s_app_home }}/app"
+    version: "{{ m2s_git_branch }}"
+    force: "{{ m2s_git_force_update }}"
+    accept_hostkey: true
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  register: git_result
+  notify:
+    - Restart gunicorn
+
+- name: Deploy single-host settings module
+  ansible.builtin.template:
+    src: settings_single_host.py.j2
+    dest: "{{ m2s_app_home }}/app/manage2soar/settings_single_host.py"
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0644"
+  notify: Restart gunicorn
+
+- name: Create Python virtual environment
+  ansible.builtin.command:
+    cmd: "{{ m2s_python_version }} -m venv {{ m2s_venv_path }}"
+    creates: "{{ m2s_venv_path }}/bin/python"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+
+- name: Upgrade pip in virtual environment
+  ansible.builtin.pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    state: present
+    virtualenv: "{{ m2s_venv_path }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+
+- name: Install Python requirements
+  ansible.builtin.pip:
+    requirements: "{{ m2s_app_home }}/app/requirements.txt"
+    virtualenv: "{{ m2s_venv_path }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  notify: Restart gunicorn
+
+- name: Install Gunicorn
+  ansible.builtin.pip:
+    name:
+      - gunicorn
+      - whitenoise
+    state: present
+    virtualenv: "{{ m2s_venv_path }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+
+- name: Deploy Django environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ m2s_app_home }}/app/.env"
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0600"
+  notify: Restart gunicorn
+
+- name: Deploy Gunicorn configuration
+  ansible.builtin.template:
+    src: gunicorn.conf.py.j2
+    dest: "{{ m2s_app_home }}/gunicorn.conf.py"
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0644"
+  notify: Restart gunicorn
+
+- name: Deploy Gunicorn systemd service
+  ansible.builtin.template:
+    src: gunicorn.service.j2
+    dest: /etc/systemd/system/gunicorn.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart gunicorn
+
+- name: Run Django migrations
+  ansible.builtin.command:
+    cmd: "{{ m2s_venv_path }}/bin/python manage.py migrate --noinput"
+    chdir: "{{ m2s_app_home }}/app"
+  environment:
+    DJANGO_SETTINGS_MODULE: "{{ m2s_django_settings_module }}"
+    DJANGO_SECRET_KEY: "{{ vault_django_secret_key }}"
+    DB_NAME: "{{ m2s_db_name }}"
+    DB_USER: "{{ m2s_db_user }}"
+    DB_PASSWORD: "{{ vault_postgresql_password }}"
+    DB_HOST: "{{ m2s_db_host }}"
+    DB_PORT: "{{ m2s_db_port }}"
+    CLUB_PREFIX: "{{ club_prefix | default('tsc') }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  when: git_result.changed or (m2s_force_migrate | default(false) | bool)
+  register: migration_result
+  changed_when: "'Applying' in migration_result.stdout"
+
+- name: Collect static files
+  ansible.builtin.command:
+    cmd: "{{ m2s_venv_path }}/bin/python manage.py collectstatic --noinput"
+    chdir: "{{ m2s_app_home }}/app"
+  environment:
+    DJANGO_SETTINGS_MODULE: "{{ m2s_django_settings_module }}"
+    DJANGO_SECRET_KEY: "{{ vault_django_secret_key }}"
+    STATIC_ROOT: "{{ m2s_django_static_root }}"
+    DB_NAME: "{{ m2s_db_name }}"
+    DB_USER: "{{ m2s_db_user }}"
+    DB_PASSWORD: "{{ vault_postgresql_password }}"
+    DB_HOST: "{{ m2s_db_host }}"
+    DB_PORT: "{{ m2s_db_port }}"
+  become: true
+  become_user: "{{ m2s_app_user }}"
+  when: git_result.changed or (m2s_force_collectstatic | default(false) | bool)
+  register: collectstatic_result
+  changed_when: "'0 static files' not in collectstatic_result.stdout"
+
+- name: Ensure static files ownership
+  ansible.builtin.file:
+    path: "{{ m2s_django_static_root }}"
+    state: directory
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    recurse: true
+  when: collectstatic_result.changed | default(false)
+
+- name: Enable and start Gunicorn service
+  ansible.builtin.systemd:
+    name: gunicorn
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Configure logrotate for application logs
+  ansible.builtin.template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/m2s
+    owner: root
+    group: root
+    mode: "0644"

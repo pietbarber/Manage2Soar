@@ -1,0 +1,33 @@
+# Gunicorn systemd service for M2S
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+[Unit]
+Description=Gunicorn daemon for Manage2Soar
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User={{ m2s_app_user }}
+Group={{ m2s_app_group }}
+WorkingDirectory={{ m2s_app_home }}/app
+Environment="PATH={{ m2s_venv_path }}/bin:/usr/bin:/bin"
+EnvironmentFile={{ m2s_app_home }}/app/.env
+ExecStart={{ m2s_venv_path }}/bin/gunicorn \
+    --config {{ m2s_app_home }}/gunicorn.conf.py \
+    manage2soar.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=3
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ m2s_log_dir }} {{ m2s_django_media_root }}
+
+[Install]
+WantedBy=multi-user.target

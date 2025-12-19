@@ -1,0 +1,131 @@
+# PostgreSQL Role - Main Tasks
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version }}.yml"
+    - "{{ ansible_distribution | lower }}.yml"
+    - "{{ ansible_os_family | lower }}.yml"
+    - "default.yml"
+  ignore_errors: true
+
+- name: Install PostgreSQL prerequisites
+  ansible.builtin.apt:
+    name:
+      - gnupg2
+      - python3-psycopg2
+      - acl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Add PostgreSQL APT repository key
+  ansible.builtin.apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+  become: true
+
+- name: Add PostgreSQL APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    state: present
+    filename: pgdg
+  become: true
+
+- name: Install PostgreSQL {{ postgresql_version }}
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "postgresql-contrib-{{ postgresql_version }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure PostgreSQL is started and enabled
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: true
+  become: true
+
+- name: Configure PostgreSQL
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/conf.d/m2s.conf"
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  become: true
+  notify: Restart PostgreSQL
+
+- name: Configure PostgreSQL client authentication
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  become: true
+  notify: Restart PostgreSQL
+
+- name: Flush handlers to apply PostgreSQL config
+  ansible.builtin.meta: flush_handlers
+
+- name: Create M2S database user
+  community.postgresql.postgresql_user:
+    name: "{{ postgresql_user }}"
+    password: "{{ postgresql_password }}"
+    role_attr_flags: "CREATEDB,NOSUPERUSER"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create M2S database
+  community.postgresql.postgresql_db:
+    name: "{{ postgresql_db }}"
+    owner: "{{ postgresql_user }}"
+    encoding: UTF8
+    lc_collate: "{{ postgresql_locale }}"
+    lc_ctype: "{{ postgresql_locale }}"
+    template: template0
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Grant privileges to M2S user
+  community.postgresql.postgresql_privs:
+    db: "{{ postgresql_db }}"
+    privs: ALL
+    type: database
+    role: "{{ postgresql_user }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create additional databases
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner | default(postgresql_user) }}"
+    encoding: UTF8
+    state: present
+  loop: "{{ postgresql_additional_databases }}"
+  become: true
+  become_user: postgres
+  when: postgresql_additional_databases | length > 0
+
+- name: Create additional users
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: "{{ item.role_attr_flags | default('NOSUPERUSER,NOCREATEDB') }}"
+    state: present
+  loop: "{{ postgresql_additional_users }}"
+  become: true
+  become_user: postgres
+  when: postgresql_additional_users | length > 0
+  no_log: true
+
+# Backup configuration
+- name: Include backup tasks
+  ansible.builtin.include_tasks: backup.yml
+  when: postgresql_backup_enabled
