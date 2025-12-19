@@ -2,6 +2,7 @@
 {% load static %}
 {% load member_extras %}
 {% load siteconfig_tags %}
+{% load cms_tags %}
 
 {% block title %}{{ member.full_display_name }} - Member Profile{% endblock %}
 
@@ -552,7 +553,7 @@
         <div class="card-body">
           {% if member.biography %}
           <div class="cms-content">
-            {{ member.biography.content|safe }}
+            {{ member.biography.content|fix_youtube_embeds|safe }}
           </div>
           {% if can_edit %}
           <div class="mt-3">

@@ -126,19 +126,24 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Test the media_url_resolver function directly with a YouTube URL
+        # TinyMCE 6.x uses callback style: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
+            () => {
+            return new Promise((testResolve) => {
                 const editor = tinymce.activeEditor;
                 const resolver = editor.options.get('media_url_resolver');
-                if (!resolver) return { error: 'No resolver found' };
-
-                try {
-                    const data = await resolver({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true, message: String(e) };
+                if (!resolver) {
+                testResolve({ error: 'No resolver found' });
+                return;
                 }
+
+                const data = { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+                resolver(data,
+                (result) => testResolve({ success: true, html: result.html }),
+                (error) => testResolve({ rejected: true, message: error.msg })
+                );
+            });
             }
         """
         )
@@ -151,6 +156,45 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         assert (
             "referrerpolicy" in result.get("html", "").lower()
         ), "Should include referrerpolicy"
+        assert (
+            'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"'
+            in result.get("html", "")
+        ), "Should include allow attribute with required permissions"
+
+    def test_non_youtube_url_falls_back_to_default(self):
+        """Test that non-YouTube URLs fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_fallback_admin", is_superuser=True)
+        self.login(username="youtube_fallback_admin")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with Vimeo URL (non-YouTube)
+        result = self.page.evaluate(
+            """
+            () => {
+                return new Promise((testResolve) => {
+                    const editor = tinymce.activeEditor;
+                    const resolver = editor.options.get('media_url_resolver');
+                    if (!resolver) {
+                        testResolve({ error: 'No resolver found' });
+                        return;
+                    }
+
+                    const data = { url: 'https://vimeo.com/123456789' };
+                    resolver(data,
+                        (result) => testResolve({ success: true, html: result.html }),
+                        (error) => testResolve({ rejected: true, message: error.msg })
+                    );
+                });
+            }
+        """
+        )
+
+        assert "success" in result, "Non-YouTube URL should resolve"
+        assert (
+            result.get("html") == ""
+        ), "Non-YouTube URLs should return empty html for fallback"
 
     def test_youtube_url_resolver_short_url(self):
         """Test that youtu.be short URLs are resolved correctly."""
@@ -161,19 +205,24 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
         # Test with youtu.be short URL
+        # TinyMCE 6.x uses callback style: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
-            async () => {
-                const editor = tinymce.activeEditor;
-                const resolver = editor.options.get('media_url_resolver');
-                if (!resolver) return { error: 'No resolver found' };
+            () => {
+                return new Promise((testResolve) => {
+                    const editor = tinymce.activeEditor;
+                    const resolver = editor.options.get('media_url_resolver');
+                    if (!resolver) {
+                        testResolve({ error: 'No resolver found' });
+                        return;
+                    }
 
-                try {
-                    const data = await resolver({ url: 'https://youtu.be/dQw4w9WgXcQ' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true, message: String(e) };
-                }
+                    const data = { url: 'https://youtu.be/dQw4w9WgXcQ' };
+                    resolver(data,
+                        (result) => testResolve({ success: true, html: result.html }),
+                        (error) => testResolve({ rejected: true, message: error.msg })
+                    );
+                });
             }
         """
         )
@@ -185,33 +234,102 @@ class TestTinyMCEYouTubeEmbed(DjangoPlaywrightTestCase):
             "html", ""
         ), "Should contain video ID in embed URL"
 
-    def test_non_youtube_url_rejected(self):
-        """Test that non-YouTube URLs are passed through to default handler."""
-        self.create_test_member(username="youtube_admin3", is_superuser=True)
-        self.login(username="youtube_admin3")
+    def test_youtube_url_with_missing_video_id(self):
+        """Test YouTube URLs with missing video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin4", is_superuser=True)
+        self.login(username="youtube_admin4")
 
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
-        # Test with non-YouTube URL (should be rejected to let default handle it)
+        # Test with YouTube URL missing video ID
         result = self.page.evaluate(
             """
-            async () => {
+            () => {
                 const editor = tinymce.activeEditor;
                 const resolver = editor.options.get('media_url_resolver');
                 if (!resolver) return { error: 'No resolver found' };
 
-                try {
-                    const data = await resolver({ url: 'https://vimeo.com/123456' });
-                    return { success: true, html: data.html };
-                } catch (e) {
-                    return { rejected: true };
-                }
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver({ url: 'https://www.youtube.com/watch' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
             }
         """
         )
 
-        assert result.get("rejected") is True, "Non-YouTube URLs should be rejected"
+        assert result.get("success") is True, "Resolver should resolve (not reject)"
+        assert (
+            result.get("html") == ""
+        ), "YouTube URLs with missing video ID should return empty html for fallback"
+
+    def test_youtube_url_with_invalid_video_id(self):
+        """Test YouTube URLs with invalid video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin5", is_superuser=True)
+        self.login(username="youtube_admin5")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with YouTube URL having invalid video ID
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const resolver = editor.options.get('media_url_resolver');
+                if (!resolver) return { error: 'No resolver found' };
+
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver(
+                    { url: 'https://www.youtube.com/watch?v=invalid***chars' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
+            }
+        """
+        )
+
+        assert result.get("success") is True, "Resolver should resolve (not reject)"
+        assert (
+            result.get("html") == ""
+        ), "YouTube URLs with invalid video ID should return empty html for fallback"
+
+    def test_youtube_short_url_with_missing_video_id(self):
+        """Test short YouTube URLs with missing video ID fall back to TinyMCE's default handler."""
+        self.create_test_member(username="youtube_admin6", is_superuser=True)
+        self.login(username="youtube_admin6")
+
+        self.page.goto(f"{self.live_server_url}/cms/create/page/")
+        self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
+
+        # Test with short YouTube URL missing video ID
+        result = self.page.evaluate(
+            """
+            () => {
+                const editor = tinymce.activeEditor;
+                const resolver = editor.options.get('media_url_resolver');
+                if (!resolver) return { error: 'No resolver found' };
+
+                let callbackResult = null;
+                const resolve = (data) => { callbackResult = { success: true, html: data.html }; };
+                const reject = () => { callbackResult = { rejected: true }; };
+
+                resolver({ url: 'https://youtu.be/' }, resolve, reject);
+
+                return callbackResult || { error: 'Callback was not called' };
+            }
+        """
+        )
+
+        assert result.get("success") is True, "Resolver should resolve (not reject)"
+        assert (
+            result.get("html") == ""
+        ), "Short YouTube URLs with missing video ID should return empty html for fallback"
 
 
 class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
@@ -260,15 +378,13 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
                 f"Media button not found. Available buttons: {toolbar_buttons[:10]}"
             )
 
-    @pytest.mark.xfail(
-        reason="Issue #422: YouTube videos not inserting via mceMedia command"
-    )
     def test_youtube_url_inserts_embed(self):
-        """Test that entering a YouTube URL in the media dialog inserts an embed.
+        """Test that using the media_url_resolver with a YouTube URL inserts an embed.
 
-        NOTE: This test is currently marked as xfail because it reproduces Issue #422.
-        When Issue #422 is fixed, this test should start passing and the xfail marker
-        can be removed.
+        This test verifies Issue #422 is fixed by:
+        1. Getting the embed HTML from the media_url_resolver
+        2. Inserting it into the editor using insertContent
+        3. Verifying the iframe is present in the editor content
         """
         self.create_test_member(username="embed_admin", is_superuser=True)
         self.login(username="embed_admin")
@@ -276,74 +392,92 @@ class TestTinyMCEMediaDialog(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/create/page/")
         self.page.wait_for_selector("iframe.tox-edit-area__iframe", timeout=10000)
 
-        # Insert YouTube video via TinyMCE command
-        self.page.evaluate(
-            """
-            () => {
-                const editor = tinymce.activeEditor;
-
-                // Use insertMedia command with YouTube URL
-                editor.execCommand('mceMedia', false, {
-                    source: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-                });
-            }
-        """
-        )
-
-        # Wait until the editor content reflects the inserted media
-        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-
-        try:
-            self.page.wait_for_function(
-                """
-                () => {
-                    const editor = tinymce.activeEditor;
-                    if (!editor) {
-                        return false;
-                    }
-                    const content = editor.getContent();
-                    if (!content) {
-                        return false;
-                    }
-                    const lower = content.toLowerCase();
-                    return (
-                        lower.includes("iframe") ||
-                        lower.includes("video") ||
-                        lower.includes("youtube") ||
-                        lower.includes("media")
-                    );
-                }
-            """,
-                timeout=5000,
-            )
-        except PlaywrightTimeoutError:
-            # Expected to timeout - this is Issue #422 (media not inserting)
-            pass
-
-        # Once the condition is satisfied (or timeout), retrieve the content
+        # Use media_url_resolver to get the embed HTML, then insert it
+        # TinyMCE 6.x uses callback-style API: resolver(data, resolve, reject)
         result = self.page.evaluate(
             """
             () => {
                 const editor = tinymce.activeEditor;
-                const content = editor ? editor.getContent() : "";
-                return { content: content };
+                const resolver = editor.options.get('media_url_resolver');
+
+                if (!resolver) {
+                    return { error: 'No resolver found' };
+                }
+
+                let result = null;
+
+                // Use callback-style API
+                resolver(
+                    { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+                    (data) => {
+                        // Success callback
+                        if (data && data.html) {
+                            // Insert the HTML into the editor
+                            editor.insertContent(data.html);
+                            // Get content right after insertion
+                            const content = editor.getContent();
+                            result = { success: true, inserted: data.html,
+                                contentAfter: content };
+                        } else {
+                            result = { error: 'Resolver returned empty html',
+                                data: JSON.stringify(data) };
+                        }
+                    },
+                    (error) => {
+                        // Reject callback
+                        result = { error: 'Resolver rejected', message: error.msg };
+                    }
+                );
+
+                return result || { error: 'Callback was not called synchronously' };
             }
         """
         )
 
-        content = result.get("content", "")
-        # The content should either contain an iframe or a video placeholder
-        # depending on how TinyMCE handles the media
+        if "error" in result:
+            self.fail(f"Failed to use resolver: {result}")
+
+        # Check if the insertion worked right away
+        content = result.get("contentAfter", "")
+
+        # If content is still empty, wait and try again
+        if not content or "iframe" not in content.lower():
+            # Wait for content to be processed
+            try:
+                self.page.wait_for_function(
+                    """
+                    () => {
+                        const editor = tinymce.activeEditor;
+                        if (!editor) return false;
+                        const content = editor.getContent();
+                        return content && content.toLowerCase().includes('iframe');
+                    }
+                    """,
+                    timeout=3000,
+                )
+            except Exception:
+                pass  # Timeout is OK, we'll check content below
+
+            # Get final content
+            content_result = self.page.evaluate(
+                """
+                () => {
+                    const editor = tinymce.activeEditor;
+                    return { content: editor ? editor.getContent() : "" };
+                }
+            """
+            )
+            content = content_result.get("content", "")
+
+        # The content should contain an iframe with YouTube embed
         has_media = (
-            "iframe" in content.lower()
-            or "video" in content.lower()
-            or "youtube" in content.lower()
-            or "media" in content.lower()
+            "iframe" in content.lower() and "youtube.com/embed" in content.lower()
         )
 
-        # Assert that media was inserted - this will fail (xfail) until Issue #422 is fixed
+        # Assert that media was inserted
         assert has_media, (
             f"YouTube video was not inserted into editor (Issue #422). "
+            f"Inserted: '{result.get('inserted', 'N/A')[:100]}', "
             f"Content: '{content[:200]}'"
         )
 

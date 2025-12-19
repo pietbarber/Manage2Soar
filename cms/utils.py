@@ -8,13 +8,27 @@ attribute to prevent YouTube Error 153 playback issues.
 
 import re
 
+# YouTube allow attribute required for proper embedding
+YOUTUBE_ALLOW_ATTR = 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"'
+
+# Required permissions for YouTube embeds
+REQUIRED_YOUTUBE_PERMISSIONS = [
+    "accelerometer",
+    "autoplay",
+    "clipboard-write",
+    "encrypted-media",
+    "gyroscope",
+    "picture-in-picture",
+    "web-share",
+]
+
 
 def fix_youtube_embeds(content):
     """
-    Fix YouTube iframe embeds by adding proper referrer policy.
+    Fix YouTube iframe embeds by adding proper referrer policy and allow attribute.
 
-    Adds referrerpolicy="strict-origin-when-cross-origin" to YouTube iframes
-    to ensure proper domain verification and prevent playback errors.
+    Adds referrerpolicy="strict-origin-when-cross-origin" and the full allow attribute
+    to YouTube iframes to ensure proper domain verification and prevent Error 153.
 
     Args:
         content (str): HTML content that may contain YouTube iframe embeds
@@ -35,22 +49,51 @@ def fix_youtube_embeds(content):
         iframe_attrs = match.group(1)
         closing = match.group(2)
 
+        needs_update = False
+
         # Check if referrerpolicy is already set correctly
-        if 'referrerpolicy="strict-origin-when-cross-origin"' in iframe_attrs:
+        if 'referrerpolicy="strict-origin-when-cross-origin"' not in iframe_attrs:
+            needs_update = True
+            # Remove any existing referrerpolicy (handles both single and double quotes)
+            iframe_attrs = re.sub(
+                r'\s*referrerpolicy=["\'][^"\']*["\']',
+                "",
+                iframe_attrs,
+                flags=re.IGNORECASE,
+            )
+            iframe_attrs = (
+                f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"'
+            )
+
+        # Check and normalize allow attribute
+        allow_match = re.search(
+            r'\sallow=["\']([^"\']*)["\']', iframe_attrs, flags=re.IGNORECASE
+        )
+
+        if allow_match:
+            existing_permissions = allow_match.group(1).lower()
+            # Check if all required permissions are present
+            if not all(
+                perm in existing_permissions for perm in REQUIRED_YOUTUBE_PERMISSIONS
+            ):
+                needs_update = True
+                # Remove existing allow and add canonical YouTube allow attribute
+                iframe_attrs = re.sub(
+                    r'\s*allow=["\'][^"\']*["\']',
+                    "",
+                    iframe_attrs,
+                    flags=re.IGNORECASE,
+                )
+                iframe_attrs = f"{iframe_attrs} {YOUTUBE_ALLOW_ATTR}"
+        else:
+            # No allow attribute present
+            needs_update = True
+            iframe_attrs = f"{iframe_attrs} {YOUTUBE_ALLOW_ATTR}"
+
+        if not needs_update:
             return match.group(0)  # Already correct
 
-        # Remove any existing referrerpolicy (handles both single and double quotes)
-        iframe_attrs = re.sub(
-            r'\s*referrerpolicy=["\'][^"\']*["\']',
-            "",
-            iframe_attrs,
-            flags=re.IGNORECASE,
-        )
-
-        # Add the correct referrerpolicy
-        return (
-            f'{iframe_attrs} referrerpolicy="strict-origin-when-cross-origin"{closing}'
-        )
+        return f"{iframe_attrs}{closing}"
 
     return youtube_pattern.sub(fix_iframe, content)
 
