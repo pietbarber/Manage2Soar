@@ -1,0 +1,36 @@
+# Gunicorn configuration file
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+# Server socket
+bind = "{{ m2s_gunicorn_bind }}"
+
+# Worker processes
+workers = {{ m2s_gunicorn_workers }}
+worker_class = "{{ m2s_gunicorn_worker_class }}"
+timeout = {{ m2s_gunicorn_timeout }}
+
+# Worker recycling to prevent memory leaks
+max_requests = {{ m2s_gunicorn_max_requests }}
+max_requests_jitter = {{ m2s_gunicorn_max_requests_jitter }}
+
+# Logging
+accesslog = "{{ m2s_gunicorn_access_log }}"
+errorlog = "{{ m2s_gunicorn_error_log }}"
+loglevel = "info"
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
+
+# Process naming
+proc_name = "gunicorn-m2s"
+
+# Security
+limit_request_line = 4094
+limit_request_fields = 100
+limit_request_field_size = 8190
+
+# Server mechanics
+daemon = False
+preload_app = True
+chdir = "{{ m2s_app_home }}/app"
+
+# Graceful restart timeout
+graceful_timeout = 30

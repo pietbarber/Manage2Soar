@@ -1,0 +1,80 @@
+---
+# Test playbook for M2S Django/Gunicorn role
+# Run with:
+#   cd infrastructure/ansible
+#   ansible-playbook -i inventory/single_host.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     -e "@group_vars/single_host/vault.yml" \
+#     -e "@group_vars/single_host/vars.yml" \
+#     playbooks/test-m2s-app.yml
+
+- name: Test M2S Django/Gunicorn Role
+  hosts: single_host
+  become: true
+
+  pre_tasks:
+    - name: Display deployment info
+      ansible.builtin.debug:
+        msg: |
+          Deploying M2S Application
+          ========================
+          App User: {{ m2s_app_user }}
+          App Home: {{ m2s_app_home }}
+          Git Branch: {{ m2s_git_branch }}
+          Python: {{ m2s_python_version }}
+          Gunicorn Bind: {{ m2s_gunicorn_bind }}
+
+  roles:
+    - role: m2s-app
+
+  post_tasks:
+    - name: Wait for Gunicorn to be ready
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8000
+        timeout: 30
+      ignore_errors: true
+      register: gunicorn_wait
+
+    - name: Check Gunicorn service status
+      ansible.builtin.systemd:
+        name: gunicorn
+        state: started
+      register: gunicorn_status
+      ignore_errors: true
+
+    - name: Test local Gunicorn response
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8000/"
+        method: GET
+        status_code: [200, 301, 302, 400, 403]
+        timeout: 10
+      register: gunicorn_response
+      ignore_errors: true
+
+    - name: Check if static files exist
+      ansible.builtin.stat:
+        path: "{{ m2s_django_static_root }}/css"
+      register: static_check
+
+    - name: Check application log directory
+      ansible.builtin.stat:
+        path: "{{ m2s_log_dir }}"
+      register: log_dir_check
+
+    - name: Display test results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          M2S Application Test Results
+          ========================================
+          Gunicorn Service: {{ 'Running' if gunicorn_status.status.ActiveState == 'active' else 'NOT Running' }}
+          Gunicorn Port: {{ 'Listening' if gunicorn_wait is succeeded else 'NOT Listening' }}
+          HTTP Response: {{ gunicorn_response.status | default('N/A') }}
+          Static Files: {{ 'Present' if static_check.stat.exists else 'Missing' }}
+          Log Directory: {{ 'Present' if log_dir_check.stat.exists else 'Missing' }}
+
+          Application: {{ m2s_app_home }}/app
+          Virtual Env: {{ m2s_venv_path }}
+          Gunicorn Config: {{ m2s_app_home }}/gunicorn.conf.py
+          ========================================

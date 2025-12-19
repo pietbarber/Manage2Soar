@@ -1,0 +1,57 @@
+---
+# M2S Django Application defaults
+# These can be overridden in group_vars or host_vars
+
+# Application settings
+m2s_app_user: "m2s"
+m2s_app_group: "m2s"
+m2s_app_home: "/opt/m2s"
+m2s_app_name: "manage2soar"
+
+# Repository settings
+m2s_git_repo: "https://github.com/pietbarber/Manage2Soar.git"
+m2s_git_branch: "main"
+m2s_git_force_update: false
+
+# Python settings
+m2s_python_version: "python3.12"
+m2s_venv_path: "{{ m2s_app_home }}/venv"
+
+# Django settings
+m2s_django_settings_module: "manage2soar.settings_single_host"
+m2s_django_debug: false
+m2s_django_allowed_hosts: "{{ m2s_domain }}"
+m2s_django_static_root: "/var/www/m2s/static"
+m2s_django_media_root: "/var/www/m2s/media"
+
+# Gunicorn settings
+m2s_gunicorn_bind: "127.0.0.1:8000"
+m2s_gunicorn_workers: 3
+m2s_gunicorn_worker_class: "sync"
+m2s_gunicorn_timeout: 120
+m2s_gunicorn_max_requests: 1000
+m2s_gunicorn_max_requests_jitter: 50
+
+# Log settings
+m2s_log_dir: "/var/log/m2s"
+m2s_gunicorn_access_log: "{{ m2s_log_dir }}/gunicorn-access.log"
+m2s_gunicorn_error_log: "{{ m2s_log_dir }}/gunicorn-error.log"
+m2s_django_log_file: "{{ m2s_log_dir }}/django.log"
+
+# Database connection (defaults - override in vault)
+m2s_db_host: "localhost"
+m2s_db_port: 5432
+m2s_db_name: "{{ postgresql_database }}"
+m2s_db_user: "{{ postgresql_user }}"
+
+# Email settings (defaults)
+m2s_email_backend: "django.core.mail.backends.smtp.EmailBackend"
+m2s_email_host: "localhost"
+m2s_email_port: 25
+m2s_email_use_tls: false
+
+# Google OAuth settings (override in vault)
+m2s_google_oauth_enabled: true
+
+# Additional Django environment variables
+m2s_extra_env_vars: {}

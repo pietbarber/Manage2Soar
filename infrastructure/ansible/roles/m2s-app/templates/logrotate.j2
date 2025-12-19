@@ -1,0 +1,16 @@
+# Logrotate configuration for M2S application logs
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+{{ m2s_log_dir }}/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ m2s_app_user }} {{ m2s_app_group }}
+    sharedscripts
+    postrotate
+        systemctl reload gunicorn > /dev/null 2>&1 || true
+    endscript
+}
