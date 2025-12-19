@@ -137,7 +137,7 @@
 
 - name: Run Django migrations
   ansible.builtin.shell:
-    cmd: source {{ m2s_app_home }}/app/.env && {{ m2s_venv_path }}/bin/python manage.py migrate --noinput
+    cmd: set -a && source {{ m2s_app_home }}/app/.env && set +a && {{ m2s_venv_path }}/bin/python manage.py migrate --noinput
     chdir: "{{ m2s_app_home }}/app"
     executable: /bin/bash
   become: true
@@ -148,7 +148,7 @@
 
 - name: Collect static files
   ansible.builtin.shell:
-    cmd: source {{ m2s_app_home }}/app/.env && {{ m2s_venv_path }}/bin/python manage.py collectstatic --noinput
+    cmd: set -a && source {{ m2s_app_home }}/app/.env && set +a && {{ m2s_venv_path }}/bin/python manage.py collectstatic --noinput
     chdir: "{{ m2s_app_home }}/app"
     executable: /bin/bash
   become: true

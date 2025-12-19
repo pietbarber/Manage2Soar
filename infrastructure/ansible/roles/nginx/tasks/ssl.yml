@@ -53,6 +53,6 @@
     day: "*"
     month: "*"
     weekday: "*"
-    job: "certbot renew --quiet --post-hook 'systemctl reload nginx'"
+    job: "certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
     user: root
   become: true
