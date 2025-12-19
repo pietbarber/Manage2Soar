@@ -1,0 +1,72 @@
+# NGINX Test Playbook
+# Tests only the NGINX role for Phase 2 development
+#
+# Usage:
+#   ansible-playbook -i inventory/single_host.yml playbooks/test-nginx.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     -e "@group_vars/single_host/vault.yml" \
+#     -e "@group_vars/single_host/vars.yml"
+
+---
+- name: Test NGINX Role
+  hosts: single_host
+  become: true
+
+  pre_tasks:
+    - name: Display target info
+      ansible.builtin.debug:
+        msg: |
+          Testing NGINX role on {{ inventory_hostname }}
+          Domain: {{ m2s_domain }}
+          SSL Enabled: {{ nginx_ssl_enabled }}
+          Static Root: {{ nginx_static_root }}
+
+  roles:
+    - role: nginx
+
+  post_tasks:
+    - name: Verify NGINX is running
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+      check_mode: true
+      register: nginx_status
+
+    - name: Test NGINX configuration
+      ansible.builtin.command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Check if NGINX is listening on port 80
+      ansible.builtin.wait_for:
+        port: 80
+        timeout: 5
+      register: port_80_check
+      ignore_errors: true
+
+    - name: Test HTTP response
+      ansible.builtin.uri:
+        url: "http://localhost/"
+        status_code: [200, 301, 302, 502]
+        validate_certs: false
+      register: http_response
+      ignore_errors: true
+
+    - name: Display test results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          NGINX Role Test Results
+          ========================================
+          Service Status: {{ 'Running' if nginx_status.status.ActiveState == 'active' else 'Not Running' }}
+          Config Test: {{ 'Passed' if nginx_test.rc == 0 else 'Failed' }}
+          Port 80: {{ 'Listening' if port_80_check is success else 'Not Listening' }}
+          HTTP Response: {{ http_response.status | default('N/A') }}
+
+          Static files: {{ nginx_static_root }}
+          Media files: {{ nginx_media_root }}
+          Upstream: {{ nginx_upstream_server }}
+          ========================================
+
+          Note: 502 Bad Gateway is expected until Gunicorn is deployed.
+          ========================================

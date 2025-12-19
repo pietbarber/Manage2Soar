@@ -1,0 +1,141 @@
+# NGINX Role - Main Tasks
+---
+
+- name: Install NGINX
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+  become: true
+
+- name: Ensure NGINX is started and enabled
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: true
+  become: true
+
+- name: Create static files directory
+  ansible.builtin.file:
+    path: "{{ nginx_static_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  become: true
+
+- name: Create media files directory
+  ansible.builtin.file:
+    path: "{{ nginx_media_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  become: true
+
+- name: Create NGINX snippets directory
+  ansible.builtin.file:
+    path: /etc/nginx/snippets
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Deploy SSL parameters snippet
+  ansible.builtin.template:
+    src: ssl-params.conf.j2
+    dest: /etc/nginx/snippets/ssl-params.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload NGINX
+  when: nginx_ssl_enabled
+
+- name: Deploy security headers snippet
+  ansible.builtin.template:
+    src: security-headers.conf.j2
+    dest: /etc/nginx/snippets/security-headers.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload NGINX
+
+- name: Deploy main NGINX configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload NGINX
+
+- name: Remove default NGINX site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  become: true
+  notify: Reload NGINX
+
+- name: Deploy M2S site configuration (HTTP only for initial setup)
+  ansible.builtin.template:
+    src: m2s-http.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nginx_ssl_enabled and not ssl_cert_exists.stat.exists | default(true)
+  notify: Reload NGINX
+
+- name: Check if SSL certificate exists
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: ssl_cert_exists
+  become: true
+  when: nginx_ssl_enabled
+
+- name: Deploy M2S site configuration (with SSL)
+  ansible.builtin.template:
+    src: m2s-ssl.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nginx_ssl_enabled and ssl_cert_exists.stat.exists | default(false)
+  notify: Reload NGINX
+
+- name: Deploy M2S site configuration (no SSL)
+  ansible.builtin.template:
+    src: m2s-nossl.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: not nginx_ssl_enabled
+  notify: Reload NGINX
+
+- name: Enable M2S site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/m2s.conf
+    dest: /etc/nginx/sites-enabled/m2s.conf
+    state: link
+  become: true
+  notify: Reload NGINX
+
+- name: Test NGINX configuration
+  ansible.builtin.command: nginx -t
+  become: true
+  changed_when: false
+
+- name: Include SSL certificate tasks
+  ansible.builtin.include_tasks: ssl.yml
+  when: nginx_ssl_enabled and not ssl_cert_exists.stat.exists | default(true)

@@ -1,0 +1,83 @@
+# M2S NGINX Configuration - No SSL (for development/testing)
+# Managed by Ansible - do not edit manually
+
+upstream {{ nginx_upstream_name }} {
+    server {{ nginx_upstream_server }};
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ nginx_server_name }};
+
+{% if nginx_security_headers_enabled %}
+    # Security headers (without HSTS for non-SSL)
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+{% endif %}
+
+    # Logging
+    access_log {{ nginx_access_log }} main;
+    error_log {{ nginx_error_log }};
+
+    # Static files
+    location {{ nginx_static_url }} {
+        alias {{ nginx_static_root }}/;
+        expires {{ nginx_static_cache_time }};
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Media files (user uploads)
+    location {{ nginx_media_url }} {
+        alias {{ nginx_media_root }}/;
+        expires {{ nginx_media_cache_time }};
+        add_header Cache-Control "public";
+    }
+
+    # Favicon
+    location = /favicon.ico {
+        alias {{ nginx_static_root }}/favicon.ico;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Robots.txt
+    location = /robots.txt {
+        alias {{ nginx_static_root }}/robots.txt;
+        access_log off;
+        log_not_found off;
+    }
+
+{% if nginx_rate_limit_enabled %}
+    # Rate-limited endpoints
+    location /accounts/login/ {
+        limit_req zone={{ nginx_rate_limit_zone }} burst={{ nginx_rate_limit_burst }} nodelay;
+        include /etc/nginx/proxy_params;
+        proxy_pass http://{{ nginx_upstream_name }};
+    }
+
+    location /api/ {
+        limit_req zone={{ nginx_rate_limit_zone }} burst={{ nginx_rate_limit_burst }} nodelay;
+        include /etc/nginx/proxy_params;
+        proxy_pass http://{{ nginx_upstream_name }};
+    }
+{% endif %}
+
+    # Django application
+    location / {
+        include /etc/nginx/proxy_params;
+        proxy_pass http://{{ nginx_upstream_name }};
+
+        # WebSocket support (if needed)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}

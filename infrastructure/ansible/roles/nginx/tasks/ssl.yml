@@ -1,0 +1,41 @@
+# NGINX Role - SSL Certificate Tasks
+---
+
+- name: Obtain Let's Encrypt certificate
+  ansible.builtin.command: >
+    certbot certonly --nginx --non-interactive --agree-tos
+    --email {{ letsencrypt_email }}
+    --domains {{ nginx_server_name }}
+  args:
+    creates: "{{ nginx_ssl_certificate }}"
+  become: true
+  register: certbot_result
+  ignore_errors: true
+
+- name: Display certbot result
+  ansible.builtin.debug:
+    msg: "Certbot result: {{ certbot_result.stdout | default('No output') }}"
+  when: certbot_result is defined
+
+- name: Deploy SSL site configuration after certificate obtained
+  ansible.builtin.template:
+    src: m2s-ssl.conf.j2
+    dest: /etc/nginx/sites-available/m2s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: certbot_result is success
+  notify: Reload NGINX
+
+- name: Set up automatic certificate renewal
+  ansible.builtin.cron:
+    name: "Certbot renewal"
+    minute: "0"
+    hour: "3"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "certbot renew --quiet --post-hook 'systemctl reload nginx'"
+    user: root
+  become: true

@@ -1,0 +1,19 @@
+# NGINX Role Handlers
+---
+
+- name: Restart NGINX
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  become: true
+
+- name: Reload NGINX
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  become: true
+
+- name: Test NGINX config
+  ansible.builtin.command: nginx -t
+  become: true
+  changed_when: false
