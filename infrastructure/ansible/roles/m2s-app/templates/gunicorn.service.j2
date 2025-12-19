@@ -7,7 +7,7 @@ After=network.target postgresql.service
 Requires=postgresql.service
 
 [Service]
-Type=notify
+Type=simple
 User={{ m2s_app_user }}
 Group={{ m2s_app_group }}
 WorkingDirectory={{ m2s_app_home }}/app

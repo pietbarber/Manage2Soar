@@ -14,7 +14,7 @@ BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${DB_NAME}"
 
 # Create backup using pg_dump with custom format (already compressed)
-pg_dump -Fc "${DB_NAME}" > "${BACKUP_FILE}"
+pg_dump -U {{ postgresql_user }} -h localhost -Fc "${DB_NAME}" > "${BACKUP_FILE}"
 
 # Verify backup was created and has content
 if [[ -s "${BACKUP_FILE}" ]]; then

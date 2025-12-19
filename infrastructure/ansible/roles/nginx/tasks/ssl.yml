@@ -9,12 +9,30 @@
     creates: "{{ nginx_ssl_certificate }}"
   become: true
   register: certbot_result
-  ignore_errors: true
+  failed_when: false
+
+- name: Check if certificate was successfully obtained
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: cert_check
+  become: true
+
+- name: Fail if certificate was not obtained
+  ansible.builtin.fail:
+    msg: |
+      Failed to obtain SSL certificate from Let's Encrypt.
+      Certbot output: {{ certbot_result.stdout | default('No output') }}
+      Error: {{ certbot_result.stderr | default('No error output') }}
+      Please check:
+      1. DNS records are correct for {{ nginx_server_name }}
+      2. Port 80 is accessible from the internet
+      3. No firewall blocking Let's Encrypt validation
+  when: certbot_result.rc != 0 and not cert_check.stat.exists
 
 - name: Display certbot result
   ansible.builtin.debug:
     msg: "Certbot result: {{ certbot_result.stdout | default('No output') }}"
-  when: certbot_result is defined
+  when: certbot_result.rc == 0
 
 - name: Deploy SSL site configuration after certificate obtained
   ansible.builtin.template:
@@ -24,7 +42,7 @@
     group: root
     mode: "0644"
   become: true
-  when: certbot_result is success
+  when: cert_check.stat.exists
   notify: Reload NGINX
 
 - name: Set up automatic certificate renewal

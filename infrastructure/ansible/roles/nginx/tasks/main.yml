@@ -97,7 +97,7 @@
     group: root
     mode: "0644"
   become: true
-  when: nginx_ssl_enabled and not ssl_cert_exists.stat.exists | default(true)
+  when: nginx_ssl_enabled and not (ssl_cert_exists.stat.exists | default(false))
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (with SSL)
@@ -108,7 +108,7 @@
     group: root
     mode: "0644"
   become: true
-  when: nginx_ssl_enabled and ssl_cert_exists.stat.exists | default(false)
+  when: nginx_ssl_enabled and (ssl_cert_exists.stat.exists | default(false))
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (no SSL)
