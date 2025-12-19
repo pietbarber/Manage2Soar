@@ -1142,6 +1142,10 @@ def propose_roster(request):
                     )
             else:
                 messages.success(request, f"Duty roster published for {month}/{year}.")
+                messages.info(
+                    request,
+                    "No duty assignments to notify, so no calendar invites were sent.",
+                )
 
             return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 

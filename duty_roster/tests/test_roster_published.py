@@ -109,6 +109,49 @@ class TestGenerateRosterIcs:
         assert b"Instructor" in ics_content
         assert b"Test Soaring Club" in ics_content
 
+    def test_uid_is_stable_across_generations(self, site_config):
+        """Same parameters should produce identical UIDs (no timestamp variation)."""
+        duty_date = date.today() + timedelta(days=14)
+        role_title = "Duty Officer"
+        member_name = "John Doe"
+
+        # Generate ICS twice with same parameters
+        ics_content_1 = generate_roster_ics(
+            duty_date=duty_date,
+            role_title=role_title,
+            member_name=member_name,
+        )
+        ics_content_2 = generate_roster_ics(
+            duty_date=duty_date,
+            role_title=role_title,
+            member_name=member_name,
+        )
+
+        # Parse both calendars
+        cal1 = Calendar.from_ical(ics_content_1.decode("utf-8"))
+        cal2 = Calendar.from_ical(ics_content_2.decode("utf-8"))
+
+        # Extract UIDs from VEVENT components
+        uid1 = None
+        uid2 = None
+        for component in cal1.walk():
+            if component.name == "VEVENT":
+                uid1 = str(component.get("uid"))
+                break
+        for component in cal2.walk():
+            if component.name == "VEVENT":
+                uid2 = str(component.get("uid"))
+                break
+
+        # UIDs should be identical (stable, no timestamp)
+        assert uid1 is not None
+        assert uid2 is not None
+        assert uid1 == uid2
+
+        # UID should be based on date, role, and member (not contain random/timestamp)
+        expected_uid = f"roster-{duty_date.isoformat()}-duty-officer-john-doe"
+        assert uid1 == expected_uid
+
 
 @pytest.mark.django_db
 class TestSendRosterPublishedNotifications:

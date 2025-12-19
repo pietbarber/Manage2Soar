@@ -226,6 +226,9 @@ def send_roster_published_notifications(year, month, assignments):
     sent_count = 0
     errors = []
 
+    # TODO: For large rosters (50+ members), consider using Django's send_mass_mail
+    # or a background task queue (Celery) to avoid blocking the request.
+    # The current implementation handles partial failures gracefully with the errors list.
     for member, duty_list in member_assignments.items():
         # Sort duties by date
         duty_list.sort(key=lambda x: x["date"])
