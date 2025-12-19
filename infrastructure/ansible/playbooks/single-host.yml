@@ -5,19 +5,23 @@
 #
 # Prerequisites:
 #   1. Copy and configure inventory/single_host.yml from .example
-#   2. Copy and configure group_vars/single_host.yml from .example
+#   2. Copy and configure group_vars/single_host/ with vars.yml and vault.yml
 #   3. Ensure SSH access to target server with sudo privileges
+#   4. Set up vault password file: ~/.ansible_vault_pass
 #
 # Usage:
-#   ansible-playbook -i inventory/single_host.yml playbooks/single-host.yml
+#   ansible-playbook -i inventory/single_host.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     -e "@group_vars/single_host/vault.yml" \
+#     -e "@group_vars/single_host/vars.yml" \
+#     playbooks/single-host.yml
 #
 # Tags:
-#   - common: Base system setup
+#   - base: Base system setup
 #   - postgresql: Database setup
 #   - nginx: Web server setup
 #   - app: Django/Gunicorn application
 #   - mail: Mail server (if enabled)
-#   - backup: Backup configuration
 
 ---
 - name: Deploy Manage2Soar Single-Host Solution
@@ -28,55 +32,41 @@
     - name: Validate required variables
       ansible.builtin.assert:
         that:
-          - postgresql_password is defined
-          - postgresql_password != "CHANGE_ME_GENERATE_STRONG_PASSWORD"
-          - django_secret_key is defined
-          - django_secret_key != "CHANGE_ME_GENERATE_50_CHAR_SECRET"
+          - vault_postgresql_password is defined
+          - vault_django_secret_key is defined
           - m2s_domain is defined
         fail_msg: |
-          Required variables are not set or still have default values.
-          Please configure group_vars/single_host.yml with your actual values.
+          Required variables are not set.
+          Please ensure vault.yml and vars.yml are properly configured.
 
     - name: Display deployment info
       ansible.builtin.debug:
         msg: |
+          ========================================
           Deploying Manage2Soar to {{ inventory_hostname }}
+          ========================================
           Domain: {{ m2s_domain }}
-          Club: {{ club_name }} ({{ club_prefix }})
-          PostgreSQL: {{ postgresql_version }}
-          Deploy method: {{ deploy_method }}
+          Club: {{ club_name | default('Not Set') }} ({{ club_prefix | default('tsc') }})
+          PostgreSQL: {{ postgresql_version | default('17') }}
+          SSL Enabled: {{ nginx_ssl_enabled | default(false) }}
+          ========================================
 
   roles:
-    # Base system setup
-    - role: common
-      tags: [common, always]
-
     # PostgreSQL database
     - role: postgresql
       tags: [postgresql, database]
 
-    # TODO: Add these roles as they are developed
-    # - role: nginx
-    #   tags: [nginx, web]
-    #
-    # - role: m2s-app
-    #   tags: [app, django]
-    #
-    # - role: m2s-backup
-    #   tags: [backup]
-    #   when: backup_enabled | default(true)
+    # Django/Gunicorn application
+    - role: m2s-app
+      tags: [app, application]
 
-    # Mail server (optional)
+    # NGINX reverse proxy
+    - role: nginx
+      tags: [nginx, web]
+
+    # Mail server (optional - future implementation)
     # - role: postfix
     #   tags: [mail, postfix]
-    #   when: mail_server_enabled | default(false)
-    #
-    # - role: opendkim
-    #   tags: [mail, opendkim]
-    #   when: mail_server_enabled | default(false)
-    #
-    # - role: rspamd
-    #   tags: [mail, rspamd]
     #   when: mail_server_enabled | default(false)
 
   post_tasks:
@@ -89,17 +79,31 @@
 
           Server: {{ inventory_hostname }}
           Domain: {{ m2s_domain }}
+          URL: http{% if nginx_ssl_enabled | default(false) %}s{% endif %}://{{ m2s_domain }}/
 
           Database:
             Host: localhost
             Port: 5432
-            Database: {{ postgresql_db }}
-            User: {{ postgresql_user }}
+            Database: {{ postgresql_database | default('m2s') }}
+            User: {{ postgresql_user | default('m2s') }}
 
-          Next steps:
-            1. Configure DNS A record for {{ m2s_domain }}
-            2. Run Django migrations
-            3. Create superuser
-            4. Configure OAuth (if using)
+          Application:
+            Home: {{ m2s_app_home | default('/opt/m2s') }}
+            Gunicorn: {{ m2s_gunicorn_bind | default('127.0.0.1:8000') }}
+
+          Static Files: {{ m2s_django_static_root | default('/var/www/m2s/static') }}
+          Media Files: {{ m2s_django_media_root | default('/var/www/m2s/media') }}
+          Logs: {{ m2s_log_dir | default('/var/log/m2s') }}
+
+          {% if nginx_ssl_enabled | default(false) %}
+          SSL: Enabled (Let's Encrypt)
+          {% else %}
+          SSL: Disabled (enable with nginx_ssl_enabled: true)
+          {% endif %}
+
+          Useful commands:
+            - View Django logs: journalctl -u gunicorn -f
+            - Restart application: systemctl restart gunicorn
+            - View NGINX logs: tail -f /var/log/nginx/access.log
 
           ========================================
