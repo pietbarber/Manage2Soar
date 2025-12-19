@@ -1,0 +1,59 @@
+# PostgreSQL Test Playbook
+# Tests only the PostgreSQL role for Phase 1 development
+#
+# Usage:
+#   ansible-playbook -i inventory/single_host.yml playbooks/test-postgresql.yml -K
+
+---
+- name: Test PostgreSQL Role
+  hosts: single_host
+  become: true
+
+  pre_tasks:
+    - name: Display target info
+      ansible.builtin.debug:
+        msg: |
+          Testing PostgreSQL role on {{ inventory_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          PostgreSQL version: {{ postgresql_version }}
+          Database: {{ postgresql_db }}
+          User: {{ postgresql_user }}
+
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - postgresql_password is defined
+          - postgresql_password | length > 8
+        fail_msg: "postgresql_password must be defined and at least 8 characters"
+
+  roles:
+    - role: postgresql
+
+  post_tasks:
+    - name: Verify PostgreSQL is running
+      ansible.builtin.systemd:
+        name: postgresql
+        state: started
+      check_mode: true
+      register: pg_status
+
+    - name: Test database connection
+      community.postgresql.postgresql_ping:
+        db: "{{ postgresql_db }}"
+        login_host: localhost
+        login_user: "{{ postgresql_user }}"
+        login_password: "{{ postgresql_password }}"
+      register: pg_ping
+
+    - name: Display test results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          PostgreSQL Role Test Results
+          ========================================
+          Service Status: {{ 'Running' if pg_status.status.ActiveState == 'active' else 'Not Running' }}
+          Database Ping: {{ 'Success' if pg_ping.is_available else 'Failed' }}
+
+          Connection String:
+            postgres://{{ postgresql_user }}:***@localhost:5432/{{ postgresql_db }}
+          ========================================

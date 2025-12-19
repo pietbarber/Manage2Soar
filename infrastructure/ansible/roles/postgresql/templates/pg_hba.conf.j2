@@ -1,0 +1,18 @@
+# PostgreSQL Client Authentication Configuration
+# Managed by Ansible - do not edit manually
+#
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             postgres                                peer
+local   all             all                                     peer
+
+# IPv4 local connections (for Django/Gunicorn)
+host    {{ postgresql_db }}    {{ postgresql_user }}    127.0.0.1/32    scram-sha-256
+
+# IPv6 local connections
+host    {{ postgresql_db }}    {{ postgresql_user }}    ::1/128         scram-sha-256
+
+# Reject all other connections
+host    all             all             0.0.0.0/0               reject
+host    all             all             ::/0                    reject

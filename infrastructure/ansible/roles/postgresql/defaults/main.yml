@@ -1,0 +1,54 @@
+# PostgreSQL Role Defaults
+# These can be overridden in group_vars or host_vars
+---
+
+# PostgreSQL version to install
+postgresql_version: "17"
+
+# Database configuration
+postgresql_db: "m2s"
+postgresql_user: "m2s"
+# postgresql_password should be set in group_vars (gitignored)
+
+# Listen addresses - localhost only for security
+postgresql_listen_addresses: "127.0.0.1"
+postgresql_port: 5432
+
+# Connection settings
+postgresql_max_connections: 100
+
+# Memory settings (adjust based on server RAM)
+# For 2GB RAM server, these are conservative defaults
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "768MB"
+postgresql_work_mem: "4MB"
+postgresql_maintenance_work_mem: "64MB"
+
+# WAL settings
+postgresql_wal_buffers: "8MB"
+postgresql_checkpoint_completion_target: 0.9
+
+# Locale settings
+postgresql_locale: "en_US.UTF-8"
+
+# Backup settings
+postgresql_backup_enabled: true
+postgresql_backup_dir: "/var/backups/postgresql"
+postgresql_backup_retention_days: 7
+postgresql_backup_hour: 2
+postgresql_backup_minute: 0
+
+# Additional databases (optional)
+postgresql_additional_databases: []
+# Example:
+# postgresql_additional_databases:
+#   - name: "other_db"
+#     owner: "other_user"
+
+# Additional users (optional)
+postgresql_additional_users: []
+# Example:
+# postgresql_additional_users:
+#   - name: "readonly_user"
+#     password: "{{ readonly_password }}"
+#     role_attr_flags: "NOSUPERUSER,NOCREATEDB"

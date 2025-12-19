@@ -203,7 +203,10 @@ run-dev-server.sh
 # ============================================================
 # NEVER commit actual inventory or variables with passwords
 infrastructure/ansible/inventory/hosts.yml
+infrastructure/ansible/inventory/single_host.yml
 infrastructure/ansible/group_vars/all.yml
+infrastructure/ansible/group_vars/single_host.yml
+infrastructure/ansible/group_vars/single_host/
 infrastructure/ansible/group_vars/*.vault.yml
 infrastructure/ansible/*.retry
 test_email.py

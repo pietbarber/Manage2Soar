@@ -1,0 +1,58 @@
+# PostgreSQL Backup Configuration
+---
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ postgresql_backup_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  become: true
+
+- name: Create daily backup subdirectory
+  ansible.builtin.file:
+    path: "{{ postgresql_backup_dir }}/daily"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  become: true
+
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "/usr/local/bin/m2s-pg-backup.sh"
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Create backup cron job
+  ansible.builtin.cron:
+    name: "M2S PostgreSQL daily backup"
+    user: postgres
+    hour: "{{ postgresql_backup_hour }}"
+    minute: "{{ postgresql_backup_minute }}"
+    job: "/usr/local/bin/m2s-pg-backup.sh >> /var/log/m2s-pg-backup.log 2>&1"
+    state: present
+  become: true
+
+- name: Create backup log file
+  ansible.builtin.file:
+    path: /var/log/m2s-pg-backup.log
+    state: touch
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  become: true
+  changed_when: false
+
+- name: Configure logrotate for backup logs
+  ansible.builtin.template:
+    src: backup-logrotate.j2
+    dest: /etc/logrotate.d/m2s-pg-backup
+    owner: root
+    group: root
+    mode: "0644"
+  become: true

@@ -1,0 +1,46 @@
+# Single-Host Ansible Inventory
+#
+# COPY THIS FILE TO single_host.yml AND FILL IN YOUR VALUES
+# single_host.yml is gitignored - never commit real IPs/hostnames
+#
+# Usage: cp single_host.yml.example single_host.yml && vim single_host.yml
+
+all:
+  children:
+    single_host:
+      hosts:
+        m2s-server:
+          # Replace with your server's IP or hostname
+          ansible_host: "192.168.1.100"
+
+          # SSH connection settings
+          ansible_user: "ubuntu"
+          ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+
+          # Become (sudo) settings
+          ansible_become: true
+          ansible_become_method: sudo
+
+          # Python interpreter (Ubuntu 22.04+)
+          ansible_python_interpreter: /usr/bin/python3
+
+      vars:
+        # Server hostname (FQDN)
+        server_fqdn: "m2s.your-club.com"
+
+        # Club-specific settings
+        club_name: "Your Soaring Club"
+        club_prefix: "ysc"
+
+# Example for testing with local VirtualBox VM
+# Uncomment and modify for development testing
+#
+# all:
+#   children:
+#     single_host:
+#       hosts:
+#         m2s-test:
+#           ansible_host: "m2s-sa"  # Using SSH config alias
+#           ansible_user: "vboxuser"
+#           ansible_become: true
+#           ansible_python_interpreter: /usr/bin/python3

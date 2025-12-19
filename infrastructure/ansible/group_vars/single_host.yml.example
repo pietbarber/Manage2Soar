@@ -1,0 +1,192 @@
+# Single-Host Deployment Variables
+#
+# COPY THIS FILE AND FILL IN YOUR VALUES:
+#   cp single_host.yml.example single_host.yml
+#
+# single_host.yml is gitignored - NEVER commit passwords or secrets
+#
+# This file contains all variables needed for a complete single-host
+# Manage2Soar deployment including database, web server, and mail.
+
+---
+# ============================================================
+# CLUB CONFIGURATION
+# ============================================================
+
+# Your club's name (displayed in the application)
+club_name: "Your Soaring Club"
+
+# Short prefix for the club (used in URLs, email, etc.)
+club_prefix: "ysc"
+
+# Primary domain for this M2S instance
+m2s_domain: "m2s.your-club.com"
+
+# ============================================================
+# POSTGRESQL DATABASE
+# ============================================================
+
+# Database name
+postgresql_db: "m2s"
+
+# Database user
+postgresql_user: "m2s"
+
+# Database password - CHANGE THIS!
+# Generate with: openssl rand -base64 32
+postgresql_password: "CHANGE_ME_GENERATE_STRONG_PASSWORD"
+
+# PostgreSQL version
+postgresql_version: "17"
+
+# Memory settings - adjust based on your server RAM
+# These defaults are for a 2GB RAM server
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "768MB"
+
+# Backup settings
+postgresql_backup_enabled: true
+postgresql_backup_retention_days: 7
+
+# ============================================================
+# DJANGO APPLICATION
+# ============================================================
+
+# Django secret key - CHANGE THIS!
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+django_secret_key: "CHANGE_ME_GENERATE_50_CHAR_SECRET"
+
+# Debug mode - MUST be false in production!
+django_debug: false
+
+# Allowed hosts (comma-separated if multiple)
+django_allowed_hosts: "{{ m2s_domain }}"
+
+# Timezone
+django_timezone: "America/New_York"
+
+# ============================================================
+# DEPLOYMENT SETTINGS
+# ============================================================
+
+# Deployment method: "git" or "upload"
+# - git: Clone from GitHub repository
+# - upload: Upload from local machine (for private forks)
+deploy_method: "git"
+
+# Git settings (if deploy_method is "git")
+git_repo: "https://github.com/pietbarber/Manage2Soar.git"
+git_branch: "main"
+
+# Application paths
+m2s_app_dir: "/opt/m2s/app"
+m2s_venv_dir: "/opt/m2s/venv"
+m2s_static_dir: "/var/www/m2s/static"
+m2s_media_dir: "/var/www/m2s/media"
+m2s_log_dir: "/opt/m2s/logs"
+
+# System user to run the application
+m2s_user: "m2s"
+m2s_group: "m2s"
+
+# ============================================================
+# GUNICORN SETTINGS
+# ============================================================
+
+# Number of worker processes
+# Recommended: (2 * CPU cores) + 1
+gunicorn_workers: 3
+
+# Worker timeout in seconds
+gunicorn_timeout: 120
+
+# Bind address (internal only - NGINX proxies to this)
+gunicorn_bind: "127.0.0.1:8000"
+
+# ============================================================
+# NGINX SETTINGS
+# ============================================================
+
+# Enable HTTPS with Let's Encrypt
+nginx_ssl_enabled: true
+
+# Email for Let's Encrypt certificate notifications
+letsencrypt_email: "admin@your-club.com"
+
+# Enable HTTP/2
+nginx_http2_enabled: true
+
+# Rate limiting for login/API endpoints
+nginx_rate_limit_enabled: true
+nginx_rate_limit: "10r/s"
+nginx_rate_limit_burst: 20
+
+# ============================================================
+# EMAIL CONFIGURATION
+# ============================================================
+
+# Email backend: "local" or "external"
+# - local: Use local Postfix (requires mail server roles)
+# - external: Use external SMTP service (SendGrid, SMTP2GO, etc.)
+email_backend: "local"
+
+# From address for system emails
+email_from_address: "noreply@{{ m2s_domain }}"
+
+# External SMTP settings (if email_backend is "external")
+# smtp_host: "smtp.sendgrid.net"
+# smtp_port: 587
+# smtp_username: "apikey"
+# smtp_password: "YOUR_SENDGRID_API_KEY"
+# smtp_use_tls: true
+
+# ============================================================
+# MAIL SERVER (if running local mail)
+# ============================================================
+
+# Set to true to deploy local mail server
+mail_server_enabled: false
+
+# If enabled, configure these:
+# mail_hostname: "mail.{{ m2s_domain }}"
+# admin_email: "postmaster@{{ m2s_domain }}"
+
+# ============================================================
+# SECURITY SETTINGS
+# ============================================================
+
+# UFW firewall
+firewall_enabled: true
+
+# Allowed SSH port (change if using non-standard port)
+ssh_port: 22
+
+# Fail2ban
+fail2ban_enabled: true
+
+# ============================================================
+# BACKUP SETTINGS
+# ============================================================
+
+# Enable automated backups
+backup_enabled: true
+
+# Backup retention
+backup_retention_days: 7
+
+# Backup destination (local path)
+backup_dir: "/var/backups/m2s"
+
+# Optional: GPG encryption for backups
+# backup_gpg_enabled: false
+# backup_gpg_recipient: "your-gpg-key-id"
+
+# ============================================================
+# MONITORING (optional)
+# ============================================================
+
+# Enable basic monitoring
+# monitoring_enabled: false
+
+# Health check endpoint
+# health_check_url: "https://{{ m2s_domain }}/health/"
