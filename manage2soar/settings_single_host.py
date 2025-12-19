@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "utils.middleware.HealthCheckMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -66,7 +67,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "social_django.middleware.SocialAuthExceptionMiddleware",
-    "cms.middleware.VisitorTrackingMiddleware",
 ]
 
 ROOT_URLCONF = "manage2soar.urls"
@@ -84,6 +84,8 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
+                "django.template.context_processors.static",
+                "django.template.context_processors.media",
                 "cms.context_processors.footer_content",
                 "duty_roster.context_processors.today_roster",
             ],
@@ -143,6 +145,9 @@ STORAGES = {
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Custom user model
+AUTH_USER_MODEL = "members.Member"
+
 # Authentication backends
 AUTHENTICATION_BACKENDS = (
     "social_core.backends.google.GoogleOAuth2",
@@ -176,6 +181,15 @@ SOCIAL_AUTH_PIPELINE = (
 
 # Club prefix for multi-tenant support
 CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")
+
+# Validate CLUB_PREFIX to prevent path traversal attacks
+import re
+
+if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
+    raise Exception(
+        f"Invalid CLUB_PREFIX '{CLUB_PREFIX}'. "
+        "CLUB_PREFIX must contain only alphanumeric characters and hyphens."
+    )
 
 # Email configuration
 EMAIL_BACKEND = os.getenv(

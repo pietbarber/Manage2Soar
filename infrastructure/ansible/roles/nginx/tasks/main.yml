@@ -1,6 +1,5 @@
 # NGINX Role - Main Tasks
 ---
-
 - name: Install NGINX
   ansible.builtin.apt:
     name:
@@ -83,6 +82,13 @@
   become: true
   notify: Reload NGINX
 
+- name: Check if SSL certificate exists
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: ssl_cert_exists
+  become: true
+  when: nginx_ssl_enabled
+
 - name: Deploy M2S site configuration (HTTP only for initial setup)
   ansible.builtin.template:
     src: m2s-http.conf.j2
@@ -93,13 +99,6 @@
   become: true
   when: nginx_ssl_enabled and not ssl_cert_exists.stat.exists | default(true)
   notify: Reload NGINX
-
-- name: Check if SSL certificate exists
-  ansible.builtin.stat:
-    path: "{{ nginx_ssl_certificate }}"
-  register: ssl_cert_exists
-  become: true
-  when: nginx_ssl_enabled
 
 - name: Deploy M2S site configuration (with SSL)
   ansible.builtin.template:

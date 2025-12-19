@@ -1,7 +1,6 @@
 # NGINX Role Defaults
 # These can be overridden in group_vars or host_vars
 ---
-
 # Domain configuration
 nginx_server_name: "{{ m2s_domain | default('localhost') }}"
 

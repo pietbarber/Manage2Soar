@@ -1,7 +1,6 @@
 # PostgreSQL Role Defaults
 # These can be overridden in group_vars or host_vars
 ---
-
 # PostgreSQL version to install
 postgresql_version: "17"
 

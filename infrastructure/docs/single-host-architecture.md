@@ -23,7 +23,7 @@ flowchart TB
         end
 
         subgraph DataLayer["Data Layer"]
-            PostgreSQL["PostgreSQL 16<br/>─────────<br/>• Primary database<br/>• All M2S data<br/>• Backups via pg_dump"]
+            PostgreSQL["PostgreSQL 17<br/>─────────<br/>• Primary database<br/>• All M2S data<br/>• Backups via pg_dump"]
             MediaFiles[("Media Files<br/>─────────<br/>/var/www/m2s/media/<br/>• Uploaded images<br/>• Documents")]
             StaticFiles[("Static Files<br/>─────────<br/>/var/www/m2s/static/<br/>• CSS, JS, Images<br/>• collectstatic output")]
         end
@@ -109,7 +109,7 @@ flowchart TB
 
 **Key Environment Variables:**
 ```bash
-DJANGO_SETTINGS_MODULE=manage2soar.settings
+DJANGO_SETTINGS_MODULE=manage2soar.settings_single_host
 SECRET_KEY=<generated-secret>
 DATABASE_URL=postgres://m2s:password@localhost:5432/m2s
 ALLOWED_HOSTS=your-domain.com
@@ -128,7 +128,7 @@ EMAIL_HOST_PASSWORD=<smtp-password>
 **Purpose:** Primary data store
 
 **Configuration:**
-- PostgreSQL 16 (latest stable)
+- PostgreSQL 17 (latest stable)
 - Database: `m2s`
 - User: `m2s` with strong password
 - Listen on `127.0.0.1:5432` (local only)
@@ -136,8 +136,8 @@ EMAIL_HOST_PASSWORD=<smtp-password>
 
 **Key Files:**
 ```
-/etc/postgresql/16/main/postgresql.conf
-/etc/postgresql/16/main/pg_hba.conf
+/etc/postgresql/17/main/postgresql.conf
+/etc/postgresql/17/main/pg_hba.conf
 /var/backups/m2s/
 ```
 

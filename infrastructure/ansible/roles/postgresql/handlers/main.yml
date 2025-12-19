@@ -1,6 +1,5 @@
 # PostgreSQL Role Handlers
 ---
-
 - name: Restart PostgreSQL
   ansible.builtin.systemd:
     name: postgresql

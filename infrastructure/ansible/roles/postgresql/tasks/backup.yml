@@ -1,6 +1,5 @@
 # PostgreSQL Backup Configuration
 ---
-
 - name: Create backup directory
   ansible.builtin.file:
     path: "{{ postgresql_backup_dir }}"

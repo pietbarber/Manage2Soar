@@ -1,6 +1,5 @@
 # PostgreSQL Role - Main Tasks
 ---
-
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ item }}"
   with_first_found:

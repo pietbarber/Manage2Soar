@@ -9,12 +9,12 @@ BACKUP_DIR="{{ postgresql_backup_dir }}/daily"
 DB_NAME="{{ postgresql_db }}"
 RETENTION_DAYS="{{ postgresql_backup_retention_days }}"
 DATE=$(date +%Y-%m-%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.sql.gz"
+BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${DB_NAME}"
 
-# Create backup using pg_dump
-pg_dump -Fc "${DB_NAME}" | gzip > "${BACKUP_FILE}"
+# Create backup using pg_dump with custom format (already compressed)
+pg_dump -Fc "${DB_NAME}" > "${BACKUP_FILE}"
 
 # Verify backup was created and has content
 if [[ -s "${BACKUP_FILE}" ]]; then
@@ -26,12 +26,12 @@ else
 fi
 
 # Create latest symlink
-ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${DB_NAME}_latest.sql.gz"
+ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${DB_NAME}_latest.pgdump"
 
 # Remove old backups
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing backups older than ${RETENTION_DAYS} days"
-find "${BACKUP_DIR}" -name "${DB_NAME}_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete
+find "${BACKUP_DIR}" -name "${DB_NAME}_*.pgdump" -type f -mtime +${RETENTION_DAYS} -delete
 
 # Count remaining backups
-BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${DB_NAME}_*.sql.gz" -type f | wc -l)
+BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${DB_NAME}_*.pgdump" -type f | wc -l)
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup complete. ${BACKUP_COUNT} backups retained."

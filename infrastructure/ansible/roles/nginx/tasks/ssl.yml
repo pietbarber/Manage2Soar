@@ -1,6 +1,5 @@
 # NGINX Role - SSL Certificate Tasks
 ---
-
 - name: Obtain Let's Encrypt certificate
   ansible.builtin.command: >
     certbot certonly --nginx --non-interactive --agree-tos

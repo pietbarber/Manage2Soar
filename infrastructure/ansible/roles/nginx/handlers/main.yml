@@ -1,6 +1,5 @@
 # NGINX Role Handlers
 ---
-
 - name: Restart NGINX
   ansible.builtin.systemd:
     name: nginx
