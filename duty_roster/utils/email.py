@@ -186,11 +186,14 @@ def send_roster_published_notifications(year, month, assignments):
         ("surge_tow_pilot", "surge_towpilot"),
     ]
 
+    # Cache role titles to avoid repeated database lookups in get_role_title
+    role_titles = {role_key: get_role_title(role_key) for _, role_key in role_fields}
+
     for assignment in assignments:
         for field_name, role_key in role_fields:
             member = getattr(assignment, field_name, None)
             if member and member.email:
-                role_title = get_role_title(role_key)
+                role_title = role_titles.get(role_key)
                 member_assignments[member].append(
                     {
                         "date": assignment.date,
