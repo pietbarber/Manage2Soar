@@ -14,6 +14,6 @@
   ansible.builtin.command:
     cmd: "{{ m2s_venv_path }}/bin/python manage.py collectstatic --noinput"
     chdir: "{{ m2s_app_home }}/app"
-    environment: "{{ lookup('community.general.envfile', m2s_app_home + '/app/.env') }}"
+    environment: "{{ lookup('community.general.envfile', m2s_app_home + '/app/.env', errors='ignore') | default({}) }}"
   become: true
   become_user: "{{ m2s_app_user }}"

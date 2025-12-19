@@ -59,7 +59,6 @@
   register: git_result
   notify:
     - Restart gunicorn
-    - Collect static files
 
 - name: Deploy single-host settings module
   ansible.builtin.template:

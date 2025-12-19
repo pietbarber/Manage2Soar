@@ -9,6 +9,8 @@ BACKUP_DIR="{{ postgresql_backup_dir }}/daily"
 DB_NAME="{{ postgresql_db }}"
 RETENTION_DAYS="{{ postgresql_backup_retention_days }}"
 DATE=$(date +%Y-%m-%d_%H%M%S)
+# Using .pgdump extension to clearly indicate PostgreSQL custom format (pg_dump -Fc)
+# Alternatives: .dump, .backup - all work, but .pgdump is most descriptive
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${DB_NAME}"

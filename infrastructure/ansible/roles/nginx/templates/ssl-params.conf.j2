@@ -14,5 +14,6 @@ ssl_session_tickets off;
 # OCSP Stapling
 ssl_stapling on;
 ssl_stapling_verify on;
-resolver 8.8.8.8 8.8.4.4 valid=300s;
+# DNS resolver for OCSP stapling; override nginx_resolver in Ansible vars if needed
+resolver {{ nginx_resolver | default('8.8.8.8 8.8.4.4') }} valid=300s;
 resolver_timeout 5s;

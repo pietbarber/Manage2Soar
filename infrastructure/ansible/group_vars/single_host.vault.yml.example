@@ -31,7 +31,10 @@ vault_postgresql_password: "CHANGE_ME_generate-with-openssl-rand"
 # Django secret key (50+ characters)
 vault_django_secret_key: "CHANGE_ME_generate-with-django-utils"
 
-# Optional: Google OAuth credentials (if using Google login)
+# Optional: Google OAuth credentials.
+# - If these remain commented out / unset, Google OAuth is DISABLED and the site will
+#   fall back to the standard Django username/password login.
+# - If you enable Google login in settings, you MUST set both values below.
 # vault_google_oauth_client_id: "your-google-client-id.apps.googleusercontent.com"
 # vault_google_oauth_client_secret: "your-google-client-secret"
 

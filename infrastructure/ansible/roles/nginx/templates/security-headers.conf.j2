@@ -18,8 +18,11 @@ add_header X-XSS-Protection "1; mode=block" always;
 # Referrer Policy
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-# Content Security Policy (adjust as needed for your app)
-# add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" always;
+# Content Security Policy (CSP) - Commented out by default
+# CSP requires careful tuning for Django, TinyMCE, and other dependencies.
+# To enable: test CSP in report-only mode first, adjust policy for your
+# application's requirements, then uncomment and set nginx_csp_enabled: true.
+# Example: add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" always;
 
 # Permissions Policy
 add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
