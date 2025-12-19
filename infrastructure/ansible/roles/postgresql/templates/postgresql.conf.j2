@@ -7,6 +7,9 @@ listen_addresses = '{{ postgresql_listen_addresses }}'
 port = {{ postgresql_port }}
 max_connections = {{ postgresql_max_connections }}
 
+# Authentication
+password_encryption = scram-sha-256
+
 # Memory Settings
 shared_buffers = {{ postgresql_shared_buffers }}
 effective_cache_size = {{ postgresql_effective_cache_size }}

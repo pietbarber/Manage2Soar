@@ -32,9 +32,8 @@ postgresql_db: "m2s"
 # Database user
 postgresql_user: "m2s"
 
-# Database password - CHANGE THIS!
-# Generate with: openssl rand -base64 32
-postgresql_password: "CHANGE_ME_GENERATE_STRONG_PASSWORD"
+# Database password from vault
+postgresql_password: "{{ vault_postgresql_password }}"
 
 # PostgreSQL version
 postgresql_version: "17"

@@ -15,8 +15,11 @@ server {
         root /var/www/html;
     }
 
-    # Redirect all other traffic to HTTPS (after SSL is set up)
+    # Serve content normally during initial setup
+    # This configuration is only used before SSL certificate is obtained
+    # After certificate acquisition, this will be replaced by m2s-ssl.conf
     location / {
-        return 301 https://$host$request_uri;
+        include /etc/nginx/proxy_params;
+        proxy_pass http://{{ nginx_upstream_name }};
     }
 }

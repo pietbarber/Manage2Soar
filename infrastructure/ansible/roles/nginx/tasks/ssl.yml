@@ -1,23 +1,31 @@
 # NGINX Role - SSL Certificate Tasks
 ---
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: cert_check_before
+  become: true
+
 - name: Obtain Let's Encrypt certificate
   ansible.builtin.command: >
     certbot certonly --nginx --non-interactive --agree-tos
     --email {{ letsencrypt_email }}
     --domains {{ nginx_server_name }}
-  args:
-    creates: "{{ nginx_ssl_certificate }}"
   become: true
   register: certbot_result
-  failed_when: false
+  when: not cert_check_before.stat.exists
+  failed_when:
+    - certbot_result.rc != 0
+    - "'Certificate not yet due for renewal' not in certbot_result.stdout | default('')"
 
-- name: Check if certificate was successfully obtained
+- name: Verify certificate was obtained
   ansible.builtin.stat:
     path: "{{ nginx_ssl_certificate }}"
-  register: cert_check
+  register: cert_check_after
   become: true
+  when: not cert_check_before.stat.exists
 
-- name: Fail if certificate was not obtained
+- name: Fail if certificate acquisition failed
   ansible.builtin.fail:
     msg: |
       Failed to obtain SSL certificate from Let's Encrypt.
@@ -27,12 +35,9 @@
       1. DNS records are correct for {{ nginx_server_name }}
       2. Port 80 is accessible from the internet
       3. No firewall blocking Let's Encrypt validation
-  when: certbot_result.rc != 0 and not cert_check.stat.exists
-
-- name: Display certbot result
-  ansible.builtin.debug:
-    msg: "Certbot result: {{ certbot_result.stdout | default('No output') }}"
-  when: certbot_result.rc == 0
+  when:
+    - not cert_check_before.stat.exists
+    - not cert_check_after.stat.exists
 
 - name: Deploy SSL site configuration after certificate obtained
   ansible.builtin.template:
@@ -42,7 +47,7 @@
     group: root
     mode: "0644"
   become: true
-  when: cert_check.stat.exists
+  when: cert_check_after.stat.exists | default(cert_check_before.stat.exists)
   notify: Reload NGINX
 
 - name: Set up automatic certificate renewal
