@@ -1091,10 +1091,12 @@ def propose_roster(request):
 
         elif action == "publish":
             from .models import DutyAssignment
+            from .utils.email import send_roster_published_notifications
 
             default_field = Airfield.objects.get(pk=settings.DEFAULT_AIRFIELD_ID)
             DutyAssignment.objects.filter(date__year=year, date__month=month).delete()
 
+            created_assignments = []
             for e in request.session.get("proposed_roster", []):
                 edt = dt_date.fromisoformat(e["date"])
                 assignment_data = {
@@ -1106,10 +1108,45 @@ def propose_roster(request):
                     if field_name and mem:
                         assignment_data[field_name] = Member.objects.get(pk=mem)
 
-                DutyAssignment.objects.create(**assignment_data)
+                assignment = DutyAssignment.objects.create(**assignment_data)
+                created_assignments.append(assignment)
 
             request.session.pop("proposed_roster", None)
-            messages.success(request, f"Duty roster published for {month}/{year}.")
+
+            # Send ICS calendar invites to all assigned members
+            if created_assignments:
+                try:
+                    result = send_roster_published_notifications(
+                        year, month, created_assignments
+                    )
+                    if result["sent_count"] > 0:
+                        messages.success(
+                            request,
+                            f"Duty roster published for {month}/{year}. "
+                            f"Calendar invites sent to {result['sent_count']} member(s).",
+                        )
+                    else:
+                        messages.success(
+                            request, f"Duty roster published for {month}/{year}."
+                        )
+                    if result["errors"]:
+                        for error in result["errors"]:
+                            messages.warning(request, error)
+                except Exception as e:
+                    messages.success(
+                        request, f"Duty roster published for {month}/{year}."
+                    )
+                    messages.warning(
+                        request,
+                        f"Could not send calendar invites: {str(e)}",
+                    )
+            else:
+                messages.success(request, f"Duty roster published for {month}/{year}.")
+                messages.info(
+                    request,
+                    "No duty assignments to notify, so no calendar invites were sent.",
+                )
+
             return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
         elif action == "cancel":
