@@ -1,0 +1,68 @@
+---
+# ============================================================
+# Postfix Role Defaults
+# ============================================================
+# These defaults can be overridden in group_vars or host_vars
+
+# Postfix configuration directory
+postfix_config_dir: /etc/postfix
+
+# Mail server hostname (FQDN for this server)
+# Defaults to the primary domain for single-host deployments
+mail_hostname: "{{ m2s_domain }}"
+
+# Primary mail domain
+mail_domain: "{{ m2s_domain }}"
+
+# IPs trusted to relay mail without authentication
+# Be cautious - only include IPs that should be able to send mail
+# Example: ["192.168.1.0/24", "10.0.0.1"]
+trusted_relay_ips: []
+
+# SMTP authentication users for Django to send mail
+# Each item: { username: "m2s", password: "secret" }
+# NOTE: vault_smtp_password MUST be defined in vault.yml for mail to work
+smtp_auth_users:
+  - username: m2s
+    password: "{{ vault_smtp_password }}"
+
+# ============================================================
+# SMTP RELAY (Optional)
+# ============================================================
+# For cloud providers that block outbound port 25 (GCP, AWS, etc.),
+# configure an external SMTP relay like SMTP2GO, SendGrid, or Mailgun.
+# Leave smtp_relay_host undefined for direct delivery.
+
+# smtp_relay_host: "mail.smtp2go.com"
+# smtp_relay_port: 587
+# smtp_relay_username: "your-username"
+# smtp_relay_password: "{{ vault_smtp_relay_password }}"
+
+# ============================================================
+# TLS SETTINGS
+# ============================================================
+# Use Let's Encrypt certificates by default
+postfix_tls_cert_file: "/etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem"
+postfix_tls_key_file: "/etc/letsencrypt/live/{{ mail_hostname }}/privkey.pem"
+
+# For self-signed certificates (testing only)
+postfix_use_self_signed_cert: false
+
+# ============================================================
+# SINGLE-HOST MODE
+# ============================================================
+# For single-host deployments, we use simplified configuration:
+# - Single domain (no multi-tenant)
+# - Direct delivery (no relay) unless blocked
+# - SASL auth for Django to send mail
+
+single_host_mode: true
+
+# Club domains configuration
+# NOTE: This list structure supports the existing multi-tenant mail server roles.
+# For single-host deployments, there will be just one entry.
+# This variable should be defined once (e.g., in group_vars) to avoid duplication
+# across roles (postfix, opendkim, rspamd).
+# Required format: [{ prefix: "club", name: "My Club" }]
+# club_domains must be provided via group_vars (e.g., group_vars/single_host/vars.yml).
+# This role intentionally does not define a default to avoid duplication across roles.

@@ -49,6 +49,7 @@
           Club: {{ club_name | default('Not Set') }} ({{ club_prefix | default('tsc') }})
           PostgreSQL: {{ postgresql_version | default('17') }}
           SSL Enabled: {{ nginx_ssl_enabled | default(false) }}
+          Mail Server: {{ mail_server_enabled | default(false) }}
           ========================================
 
   roles:
@@ -64,12 +65,58 @@
     - role: nginx
       tags: [nginx, web]
 
-    # Mail server (optional - future implementation)
-    # - role: postfix
-    #   tags: [mail, postfix]
-    #   when: mail_server_enabled | default(false)
+    # Mail server (optional)
+    - role: postfix
+      tags: [mail, postfix]
+      when: mail_server_enabled | default(false) | bool
+
+    - role: opendkim
+      tags: [mail, dkim, opendkim]
+      when: mail_server_enabled | default(false) | bool
+
+    - role: rspamd
+      tags: [mail, spam, rspamd]
+      when: (mail_server_enabled | default(false)) and (mail_server_receive_enabled | default(false))
 
   post_tasks:
+    - name: Display DKIM DNS records (if mail enabled)
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          DKIM DNS Record Required
+          ========================================
+
+          Add this TXT record to your DNS:
+
+          Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
+          Type: TXT
+          Value: (see file on server - path shown below)
+
+          To get the exact value, run on server:
+            cat /etc/opendkim/keys/{{ (club_domains[0].prefix | default(club_prefix | default('club'))) }}.{{ mail_domain | default(m2s_domain) }}/{{ dkim_selector | default('default') }}.txt
+
+          NOTE ABOUT PATH VS DNS:
+            The on-disk key directory name includes the club_prefix to support
+            multi-tenant OpenDKIM configuration:
+              /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
+
+            For example, if:
+              - club_prefix = "msc"
+              - m2s_domain  = "mountainsoaring.org"
+            then the public key file will be at:
+              /etc/opendkim/keys/msc.mountainsoaring.org/default.txt
+
+            However, the DNS record name does NOT include the club_prefix.
+            You still create the TXT record for your actual mail domain only:
+              Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
+
+            OpenDKIM uses the key stored under the prefixed directory but
+            correctly signs outgoing email for the un-prefixed domain
+            {{ m2s_domain }}.
+
+          ========================================
+      when: mail_server_enabled | default(false) | bool
+
     - name: Deployment complete
       ansible.builtin.debug:
         msg: |
@@ -96,14 +143,29 @@
           Logs: {{ m2s_log_dir | default('/var/log/m2s') }}
 
           {% if nginx_ssl_enabled | default(false) %}
-          SSL: Enabled (Let's Encrypt)
+          SSL: Enabled (Let's Encrypt or self-signed)
           {% else %}
           SSL: Disabled (enable with nginx_ssl_enabled: true)
+          {% endif %}
+
+          {% if mail_server_enabled | default(false) %}
+          Mail Server: Enabled (Postfix + OpenDKIM)
+            - SMTP Host: localhost
+            - SMTP Port: 25
+            - Django -> Postfix: local delivery on localhost:25 without SMTP AUTH
+            - Postfix -> relay (optional): uses smtp_auth_users credentials for outbound authentication/TLS if a relay/smarthost is configured
+            - See DKIM DNS record above
+          {% else %}
+          Mail Server: Disabled (enable with mail_server_enabled: true)
           {% endif %}
 
           Useful commands:
             - View Django logs: journalctl -u gunicorn -f
             - Restart application: systemctl restart gunicorn
             - View NGINX logs: tail -f /var/log/nginx/access.log
+            {% if mail_server_enabled | default(false) %}
+            - View mail logs: tail -f /var/log/mail.log
+            - Test mail: echo "Test" | mail -s "Test" your@email.com
+            {% endif %}
 
           ========================================

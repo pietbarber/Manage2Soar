@@ -1,0 +1,34 @@
+---
+# ============================================================
+# OpenDKIM Role Defaults
+# ============================================================
+# DKIM signing configuration for outbound email
+
+# OpenDKIM configuration directories
+opendkim_config_dir: /etc/opendkim
+opendkim_keys_dir: /etc/opendkim/keys
+
+# DKIM selector (used in DNS record)
+# Format: [selector]._domainkey.example.com
+# Recommendation: In production, override this with a club-specific or date-based
+# selector (e.g., "m2s-2025") in your inventory/group_vars/host_vars.
+# This default is static to keep playbook runs idempotent across year boundaries.
+dkim_selector: "default"
+
+# DKIM key size (2048 is standard, 1024 for compatibility)
+dkim_key_size: 2048
+
+# Mail domain for DKIM signing
+mail_domain: "{{ m2s_domain }}"
+
+# ============================================================
+# SINGLE-HOST MODE
+# ============================================================
+# For single-host deployments, we sign mail for a single domain
+
+# Club domains configuration
+# NOTE: Inherits from postfix role defaults. Define once in group_vars to avoid
+# duplication across roles. For single-host, this will be one entry.
+# Required format: [{ prefix: "club", name: "My Club" }]
+# club_domains must be provided via group_vars (e.g., group_vars/single_host/vars.yml).
+# This role intentionally does not define a default to avoid duplication across roles.

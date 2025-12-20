@@ -41,3 +41,19 @@ vault_django_secret_key: "CHANGE_ME_generate-with-django-utils"
 # Optional: Email credentials (if using authenticated SMTP)
 # vault_email_host_user: "smtp-username"
 # vault_email_host_password: "smtp-password"
+
+# ============================================================
+# MAIL SERVER SECRETS (REQUIRED if mail_server_enabled: true)
+# ============================================================
+
+# SMTP password for Postfix SASL authentication
+# NOTE: This is used by Postfix for SASL support when relaying to external SMTP
+# servers (if smtp_relay_host is configured). Django sends mail unauthenticated
+# to localhost:25, and Postfix handles authentication for external relays.
+# MUST be set if mail_server_enabled: true
+# Generate with: openssl rand -base64 24
+vault_smtp_password: "CHANGE_ME_generate-with-openssl-rand"
+
+# SMTP relay credentials (if using external relay like SMTP2GO)
+# vault_smtp_relay_username: "your-relay-username"
+# vault_smtp_relay_password: "your-relay-password"

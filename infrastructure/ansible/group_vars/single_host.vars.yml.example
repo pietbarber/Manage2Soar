@@ -141,8 +141,47 @@ m2s_google_oauth_enabled: false
 # ============================================================
 # MAIL SERVER (optional)
 # ============================================================
+# Deploy Postfix + OpenDKIM for sending transactional emails.
+# This enables Django to send emails directly from the server.
 
-mail_server_enabled: false  # Set true to deploy Postfix
+mail_server_enabled: false  # Set true to deploy Postfix + OpenDKIM
+
+# Mail server hostname (usually same as m2s_domain)
+mail_hostname: "{{ m2s_domain }}"
+
+# Primary mail domain for sending
+mail_domain: "{{ m2s_domain }}"
+
+# SMTP relay configuration (optional)
+# Some cloud providers block port 25. Use an external relay like:
+# - SMTP2GO, SendGrid, Mailgun, Amazon SES, etc.
+# Leave undefined for direct delivery.
+# smtp_relay_host: "mail.smtp2go.com"
+# smtp_relay_port: 587
+
+# Enable incoming mail processing (requires additional DNS setup)
+# Only enable if you need mailing list functionality
+mail_server_receive_enabled: false
+
+# Club domains configuration (required for mail server roles)
+# This must be defined here to avoid duplication across roles
+club_domains:
+  - prefix: "{{ club_prefix }}"
+    name: "{{ club_name }}"
+
+# Email dev mode - prevents actual email sending during initial deployment
+# HIGHLY RECOMMENDED: Keep this true until you've verified your mail server
+# configuration and tested with a safe email address.
+email_dev_mode: true  # Set false only after testing mail server
+
+# When email_dev_mode is true, redirect all emails to this address
+# Useful for testing without spamming members during deployment
+# email_dev_mode_redirect_to: "admin@your-club.com"
+
+# DKIM selector (used in DNS record name)
+# The opendkim role defaults to a static selector ("default") for idempotency.
+# Override only if you have a specific selector naming scheme.
+# dkim_selector: "default"
 
 # ============================================================
 # SECURITY SETTINGS
