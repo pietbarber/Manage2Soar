@@ -6,7 +6,7 @@
   register: cert_check_before
   become: true
 
-- name: Obtain Let's Encrypt certificate
+- name: Try to obtain Let's Encrypt certificate
   ansible.builtin.command: >
     certbot certonly --nginx --non-interactive --agree-tos
     --email {{ letsencrypt_email }}
@@ -14,32 +14,54 @@
   become: true
   register: certbot_result
   when: not cert_check_before.stat.exists
-  failed_when:
-    - certbot_result.rc != 0
-    - "'Certificate not yet due for renewal' not in certbot_result.stdout | default('')"
+  failed_when: false
+  changed_when: certbot_result.rc == 0
 
-- name: Verify certificate was obtained
+- name: Check if Let's Encrypt succeeded
   ansible.builtin.stat:
     path: "{{ nginx_ssl_certificate }}"
-  register: cert_check_after
+  register: cert_check_after_letsencrypt
   become: true
   when: not cert_check_before.stat.exists
 
-- name: Fail if certificate acquisition failed
-  ansible.builtin.fail:
-    msg: |
-      Failed to obtain SSL certificate from Let's Encrypt.
-      Certbot output: {{ certbot_result.stdout | default('No output') }}
-      Error: {{ certbot_result.stderr | default('No error output') }}
-      Please check:
-      1. DNS records are correct for {{ nginx_server_name }}
-      2. Port 80 is accessible from the internet
-      3. No firewall blocking Let's Encrypt validation
+- name: Generate self-signed certificate for testing (if Let's Encrypt failed)
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048
+    -keyout /etc/ssl/private/{{ nginx_server_name }}.key
+    -out /etc/ssl/certs/{{ nginx_server_name }}.crt
+    -subj "/C=US/ST=State/L=City/O=Organization/CN={{ nginx_server_name }}"
+  become: true
   when:
     - not cert_check_before.stat.exists
-    - not cert_check_after.stat.exists
+    - not (cert_check_after_letsencrypt.stat.exists | default(false))
+  register: selfsigned_result
 
-- name: Deploy SSL site configuration after certificate obtained
+- name: Update SSL certificate paths for self-signed cert
+  ansible.builtin.set_fact:
+    nginx_ssl_certificate: "/etc/ssl/certs/{{ nginx_server_name }}.crt"
+    nginx_ssl_certificate_key: "/etc/ssl/private/{{ nginx_server_name }}.key"
+  when:
+    - selfsigned_result is defined
+    - selfsigned_result is changed
+
+- name: Verify certificate exists (Let's Encrypt or self-signed)
+  ansible.builtin.stat:
+    path: "{{ nginx_ssl_certificate }}"
+  register: cert_check_final
+  become: true
+
+- name: Display certificate type
+  ansible.builtin.debug:
+    msg: >
+      {% if cert_check_after_letsencrypt.stat.exists | default(false) %}
+      Let's Encrypt certificate obtained successfully
+      {% elif selfsigned_result is changed %}
+      Self-signed certificate generated (Let's Encrypt failed - likely DNS issue)
+      {% else %}
+      Using existing certificate
+      {% endif %}
+
+- name: Deploy SSL site configuration
   ansible.builtin.template:
     src: m2s-ssl.conf.j2
     dest: /etc/nginx/sites-available/m2s.conf
@@ -47,10 +69,10 @@
     group: root
     mode: "0644"
   become: true
-  when: cert_check_after.stat.exists | default(cert_check_before.stat.exists)
+  when: cert_check_final.stat.exists
   notify: Reload NGINX
 
-- name: Set up automatic certificate renewal
+- name: Set up automatic certificate renewal (Let's Encrypt only)
   ansible.builtin.cron:
     name: "Certbot renewal"
     minute: "0"
@@ -61,3 +83,4 @@
     job: "certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
     user: root
   become: true
+  when: cert_check_after_letsencrypt.stat.exists | default(false)

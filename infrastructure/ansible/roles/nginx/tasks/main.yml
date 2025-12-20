@@ -53,7 +53,7 @@
     mode: "0644"
   become: true
   notify: Reload NGINX
-  when: nginx_ssl_enabled
+  when: nginx_ssl_enabled | bool
 
 - name: Deploy security headers snippet
   ansible.builtin.template:
@@ -87,7 +87,7 @@
     path: "{{ nginx_ssl_certificate }}"
   register: ssl_cert_exists
   become: true
-  when: nginx_ssl_enabled
+  when: nginx_ssl_enabled | bool
 
 - name: Deploy M2S site configuration (HTTP only for initial setup)
   ansible.builtin.template:
@@ -97,7 +97,7 @@
     group: root
     mode: "0644"
   become: true
-  when: nginx_ssl_enabled and not (ssl_cert_exists.stat.exists | default(false))
+  when: (nginx_ssl_enabled | bool) and not (ssl_cert_exists.stat.exists | default(false))
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (with SSL)
@@ -108,7 +108,7 @@
     group: root
     mode: "0644"
   become: true
-  when: nginx_ssl_enabled and (ssl_cert_exists.stat.exists | default(false))
+  when: (nginx_ssl_enabled | bool) and (ssl_cert_exists.stat.exists | default(false))
   notify: Reload NGINX
 
 - name: Deploy M2S site configuration (no SSL)
@@ -119,7 +119,7 @@
     group: root
     mode: "0644"
   become: true
-  when: not nginx_ssl_enabled
+  when: not (nginx_ssl_enabled | bool)
   notify: Reload NGINX
 
 - name: Enable M2S site
@@ -137,4 +137,4 @@
 
 - name: Include SSL certificate tasks
   ansible.builtin.include_tasks: ssl.yml
-  when: nginx_ssl_enabled and not ssl_cert_exists.stat.exists | default(true)
+  when: (nginx_ssl_enabled | bool) and not (ssl_cert_exists.stat.exists | default(true))
