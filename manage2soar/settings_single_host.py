@@ -90,7 +90,7 @@ TEMPLATES = [
                 "django.template.context_processors.static",
                 "django.template.context_processors.media",
                 "cms.context_processors.footer_content",
-                "duty_roster.context_processors.today_roster",
+                "duty_roster.context_processors.instructor_pending_requests",
             ],
         },
     },
