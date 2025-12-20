@@ -95,8 +95,10 @@
           To get the exact value, run on server:
             cat /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
 
-          Note: Keys are organized as {club_prefix}.{domain} due to multi-tenant
-          mail server architecture. For single-host, this will be one directory.
+          IMPORTANT: The key path includes club_prefix (e.g., ysc.m2s.yourclub.com)
+          due to the multi-tenant OpenDKIM role architecture, but the DNS record
+          should be for your actual mail domain ({{ m2s_domain }}) without the prefix.
+          The OpenDKIM role will correctly sign emails for {{ m2s_domain }}.
 
           ========================================
       when: mail_server_enabled | default(false) | bool

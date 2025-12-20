@@ -319,15 +319,18 @@ Value: v=spf1 a mx ip4:YOUR-SERVER-IP ~all
 The playbook will output the DKIM record path. Get the value with:
 ```bash
 ssh your-server
-# For single-host deployment, keys are stored in club.yourdomain.com format
-# where "club" is your club_prefix and "yourdomain.com" is your mail_domain
+# Keys are stored in {club_prefix}.{mail_domain} format due to multi-tenant OpenDKIM role
 # Example: if club_prefix=msc and mail_domain=mountainsoaring.org:
 cat /etc/opendkim/keys/msc.mountainsoaring.org/default.txt
 ```
 
-**Note**: The directory structure uses `{club_prefix}.{mail_domain}` format due to
-the underlying multi-tenant mail server architecture. For single-host deployments,
-this will be a single directory.
+**IMPORTANT**: Despite the directory structure using `{club_prefix}.{mail_domain}`,
+your mail is sent FROM your actual `mail_domain` (e.g., m2s.yourclub.com), NOT from
+a prefixed subdomain. The OpenDKIM role correctly signs emails for `mail_domain`.
+Your DNS records should use `mail_domain` only, not `club_prefix.mail_domain`.
+
+This directory structure exists to support multi-tenant hosting where multiple clubs
+share one mail server. For single-host deployments, there will be one directory.
 
 Add as TXT record:
 ```
