@@ -76,7 +76,7 @@
 
     - role: rspamd
       tags: [mail, spam, rspamd]
-      when: mail_server_enabled | default(false) | bool and mail_server_receive_enabled | default(false) | bool
+      when: (mail_server_enabled | default(false)) and (mail_server_receive_enabled | default(false))
 
   post_tasks:
     - name: Display DKIM DNS records (if mail enabled)
@@ -93,12 +93,26 @@
           Value: (see file on server - path shown below)
 
           To get the exact value, run on server:
-            cat /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
+            cat /etc/opendkim/keys/{{ (club_domains[0].prefix | default(club_prefix | default('club'))) }}.{{ mail_domain | default(m2s_domain) }}/{{ dkim_selector | default('default') }}.txt
 
-          IMPORTANT: The key path includes club_prefix (e.g., ysc.m2s.yourclub.com)
-          due to the multi-tenant OpenDKIM role architecture, but the DNS record
-          should be for your actual mail domain ({{ m2s_domain }}) without the prefix.
-          The OpenDKIM role will correctly sign emails for {{ m2s_domain }}.
+          NOTE ABOUT PATH VS DNS:
+            The on-disk key directory name includes the club_prefix to support
+            multi-tenant OpenDKIM configuration:
+              /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
+
+            For example, if:
+              - club_prefix = "msc"
+              - m2s_domain  = "mountainsoaring.org"
+            then the public key file will be at:
+              /etc/opendkim/keys/msc.mountainsoaring.org/default.txt
+
+            However, the DNS record name does NOT include the club_prefix.
+            You still create the TXT record for your actual mail domain only:
+              Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
+
+            OpenDKIM uses the key stored under the prefixed directory but
+            correctly signs outgoing email for the un-prefixed domain
+            {{ m2s_domain }}.
 
           ========================================
       when: mail_server_enabled | default(false) | bool

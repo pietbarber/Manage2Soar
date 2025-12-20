@@ -4,24 +4,31 @@ This directory contains Ansible playbooks and roles for deploying a complete Man
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Single Host Server                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐   │
-│   │   NGINX     │───▶│  Gunicorn    │───▶│   PostgreSQL    │   │
-│   │  (Port 80)  │    │ (Port 8000)  │    │   (Port 5432)   │   │
-│   │  (Port 443) │    │              │    │                 │   │
-│   └─────────────┘    └──────────────┘    └─────────────────┘   │
-│         │                   │                    │              │
-│         ▼                   ▼                    ▼              │
-│   ┌───────────┐      ┌───────────┐        ┌───────────┐        │
-│   │  Static   │      │  Django   │        │  Database │        │
-│   │  Files    │      │  App      │        │   Data    │        │
-│   └───────────┘      └───────────┘        └───────────┘        │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Single Host Server"
+        nginx["NGINX<br/>Port 80/443"]
+        gunicorn["Gunicorn<br/>Port 8000"]
+        postgresql["PostgreSQL<br/>Port 5432"]
+        static["Static Files"]
+        django["Django App"]
+        dbdata["Database Data"]
+
+        nginx -->|Reverse Proxy| gunicorn
+        gunicorn -->|SQL Queries| postgresql
+        nginx -.->|Serves| static
+        gunicorn -.->|Runtime| django
+        postgresql -.->|Storage| dbdata
+    end
+
+    client[Client Browser] -->|HTTP/HTTPS| nginx
+
+    style nginx fill:#2196F3,stroke:#1976D2,color:#fff
+    style gunicorn fill:#4CAF50,stroke:#388E3C,color:#fff
+    style postgresql fill:#FF9800,stroke:#F57C00,color:#fff
+    style static fill:#9E9E9E,stroke:#616161,color:#fff
+    style django fill:#9C27B0,stroke:#7B1FA2,color:#fff
+    style dbdata fill:#795548,stroke:#5D4037,color:#fff
 ```
 
 ## System Requirements
@@ -304,6 +311,7 @@ Add the SMTP password to your vault:
 vault_smtp_password: "generate-with-openssl-rand"
 ```
 
+**NOTE**: The `vault_smtp_password` is used by Postfix for SASL authentication when relaying to external SMTP servers (see "Using an SMTP Relay" below). Django sends mail unauthenticated to `localhost:25`, and Postfix handles all authentication for external relays.
 ### DNS Records Required
 
 After deployment, add these DNS records:
@@ -392,9 +400,9 @@ EMAIL_USE_TLS: false  # No TLS for localhost - Postfix handles outbound TLS
 
 **Note**: Django sends mail to the local Postfix server without authentication (localhost:25).
 Postfix then handles:
-- DKIM signing via OpenDKIM milter
+- DKIM signing via OpenDKIM milter (configured automatically by the opendkim role tasks)
 - TLS encryption for outbound delivery
-- Optional SMTP relay authentication (if configured)
+- Optional SMTP relay authentication (if configured with `smtp_relay_host`)
 
 ## Configuration Reference
 
