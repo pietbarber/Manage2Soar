@@ -280,7 +280,7 @@ Configures DKIM email signing:
 Spam filtering for inbound mail:
 - Only enabled if `mail_server_receive_enabled: true`
 - Redis-backed for rate limiting and history
-- Milter integration with Postfix
+- Milter integration with Postfix for inbound mail only (no effect on send-only outbound mail)
 
 ## Mail Server Configuration
 
@@ -319,8 +319,15 @@ Value: v=spf1 a mx ip4:YOUR-SERVER-IP ~all
 The playbook will output the DKIM record path. Get the value with:
 ```bash
 ssh your-server
-cat /etc/opendkim/keys/club.yourdomain.com/2025.txt
+# For single-host deployment, keys are stored in club.yourdomain.com format
+# where "club" is your club_prefix and "yourdomain.com" is your mail_domain
+# Example: if club_prefix=msc and mail_domain=mountainsoaring.org:
+cat /etc/opendkim/keys/msc.mountainsoaring.org/default.txt
 ```
+
+**Note**: The directory structure uses `{club_prefix}.{mail_domain}` format due to
+the underlying multi-tenant mail server architecture. For single-host deployments,
+this will be a single directory.
 
 Add as TXT record:
 ```
@@ -376,9 +383,15 @@ The deployment automatically configures Django to use the local Postfix server:
 # Automatically set in .env
 EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST: localhost
-EMAIL_PORT: 25
-EMAIL_USE_TLS: false
+EMAIL_PORT: 25  # Django sends to local Postfix without authentication
+EMAIL_USE_TLS: false  # No TLS for localhost - Postfix handles outbound TLS
 ```
+
+**Note**: Django sends mail to the local Postfix server without authentication (localhost:25).
+Postfix then handles:
+- DKIM signing via OpenDKIM milter
+- TLS encryption for outbound delivery
+- Optional SMTP relay authentication (if configured)
 
 ## Configuration Reference
 

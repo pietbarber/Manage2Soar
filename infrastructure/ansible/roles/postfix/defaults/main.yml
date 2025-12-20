@@ -16,13 +16,15 @@ mail_domain: "{{ m2s_domain }}"
 
 # IPs trusted to relay mail without authentication
 # Be cautious - only include IPs that should be able to send mail
+# Example: ["192.168.1.0/24", "10.0.0.1"]
 trusted_relay_ips: []
 
 # SMTP authentication users for Django to send mail
 # Each item: { username: "m2s", password: "secret" }
+# NOTE: vault_smtp_password MUST be defined in vault.yml for mail to work
 smtp_auth_users:
   - username: m2s
-    password: "{{ vault_smtp_password | default('changeme') }}"
+    password: "{{ vault_smtp_password }}"
 
 # ============================================================
 # SMTP RELAY (Optional)
@@ -56,7 +58,11 @@ postfix_use_self_signed_cert: false
 
 single_host_mode: true
 
-# Club domains for single-host mode (just one entry)
+# Club domains configuration
+# NOTE: This list structure supports the existing multi-tenant mail server roles.
+# For single-host deployments, there will be just one entry.
+# This variable should be defined once (e.g., in group_vars) to avoid duplication
+# across roles (postfix, opendkim, rspamd).
 club_domains:
   - prefix: "{{ club_prefix | default('club') }}"
     name: "{{ club_name | default('My Soaring Club') }}"

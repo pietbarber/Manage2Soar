@@ -5,7 +5,8 @@
 # Spam filtering configuration for inbound email
 
 # Whether to enable Rspamd (can be disabled for send-only servers)
-rspamd_enabled: true
+# Default false - only enable when mail_server_receive_enabled: true
+rspamd_enabled: false
 
 # Spam action thresholds
 # Higher thresholds = less aggressive (fewer false positives)

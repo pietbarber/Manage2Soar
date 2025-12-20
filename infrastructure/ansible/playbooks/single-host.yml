@@ -88,12 +88,15 @@
 
           Add this TXT record to your DNS:
 
-          Name: {{ dkim_selector | default(ansible_date_time.year) }}._domainkey.{{ m2s_domain }}
+          Name: {{ dkim_selector | default('default') }}._domainkey.{{ m2s_domain }}
           Type: TXT
-          Value: (see /etc/opendkim/keys/{{ club_prefix }}.{{ m2s_domain }}/{{ dkim_selector | default(ansible_date_time.year) }}.txt)
+          Value: (see file on server - path shown below)
 
           To get the exact value, run on server:
-            cat /etc/opendkim/keys/{{ club_prefix }}.{{ m2s_domain }}/{{ dkim_selector | default(ansible_date_time.year) }}.txt
+            cat /etc/opendkim/keys/{{ club_prefix | default('club') }}.{{ m2s_domain }}/{{ dkim_selector | default('default') }}.txt
+
+          Note: Keys are organized as {club_prefix}.{domain} due to multi-tenant
+          mail server architecture. For single-host, this will be one directory.
 
           ========================================
       when: mail_server_enabled | default(false) | bool
@@ -132,7 +135,8 @@
           {% if mail_server_enabled | default(false) %}
           Mail Server: Enabled (Postfix + OpenDKIM)
             - SMTP Host: localhost
-            - SMTP Port: 25 (local) or 587 (authenticated)
+            - SMTP Port: 25 (Django uses local unauthenticated delivery)
+            - Postfix handles outbound authentication/TLS if relay configured
             - See DKIM DNS record above
           {% else %}
           Mail Server: Disabled (enable with mail_server_enabled: true)
