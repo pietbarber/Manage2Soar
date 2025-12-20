@@ -21,8 +21,8 @@
   ansible.builtin.file:
     path: "{{ nginx_static_root }}"
     state: directory
-    owner: www-data
-    group: www-data
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
     mode: "0755"
   become: true
 
@@ -30,8 +30,8 @@
   ansible.builtin.file:
     path: "{{ nginx_media_root }}"
     state: directory
-    owner: www-data
-    group: www-data
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
     mode: "0755"
   become: true
 

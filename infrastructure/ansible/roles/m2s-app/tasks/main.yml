@@ -123,6 +123,14 @@
     mode: "0644"
   notify: Restart gunicorn
 
+- name: Deploy manage.sh wrapper script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ m2s_app_home }}/manage.sh"
+    owner: "{{ m2s_app_user }}"
+    group: "{{ m2s_app_group }}"
+    mode: "0755"
+
 - name: Deploy Gunicorn systemd service
   ansible.builtin.template:
     src: gunicorn.service.j2
