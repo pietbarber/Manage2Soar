@@ -49,6 +49,7 @@
           Club: {{ club_name | default('Not Set') }} ({{ club_prefix | default('tsc') }})
           PostgreSQL: {{ postgresql_version | default('17') }}
           SSL Enabled: {{ nginx_ssl_enabled | default(false) }}
+          Mail Server: {{ mail_server_enabled | default(false) }}
           ========================================
 
   roles:
@@ -64,12 +65,39 @@
     - role: nginx
       tags: [nginx, web]
 
-    # Mail server (optional - future implementation)
-    # - role: postfix
-    #   tags: [mail, postfix]
-    #   when: mail_server_enabled | default(false)
+    # Mail server (optional)
+    - role: postfix
+      tags: [mail, postfix]
+      when: mail_server_enabled | default(false) | bool
+
+    - role: opendkim
+      tags: [mail, dkim, opendkim]
+      when: mail_server_enabled | default(false) | bool
+
+    - role: rspamd
+      tags: [mail, spam, rspamd]
+      when: mail_server_enabled | default(false) | bool and mail_server_receive_enabled | default(false) | bool
 
   post_tasks:
+    - name: Display DKIM DNS records (if mail enabled)
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          DKIM DNS Record Required
+          ========================================
+
+          Add this TXT record to your DNS:
+
+          Name: {{ dkim_selector | default(ansible_date_time.year) }}._domainkey.{{ m2s_domain }}
+          Type: TXT
+          Value: (see /etc/opendkim/keys/{{ club_prefix }}.{{ m2s_domain }}/{{ dkim_selector | default(ansible_date_time.year) }}.txt)
+
+          To get the exact value, run on server:
+            cat /etc/opendkim/keys/{{ club_prefix }}.{{ m2s_domain }}/{{ dkim_selector | default(ansible_date_time.year) }}.txt
+
+          ========================================
+      when: mail_server_enabled | default(false) | bool
+
     - name: Deployment complete
       ansible.builtin.debug:
         msg: |
@@ -96,14 +124,27 @@
           Logs: {{ m2s_log_dir | default('/var/log/m2s') }}
 
           {% if nginx_ssl_enabled | default(false) %}
-          SSL: Enabled (Let's Encrypt)
+          SSL: Enabled (Let's Encrypt or self-signed)
           {% else %}
           SSL: Disabled (enable with nginx_ssl_enabled: true)
+          {% endif %}
+
+          {% if mail_server_enabled | default(false) %}
+          Mail Server: Enabled (Postfix + OpenDKIM)
+            - SMTP Host: localhost
+            - SMTP Port: 25 (local) or 587 (authenticated)
+            - See DKIM DNS record above
+          {% else %}
+          Mail Server: Disabled (enable with mail_server_enabled: true)
           {% endif %}
 
           Useful commands:
             - View Django logs: journalctl -u gunicorn -f
             - Restart application: systemctl restart gunicorn
             - View NGINX logs: tail -f /var/log/nginx/access.log
+            {% if mail_server_enabled | default(false) %}
+            - View mail logs: tail -f /var/log/mail.log
+            - Test mail: echo "Test" | mail -s "Test" your@email.com
+            {% endif %}
 
           ========================================

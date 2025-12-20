@@ -1,0 +1,30 @@
+---
+# ============================================================
+# Rspamd Role Defaults
+# ============================================================
+# Spam filtering configuration for inbound email
+
+# Whether to enable Rspamd (can be disabled for send-only servers)
+rspamd_enabled: true
+
+# Spam action thresholds
+# Higher thresholds = less aggressive (fewer false positives)
+rspamd_reject_score: 15
+rspamd_add_header_score: 6
+rspamd_rewrite_subject_score: 4
+
+# ============================================================
+# REDIS SETTINGS
+# ============================================================
+# Redis is required for Rspamd history and rate limiting
+rspamd_redis_host: "127.0.0.1"
+rspamd_redis_port: 6379
+
+# ============================================================
+# SINGLE-HOST MODE
+# ============================================================
+# For single-host deployments, Rspamd is optional since we're
+# primarily sending mail, not receiving it.
+# Set mail_server_receive_enabled: true if accepting inbound mail.
+
+mail_server_receive_enabled: false

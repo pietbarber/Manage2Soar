@@ -1,0 +1,30 @@
+---
+# ============================================================
+# OpenDKIM Role Defaults
+# ============================================================
+# DKIM signing configuration for outbound email
+
+# OpenDKIM configuration directories
+opendkim_config_dir: /etc/opendkim
+opendkim_keys_dir: /etc/opendkim/keys
+
+# DKIM selector (used in DNS record)
+# Format: [selector]._domainkey.example.com
+# Recommendation: Use date-based selectors for easy rotation (e.g., "2024")
+dkim_selector: "{{ lookup('pipe', 'date +%Y') }}"
+
+# DKIM key size (2048 is standard, 1024 for compatibility)
+dkim_key_size: 2048
+
+# Mail domain for DKIM signing
+mail_domain: "{{ m2s_domain }}"
+
+# ============================================================
+# SINGLE-HOST MODE
+# ============================================================
+# For single-host deployments, we sign mail for a single domain
+
+# Club domains for single-host mode (just one entry)
+club_domains:
+  - prefix: "{{ club_prefix | default('club') }}"
+    name: "{{ club_name | default('My Soaring Club') }}"

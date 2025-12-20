@@ -141,8 +141,31 @@ m2s_google_oauth_enabled: false
 # ============================================================
 # MAIL SERVER (optional)
 # ============================================================
+# Deploy Postfix + OpenDKIM for sending transactional emails.
+# This enables Django to send emails directly from the server.
 
-mail_server_enabled: false  # Set true to deploy Postfix
+mail_server_enabled: false  # Set true to deploy Postfix + OpenDKIM
+
+# Mail server hostname (usually same as m2s_domain)
+mail_hostname: "{{ m2s_domain }}"
+
+# Primary mail domain for sending
+mail_domain: "{{ m2s_domain }}"
+
+# SMTP relay configuration (optional)
+# Some cloud providers block port 25. Use an external relay like:
+# - SMTP2GO, SendGrid, Mailgun, Amazon SES, etc.
+# Leave undefined for direct delivery.
+# smtp_relay_host: "mail.smtp2go.com"
+# smtp_relay_port: 587
+
+# Enable incoming mail processing (requires additional DNS setup)
+# Only enable if you need mailing list functionality
+mail_server_receive_enabled: false
+
+# DKIM selector (used in DNS record name)
+# Default uses current year for easy annual rotation
+# dkim_selector: "2025"
 
 # ============================================================
 # SECURITY SETTINGS
