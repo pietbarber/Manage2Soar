@@ -29,7 +29,6 @@ mail_domain: "{{ m2s_domain }}"
 # Club domains configuration
 # NOTE: Inherits from postfix role defaults. Define once in group_vars to avoid
 # duplication across roles. For single-host, this will be one entry.
-# Format: [{ prefix: "club", name: "My Club" }]
-club_domains:
-  - prefix: "{{ club_prefix | default('club') }}"
-    name: "{{ club_name | default('My Soaring Club') }}"
+# Required format: [{ prefix: "club", name: "My Club" }]
+# club_domains must be provided via group_vars (e.g., group_vars/single_host/vars.yml).
+# This role intentionally does not define a default to avoid duplication across roles.

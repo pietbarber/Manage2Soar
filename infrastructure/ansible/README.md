@@ -264,7 +264,7 @@ Deploys the Django application:
 
 Installs and configures Postfix mail server:
 - Send-only MTA for transactional emails
-- SASL authentication for Django
+- SASL authentication support (for future use)
 - TLS encryption for outbound mail
 - Optional SMTP relay support (for cloud providers that block port 25)
 
@@ -332,7 +332,7 @@ this will be a single directory.
 Add as TXT record:
 ```
 Type: TXT
-Name: 2025._domainkey (selector may vary)
+Name: default._domainkey
 Value: (paste content from file)
 ```
 

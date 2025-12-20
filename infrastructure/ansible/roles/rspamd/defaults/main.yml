@@ -3,10 +3,8 @@
 # Rspamd Role Defaults
 # ============================================================
 # Spam filtering configuration for inbound email
-
-# Whether to enable Rspamd (can be disabled for send-only servers)
-# Default false - only enable when mail_server_receive_enabled: true
-rspamd_enabled: false
+# NOTE: Rspamd is only deployed when mail_server_receive_enabled: true
+# in the playbook. This role has no separate enable flag.
 
 # Spam action thresholds
 # Higher thresholds = less aggressive (fewer false positives)
@@ -18,6 +16,8 @@ rspamd_rewrite_subject_score: 4
 # REDIS SETTINGS
 # ============================================================
 # Redis is required for Rspamd history and rate limiting
+# NOTE: The rspamd role automatically installs Redis. No separate
+# configuration needed for single-host deployments.
 rspamd_redis_host: "127.0.0.1"
 rspamd_redis_port: 6379
 
