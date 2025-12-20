@@ -24,11 +24,84 @@ This directory contains Ansible playbooks and roles for deploying a complete Man
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## System Requirements
+
+### Recommended Server Specifications
+
+#### Minimum Viable (Testing/Small Club <50 members)
+- **RAM**: 2GB
+- **CPU**: 1-2 cores
+- **Disk**: 20GB
+- **Notes**: Tight but functional. PostgreSQL defaults are tuned for this.
+
+#### Recommended (Small-Medium Club 50-200 members)
+- **RAM**: 4GB
+- **CPU**: 2 cores
+- **Disk**: 40GB
+- **Notes**: Comfortable headroom for growth, multiple concurrent users, background tasks.
+
+#### Comfortable (Medium-Large Club 200-500 members)
+- **RAM**: 8GB
+- **CPU**: 4 cores
+- **Disk**: 80GB
+- **Notes**: Handles peak usage (weekend operations), large datasets, analytics queries.
+
+#### Component Memory Breakdown (4GB example)
+
+| Component | RAM Usage | Notes |
+|-----------|-----------|-------|
+| Ubuntu 24.04 | ~500MB | Base OS |
+| PostgreSQL | ~800MB | Shared buffers + cache |
+| Gunicorn (3 workers) | ~600MB | 3×200MB per worker |
+| NGINX | ~50MB | Minimal footprint |
+| System buffer/cache | ~2GB | File caching, performance |
+| **Total** | **~4GB** | |
+
+#### Disk Space Breakdown
+
+| Directory | Typical Size | Growth Rate |
+|-----------|-------------|-------------|
+| OS + packages | ~5GB | Static |
+| Django app | ~500MB | Minimal |
+| PostgreSQL data | 500MB-5GB | 1-2GB/year |
+| Media uploads | 1-10GB | Varies by usage |
+| Backups (7-day retention) | 3-20GB | ~7× daily size |
+| Logs | 100MB-1GB | Rotated |
+| **Recommended** | **40-80GB** | |
+
+#### Performance Tuning for Larger Servers
+
+If you allocate more RAM, update these in `group_vars/single_host/vars.yml`:
+
+```yaml
+# For 4GB RAM server
+postgresql_shared_buffers: "512MB"        # 12.5% of RAM
+postgresql_effective_cache_size: "3GB"    # 75% of RAM
+postgresql_work_mem: "8MB"
+m2s_gunicorn_workers: 5                   # (2 × 2 cores) + 1
+
+# For 8GB RAM server
+postgresql_shared_buffers: "1GB"          # 12.5% of RAM
+postgresql_effective_cache_size: "6GB"    # 75% of RAM
+postgresql_work_mem: "16MB"
+m2s_gunicorn_workers: 9                   # (2 × 4 cores) + 1
+```
+
+#### Cloud VPS Cost Comparison
+
+| Provider | Specs | Monthly Cost |
+|----------|-------|--------------|
+| DigitalOcean | 2GB / 1 CPU / 50GB | $12 |
+| DigitalOcean | 4GB / 2 CPU / 80GB | $24 |
+| Linode | 4GB / 2 CPU / 80GB | $24 |
+| Hetzner | 4GB / 2 CPU / 80GB | €5 (~$5) |
+| **GKE (comparison)** | **~$70-150/month** | |
+
 ## Quick Start
 
 ### Prerequisites
 
-1. **Target Server**: Ubuntu 22.04 or 24.04 LTS with SSH access
+1. **Target Server**: Ubuntu 22.04 or 24.04 LTS with SSH access (see [System Requirements](#system-requirements) above)
 2. **Control Machine**: Any machine with Ansible 2.10+ installed
 3. **Domain Name**: A domain pointing to your server (for SSL)
 
