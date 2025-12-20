@@ -416,7 +416,7 @@ Postfix then handles:
 | `postgresql_database` | Database name | `"m2s"` |
 | `postgresql_user` | Database user | `"m2s"` |
 | `nginx_ssl_enabled` | Enable HTTPS | `true` |
-| `letsencrypt_email` | Email for certs | `"admin@club.org"` |
+| `letsencrypt_email` | Email for certificates | `"admin@club.org"` |
 | `mail_server_enabled` | Enable Postfix | `false` |
 | `mail_hostname` | Mail server FQDN | `"{{ m2s_domain }}"` |
 | `smtp_relay_host` | External relay | `"mail.smtp2go.com"` |

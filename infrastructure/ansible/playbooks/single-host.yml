@@ -151,8 +151,9 @@
           {% if mail_server_enabled | default(false) %}
           Mail Server: Enabled (Postfix + OpenDKIM)
             - SMTP Host: localhost
-            - SMTP Port: 25 (Django uses local unauthenticated delivery)
-            - Postfix handles outbound authentication/TLS if relay configured
+            - SMTP Port: 25
+            - Django -> Postfix: local delivery on localhost:25 without SMTP AUTH
+            - Postfix -> relay (optional): uses smtp_auth_users credentials for outbound authentication/TLS if a relay/smarthost is configured
             - See DKIM DNS record above
           {% else %}
           Mail Server: Disabled (enable with mail_server_enabled: true)
