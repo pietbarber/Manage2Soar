@@ -169,6 +169,15 @@ club_domains:
   - prefix: "{{ club_prefix }}"
     name: "{{ club_name }}"
 
+# Email dev mode - prevents actual email sending during initial deployment
+# HIGHLY RECOMMENDED: Keep this true until you've verified your mail server
+# configuration and tested with a safe email address.
+email_dev_mode: true  # Set false only after testing mail server
+
+# When email_dev_mode is true, redirect all emails to this address
+# Useful for testing without spamming members during deployment
+# email_dev_mode_redirect_to: "admin@your-club.com"
+
 # DKIM selector (used in DNS record name)
 # The opendkim role defaults to a static selector ("default") for idempotency.
 # Override only if you have a specific selector naming scheme.
