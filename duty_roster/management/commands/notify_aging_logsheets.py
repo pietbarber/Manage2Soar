@@ -4,6 +4,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
+from duty_roster.utils.email import get_email_config
 from logsheet.models import Logsheet
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
@@ -101,7 +102,7 @@ class Command(BaseCronJobCommand):
         # Build email content
         logsheet_list = []
         for logsheet, days_old in logsheet_data:
-            date_str = logsheet.created_at.strftime("%A, %B %d, %Y")
+            date_str = logsheet.log_date.strftime("%A, %B %d, %Y")
             logsheet_list.append(
                 f"- {date_str} at {logsheet.airfield} ({days_old} days old)"
             )
@@ -125,15 +126,20 @@ Thank you for your attention to this matter.
 - Manage2Soar Automated Notifications"""
 
         # Prepare context for email templates
-        config = SiteConfiguration.objects.first()
+        email_config = get_email_config()
+        config = email_config["config"]
 
         context = {
             "member": member,
             "logsheet_list": logsheet_list,
-            "logsheet_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/logsheet/",
-            "club_name": config.club_name if config else "Club",
+            "logsheet_url": (
+                f"{email_config['site_url']}/logsheet/"
+                if email_config["site_url"]
+                else "/logsheet/"
+            ),
+            "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
-            "site_url": getattr(settings, "SITE_URL", None),
+            "site_url": email_config["site_url"],
         }
 
         # Render HTML and plain text templates
@@ -149,7 +155,7 @@ Thank you for your attention to this matter.
             send_mail(
                 subject=subject,
                 message=text_message,
-                from_email="noreply@default.manage2soar.com",
+                from_email=email_config["from_email"],
                 recipient_list=[member.email],
                 html_message=html_message,
                 fail_silently=False,
