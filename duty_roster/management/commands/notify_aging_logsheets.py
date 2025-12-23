@@ -111,20 +111,6 @@ class Command(BaseCronJobCommand):
             f"Aging Logsheet Reminder - {len(logsheet_data)} Unfinalized Logsheet(s)"
         )
 
-        message = f"""Hello {member.full_display_name},
-
-The following logsheet(s) are overdue for finalization:
-
-{chr(10).join(logsheet_list)}
-
-Please log into Manage2Soar to finalize these logsheets as soon as possible. Unfinalized logsheets prevent accurate reporting and billing.
-
-Logsheet Management: {settings.SITE_URL}/logsheet/
-
-Thank you for your attention to this matter.
-
-- Manage2Soar Automated Notifications"""
-
         # Prepare context for email templates
         email_config = get_email_config()
         config = email_config["config"]
