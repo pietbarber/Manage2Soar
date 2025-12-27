@@ -106,7 +106,7 @@ read -p "How many tenants/clubs? (0 for single-tenant): " TENANT_COUNT
 
 while [[ ! "$TENANT_COUNT" =~ ^[0-9]+$ ]]; do
     echo -e "${RED}Please enter a non-negative integer for the tenant count.${NC}"
-    read -p "How many tenants/clubs? (0 for single-tenant): " TENANT_COUNT
+    read -p "$(echo -e "${YELLOW}How many tenants/clubs? (0 for single-tenant): ${NC}")" TENANT_COUNT
 done
 
 TENANT_SECRETS=""
@@ -117,10 +117,10 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
             if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_]+$ ]]; then
                 break
             fi
-            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, and underscores (_). Please try again."
+            echo -e "  ${RED}Tenant prefix may only contain letters, numbers, and underscores (_). Please try again.${NC}"
         done
         TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh") || {
-            echo -e "  ${RED}Error:${NC} Failed to generate password for tenant: $TENANT_PREFIX"
+            echo -e "  ${RED}Failed to generate password for tenant: $TENANT_PREFIX${NC}"
             exit 1
         }
         TENANT_SECRETS="${TENANT_SECRETS}vault_postgresql_password_${TENANT_PREFIX}: \"${TENANT_PASS}\""$'\n'
@@ -129,7 +129,9 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
 fi
 
 # Create the vault file content
-# Note: TENANT_SECRETS will be empty if TENANT_COUNT is 0 (single-tenant mode), which is intentional
+# Note: TENANT_SECRETS is an empty string when TENANT_COUNT is 0 (single-tenant mode), so this
+#       section expands to just a blank line. When tenants exist, each entry ends with a newline;
+#       this trailing newline is intentional and harmless in the generated YAML.
 cat > "$VAULT_FILE" << EOF
 # M2S Ansible Vault Secrets
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")

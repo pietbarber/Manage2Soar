@@ -23,7 +23,6 @@
       -out {{ postgresql_ssl_cert }}
       -keyout {{ postgresql_ssl_key }}
       -subj "/CN={{ postgresql_ssl_cert_cn }}"
-    creates: "{{ postgresql_ssl_cert }}"
   become: true
   become_user: postgres
   when:

@@ -47,7 +47,12 @@ vault_postgresql_password: "CHANGE_ME_generate-with-openssl-rand"
 # Use scripts/generate-db-password.sh or scripts/initialize-vault-secrets.sh
 vault_postgresql_password_ssc: "CHANGE_ME_password_for_ssc"
 vault_postgresql_password_masa: "CHANGE_ME_password_for_masa"
-# vault_postgresql_password_nfss: "{{ lookup('env', 'NFSS_DB_PASSWORD') }}"  # example: load from environment, do not hard-code
+# WARNING: Using lookup('env', ...) here bypasses Ansible Vault encryption.
+# WARNING: Do NOT rely on environment variables for production database
+# WARNING: passwords in this file, except in tightly controlled CI/CD jobs
+# WARNING: where secrets are injected at runtime and never committed.
+# Example (CI/CD-only): load from environment instead of committing a value:
+# vault_postgresql_password_nfss: "{{ lookup('env', 'NFSS_DB_PASSWORD') }}"
 
 # ============================================================
 # DJANGO SECRET KEY

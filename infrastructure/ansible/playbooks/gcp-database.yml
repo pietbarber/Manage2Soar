@@ -111,9 +111,9 @@
           PostgreSQL multi-tenant credentials are not fully configured.
 
           You have enabled postgresql_multi_tenant and defined tenant "{{ item.prefix }}",
-          but the corresponding vault variable is missing.
+          but the corresponding vault variable is missing or empty.
 
-          Define the following in your vault.yml:
+          Define the following non-empty password variable in your vault.yml:
             - vault_postgresql_password_{{ item.prefix }}
       loop: "{{ postgresql_tenants | default([]) }}"
       when: postgresql_multi_tenant | default(false)
