@@ -89,19 +89,34 @@
         that:
           # In single-tenant mode, require the primary PostgreSQL password
           - (postgresql_multi_tenant | default(false)) or (vault_postgresql_password is defined)
-          # In multi-tenant mode, require at least one tenant password to be defined
+          # In multi-tenant mode, require that the tenants list is defined and non-empty
           - (not (postgresql_multi_tenant | default(false))) or
-            (vault_postgresql_password_ssc is defined or vault_postgresql_password_masa is defined)
+            (postgresql_tenants is defined and (postgresql_tenants | length) > 0)
         fail_msg: |
           PostgreSQL credentials are not fully configured.
 
           When postgresql_multi_tenant is false (single-tenant mode), you must set:
             - vault_postgresql_password in your vault.yml
 
-          When postgresql_multi_tenant is true (multi-tenant mode), you must define
-          at least one tenant database password, for example:
-            - vault_postgresql_password_ssc
-            - vault_postgresql_password_masa
+          When postgresql_multi_tenant is true (multi-tenant mode), you must:
+            - define postgresql_tenants in your vars.yml
+            - provide a vault_postgresql_password_<prefix> entry in vault.yml
+              for each tenant listed in postgresql_tenants.
+
+    - name: Validate multi-tenant tenant passwords
+      ansible.builtin.assert:
+        that:
+          - lookup('vars', 'vault_postgresql_password_' + item.prefix) is defined
+        fail_msg: |
+          PostgreSQL multi-tenant credentials are not fully configured.
+
+          You have enabled postgresql_multi_tenant and defined tenant "{{ item.prefix }}",
+          but the corresponding vault variable is missing.
+
+          Define the following in your vault.yml:
+            - vault_postgresql_password_{{ item.prefix }}
+      loop: "{{ postgresql_tenants | default([]) }}"
+      when: postgresql_multi_tenant | default(false)
 
     - name: Update apt cache
       ansible.builtin.apt:

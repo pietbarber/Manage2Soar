@@ -32,6 +32,11 @@ SECRET_KEY=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)'
 if [[ ${#SECRET_KEY} -lt $LENGTH ]]; then
     # Fallback: generate more and try again
     SECRET_KEY=$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")
+    # Final check: if still too short, fail explicitly
+    if [[ ${#SECRET_KEY} -lt $LENGTH ]]; then
+        echo "Error: Could not generate secret of sufficient length (requested $LENGTH, got ${#SECRET_KEY})." >&2
+        exit 1
+    fi
 fi
 
 echo "$SECRET_KEY"

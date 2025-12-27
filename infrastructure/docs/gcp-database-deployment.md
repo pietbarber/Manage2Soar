@@ -11,7 +11,7 @@ The GCP database deployment supports:
 - **Multi-tenant databases**: One database per club/tenant
 - **SSL/TLS encryption**: Secure connections to PostgreSQL
 - **Firewall rules**: GCP and UFW firewall configuration
-- **Automated backups**: Daily PostgreSQL backups with retention
+- **Backup configuration support**: PostgreSQL backup options (retention, scheduling) via role variables
 
 ## Architecture
 

@@ -34,6 +34,12 @@ PASSWORD=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c "$LENGTH")
 if [[ ${#PASSWORD} -lt $LENGTH ]]; then
     # Fallback using /dev/urandom
     PASSWORD=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c "$LENGTH")
+
+    # Final validation: fail if we still don't have enough characters
+    if [[ ${#PASSWORD} -lt $LENGTH ]]; then
+        echo "Error: Could not generate password of sufficient length" >&2
+        exit 1
+    fi
 fi
 
 echo "$PASSWORD"

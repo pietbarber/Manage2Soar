@@ -185,9 +185,7 @@
     state: present
   delegate_to: localhost
   become: false
-  when:
-    - gcp_create_firewall_rules
-    - gcp_allow_ssh
+  when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
 
 # ============================================================
 # WAIT FOR VM TO BE READY
@@ -203,6 +201,7 @@
   delegate_to: localhost
   become: false
   when:
+    - gcp_vm_external_ip is defined
     - gcp_vm_external_ip != 'N/A'
     - not gcp_vm_exists
 

@@ -73,10 +73,27 @@ echo ""
 echo "Generating secrets..."
 echo ""
 
+DJANGO_SECRET_SCRIPT="$SCRIPT_DIR/generate-django-secret.sh"
+DB_PASSWORD_SCRIPT="$SCRIPT_DIR/generate-db-password.sh"
+
+# Verify generator scripts exist and are executable
+for script in "$DJANGO_SECRET_SCRIPT" "$DB_PASSWORD_SCRIPT"; do
+    if [[ ! -f "$script" ]]; then
+        echo -e "${RED}Error: Required script not found: $script${NC}"
+        echo "Ensure this script exists in the infrastructure/scripts directory."
+        exit 1
+    fi
+    if [[ ! -x "$script" ]]; then
+        echo -e "${RED}Error: Script is not executable: $script${NC}"
+        echo "Make it executable with: chmod +x \"$script\""
+        exit 1
+    fi
+done
+
 # Generate secrets
-DJANGO_SECRET=$("$SCRIPT_DIR/generate-django-secret.sh")
-DB_PASSWORD=$("$SCRIPT_DIR/generate-db-password.sh")
-SMTP_PASSWORD=$("$SCRIPT_DIR/generate-db-password.sh" --length 24)
+DJANGO_SECRET=$("$DJANGO_SECRET_SCRIPT")
+DB_PASSWORD=$("$DB_PASSWORD_SCRIPT")
+SMTP_PASSWORD=$("$DB_PASSWORD_SCRIPT" --length 24)
 
 echo -e "${GREEN}✓${NC} Django SECRET_KEY generated (${#DJANGO_SECRET} chars)"
 echo -e "${GREEN}✓${NC} PostgreSQL password generated (${#DB_PASSWORD} chars)"
@@ -97,12 +114,15 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
     for i in $(seq 1 "$TENANT_COUNT"); do
         while true; do
             read -p "  Tenant $i prefix (e.g., ssc, masa): " TENANT_PREFIX
-            if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_]+$ ]]; then
                 break
             fi
-            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, underscores (_), and hyphens (-). Please try again."
+            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, and underscores (_). Please try again."
         done
-        TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh")
+        TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh") || {
+            echo -e "  ${RED}Error:${NC} Failed to generate password for tenant: $TENANT_PREFIX"
+            exit 1
+        }
         TENANT_SECRETS="${TENANT_SECRETS}vault_postgresql_password_${TENANT_PREFIX}: \"${TENANT_PASS}\""$'\n'
         echo -e "  ${GREEN}✓${NC} Generated password for tenant: $TENANT_PREFIX"
     done
