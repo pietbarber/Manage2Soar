@@ -129,7 +129,7 @@
 - name: Set VM IP facts
   ansible.builtin.set_fact:
     gcp_vm_internal_ip: "{{ gcp_vm_instance.networkInterfaces[0].networkIP }}"
-    gcp_vm_external_ip: "{{ gcp_vm_instance.networkInterfaces[0].accessConfigs[0].natIP | default('N/A') }}"
+    gcp_vm_external_ip: "{{ gcp_vm_instance.networkInterfaces[0].accessConfigs | default([]) | map(attribute='natIP') | first | default('N/A', true) }}"
   when: gcp_vm_instance is defined
 
 - name: Display VM network info

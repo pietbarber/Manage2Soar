@@ -6,7 +6,7 @@
       - gnupg2
       - python3-psycopg2
       - acl
-      - ssl-cert
+      - ssl-cert  # Required for system SSL certificate handling used by PostgreSQL SSL/TLS configuration (see ssl.yml)
     state: present
     update_cache: true
   become: true

@@ -57,7 +57,7 @@ gcp_allow_ssh: true
 # SSH source ranges - RESTRICT IN PRODUCTION!
 # For production, use your office IP or VPN CIDR
 gcp_ssh_allowed_sources:
-  - "0.0.0.0/0"  # WARNING: Open to all - change this!
+  - "YOUR_SSH_SOURCE_CIDR_HERE"  # REQUIRED: replace with a valid CIDR, e.g. "203.0.113.10/32"
   # - "YOUR_OFFICE_IP/32"
   # - "YOUR_VPN_CIDR"
 

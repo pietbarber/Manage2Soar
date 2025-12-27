@@ -69,9 +69,12 @@ gcp_postgresql_allowed_sources:
 # Whether to allow SSH access
 gcp_allow_ssh: true
 
-# SSH allowed sources (restrict in production!)
-gcp_ssh_allowed_sources:
-  - "0.0.0.0/0" # WARNING: Open to all - restrict in production
+# SSH allowed sources.
+# IMPORTANT: Override this in group_vars/host_vars with your trusted CIDR ranges.
+# Example:
+# gcp_ssh_allowed_sources:
+#   - "203.0.113.0/24"  # Office VPN
+gcp_ssh_allowed_sources: []
 
 # ============================================================
 # LABELS AND TAGS

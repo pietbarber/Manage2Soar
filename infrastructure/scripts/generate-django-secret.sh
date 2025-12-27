@@ -18,6 +18,12 @@ if [[ "${1:-}" == "--length" ]]; then
     LENGTH="${2:-50}"
 fi
 
+# Validate LENGTH is a positive integer
+if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || [ "$LENGTH" -le 0 ]; then
+    echo "Error: LENGTH must be a positive integer (got: '$LENGTH')." >&2
+    exit 1
+fi
+
 # Generate the secret key
 # Using /dev/urandom with base64 encoding, filtering to URL-safe characters
 SECRET_KEY=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")

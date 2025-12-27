@@ -87,10 +87,21 @@ echo ""
 echo "Multi-tenant database configuration:"
 read -p "How many tenants/clubs? (0 for single-tenant): " TENANT_COUNT
 
+while [[ ! "$TENANT_COUNT" =~ ^[0-9]+$ ]]; do
+    echo -e "${RED}Please enter a non-negative integer for the tenant count.${NC}"
+    read -p "How many tenants/clubs? (0 for single-tenant): " TENANT_COUNT
+done
+
 TENANT_SECRETS=""
-if [[ $TENANT_COUNT -gt 0 ]]; then
-    for i in $(seq 1 $TENANT_COUNT); do
-        read -p "  Tenant $i prefix (e.g., ssc, masa): " TENANT_PREFIX
+if [[ "$TENANT_COUNT" -gt 0 ]]; then
+    for i in $(seq 1 "$TENANT_COUNT"); do
+        while true; do
+            read -p "  Tenant $i prefix (e.g., ssc, masa): " TENANT_PREFIX
+            if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                break
+            fi
+            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, underscores (_), and hyphens (-). Please try again."
+        done
         TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh")
         TENANT_SECRETS="${TENANT_SECRETS}vault_postgresql_password_${TENANT_PREFIX}: \"${TENANT_PASS}\""$'\n'
         echo -e "  ${GREEN}✓${NC} Generated password for tenant: $TENANT_PREFIX"

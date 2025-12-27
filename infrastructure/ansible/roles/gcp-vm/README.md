@@ -1,5 +1,4 @@
 # GCP VM Role
-# This role provisions or configures a GCP Compute Engine VM for M2S database
 
 This role handles GCP VM provisioning for Manage2Soar database servers.
 

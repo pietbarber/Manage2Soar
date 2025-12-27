@@ -11,11 +11,19 @@
 set -euo pipefail
 
 # Default length
-LENGTH=${1:-32}
+LENGTH=32
 
-# Handle --length argument
+# Handle --length argument or positional length
 if [[ "${1:-}" == "--length" ]]; then
     LENGTH="${2:-32}"
+elif [[ -n "${1:-}" ]]; then
+    LENGTH="$1"
+fi
+
+# Validate LENGTH is a positive integer
+if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || (( LENGTH <= 0 )); then
+    echo "Error: LENGTH must be a positive integer (got: '$LENGTH')" >&2
+    exit 1
 fi
 
 # Generate password using openssl (available on most systems)

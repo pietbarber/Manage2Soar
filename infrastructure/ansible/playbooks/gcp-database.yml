@@ -87,10 +87,21 @@
     - name: Validate required variables
       ansible.builtin.assert:
         that:
-          - vault_postgresql_password is defined or postgresql_multi_tenant
+          # In single-tenant mode, require the primary PostgreSQL password
+          - (postgresql_multi_tenant | default(false)) or (vault_postgresql_password is defined)
+          # In multi-tenant mode, require at least one tenant password to be defined
+          - (not (postgresql_multi_tenant | default(false))) or
+            (vault_postgresql_password_ssc is defined or vault_postgresql_password_masa is defined)
         fail_msg: |
-          PostgreSQL password is required.
-          Set vault_postgresql_password in your vault.yml
+          PostgreSQL credentials are not fully configured.
+
+          When postgresql_multi_tenant is false (single-tenant mode), you must set:
+            - vault_postgresql_password in your vault.yml
+
+          When postgresql_multi_tenant is true (multi-tenant mode), you must define
+          at least one tenant database password, for example:
+            - vault_postgresql_password_ssc
+            - vault_postgresql_password_masa
 
     - name: Update apt cache
       ansible.builtin.apt:
