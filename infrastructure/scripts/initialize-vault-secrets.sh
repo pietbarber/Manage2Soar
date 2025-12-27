@@ -91,13 +91,14 @@ for script in "$DJANGO_SECRET_SCRIPT" "$DB_PASSWORD_SCRIPT"; do
 done
 
 # Generate secrets
+echo -e "${YELLOW}Note:${NC} SMTP password is for external mail relay authentication (if configured)."
 DJANGO_SECRET=$("$DJANGO_SECRET_SCRIPT")
 DB_PASSWORD=$("$DB_PASSWORD_SCRIPT")
 SMTP_PASSWORD=$("$DB_PASSWORD_SCRIPT" --length 24)
 
 echo -e "${GREEN}✓${NC} Django SECRET_KEY generated (${#DJANGO_SECRET} chars)"
 echo -e "${GREEN}✓${NC} PostgreSQL password generated (${#DB_PASSWORD} chars)"
-echo -e "${GREEN}✓${NC} SMTP password generated (${#SMTP_PASSWORD} chars)"
+echo -e "${GREEN}✓${NC} SMTP password generated (${#SMTP_PASSWORD} chars) - for mail relay"
 
 # Prompt for tenant configuration
 echo ""
@@ -105,23 +106,25 @@ echo "Multi-tenant database configuration:"
 read -p "How many tenants/clubs? (0 for single-tenant): " TENANT_COUNT
 
 while [[ ! "$TENANT_COUNT" =~ ^[0-9]+$ ]]; do
-    echo -e "${RED}Please enter a non-negative integer for the tenant count.${NC}"
+    echo -e "${RED}Error: Please enter a non-negative integer for the tenant count.${NC}"
     read -p "$(echo -e "${YELLOW}How many tenants/clubs? (0 for single-tenant): ${NC}")" TENANT_COUNT
 done
 
 TENANT_SECRETS=""
 if [[ "$TENANT_COUNT" -gt 0 ]]; then
-    # Note: Only iterate when TENANT_COUNT > 0; seq 1 0 behavior varies by shell
+    # Note: Only iterate when TENANT_COUNT > 0; seq 1 0 behavior varies by shell.
+    # When TENANT_COUNT is 0, the for loop produces no iterations (seq 1 0 outputs nothing
+    # in bash), so TENANT_SECRETS remains empty, which is correct for single-tenant mode.
     for i in $(seq 1 "$TENANT_COUNT"); do
         while true; do
             read -p "  Tenant $i prefix (e.g., ssc, masa): " TENANT_PREFIX
             if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_]+$ ]]; then
                 break
             fi
-            echo -e "  ${RED}Tenant prefix may only contain letters, numbers, and underscores (_). Please try again.${NC}"
+            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, and underscores (_). Please try again.\"
         done
-        TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh") || {
-            echo -e "  ${RED}Failed to generate password for tenant: $TENANT_PREFIX${NC}"
+        TENANT_PASS=$(\"$SCRIPT_DIR/generate-db-password.sh\") || {
+            echo -e \"  ${RED}Error: Failed to generate password for tenant: $TENANT_PREFIX${NC}\"
             exit 1
         }
         TENANT_SECRETS="${TENANT_SECRETS}vault_postgresql_password_${TENANT_PREFIX}: \"${TENANT_PASS}\""$'\n'
@@ -130,10 +133,11 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
 fi
 
 # Create the vault file content
-# Note: TENANT_SECRETS is an empty string when TENANT_COUNT is 0 (single-tenant mode), so this
-#       section expands to just a blank line. When tenants exist, each entry ends with a newline,
-#       so there is a trailing blank line before the comments section; this is an artifact of the
-#       string concatenation and is harmless in the generated YAML.
+# Note: TENANT_SECRETS is an empty string when TENANT_COUNT is 0 (single-tenant mode), so the
+#       tenant section expands to just a blank line in the generated YAML. When tenants exist,
+#       each entry ends with a newline (line 126), and then line 152 adds the TENANT_SECRETS
+#       expansion, resulting in a trailing blank line before the comments section. This trailing
+#       newline is an artifact of the string concatenation pattern and is harmless in YAML.
 cat > "$VAULT_FILE" << EOF
 # M2S Ansible Vault Secrets
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")

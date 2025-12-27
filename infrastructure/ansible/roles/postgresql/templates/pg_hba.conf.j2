@@ -32,8 +32,13 @@ host    {{ postgresql_db }}    {{ postgresql_user }}    ::1/128         scram-sh
 # REMOTE ACCESS RULES
 # ============================================================
 # These rules allow connections from trusted networks (e.g., K8s pods)
-# Note: This section has nested conditionals (SSL, multi-tenant, CIDR).
-# Future improvement: Consider refactoring into Jinja2 macros for better maintainability.
+#
+# MAINTAINABILITY WARNING: This section uses 3-level nested conditionals
+# (remote access check, SSL check, multi-tenant check) that create 4 different
+# combinations. This makes the template difficult to understand and error-prone.
+# Future improvement: Refactor using Jinja2 macros like:
+#   {% macro pg_hba_entry(db, user, cidr, ssl=false) %}
+# to reduce duplication and improve maintainability.
 {% for cidr in postgresql_remote_access_cidrs %}
 
 {% if postgresql_ssl_enabled and postgresql_ssl_require_remote %}

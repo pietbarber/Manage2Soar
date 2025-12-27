@@ -16,8 +16,12 @@
   become: true
 
 # Generate self-signed SSL certificate with unencrypted private key
-# Note: -nodes flag creates an unencrypted private key for automatic server startup
-# File permissions (mode 0600, postgres user) are critical for security
+# SECURITY NOTE: The -nodes flag creates an UNENCRYPTED private key stored on disk.
+# This is necessary for automatic PostgreSQL server startup without manual intervention.
+# The key is protected ONLY by file permissions (mode 0600, postgres user ownership).
+# Anyone with root or postgres user access can read this key.
+# For high-security environments, consider using encrypted keys with a separate key
+# management solution (e.g., HashiCorp Vault, AWS Secrets Manager).
 - name: Generate self-signed SSL certificate
   ansible.builtin.command:
     cmd: >

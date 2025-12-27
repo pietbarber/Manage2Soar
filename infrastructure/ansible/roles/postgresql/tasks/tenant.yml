@@ -41,3 +41,4 @@
       Database: m2s_{{ tenant.prefix }}
       User: m2s_{{ tenant.prefix }}
       ----------------------------------------
+  no_log: true  # Prevent accidental password exposure in future modifications
