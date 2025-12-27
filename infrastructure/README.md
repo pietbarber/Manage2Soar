@@ -2,6 +2,14 @@
 
 This directory contains Ansible playbooks and configuration for Manage2Soar infrastructure.
 
+## Deployment Options
+
+| Option | Description | Documentation |
+|--------|-------------|---------------|
+| **GCP Database** | Dedicated PostgreSQL server on GCP | [docs/gcp-database-deployment.md](docs/gcp-database-deployment.md) |
+| **Single-Host** | All-in-one server deployment | [docs/single-host-architecture.md](docs/single-host-architecture.md) |
+| **Mail Server** | Dedicated mail server with mailing lists | This document (below) |
+
 ## Structure
 
 ```
@@ -10,18 +18,33 @@ infrastructure/
 │   ├── ansible.cfg              # Ansible configuration
 │   ├── inventory/
 │   │   ├── hosts.yml.example    # Template - copy to hosts.yml
+│   │   ├── gcp_database.yml.example  # GCP database inventory template
 │   │   └── hosts.yml            # GITIGNORED - your actual inventory
 │   ├── group_vars/
 │   │   ├── all.yml.example      # Template - copy to all.yml
+│   │   ├── gcp_database.*.example    # GCP database config templates
 │   │   └── all.yml              # GITIGNORED - your actual variables
 │   ├── playbooks/
-│   │   └── mail-server.yml      # Main mail server playbook
+│   │   ├── gcp-database.yml     # GCP database server playbook
+│   │   ├── single-host.yml      # Single-host deployment playbook
+│   │   └── mail-server.yml      # Mail server playbook
 │   └── roles/
 │       ├── common/              # Base system setup
+│       ├── gcp-vm/              # GCP VM provisioning
+│       ├── postgresql/          # PostgreSQL database
+│       ├── m2s-app/             # Django/Gunicorn application
+│       ├── nginx/               # NGINX reverse proxy
 │       ├── postfix/             # Postfix MTA
 │       ├── opendkim/            # DKIM signing
 │       ├── rspamd/              # Spam filtering
 │       └── m2s-mail-sync/       # M2S alias sync script
+├── scripts/
+│   ├── generate-db-password.sh      # Generate secure DB password
+│   ├── generate-django-secret.sh    # Generate Django SECRET_KEY
+│   └── initialize-vault-secrets.sh  # Initialize all secrets
+├── docs/
+│   ├── gcp-database-deployment.md   # GCP database documentation
+│   └── single-host-architecture.md  # Single-host documentation
 └── README.md
 ```
 
@@ -31,8 +54,26 @@ infrastructure/
 
 The following files are gitignored and must be created manually:
 - `ansible/inventory/hosts.yml` - Your actual inventory with IPs
+- `ansible/inventory/gcp_database.yml` - GCP database inventory
 - `ansible/group_vars/all.yml` - Your actual variables with passwords
+- `ansible/group_vars/gcp_database/` - GCP database configuration
 - Any `*.vault.yml` files - Ansible Vault encrypted files
+- Any `*.json` files in ansible/ - GCP service account keys
+
+### Secret Generation
+
+Use the provided scripts to generate secure secrets:
+
+```bash
+# Generate a database password
+./scripts/generate-db-password.sh
+
+# Generate a Django SECRET_KEY
+./scripts/generate-django-secret.sh
+
+# Initialize all secrets with Ansible Vault encryption
+./scripts/initialize-vault-secrets.sh group_vars/gcp_database/vault.yml
+```
 
 ## Quick Start
 

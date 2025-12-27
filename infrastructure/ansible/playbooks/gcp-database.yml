@@ -1,0 +1,193 @@
+# GCP Database Server Playbook
+#
+# This playbook provisions and configures a GCP VM for PostgreSQL database server.
+# It supports both creating new VMs and configuring existing ones.
+#
+# Prerequisites:
+#   1. Install GCP Ansible collection:
+#      ansible-galaxy collection install google.cloud
+#
+#   2. Set up GCP authentication (one of):
+#      - gcloud auth application-default login
+#      - Service account JSON key file
+#
+#   3. Copy and configure inventory/gcp_database.yml from .example
+#   4. Copy and configure group_vars/gcp_database/ with vars.yml and vault.yml
+#   5. Set up vault password file: ~/.ansible_vault_pass
+#
+# Usage:
+#   # Create VM and configure database
+#   ansible-playbook -i inventory/gcp_database.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-database.yml
+#
+#   # Configure existing VM only (skip GCP provisioning)
+#   ansible-playbook -i inventory/gcp_database.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-database.yml --skip-tags gcp-provision
+#
+#   # Only run PostgreSQL setup
+#   ansible-playbook -i inventory/gcp_database.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-database.yml --tags postgresql
+#
+# Tags:
+#   - gcp-provision: GCP VM provisioning
+#   - base: Base system setup
+#   - postgresql: Database setup
+#   - ssl: SSL/TLS configuration
+#   - multi-tenant: Multi-tenant database setup
+
+---
+# ============================================================
+# PHASE 1: GCP VM Provisioning (runs on localhost)
+# ============================================================
+- name: Provision GCP Database Server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [gcp-provision]
+
+  pre_tasks:
+    - name: Validate GCP configuration
+      ansible.builtin.assert:
+        that:
+          - gcp_project is defined
+          - gcp_project | length > 0
+        fail_msg: |
+          GCP project is required. Set gcp_project in your group_vars.
+
+    - name: Display provisioning plan
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GCP Database Provisioning Plan
+          ========================================
+          Project: {{ gcp_project }}
+          Zone: {{ gcp_zone | default('us-east1-b') }}
+          VM Name: {{ gcp_vm_name | default('m2s-database') }}
+          Machine Type: {{ gcp_machine_type | default('e2-small') }}
+          Provision New VM: {{ gcp_vm_provision | default(true) }}
+          ========================================
+
+  roles:
+    - role: gcp-vm
+      tags: [gcp-provision]
+
+# ============================================================
+# PHASE 2: Base System Configuration
+# ============================================================
+- name: Configure Database Server
+  hosts: gcp_database_servers
+  become: true
+  gather_facts: true
+  tags: [configure]
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - vault_postgresql_password is defined or postgresql_multi_tenant
+        fail_msg: |
+          PostgreSQL password is required.
+          Set vault_postgresql_password in your vault.yml
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [base]
+
+    - name: Install essential packages
+      ansible.builtin.apt:
+        name:
+          - ufw
+          - fail2ban
+          - htop
+          - vim
+          - curl
+          - gnupg2
+        state: present
+      tags: [base]
+
+    # ============================================================
+    # UFW Firewall Configuration
+    # ============================================================
+    - name: Configure UFW defaults
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: "incoming", policy: "deny" }
+        - { direction: "outgoing", policy: "allow" }
+      tags: [base, firewall]
+
+    - name: Allow SSH through UFW
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+      tags: [base, firewall]
+
+    - name: Allow PostgreSQL from trusted networks
+      community.general.ufw:
+        rule: allow
+        port: "5432"
+        proto: tcp
+        src: "{{ item }}"
+      loop: "{{ postgresql_remote_access_cidrs | default([]) }}"
+      when: postgresql_remote_access_cidrs is defined and postgresql_remote_access_cidrs | length > 0
+      tags: [base, firewall]
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+      tags: [base, firewall]
+
+    - name: Display configuration info
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Database Server Configuration
+          ========================================
+          Hostname: {{ ansible_hostname }}
+          PostgreSQL Version: {{ postgresql_version | default('17') }}
+          Multi-Tenant Mode: {{ postgresql_multi_tenant | default(false) }}
+          SSL Enabled: {{ postgresql_ssl_enabled | default(false) }}
+          {% if postgresql_multi_tenant | default(false) %}
+          Tenants: {{ postgresql_tenants | map(attribute='prefix') | join(', ') }}
+          {% endif %}
+          ========================================
+
+  roles:
+    # PostgreSQL database
+    - role: postgresql
+      tags: [postgresql, database]
+
+  post_tasks:
+    - name: Display connection information
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          PostgreSQL Database Ready
+          ========================================
+          Host: {{ ansible_host }}
+          Port: {{ postgresql_port | default(5432) }}
+          {% if postgresql_multi_tenant | default(false) %}
+          Databases:
+          {% for tenant in postgresql_tenants %}
+            - m2s_{{ tenant.prefix }} (user: m2s_{{ tenant.prefix }})
+          {% endfor %}
+          {% else %}
+          Database: {{ postgresql_db | default('m2s') }}
+          User: {{ postgresql_user | default('m2s') }}
+          {% endif %}
+          SSL: {{ 'Required' if (postgresql_ssl_enabled | default(false) and postgresql_ssl_require_remote | default(true)) else 'Optional' if postgresql_ssl_enabled | default(false) else 'Disabled' }}
+
+          Connection string example:
+          {% if postgresql_multi_tenant | default(false) %}
+          postgresql://m2s_{{ postgresql_tenants[0].prefix }}:PASSWORD@{{ ansible_host }}:{{ postgresql_port | default(5432) }}/m2s_{{ postgresql_tenants[0].prefix }}{% if postgresql_ssl_enabled | default(false) %}?sslmode=require{% endif %}
+          {% else %}
+          postgresql://{{ postgresql_user | default('m2s') }}:PASSWORD@{{ ansible_host }}:{{ postgresql_port | default(5432) }}/{{ postgresql_db | default('m2s') }}{% if postgresql_ssl_enabled | default(false) %}?sslmode=require{% endif %}
+          {% endif %}
+          ========================================

@@ -1,0 +1,65 @@
+# PostgreSQL SSL/TLS Configuration Tasks
+---
+- name: Ensure SSL directory exists
+  ansible.builtin.file:
+    path: "/etc/postgresql/{{ postgresql_version }}/main"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+  become: true
+
+- name: Check if SSL certificate exists
+  ansible.builtin.stat:
+    path: "{{ postgresql_ssl_cert }}"
+  register: ssl_cert_stat
+  become: true
+
+- name: Generate self-signed SSL certificate
+  ansible.builtin.command:
+    cmd: >
+      openssl req -new -x509 -days {{ postgresql_ssl_cert_days }}
+      -nodes -text
+      -out {{ postgresql_ssl_cert }}
+      -keyout {{ postgresql_ssl_key }}
+      -subj "/CN={{ postgresql_ssl_cert_cn }}"
+    creates: "{{ postgresql_ssl_cert }}"
+  become: true
+  become_user: postgres
+  when:
+    - postgresql_ssl_generate_self_signed
+    - not ssl_cert_stat.stat.exists
+
+- name: Set SSL certificate permissions
+  ansible.builtin.file:
+    path: "{{ postgresql_ssl_cert }}"
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  become: true
+  when: postgresql_ssl_generate_self_signed
+
+- name: Set SSL key permissions
+  ansible.builtin.file:
+    path: "{{ postgresql_ssl_key }}"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  become: true
+  when: postgresql_ssl_generate_self_signed
+
+- name: Display SSL certificate info
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      PostgreSQL SSL Configuration
+      ========================================
+      SSL Enabled: {{ postgresql_ssl_enabled }}
+      Certificate: {{ postgresql_ssl_cert }}
+      Key: {{ postgresql_ssl_key }}
+      Require SSL for remote: {{ postgresql_ssl_require_remote }}
+      {% if postgresql_ssl_generate_self_signed %}
+      Certificate CN: {{ postgresql_ssl_cert_cn }}
+      Certificate validity: {{ postgresql_ssl_cert_days }} days
+      {% endif %}
+      ========================================

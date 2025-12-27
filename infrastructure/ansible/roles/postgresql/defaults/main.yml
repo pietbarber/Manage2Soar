@@ -4,17 +4,78 @@
 # PostgreSQL version to install
 postgresql_version: "17"
 
-# Database configuration
+# ============================================================
+# DATABASE CONFIGURATION
+# ============================================================
+
+# Primary database configuration (single-tenant mode)
 postgresql_db: "m2s"
 postgresql_user: "m2s"
 # postgresql_password should be set in group_vars (gitignored)
 
+# ============================================================
+# MULTI-TENANT CONFIGURATION
+# ============================================================
+
+# Enable multi-tenant mode (one database per tenant)
+postgresql_multi_tenant: false
+
+# List of tenants (used when postgresql_multi_tenant is true)
+# Each tenant gets their own database: m2s_{prefix}
+postgresql_tenants: []
+# Example:
+# postgresql_tenants:
+#   - prefix: "ssc"
+#     name: "Skyline Soaring Club"
+#     password: "{{ vault_postgresql_password_ssc }}"
+#   - prefix: "masa"
+#     name: "Mid-Atlantic Soaring Association"
+#     password: "{{ vault_postgresql_password_masa }}"
+
+# ============================================================
+# NETWORK CONFIGURATION
+# ============================================================
+
 # Listen addresses - localhost only for security
+# For GCP database server, set to '*' or '0.0.0.0' to allow remote connections
 postgresql_listen_addresses: "127.0.0.1"
 postgresql_port: 5432
 
 # Connection settings
 postgresql_max_connections: 100
+
+# Remote access configuration (for dedicated database servers)
+# List of CIDR ranges allowed to connect remotely
+postgresql_remote_access_cidrs: []
+# Example for GCP/K8s:
+# postgresql_remote_access_cidrs:
+#   - "10.0.0.0/8"      # Internal GCP network
+#   - "35.192.0.0/12"   # GKE pod IP range
+
+# ============================================================
+# SSL/TLS CONFIGURATION
+# ============================================================
+
+# Enable SSL for PostgreSQL connections
+postgresql_ssl_enabled: false
+
+# SSL certificate paths (auto-generated if not provided)
+postgresql_ssl_cert: "/etc/postgresql/{{ postgresql_version }}/main/server.crt"
+postgresql_ssl_key: "/etc/postgresql/{{ postgresql_version }}/main/server.key"
+
+# Generate self-signed certificate if no cert exists
+postgresql_ssl_generate_self_signed: true
+
+# SSL certificate details (for self-signed)
+postgresql_ssl_cert_days: 3650
+postgresql_ssl_cert_cn: "{{ ansible_fqdn | default(ansible_hostname) }}"
+
+# Require SSL for remote connections (recommended for production)
+postgresql_ssl_require_remote: true
+
+# ============================================================
+# MEMORY SETTINGS
+# ============================================================
 
 # Memory settings (adjust based on server RAM)
 # For 2GB RAM server, these are conservative defaults
@@ -30,12 +91,19 @@ postgresql_checkpoint_completion_target: 0.9
 # Locale settings
 postgresql_locale: "en_US.UTF-8"
 
-# Backup settings
+# ============================================================
+# BACKUP SETTINGS
+# ============================================================
+
 postgresql_backup_enabled: true
 postgresql_backup_dir: "/var/backups/postgresql"
 postgresql_backup_retention_days: 7
 postgresql_backup_hour: 2
 postgresql_backup_minute: 0
+
+# ============================================================
+# ADDITIONAL DATABASES/USERS
+# ============================================================
 
 # Additional databases (optional)
 postgresql_additional_databases: []

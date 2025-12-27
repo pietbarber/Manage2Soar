@@ -1,0 +1,73 @@
+# GCP Database Server Secrets - Vault Template
+#
+# This file should be encrypted with ansible-vault.
+#
+# SETUP INSTRUCTIONS:
+#
+# 1. Create vault password file (if not already done):
+#    echo "your-secure-vault-password" > ~/.ansible_vault_pass
+#    chmod 600 ~/.ansible_vault_pass
+#
+# 2. Create the directory structure:
+#    mkdir -p group_vars/gcp_database
+#
+# 3. Create encrypted vault file:
+#    ansible-vault create group_vars/gcp_database/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# 4. Paste and customize the contents below.
+#
+# ALTERNATIVE: Use the automated secret generator:
+#    ./infrastructure/scripts/initialize-vault-secrets.sh \
+#      infrastructure/ansible/group_vars/gcp_database/vault.yml
+#
+# TO EDIT LATER:
+#    ansible-vault edit group_vars/gcp_database/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# TO VIEW:
+#    ansible-vault view group_vars/gcp_database/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# GENERATE SECRETS:
+#   Database password: ./infrastructure/scripts/generate-db-password.sh
+#   Django secret: ./infrastructure/scripts/generate-django-secret.sh
+
+---
+# ============================================================
+# POSTGRESQL PASSWORDS
+# ============================================================
+
+# Single-tenant mode password (used when postgresql_multi_tenant: false)
+vault_postgresql_password: "CHANGE_ME_generate-with-openssl-rand"
+
+# Multi-tenant passwords (used when postgresql_multi_tenant: true)
+# Add one entry for each tenant defined in vars.yml
+vault_postgresql_password_ssc: "CHANGE_ME_password_for_ssc"
+vault_postgresql_password_masa: "CHANGE_ME_password_for_masa"
+# vault_postgresql_password_nfss: "CHANGE_ME_password_for_nfss"
+
+# ============================================================
+# DJANGO SECRET KEY
+# ============================================================
+# Generate with: ./infrastructure/scripts/generate-django-secret.sh
+# Or: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+vault_django_secret_key: "CHANGE_ME_generate-50-char-secret"
+
+# ============================================================
+# OPTIONAL: GOOGLE OAUTH
+# ============================================================
+# Only needed if using Google OAuth for authentication
+# Get these from: https://console.cloud.google.com/apis/credentials
+
+# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret: "your-client-secret"
+
+# ============================================================
+# OPTIONAL: SMTP CREDENTIALS
+# ============================================================
+# For external SMTP relay (SendGrid, SMTP2GO, etc.)
+
+# vault_smtp_relay_username: "your-smtp-username"
+# vault_smtp_relay_password: "your-smtp-password"

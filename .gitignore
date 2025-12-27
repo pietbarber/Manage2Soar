@@ -204,10 +204,25 @@ run-dev-server.sh
 # NEVER commit actual inventory or variables with passwords
 infrastructure/ansible/inventory/hosts.yml
 infrastructure/ansible/inventory/single_host.yml
+infrastructure/ansible/inventory/gcp_database.yml
 infrastructure/ansible/group_vars/all.yml
 infrastructure/ansible/group_vars/single_host.yml
 infrastructure/ansible/group_vars/single_host/
+infrastructure/ansible/group_vars/gcp_database.yml
+infrastructure/ansible/group_vars/gcp_database/
 infrastructure/ansible/group_vars/*.vault.yml
 infrastructure/ansible/*.retry
+
+# GCP Service Account credentials - NEVER commit these
+infrastructure/ansible/*.json
+infrastructure/ansible/credentials/
+*.service-account.json
+*-service-account-key.json
+gcp-credentials*.json
+
+# Generated secrets
+infrastructure/ansible/generated_secrets/
+infrastructure/scripts/*.generated
+
 test_email.py
 pushy-enhanced-v4.sh

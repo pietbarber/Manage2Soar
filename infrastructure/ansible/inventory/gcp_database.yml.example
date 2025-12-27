@@ -1,0 +1,56 @@
+# GCP Database Server Inventory
+#
+# COPY THIS FILE AND FILL IN YOUR VALUES:
+#   cp gcp_database.yml.example gcp_database.yml
+#
+# gcp_database.yml is gitignored - NEVER commit this file!
+#
+# This inventory supports two modes:
+#
+# 1. GCP PROVISIONING MODE (default):
+#    Ansible creates the VM in GCP, then configures it.
+#    Leave gcp_database_servers empty - VM is added dynamically.
+#
+# 2. EXISTING VM MODE:
+#    You already have a VM and just want to configure PostgreSQL.
+#    Fill in gcp_database_servers with your VM's IP.
+#    Set gcp_vm_provision: false in group_vars.
+
+---
+all:
+  children:
+    # ============================================================
+    # GCP PROVISIONING MODE
+    # ============================================================
+    # The gcp-vm role runs on localhost to provision GCP resources.
+    # After provisioning, the new VM is added to gcp_database_servers
+    # group dynamically.
+    #
+    # Leave this section as-is for GCP provisioning mode.
+    localhost:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+    # ============================================================
+    # DATABASE SERVERS
+    # ============================================================
+    # For GCP provisioning mode: Leave this empty - populated dynamically
+    # For existing VM mode: Add your server(s) here
+    gcp_database_servers:
+      hosts: {}
+      # Uncomment and fill in for existing VM mode:
+      # hosts:
+      #   m2s-database:
+      #     ansible_host: 35.123.45.67
+      #     ansible_user: your-ssh-username
+      #     ansible_ssh_private_key_file: ~/.ssh/gcp-key
+
+  vars:
+    # SSH settings (used when connecting to provisioned VM)
+    ansible_user: "{{ lookup('env', 'USER') }}"
+    ansible_ssh_private_key_file: "~/.ssh/google_compute_engine"
+
+    # Python interpreter on remote hosts
+    ansible_python_interpreter: /usr/bin/python3

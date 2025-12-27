@@ -6,6 +6,7 @@
       - gnupg2
       - python3-psycopg2
       - acl
+      - ssl-cert
     state: present
     update_cache: true
   become: true
@@ -39,6 +40,18 @@
     enabled: true
   become: true
 
+# ============================================================
+# SSL/TLS Configuration
+# ============================================================
+
+- name: Include SSL configuration tasks
+  ansible.builtin.include_tasks: ssl.yml
+  when: postgresql_ssl_enabled
+
+# ============================================================
+# PostgreSQL Configuration
+# ============================================================
+
 - name: Configure PostgreSQL
   ansible.builtin.template:
     src: postgresql.conf.j2
@@ -62,6 +75,21 @@
 - name: Flush handlers to apply PostgreSQL config
   ansible.builtin.meta: flush_handlers
 
+# ============================================================
+# Multi-Tenant Database Setup
+# ============================================================
+
+- name: Create tenant databases and users
+  ansible.builtin.include_tasks: tenant.yml
+  loop: "{{ postgresql_tenants }}"
+  loop_control:
+    loop_var: tenant
+  when: postgresql_multi_tenant
+
+# ============================================================
+# Single-Tenant Database Setup
+# ============================================================
+
 - name: Create M2S database user
   community.postgresql.postgresql_user:
     name: "{{ postgresql_user }}"
@@ -70,6 +98,7 @@
     state: present
   become: true
   become_user: postgres
+  when: not postgresql_multi_tenant
 
 - name: Create M2S database
   community.postgresql.postgresql_db:
@@ -82,6 +111,7 @@
     state: present
   become: true
   become_user: postgres
+  when: not postgresql_multi_tenant
 
 - name: Grant privileges to M2S user
   community.postgresql.postgresql_privs:
@@ -92,6 +122,11 @@
     state: present
   become: true
   become_user: postgres
+  when: not postgresql_multi_tenant
+
+# ============================================================
+# Additional Databases and Users
+# ============================================================
 
 - name: Create additional databases
   community.postgresql.postgresql_db:

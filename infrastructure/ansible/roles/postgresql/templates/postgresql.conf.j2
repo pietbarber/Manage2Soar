@@ -10,6 +10,17 @@ max_connections = {{ postgresql_max_connections }}
 # Authentication
 password_encryption = scram-sha-256
 
+{% if postgresql_ssl_enabled %}
+# ============================================================
+# SSL/TLS Configuration
+# ============================================================
+ssl = on
+ssl_cert_file = '{{ postgresql_ssl_cert }}'
+ssl_key_file = '{{ postgresql_ssl_key }}'
+ssl_min_protocol_version = 'TLSv1.2'
+ssl_prefer_server_ciphers = on
+{% endif %}
+
 # Memory Settings
 shared_buffers = {{ postgresql_shared_buffers }}
 effective_cache_size = {{ postgresql_effective_cache_size }}
@@ -29,6 +40,10 @@ log_rotation_age = 1d
 log_rotation_size = 100MB
 log_min_duration_statement = 1000
 log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+{% if postgresql_ssl_enabled %}
+log_connections = on
+log_disconnections = on
+{% endif %}
 
 # Locale
 lc_messages = '{{ postgresql_locale }}'

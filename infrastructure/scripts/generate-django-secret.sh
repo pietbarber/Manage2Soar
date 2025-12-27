@@ -1,0 +1,31 @@
+#!/bin/bash
+# generate-django-secret.sh
+# Generates a secure Django SECRET_KEY
+#
+# Usage:
+#   ./generate-django-secret.sh
+#   ./generate-django-secret.sh --length 64
+#
+# Output: A URL-safe base64-encoded random string suitable for Django SECRET_KEY
+
+set -euo pipefail
+
+# Default length (Django recommends at least 50 characters)
+LENGTH=${1:-50}
+
+# Handle --length argument
+if [[ "${1:-}" == "--length" ]]; then
+    LENGTH="${2:-50}"
+fi
+
+# Generate the secret key
+# Using /dev/urandom with base64 encoding, filtering to URL-safe characters
+SECRET_KEY=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")
+
+# Ensure we got enough characters
+if [[ ${#SECRET_KEY} -lt $LENGTH ]]; then
+    # Fallback: generate more and try again
+    SECRET_KEY=$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")
+fi
+
+echo "$SECRET_KEY"

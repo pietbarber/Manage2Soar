@@ -1,0 +1,6 @@
+# GCP VM Role - Requirements
+# Install these Ansible Galaxy collections before running the playbook
+---
+collections:
+  - name: google.cloud
+    version: ">=1.3.0"
