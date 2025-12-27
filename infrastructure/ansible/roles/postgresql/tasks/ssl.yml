@@ -15,6 +15,9 @@
   register: ssl_cert_stat
   become: true
 
+# Generate self-signed SSL certificate with unencrypted private key
+# Note: -nodes flag creates an unencrypted private key for automatic server startup
+# File permissions (mode 0600, postgres user) are critical for security
 - name: Generate self-signed SSL certificate
   ansible.builtin.command:
     cmd: >

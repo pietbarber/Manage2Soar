@@ -25,16 +25,26 @@ if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || [ "$LENGTH" -le 0 ]; then
 fi
 
 # Generate the secret key
-# Using /dev/urandom with base64 encoding, filtering to URL-safe characters
+# Generate secret using /dev/urandom with base64 encoding
+# Filtered to alphanumeric + common special characters for Django SECRET_KEY
 SECRET_KEY=$(head -c 64 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")
 
-# Ensure we got enough characters
+# Ensure we got enough characters; if not, generate multiple chunks until we have enough
 if [[ ${#SECRET_KEY} -lt $LENGTH ]]; then
-    # Fallback: generate more and try again
-    SECRET_KEY=$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)' | head -c "$LENGTH")
+    # Fallback: generate in a loop until we have enough characters
+    ATTEMPTS=0
+    MAX_ATTEMPTS=10
+    while [[ ${#SECRET_KEY} -lt $LENGTH ]] && [[ $ATTEMPTS -lt $MAX_ATTEMPTS ]]; do
+        CHUNK=$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9!@#$%^&*(-_=+)')
+        SECRET_KEY="${SECRET_KEY}${CHUNK}"
+        ((ATTEMPTS++))
+    done
+    # Truncate to exact length
+    SECRET_KEY="${SECRET_KEY:0:$LENGTH}"
+
     # Final check: if still too short, fail explicitly
     if [[ ${#SECRET_KEY} -lt $LENGTH ]]; then
-        echo "Error: Could not generate secret of sufficient length (requested $LENGTH, got ${#SECRET_KEY})." >&2
+        echo "Error: Could not generate secret of sufficient length (requested $LENGTH, got ${#SECRET_KEY}) after $MAX_ATTEMPTS attempts." >&2
         exit 1
     fi
 fi

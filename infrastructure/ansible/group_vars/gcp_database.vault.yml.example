@@ -39,18 +39,16 @@
 # ============================================================
 
 # Single-tenant mode password (used when postgresql_multi_tenant: false)
-vault_postgresql_password: "CHANGE_ME_generate-with-openssl-rand"
+vault_postgresql_password: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 
 # Multi-tenant passwords (used when postgresql_multi_tenant: true)
 # Add one entry for each tenant defined in vars.yml
 # IMPORTANT: Replace CHANGE_ME placeholders before encrypting this file!
 # Use scripts/generate-db-password.sh or scripts/initialize-vault-secrets.sh
-vault_postgresql_password_ssc: "CHANGE_ME_password_for_ssc"
-vault_postgresql_password_masa: "CHANGE_ME_password_for_masa"
-# WARNING: Using lookup('env', ...) here bypasses Ansible Vault encryption.
-# WARNING: Do NOT rely on environment variables for production database
-# WARNING: passwords in this file, except in tightly controlled CI/CD jobs
-# WARNING: where secrets are injected at runtime and never committed.
+vault_postgresql_password_ssc: "CHANGE_ME_GENERATE_WITH_SCRIPT"
+vault_postgresql_password_masa: "CHANGE_ME_GENERATE_WITH_SCRIPT"
+# WARNING: Only use lookup('env', ...) in tightly controlled CI/CD jobs where
+# secrets are injected at runtime and never stored in this vault file.
 # Example (CI/CD-only): load from environment instead of committing a value:
 # vault_postgresql_password_nfss: "{{ lookup('env', 'NFSS_DB_PASSWORD') }}"
 
@@ -60,7 +58,7 @@ vault_postgresql_password_masa: "CHANGE_ME_password_for_masa"
 # Generate with: ./infrastructure/scripts/generate-django-secret.sh
 # Or: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 
-vault_django_secret_key: "CHANGE_ME_generate-50-char-secret"
+vault_django_secret_key: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 
 # ============================================================
 # OPTIONAL: GOOGLE OAUTH

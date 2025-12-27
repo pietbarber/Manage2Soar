@@ -103,6 +103,22 @@
             - provide a vault_postgresql_password_<prefix> entry in vault.yml
               for each tenant listed in postgresql_tenants.
 
+    - name: Validate multi-tenant tenant structure
+      ansible.builtin.assert:
+        that:
+          - item.prefix is defined
+          - item.name is defined
+        fail_msg: |
+          Multi-tenant configuration error: tenant entry is malformed.
+
+          Each tenant in postgresql_tenants must have:
+            - prefix: database/user identifier (e.g., 'ssc', 'masa')
+            - name: human-readable name (e.g., 'Skyline Soaring Club')
+
+          Malformed entry: {{ item }}
+      loop: "{{ postgresql_tenants | default([]) }}"
+      when: postgresql_multi_tenant | default(false)
+
     - name: Validate multi-tenant tenant passwords
       ansible.builtin.assert:
         that:

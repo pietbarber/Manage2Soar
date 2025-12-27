@@ -27,7 +27,8 @@ if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || [ "$LENGTH" -le 0 ]; then
 fi
 
 # Generate password using openssl (available on most systems)
-# Using alphanumeric + some special chars that are safe for most contexts
+# Using alphanumeric only for maximum compatibility with database connection strings
+# Note: 32-char alphanumeric (62 chars/position) provides ~190 bits of entropy
 PASSWORD=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c "$LENGTH")
 
 # Ensure we got enough characters

@@ -111,6 +111,7 @@ done
 
 TENANT_SECRETS=""
 if [[ "$TENANT_COUNT" -gt 0 ]]; then
+    # Note: Only iterate when TENANT_COUNT > 0; seq 1 0 behavior varies by shell
     for i in $(seq 1 "$TENANT_COUNT"); do
         while true; do
             read -p "  Tenant $i prefix (e.g., ssc, masa): " TENANT_PREFIX
@@ -130,8 +131,9 @@ fi
 
 # Create the vault file content
 # Note: TENANT_SECRETS is an empty string when TENANT_COUNT is 0 (single-tenant mode), so this
-#       section expands to just a blank line. When tenants exist, each entry ends with a newline;
-#       this trailing newline is intentional and harmless in the generated YAML.
+#       section expands to just a blank line. When tenants exist, each entry ends with a newline,
+#       so there is a trailing blank line before the comments section; this is an artifact of the
+#       string concatenation and is harmless in the generated YAML.
 cat > "$VAULT_FILE" << EOF
 # M2S Ansible Vault Secrets
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
