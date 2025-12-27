@@ -228,3 +228,6 @@ test_email.py
 pushy-enhanced-v4.sh
 infrastructure/ansible/group_vars/localhost/vars.yml
 infrastructure/ansible/group_vars/localhost/vault.yml
+infrastructure/ansible/group_vars/gcp_provisioner/vars.yml
+.gitignore
+infrastructure/ansible/group_vars/gcp_provisioner/vault.yml
