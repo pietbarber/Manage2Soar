@@ -121,10 +121,10 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
             if [[ "$TENANT_PREFIX" =~ ^[A-Za-z0-9_]+$ ]]; then
                 break
             fi
-            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, and underscores (_). Please try again.\"
+            echo -e "  ${RED}Error:${NC} Tenant prefix may only contain letters, numbers, and underscores (_). Please try again."
         done
-        TENANT_PASS=$(\"$SCRIPT_DIR/generate-db-password.sh\") || {
-            echo -e \"  ${RED}Error: Failed to generate password for tenant: $TENANT_PREFIX${NC}\"
+        TENANT_PASS=$("$SCRIPT_DIR/generate-db-password.sh") || {
+            echo -e "  ${RED}Error: Failed to generate password for tenant: $TENANT_PREFIX${NC}"
             exit 1
         }
         TENANT_SECRETS="${TENANT_SECRETS}vault_postgresql_password_${TENANT_PREFIX}: \"${TENANT_PASS}\""$'\n'
