@@ -98,7 +98,7 @@
       - network:
           selfLink: "global/networks/{{ gcp_network }}"
         subnetwork: "{{ gcp_subnetwork | default(omit) }}"
-        access_configs: "{{ gcp_external_ip | ternary([{'name': 'External NAT', 'nat_ip': gcp_static_address.address | default(omit), 'type': 'ONE_TO_ONE_NAT'}], []) }}"
+        access_configs: "{{ gcp_external_ip | ternary([{'name': 'External NAT', 'nat_ip': (gcp_static_address | default({})).address | default(omit), 'type': 'ONE_TO_ONE_NAT'}], []) }}"
     tags:
       items: "{{ gcp_network_tags }}"
     labels: "{{ gcp_labels }}"

@@ -106,7 +106,7 @@
     - name: Validate multi-tenant tenant passwords
       ansible.builtin.assert:
         that:
-          - lookup('vars', 'vault_postgresql_password_' + item.prefix) is defined
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
         fail_msg: |
           PostgreSQL multi-tenant credentials are not fully configured.
 

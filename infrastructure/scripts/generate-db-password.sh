@@ -21,7 +21,7 @@ elif [[ -n "${1:-}" ]]; then
 fi
 
 # Validate LENGTH is a positive integer
-if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || (( LENGTH <= 0 )); then
+if ! [[ "$LENGTH" =~ ^[0-9]+$ ]] || [ "$LENGTH" -le 0 ]; then
     echo "Error: LENGTH must be a positive integer (got: '$LENGTH')" >&2
     exit 1
 fi

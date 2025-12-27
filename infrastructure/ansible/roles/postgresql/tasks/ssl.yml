@@ -58,8 +58,12 @@
       Certificate: {{ postgresql_ssl_cert }}
       Key: {{ postgresql_ssl_key }}
       Require SSL for remote: {{ postgresql_ssl_require_remote }}
-      {% if postgresql_ssl_generate_self_signed %}
+      ========================================
+
+- name: Display self-signed SSL certificate details
+  ansible.builtin.debug:
+    msg: |
+      Self-signed SSL certificate details:
       Certificate CN: {{ postgresql_ssl_cert_cn }}
       Certificate validity: {{ postgresql_ssl_cert_days }} days
-      {% endif %}
-      ========================================
+  when: postgresql_ssl_generate_self_signed

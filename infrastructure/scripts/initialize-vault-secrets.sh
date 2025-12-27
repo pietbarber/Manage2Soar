@@ -129,6 +129,7 @@ if [[ "$TENANT_COUNT" -gt 0 ]]; then
 fi
 
 # Create the vault file content
+# Note: TENANT_SECRETS will be empty if TENANT_COUNT is 0 (single-tenant mode), which is intentional
 cat > "$VAULT_FILE" << EOF
 # M2S Ansible Vault Secrets
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
