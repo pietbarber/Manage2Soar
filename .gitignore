@@ -226,3 +226,5 @@ infrastructure/scripts/*.generated
 
 test_email.py
 pushy-enhanced-v4.sh
+infrastructure/ansible/group_vars/localhost/vars.yml
+infrastructure/ansible/group_vars/localhost/vault.yml

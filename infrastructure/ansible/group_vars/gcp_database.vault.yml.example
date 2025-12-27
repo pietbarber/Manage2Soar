@@ -9,14 +9,20 @@
 #    chmod 600 ~/.ansible_vault_pass
 #
 # 2. Create the directory structure:
-#    mkdir -p group_vars/gcp_database
+#    mkdir -p group_vars/localhost
 #
-# 3. Create encrypted vault file:
-#    ansible-vault create group_vars/gcp_database/vault.yml \
+# 3. Copy and encrypt this file:
+#    cp group_vars/gcp_database.vault.yml.example group_vars/localhost/vault.yml
+#    ansible-vault encrypt group_vars/localhost/vault.yml \
 #      --vault-password-file ~/.ansible_vault_pass
 #
-# 4. Paste and customize the contents below.
+# OR use the automated script:
+#    infrastructure/scripts/initialize-vault-secrets.sh group_vars/localhost/vault.yml
 #
+# NOTE: Use group_vars/localhost/ not group_vars/gcp_database/
+# because the playbook targets 'hosts: localhost' for provisioning.
+
+---
 # ALTERNATIVE: Use the automated secret generator:
 #    ./infrastructure/scripts/initialize-vault-secrets.sh \
 #      infrastructure/ansible/group_vars/gcp_database/vault.yml

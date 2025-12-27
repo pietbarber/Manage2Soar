@@ -1,10 +1,12 @@
 # GCP Database Server Variables
 #
 # COPY THIS FILE AND FILL IN YOUR VALUES:
-#   mkdir -p group_vars/gcp_database
-#   cp gcp_database.vars.yml.example group_vars/gcp_database/vars.yml
+#   mkdir -p group_vars/localhost
+#   cp group_vars/gcp_database.vars.yml.example group_vars/localhost/vars.yml
 #
-# This file is gitignored when placed in group_vars/gcp_database/
+# NOTE: Use group_vars/localhost/ not group_vars/gcp_database/
+# because the playbook targets 'hosts: localhost' for provisioning.
+# This file is gitignored when placed in group_vars/localhost/
 #
 # For secrets (passwords, keys), use a separate vault.yml file.
 # See gcp_database.vault.yml.example for the vault template.

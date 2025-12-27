@@ -93,16 +93,16 @@ cd infrastructure/ansible
 # Inventory
 cp inventory/gcp_database.yml.example inventory/gcp_database.yml
 
-# Variables
-mkdir -p group_vars/gcp_database
-cp group_vars/gcp_database.vars.yml.example group_vars/gcp_database/vars.yml
+# Variables (note: use localhost directory, not gcp_database)
+mkdir -p group_vars/localhost
+cp group_vars/gcp_database.vars.yml.example group_vars/localhost/vars.yml
 ```
 
 ### Step 2: Initialize Secrets
 
 Use the automated script:
 ```bash
-../scripts/initialize-vault-secrets.sh group_vars/gcp_database/vault.yml
+../scripts/initialize-vault-secrets.sh group_vars/localhost/vault.yml
 ```
 
 Or manually create the vault:
@@ -112,7 +112,7 @@ echo "your-secure-password" > ~/.ansible_vault_pass
 chmod 600 ~/.ansible_vault_pass
 
 # Create encrypted vault
-ansible-vault create group_vars/gcp_database/vault.yml \
+ansible-vault create group_vars/localhost/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -123,10 +123,10 @@ ansible-vault create group_vars/gcp_database/vault.yml \
 vim inventory/gcp_database.yml
 
 # Edit variables (project, machine type, tenants)
-vim group_vars/gcp_database/vars.yml
+vim group_vars/localhost/vars.yml
 
 # Edit secrets (passwords)
-ansible-vault edit group_vars/gcp_database/vault.yml \
+ansible-vault edit group_vars/localhost/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -352,4 +352,3 @@ sudo -u postgres psql m2s_ssc < backup.sql
 
 - [Single-Host Deployment](single-host-architecture.md)
 - [Ansible README](../ansible/README.md)
-- [PostgreSQL Role](../ansible/roles/postgresql/README.md)
