@@ -105,6 +105,50 @@ The authenticated user/service account needs:
 PERMISSION_DENIED: Compute Engine API has not been used in project before or it is disabled
 ```
 
+### 5. Configure SSH Access
+
+**CRITICAL**: You must configure SSH access before running the playbook, or Ansible won't be able to connect to the new VM.
+
+1. **Disable Host Key Checking** (required for new VMs):
+   ```bash
+   cd infrastructure/ansible
+   # Edit ansible.cfg and change:
+   host_key_checking = False
+   ```
+
+2. **Get Your Public IP Address**:
+   ```bash
+   curl -s https://api.ipify.org
+   # Example output: 203.0.113.42
+   ```
+
+3. **Get Your SSH Public Key**:
+   ```bash
+   cat ~/.ssh/id_ed25519.pub
+   # OR
+   cat ~/.ssh/id_rsa.pub
+   # Example output: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyHere user@hostname
+   ```
+
+4. **Configure SSH in group_vars/gcp_provisioner/vars.yml**:
+   ```yaml
+   # SSH firewall - Add YOUR public IP address:
+   gcp_ssh_allowed_sources:
+     - "203.0.113.42/32"  # Replace with YOUR IP from step 2
+
+   # SSH public keys - Add YOUR SSH public key from step 3:
+   gcp_ssh_public_keys:
+     - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyHere pb@laptop"
+
+   # Optional: Set Ansible SSH user (defaults to your local username)
+   # gcp_ansible_user: "pb"  # Must match username in gcp_ssh_public_keys
+   ```
+
+**Common Errors**:
+- **Host key verification failed** → Set `host_key_checking = False` in ansible.cfg
+- **Connection timed out** → Add your IP to `gcp_ssh_allowed_sources`
+- **Permission denied (publickey)** → Add your SSH public key to `gcp_ssh_public_keys`
+
 ## Quick Start
 
 ### Step 1: Copy Configuration Files
@@ -115,16 +159,16 @@ cd infrastructure/ansible
 # Inventory
 cp inventory/gcp_database.yml.example inventory/gcp_database.yml
 
-# Variables (note: use localhost directory, not gcp_database)
-mkdir -p group_vars/localhost
-cp group_vars/gcp_database.vars.yml.example group_vars/localhost/vars.yml
+# Variables (note: use gcp_provisioner directory)
+mkdir -p group_vars/gcp_provisioner
+cp group_vars/gcp_database.vars.yml.example group_vars/gcp_provisioner/vars.yml
 ```
 
 ### Step 2: Initialize Secrets
 
 Use the automated script:
 ```bash
-../scripts/initialize-vault-secrets.sh group_vars/localhost/vault.yml
+../scripts/initialize-vault-secrets.sh group_vars/gcp_provisioner/vault.yml
 ```
 
 Or manually create the vault:
@@ -134,7 +178,7 @@ echo "your-secure-password" > ~/.ansible_vault_pass
 chmod 600 ~/.ansible_vault_pass
 
 # Create encrypted vault
-ansible-vault create group_vars/localhost/vault.yml \
+ansible-vault create group_vars/gcp_provisioner/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -145,10 +189,15 @@ ansible-vault create group_vars/localhost/vault.yml \
 vim inventory/gcp_database.yml
 
 # Edit variables (project, machine type, tenants)
-vim group_vars/localhost/vars.yml
+vim group_vars/gcp_provisioner/vars.yml
+
+# CRITICAL SSH SETUP:
+# 1. Get your IP: curl -s https://api.ipify.org
+# 2. Add to gcp_ssh_allowed_sources in vars.yml
+# 3. Edit ansible.cfg: set host_key_checking = False
 
 # Edit secrets (passwords)
-ansible-vault edit group_vars/localhost/vault.yml \
+ansible-vault edit group_vars/gcp_provisioner/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 

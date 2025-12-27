@@ -76,6 +76,20 @@ gcp_allow_ssh: true
 #   - "203.0.113.0/24"  # Office VPN
 gcp_ssh_allowed_sources: []
 
+# SSH public keys to add to VM metadata
+# Format: "username:ssh-rsa AAAA... user@host"
+# IMPORTANT: Override this in group_vars with your actual SSH public keys
+# Example:
+# gcp_ssh_public_keys:
+#   - "pb:ssh-ed25519 AAAAC3Nz... pb@laptop"
+#   - "admin:ssh-rsa AAAAB3Nz... admin@workstation"
+gcp_ssh_public_keys: []
+
+# Ansible SSH connection settings (optional)
+# If not set, Ansible will use your local username
+# gcp_ansible_user: "pb"
+# gcp_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+
 # ============================================================
 # LABELS AND TAGS
 # ============================================================

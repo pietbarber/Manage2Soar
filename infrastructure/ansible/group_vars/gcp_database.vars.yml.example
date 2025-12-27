@@ -63,6 +63,19 @@ gcp_ssh_allowed_sources: []
 #   - "YOUR_OFFICE_IP/32"
 #   - "YOUR_VPN_CIDR"
 
+# SSH public keys to add to VM metadata
+# CRITICAL: Add your SSH public key here or Ansible won't be able to connect!
+# Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
+# Format: "username:ssh-type key-data username@hostname"
+gcp_ssh_public_keys:
+  - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHere pb@laptop"
+  # Add multiple keys if needed:
+  # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
+
+# Ansible SSH connection settings (optional - defaults to your local username)
+# gcp_ansible_user: "pb"  # Must match the username in gcp_ssh_public_keys
+# gcp_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+
 # PostgreSQL source ranges - your K8s cluster or app servers
 gcp_postgresql_allowed_sources:
   - "10.0.0.0/8"      # Internal GCP network
