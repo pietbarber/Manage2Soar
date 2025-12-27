@@ -89,6 +89,9 @@
   become: true
   gather_facts: true
   tags: [configure]
+  vars_files:
+    - ../group_vars/gcp_provisioner/vars.yml
+    - ../group_vars/gcp_provisioner/vault.yml
 
   pre_tasks:
     - name: Validate required variables
