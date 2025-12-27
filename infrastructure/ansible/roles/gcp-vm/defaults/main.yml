@@ -1,0 +1,111 @@
+# GCP VM Role Defaults
+# These can be overridden in group_vars or host_vars
+---
+# ============================================================
+# GCP PROJECT CONFIGURATION
+# ============================================================
+
+# GCP project ID (required)
+# gcp_project: "your-project-id"
+
+# GCP region and zone
+gcp_region: "us-east1"
+gcp_zone: "us-east1-b"
+
+# ============================================================
+# VM CONFIGURATION
+# ============================================================
+
+# Whether to provision a new VM or use an existing one
+# Set to false if VM already exists and you just want to configure it
+gcp_vm_provision: true
+
+# VM instance name
+gcp_vm_name: "m2s-database"
+
+# Machine type (adjust based on needs)
+# See: https://cloud.google.com/compute/docs/machine-types
+gcp_machine_type: "e2-small"
+
+# Boot disk settings
+gcp_boot_disk_size_gb: 20
+gcp_boot_disk_type: "pd-standard"
+
+# OS image
+gcp_image_family: "ubuntu-2404-lts-amd64"
+gcp_image_project: "ubuntu-os-cloud"
+
+# ============================================================
+# NETWORK CONFIGURATION
+# ============================================================
+
+# VPC network name
+gcp_network: "default"
+
+# Subnetwork (optional - uses auto-mode if not specified)
+# gcp_subnetwork: "default"
+
+# Whether to assign an external IP
+gcp_external_ip: true
+
+# Static IP name (optional - creates ephemeral if not set)
+# gcp_static_ip_name: "m2s-database-ip"
+
+# ============================================================
+# FIREWALL RULES
+# ============================================================
+
+# Whether to create firewall rules for PostgreSQL
+gcp_create_firewall_rules: true
+
+# Firewall rule name prefix
+gcp_firewall_name_prefix: "m2s-database"
+
+# Source ranges allowed to connect to PostgreSQL
+# This should be your K8s cluster's pod CIDR or specific IPs
+gcp_postgresql_allowed_sources:
+  - "10.0.0.0/8" # Internal GCP network
+
+# Whether to allow SSH access
+gcp_allow_ssh: true
+
+# SSH allowed sources.
+# IMPORTANT: Override this in group_vars/host_vars with your trusted CIDR ranges.
+# Example:
+# gcp_ssh_allowed_sources:
+#   - "203.0.113.0/24"  # Office VPN
+gcp_ssh_allowed_sources: []
+
+# ============================================================
+# LABELS AND TAGS
+# ============================================================
+
+# Network tags for firewall rules
+gcp_network_tags:
+  - "m2s-database"
+  - "postgresql"
+
+# Labels for resource organization
+gcp_labels:
+  environment: "production"
+  application: "manage2soar"
+  component: "database"
+
+# ============================================================
+# SERVICE ACCOUNT
+# ============================================================
+
+# Service account email (optional - uses default if not set)
+# gcp_service_account_email: "m2s-database@your-project.iam.gserviceaccount.com"
+
+# Scopes for the service account
+gcp_scopes:
+  - "https://www.googleapis.com/auth/cloud-platform"
+# ============================================================
+# AUTHENTICATION
+# ============================================================
+
+# Path to GCP service account JSON key file
+# This should be a path on your local machine running Ansible
+# gcp_auth_kind: "serviceaccount"
+# gcp_service_account_file: "/path/to/service-account-key.json"

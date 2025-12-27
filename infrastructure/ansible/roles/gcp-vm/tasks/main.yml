@@ -1,0 +1,214 @@
+# GCP VM Provisioning Role - Main Tasks
+#
+# This role handles:
+# 1. Checking if VM already exists
+# 2. Creating VM if gcp_vm_provision is true and VM doesn't exist
+# 3. Creating/updating firewall rules
+# 4. Registering the VM's IP for subsequent roles
+---
+- name: Validate required GCP variables
+  ansible.builtin.assert:
+    that:
+      - gcp_project is defined
+      - gcp_project | length > 0
+    fail_msg: |
+      GCP project ID is required.
+      Please set gcp_project in your group_vars or inventory.
+
+- name: Check if VM already exists
+  google.cloud.gcp_compute_instance_info:
+    zone: "{{ gcp_zone }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+  register: existing_vms
+  delegate_to: localhost
+  become: false
+
+- name: Set VM exists fact
+  ansible.builtin.set_fact:
+    gcp_vm_exists: "{{ existing_vms.resources | selectattr('name', 'equalto', gcp_vm_name) | list | length > 0 }}"
+
+- name: Display VM status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      GCP VM Status: {{ gcp_vm_name }}
+      ========================================
+      VM Exists: {{ gcp_vm_exists }}
+      Provision New VM: {{ gcp_vm_provision }}
+      {% if gcp_vm_exists %}
+      Action: Will use existing VM
+      {% elif gcp_vm_provision %}
+      Action: Will create new VM
+      {% else %}
+      Action: ERROR - VM doesn't exist and provisioning is disabled
+      {% endif %}
+      ========================================
+
+- name: Fail if VM doesn't exist and provisioning is disabled
+  ansible.builtin.fail:
+    msg: |
+      VM '{{ gcp_vm_name }}' does not exist and gcp_vm_provision is false.
+      Either create the VM manually or set gcp_vm_provision: true
+  when:
+    - not gcp_vm_exists
+    - not gcp_vm_provision
+
+# ============================================================
+# CREATE STATIC IP (if configured)
+# ============================================================
+
+- name: Create static IP address
+  google.cloud.gcp_compute_address:
+    name: "{{ gcp_static_ip_name }}"
+    region: "{{ gcp_region }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    state: present
+  register: gcp_static_address
+  delegate_to: localhost
+  become: false
+  when:
+    - gcp_static_ip_name is defined
+    - not gcp_vm_exists
+    - gcp_vm_provision
+
+# ============================================================
+# CREATE VM
+# ============================================================
+
+- name: Create GCP VM instance
+  google.cloud.gcp_compute_instance:
+    name: "{{ gcp_vm_name }}"
+    machine_type: "{{ gcp_machine_type }}"
+    zone: "{{ gcp_zone }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    disks:
+      - auto_delete: true
+        boot: true
+        initialize_params:
+          source_image: "projects/{{ gcp_image_project }}/global/images/family/{{ gcp_image_family }}"
+          disk_size_gb: "{{ gcp_boot_disk_size_gb }}"
+          disk_type: "{{ gcp_boot_disk_type }}"
+    network_interfaces:
+      - network:
+          selfLink: "global/networks/{{ gcp_network }}"
+        subnetwork: "{{ gcp_subnetwork | default(omit) }}"
+        access_configs: "{{ gcp_external_ip | ternary([{'name': 'External NAT', 'nat_ip': (gcp_static_address | default({})).address | default(omit), 'type': 'ONE_TO_ONE_NAT'}], []) }}"
+    tags:
+      items: "{{ gcp_network_tags }}"
+    labels: "{{ gcp_labels }}"
+    service_accounts:
+      - email: "{{ gcp_service_account_email | default(omit) }}"
+        scopes: "{{ gcp_scopes }}"
+    state: present
+  register: gcp_vm_instance
+  delegate_to: localhost
+  become: false
+  when:
+    - not gcp_vm_exists
+    - gcp_vm_provision
+
+# ============================================================
+# GET EXISTING VM INFO
+# ============================================================
+
+- name: Get existing VM details
+  ansible.builtin.set_fact:
+    gcp_vm_instance: "{{ existing_vms.resources | selectattr('name', 'equalto', gcp_vm_name) | first }}"
+  when: gcp_vm_exists
+
+# ============================================================
+# REGISTER VM IP
+# ============================================================
+
+- name: Set VM IP facts
+  ansible.builtin.set_fact:
+    gcp_vm_internal_ip: "{{ gcp_vm_instance.networkInterfaces[0].networkIP }}"
+    gcp_vm_external_ip: "{{ gcp_vm_instance.networkInterfaces[0].accessConfigs | default([]) | map(attribute='natIP') | first | default('N/A', true) }}"
+  when: gcp_vm_instance is defined
+
+- name: Display VM network info
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VM Network Configuration
+      ========================================
+      VM Name: {{ gcp_vm_name }}
+      Internal IP: {{ gcp_vm_internal_ip }}
+      External IP: {{ gcp_vm_external_ip }}
+      ========================================
+
+# ============================================================
+# FIREWALL RULES
+# ============================================================
+
+- name: Create PostgreSQL firewall rule
+  google.cloud.gcp_compute_firewall:
+    name: "{{ gcp_firewall_name_prefix }}-allow-postgresql"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    network:
+      selfLink: "global/networks/{{ gcp_network }}"
+    allowed:
+      - ip_protocol: tcp
+        ports:
+          - "5432"
+    source_ranges: "{{ gcp_postgresql_allowed_sources }}"
+    target_tags: "{{ gcp_network_tags }}"
+    description: "Allow PostgreSQL connections from trusted sources"
+    state: present
+  delegate_to: localhost
+  become: false
+  when: gcp_create_firewall_rules
+
+- name: Create SSH firewall rule
+  google.cloud.gcp_compute_firewall:
+    name: "{{ gcp_firewall_name_prefix }}-allow-ssh"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    network:
+      selfLink: "global/networks/{{ gcp_network }}"
+    allowed:
+      - ip_protocol: tcp
+        ports:
+          - "22"
+    source_ranges: "{{ gcp_ssh_allowed_sources }}"
+    target_tags: "{{ gcp_network_tags }}"
+    description: "Allow SSH access for management"
+    state: present
+  delegate_to: localhost
+  become: false
+  when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
+
+# ============================================================
+# WAIT FOR VM TO BE READY
+# ============================================================
+
+- name: Wait for SSH to become available
+  ansible.builtin.wait_for:
+    host: "{{ gcp_vm_external_ip }}"
+    port: 22
+    delay: 10
+    timeout: 300
+    state: started
+  delegate_to: localhost
+  become: false
+  when:
+    - gcp_vm_external_ip is defined
+    - gcp_vm_external_ip != 'N/A'
+    - not gcp_vm_exists
+
+- name: Add new VM to in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ gcp_vm_name }}"
+    ansible_host: "{{ gcp_vm_external_ip }}"
+    groups:
+      - gcp_database_servers
+  when: gcp_vm_external_ip != 'N/A'

@@ -7,11 +7,61 @@
 local   all             postgres                                peer
 local   all             all                                     peer
 
-# IPv4 local connections (for Django/Gunicorn)
+# IPv4 local connections (for Django/Gunicorn on same host)
+{% if postgresql_multi_tenant %}
+# Multi-tenant mode: allow access to all tenant databases
+{% for tenant in postgresql_tenants %}
+host    m2s_{{ tenant.prefix }}    m2s_{{ tenant.prefix }}    127.0.0.1/32    scram-sha-256
+{% endfor %}
+{% else %}
+# Single-tenant mode
 host    {{ postgresql_db }}    {{ postgresql_user }}    127.0.0.1/32    scram-sha-256
+{% endif %}
 
 # IPv6 local connections
+{% if postgresql_multi_tenant %}
+{% for tenant in postgresql_tenants %}
+host    m2s_{{ tenant.prefix }}    m2s_{{ tenant.prefix }}    ::1/128         scram-sha-256
+{% endfor %}
+{% else %}
 host    {{ postgresql_db }}    {{ postgresql_user }}    ::1/128         scram-sha-256
+{% endif %}
+
+{% if postgresql_remote_access_cidrs | length > 0 %}
+# ============================================================
+# REMOTE ACCESS RULES
+# ============================================================
+# These rules allow connections from trusted networks (e.g., K8s pods)
+#
+# MAINTAINABILITY WARNING: This section uses 3-level nested conditionals
+# (remote access check, SSL check, multi-tenant check) that create 4 different
+# combinations. This makes the template difficult to understand and error-prone.
+# Future improvement: Refactor using Jinja2 macros like:
+#   {% macro pg_hba_entry(db, user, cidr, ssl=false) %}
+# to reduce duplication and improve maintainability.
+{% for cidr in postgresql_remote_access_cidrs %}
+
+{% if postgresql_ssl_enabled and postgresql_ssl_require_remote %}
+# SSL required for remote connections from {{ cidr }}
+{% if postgresql_multi_tenant %}
+{% for tenant in postgresql_tenants %}
+hostssl m2s_{{ tenant.prefix }}    m2s_{{ tenant.prefix }}    {{ cidr }}    scram-sha-256
+{% endfor %}
+{% else %}
+hostssl {{ postgresql_db }}    {{ postgresql_user }}    {{ cidr }}    scram-sha-256
+{% endif %}
+{% else %}
+# Remote connections from {{ cidr }}
+{% if postgresql_multi_tenant %}
+{% for tenant in postgresql_tenants %}
+host    m2s_{{ tenant.prefix }}    m2s_{{ tenant.prefix }}    {{ cidr }}    scram-sha-256
+{% endfor %}
+{% else %}
+host    {{ postgresql_db }}    {{ postgresql_user }}    {{ cidr }}    scram-sha-256
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
 
 # Reject all other connections
 host    all             all             0.0.0.0/0               reject

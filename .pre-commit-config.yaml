@@ -74,6 +74,7 @@ repos:
     rev: v1.4.2
     hooks:
       - id: python-safety-dependencies-check
+        exclude: ^infrastructure/ansible/  # Exclude Ansible requirements files
 
 # Global pre-commit settings
 fail_fast: false
