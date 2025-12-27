@@ -83,6 +83,28 @@ The authenticated user/service account needs:
 - `roles/compute.admin` - Create/manage VMs
 - `roles/compute.networkAdmin` - Create firewall rules
 
+### 4. Enable Required GCP APIs
+
+**CRITICAL**: Before running the playbook, you must enable the Compute Engine API in your GCP project:
+
+1. **Visit the API Console**:
+   - Direct link: `https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=YOUR_PROJECT_ID`
+   - Replace `YOUR_PROJECT_ID` with your actual GCP project ID
+
+2. **Enable the Compute Engine API**:
+   - Click the "Enable" button
+   - Wait 2-5 minutes for the API to propagate across Google's systems
+
+3. **Verify Enablement** (Optional):
+   ```bash
+   gcloud services list --enabled --filter="compute.googleapis.com"
+   ```
+
+**Common Error**: If you skip this step, you'll see:
+```
+PERMISSION_DENIED: Compute Engine API has not been used in project before or it is disabled
+```
+
 ## Quick Start
 
 ### Step 1: Copy Configuration Files
