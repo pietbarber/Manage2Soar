@@ -52,10 +52,6 @@
     - ../group_vars/gcp_provisioner/vault.yml
 
   pre_tasks:
-    - name: Debug - Show all hostvars
-      ansible.builtin.debug:
-        msg: "gcp_project={{ gcp_project | default('UNDEFINED') }}, inventory_hostname={{ inventory_hostname }}"
-
     - name: Validate GCP configuration
       ansible.builtin.assert:
         that:
