@@ -284,14 +284,17 @@ Each tenant gets:
 
 ## SSH Configuration
 
-### 1. Disable Host Key Checking
+### 1. Add VM Host Key to Known Hosts
 
-For new VMs, you need to disable host key checking temporarily:
+For new VMs, add the host key to your known_hosts file:
 
 ```bash
-# In ansible.cfg, set:
-host_key_checking = False
+# After the VM is provisioned, get its IP from the playbook output
+# Then add its host key:
+ssh-keyscan MAIL_VM_IP >> ~/.ssh/known_hosts
 ```
+
+**Security Note**: Do not disable `host_key_checking` globally in `ansible.cfg` as this removes protection against man-in-the-middle attacks.
 
 ### 2. Get Your Public IP
 
@@ -349,7 +352,15 @@ Wait 2-5 minutes for the API to propagate.
 
 #### "Host key verification failed"
 
-Set `host_key_checking = False` in `ansible.cfg`.
+This usually means the mail VM's SSH host key is not in your `known_hosts` file or has changed.
+
+1. Get the VM's SSH host key and add it to `known_hosts` (replace `MAIL_VM_IP` with the VM's external IP):
+
+   ```bash
+   ssh-keyscan MAIL_VM_IP >> ~/.ssh/known_hosts
+   ```
+
+2. Do **not** disable SSH host key checking globally (e.g., `host_key_checking = False` in `ansible.cfg`), as this removes protection against man-in-the-middle attacks.
 
 #### "Permission denied (publickey)"
 
@@ -448,5 +459,5 @@ Remember to update DNS records with the new DKIM public keys!
 ## Related Documentation
 
 - [GCP Database Deployment](gcp-database-deployment.md) - Similar pattern for database
-- [Single-Host Deployment](single-host-ansible-deployment.md) - All-in-one deployment
-- [Email Style Guide](../docs/email-style-guide.md) - Email formatting standards
+- [Single-Host Deployment](../../docs/single-host-ansible-deployment.md) - All-in-one deployment
+- [Email Style Guide](../../docs/email-style-guide.md) - Email formatting standards
