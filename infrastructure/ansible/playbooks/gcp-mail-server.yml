@@ -243,9 +243,12 @@
              EMAIL_PORT = {{ smtp_relay_port | default(587) }}
              EMAIL_USE_TLS = True
 
-             # NOTE: EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are stored in Ansible Vault.
-             #       Retrieve these from your vault files and configure them in Django
-             #       without printing or logging their values.
+             # NOTE: SMTP2Go relay credentials (vault_smtp_relay_username
+             #       and vault_smtp_relay_password in group_vars/gcp_mail/vault.yml)
+             #       should be copied into your Django settings as:
+             #           EMAIL_HOST_USER = "<smtp2go-username>"
+             #           EMAIL_HOST_PASSWORD = "<smtp2go-password>"
+             #       Do not print or log these values.
              #
              # Security reminder: Protect Ansible vault files and any captured playbook
              # output/logs, as they may contain operational details about your mail setup.

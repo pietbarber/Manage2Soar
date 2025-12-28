@@ -236,7 +236,9 @@ _dmarc.masa.manage2soar.com   TXT    v=DMARC1; p=quarantine; rua=mailto:dmarc@ma
 
 ### Step 6: Register and Verify Domains in SMTP2Go
 
-**Important**: This step assumes you have already:
+#### Prerequisites
+
+Before you begin, ensure you have:
 - Run the playbook (Step 4)
 - Added all SPF, DKIM, and DMARC DNS records (Step 5)
 - Allowed time for DNS propagation (can take several hours)
