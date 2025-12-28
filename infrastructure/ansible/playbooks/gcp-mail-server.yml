@@ -208,8 +208,7 @@
           For each tenant domain, add this TXT record:
 
           {% for club in club_domains %}
-          {{ club.prefix }}.{{ mail_domain }}
-              v=spf1 include:spf.smtp2go.com ~all
+          {{ club.prefix }}.{{ mail_domain }}    TXT    "v=spf1 include:spf.smtp2go.com ~all"
 
           {% endfor %}
 
@@ -220,8 +219,7 @@
           For each tenant domain, add this TXT record at _dmarc.DOMAIN:
 
           {% for club in club_domains %}
-          _dmarc.{{ club.prefix }}.{{ mail_domain }}
-              v=DMARC1; p=quarantine; rua=mailto:dmarc@{{ club.prefix }}.{{ mail_domain }}
+          _dmarc.{{ club.prefix }}.{{ mail_domain }}    TXT    "v=DMARC1; p=quarantine; rua=mailto:dmarc@{{ club.prefix }}.{{ mail_domain }}"
 
           {% endfor %}
 
