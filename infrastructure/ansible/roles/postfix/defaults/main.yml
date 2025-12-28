@@ -19,12 +19,13 @@ mail_domain: "{{ m2s_domain }}"
 # Example: ["192.168.1.0/24", "10.0.0.1"]
 trusted_relay_ips: []
 
-# SMTP authentication users for Django to send mail
+# SMTP authentication users for Django to send mail through this server
+# Only needed if Django sends mail through this Postfix server (not SMTP2Go directly)
 # Each item: { username: "m2s", password: "secret" }
-# NOTE: vault_smtp_password MUST be defined in vault.yml for mail to work
-smtp_auth_users:
-  - username: m2s
-    password: "{{ vault_smtp_password }}"
+# NOTE: vault_smtp_password MUST be defined in vault.yml if you enable this
+# smtp_auth_users:
+#   - username: m2s
+#     password: "{{ vault_smtp_password }}"
 
 # ============================================================
 # SMTP RELAY (Optional)
@@ -57,7 +58,6 @@ postfix_use_self_signed_cert: false
 # - SASL auth for Django to send mail
 
 single_host_mode: true
-
 # Club domains configuration
 # NOTE: This list structure supports the existing multi-tenant mail server roles.
 # For single-host deployments, there will be just one entry.

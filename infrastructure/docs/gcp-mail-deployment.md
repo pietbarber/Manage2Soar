@@ -295,12 +295,13 @@ Each tenant gets:
 
 ### 1. Add VM Host Key to Known Hosts
 
-For new VMs, add the host key to your known_hosts file:
+**The playbook automatically handles this for new VMs.** After provisioning a new VM, the `gcp-vm` role runs `ssh-keyscan` to add the host key to `~/.ssh/known_hosts`.
+
+If you need to manually add the host key (e.g., for an existing VM or after reprovisioning):
 
 ```bash
-# After the VM is provisioned, get its IP from the playbook output
-# Then add its host key:
-ssh-keyscan MAIL_VM_IP >> ~/.ssh/known_hosts
+# Get the VM's IP from the playbook output, then:
+ssh-keyscan -H MAIL_VM_IP >> ~/.ssh/known_hosts
 ```
 
 **Security Note**: Do not disable `host_key_checking` globally in `ansible.cfg` as this removes protection against man-in-the-middle attacks.
@@ -361,15 +362,18 @@ Wait 2-5 minutes for the API to propagate.
 
 #### "Host key verification failed"
 
-This usually means the mail VM's SSH host key is not in your `known_hosts` file or has changed.
+**The playbook should handle this automatically for new VMs.** If you see this error, it usually means:
 
-1. Get the VM's SSH host key and add it to `known_hosts` (replace `MAIL_VM_IP` with the VM's external IP):
+1. **The VM already existed** before you ran the playbook (so the automatic `ssh-keyscan` was skipped), OR
+2. **The VM's SSH host key changed** (e.g., after deletion and recreation)
 
-   ```bash
-   ssh-keyscan MAIL_VM_IP >> ~/.ssh/known_hosts
-   ```
+**Manual fix:**
+```bash
+# Get the VM's external IP from the playbook output, then:
+ssh-keyscan -H MAIL_VM_IP >> ~/.ssh/known_hosts
+```
 
-2. Do **not** disable SSH host key checking globally (e.g., `host_key_checking = False` in `ansible.cfg`), as this removes protection against man-in-the-middle attacks.
+**Security Note:** Do not disable SSH host key checking globally (e.g., `host_key_checking = False` in `ansible.cfg`), as this removes protection against man-in-the-middle attacks.
 
 #### "Permission denied (publickey)"
 
