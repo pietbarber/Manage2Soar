@@ -256,7 +256,7 @@ _dmarc.masa.manage2soar.com   TXT    v=DMARC1; p=quarantine; rua=mailto:dmarc@ma
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gcp_project` | (required) | GCP project ID |
-| `gcp_vm_provision` | `true` | Create VM if doesn't exist |
+| `gcp_vm_provision` | `true` | Create VM if it doesn't exist |
 | `gcp_vm_name` | `m2s-mail` | VM instance name |
 | `gcp_machine_type` | `e2-micro` | GCP machine type |
 | `gcp_zone` | `us-east1-b` | GCP zone |
@@ -391,14 +391,14 @@ Add your IP address to `gcp_ssh_allowed_sources`.
 ### Mail Queue Issues
 
 ```bash
-# Check mail queue
-ssh root@mail-server 'mailq'
+# Check mail queue (replace YOUR_USER and MAIL_VM_IP with your values)
+ssh YOUR_USER@MAIL_VM_IP 'mailq'
 
 # View mail logs
-ssh root@mail-server 'tail -100 /var/log/mail.log'
+ssh YOUR_USER@MAIL_VM_IP 'sudo tail -100 /var/log/mail.log'
 
 # Flush queue (retry delivery)
-ssh root@mail-server 'postqueue -f'
+ssh YOUR_USER@MAIL_VM_IP 'sudo postqueue -f'
 ```
 
 ### Testing Email Delivery

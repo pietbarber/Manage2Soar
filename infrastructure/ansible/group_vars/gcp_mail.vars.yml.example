@@ -56,9 +56,9 @@ gcp_allow_ssh: true
 
 # SSH source ranges - RESTRICT IN PRODUCTION!
 # For production, use your office IP or VPN CIDR
-# CRITICAL: Replace this example IP with your actual public IP before deployment!
+# CRITICAL: Replace this placeholder with your actual public IP/VPN CIDR before deployment!
 gcp_ssh_allowed_sources:
-  - "203.0.113.10/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
+  - "YOUR_IP_HERE/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
 
 # SSH public keys to add to VM metadata
 # CRITICAL: Add your SSH public key here or Ansible won't be able to connect!
