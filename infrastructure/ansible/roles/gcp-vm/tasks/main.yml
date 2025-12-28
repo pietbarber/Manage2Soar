@@ -206,6 +206,17 @@
     - gcp_vm_external_ip != 'N/A'
     - not gcp_vm_exists
 
+- name: Add SSH host key to known_hosts
+  ansible.builtin.shell:
+    cmd: "ssh-keyscan -H {{ gcp_vm_external_ip }} >> ~/.ssh/known_hosts"
+  delegate_to: localhost
+  become: false
+  when:
+    - gcp_vm_external_ip is defined
+    - gcp_vm_external_ip != 'N/A'
+    - not gcp_vm_exists
+  changed_when: true
+
 - name: Add new VM to in-memory inventory
   ansible.builtin.add_host:
     name: "{{ gcp_vm_name }}"

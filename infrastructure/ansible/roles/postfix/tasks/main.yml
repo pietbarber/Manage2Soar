@@ -128,6 +128,7 @@
   register: sasl_result
   changed_when: "'created' in sasl_result.stdout"
   notify: Copy sasldb to chroot
+  when: smtp_auth_users is defined and smtp_auth_users | length > 0
 
 - name: Copy sasldb to Postfix chroot
   ansible.builtin.copy:
@@ -137,6 +138,7 @@
     owner: root
     group: postfix
     mode: "0640"
+  when: smtp_auth_users is defined and smtp_auth_users | length > 0
 
 - name: Add postfix to sasl group
   ansible.builtin.user:
