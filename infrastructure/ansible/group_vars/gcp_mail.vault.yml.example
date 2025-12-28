@@ -1,0 +1,75 @@
+# GCP Mail Server Secrets - Vault Template
+#
+# This file should be encrypted with ansible-vault.
+#
+# SETUP INSTRUCTIONS:
+#
+# 1. Create vault password file (if not already done):
+#    echo "<YOUR_VAULT_PASSWORD>" > ~/.ansible_vault_pass
+#    chmod 600 ~/.ansible_vault_pass
+#
+# 2. Create the directory structure:
+#    mkdir -p group_vars/gcp_mail
+#
+# 3. Copy and edit this file, then encrypt:
+#    cp group_vars/gcp_mail.vault.yml.example group_vars/gcp_mail/vault.yml
+#    # Edit vault.yml and fill in real values
+#    ansible-vault encrypt group_vars/gcp_mail/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# TO EDIT LATER:
+#    ansible-vault edit group_vars/gcp_mail/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# TO VIEW:
+#    ansible-vault view group_vars/gcp_mail/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+
+---
+# ============================================================
+# SMTP2GO CREDENTIALS (REQUIRED)
+# ============================================================
+# Get these from: https://app.smtp2go.com/settings/api_keys/
+#
+# Steps to get SMTP2Go credentials:
+#
+# 1. Log into SMTP2Go: https://app.smtp2go.com/
+#
+# 2. Go to Settings → API Keys
+#
+# 3. Create a new API key:
+#    - Click "Add API Key"
+#    - Give it a name like "M2S Mail Server"
+#    - Copy the username and password shown
+#
+# 4. Add your sending domains:
+#    Settings → Sender Domains → Add Domain
+#    Add each tenant domain (e.g., ssc.manage2soar.com)
+#
+# 5. Verify domains by adding DNS records (SPF, DKIM)
+#    The playbook will output the required records
+
+# CRITICAL: Replace these placeholders with your actual SMTP2Go credentials
+# If you forget, mail sending will fail because these placeholder values are invalid.
+vault_smtp_relay_username: REPLACEME_smtp2go_username
+vault_smtp_relay_password: REPLACEME_smtp2go_password
+
+# ============================================================
+# LOCAL SMTP AUTHENTICATION (OPTIONAL)
+# ============================================================
+# Only needed if Django connects to this server directly
+# instead of connecting to SMTP2Go directly.
+#
+# Generate a secure password:
+#   openssl rand -base64 32
+
+# vault_smtp_password: "<GENERATE_WITH_openssl_rand_-base64_32>"
+
+# ============================================================
+# OPTIONAL: GOOGLE OAUTH
+# ============================================================
+# Only needed if using Google OAuth for authentication
+# Get these from: https://console.cloud.google.com/apis/credentials
+
+# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret: "your-client-secret"

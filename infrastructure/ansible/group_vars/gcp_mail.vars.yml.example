@@ -1,0 +1,192 @@
+# GCP Mail Server Variables
+#
+# COPY THIS FILE AND FILL IN YOUR VALUES:
+#   mkdir -p group_vars/gcp_mail
+#   cp group_vars/gcp_mail.vars.yml.example group_vars/gcp_mail/vars.yml
+#
+# NOTE: Use group_vars/gcp_mail/ to match the playbook's vars_files paths.
+# This file is gitignored when placed in group_vars/gcp_mail/
+#
+# For secrets (passwords, keys), use a separate vault.yml file.
+# See gcp_mail.vault.yml.example for the vault template.
+
+---
+# ============================================================
+# GCP PROJECT CONFIGURATION
+# ============================================================
+
+# Your GCP project ID (required) - REPLACE this example value with your real project ID
+gcp_project: "example-gcp-project-id"
+
+# GCP region and zone
+gcp_region: "us-east1"
+gcp_zone: "us-east1-b"
+
+# ============================================================
+# VM PROVISIONING
+# ============================================================
+
+# Whether to provision a new VM or use an existing one
+# Set to false if VM already exists and you just want to configure mail
+gcp_vm_provision: true
+
+# VM instance name
+gcp_vm_name: "m2s-mail"
+
+# Machine type - mail servers are lightweight
+# e2-micro: Minimal mail relay (2 vCPU shared, 1GB RAM) - usually sufficient
+# e2-small: Higher volume (2 vCPU, 2GB RAM)
+gcp_machine_type: "e2-micro"
+
+# Boot disk size (GB) - mail queues are temporary, 10GB is plenty
+gcp_boot_disk_size_gb: 10
+
+# Static IP name (recommended for mail servers to avoid DNS changes)
+# gcp_static_ip_name: "m2s-mail-ip"
+
+# ============================================================
+# NETWORK & SECURITY
+# ============================================================
+
+# VPC network (use 'default' or your custom VPC)
+gcp_network: "default"
+
+# Whether to allow SSH access (recommend: true for initial setup)
+gcp_allow_ssh: true
+
+# SSH source ranges - RESTRICT IN PRODUCTION!
+# For production, use your office IP or VPN CIDR
+# CRITICAL: Replace this placeholder with your actual public IP/VPN CIDR before deployment!
+gcp_ssh_allowed_sources:
+  - "YOUR_IP_HERE/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
+
+# SSH public keys to add to VM metadata
+# CRITICAL: You MUST add at least one valid SSH public key here or Ansible won't be able to connect!
+# Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
+# Format: "username:ssh-type key-data username@hostname"
+gcp_ssh_public_keys: []
+# Example (uncomment and REPLACE with your actual key):
+# gcp_ssh_public_keys:
+#   - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAYourRealKeyDataHere pb@laptop"
+#   # Add multiple keys if needed:
+#   # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
+
+# Ansible SSH connection settings (optional - defaults to your local username)
+# gcp_ansible_user: "pb"  # Must match the username in gcp_ssh_public_keys
+# gcp_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+
+# Network tags for firewall rules
+gcp_network_tags:
+  - "m2s-mail"
+  - "smtp-relay"
+
+# Firewall rule prefix
+gcp_firewall_name_prefix: "m2s-mail"
+
+# Whether to create firewall rules
+gcp_create_firewall_rules: true
+
+# PostgreSQL source ranges (not needed for mail server, but required by gcp-vm role)
+gcp_postgresql_allowed_sources: []
+
+# ============================================================
+# MAIL SERVER CONFIGURATION
+# ============================================================
+
+# Base domain for mail (e.g., manage2soar.com)
+mail_domain: "manage2soar.com"
+
+# Mail server hostname (FQDN)
+# This will be used in HELO/EHLO and TLS certificates
+mail_hostname: "mail.{{ mail_domain }}"
+
+# ============================================================
+# SMTP RELAY (SMTP2Go)
+# ============================================================
+# GCP blocks outbound port 25, so we relay through SMTP2Go.
+# Get credentials from: https://app.smtp2go.com/settings/api_keys/
+
+# SMTP2Go relay configuration
+smtp_relay_host: "mail.smtp2go.com"
+smtp_relay_port: 587
+
+# Relay credentials - stored in vault.yml
+smtp_relay_username: "{{ vault_smtp_relay_username }}"
+smtp_relay_password: "{{ vault_smtp_relay_password }}"
+
+# ============================================================
+# DKIM CONFIGURATION
+# ============================================================
+
+# DKIM selector (used in DNS record: selector._domainkey.domain.com)
+# Use a date-based or deployment-specific selector for easy rotation
+# Example: "m2s-2024", "production", "default"
+dkim_selector: "m2s"
+
+# DKIM key size (2048 is recommended, 1024 for compatibility with old DNS)
+dkim_key_size: 2048
+
+# ============================================================
+# MULTI-TENANT CONFIGURATION
+# ============================================================
+# Each club gets their own subdomain for sending mail.
+# Mail is sent as noreply@clubprefix.manage2soar.com
+#
+# IMPORTANT: You must add each domain to SMTP2Go:
+# Settings → Sender Domains → Add Domain
+
+# List of tenant clubs
+club_domains:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+
+  # Add more tenants as needed:
+  # - prefix: "nfss"
+  #   name: "Northern Florida Soaring Society"
+
+# ============================================================
+# SMTP AUTHENTICATION (Optional)
+# ============================================================
+# For Django applications to authenticate when sending through this server.
+# Not typically needed when using SMTP2Go relay - Django can connect
+# directly to SMTP2Go instead.
+
+# Uncomment if you need local SMTP authentication:
+# smtp_auth_users:
+#   - username: m2s
+#     password: "{{ vault_smtp_password }}"
+
+# ============================================================
+# TLS SETTINGS (Optional)
+# ============================================================
+# By default, we skip TLS cert setup since we're just relaying to SMTP2Go.
+# Django connects directly to SMTP2Go with their TLS certificates.
+
+# If you want to receive mail on this server (not recommended for GCP):
+# postfix_tls_cert_file: "/etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem"
+# postfix_tls_key_file: "/etc/letsencrypt/live/{{ mail_hostname }}/privkey.pem"
+
+# Use self-signed certificates for testing
+postfix_use_self_signed_cert: true
+
+# ============================================================
+# SINGLE-HOST MODE
+# ============================================================
+# For GCP deployment, this is NOT single-host mode
+single_host_mode: false
+
+# ============================================================
+# GCP AUTHENTICATION
+# ============================================================
+# Choose one authentication method:
+
+# Option 1: Application Default Credentials (recommended)
+# Run: gcloud auth application-default login
+# No additional config needed - Ansible will use your gcloud credentials
+
+# Option 2: Service Account Key File
+# gcp_auth_kind: "serviceaccount"
+# gcp_service_account_file: "/path/to/service-account-key.json"
