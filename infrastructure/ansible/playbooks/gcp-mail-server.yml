@@ -1,0 +1,263 @@
+# GCP Mail Server Playbook
+#
+# This playbook provisions and configures a GCP VM for mail forwarding.
+# It sets up Postfix with SMTP2Go relay for sending mail from M2S applications.
+#
+# Prerequisites:
+#   1. Install GCP Ansible collection:
+#      ansible-galaxy collection install google.cloud
+#
+#   2. Set up GCP authentication (one of):
+#      - gcloud auth application-default login
+#      - Service account JSON key file
+#
+#   3. Copy and configure inventory/gcp_mail.yml from .example
+#   4. Copy and configure group_vars/gcp_mail/ with vars.yml and vault.yml
+#   5. Set up vault password file: ~/.ansible_vault_pass
+#   6. Get SMTP2Go credentials from https://app.smtp2go.com/settings/api_keys/
+#
+# Usage:
+#   # Create VM and configure mail server
+#   ansible-playbook -i inventory/gcp_mail.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-mail-server.yml
+#
+#   # Configure existing VM only (skip GCP provisioning)
+#   ansible-playbook -i inventory/gcp_mail.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-mail-server.yml --skip-tags gcp-provision
+#
+#   # Only run Postfix setup
+#   ansible-playbook -i inventory/gcp_mail.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-mail-server.yml --tags postfix
+#
+# Tags:
+#   - gcp-provision: GCP VM provisioning
+#   - base: Base system setup
+#   - postfix: Postfix MTA configuration
+#   - opendkim: DKIM signing setup
+#   - multi-tenant: Multi-tenant mail configuration
+
+---
+# ============================================================
+# PHASE 1: GCP VM Provisioning (runs on localhost)
+# ============================================================
+- name: Provision GCP Mail Server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [gcp-provision]
+  vars_files:
+    - ../group_vars/gcp_mail/vars.yml
+    - ../group_vars/gcp_mail/vault.yml
+
+  pre_tasks:
+    - name: Validate GCP configuration
+      ansible.builtin.assert:
+        that:
+          - gcp_project is defined
+          - gcp_project | length > 0
+        fail_msg: |
+          GCP project is required. Set gcp_project in your group_vars.
+
+    - name: Display provisioning plan
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GCP Mail Server Provisioning Plan
+          ========================================
+          Project: {{ gcp_project }}
+          Zone: {{ gcp_zone | default('us-east1-b') }}
+          VM Name: {{ gcp_vm_name | default('m2s-mail') }}
+          Machine Type: {{ gcp_machine_type | default('e2-micro') }}
+          Provision New VM: {{ gcp_vm_provision | default(true) }}
+          SMTP Relay: {{ smtp_relay_host | default('mail.smtp2go.com') }}
+          ========================================
+
+  roles:
+    - role: gcp-vm
+      tags: [gcp-provision]
+      vars:
+        gcp_target_inventory_group: gcp_mail_servers
+
+# ============================================================
+# PHASE 2: Mail Server Configuration
+# ============================================================
+- name: Configure Mail Server
+  hosts: gcp_mail_servers
+  become: true
+  gather_facts: true
+  tags: [configure]
+  vars_files:
+    - ../group_vars/gcp_mail/vars.yml
+    - ../group_vars/gcp_mail/vault.yml
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - mail_domain is defined
+          - smtp_relay_host is defined
+          - vault_smtp_relay_username is defined
+          - vault_smtp_relay_password is defined
+          - club_domains is defined
+          - (club_domains | length) > 0
+        fail_msg: |
+          Required mail configuration missing. Please check:
+          - mail_domain: Base domain for mail (e.g., manage2soar.com)
+          - smtp_relay_host: Relay host (mail.smtp2go.com)
+          - vault_smtp_relay_username: Relay service credentials (in vault.yml)
+          - vault_smtp_relay_password: Relay service credentials (in vault.yml)
+          - club_domains: List of tenant domains
+
+    - name: Display mail server plan
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Mail Server Configuration Plan
+          ========================================
+          Mail Domain: {{ mail_domain }}
+          Hostname: {{ mail_hostname | default('mail.' + mail_domain) }}
+          SMTP Relay: {{ smtp_relay_host }}:{{ smtp_relay_port | default(587) }}
+          Tenant Domains:
+          {% for club in club_domains %}
+            - {{ club.prefix }}.{{ mail_domain }} ({{ club.name }})
+          {% endfor %}
+          ========================================
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+      tags: [base]
+
+    - role: postfix
+      tags: [postfix, mail]
+
+    - role: opendkim
+      tags: [opendkim, dkim, mail]
+
+  post_tasks:
+    - name: Create DKIM keys output directory
+      ansible.builtin.file:
+        path: /root/dkim-dns-records
+        state: directory
+        mode: "0700"
+
+    - name: Copy DKIM public keys for DNS configuration
+      ansible.builtin.copy:
+        src: "/etc/opendkim/keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
+        dest: "/root/dkim-dns-records/{{ item.prefix }}.{{ mail_domain }}.txt"
+        remote_src: true
+        mode: "0644"
+      loop: "{{ club_domains }}"
+      ignore_errors: true
+
+    - name: Read DKIM public keys
+      ansible.builtin.slurp:
+        src: "/etc/opendkim/keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
+      loop: "{{ club_domains }}"
+      register: dkim_keys
+      ignore_errors: true
+
+    - name: Display DKIM DNS records
+      ansible.builtin.debug:
+        msg: |
+
+          ============================================================
+          DKIM PUBLIC KEYS - ADD THESE TO YOUR DNS
+          ============================================================
+
+          For each tenant domain, add the TXT record below.
+          The record name is: {{ dkim_selector }}._domainkey.DOMAIN
+
+          {% for result in dkim_keys.results %}
+          {% if result.content is defined %}
+          Domain: {{ result.item.prefix }}.{{ mail_domain }}
+          ----------------------------------------
+          {{ result.content | b64decode }}
+
+          {% endif %}
+          {% endfor %}
+
+          ============================================================
+          SPF RECORDS - ADD THESE TO YOUR DNS
+          ============================================================
+
+          For each tenant domain, add this TXT record:
+
+          {% for club in club_domains %}
+          {{ club.prefix }}.{{ mail_domain }}
+              v=spf1 include:spf.smtp2go.com ~all
+
+          {% endfor %}
+
+          ============================================================
+          DMARC RECORDS - ADD THESE TO YOUR DNS
+          ============================================================
+
+          For each tenant domain, add this TXT record at _dmarc.DOMAIN:
+
+          {% for club in club_domains %}
+          _dmarc.{{ club.prefix }}.{{ mail_domain }}
+              v=DMARC1; p=quarantine; rua=mailto:dmarc@{{ club.prefix }}.{{ mail_domain }}
+
+          {% endfor %}
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg: |
+
+          ============================================================
+          GCP MAIL SERVER SETUP COMPLETE
+          ============================================================
+
+          Mail Server: {{ gcp_vm_external_ip | default(ansible_host) }}
+          SMTP Relay: {{ smtp_relay_host }}:{{ smtp_relay_port | default(587) }}
+
+          NEXT STEPS:
+
+          1. Add DNS records (see above for DKIM, SPF, DMARC)
+
+          2. Configure M2S Django settings:
+             EMAIL_HOST = "{{ smtp_relay_host }}"
+             EMAIL_PORT = {{ smtp_relay_port | default(587) }}
+             EMAIL_USE_TLS = True
+             EMAIL_HOST_USER = "{{ vault_smtp_relay_username }}"
+             EMAIL_HOST_PASSWORD = "<from vault>"
+
+          3. Test email delivery:
+             echo "Test" | mail -s "Test from M2S" your@email.com
+
+          4. Check mail logs:
+             sudo tail -f /var/log/mail.log
+
+          5. Check mail queue:
+             mailq
+
+          DKIM public keys saved to: /root/dkim-dns-records/
+
+          ============================================================
+          SMTP2GO CONFIGURATION NOTES
+          ============================================================
+
+          If you haven't already:
+
+          1. Log into SMTP2Go: https://app.smtp2go.com/
+
+          2. Add your sending domains:
+             Settings → Sender Domains → Add Domain
+          {% for club in club_domains %}
+             - {{ club.prefix }}.{{ mail_domain }}
+          {% endfor %}
+
+          3. Verify each domain by adding the DKIM and SPF records shown above
+
+          4. Get your API credentials:
+             Settings → API Keys → Create new API key
+
+          ============================================================

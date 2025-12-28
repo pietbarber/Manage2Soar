@@ -76,6 +76,8 @@
   roles:
     - role: gcp-vm
       tags: [gcp-provision]
+      vars:
+        gcp_target_inventory_group: gcp_database_servers
 
 # ============================================================
 # PHASE 2: Base System Configuration
