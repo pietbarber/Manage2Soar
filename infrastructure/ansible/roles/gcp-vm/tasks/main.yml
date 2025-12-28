@@ -213,5 +213,6 @@
     ansible_user: "{{ gcp_ansible_user | default(lookup('env', 'USER')) }}"
     ansible_ssh_private_key_file: "{{ gcp_ansible_ssh_private_key_file | default(omit) }}"
     groups:
-      - "{{ gcp_target_inventory_group | default('gcp_servers') }}"
+      # gcp_vm_inventory_group is the preferred name, gcp_target_inventory_group kept for backward compat
+      - "{{ gcp_vm_inventory_group | default(gcp_target_inventory_group | default('gcp_servers')) }}"
   when: gcp_vm_external_ip != 'N/A'

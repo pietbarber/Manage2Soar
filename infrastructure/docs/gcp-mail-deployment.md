@@ -234,14 +234,20 @@ _dmarc.ssc.manage2soar.com    TXT    v=DMARC1; p=quarantine; rua=mailto:dmarc@ss
 _dmarc.masa.manage2soar.com   TXT    v=DMARC1; p=quarantine; rua=mailto:dmarc@masa.manage2soar.com
 ```
 
-### Step 6: Register Domains in SMTP2Go
+### Step 6: Register and Verify Domains in SMTP2Go
+
+**Important**: This step assumes you have already:
+- Run the playbook (Step 4)
+- Added all SPF, DKIM, and DMARC DNS records (Step 5)
+- Allowed time for DNS propagation (can take several hours)
 
 1. Log into SMTP2Go: https://app.smtp2go.com/
 2. Go to **Settings → Sender Domains**
 3. Add each tenant domain:
    - `ssc.manage2soar.com`
    - `masa.manage2soar.com`
-4. Follow SMTP2Go's verification process for each domain
+4. Use SMTP2Go's verification process for each domain
+5. **If verification fails**: Wait for DNS propagation (up to 24-48 hours) and retry
 
 ## Configuration Reference
 

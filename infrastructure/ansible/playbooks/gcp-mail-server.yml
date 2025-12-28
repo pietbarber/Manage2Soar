@@ -103,13 +103,19 @@
           - vault_smtp_relay_password is defined
           - club_domains is defined
           - (club_domains | length) > 0
+          - (club_domains | selectattr('prefix', 'defined') | list | length) == (club_domains | length)
+          - (club_domains | selectattr('name', 'defined') | list | length) == (club_domains | length)
         fail_msg: |
-          Required mail configuration missing. Please check:
+          Required mail configuration missing or invalid. Please check:
           - mail_domain: Base domain for mail (e.g., manage2soar.com)
           - smtp_relay_host: Relay host (mail.smtp2go.com)
           - vault_smtp_relay_username: Relay service credentials (in vault.yml)
           - vault_smtp_relay_password: Relay service credentials (in vault.yml)
           - club_domains: List of tenant domains
+              * Must be a non-empty list
+              * Each entry must include:
+                  - prefix: Subdomain prefix (e.g., club1)
+                  - name: Human-readable club name
 
     - name: Display mail server plan
       ansible.builtin.debug:
@@ -155,14 +161,25 @@
         remote_src: true
         mode: "0644"
       loop: "{{ club_domains }}"
-      ignore_errors: true
+      register: dkim_copy_results
+      failed_when: false
+
+    - name: Warn if DKIM public keys could not be copied
+      ansible.builtin.debug:
+        msg: |
+          WARNING: Failed to copy DKIM public key for {{ item.item.prefix }}.{{ mail_domain }}.
+          The key file may not exist. Check if OpenDKIM role completed successfully.
+      loop: "{{ dkim_copy_results.results | default([]) }}"
+      when:
+        - dkim_copy_results is defined
+        - item.failed | default(false)
 
     - name: Read DKIM public keys
       ansible.builtin.slurp:
         src: "/etc/opendkim/keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
       loop: "{{ club_domains }}"
       register: dkim_keys
-      ignore_errors: true
+      failed_when: false
 
     - name: Display DKIM DNS records
       ansible.builtin.debug:
@@ -227,8 +244,13 @@
              EMAIL_HOST = "{{ smtp_relay_host }}"
              EMAIL_PORT = {{ smtp_relay_port | default(587) }}
              EMAIL_USE_TLS = True
-             EMAIL_HOST_USER = "{{ vault_smtp_relay_username }}"
-             EMAIL_HOST_PASSWORD = "<from vault>"
+
+             # NOTE: EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are stored in Ansible Vault.
+             #       Retrieve these from your vault files and configure them in Django
+             #       without printing or logging their values.
+             #
+             # Security reminder: Protect Ansible vault files and any captured playbook
+             # output/logs, as they may contain operational details about your mail setup.
 
           3. Test email delivery:
              echo "Test" | mail -s "Test from M2S" your@email.com

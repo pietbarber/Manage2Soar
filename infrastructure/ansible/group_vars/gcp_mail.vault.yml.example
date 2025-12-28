@@ -49,8 +49,10 @@
 # 5. Verify domains by adding DNS records (SPF, DKIM)
 #    The playbook will output the required records
 
-vault_smtp_relay_username: "<YOUR_SMTP2GO_USERNAME>"
-vault_smtp_relay_password: "<YOUR_SMTP2GO_PASSWORD>"
+# CRITICAL: Replace these placeholders with your actual SMTP2Go credentials
+# If you forget, Ansible will fail with: "'REPLACEME_smtp2go_username' is undefined"
+vault_smtp_relay_username: "{{ REPLACEME_smtp2go_username }}"
+vault_smtp_relay_password: "{{ REPLACEME_smtp2go_password }}"
 
 # ============================================================
 # LOCAL SMTP AUTHENTICATION (OPTIONAL)

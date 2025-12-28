@@ -56,16 +56,16 @@ gcp_allow_ssh: true
 
 # SSH source ranges - RESTRICT IN PRODUCTION!
 # For production, use your office IP or VPN CIDR
-gcp_ssh_allowed_sources: []
-#   - "203.0.113.10/32"  # EXAMPLE: replace with your public IP CIDR
-#   - "YOUR_OFFICE_IP/32"
+# CRITICAL: Replace this example IP with your actual public IP before deployment!
+gcp_ssh_allowed_sources:
+  - "203.0.113.10/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
 
 # SSH public keys to add to VM metadata
 # CRITICAL: Add your SSH public key here or Ansible won't be able to connect!
 # Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
 # Format: "username:ssh-type key-data username@hostname"
 gcp_ssh_public_keys:
-  - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHere pb@laptop"
+  - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHereMoreBase64Chars1234567890abcd pb@laptop  # EXAMPLE ONLY - REPLACE WITH YOUR KEY"
   # Add multiple keys if needed:
   # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
 
