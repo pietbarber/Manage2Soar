@@ -15,8 +15,8 @@
 # GCP PROJECT CONFIGURATION
 # ============================================================
 
-# Your GCP project ID (required)
-gcp_project: "your-gcp-project-id"
+# Your GCP project ID (required) - REPLACE this example value with your real project ID
+gcp_project: "example-gcp-project-id"
 
 # GCP region and zone
 gcp_region: "us-east1"
@@ -61,13 +61,15 @@ gcp_ssh_allowed_sources:
   - "YOUR_IP_HERE/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
 
 # SSH public keys to add to VM metadata
-# CRITICAL: Add your SSH public key here or Ansible won't be able to connect!
+# CRITICAL: You MUST add at least one valid SSH public key here or Ansible won't be able to connect!
 # Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
 # Format: "username:ssh-type key-data username@hostname"
-gcp_ssh_public_keys:
-  - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHereMoreBase64Chars1234567890abcd pb@laptop  # EXAMPLE ONLY - REPLACE WITH YOUR KEY"
-  # Add multiple keys if needed:
-  # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
+gcp_ssh_public_keys: []
+# Example (uncomment and REPLACE with your actual key):
+# gcp_ssh_public_keys:
+#   - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAYourRealKeyDataHere pb@laptop"
+#   # Add multiple keys if needed:
+#   # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
 
 # Ansible SSH connection settings (optional - defaults to your local username)
 # gcp_ansible_user: "pb"  # Must match the username in gcp_ssh_public_keys

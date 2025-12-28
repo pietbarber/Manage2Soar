@@ -101,6 +101,8 @@
           - smtp_relay_host is defined
           - vault_smtp_relay_username is defined
           - vault_smtp_relay_password is defined
+          - not (vault_smtp_relay_username | string).startswith('REPLACEME')
+          - not (vault_smtp_relay_password | string).startswith('REPLACEME')
           - club_domains is defined
           - (club_domains | length) > 0
           - (club_domains | selectattr('prefix', 'defined') | list | length) == (club_domains | length)
@@ -111,6 +113,7 @@
           - smtp_relay_host: Relay host (mail.smtp2go.com)
           - vault_smtp_relay_username: Relay service credentials (in vault.yml)
           - vault_smtp_relay_password: Relay service credentials (in vault.yml)
+              * IMPORTANT: Replace REPLACEME placeholder values with actual SMTP2Go credentials
           - club_domains: List of tenant domains
               * Must be a non-empty list
               * Each entry must include:

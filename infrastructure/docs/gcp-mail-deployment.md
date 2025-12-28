@@ -236,12 +236,13 @@ _dmarc.masa.manage2soar.com   TXT    v=DMARC1; p=quarantine; rua=mailto:dmarc@ma
 
 ### Step 6: Register and Verify Domains in SMTP2Go
 
-#### Prerequisites
+You can register your sender domains in SMTP2Go as soon as you've decided on your tenant subdomains. This step can be done **in parallel** with Step 4 (running the playbook) and Step 5 (adding DNS records), but domain **verification will only succeed once the DNS records have propagated**.
 
-Before you begin, ensure you have:
-- Run the playbook (Step 4)
-- Added all SPF, DKIM, and DMARC DNS records (Step 5)
-- Allowed time for DNS propagation (can take several hours)
+#### Prerequisites for successful verification
+
+Before you expect verification to pass, ensure you have:
+- Added the required SPF, DKIM, and DMARC DNS records (Step 5)
+- Allowed time for DNS propagation (can take several hours, sometimes up to 24-48 hours)
 
 1. Log into SMTP2Go: https://app.smtp2go.com/
 2. Go to **Settings → Sender Domains**
@@ -249,7 +250,7 @@ Before you begin, ensure you have:
    - `ssc.manage2soar.com`
    - `masa.manage2soar.com`
 4. Use SMTP2Go's verification process for each domain
-5. **If verification fails**: Wait for DNS propagation (up to 24-48 hours) and retry
+5. **If verification fails**: Wait for additional DNS propagation time (up to 24-48 hours) and retry
 
 ## Configuration Reference
 
