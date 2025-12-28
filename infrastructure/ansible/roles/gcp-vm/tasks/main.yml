@@ -105,6 +105,7 @@
     service_accounts:
       - email: "{{ gcp_service_account_email | default(omit) }}"
         scopes: "{{ gcp_scopes }}"
+    metadata: "{{ {'ssh-keys': (gcp_ssh_public_keys | join('\n'))} if gcp_ssh_public_keys | length > 0 else omit }}"
     state: present
   register: gcp_vm_instance
   delegate_to: localhost
@@ -209,6 +210,8 @@
   ansible.builtin.add_host:
     name: "{{ gcp_vm_name }}"
     ansible_host: "{{ gcp_vm_external_ip }}"
+    ansible_user: "{{ gcp_ansible_user | default(lookup('env', 'USER')) }}"
+    ansible_ssh_private_key_file: "{{ gcp_ansible_ssh_private_key_file | default(omit) }}"
     groups:
       - gcp_database_servers
   when: gcp_vm_external_ip != 'N/A'

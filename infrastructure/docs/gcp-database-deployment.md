@@ -83,6 +83,72 @@ The authenticated user/service account needs:
 - `roles/compute.admin` - Create/manage VMs
 - `roles/compute.networkAdmin` - Create firewall rules
 
+### 4. Enable Required GCP APIs
+
+**CRITICAL**: Before running the playbook, you must enable the Compute Engine API in your GCP project:
+
+1. **Visit the API Console**:
+   - Direct link: `https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=YOUR_PROJECT_ID`
+   - Replace `YOUR_PROJECT_ID` with your actual GCP project ID
+
+2. **Enable the Compute Engine API**:
+   - Click the "Enable" button
+   - Wait 2-5 minutes for the API to propagate across Google's systems
+
+3. **Verify Enablement** (Optional):
+   ```bash
+   gcloud services list --enabled --filter="compute.googleapis.com"
+   ```
+
+**Common Error**: If you skip this step, you'll see:
+```
+PERMISSION_DENIED: Compute Engine API has not been used in project before or it is disabled
+```
+
+### 5. Configure SSH Access
+
+**CRITICAL**: You must configure SSH access before running the playbook, or Ansible won't be able to connect to the new VM.
+
+1. **Disable Host Key Checking** (required for new VMs):
+   ```bash
+   cd infrastructure/ansible
+   # Edit ansible.cfg and change:
+   host_key_checking = False
+   ```
+
+2. **Get Your Public IP Address**:
+   ```bash
+   curl -s https://api.ipify.org
+   # Example output: 203.0.113.42
+   ```
+
+3. **Get Your SSH Public Key**:
+   ```bash
+   cat ~/.ssh/id_ed25519.pub
+   # OR
+   cat ~/.ssh/id_rsa.pub
+   # Example output: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyHere user@hostname
+   ```
+
+4. **Configure SSH in group_vars/gcp_provisioner/vars.yml**:
+   ```yaml
+   # SSH firewall - Add YOUR public IP address:
+   gcp_ssh_allowed_sources:
+     - "203.0.113.42/32"  # Replace with YOUR IP from step 2
+
+   # SSH public keys - Add YOUR SSH public key from step 3:
+   gcp_ssh_public_keys:
+     - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyHere pb@laptop"
+
+   # Optional: Set Ansible SSH user (defaults to your local username)
+   # gcp_ansible_user: "pb"  # Must match username in gcp_ssh_public_keys
+   ```
+
+**Common Errors**:
+- **Host key verification failed** → Set `host_key_checking = False` in ansible.cfg
+- **Connection timed out** → Add your IP to `gcp_ssh_allowed_sources`
+- **Permission denied (publickey)** → Add your SSH public key to `gcp_ssh_public_keys`
+
 ## Quick Start
 
 ### Step 1: Copy Configuration Files
@@ -93,16 +159,16 @@ cd infrastructure/ansible
 # Inventory
 cp inventory/gcp_database.yml.example inventory/gcp_database.yml
 
-# Variables
-mkdir -p group_vars/gcp_database
-cp group_vars/gcp_database.vars.yml.example group_vars/gcp_database/vars.yml
+# Variables (note: use gcp_provisioner directory)
+mkdir -p group_vars/gcp_provisioner
+cp group_vars/gcp_database.vars.yml.example group_vars/gcp_provisioner/vars.yml
 ```
 
 ### Step 2: Initialize Secrets
 
 Use the automated script:
 ```bash
-../scripts/initialize-vault-secrets.sh group_vars/gcp_database/vault.yml
+../scripts/initialize-vault-secrets.sh group_vars/gcp_provisioner/vault.yml
 ```
 
 Or manually create the vault:
@@ -112,7 +178,7 @@ echo "your-secure-password" > ~/.ansible_vault_pass
 chmod 600 ~/.ansible_vault_pass
 
 # Create encrypted vault
-ansible-vault create group_vars/gcp_database/vault.yml \
+ansible-vault create group_vars/gcp_provisioner/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -123,10 +189,15 @@ ansible-vault create group_vars/gcp_database/vault.yml \
 vim inventory/gcp_database.yml
 
 # Edit variables (project, machine type, tenants)
-vim group_vars/gcp_database/vars.yml
+vim group_vars/gcp_provisioner/vars.yml
+
+# CRITICAL SSH SETUP:
+# 1. Get your IP: curl -s https://api.ipify.org
+# 2. Add to gcp_ssh_allowed_sources in vars.yml
+# 3. Edit ansible.cfg: set host_key_checking = False
 
 # Edit secrets (passwords)
-ansible-vault edit group_vars/gcp_database/vault.yml \
+ansible-vault edit group_vars/gcp_provisioner/vault.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -352,4 +423,3 @@ sudo -u postgres psql m2s_ssc < backup.sql
 
 - [Single-Host Deployment](single-host-architecture.md)
 - [Ansible README](../ansible/README.md)
-- [PostgreSQL Role](../ansible/roles/postgresql/README.md)

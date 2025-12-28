@@ -47,6 +47,9 @@
   connection: local
   gather_facts: false
   tags: [gcp-provision]
+  vars_files:
+    - ../group_vars/gcp_provisioner/vars.yml
+    - ../group_vars/gcp_provisioner/vault.yml
 
   pre_tasks:
     - name: Validate GCP configuration
@@ -82,6 +85,9 @@
   become: true
   gather_facts: true
   tags: [configure]
+  vars_files:
+    - ../group_vars/gcp_provisioner/vars.yml
+    - ../group_vars/gcp_provisioner/vault.yml
 
   pre_tasks:
     - name: Validate required variables
