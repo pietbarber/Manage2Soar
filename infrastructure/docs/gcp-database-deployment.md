@@ -495,7 +495,7 @@ sudo -u postgres psql m2s_ssc < backup.sql
    ```bash
    # From your workstation
    telnet DATABASE_IP 5432
-   # Should connect (then Ctrl+] and type 'quit')
+   # Should connect. To exit: press Ctrl+], then at the telnet> prompt type 'quit' and press Enter.
    ```
 
 5. **Check PostgreSQL logs**:
