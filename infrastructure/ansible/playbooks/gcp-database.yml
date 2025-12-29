@@ -60,6 +60,99 @@
         fail_msg: |
           GCP project is required. Set gcp_project in your group_vars.
 
+    # ============================================================
+    # PRE-FLIGHT GCP API CHECKS
+    # ============================================================
+    - name: Check GCP project exists and is accessible
+      google.cloud.gcp_resourcemanager_project_info:
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_auth_kind | default('application') }}"
+        service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+      register: gcp_project_info
+      ignore_errors: true
+      tags: [gcp-provision, preflight]
+
+    - name: Validate GCP project access
+      ansible.builtin.assert:
+        that:
+          - gcp_project_info is defined
+          - gcp_project_info.resources is defined
+          - gcp_project_info.resources | length > 0
+        fail_msg: |
+          ========================================
+          GCP PRE-FLIGHT CHECK FAILED
+          ========================================
+          Cannot access GCP project: {{ gcp_project }}
+
+          Possible causes:
+          1. Project doesn't exist
+          2. Authentication not configured (run: gcloud auth application-default login)
+          3. Service account doesn't have required permissions
+          4. Project ID is incorrect
+
+          Current auth method: {{ gcp_auth_kind | default('application') }}
+          {% if gcp_service_account_file is defined %}
+          Service account file: {{ gcp_service_account_file }}
+          {% endif %}
+
+          To verify your setup:
+            gcloud projects describe {{ gcp_project }}
+          ========================================
+      tags: [gcp-provision, preflight]
+
+    - name: Check Compute Engine API availability
+      google.cloud.gcp_compute_zone_info:
+        zone: "{{ gcp_zone | default('us-east1-b') }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_auth_kind | default('application') }}"
+        service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+      register: gcp_compute_check
+      ignore_errors: true
+      tags: [gcp-provision, preflight]
+
+    - name: Validate Compute Engine API
+      ansible.builtin.assert:
+        that:
+          - gcp_compute_check is defined
+          - not (gcp_compute_check.failed | default(false))
+        fail_msg: |
+          ========================================
+          GCP COMPUTE ENGINE API CHECK FAILED
+          ========================================
+          The Compute Engine API may not be enabled for project: {{ gcp_project }}
+
+          To enable it, run:
+            gcloud services enable compute.googleapis.com --project={{ gcp_project }}
+
+          Or visit:
+            https://console.cloud.google.com/apis/library/compute.googleapis.com?project={{ gcp_project }}
+
+          Error: {{ gcp_compute_check.msg | default('Unknown error') }}
+          ========================================
+      tags: [gcp-provision, preflight]
+
+    - name: Display pre-flight check results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GCP PRE-FLIGHT CHECKS PASSED
+          ========================================
+          ✓ Project exists and is accessible
+          ✓ Authentication is working
+          ✓ Compute Engine API is enabled
+
+          Project Details:
+            Project ID: {{ gcp_project_info.resources[0].projectId }}
+            Project Name: {{ gcp_project_info.resources[0].name }}
+            Project Number: {{ gcp_project_info.resources[0].projectNumber }}
+            State: {{ gcp_project_info.resources[0].lifecycleState }}
+          ========================================
+      when:
+        - gcp_project_info is defined
+        - gcp_project_info.resources is defined
+        - (gcp_project_info.resources | length) > 0
+      tags: [gcp-provision, preflight]
+
     - name: Display provisioning plan
       ansible.builtin.debug:
         msg: |
@@ -151,7 +244,6 @@
     - name: Install essential packages
       ansible.builtin.apt:
         name:
-          - ufw
           - fail2ban
           - htop
           - vim
@@ -159,40 +251,6 @@
           - gnupg2
         state: present
       tags: [base]
-
-    # ============================================================
-    # UFW Firewall Configuration
-    # ============================================================
-    - name: Configure UFW defaults
-      community.general.ufw:
-        direction: "{{ item.direction }}"
-        policy: "{{ item.policy }}"
-      loop:
-        - { direction: "incoming", policy: "deny" }
-        - { direction: "outgoing", policy: "allow" }
-      tags: [base, firewall]
-
-    - name: Allow SSH through UFW
-      community.general.ufw:
-        rule: allow
-        port: "22"
-        proto: tcp
-      tags: [base, firewall]
-
-    - name: Allow PostgreSQL from trusted networks
-      community.general.ufw:
-        rule: allow
-        port: "5432"
-        proto: tcp
-        src: "{{ item }}"
-      loop: "{{ postgresql_remote_access_cidrs | default([]) }}"
-      when: postgresql_remote_access_cidrs is defined and postgresql_remote_access_cidrs | length > 0
-      tags: [base, firewall]
-
-    - name: Enable UFW
-      community.general.ufw:
-        state: enabled
-      tags: [base, firewall]
 
     - name: Display configuration info
       ansible.builtin.debug:
@@ -209,7 +267,23 @@
           {% endif %}
           ========================================
 
+    - name: Build UFW port configuration for PostgreSQL
+      ansible.builtin.set_fact:
+        postgresql_ufw_ports: |
+          {% set ports = [] %}
+          {% for cidr in postgresql_remote_access_cidrs | default([]) %}
+          {%   set _ = ports.append({'port': 5432, 'proto': 'tcp', 'src': cidr, 'comment': 'PostgreSQL'}) %}
+          {% endfor %}
+          {{ ports }}
+      tags: [firewall, verify]
+
   roles:
+    # UFW firewall
+    - role: ufw
+      tags: [firewall]
+      vars:
+        ufw_allow_ports: "{{ postgresql_ufw_ports | from_yaml }}"
+
     # PostgreSQL database
     - role: postgresql
       tags: [postgresql, database]
@@ -241,3 +315,91 @@
           postgresql://{{ postgresql_user | default('m2s') }}:PASSWORD@{{ ansible_host }}:{{ postgresql_port | default(5432) }}/{{ postgresql_db | default('m2s') }}{% if postgresql_ssl_enabled | default(false) %}?sslmode=require{% endif %}
           {% endif %}
           ========================================
+
+    # ============================================================
+    # POST-DEPLOYMENT VERIFICATION
+    # ============================================================
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+      tags: [verify]
+
+    - name: Check PostgreSQL service status
+      ansible.builtin.set_fact:
+        postgresql_service_running: >-
+          {{ 'postgresql.service' in ansible_facts.services
+             and ansible_facts.services['postgresql.service'].state == 'running' }}
+      tags: [verify]
+
+    - name: Verify PostgreSQL port is accessible
+      ansible.builtin.wait_for:
+        port: "{{ postgresql_port | default(5432) }}"
+        host: "{{ ansible_host }}"
+        timeout: 10
+      delegate_to: localhost
+      become: false
+      register: port_check
+      failed_when: false
+      tags: [verify]
+
+    - name: Test database connection via TCP (single-tenant)
+      ansible.builtin.command: >
+        psql -h 127.0.0.1 -U {{ postgresql_user | default('m2s') }}
+        -d {{ postgresql_db | default('m2s') }}
+        -c "SELECT version();"
+      become: true
+      become_user: postgres
+      environment:
+        PGPASSWORD: "{{ vault_postgresql_password }}"
+      register: db_test_single
+      changed_when: false
+      failed_when: false
+      no_log: true
+      when: not (postgresql_multi_tenant | default(false))
+      tags: [verify]
+
+    - name: Test database connections via TCP (multi-tenant)
+      ansible.builtin.command: >
+        psql -h 127.0.0.1 -U m2s_{{ item.prefix }}
+        -d m2s_{{ item.prefix }}
+        -c "SELECT version();"
+      become: true
+      become_user: postgres
+      environment:
+        PGPASSWORD: "{{ lookup('vars', 'vault_postgresql_password_' + item.prefix) }}"
+      loop: "{{ postgresql_tenants | default([]) }}"
+      register: db_test_multi
+      changed_when: false
+      failed_when: false
+      no_log: true
+      when: postgresql_multi_tenant | default(false)
+      tags: [verify]
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          PostgreSQL Deployment Verification
+          ========================================
+          Service Status: {{ 'Running' if (postgresql_service_running | default(false)) else 'NOT RUNNING - CHECK LOGS' }}
+          Port {{ postgresql_port | default(5432) }}: {{ 'Accessible' if not (port_check.failed | default(false)) else 'NOT ACCESSIBLE - Check UFW/GCP firewall rules' }}
+          {% if not (postgresql_multi_tenant | default(false)) %}
+          Database Connection (TCP): {{ 'SUCCESS' if (db_test_single is defined and (db_test_single.rc | default(1)) == 0) else 'FAILED - Check credentials, pg_hba.conf, or password' }}
+          {% else %}
+          Database Connections (TCP):
+          {% if db_test_multi is defined %}
+          {% for result in (db_test_multi.results | default([])) %}
+          {% if not (result.skipped | default(false)) %}
+            - m2s_{{ result.item.prefix }}: {{ 'SUCCESS' if (result.rc | default(1)) == 0 else 'FAILED' }}
+          {% else %}
+            - m2s_{{ result.item.prefix }}: SKIPPED
+          {% endif %}
+          {% endfor %}
+          {% else %}
+            (not in multi-tenant mode)
+          {% endif %}
+          {% endif %}
+
+          Note: Database connections tested via TCP (127.0.0.1) to validate
+                full authentication stack including pg_hba.conf and passwords.
+          ========================================
+      tags: [verify]

@@ -203,8 +203,10 @@ ansible-vault edit group_vars/gcp_provisioner/vault.yml \
 
 ### Step 4: Run the Playbook
 
+The playbook includes automatic pre-flight checks to validate your GCP setup before provisioning.
+
 ```bash
-# Full deployment (provision VM + configure PostgreSQL)
+# Full deployment (provision VM + configure PostgreSQL + verify)
 ansible-playbook -i inventory/gcp_database.yml \
   --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-database.yml
@@ -213,7 +215,35 @@ ansible-playbook -i inventory/gcp_database.yml \
 ansible-playbook -i inventory/gcp_database.yml \
   --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-database.yml --skip-tags gcp-provision
+
+# Run only verification checks
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --tags verify
 ```
+
+#### What the Playbook Does
+
+1. **Pre-flight Checks** (automatic):
+   - ✓ Validates GCP project exists and is accessible
+   - ✓ Checks Compute Engine API is enabled
+   - ✓ Verifies authentication is working
+
+2. **Provisioning** (if VM doesn't exist):
+   - Creates GCP VM instance
+   - Configures firewall rules
+   - Sets up SSH access
+
+3. **Configuration**:
+   - Installs and configures PostgreSQL
+   - Sets up UFW firewall with rules for PostgreSQL port
+   - Configures SSL/TLS (if enabled)
+   - Creates databases and users (single or multi-tenant)
+
+4. **Post-deployment Verification** (automatic):
+   - ✓ Verifies PostgreSQL service is running
+   - ✓ Tests port connectivity
+   - ✓ Validates database connections
 
 ## Configuration Reference
 
@@ -237,6 +267,24 @@ ansible-playbook -i inventory/gcp_database.yml \
 | `postgresql_ssl_enabled` | `false` | Enable SSL connections |
 | `postgresql_ssl_require_remote` | `true` | Require SSL for remote |
 | `postgresql_remote_access_cidrs` | `[]` | CIDRs allowed to connect |
+
+### Firewall Configuration
+
+The playbook uses a dedicated UFW role for firewall management. It automatically:
+- Denies all incoming traffic by default
+- Allows all outgoing traffic
+- Always allows SSH (port 22)
+- Opens PostgreSQL port (5432) only for CIDRs listed in `postgresql_remote_access_cidrs`
+
+To allow database access from your Kubernetes cluster:
+```yaml
+# In group_vars/gcp_provisioner/vars.yml
+postgresql_remote_access_cidrs:
+  - "10.0.0.0/8"      # GCP internal network
+  - "YOUR_IP/32"      # Your admin workstation
+```
+
+For more control over firewall rules, see [roles/ufw/README.md](../ansible/roles/ufw/README.md).
 
 ### Multi-Tenant Configuration
 
@@ -399,12 +447,61 @@ sudo -u postgres psql m2s_ssc < backup.sql
 
 ## Troubleshooting
 
-### Cannot Connect to PostgreSQL
+### Pre-flight Checks Failed
 
-1. Check GCP firewall rules in Console
-2. Verify `postgresql_remote_access_cidrs` includes your IP
-3. Check UFW status: `sudo ufw status`
-4. Check PostgreSQL logs: `sudo tail -f /var/log/postgresql/postgresql-17-main.log`
+#### "Cannot access GCP project"
+- **Run**: `gcloud projects describe YOUR_PROJECT_ID`
+- **Fix**: Ensure project ID is correct and you have access
+- **Fix**: Run `gcloud auth application-default login`
+- **Fix**: If using service account, verify key file path and permissions
+
+#### "Compute Engine API is not enabled"
+- **Run**: `gcloud services enable compute.googleapis.com --project=YOUR_PROJECT_ID`
+- **Wait**: 2-5 minutes for API propagation
+- **Verify**: `gcloud services list --enabled --filter="compute.googleapis.com"`
+
+### Post-deployment Verification Failed
+
+#### "PostgreSQL service NOT RUNNING"
+- **Check logs**: `sudo journalctl -u postgresql -n 50`
+- **Check status**: `sudo systemctl status postgresql`
+- **Common issue**: Configuration error in postgresql.conf or pg_hba.conf
+
+#### "Database connection FAILED"
+- **Check pg_hba.conf**: Verify authentication methods
+- **Check password**: Ensure vault passwords are correct
+- **Test locally**: `sudo -u postgres psql -l` (should list databases)
+
+### Cannot Connect to PostgreSQL (from remote)
+
+1. **Check firewall rules**:
+   ```bash
+   # On database server
+   sudo ufw status
+
+   # Should show: 5432/tcp ALLOW from YOUR_CIDR
+   ```
+
+2. **Verify GCP firewall** in Console: `allow-postgresql` rule exists
+
+3. **Check your IP is allowed**:
+   ```yaml
+   # In vars.yml
+   postgresql_remote_access_cidrs:
+     - "YOUR_IP/32"  # Your current IP
+   ```
+
+4. **Test connectivity**:
+   ```bash
+   # From your workstation
+   telnet DATABASE_IP 5432
+   # Should connect. To exit: press Ctrl+], then at the telnet> prompt type 'quit' and press Enter.
+   ```
+
+5. **Check PostgreSQL logs**:
+   ```bash
+   sudo tail -f /var/log/postgresql/postgresql-17-main.log
+   ```
 
 ### VM Provisioning Fails
 
@@ -423,3 +520,4 @@ sudo -u postgres psql m2s_ssc < backup.sql
 
 - [Single-Host Deployment](single-host-architecture.md)
 - [Ansible README](../ansible/README.md)
+- [UFW Firewall Role](../ansible/roles/ufw/README.md)

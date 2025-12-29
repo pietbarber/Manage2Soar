@@ -1,0 +1,60 @@
+---
+# ============================================================
+# UFW Firewall Role
+# ============================================================
+# Configures UFW (Uncomplicated Firewall) with sensible defaults
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Reset UFW to default (if requested)
+  community.general.ufw:
+    state: reset
+  when:
+    - ufw_reset | default(false)
+
+- name: Configure UFW default incoming policy
+  community.general.ufw:
+    direction: incoming
+    policy: "{{ ufw_default_incoming_policy }}"
+
+- name: Configure UFW default outgoing policy
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ ufw_default_outgoing_policy }}"
+
+- name: Allow SSH (safety first)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ufw_ssh_port }}"
+    proto: tcp
+    comment: "SSH access"
+  when: ufw_allow_ssh | default(true)
+
+- name: Configure additional UFW rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | default(item) }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    src: "{{ item.src | default(omit) }}"
+    comment: "{{ item.comment | default(omit) }}"
+  loop: "{{ ufw_allow_ports }}"
+  when: ufw_allow_ports is defined and ufw_allow_ports | length > 0
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: ufw_enabled | default(true)
+
+- name: Display UFW status
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status
+  changed_when: false
+
+- name: Show UFW configuration
+  ansible.builtin.debug:
+    msg: "{{ ufw_status.stdout_lines }}"

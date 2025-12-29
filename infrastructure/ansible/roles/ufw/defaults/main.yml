@@ -1,0 +1,34 @@
+---
+# ============================================================
+# UFW Firewall Role Defaults
+# ============================================================
+# These defaults can be overridden in group_vars or host_vars
+
+# UFW default policies
+ufw_default_incoming_policy: deny
+ufw_default_outgoing_policy: allow
+
+# Always allow SSH (safety first!)
+ufw_allow_ssh: true
+ufw_ssh_port: 22
+
+# Additional ports to allow
+# Each item can be:
+#   - Simple port number: 80
+#   - Port with protocol: { port: 443, proto: tcp }
+#   - Port with source restriction: { port: 5432, proto: tcp, src: "10.0.0.0/8" }
+#   - Port with comment: { port: 8000, proto: tcp, comment: "Django dev server" }
+ufw_allow_ports: []
+
+# Example:
+# ufw_allow_ports:
+#   - 80                                           # HTTP
+#   - { port: 443, proto: tcp }                   # HTTPS
+#   - { port: 5432, proto: tcp, src: "10.0.0.0/8" }  # PostgreSQL from private network
+#   - { port: 25, proto: tcp, comment: "SMTP" }   # SMTP with comment
+
+# Enable UFW (set to false to configure but not enable)
+ufw_enabled: true
+
+# Reset UFW rules before applying (dangerous - use with caution)
+ufw_reset: false
