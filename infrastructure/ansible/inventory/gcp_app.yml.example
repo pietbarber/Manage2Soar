@@ -1,0 +1,59 @@
+# GCP App Deployment Inventory
+#
+# COPY THIS FILE AND CONFIGURE:
+#   cp inventory/gcp_app.yml.example inventory/gcp_app.yml
+#
+# This inventory is used for deploying Django apps to GKE.
+# Since GKE deployments run from localhost (using kubectl),
+# no remote hosts are needed.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml
+
+---
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  vars:
+    # ============================================================
+    # GCP PROJECT CONFIGURATION
+    # ============================================================
+    gcp_project: "your-gcp-project-id"
+    gcp_region: "us-central1"
+    gcp_zone: "us-central1-c"
+
+    # ============================================================
+    # GKE CLUSTER
+    # ============================================================
+    gke_cluster_name: "manage2soar-cluster"
+
+    # ============================================================
+    # APPLICATION
+    # ============================================================
+    gke_app_name: "manage2soar"
+    gke_base_domain: "manage2soar.com"
+
+    # ============================================================
+    # DATABASE (internal GCP IP)
+    # ============================================================
+    gke_db_host: "10.128.0.2"
+
+    # ============================================================
+    # MULTI-TENANT
+    # ============================================================
+    gke_multi_tenant: true
+
+    # Define tenants (or override in group_vars)
+    gke_tenants:
+      - prefix: "ssc"
+        name: "Skyline Soaring Club"
+        domain: "m2s.skylinesoaring.org"
+
+      - prefix: "masa"
+        name: "Mid-Atlantic Soaring Association"
+        domain: "m2s.midatlanticsoaring.org"

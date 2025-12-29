@@ -1,0 +1,95 @@
+---
+# GKE Deploy Role - Deployment Verification Tasks
+
+- name: Get deployment status
+  ansible.builtin.command:
+    cmd: kubectl get deployment {{ gke_deployment_name }} -n {{ gke_namespace }} -o jsonpath='{.status.readyReplicas}/{.spec.replicas}'
+  delegate_to: localhost
+  run_once: true
+  register: deployment_status
+  changed_when: false
+
+- name: Get pod status
+  ansible.builtin.command:
+    cmd: kubectl get pods -l app={{ gke_deployment_name }} -n {{ gke_namespace }} --no-headers
+  delegate_to: localhost
+  run_once: true
+  register: pod_status
+  changed_when: false
+
+- name: Get current image
+  ansible.builtin.command:
+    cmd: kubectl get deployment {{ gke_deployment_name }} -n {{ gke_namespace }} -o jsonpath='{.spec.template.spec.containers[0].image}'
+  delegate_to: localhost
+  run_once: true
+  register: current_image
+  changed_when: false
+
+- name: Verify environment variables in pod
+  ansible.builtin.shell:
+    cmd: |
+      POD=$(kubectl get pods -l app={{ gke_deployment_name }} -n {{ gke_namespace }} --no-headers | head -1 | awk '{print $1}')
+      kubectl exec $POD -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true
+  delegate_to: localhost
+  run_once: true
+  register: env_check
+  changed_when: false
+  failed_when: false
+
+- name: Display verification results
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      GKE Deployment Verification
+      ========================================
+      Namespace: {{ gke_namespace }}
+      Deployment: {{ gke_deployment_name }}
+      Replicas: {{ deployment_status.stdout | default('unknown') }}
+      Image: {{ current_image.stdout | default('unknown') }}
+
+      Pod Status:
+      {{ pod_status.stdout | default('No pods found') }}
+
+      Environment Variables:
+      {{ env_check.stdout | default('Could not retrieve') }}
+      ========================================
+  delegate_to: localhost
+  run_once: true
+
+- name: Validate deployment health
+  ansible.builtin.assert:
+    that:
+      - deployment_status.stdout is defined
+      - "deployment_status.stdout.split('/')[0] == deployment_status.stdout.split('/')[1]"
+    fail_msg: |
+      Deployment is not healthy!
+      Expected: {{ gke_replicas }} ready replicas
+      Got: {{ deployment_status.stdout }}
+    success_msg: "All {{ deployment_status.stdout }} replicas are ready"
+  delegate_to: localhost
+  run_once: true
+  when: gke_wait_for_rollout | bool
+
+- name: Display deployment summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ✅ DEPLOYMENT COMPLETE
+      ========================================
+      Image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+      Cluster: {{ gke_cluster_name }}
+      Namespace: {{ gke_namespace }}
+
+      {% if gke_multi_tenant %}
+      Tenant: {{ gke_club_prefix }}
+      {% endif %}
+
+      Application URL: https://{{ gke_app_domain | default('your-domain.com') }}
+
+      Useful commands:
+        kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
+        kubectl get pods -n {{ gke_namespace }}
+        kubectl describe deployment {{ gke_deployment_name }} -n {{ gke_namespace }}
+      ========================================
+  delegate_to: localhost
+  run_once: true

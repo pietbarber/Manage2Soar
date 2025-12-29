@@ -1,0 +1,208 @@
+# GCP App Deployment Variables
+#
+# COPY THIS FILE AND FILL IN YOUR VALUES:
+#   mkdir -p group_vars/gcp_app
+#   cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
+#
+# This file is gitignored when placed in group_vars/gcp_app/
+#
+# For secrets (passwords, keys), use a separate vault.yml file.
+# See gcp_app.vault.yml.example for the vault template.
+
+---
+# ============================================================
+# GCP PROJECT CONFIGURATION
+# ============================================================
+
+# Your GCP project ID (required)
+gcp_project: "your-gcp-project-id"
+
+# GCP region and zone for GKE cluster
+gcp_region: "us-central1"
+gcp_zone: "us-central1-c"
+
+# ============================================================
+# GKE CLUSTER CONFIGURATION
+# ============================================================
+
+# GKE cluster name (required)
+gke_cluster_name: "manage2soar-cluster"
+
+# GKE cluster zone (defaults to gcp_zone)
+gke_cluster_zone: "{{ gcp_zone }}"
+
+# Default namespace for deployments
+gke_namespace: "default"
+
+# ============================================================
+# APPLICATION CONFIGURATION
+# ============================================================
+
+# Application name (used for image name, deployments, etc.)
+gke_app_name: "manage2soar"
+
+# Base domain for application URLs
+gke_base_domain: "manage2soar.com"
+
+# Application domain (for single-tenant)
+gke_app_domain: "m2s.{{ gke_base_domain }}"
+
+# Django settings module
+gke_django_settings_module: "manage2soar.settings"
+
+# Django debug mode (NEVER true in production!)
+gke_django_debug: false
+
+# Allowed hosts (comma-separated)
+gke_django_allowed_hosts: "*"
+
+# ============================================================
+# CONTAINER RESOURCES
+# ============================================================
+
+# Number of replicas
+gke_replicas: 2
+
+# CPU requests and limits
+gke_cpu_request: "100m"
+gke_cpu_limit: "250m"
+
+# Memory requests and limits
+gke_memory_request: "192Mi"
+gke_memory_limit: "384Mi"
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+# Database host (use internal GCP IP for production)
+# Get from: gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].networkIP)'
+gke_db_host: "10.128.0.2"
+
+# Database port
+gke_db_port: 5432
+
+# Database SSL mode (require, prefer, disable)
+gke_db_sslmode: "require"
+
+# For single-tenant mode:
+gke_db_name: "m2s"
+gke_db_user: "m2s"
+
+# ============================================================
+# GOOGLE CLOUD STORAGE
+# ============================================================
+
+# GCS bucket name (usually same as project ID)
+gke_gcs_bucket: "{{ gcp_project }}"
+
+# GCS project ID
+gke_gcs_project_id: "{{ gcp_project }}"
+
+# Club prefix for media/static paths (single-tenant)
+club_prefix: "ssc"
+
+# ============================================================
+# EMAIL CONFIGURATION
+# ============================================================
+
+# Mail server host
+mail_host: "mail.manage2soar.com"
+
+# Mail server port
+mail_port: 587
+
+# Mail domain
+mail_domain: "manage2soar.com"
+
+# ============================================================
+# DOCKER IMAGE CONFIGURATION
+# ============================================================
+
+# Image tag generation type:
+# - auto: YYYYMMDD-HHMM-{git_hash} (recommended)
+# - timestamp: YYYYMMDD-HHMM
+# - git: git commit hash only
+# - git-tag: use git tag if available
+# - or specify a manual version string
+gke_image_tag_type: "auto"
+
+# Manual image tag (overrides gke_image_tag_type)
+# gke_image_tag: "v1.2.3"
+
+# Project directory (for Docker build context)
+gke_project_dir: "{{ playbook_dir }}/../../.."
+
+# ============================================================
+# DEPLOYMENT OPTIONS
+# ============================================================
+
+# Build Docker image locally
+gke_build_image: true
+
+# Push image to GCR
+gke_push_image: true
+
+# Apply Kubernetes configurations
+gke_apply_config: true
+
+# Wait for rollout to complete
+gke_wait_for_rollout: true
+
+# Rollout timeout (seconds)
+gke_rollout_timeout: 300
+
+# Deploy CronJobs
+gke_deploy_cronjobs: true
+
+# Run database migrations after deploy
+gke_run_migrations: false
+
+# Collect static files after deploy
+gke_collect_static: false
+
+# ============================================================
+# GCP SERVICE ACCOUNT
+# ============================================================
+
+# Path to GCP service account key file (for creating K8s secret)
+# gke_gcp_sa_key_file: "/path/to/service-account-key.json"
+
+# ============================================================
+# MULTI-TENANT CONFIGURATION
+# ============================================================
+
+# Enable multi-tenant mode (deploy multiple clubs)
+gke_multi_tenant: true
+
+# List of tenants to deploy
+# Each tenant gets their own:
+#   - Kubernetes namespace
+#   - Deployment and Service
+#   - Secrets (with tenant-specific DB credentials)
+#   - CronJobs
+gke_tenants:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    domain: "m2s.skylinesoaring.org"
+    # Optional overrides:
+    # namespace: "ssc-production"
+    # replicas: 3
+
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+    domain: "m2s.midatlanticsoaring.org"
+
+  # Add more tenants as needed:
+  # - prefix: "nfss"
+  #   name: "Northern Florida Soaring Society"
+  #   domain: "m2s.nfss.org"
+
+# ============================================================
+# ADDITIONAL ENVIRONMENT VARIABLES
+# ============================================================
+
+# Add any extra environment variables here
+# gke_extra_env:
+#   FEATURE_FLAG_NEW_UI: "true"
+#   SENTRY_DSN: "https://..."

@@ -1,0 +1,59 @@
+# GCP App Deployment Vault Secrets
+#
+# COPY THIS FILE AND FILL IN YOUR SECRETS:
+#   mkdir -p group_vars/gcp_app
+#   cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
+#   ansible-vault encrypt group_vars/gcp_app/vault.yml
+#
+# This file should be encrypted with ansible-vault:
+#   ansible-vault encrypt group_vars/gcp_app/vault.yml
+#   ansible-vault edit group_vars/gcp_app/vault.yml
+#
+# All variables in this file should be prefixed with 'vault_' for clarity.
+
+---
+# ============================================================
+# DJANGO SECRETS
+# ============================================================
+
+# Django secret key (required)
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+vault_django_secret_key: "your-very-long-random-secret-key-here"
+
+# ============================================================
+# DATABASE PASSWORDS
+# ============================================================
+
+# For single-tenant mode:
+vault_postgresql_password: "your-database-password"
+
+# For multi-tenant mode (one per tenant):
+vault_postgresql_password_ssc: "ssc-database-password"
+vault_postgresql_password_masa: "masa-database-password"
+# vault_postgresql_password_nfss: "nfss-database-password"
+
+# ============================================================
+# EMAIL CREDENTIALS (OPTIONAL)
+# ============================================================
+
+# SMTP authentication (if using authenticated SMTP relay)
+# vault_email_host_user: "your-smtp-username"
+# vault_email_host_password: "your-smtp-password"
+
+# ============================================================
+# GOOGLE OAUTH (OPTIONAL)
+# ============================================================
+
+# Only needed if using Google OAuth for user authentication
+# Get these from: https://console.cloud.google.com/apis/credentials
+
+# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret: "your-client-secret"
+
+# ============================================================
+# ADDITIONAL SECRETS
+# ============================================================
+
+# Add any other secrets your application needs:
+# vault_sentry_dsn: "https://..."
+# vault_stripe_api_key: "sk_live_..."

@@ -1,0 +1,187 @@
+---
+# GKE Deploy Role - Default Variables
+#
+# These can be overridden in group_vars/gcp_app/vars.yml
+
+# ============================================================
+# CONTAINER REGISTRY
+# ============================================================
+
+# GCP project for Container Registry
+gke_gcr_project: "{{ gcp_project }}"
+
+# Docker image name (without tag)
+gke_image_name: "gcr.io/{{ gke_gcr_project }}/{{ gke_app_name | default('manage2soar') }}"
+
+# Image tag (auto-generated if not specified)
+# Options: auto, timestamp, git, git-tag, or a manual version string
+gke_image_tag_type: "auto"
+
+# Manual image tag (overrides gke_image_tag_type if set)
+# gke_image_tag: "v1.2.3"
+
+# ============================================================
+# KUBERNETES CLUSTER
+# ============================================================
+
+# GKE cluster name
+gke_cluster_name: "manage2soar-cluster"
+
+# GKE cluster zone
+gke_cluster_zone: "{{ gcp_zone | default('us-central1-c') }}"
+
+# Kubernetes namespace (per-tenant in multi-tenant mode)
+gke_namespace: "default"
+
+# Deployment name
+gke_deployment_name: "django-app"
+
+# Service name
+gke_service_name: "django-app"
+
+# Number of replicas
+gke_replicas: 2
+
+# ============================================================
+# CONTAINER RESOURCES
+# ============================================================
+
+# CPU requests and limits
+gke_cpu_request: "100m"
+gke_cpu_limit: "250m"
+
+# Memory requests and limits
+gke_memory_request: "192Mi"
+gke_memory_limit: "384Mi"
+
+# Container port
+gke_container_port: 8000
+
+# ============================================================
+# APPLICATION CONFIGURATION
+# ============================================================
+
+# Application name
+gke_app_name: "manage2soar"
+
+# Django settings module
+gke_django_settings_module: "manage2soar.settings"
+
+# Django debug mode (NEVER true in production)
+gke_django_debug: false
+
+# Allowed hosts (comma-separated)
+gke_django_allowed_hosts: "*"
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+# Database host (internal GCP IP recommended)
+gke_db_host: "{{ postgresql_host | default('10.128.0.2') }}"
+
+# Database port
+gke_db_port: "{{ postgresql_port | default(5432) }}"
+
+# Database name (uses tenant prefix in multi-tenant mode)
+gke_db_name: "{{ postgresql_db | default('m2s') }}"
+
+# Database user (uses tenant prefix in multi-tenant mode)
+gke_db_user: "{{ postgresql_user | default('m2s') }}"
+
+# Database SSL mode
+gke_db_sslmode: "{{ 'require' if (postgresql_ssl_enabled | default(false)) else 'prefer' }}"
+
+# ============================================================
+# GOOGLE CLOUD STORAGE
+# ============================================================
+
+# GCS bucket name
+gke_gcs_bucket: "{{ gcp_project }}"
+
+# GCS project ID
+gke_gcs_project_id: "{{ gcp_project }}"
+
+# Club prefix for media/static paths
+gke_club_prefix: "{{ club_prefix | default('club') }}"
+
+# Media and static locations
+gke_gcs_media_location: "{{ gke_club_prefix }}/media"
+gke_gcs_static_location: "{{ gke_club_prefix }}/static"
+
+# Public URLs
+gke_media_url: "https://storage.googleapis.com/{{ gke_gcs_bucket }}/{{ gke_gcs_media_location }}/"
+gke_static_url: "https://storage.googleapis.com/{{ gke_gcs_bucket }}/{{ gke_gcs_static_location }}/"
+
+# ============================================================
+# EMAIL CONFIGURATION
+# ============================================================
+
+# Email backend
+gke_email_backend: "django.core.mail.backends.smtp.EmailBackend"
+
+# SMTP settings
+gke_email_host: "{{ mail_host | default('localhost') }}"
+gke_email_port: "{{ mail_port | default(587) }}"
+gke_email_use_tls: true
+
+# Default from address
+gke_default_from_email: "noreply@{{ mail_domain | default('example.com') }}"
+
+# ============================================================
+# SECRETS MANAGEMENT
+# ============================================================
+
+# Kubernetes secret name for environment variables
+gke_secret_name: "{{ gke_app_name }}-env"
+
+# Kubernetes secret name for GCP service account
+gke_gcp_sa_secret_name: "gcp-sa-key"
+
+# Path to GCP service account key in container
+gke_gcp_credentials_path: "/app/gcp-credentials.json"
+
+# ============================================================
+# MULTI-TENANT CONFIGURATION
+# ============================================================
+
+# Enable multi-tenant deployment
+gke_multi_tenant: "{{ postgresql_multi_tenant | default(false) }}"
+
+# List of tenants (from postgresql_tenants or gke_tenants)
+gke_tenants: "{{ postgresql_tenants | default([]) }}"
+
+# ============================================================
+# DEPLOYMENT OPTIONS
+# ============================================================
+
+# Build Docker image locally
+gke_build_image: true
+
+# Push image to registry
+gke_push_image: true
+
+# Apply Kubernetes configurations
+gke_apply_config: true
+
+# Wait for rollout to complete
+gke_wait_for_rollout: true
+
+# Rollout timeout (seconds)
+gke_rollout_timeout: 300
+
+# Run database migrations
+gke_run_migrations: false
+
+# Collect static files
+gke_collect_static: false
+
+# ============================================================
+# CRONJOB CONFIGURATION
+# ============================================================
+
+# Enable CronJob deployment
+gke_deploy_cronjobs: true
+
+# CronJob image (defaults to same as deployment)
+gke_cronjob_image: "{{ gke_image_name }}:{{ gke_computed_image_tag }}"
