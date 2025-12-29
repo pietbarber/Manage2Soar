@@ -16,7 +16,6 @@
     state: reset
   when:
     - ufw_reset | default(false)
-    - ufw_reset_confirm | default(false)
 
 - name: Configure UFW default incoming policy
   community.general.ufw:

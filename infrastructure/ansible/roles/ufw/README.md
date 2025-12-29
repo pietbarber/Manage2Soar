@@ -101,7 +101,7 @@ Each item can be:
 
 ## Dependencies
 
-None
+- `community.general` Ansible collection (for `community.general.ufw` module)
 
 ## License
 
