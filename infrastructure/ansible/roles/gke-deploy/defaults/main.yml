@@ -47,12 +47,13 @@ gke_replicas: 2
 # ============================================================
 
 # CPU requests and limits
-gke_cpu_request: "100m"
-gke_cpu_limit: "250m"
+# CPU requests and limits (tune per workload; these are safe defaults for Django)
+gke_cpu_request: "250m"
+gke_cpu_limit: "500m"
 
-# Memory requests and limits
-gke_memory_request: "192Mi"
-gke_memory_limit: "384Mi"
+# Memory requests and limits (Django typically needs 512Mi–1Gi under load)
+gke_memory_request: "512Mi"
+gke_memory_limit: "1Gi"
 
 # Container port
 gke_container_port: 8000
@@ -173,8 +174,8 @@ gke_rollout_timeout: 300
 # Run database migrations
 gke_run_migrations: false
 
-# Collect static files
-gke_collect_static: false
+# Collect static files (enabled by default for GCS-backed Django apps)
+gke_collect_static: true
 
 # ============================================================
 # CRONJOB CONFIGURATION

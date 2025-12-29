@@ -53,8 +53,9 @@ gke_django_settings_module: "manage2soar.settings"
 # Django debug mode (NEVER true in production!)
 gke_django_debug: false
 
-# Allowed hosts (comma-separated)
-gke_django_allowed_hosts: "*"
+# SECURITY: Allowed hosts MUST be explicit hostnames; do NOT use "*" in production.
+# Example below allows the main app domain plus local development.
+gke_django_allowed_hosts: "m2s.{{ gke_base_domain }},localhost,127.0.0.1"
 
 # ============================================================
 # CONTAINER RESOURCES

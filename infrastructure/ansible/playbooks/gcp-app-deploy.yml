@@ -220,8 +220,8 @@
         gke_service_name: "django-app-{{ tenant.prefix }}"
         gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
         gke_image_tag: "{{ gke_shared_image_tag | trim }}"
-        gke_build_image: false  # Already built above
-        gke_push_image: false   # Already pushed above
+        gke_build_image: false # Already built above
+        gke_push_image: false # Already pushed above
         gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
       loop: "{{ gke_deploy_tenants }}"
       loop_control:

@@ -69,10 +69,18 @@
         cmd: kubectl rollout status deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --timeout={{ gke_rollout_timeout }}s
       delegate_to: localhost
       run_once: true
+      register: rollback_status
+      failed_when: false
 
     - name: Fail after rollback
       ansible.builtin.fail:
-        msg: "Deployment failed and was rolled back. Check pod logs for details."
+        msg: |
+          Deployment failed and a rollback was attempted. Check pod logs for details.
+
+          Rollback status:
+            exit code: {{ rollback_status.rc | default('unknown') }}
+            stdout: {{ rollback_status.stdout | default('') }}
+            stderr: {{ rollback_status.stderr | default('') }}
   when:
     - gke_wait_for_rollout | bool
     - rollout_result.rc is defined

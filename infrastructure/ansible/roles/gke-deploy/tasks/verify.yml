@@ -28,8 +28,12 @@
 - name: Verify environment variables in pod
   ansible.builtin.shell:
     cmd: |
-      POD=$(kubectl get pods -l app={{ gke_deployment_name }} -n {{ gke_namespace }} --no-headers | head -1 | awk '{print $1}')
-      kubectl exec $POD -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true
+      POD=$(kubectl get pods -l app={{ gke_deployment_name }} -n {{ gke_namespace }} --field-selector=status.phase=Running --no-headers | head -1 | awk '{print $1}')
+      if [ -z "$POD" ]; then
+        echo "No running pods found for app={{ gke_deployment_name }} in namespace {{ gke_namespace }}"
+        exit 0
+      fi
+      kubectl exec "$POD" -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true
   delegate_to: localhost
   run_once: true
   register: env_check
@@ -60,11 +64,12 @@
   ansible.builtin.assert:
     that:
       - deployment_status.stdout is defined
+      - "'/' in deployment_status.stdout"
       - "deployment_status.stdout.split('/')[0] == deployment_status.stdout.split('/')[1]"
     fail_msg: |
       Deployment is not healthy!
       Expected: {{ gke_replicas }} ready replicas
-      Got: {{ deployment_status.stdout }}
+      Got: {{ deployment_status.stdout | default('unknown') }}
     success_msg: "All {{ deployment_status.stdout }} replicas are ready"
   delegate_to: localhost
   run_once: true
