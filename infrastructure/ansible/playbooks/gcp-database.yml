@@ -372,19 +372,23 @@
           ========================================
           PostgreSQL Deployment Verification
           ========================================
-          Service Status: {{ 'Running' if postgresql_service_running else 'NOT RUNNING - CHECK LOGS' }}
+          Service Status: {{ 'Running' if (postgresql_service_running | default(false)) else 'NOT RUNNING - CHECK LOGS' }}
           Port {{ postgresql_port | default(5432) }}: {{ 'Accessible' if not (port_check.failed | default(false)) else 'NOT ACCESSIBLE - Check UFW/GCP firewall rules' }}
           {% if not (postgresql_multi_tenant | default(false)) %}
-          Database Connection (TCP): {{ 'SUCCESS' if (db_test_single.rc | default(1)) == 0 else 'FAILED - Check credentials, pg_hba.conf, or password' }}
+          Database Connection (TCP): {{ 'SUCCESS' if (db_test_single is defined and (db_test_single.rc | default(1)) == 0) else 'FAILED - Check credentials, pg_hba.conf, or password' }}
           {% else %}
           Database Connections (TCP):
+          {% if db_test_multi is defined %}
           {% for result in (db_test_multi.results | default([])) %}
           {% if not (result.skipped | default(false)) %}
-            - m2s_{{ result.item.prefix }}: {{ 'SUCCESS' if (result.rc | default(1)) == 0 else 'FAILED - Check credentials' }}
+            - m2s_{{ result.item.prefix }}: {{ 'SUCCESS' if (result.rc | default(1)) == 0 else 'FAILED' }}
           {% else %}
             - m2s_{{ result.item.prefix }}: SKIPPED
           {% endif %}
           {% endfor %}
+          {% else %}
+            (not in multi-tenant mode)
+          {% endif %}
           {% endif %}
 
           Note: Database connections tested via TCP (127.0.0.1) to validate
