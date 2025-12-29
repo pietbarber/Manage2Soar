@@ -65,11 +65,3 @@ vault_smtp_relay_password: REPLACEME_smtp2go_password
 
 # vault_smtp_password: "<GENERATE_WITH_openssl_rand_-base64_32>"
 
-# ============================================================
-# OPTIONAL: GOOGLE OAUTH
-# ============================================================
-# Only needed if using Google OAuth for authentication
-# Get these from: https://console.cloud.google.com/apis/credentials
-
-# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
-# vault_google_oauth_client_secret: "your-client-secret"
