@@ -275,7 +275,7 @@
           {%   set _ = ports.append({'port': 5432, 'proto': 'tcp', 'src': cidr, 'comment': 'PostgreSQL'}) %}
           {% endfor %}
           {{ ports }}
-      tags: [firewall]
+      tags: [firewall, verify]
 
   roles:
     # UFW firewall
@@ -325,7 +325,9 @@
 
     - name: Check PostgreSQL service status
       ansible.builtin.set_fact:
-        postgresql_service_running: "{{ ansible_facts.services['postgresql.service'].state == 'running' }}"
+        postgresql_service_running: >-
+          {{ 'postgresql.service' in ansible_facts.services
+             and ansible_facts.services['postgresql.service'].state == 'running' }}
       tags: [verify]
 
     - name: Verify PostgreSQL port is accessible
