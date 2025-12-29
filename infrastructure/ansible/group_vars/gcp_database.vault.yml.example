@@ -66,15 +66,6 @@ vault_postgresql_password_masa: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 vault_django_secret_key: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 
 # ============================================================
-# OPTIONAL: GOOGLE OAUTH
-# ============================================================
-# Only needed if using Google OAuth for authentication
-# Get these from: https://console.cloud.google.com/apis/credentials
-
-# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
-# vault_google_oauth_client_secret: "your-client-secret"
-
-# ============================================================
 # OPTIONAL: SMTP CREDENTIALS
 # ============================================================
 # For external SMTP relay (SendGrid, SMTP2GO, etc.)
