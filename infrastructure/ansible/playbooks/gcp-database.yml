@@ -147,6 +147,10 @@
             Project Number: {{ gcp_project_info.resources[0].projectNumber }}
             State: {{ gcp_project_info.resources[0].lifecycleState }}
           ========================================
+      when:
+        - gcp_project_info is defined
+        - gcp_project_info.resources is defined
+        - (gcp_project_info.resources | length) > 0
       tags: [gcp-provision, preflight]
 
     - name: Display provisioning plan
@@ -347,6 +351,7 @@
       register: db_test_single
       changed_when: false
       failed_when: false
+      no_log: true
       when: not (postgresql_multi_tenant | default(false))
       tags: [verify]
 
@@ -363,6 +368,7 @@
       register: db_test_multi
       changed_when: false
       failed_when: false
+      no_log: true
       when: postgresql_multi_tenant | default(false)
       tags: [verify]
 
