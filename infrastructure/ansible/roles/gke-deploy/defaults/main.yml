@@ -71,10 +71,10 @@ gke_django_settings_module: "manage2soar.settings"
 gke_django_debug: false
 
 # Allowed hosts (comma-separated, e.g. "example.com,www.example.com")
-# IMPORTANT: Do NOT use "*" in production. This default restricts access to the
-# in-cluster service DNS name and localhost; production deployments should override
-# this with the actual public hostnames used by ingress.
-gke_django_allowed_hosts: "{{ gke_app_name }}.{{ gke_namespace }}.svc.cluster.local,localhost,127.0.0.1"
+# IMPORTANT: Do NOT use "*" in production. This placeholder value MUST be overridden
+# in real deployments with the actual public hostnames used by ingress. Leaving this
+# as-is will cause Django to only accept "CONFIGURE_ALLOWED_HOSTS" as a valid host.
+gke_django_allowed_hosts: "CONFIGURE_ALLOWED_HOSTS"
 
 # ============================================================
 # DATABASE CONNECTION
@@ -186,8 +186,10 @@ gke_rollout_timeout: 300
 # Run database migrations
 gke_run_migrations: false
 
-# Collect static files (enabled by default for GCS-backed Django apps)
-gke_collect_static: true
+# Collect static files to GCS (disabled by default; enable when deploying static file changes)
+# Running collectstatic on every deployment increases deploy time and GCS costs unnecessarily.
+# Enable this when deploying CSS, JS, or image changes, or run as a separate post-deployment step.
+gke_collect_static: false
 
 # Keep generated manifest files for debugging (default: clean up after deployment)
 gke_keep_manifests: false

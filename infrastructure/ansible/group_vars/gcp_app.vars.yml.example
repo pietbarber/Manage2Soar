@@ -54,12 +54,18 @@ gke_django_settings_module: "manage2soar.settings"
 gke_django_debug: false
 
 # SECURITY: Allowed hosts MUST be explicit hostnames; do NOT use "*" in production.
-# Example below allows the main app domain plus local development.
-gke_django_allowed_hosts: "m2s.{{ gke_base_domain }},localhost,127.0.0.1"
+# Example below allows only the main app domain for production.
+# For debugging from localhost, explicitly add "localhost,127.0.0.1" with full awareness of the security implications.
+gke_django_allowed_hosts: "m2s.{{ gke_base_domain }}"
 
 # ============================================================
 # CONTAINER RESOURCES
 # ============================================================
+# NOTE: The values below are set lower than role defaults for minimal/dev deployments.
+# Role defaults (in defaults/main.yml): 250m/500m CPU, 512Mi/1Gi memory.
+# For production use with Manage2Soar's feature set (analytics, PDF generation,
+# email processing, CMS, etc.), consider using the role defaults or higher to avoid
+# pod restarts, timeouts, and slow response times.
 
 # Number of replicas
 gke_replicas: 2
@@ -131,11 +137,11 @@ gke_image_tag_type: "auto"
 # Manual image tag (overrides gke_image_tag_type)
 # gke_image_tag: "v1.2.3"
 
-# Project directory (for Docker build context).
-# Defaults to three directories above playbook_dir, assuming playbooks live at:
-#   infrastructure/ansible/playbooks/
-# Override this value in group_vars if your playbook layout differs.
-gke_project_dir: "{{ playbook_dir | dirname | dirname | dirname }}"
+# Project directory (for Docker build context)
+# By default, this is set in the gke-deploy role's defaults/main.yml based on playbook_dir.
+# You normally do NOT need to set this here.
+# If your playbook layout is non-standard, override with an explicit path, e.g.:
+# gke_project_dir: "/path/to/your/manage2soar/project"
 
 # ============================================================
 # DEPLOYMENT OPTIONS

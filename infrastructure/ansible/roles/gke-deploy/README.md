@@ -141,6 +141,8 @@ gke_tenants:
     domain: "m2s.midatlanticsoaring.org"
 ```
 
+> **Note:** This role assumes that the per-tenant PostgreSQL databases and users (following the `m2s_<prefix>` naming convention, e.g. `m2s_ssc`) have already been created. The GKE deploy role only configures Kubernetes secrets that point to these existing databases; it does **not** provision the databases themselves. Database provisioning should be handled separately, either manually or via the dedicated PostgreSQL role referenced in the comparison table.
+
 Each tenant gets:
 - Separate Kubernetes namespace (`tenant-<prefix>`)
 - Own deployment and service (`django-app-<prefix>`)

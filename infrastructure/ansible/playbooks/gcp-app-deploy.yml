@@ -105,17 +105,9 @@
             - vault_django_secret_key
             - vault_postgresql_password (for single-tenant)
             - vault_postgresql_password_<prefix> for each tenant (for multi-tenant)
-      no_log: true
 
-    - name: Validate multi-tenant vault secrets early
-      ansible.builtin.assert:
-        that:
-          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
-        fail_msg: |
-          Missing vault secret for tenant: {{ item.prefix }}
-          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
-      loop: "{{ gke_tenants | default([]) }}"
-      when: gke_multi_tenant | default(false)
+          NOTE: Multi-tenant vault secrets validated in second play after tenant
+          filtering (allows deploying single tenant without all tenant passwords)
       no_log: true
 
     - name: Display deployment configuration
@@ -161,8 +153,6 @@
           Multi-tenant mode is enabled but no tenants configured.
           Please configure gke_tenants in group_vars/gcp_app/vars.yml
 
-    # NOTE: Vault secrets validation already done in first play (lines 110-119)
-
     - name: Filter tenants if specific tenant requested
       ansible.builtin.set_fact:
         gke_deploy_tenants: >-
@@ -171,6 +161,16 @@
           {% else %}
           {{ gke_tenants }}
           {% endif %}
+
+    - name: Validate vault secrets for selected tenants
+      ansible.builtin.assert:
+        that:
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
+        fail_msg: |
+          Missing vault secret for tenant: {{ item.prefix }}
+          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
+      loop: "{{ gke_deploy_tenants }}"
+      no_log: true
 
     - name: Display multi-tenant deployment plan
       ansible.builtin.debug:
@@ -185,14 +185,16 @@
           ========================================
 
   tasks:
+    # Generate shared image tag once (used for both build and deployment)
+    - name: Generate shared image tag
+      ansible.builtin.set_fact:
+        gke_shared_image_tag: >-
+          {% if gke_image_tag is defined %}{{ gke_image_tag }}
+          {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo "nogit"') }}{% endif %}
+
     # Build and push image once (shared across tenants)
     - name: Build and push shared Docker image
       block:
-        - name: Generate shared image tag
-          ansible.builtin.set_fact:
-            gke_shared_image_tag: >-
-              {% if gke_image_tag is defined %}{{ gke_image_tag }}
-              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null') }}{% endif %}
 
         - name: Build Docker image
           ansible.builtin.command:

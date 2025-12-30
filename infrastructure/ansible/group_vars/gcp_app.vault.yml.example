@@ -24,12 +24,13 @@ vault_django_secret_key: "your-very-long-random-secret-key-here"
 # DATABASE PASSWORDS
 # ============================================================
 # IMPORTANT: Replace placeholder values before deployment!
-# The playbook validates that these variables are defined, but does NOT
-# check if you've changed them from placeholder values. Deploying with
-# placeholder passwords like "your-database-password" creates serious
-# security vulnerabilities.
+# Common placeholder patterns (your-*, *-password, change*, etc.) should be
+# detected by playbook validation. However, always use strong, unique passwords
+# generated with: openssl rand -base64 32
 #
-# Generate strong passwords with: openssl rand -base64 32
+# SECURITY WARNING: Deploying with weak or placeholder passwords creates
+# serious vulnerabilities. The playbook will fail if it detects obvious
+# placeholder patterns, but validation is not foolproof.
 
 # For single-tenant mode:
 vault_postgresql_password: "your-database-password"

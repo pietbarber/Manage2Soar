@@ -55,6 +55,11 @@ spec:
               command:
                 - python
                 - manage.py
+                # NOTE: We intentionally call Django's built-in `clearsessions` command directly.
+                # This operation is idempotent and safe to run concurrently across multiple pods:
+                # it only deletes expired sessions, so duplicate or overlapping deletions do not
+                # cause data corruption or inconsistent behavior. For this specific CronJob,
+                # distributed locking via BaseCronJobCommand is not required.
                 - clearsessions
               workingDir: /app
               envFrom:

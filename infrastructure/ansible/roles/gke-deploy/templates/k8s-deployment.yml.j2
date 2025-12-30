@@ -67,8 +67,10 @@ spec:
             limits:
               memory: "{{ gke_memory_limit }}"
               cpu: "{{ gke_cpu_limit }}"
-          # Health checks: Using TCP socket probes until /health/ endpoint is implemented
-          # TODO: Add dedicated health check view to Django that validates DB connectivity
+          # Health checks: Using TCP socket probes temporarily - NOT production-ready!
+          # TODO: Implement /health/ endpoint in Django that validates DB connectivity before production use.
+          # RISK: TCP probes only verify port is open, not that Django is functional or can connect to database.
+          # A pod with database connection failures or Django crashes could still be marked healthy and receive traffic.
           livenessProbe:
             tcpSocket:
               port: {{ gke_container_port }}
