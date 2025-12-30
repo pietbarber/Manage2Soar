@@ -23,6 +23,11 @@ all:
     # ============================================================
     # GCP PROJECT CONFIGURATION
     # ============================================================
+    # WARNING: YOU MUST CHANGE THIS VALUE.
+    # - Set this to your actual GCP project ID (e.g. "my-real-gcp-project").
+    # - This value is also used as a GCS bucket name in deployment playbooks.
+    # - Leaving it as "your-gcp-project-id" can cause deployment failures
+    #   or unexpected behavior.
     gcp_project: "your-gcp-project-id"
     gcp_region: "us-central1"
     gcp_zone: "us-central1-c"

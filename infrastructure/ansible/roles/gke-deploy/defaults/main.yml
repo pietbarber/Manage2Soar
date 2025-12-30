@@ -105,7 +105,9 @@ gke_gcs_bucket: "{{ gcp_project }}"
 gke_gcs_project_id: "{{ gcp_project }}"
 
 # GCS default ACL (private or publicRead)
-# SECURITY: Use 'private' for sensitive data, 'publicRead' only for truly public assets
+# SECURITY: Keep this as 'private' for ANY user-uploaded or potentially sensitive media.
+# Only use 'publicRead' for non-user static assets (e.g. CSS, JS, logos) that are intended
+# to be world-readable. NEVER use 'publicRead' for user-uploaded media files.
 gke_gcs_default_acl: "private"
 
 # Club prefix for media/static paths
@@ -181,6 +183,12 @@ gke_run_migrations: false
 
 # Collect static files (enabled by default for GCS-backed Django apps)
 gke_collect_static: true
+
+# Keep generated manifest files for debugging (default: clean up after deployment)
+gke_keep_manifests: false
+
+# Docker build context directory (relative to playbook or absolute path)
+gke_docker_context: "."
 
 # ============================================================
 # CRONJOB CONFIGURATION

@@ -39,11 +39,6 @@
         exit 1
       fi
       echo "$ENV_VARS"
-      if [ -z "$ENV_VARS" ]; then
-        echo "Expected environment variables (DJANGO_DEBUG, DB_HOST, CLUB_PREFIX, MEDIA_URL) not found in pod $POD"
-        exit 1
-      fi
-      echo "$ENV_VARS"
   delegate_to: localhost
   run_once: true
   register: env_check

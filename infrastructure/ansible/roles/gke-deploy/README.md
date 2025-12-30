@@ -65,10 +65,10 @@ See `defaults/main.yml` for all available variables with defaults.
 
 ```yaml
 gke_replicas: 2
-gke_cpu_request: "100m"
-gke_cpu_limit: "250m"
-gke_memory_request: "192Mi"
-gke_memory_limit: "384Mi"
+gke_cpu_request: "250m"
+gke_cpu_limit: "500m"
+gke_memory_request: "512Mi"
+gke_memory_limit: "1Gi"
 ```
 
 #### Deployment Options
