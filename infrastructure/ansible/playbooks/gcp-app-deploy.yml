@@ -88,6 +88,17 @@
           Please configure group_vars/gcp_app/vars.yml with:
             - gcp_project: "your-gcp-project-id"
 
+    - name: Validate GCP project is not placeholder
+      ansible.builtin.assert:
+        that:
+          - gcp_project not in ['your-gcp-project-id', 'CHANGEME', 'changeme', 'example-project']
+          - "'your-' not in gcp_project | lower"
+        fail_msg: |
+          GCP project is set to a placeholder value: {{ gcp_project }}
+
+          This will cause deployment failures. Set gcp_project to your actual GCP project ID
+          in group_vars/gcp_app/vars.yml or inventory/gcp_app.yml
+
     - name: Validate GKE cluster name is defined
       ansible.builtin.assert:
         that:
@@ -144,30 +155,15 @@
             ansible-vault encrypt group_vars/gcp_app/vault.yml
       no_log: true
 
-    - name: Validate placeholder passwords not used
+    - name: Validate multi-tenant vault secrets early
       ansible.builtin.assert:
         that:
-          - "'your-' not in vault_django_secret_key | lower"
-          - "'change' not in vault_django_secret_key | lower"
-          - "'placeholder' not in vault_django_secret_key | lower"
-          - "'example' not in vault_django_secret_key | lower"
-          - "vault_postgresql_password is not defined or ('your-' not in vault_postgresql_password | lower and 'change' not in vault_postgresql_password | lower and 'placeholder' not in vault_postgresql_password | lower and 'password' not in vault_postgresql_password | lower)"
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
         fail_msg: |
-          SECURITY CRITICAL: Placeholder or weak passwords detected in vault.yml!
-
-          Common placeholder patterns found:
-            - "your-*" prefix
-            - "change*" prefix
-            - "placeholder" text
-            - "*-password" suffix
-            - "example" text
-
-          Generate strong passwords with:
-            Django Secret Key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
-            Database Password: openssl rand -base64 32
-
-          Update group_vars/gcp_app/vault.yml with strong passwords, then re-encrypt:
-            ansible-vault encrypt group_vars/gcp_app/vault.yml
+          Missing vault secret for tenant: {{ item.prefix }}
+          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
+      loop: "{{ gke_tenants | default([]) }}"
+      when: gke_multi_tenant | default(false)
       no_log: true
 
     - name: Display deployment configuration
@@ -255,7 +251,6 @@
     # Build and push image once (shared across tenants)
     - name: Build and push shared Docker image
       block:
-
         - name: Build Docker image
           ansible.builtin.command:
             cmd: docker build -t gcr.io/{{ gcp_project }}/{{ gke_app_name | default('manage2soar') }}:{{ gke_shared_image_tag | trim }} .

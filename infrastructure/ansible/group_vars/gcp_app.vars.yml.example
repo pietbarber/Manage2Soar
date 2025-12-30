@@ -138,11 +138,12 @@ gke_image_tag_type: "auto"
 # gke_image_tag: "v1.2.3"
 
 # Project directory (for Docker build context)
-# By default, this is set in the role's defaults/main.yml based on playbook_dir.
-# Only override if your repository layout differs from standard structure:
-# gke_project_dir: "/path/to/your/project"
-# If your playbook layout is non-standard, override with an explicit path, e.g.:
-# gke_project_dir: "/path/to/your/manage2soar/project"
+# IMPORTANT: The role defaults to playbook_dir + '/../../..' which assumes the playbook
+# is in infrastructure/ansible/playbooks/. If you move the playbook or restructure the
+# project, you MUST explicitly set this variable to the Django project root directory.
+# Default calculation: infrastructure/ansible/playbooks/../../../ = project_root
+# Override if your layout differs:
+# gke_project_dir: "/absolute/path/to/project/root"
 
 # ============================================================
 # DEPLOYMENT OPTIONS
