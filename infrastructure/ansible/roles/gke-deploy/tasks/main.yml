@@ -22,7 +22,7 @@
       {% elif gke_image_tag_type == 'auto' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD') }}
       {% elif gke_image_tag_type == 'timestamp' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}
       {% elif gke_image_tag_type == 'git' %}{{ lookup('pipe', 'git rev-parse --short HEAD') }}
-      {% elif gke_image_tag_type == 'git-tag' %}{{ lookup('pipe', 'git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD') }}
+      {% elif gke_image_tag_type == 'git-tag' %}{{ lookup('pipe', '(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD) 2>/dev/null || echo "unknown"') }}
       {% else %}{{ gke_image_tag_type }}{% endif %}
   delegate_to: localhost
   run_once: true
@@ -84,9 +84,10 @@
     that:
       - "'gke_' in kubectl_context.stdout"
       - "gke_cluster_name in kubectl_context.stdout"
+      - "gcp_project in kubectl_context.stdout"
     fail_msg: |
       Wrong kubectl context: {{ kubectl_context.stdout }}
-      Expected context for cluster: {{ gke_cluster_name }}
+      Expected context for cluster: {{ gke_cluster_name }} in project: {{ gcp_project }}
   delegate_to: localhost
   run_once: true
   tags: [gke-auth]

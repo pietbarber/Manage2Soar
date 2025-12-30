@@ -55,27 +55,55 @@
           {{ rollout_result.stderr | default('') }}
           {{ rollout_result.stdout | default('') }}
 
-          Initiating rollback...
+          Checking rollout history before attempting rollback...
           ========================================
+
+    - name: Check rollout history
+      ansible.builtin.command:
+        cmd: kubectl rollout history deployment/{{ gke_deployment_name }} -n {{ gke_namespace }}
+      delegate_to: localhost
+      run_once: true
+      register: rollout_history
+      failed_when: false
 
     - name: Rollback deployment
       ansible.builtin.command:
         cmd: kubectl rollout undo deployment/{{ gke_deployment_name }} -n {{ gke_namespace }}
       delegate_to: localhost
       run_once: true
+      when: rollout_history.stdout_lines | length > 2 # More than just header means history exists
+      register: rollback_command
+
+    - name: Skip rollback for first deployment
+      ansible.builtin.debug:
+        msg: |
+          First-time deployment detected (no rollout history).
+          Skipping rollback. Deployment will remain in failed state for manual inspection.
+      when: rollout_history.stdout_lines | length <= 2
 
     - name: Wait for rollback to complete
       ansible.builtin.command:
         cmd: kubectl rollout status deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --timeout={{ gke_rollout_timeout }}s
       delegate_to: localhost
       run_once: true
+      when: rollback_command is not skipped and rollback_command is defined
       register: rollback_status
       failed_when: false
 
     - name: Fail after rollback
       ansible.builtin.fail:
         msg: |
-          {% if rollback_status.rc == 0 %}
+          {% if rollout_history.stdout_lines | length <= 2 %}
+          Deployment failed on first deployment attempt (no rollout history).
+          Manual intervention required to diagnose and fix the deployment issue.
+
+          Deployment failure details:
+            stdout: {{ rollout_result.stdout | default('') }}
+            stderr: {{ rollout_result.stderr | default('') }}
+
+          Check pod logs to diagnose:
+            kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
+          {% elif rollback_status.rc == 0 %}
           Deployment failed but rollback succeeded. Check pod logs to diagnose the deployment issue:
           kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
           {% else %}
@@ -98,6 +126,11 @@
 # ============================================================
 # DATABASE MIGRATIONS (OPTIONAL)
 # ============================================================
+# WARNING: Running migrations in multi-pod deployments (gke_replicas > 1) may cause
+# race conditions if multiple pods attempt to run migrations simultaneously. This task
+# uses 'kubectl exec deployment/...' which targets a single pod, reducing (but not
+# eliminating) the risk. For production multi-pod deployments, consider running migrations
+# as a separate Job or initContainer to ensure only one migration runs at a time.
 
 - name: Run database migrations
   ansible.builtin.command:

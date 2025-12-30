@@ -78,17 +78,24 @@
     - ../group_vars/gcp_app/vault.yml
 
   pre_tasks:
-    - name: Validate GCP configuration
+    - name: Validate GCP project is defined
       ansible.builtin.assert:
         that:
           - gcp_project is defined
           - gcp_project | length > 0
+        fail_msg: |
+          Required GCP project configuration is missing.
+          Please configure group_vars/gcp_app/vars.yml with:
+            - gcp_project: "your-gcp-project-id"
+
+    - name: Validate GKE cluster name is defined
+      ansible.builtin.assert:
+        that:
           - gke_cluster_name is defined
         fail_msg: |
-          Required GCP/GKE configuration is missing.
+          Required GKE cluster configuration is missing.
           Please configure group_vars/gcp_app/vars.yml with:
-            - gcp_project
-            - gke_cluster_name
+            - gke_cluster_name: "your-cluster-name"
 
     # Vault secrets validation (unified for single and multi-tenant)
     # Single-tenant requires: vault_django_secret_key, vault_postgresql_password
@@ -109,6 +116,58 @@
           NOTE: Multi-tenant tenant-specific passwords are validated in the second
           play after tenant filtering (allows deploying single tenant with
           --extra-vars gke_deploy_tenant=<prefix> without requiring all tenant passwords)
+      no_log: true
+
+    - name: Validate placeholder passwords not used
+      ansible.builtin.assert:
+        that:
+          - "'your-' not in vault_django_secret_key | lower"
+          - "'change' not in vault_django_secret_key | lower"
+          - "'placeholder' not in vault_django_secret_key | lower"
+          - "'example' not in vault_django_secret_key | lower"
+          - "vault_postgresql_password is not defined or ('your-' not in vault_postgresql_password | lower and 'change' not in vault_postgresql_password | lower and 'placeholder' not in vault_postgresql_password | lower and 'password' not in vault_postgresql_password | lower)"
+        fail_msg: |
+          SECURITY CRITICAL: Placeholder or weak passwords detected in vault.yml!
+
+          Common placeholder patterns found:
+            - "your-*" prefix
+            - "change*" prefix
+            - "placeholder" text
+            - "*-password" suffix
+            - "example" text
+
+          Generate strong passwords with:
+            Django Secret Key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+            Database Password: openssl rand -base64 32
+
+          Update group_vars/gcp_app/vault.yml with strong passwords, then re-encrypt:
+            ansible-vault encrypt group_vars/gcp_app/vault.yml
+      no_log: true
+
+    - name: Validate placeholder passwords not used
+      ansible.builtin.assert:
+        that:
+          - "'your-' not in vault_django_secret_key | lower"
+          - "'change' not in vault_django_secret_key | lower"
+          - "'placeholder' not in vault_django_secret_key | lower"
+          - "'example' not in vault_django_secret_key | lower"
+          - "vault_postgresql_password is not defined or ('your-' not in vault_postgresql_password | lower and 'change' not in vault_postgresql_password | lower and 'placeholder' not in vault_postgresql_password | lower and 'password' not in vault_postgresql_password | lower)"
+        fail_msg: |
+          SECURITY CRITICAL: Placeholder or weak passwords detected in vault.yml!
+
+          Common placeholder patterns found:
+            - "your-*" prefix
+            - "change*" prefix
+            - "placeholder" text
+            - "*-password" suffix
+            - "example" text
+
+          Generate strong passwords with:
+            Django Secret Key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+            Database Password: openssl rand -base64 32
+
+          Update group_vars/gcp_app/vault.yml with strong passwords, then re-encrypt:
+            ansible-vault encrypt group_vars/gcp_app/vault.yml
       no_log: true
 
     - name: Display deployment configuration
@@ -191,7 +250,7 @@
       ansible.builtin.set_fact:
         gke_shared_image_tag: >-
           {% if gke_image_tag is defined %}{{ gke_image_tag }}
-          {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo "nogit"') }}{% endif %}
+          {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo "-nogit"') }}{% endif %}
 
     # Build and push image once (shared across tenants)
     - name: Build and push shared Docker image
