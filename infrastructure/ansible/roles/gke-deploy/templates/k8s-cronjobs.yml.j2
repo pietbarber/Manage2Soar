@@ -481,7 +481,7 @@ spec:
               volumeMounts:
                 - name: gcp-sa-key
                   mountPath: {{ gke_gcp_credentials_path }}
-                  subPath: gcp-credentials.json
+                  subPath: {{ gke_gcp_credentials_filename }}
                   readOnly: true
               resources:
                 requests:

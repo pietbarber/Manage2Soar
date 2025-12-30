@@ -47,7 +47,7 @@
 #   ansible-playbook -i inventory/gcp_app.yml \
 #     --vault-password-file ~/.ansible_vault_pass \
 #     playbooks/gcp-app-deploy.yml \
-#     -e gke_club_prefix=ssc
+#     -e gke_deploy_tenant=ssc
 #
 #   # Use specific image tag
 #   ansible-playbook -i inventory/gcp_app.yml \
@@ -246,7 +246,8 @@
         gke_deployment_name: "django-app-{{ tenant.prefix }}"
         gke_service_name: "django-app-{{ tenant.prefix }}"
         gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
-        # Pass shared image tag to role as gke_image_tag (role's expected input variable)\n        gke_image_tag: "{{ gke_shared_image_tag | trim }}"
+        # Pass shared image tag to role as gke_image_tag (role's expected input variable)
+        gke_image_tag: "{{ gke_shared_image_tag | trim }}"
         gke_build_image: false # Already built above
         gke_push_image: false # Already pushed above
         gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
@@ -272,6 +273,6 @@
           Useful commands:
           {% for tenant in gke_deploy_tenants %}
             # {{ tenant.prefix }}
-            kubectl logs -l app=django-app-{{ tenant.prefix }} -n tenant-{{ tenant.prefix }} -f
+            kubectl logs -l app=django-app-{{ tenant.prefix }} -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} -f
           {% endfor %}
           ========================================
