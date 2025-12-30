@@ -192,7 +192,7 @@
           ansible.builtin.set_fact:
             gke_shared_image_tag: >-
               {% if gke_image_tag is defined %}{{ gke_image_tag }}
-              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo -nogit') }}{% endif %}
+              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null') }}{% endif %}
 
         - name: Build Docker image
           ansible.builtin.command:

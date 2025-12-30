@@ -43,7 +43,6 @@
   run_once: true
   register: env_check
   changed_when: false
-  failed_when: false
 
 - name: Display verification results
   ansible.builtin.debug:

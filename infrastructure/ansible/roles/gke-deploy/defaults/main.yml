@@ -71,9 +71,10 @@ gke_django_settings_module: "manage2soar.settings"
 gke_django_debug: false
 
 # Allowed hosts (comma-separated, e.g. "example.com,www.example.com")
-# IMPORTANT: Do NOT use "*" in production. This default is intentionally empty
-# so that deployments must explicitly set safe hostnames.
-gke_django_allowed_hosts: ""
+# IMPORTANT: Do NOT use "*" in production. This default restricts access to the
+# in-cluster service DNS name and localhost; production deployments should override
+# this with the actual public hostnames used by ingress.
+gke_django_allowed_hosts: "{{ gke_app_name }}.{{ gke_namespace }}.svc.cluster.local,localhost,127.0.0.1"
 
 # ============================================================
 # DATABASE CONNECTION
