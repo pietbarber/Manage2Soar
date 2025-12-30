@@ -31,7 +31,7 @@
       POD=$(kubectl get pods -l app={{ gke_deployment_name }} -n {{ gke_namespace }} --field-selector=status.phase=Running --no-headers | head -1 | awk '{print $1}')
       if [ -z "$POD" ]; then
         echo "No running pods found for app={{ gke_deployment_name }} in namespace {{ gke_namespace }}"
-        exit 0
+        exit 1
       fi
       ENV_VARS=$(kubectl exec "$POD" -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true)
       if [ -z "$ENV_VARS" ]; then

@@ -161,15 +161,7 @@
           Multi-tenant mode is enabled but no tenants configured.
           Please configure gke_tenants in group_vars/gcp_app/vars.yml
 
-    - name: Validate tenant vault secrets
-      ansible.builtin.assert:
-        that:
-          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
-        fail_msg: |
-          Missing vault secret for tenant: {{ item.prefix }}
-          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
-      loop: "{{ gke_tenants }}"
-      no_log: true
+    # NOTE: Vault secrets validation already done in first play (lines 110-119)
 
     - name: Filter tenants if specific tenant requested
       ansible.builtin.set_fact:
@@ -200,7 +192,7 @@
           ansible.builtin.set_fact:
             gke_shared_image_tag: >-
               {% if gke_image_tag is defined %}{{ gke_image_tag }}
-              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo nogit') }}{% endif %}
+              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo -nogit') }}{% endif %}
 
         - name: Build Docker image
           ansible.builtin.command:

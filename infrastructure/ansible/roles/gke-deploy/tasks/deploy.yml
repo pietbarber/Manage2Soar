@@ -75,12 +75,19 @@
     - name: Fail after rollback
       ansible.builtin.fail:
         msg: |
-          Deployment failed and a rollback was attempted. Check pod logs for details.
+          {% if rollback_status.rc == 0 %}
+          Deployment failed but rollback succeeded. Check pod logs to diagnose the deployment issue:
+          kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
+          {% else %}
+          CRITICAL: Both deployment AND rollback failed!
+          Original deployment failed, and the automatic rollback also failed.
+          Manual intervention required to restore service.
 
-          Rollback status:
-            exit code: {{ rollback_status.rc | default('unknown') }}
+          Rollback failure details:
+            exit code: {{ rollback_status.rc }}
             stdout: {{ rollback_status.stdout | default('') }}
             stderr: {{ rollback_status.stderr | default('') }}
+          {% endif %}
   when:
     - gke_wait_for_rollout | bool
     - rollout_result.rc is defined

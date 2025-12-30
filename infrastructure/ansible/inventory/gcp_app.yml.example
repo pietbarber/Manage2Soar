@@ -26,9 +26,13 @@ all:
     # WARNING: YOU MUST CHANGE THIS VALUE.
     # - Set this to your actual GCP project ID (e.g. "my-real-gcp-project").
     # - This value is also used as a GCS bucket name in deployment playbooks.
-    # - Leaving it as "your-gcp-project-id" can cause deployment failures
+    # - Leaving it unset or as a placeholder will cause deployment failures
     #   or unexpected behavior.
-    gcp_project: "your-gcp-project-id"
+    # NOTE: This example file intentionally leaves gcp_project blank.
+    #       When you copy this to inventory/gcp_app.yml, you MUST set
+    #       gcp_project to your real GCP project ID before running any
+    #       playbooks.
+    gcp_project: ""
     gcp_region: "us-central1"
     gcp_zone: "us-central1-c"
 

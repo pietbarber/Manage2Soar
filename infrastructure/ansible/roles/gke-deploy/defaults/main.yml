@@ -149,6 +149,10 @@ gke_gcp_sa_secret_name: "gcp-sa-key"
 # Path to GCP service account key in container
 gke_gcp_credentials_path: "/app/gcp-credentials.json"
 
+# Filename of GCP credentials within the secret (for backward compatibility)
+# Override this if migrating from existing deployments using different filenames
+gke_gcp_credentials_filename: "gcp-credentials.json"
+
 # ============================================================
 # MULTI-TENANT CONFIGURATION
 # ============================================================

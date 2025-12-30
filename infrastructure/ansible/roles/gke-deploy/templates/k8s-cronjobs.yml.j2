@@ -8,16 +8,14 @@
 # These CronJobs match the actual production k8s-cronjobs.yaml configuration
 #
 # Resource Allocation Strategy:
-#   - Small tasks (clearsessions, duty emails): 64Mi/50m CPU
-#   - Medium tasks (aging logsheets, maintenance): 128Mi/100m CPU
-#   - Large tasks (SPRs, delinquents): 256Mi/200m CPU
+#   - Small tasks (clearsessions, duty emails, ad-hoc expiration): 64Mi/50m → 128Mi/100m
+#   - Medium tasks (aging logsheets, maintenance, SPRs, delinquents): 128Mi/100m → 256Mi/200m
 # Resource limits are based on observed production usage patterns and may need
 # tuning for datasets with significantly different sizes or email volumes.
 #
 # Rationale:
 #   - Small tasks: Minimal DB queries, few emails (< 10)
-#   - Medium tasks: Moderate DB queries, batch email processing (10-50 emails)
-#   - Large tasks: Complex queries, many emails (50+ emails), monthly reports
+#   - Medium tasks: Moderate DB queries, batch email processing (10-50+ emails)
 # Consider overriding via gke_cronjob_resources_* variables in group_vars for
 # clubs with significantly larger member counts or duty roster sizes.
 

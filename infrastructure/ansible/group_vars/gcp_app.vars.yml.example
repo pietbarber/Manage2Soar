@@ -131,8 +131,11 @@ gke_image_tag_type: "auto"
 # Manual image tag (overrides gke_image_tag_type)
 # gke_image_tag: "v1.2.3"
 
-# Project directory (for Docker build context)
-gke_project_dir: "{{ playbook_dir }}/../../.."
+# Project directory (for Docker build context).
+# Defaults to three directories above playbook_dir, assuming playbooks live at:
+#   infrastructure/ansible/playbooks/
+# Override this value in group_vars if your playbook layout differs.
+gke_project_dir: "{{ playbook_dir | dirname | dirname | dirname }}"
 
 # ============================================================
 # DEPLOYMENT OPTIONS
