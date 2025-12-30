@@ -1,0 +1,335 @@
+# GCP App Deployment Playbook
+#
+# This playbook deploys Django applications to Google Kubernetes Engine (GKE).
+# It replaces the pushy-enhanced-v4.sh script with Ansible-managed deployments.
+#
+# Features:
+#   - Multi-tenant support (deploy multiple clubs to separate namespaces)
+#   - Kubernetes secrets from Ansible Vault
+#   - Docker image build and push to GCR
+#   - Automatic rollback on failure
+#   - Verification and health checks
+#
+# Prerequisites:
+#   1. Install required Ansible collections:
+#      ansible-galaxy collection install kubernetes.core
+#      ansible-galaxy collection install google.cloud
+#
+#   2. Set up GCP authentication:
+#      gcloud auth application-default login
+#      gcloud auth configure-docker
+#
+#   3. Copy and configure group_vars:
+#      cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
+#      cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
+#      ansible-vault encrypt group_vars/gcp_app/vault.yml
+#
+#   4. Set up vault password file: ~/.ansible_vault_pass
+#
+# Usage:
+#   # Full deployment (build, push, deploy)
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml
+#
+#   # Deploy only (use existing image)
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml \
+#     -e gke_build_image=false -e gke_push_image=false
+#
+#   # Update secrets only
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml --tags secrets
+#
+#   # Deploy specific tenant
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml \
+#     -e gke_deploy_tenant=ssc
+#
+#   # Use specific image tag
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-app-deploy.yml \
+#     -e gke_image_tag=20251229-1200-abc1234
+#
+# Tags:
+#   - docker: Docker build and push
+#   - build: Build Docker image
+#   - push: Push image to registry
+#   - secrets: Kubernetes secrets management
+#   - deploy: Apply Kubernetes configurations
+#   - cronjobs: Deploy CronJob configurations
+#   - verify: Verification and health checks
+#   - gke-auth: GKE authentication
+
+---
+# ============================================================
+# SINGLE-TENANT DEPLOYMENT
+# ============================================================
+- name: Deploy Django App to GKE (Single-Tenant)
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
+    - ../group_vars/gcp_app/vault.yml
+
+  pre_tasks:
+    - name: Validate GCP project is defined
+      ansible.builtin.assert:
+        that:
+          - gcp_project is defined
+          - gcp_project | length > 0
+        fail_msg: |
+          Required GCP project configuration is missing.
+          Please configure group_vars/gcp_app/vars.yml with:
+            - gcp_project: "your-gcp-project-id"
+
+    - name: Validate GCP project is not placeholder
+      ansible.builtin.assert:
+        that:
+          - gcp_project not in ['your-gcp-project-id', 'CHANGEME', 'changeme', 'example-project']
+          - "'your-' not in gcp_project | lower"
+        fail_msg: |
+          GCP project is set to a placeholder value: {{ gcp_project }}
+
+          This will cause deployment failures. Set gcp_project to your actual GCP project ID
+          in group_vars/gcp_app/vars.yml or inventory/gcp_app.yml
+
+    - name: Validate GKE cluster name is defined
+      ansible.builtin.assert:
+        that:
+          - gke_cluster_name is defined
+        fail_msg: |
+          Required GKE cluster configuration is missing.
+          Please configure group_vars/gcp_app/vars.yml with:
+            - gke_cluster_name: "your-cluster-name"
+
+    # Vault secrets validation (unified for single and multi-tenant)
+    # Single-tenant requires: vault_django_secret_key, vault_postgresql_password
+    # Multi-tenant requires: vault_django_secret_key, vault_postgresql_password_<tenant>
+    # Multi-tenant tenant-specific passwords validated in second play
+    - name: Validate vault secrets (unified for both modes)
+      ansible.builtin.assert:
+        that:
+          - vault_django_secret_key is defined
+          - vault_postgresql_password is defined or gke_multi_tenant | default(false)
+        fail_msg: |
+          Required vault secrets are missing.
+          Please configure group_vars/gcp_app/vault.yml with:
+            - vault_django_secret_key
+            - vault_postgresql_password (for single-tenant)
+            - vault_postgresql_password_<prefix> for each tenant (for multi-tenant)
+
+          NOTE: Multi-tenant tenant-specific passwords are validated in the second
+          play after tenant filtering (allows deploying single tenant with
+          --extra-vars gke_deploy_tenant=<prefix> without requiring all tenant passwords)
+      no_log: true
+
+    - name: Validate placeholder passwords not used
+      ansible.builtin.assert:
+        that:
+          - "'your-' not in vault_django_secret_key | lower"
+          - "'change' not in vault_django_secret_key | lower"
+          - "'placeholder' not in vault_django_secret_key | lower"
+          - "'example' not in vault_django_secret_key | lower"
+          - "vault_postgresql_password is not defined or ('your-' not in vault_postgresql_password | lower and 'change' not in vault_postgresql_password | lower and 'placeholder' not in vault_postgresql_password | lower and 'password' not in vault_postgresql_password | lower)"
+        fail_msg: |
+          SECURITY CRITICAL: Placeholder or weak passwords detected in vault.yml!
+
+          Common placeholder patterns found:
+            - "your-*" prefix
+            - "change*" prefix
+            - "placeholder" text
+            - "*-password" suffix
+            - "example" text
+
+          Generate strong passwords with:
+            Django Secret Key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+            Database Password: openssl rand -base64 32
+
+          Update group_vars/gcp_app/vault.yml with strong passwords, then re-encrypt:
+            ansible-vault encrypt group_vars/gcp_app/vault.yml
+      no_log: true
+
+    - name: Validate multi-tenant vault secrets early
+      ansible.builtin.assert:
+        that:
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
+        fail_msg: |
+          Missing vault secret for tenant: {{ item.prefix }}
+          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
+      loop: "{{ gke_tenants | default([]) }}"
+      when: gke_multi_tenant | default(false)
+      no_log: true
+
+    - name: Display deployment configuration
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GCP App Deployment Configuration
+          ========================================
+          Project: {{ gcp_project }}
+          Cluster: {{ gke_cluster_name }}
+          Zone: {{ gke_cluster_zone | default('us-central1-c') }}
+          Multi-tenant: {{ gke_multi_tenant | default(false) }}
+          Build Image: {{ gke_build_image | default(true) }}
+          Push Image: {{ gke_push_image | default(true) }}
+          ========================================
+
+  roles:
+    - role: gke-deploy
+      when: not (gke_multi_tenant | default(false))
+
+# ============================================================
+# MULTI-TENANT DEPLOYMENT
+# ============================================================
+- name: Deploy Django App to GKE (Multi-Tenant)
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars_files:
+    - ../group_vars/gcp_app/vars.yml
+    - ../group_vars/gcp_app/vault.yml
+
+  pre_tasks:
+    - name: Skip if not multi-tenant
+      ansible.builtin.meta: end_play
+      when: not (gke_multi_tenant | default(false))
+
+    - name: Validate multi-tenant configuration
+      ansible.builtin.assert:
+        that:
+          - gke_tenants is defined
+          - gke_tenants | length > 0
+        fail_msg: |
+          Multi-tenant mode is enabled but no tenants configured.
+          Please configure gke_tenants in group_vars/gcp_app/vars.yml
+
+    - name: Filter tenants if specific tenant requested
+      ansible.builtin.set_fact:
+        gke_deploy_tenants: >-
+          {% if gke_deploy_tenant is defined %}
+          {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list }}
+          {% else %}
+          {{ gke_tenants }}
+          {% endif %}
+
+    - name: Validate vault secrets for selected tenants
+      ansible.builtin.assert:
+        that:
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
+        fail_msg: |
+          Missing vault secret for tenant: {{ item.prefix }}
+          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
+      loop: "{{ gke_deploy_tenants }}"
+      no_log: true
+
+    - name: Display multi-tenant deployment plan
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Multi-Tenant Deployment Plan
+          ========================================
+          Deploying {{ gke_deploy_tenants | length }} tenant(s):
+          {% for tenant in gke_deploy_tenants %}
+            - {{ tenant.prefix }}: {{ tenant.name }}
+          {% endfor %}
+          ========================================
+
+  tasks:
+    # Generate shared image tag once (used for both build and deployment)
+    - name: Generate shared image tag
+      ansible.builtin.set_fact:
+        gke_shared_image_tag: >-
+          {% if gke_image_tag is defined %}{{ gke_image_tag }}
+          {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo "-nogit"') }}{% endif %}
+
+    # Build and push image once (shared across tenants)
+    - name: Build and push shared Docker image
+      block:
+        - name: Build Docker image
+          ansible.builtin.command:
+            cmd: docker build -t gcr.io/{{ gcp_project }}/{{ gke_app_name | default('manage2soar') }}:{{ gke_shared_image_tag | trim }} .
+            chdir: "{{ gke_project_dir | default(playbook_dir | dirname | dirname | dirname) }}"
+          when: gke_build_image | default(true) | bool
+          tags: [docker, build]
+
+        - name: Authenticate with GCR
+          ansible.builtin.shell:
+            cmd: gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+          when: gke_push_image | default(true) | bool
+          changed_when: false
+          no_log: true
+          tags: [docker, push]
+
+        - name: Push Docker image
+          ansible.builtin.command:
+            cmd: docker push gcr.io/{{ gcp_project }}/{{ gke_app_name | default('manage2soar') }}:{{ gke_shared_image_tag | trim }}
+          when: gke_push_image | default(true) | bool
+          tags: [docker, push]
+      run_once: true
+      tags: [docker]
+
+    # Validate image availability for deploy-only scenarios
+    - name: Ensure shared image tag is available for deployment
+      block:
+        - name: Check if shared image tag is defined
+          ansible.builtin.assert:
+            that:
+              - gke_shared_image_tag is defined or gke_image_tag is defined
+            fail_msg: >-
+              No Docker image tag is available for deployment. Either run without
+              restricting tags (to build/push), or provide gke_image_tag for existing image.
+
+        - name: Use provided image tag if shared tag not set
+          ansible.builtin.set_fact:
+            gke_shared_image_tag: "{{ gke_image_tag | trim }}"
+          when:
+            - gke_shared_image_tag is not defined
+            - gke_image_tag is defined
+      tags: [deploy]
+
+    # Deploy each tenant
+    - name: Deploy each tenant
+      ansible.builtin.include_role:
+        name: gke-deploy
+      vars:
+        gke_club_prefix: "{{ tenant.prefix }}"
+        gke_namespace: "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+        gke_deployment_name: "django-app-{{ tenant.prefix }}"
+        gke_service_name: "django-app-{{ tenant.prefix }}"
+        gke_secret_name: "manage2soar-env-{{ tenant.prefix }}"
+        # Pass shared image tag to role as gke_image_tag (role's expected input variable)
+        gke_image_tag: "{{ gke_shared_image_tag | trim }}"
+        gke_build_image: false # Already built above
+        gke_push_image: false # Already pushed above
+        gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+
+  post_tasks:
+    - name: Display multi-tenant deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          ✅ MULTI-TENANT DEPLOYMENT COMPLETE
+          ========================================
+          Image: gcr.io/{{ gcp_project }}/{{ gke_app_name | default('manage2soar') }}:{{ gke_shared_image_tag | trim }}
+
+          Deployed tenants:
+          {% for tenant in gke_deploy_tenants %}
+            - {{ tenant.prefix }}: https://{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}
+          {% endfor %}
+
+          Useful commands:
+          {% for tenant in gke_deploy_tenants %}
+            # {{ tenant.prefix }}
+            kubectl logs -l app=django-app-{{ tenant.prefix }} -n {{ tenant.namespace | default('tenant-' + tenant.prefix) }} -f
+          {% endfor %}
+          ========================================

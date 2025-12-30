@@ -1,0 +1,191 @@
+---
+# GKE Deploy Role - Kubernetes Deployment Tasks
+
+- name: Create namespace if it doesn't exist
+  ansible.builtin.command:
+    cmd: kubectl create namespace {{ gke_namespace }}
+  delegate_to: localhost
+  run_once: true
+  register: ns_result
+  failed_when: false
+  changed_when: "'created' in ns_result.stdout"
+  when: gke_namespace != 'default'
+
+- name: Generate deployment manifest
+  ansible.builtin.template:
+    src: k8s-deployment.yml.j2
+    dest: "/tmp/k8s-deployment-{{ gke_namespace }}.yml"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+  register: deployment_template
+
+- name: Apply deployment configuration
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-deployment-{{ gke_namespace }}.yml
+  delegate_to: localhost
+  run_once: true
+  register: deploy_result
+  changed_when: "'configured' in deploy_result.stdout or 'created' in deploy_result.stdout"
+
+- name: Display deployment result
+  ansible.builtin.debug:
+    msg: "{{ deploy_result.stdout_lines }}"
+  delegate_to: localhost
+  run_once: true
+  when: deploy_result.stdout_lines is defined
+
+- name: Wait for rollout to complete
+  ansible.builtin.command:
+    cmd: kubectl rollout status deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --timeout={{ gke_rollout_timeout }}s
+  delegate_to: localhost
+  run_once: true
+  when: gke_wait_for_rollout | bool
+  register: rollout_result
+  failed_when: false
+
+- name: Handle rollout failure
+  block:
+    - name: Display rollout failure
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          DEPLOYMENT ROLLOUT FAILED
+          ========================================
+          {{ rollout_result.stderr | default('') }}
+          {{ rollout_result.stdout | default('') }}
+
+          Checking rollout history before attempting rollback...
+          ========================================
+
+    - name: Check rollout history
+      ansible.builtin.command:
+        cmd: kubectl rollout history deployment/{{ gke_deployment_name }} -n {{ gke_namespace }}
+      delegate_to: localhost
+      run_once: true
+      register: rollout_history
+      failed_when: false
+
+    - name: Rollback deployment
+      ansible.builtin.command:
+        cmd: kubectl rollout undo deployment/{{ gke_deployment_name }} -n {{ gke_namespace }}
+      delegate_to: localhost
+      run_once: true
+      when: rollout_history.stdout_lines | length > 2 # More than just header means history exists
+      register: rollback_command
+
+    - name: Skip rollback for first deployment
+      ansible.builtin.debug:
+        msg: |
+          First-time deployment detected (no rollout history).
+          Skipping rollback. Deployment will remain in failed state for manual inspection.
+      when: rollout_history.stdout_lines | length <= 2
+
+    - name: Wait for rollback to complete
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --timeout={{ gke_rollout_timeout }}s
+      delegate_to: localhost
+      run_once: true
+      when: rollback_command is not skipped and rollback_command is defined
+      register: rollback_status
+      failed_when: false
+
+    - name: Fail after rollback
+      ansible.builtin.fail:
+        msg: |
+          {% if rollout_history.stdout_lines | length <= 2 %}
+          Deployment failed on first deployment attempt (no rollout history).
+          Manual intervention required to diagnose and fix the deployment issue.
+
+          Deployment failure details:
+            stdout: {{ rollout_result.stdout | default('') }}
+            stderr: {{ rollout_result.stderr | default('') }}
+
+          Check pod logs to diagnose:
+            kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
+          {% elif rollback_status.rc == 0 %}
+          Deployment failed but rollback succeeded. Check pod logs to diagnose the deployment issue:
+          kubectl logs -l app={{ gke_deployment_name }} -n {{ gke_namespace }} -f
+          {% else %}
+          CRITICAL: Both deployment AND rollback failed!
+          Original deployment failed, and the automatic rollback also failed.
+          Manual intervention required to restore service.
+
+          Rollback failure details:
+            exit code: {{ rollback_status.rc }}
+            stdout: {{ rollback_status.stdout | default('') }}
+            stderr: {{ rollback_status.stderr | default('') }}
+          {% endif %}
+  when:
+    - gke_wait_for_rollout | bool
+    - rollout_result.rc is defined
+    - rollout_result.rc != 0
+  delegate_to: localhost
+  run_once: true
+
+# ============================================================
+# DATABASE MIGRATIONS (OPTIONAL)
+# ============================================================
+# WARNING: Running migrations in multi-pod deployments (gke_replicas > 1) may cause
+# race conditions if multiple pods attempt to run migrations simultaneously. This task
+# uses 'kubectl exec deployment/...' which targets a single pod, reducing (but not
+# eliminating) the risk. For production multi-pod deployments, consider running migrations
+# as a separate Job or initContainer to ensure only one migration runs at a time.
+
+- name: Run database migrations
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
+      python manage.py migrate --noinput
+  delegate_to: localhost
+  run_once: true
+  when: gke_run_migrations | bool
+  register: migrate_result
+
+- name: Display migration result
+  ansible.builtin.debug:
+    msg: "{{ migrate_result.stdout_lines }}"
+  when:
+    - gke_run_migrations | bool
+    - migrate_result.stdout_lines is defined
+  delegate_to: localhost
+  run_once: true
+
+# ============================================================
+# STATIC FILES (OPTIONAL)
+# ============================================================
+
+- name: Collect static files
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec deployment/{{ gke_deployment_name }} -n {{ gke_namespace }} --
+      python manage.py collectstatic --noinput
+  delegate_to: localhost
+  run_once: true
+  when: gke_collect_static | bool
+  register: collectstatic_result
+
+- name: Display collectstatic result
+  ansible.builtin.debug:
+    msg: "{{ collectstatic_result.stdout_lines }}"
+  when:
+    - gke_collect_static | bool
+    - collectstatic_result.stdout_lines is defined
+  delegate_to: localhost
+  run_once: true
+
+# ============================================================
+# CLEANUP
+# ============================================================
+# NOTE: Deployment manifests are cleaned at the end to allow debugging.
+# Secrets manifests are cleaned immediately after creation in secrets.yml
+# for security reasons. This is intentional - use gke_keep_manifests=true
+# to preserve all manifests for troubleshooting.
+
+- name: Clean up deployment manifest
+  ansible.builtin.file:
+    path: "/tmp/k8s-deployment-{{ gke_namespace }}.yml"
+    state: absent
+  delegate_to: localhost
+  run_once: true
+  when: not (gke_keep_manifests | default(false))

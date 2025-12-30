@@ -1,0 +1,178 @@
+---
+# GKE Deploy Role - Main Tasks
+#
+# Deploys Django application to Google Kubernetes Engine
+
+# ============================================================
+# PREREQUISITES
+# ============================================================
+
+- name: Check if git repository exists
+  ansible.builtin.stat:
+    path: "{{ gke_project_dir | default(playbook_dir + '/../../..') }}/.git"
+  register: git_repo
+  delegate_to: localhost
+  run_once: true
+
+- name: Generate image tag
+  ansible.builtin.set_fact:
+    gke_computed_image_tag: >-
+      {% if gke_image_tag is defined %}{{ gke_image_tag }}
+      {% elif not git_repo.stat.exists %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-nogit
+      {% elif gke_image_tag_type == 'auto' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD') }}
+      {% elif gke_image_tag_type == 'timestamp' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}
+      {% elif gke_image_tag_type == 'git' %}{{ lookup('pipe', 'git rev-parse --short HEAD') }}
+      {% elif gke_image_tag_type == 'git-tag' %}{{ lookup('pipe', '(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD) 2>/dev/null || echo "unknown"') }}
+      {% else %}{{ gke_image_tag_type }}{% endif %}
+  delegate_to: localhost
+  run_once: true
+  tags: [always]
+
+- name: Display deployment plan
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      GKE Deployment Plan
+      ========================================
+      Cluster: {{ gke_cluster_name }} ({{ gke_cluster_zone }})
+      Image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+      Namespace: {{ gke_namespace }}
+      Multi-tenant: {{ gke_multi_tenant }}
+      {% if gke_multi_tenant %}
+      Tenants:
+      {% for tenant in gke_tenants %}
+        - {{ tenant.prefix }}: {{ tenant.name }}
+      {% endfor %}
+      {% endif %}
+
+      Operations:
+        Build Image: {{ gke_build_image }}
+        Push Image: {{ gke_push_image }}
+        Apply Config: {{ gke_apply_config }}
+        Run Migrations: {{ gke_run_migrations }}
+      ========================================
+  delegate_to: localhost
+  run_once: true
+  tags: [always]
+
+# ============================================================
+# GKE AUTHENTICATION
+# ============================================================
+
+- name: Get GKE cluster credentials
+  ansible.builtin.command:
+    cmd: >
+      gcloud container clusters get-credentials {{ gke_cluster_name }}
+      --zone {{ gke_cluster_zone }}
+      --project {{ gcp_project }}
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+  tags: [gke-auth]
+
+- name: Verify kubectl context
+  ansible.builtin.command:
+    cmd: kubectl config current-context
+  delegate_to: localhost
+  run_once: true
+  register: kubectl_context
+  changed_when: false
+  tags: [gke-auth]
+
+- name: Validate kubectl context
+  ansible.builtin.assert:
+    that:
+      - "'gke_' in kubectl_context.stdout"
+      - "gke_cluster_name in kubectl_context.stdout"
+      - "gcp_project in kubectl_context.stdout"
+    fail_msg: |
+      Wrong kubectl context: {{ kubectl_context.stdout }}
+      Expected context for cluster: {{ gke_cluster_name }} in project: {{ gcp_project }}
+  delegate_to: localhost
+  run_once: true
+  tags: [gke-auth]
+
+# ============================================================
+# DOCKER BUILD & PUSH
+# ============================================================
+
+- name: Build Docker image
+  ansible.builtin.command:
+    cmd: docker build -t {{ gke_image_name }}:{{ gke_computed_image_tag | trim }} {{ gke_docker_context | default('.') }}
+    chdir: "{{ gke_project_dir | default(playbook_dir + '/../../..') }}"
+  delegate_to: localhost
+  run_once: true
+  when: gke_build_image | bool
+  register: docker_build
+  tags: [docker, build]
+
+- name: Tag image as latest
+  ansible.builtin.command:
+    cmd: docker tag {{ gke_image_name }}:{{ gke_computed_image_tag | trim }} {{ gke_image_name }}:latest
+  delegate_to: localhost
+  run_once: true
+  when: gke_build_image | bool
+  tags: [docker, build]
+
+# Authenticate with Google Container Registry (GCR)
+# Uses --password-stdin to securely pass access token without exposing in process list
+# This is the recommended GCR authentication pattern per Google Cloud documentation
+- name: Authenticate with GCR
+  ansible.builtin.shell:
+    cmd: gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+  delegate_to: localhost
+  run_once: true
+  when: gke_push_image | bool
+  changed_when: false
+  no_log: true
+  tags: [docker, push]
+
+- name: Push Docker image
+  ansible.builtin.command:
+    cmd: docker push {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+  delegate_to: localhost
+  run_once: true
+  when: gke_push_image | bool
+  tags: [docker, push]
+
+- name: Push latest tag
+  ansible.builtin.command:
+    cmd: docker push {{ gke_image_name }}:latest
+  delegate_to: localhost
+  run_once: true
+  when: gke_push_image | bool
+  tags: [docker, push]
+
+# ============================================================
+# KUBERNETES SECRETS
+# ============================================================
+
+- name: Include secrets tasks
+  ansible.builtin.include_tasks: secrets.yml
+  tags: [secrets]
+
+# ============================================================
+# KUBERNETES DEPLOYMENT
+# ============================================================
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  when: gke_apply_config | bool
+  tags: [deploy]
+
+# ============================================================
+# CRONJOBS
+# ============================================================
+
+- name: Include cronjob tasks
+  ansible.builtin.include_tasks: cronjobs.yml
+  when: gke_deploy_cronjobs | bool
+  tags: [cronjobs]
+
+# ============================================================
+# VERIFICATION
+# ============================================================
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags: [verify]

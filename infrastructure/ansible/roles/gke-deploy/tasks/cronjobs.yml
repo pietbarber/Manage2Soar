@@ -1,0 +1,33 @@
+---
+# GKE Deploy Role - CronJob Deployment Tasks
+
+- name: Generate cronjobs manifest
+  ansible.builtin.template:
+    src: k8s-cronjobs.yml.j2
+    dest: "/tmp/k8s-cronjobs-{{ gke_namespace }}.yml"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+
+- name: Apply cronjobs configuration
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-cronjobs-{{ gke_namespace }}.yml
+  delegate_to: localhost
+  run_once: true
+  register: cronjobs_result
+  changed_when: "'configured' in cronjobs_result.stdout or 'created' in cronjobs_result.stdout"
+
+- name: Display cronjobs result
+  ansible.builtin.debug:
+    msg: "{{ cronjobs_result.stdout_lines }}"
+  delegate_to: localhost
+  run_once: true
+  when: cronjobs_result.stdout_lines is defined
+
+- name: Clean up cronjobs manifest
+  ansible.builtin.file:
+    path: "/tmp/k8s-cronjobs-{{ gke_namespace }}.yml"
+    state: absent
+  delegate_to: localhost
+  run_once: true
+  when: not (gke_keep_manifests | default(false))
