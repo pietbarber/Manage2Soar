@@ -90,6 +90,10 @@
             - gcp_project
             - gke_cluster_name
 
+    # Vault secrets validation (unified for single and multi-tenant)
+    # Single-tenant requires: vault_django_secret_key, vault_postgresql_password
+    # Multi-tenant requires: vault_django_secret_key, vault_postgresql_password_<tenant>
+    # Multi-tenant tenant-specific passwords validated in second play
     - name: Validate vault secrets (unified for both modes)
       ansible.builtin.assert:
         that:

@@ -113,6 +113,9 @@
   when: gke_build_image | bool
   tags: [docker, build]
 
+# Authenticate with Google Container Registry (GCR)
+# Uses --password-stdin to securely pass access token without exposing in process list
+# This is the recommended GCR authentication pattern per Google Cloud documentation
 - name: Authenticate with GCR
   ansible.builtin.shell:
     cmd: |

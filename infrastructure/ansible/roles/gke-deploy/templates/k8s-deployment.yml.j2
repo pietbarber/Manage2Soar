@@ -67,17 +67,17 @@ spec:
             limits:
               memory: "{{ gke_memory_limit }}"
               cpu: "{{ gke_cpu_limit }}"
+          # Health checks: Using TCP socket probes until /health/ endpoint is implemented
+          # TODO: Add dedicated health check view to Django that validates DB connectivity
           livenessProbe:
-            httpGet:
-              path: /health/
+            tcpSocket:
               port: {{ gke_container_port }}
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
-            httpGet:
-              path: /health/
+            tcpSocket:
               port: {{ gke_container_port }}
             initialDelaySeconds: 10
             periodSeconds: 5

@@ -137,6 +137,10 @@
 # ============================================================
 # CLEANUP
 # ============================================================
+# NOTE: Deployment manifests are cleaned at the end to allow debugging.
+# Secrets manifests are cleaned immediately after creation in secrets.yml
+# for security reasons. This is intentional - use gke_keep_manifests=true
+# to preserve all manifests for troubleshooting.
 
 - name: Clean up deployment manifest
   ansible.builtin.file:

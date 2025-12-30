@@ -13,6 +13,13 @@
 #   - Large tasks (SPRs, delinquents): 256Mi/200m CPU
 # Resource limits are based on observed production usage patterns and may need
 # tuning for datasets with significantly different sizes or email volumes.
+#
+# Rationale:
+#   - Small tasks: Minimal DB queries, few emails (< 10)
+#   - Medium tasks: Moderate DB queries, batch email processing (10-50 emails)
+#   - Large tasks: Complex queries, many emails (50+ emails), monthly reports
+# Consider overriding via gke_cronjob_resources_* variables in group_vars for
+# clubs with significantly larger member counts or duty roster sizes.
 
 ---
 # ============================================================
