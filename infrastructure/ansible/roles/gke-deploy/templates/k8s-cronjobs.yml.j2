@@ -385,62 +385,66 @@ spec:
                 secretName: {{ gke_gcp_sa_secret_name }}
 
 ---
-# Weekly: Maintenance Digest (Sunday 9:00 AM UTC)
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: {{ gke_deployment_name }}-send-maintenance-digest
-  namespace: {{ gke_namespace }}
-  labels:
-    app: {{ gke_deployment_name }}
-    cronjob: send-maintenance-digest
-{% if gke_multi_tenant %}
-    tenant: {{ gke_club_prefix }}
-{% endif %}
-spec:
-  schedule: "0 9 * * 0"  # Weekly on Sunday at 9:00 AM UTC
-  timeZone: "UTC"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      backoffLimit: 2
-      activeDeadlineSeconds: 600  # 10 minute timeout
-      template:
-        spec:
-          restartPolicy: Never
-          containers:
-            - name: send-maintenance-digest
-              image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
-              command:
-                - python
-                - manage.py
-                - send_maintenance_digest
-                - --verbosity=1
-              workingDir: /app
-              envFrom:
-                - secretRef:
-                    name: {{ gke_secret_name }}
-              env:
-                - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: {{ gke_gcp_credentials_path }}
-              volumeMounts:
-                - name: gcp-sa-key
-                  mountPath: {{ gke_gcp_credentials_path }}
-                  subPath: {{ gke_gcp_credentials_filename }}
-                  readOnly: true
-              resources:
-                requests:
-                  memory: "64Mi"
-                  cpu: "50m"
-                limits:
-                  memory: "128Mi"
-                  cpu: "100m"
-          volumes:
-            - name: gcp-sa-key
-              secret:
-                secretName: {{ gke_gcp_sa_secret_name }}
+# NOTE: Planned CronJob, currently disabled because the management command
+# doesn't exist yet. Uncomment this CronJob once
+# notifications/management/commands/send_maintenance_digest.py is implemented.
+#
+# # Weekly: Maintenance Digest (Sunday 9:00 AM UTC)
+# apiVersion: batch/v1
+# kind: CronJob
+# metadata:
+#   name: {{ gke_deployment_name }}-send-maintenance-digest
+#   namespace: {{ gke_namespace }}
+#   labels:
+#     app: {{ gke_deployment_name }}
+#     cronjob: send-maintenance-digest
+# {% if gke_multi_tenant %}
+#     tenant: {{ gke_club_prefix }}
+# {% endif %}
+# spec:
+#   schedule: "0 9 * * 0"  # Weekly on Sunday at 9:00 AM UTC
+#   timeZone: "UTC"
+#   concurrencyPolicy: Forbid
+#   successfulJobsHistoryLimit: 3
+#   failedJobsHistoryLimit: 3
+#   jobTemplate:
+#     spec:
+#       backoffLimit: 2
+#       activeDeadlineSeconds: 600  # 10 minute timeout
+#       template:
+#         spec:
+#           restartPolicy: Never
+#           containers:
+#             - name: send-maintenance-digest
+#               image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
+#               command:
+#                 - python
+#                 - manage.py
+#                 - send_maintenance_digest
+#                 - --verbosity=1
+#               workingDir: /app
+#               envFrom:
+#                 - secretRef:
+#                     name: {{ gke_secret_name }}
+#               env:
+#                 - name: GOOGLE_APPLICATION_CREDENTIALS
+#                   value: {{ gke_gcp_credentials_path }}
+#               volumeMounts:
+#                 - name: gcp-sa-key
+#                   mountPath: {{ gke_gcp_credentials_path }}
+#                   subPath: {{ gke_gcp_credentials_filename }}
+#                   readOnly: true
+#               resources:
+#                 requests:
+#                   memory: "64Mi"
+#                   cpu: "50m"
+#                 limits:
+#                   memory: "128Mi"
+#                   cpu: "100m"
+#           volumes:
+#             - name: gcp-sa-key
+#               secret:
+#                 secretName: {{ gke_gcp_sa_secret_name }}
 
 ---
 # Monthly: Duty Delinquent Report (1st of month, 7:00 AM UTC)

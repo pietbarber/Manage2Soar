@@ -138,8 +138,9 @@ gke_image_tag_type: "auto"
 # gke_image_tag: "v1.2.3"
 
 # Project directory (for Docker build context)
-# By default, this is set in the gke-deploy role's defaults/main.yml based on playbook_dir.
-# You normally do NOT need to set this here.
+# By default, this is set in the role's defaults/main.yml based on playbook_dir.
+# Only override if your repository layout differs from standard structure:
+# gke_project_dir: "/path/to/your/project"
 # If your playbook layout is non-standard, override with an explicit path, e.g.:
 # gke_project_dir: "/path/to/your/manage2soar/project"
 

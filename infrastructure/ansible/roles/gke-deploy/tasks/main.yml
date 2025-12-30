@@ -18,7 +18,7 @@
   ansible.builtin.set_fact:
     gke_computed_image_tag: >-
       {% if gke_image_tag is defined %}{{ gke_image_tag }}
-      {% elif not git_repo.stat.exists %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}nogit
+      {% elif not git_repo.stat.exists %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-nogit
       {% elif gke_image_tag_type == 'auto' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD') }}
       {% elif gke_image_tag_type == 'timestamp' %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}
       {% elif gke_image_tag_type == 'git' %}{{ lookup('pipe', 'git rev-parse --short HEAD') }}

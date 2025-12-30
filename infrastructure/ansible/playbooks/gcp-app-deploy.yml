@@ -106,8 +106,9 @@
             - vault_postgresql_password (for single-tenant)
             - vault_postgresql_password_<prefix> for each tenant (for multi-tenant)
 
-          NOTE: Multi-tenant vault secrets validated in second play after tenant
-          filtering (allows deploying single tenant without all tenant passwords)
+          NOTE: Multi-tenant tenant-specific passwords are validated in the second
+          play after tenant filtering (allows deploying single tenant with
+          --extra-vars gke_deploy_tenant=<prefix> without requiring all tenant passwords)
       no_log: true
 
     - name: Display deployment configuration
