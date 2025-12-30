@@ -90,7 +90,7 @@
             - gcp_project
             - gke_cluster_name
 
-    - name: Validate vault secrets
+    - name: Validate vault secrets (unified for both modes)
       ansible.builtin.assert:
         that:
           - vault_django_secret_key is defined
@@ -100,6 +100,18 @@
           Please configure group_vars/gcp_app/vault.yml with:
             - vault_django_secret_key
             - vault_postgresql_password (for single-tenant)
+            - vault_postgresql_password_<prefix> for each tenant (for multi-tenant)
+      no_log: true
+
+    - name: Validate multi-tenant vault secrets early
+      ansible.builtin.assert:
+        that:
+          - (lookup('vars', 'vault_postgresql_password_' + item.prefix, default='') | length) > 0
+        fail_msg: |
+          Missing vault secret for tenant: {{ item.prefix }}
+          Please add vault_postgresql_password_{{ item.prefix }} to vault.yml
+      loop: "{{ gke_tenants | default([]) }}"
+      when: gke_multi_tenant | default(false)
       no_log: true
 
     - name: Display deployment configuration
@@ -184,12 +196,12 @@
           ansible.builtin.set_fact:
             gke_shared_image_tag: >-
               {% if gke_image_tag is defined %}{{ gke_image_tag }}
-              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD') }}{% endif %}
+              {% else %}{{ lookup('pipe', 'date +%Y%m%d-%H%M') }}-{{ lookup('pipe', 'git rev-parse --short HEAD 2>/dev/null || echo nogit') }}{% endif %}
 
         - name: Build Docker image
           ansible.builtin.command:
             cmd: docker build -t gcr.io/{{ gcp_project }}/{{ gke_app_name | default('manage2soar') }}:{{ gke_shared_image_tag | trim }} .
-            chdir: "{{ gke_project_dir | default(playbook_dir + '/../../..') }}"
+            chdir: "{{ gke_project_dir | default(playbook_dir | dirname | dirname | dirname) }}"
           when: gke_build_image | default(true) | bool
           tags: [docker, build]
 
@@ -208,6 +220,25 @@
           tags: [docker, push]
       run_once: true
       tags: [docker]
+
+    # Validate image availability for deploy-only scenarios
+    - name: Ensure shared image tag is available for deployment
+      block:
+        - name: Check if shared image tag is defined
+          ansible.builtin.assert:
+            that:
+              - gke_shared_image_tag is defined or gke_image_tag is defined
+            fail_msg: >-
+              No Docker image tag is available for deployment. Either run without
+              restricting tags (to build/push), or provide gke_image_tag for existing image.
+
+        - name: Use provided image tag if shared tag not set
+          ansible.builtin.set_fact:
+            gke_shared_image_tag: "{{ gke_image_tag | trim }}"
+          when:
+            - gke_shared_image_tag is not defined
+            - gke_image_tag is defined
+      tags: [deploy]
 
     # Deploy each tenant
     - name: Deploy each tenant

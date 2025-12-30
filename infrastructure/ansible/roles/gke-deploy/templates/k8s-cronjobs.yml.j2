@@ -6,6 +6,13 @@
 # Generated: {{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -Iseconds')) }}
 #
 # These CronJobs match the actual production k8s-cronjobs.yaml configuration
+#
+# Resource Allocation Strategy:
+#   - Small tasks (clearsessions, duty emails): 64Mi/50m CPU
+#   - Medium tasks (aging logsheets, maintenance): 128Mi/100m CPU
+#   - Large tasks (SPRs, delinquents): 256Mi/200m CPU
+# Resource limits are based on observed production usage patterns and may need
+# tuning for datasets with significantly different sizes or email volumes.
 
 ---
 # ============================================================

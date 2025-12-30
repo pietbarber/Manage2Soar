@@ -46,7 +46,6 @@ gke_replicas: 2
 # CONTAINER RESOURCES
 # ============================================================
 
-# CPU requests and limits
 # CPU requests and limits (tune per workload; these are safe defaults for Django)
 gke_cpu_request: "250m"
 gke_cpu_limit: "500m"
@@ -71,8 +70,10 @@ gke_django_settings_module: "manage2soar.settings"
 # Django debug mode (NEVER true in production)
 gke_django_debug: false
 
-# Allowed hosts (comma-separated)
-gke_django_allowed_hosts: "*"
+# Allowed hosts (comma-separated, e.g. "example.com,www.example.com")
+# IMPORTANT: Do NOT use "*" in production. This default is intentionally empty
+# so that deployments must explicitly set safe hostnames.
+gke_django_allowed_hosts: ""
 
 # ============================================================
 # DATABASE CONNECTION
@@ -102,6 +103,10 @@ gke_gcs_bucket: "{{ gcp_project }}"
 
 # GCS project ID
 gke_gcs_project_id: "{{ gcp_project }}"
+
+# GCS default ACL (private or publicRead)
+# SECURITY: Use 'private' for sensitive data, 'publicRead' only for truly public assets
+gke_gcs_default_acl: "private"
 
 # Club prefix for media/static paths
 gke_club_prefix: "{{ club_prefix | default('club') }}"

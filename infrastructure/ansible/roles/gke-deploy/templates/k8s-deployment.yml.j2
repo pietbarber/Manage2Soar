@@ -40,7 +40,9 @@ spec:
       containers:
         - name: django
           image: {{ gke_image_name }}:{{ gke_computed_image_tag | trim }}
-          imagePullPolicy: Always          workingDir: /app          ports:
+          imagePullPolicy: Always
+          workingDir: /app
+          ports:
             - containerPort: {{ gke_container_port }}
               protocol: TCP
           env:

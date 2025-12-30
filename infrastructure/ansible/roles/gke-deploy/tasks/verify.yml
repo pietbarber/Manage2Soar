@@ -33,7 +33,12 @@
         echo "No running pods found for app={{ gke_deployment_name }} in namespace {{ gke_namespace }}"
         exit 0
       fi
-      kubectl exec "$POD" -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true
+      ENV_VARS=$(kubectl exec "$POD" -n {{ gke_namespace }} -- env | grep -E '^(DJANGO_DEBUG|DB_HOST|CLUB_PREFIX|MEDIA_URL)=' || true)
+      if [ -z "$ENV_VARS" ]; then
+        echo "Expected environment variables (DJANGO_DEBUG, DB_HOST, CLUB_PREFIX, MEDIA_URL) not found in pod $POD"
+        exit 1
+      fi
+      echo "$ENV_VARS"
   delegate_to: localhost
   run_once: true
   register: env_check
@@ -65,6 +70,7 @@
     that:
       - deployment_status.stdout is defined
       - "'/' in deployment_status.stdout"
+      - "deployment_status.stdout.split('/') | length == 2"
       - "deployment_status.stdout.split('/')[0] == deployment_status.stdout.split('/')[1]"
     fail_msg: |
       Deployment is not healthy!
