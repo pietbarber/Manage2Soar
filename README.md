@@ -228,10 +228,9 @@ ansible-playbook -i inventory/single_host.yml playbooks/single-host.yml
 ### Quick Start: GKE Deployment
 ```bash
 cd infrastructure/ansible
-ansible-playbook playbooks/gcp-app-deploy.yml \
-  --extra-vars "project_id=your-project" \
-  --extra-vars "gke_cluster_name=your-cluster" \
-  --extra-vars "image_tag=latest"
+cp inventory/gcp_app.yml.example inventory/gcp_app.yml
+# Edit inventory/gcp_app.yml and related group_vars/vault files with your GCP project and cluster details
+ansible-playbook -i inventory/gcp_app.yml playbooks/gcp-app-deploy.yml
 ```
 
 ### 📚 Deployment Documentation
