@@ -211,8 +211,8 @@ Manage2Soar offers **fully automated deployment** via Ansible playbooks. Choose 
 | Feature | Single-Host | GKE (Kubernetes) |
 |---------|-------------|------------------|
 | **Best For** | Small clubs, simple setup | Large clubs, multi-tenant |
-| **Infrastructure** | Single VM (Docker Compose) | Google Kubernetes Engine |
-| **Database** | SQLite or local PostgreSQL | Cloud SQL (PostgreSQL) |
+| **Infrastructure** | Single VM (Gunicorn/systemd) | Google Kubernetes Engine |
+| **Database** | Local PostgreSQL | Cloud SQL (PostgreSQL) |
 | **Scaling** | Vertical only | Horizontal pod scaling |
 | **High Availability** | No | Yes (2+ pods) |
 | **Setup Complexity** | Low | Medium |
@@ -220,15 +220,15 @@ Manage2Soar offers **fully automated deployment** via Ansible playbooks. Choose 
 ### Quick Start: Single-Host Deployment
 ```bash
 cd infrastructure/ansible
-cp hosts.example hosts.ini
-# Edit hosts.ini with your server details
-ansible-playbook -i hosts.ini deploy.yml
+cp inventory/single_host.yml.example inventory/single_host.yml
+# Edit inventory/single_host.yml with your server details
+ansible-playbook -i inventory/single_host.yml playbooks/single-host.yml
 ```
 
 ### Quick Start: GKE Deployment
 ```bash
 cd infrastructure/ansible
-ansible-playbook gcp-app-deploy.yml \
+ansible-playbook playbooks/gcp-app-deploy.yml \
   --extra-vars "project_id=your-project" \
   --extra-vars "gke_cluster_name=your-cluster" \
   --extra-vars "image_tag=latest"

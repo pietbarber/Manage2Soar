@@ -114,12 +114,16 @@ gcloud container clusters get-credentials CLUSTER_NAME \
 ```bash
 cd infrastructure/ansible
 
-# Create configuration directory
+# Create configuration directories
 mkdir -p group_vars/gcp_app
+mkdir -p inventory
 
-# Copy example files
+# Copy example variable files
 cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
 cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
+
+# Copy example inventory file
+cp inventory/gcp_app.yml.example inventory/gcp_app.yml
 ```
 
 Edit `group_vars/gcp_app/vars.yml`:
@@ -203,7 +207,7 @@ infrastructure/ansible/
 │   ├── gcp_app.vars.yml.example    # Template for vars
 │   └── gcp_app.vault.yml.example   # Template for secrets
 ├── inventory/
-│   └── gcp_app.yml                 # Inventory file
+│   └── gcp_app.yml.example         # Inventory template (copy to gcp_app.yml)
 ├── playbooks/
 │   └── gcp-app-deploy.yml          # Main GKE deployment playbook
 └── roles/

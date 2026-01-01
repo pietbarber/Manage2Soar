@@ -233,7 +233,7 @@ infrastructure/ansible/
 │   └── gke-deployment-guide.md    # GKE deployment documentation
 ├── inventory/
 │   ├── single_host.yml.example    # Single-host inventory template
-│   └── gcp_app.yml                # GKE inventory
+│   └── gcp_app.yml.example        # GKE inventory template (copy to gcp_app.yml)
 ├── group_vars/
 │   ├── single_host/               # Single-host config (gitignored)
 │   │   ├── vars.yml               # Non-secret variables
