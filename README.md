@@ -72,8 +72,11 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 
 
 ### Deployment & Cloud
-- **Kubernetes-ready:** This project includes manifests and configuration for Kubernetes deployment.
-- **GCP Support:** Out-of-the-box configuration for Google Cloud Platform (GCP) is provided; see `k8s-deployment.yaml` and related files for details.
+- **Ansible Automation:** Fully automated deployment via Ansible playbooks for both single-host and GKE environments
+- **Kubernetes-ready:** Production-tested on Google Kubernetes Engine (GKE) with 2-pod deployments
+- **GCP Support:** Integrated with Cloud SQL, GCR, Cloud Storage, and Secret Manager
+- **Multi-Tenant:** Supports deploying multiple club instances on shared infrastructure
+- See [Production Deployment](#-production-deployment) below for details
 
 ### Notes
 - All Python dependencies are listed in `requirements.txt`.
@@ -200,6 +203,40 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
    ```bash
    python manage.py runserver
    ```
+
+# 🚀 Production Deployment
+
+Manage2Soar offers **fully automated deployment** via Ansible playbooks. Choose the deployment option that fits your club:
+
+| Feature | Single-Host | GKE (Kubernetes) |
+|---------|-------------|------------------|
+| **Best For** | Small clubs, simple setup | Large clubs, multi-tenant |
+| **Infrastructure** | Single VM (Gunicorn/systemd) | Google Kubernetes Engine |
+| **Database** | Local PostgreSQL | Cloud SQL (PostgreSQL) |
+| **Scaling** | Vertical only | Horizontal pod scaling |
+| **High Availability** | No | Yes (2+ pods) |
+| **Setup Complexity** | Low | Medium |
+
+### Quick Start: Single-Host Deployment
+```bash
+cd infrastructure/ansible
+cp inventory/single_host.yml.example inventory/single_host.yml
+# Edit inventory/single_host.yml with your server details
+ansible-playbook -i inventory/single_host.yml playbooks/single-host.yml
+```
+
+### Quick Start: GKE Deployment
+```bash
+cd infrastructure/ansible
+cp inventory/gcp_app.yml.example inventory/gcp_app.yml
+# Edit inventory/gcp_app.yml and related group_vars/vault files with your GCP project and cluster details
+ansible-playbook -i inventory/gcp_app.yml playbooks/gcp-app-deploy.yml
+```
+
+### 📚 Deployment Documentation
+- **[infrastructure/ansible/README.md](infrastructure/ansible/README.md)** – Deployment overview and comparison
+- **[GKE Deployment Guide](infrastructure/ansible/docs/gke-deployment-guide.md)** – Comprehensive GKE deployment guide
+- **[Single-Host Guide](docs/single-host-ansible-deployment.md)** – Single VM deployment details
 
 ## 🔒 **Security & Code Quality**
 

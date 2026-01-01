@@ -1,6 +1,17 @@
-# Manage2Soar Single-Host Ansible Deployment
+# Manage2Soar Ansible Deployment
 
-This directory contains Ansible playbooks and roles for deploying a complete Manage2Soar instance on a single server. This is ideal for small to medium-sized soaring clubs that want a self-hosted solution.
+This directory contains Ansible playbooks and roles for deploying Manage2Soar. Two deployment options are available:
+
+| Deployment Type | Best For | Cost | Complexity |
+|----------------|----------|------|------------|
+| **[Single-Host](#single-host-deployment)** | Small-medium clubs, self-hosted | ~$12-24/month VPS | Low |
+| **[GKE (Kubernetes)](docs/gke-deployment-guide.md)** | Large clubs, multi-tenant, high availability | ~$70-150/month | Medium |
+
+---
+
+# Single-Host Deployment
+
+This section covers deploying a complete Manage2Soar instance on a single server. This is ideal for small to medium-sized soaring clubs that want a self-hosted solution.
 
 ## Architecture Overview
 
@@ -218,20 +229,30 @@ ansible-playbook -i inventory/single_host.yml \
 
 ```
 infrastructure/ansible/
+├── docs/
+│   └── gke-deployment-guide.md    # GKE deployment documentation
 ├── inventory/
-│   └── single_host.yml.example     # Inventory template
+│   ├── single_host.yml.example    # Single-host inventory template
+│   └── gcp_app.yml.example        # GKE inventory template (copy to gcp_app.yml)
 ├── group_vars/
-│   ├── single_host/                # Your configuration (gitignored)
+│   ├── single_host/               # Single-host config (gitignored)
 │   │   ├── vars.yml               # Non-secret variables
 │   │   └── vault.yml              # Encrypted secrets
+│   ├── gcp_app/                   # GKE config (gitignored)
+│   │   ├── vars.yml               # GCP/GKE variables
+│   │   └── vault.yml              # Encrypted secrets
 │   ├── single_host.vars.yml.example
-│   └── single_host.vault.yml.example
+│   ├── single_host.vault.yml.example
+│   ├── gcp_app.vars.yml.example   # GKE variables template
+│   └── gcp_app.vault.yml.example  # GKE secrets template
 ├── playbooks/
-│   ├── single-host.yml            # Main deployment playbook
+│   ├── single-host.yml            # Single-host deployment
+│   ├── gcp-app-deploy.yml         # GKE deployment
 │   ├── test-postgresql.yml        # PostgreSQL testing
 │   ├── test-nginx.yml             # NGINX testing
 │   └── test-m2s-app.yml           # Application testing
 └── roles/
+    ├── gke-deploy/                # GKE deployment role
     ├── postgresql/                # Database role
     ├── nginx/                     # Web server role
     ├── m2s-app/                   # Django application role
@@ -524,6 +545,30 @@ sudo certbot --nginx -d your-domain.com
 3. **fail2ban**: Installed and configured automatically
 4. **Updates**: Keep the server updated with `apt upgrade`
 5. **Backups**: PostgreSQL backups are automatic; also backup `/var/www/m2s/media`
+
+---
+
+# GKE Deployment
+
+For deploying to Google Kubernetes Engine (GKE), see the comprehensive guide:
+
+📘 **[GKE Deployment Guide](docs/gke-deployment-guide.md)**
+
+GKE deployment features:
+- **Multi-tenant support** - Deploy multiple soaring clubs to one cluster
+- **Automatic rollback** - Failed deployments automatically roll back
+- **Kubernetes secrets** - Secure secrets management via Ansible Vault
+- **CronJob management** - Scheduled Django management commands
+- **Docker image versioning** - Automatic tagging with git commit hashes
+
+Quick start:
+
+```bash
+# Full GKE deployment
+ansible-playbook -i inventory/gcp_app.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-app-deploy.yml
+```
 
 ## License
 
