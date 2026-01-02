@@ -147,7 +147,7 @@
         name: "{{ gke_subnet_name }}"
         project: "{{ gcp_project }}"
         region: "{{ gcp_region }}"
-        network: "{{ gke_vpc }}"
+        network: "{{ gke_vpc.selfLink }}"
         ip_cidr_range: "{{ gke_subnet_cidr }}"
         secondary_ip_ranges:
           - range_name: "pods"
@@ -233,9 +233,8 @@
       changed_when: autoscaling_result.rc == 0
       failed_when: >
         autoscaling_result.rc != 0 and
-        (autoscaling_result.stderr is not defined or
-         ('already has autoscaling' not in (autoscaling_result.stderr | lower) and
-          'already configured' not in (autoscaling_result.stderr | lower)))
+        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower) and
+        'already configured' not in (autoscaling_result.stderr | default('') | lower)
       tags: [nodepool]
 
     # ============================================================
