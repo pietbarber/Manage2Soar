@@ -1,0 +1,47 @@
+# GKE Cluster Provisioning Vault Secrets
+#
+# COPY THIS FILE AND ENCRYPT:
+#   mkdir -p group_vars/gcp_cluster
+#   cp group_vars/gcp_cluster.vault.yml.example group_vars/gcp_cluster/vault.yml
+#   ansible-vault encrypt group_vars/gcp_cluster/vault.yml
+#
+# This file contains secrets for GKE cluster provisioning.
+# It should be encrypted with ansible-vault before committing.
+#
+# IMPORTANT: For most use cases, you don't need secrets here!
+# The playbook uses your gcloud CLI authentication by default.
+# Only add service account credentials if you need unattended/CI provisioning.
+
+---
+# ============================================================
+# GCP SERVICE ACCOUNT (Optional)
+# ============================================================
+# Only needed if you're NOT using gcloud CLI authentication.
+# For CI/CD pipelines or automated provisioning, provide a service account.
+#
+# The service account needs these roles:
+#   - roles/container.admin (create/manage GKE clusters)
+#   - roles/compute.admin (create VPCs, subnets, firewall rules)
+#   - roles/iam.serviceAccountUser (for node service account)
+#   - roles/serviceusage.serviceUsageAdmin (enable APIs)
+
+# Option 1: Path to service account JSON key file
+# vault_gcp_service_account_file: "/path/to/service-account.json"
+
+# Option 2: Service account JSON content (inline)
+# Generate this from GCP Console > IAM > Service Accounts > Keys
+# vault_gcp_service_account_contents: |
+#   {
+#     "type": "service_account",
+#     "project_id": "your-project-id",
+#     ... (paste your service account JSON here)
+#   }
+
+# ============================================================
+# CLUSTER SECRETS (Optional)
+# ============================================================
+# These are rarely needed for cluster provisioning.
+# Most secrets are for the application deployment (gcp_app vault).
+
+# Master authorized network for your IP (if you want to restrict API access)
+# vault_admin_ip_cidr: "203.0.113.50/32"
