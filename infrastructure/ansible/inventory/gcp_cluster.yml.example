@@ -25,7 +25,7 @@ all:
     # ============================================================
     # WARNING: YOU MUST CHANGE THIS VALUE.
     # Set this to your actual GCP project ID (e.g. "my-real-gcp-project").
-    gcp_project: ""
+    gcp_project: "your-gcp-project-id"
     gcp_region: "us-central1"
     gcp_zone: "us-central1-c"
 
@@ -40,10 +40,6 @@ all:
     # - standard: Full control over nodes, node pools, and scaling
     # - autopilot: Google manages nodes, pay per pod resource usage
     gke_cluster_type: "standard"
-
-    # Kubernetes version (leave empty for latest stable)
-    # Examples: "1.28", "1.29", "latest"
-    gke_kubernetes_version: ""
 
     # ============================================================
     # NETWORKING
@@ -90,17 +86,6 @@ all:
     # Workload Identity (recommended for GCP service access)
     gke_enable_workload_identity: true
 
-    # Private cluster (nodes have no public IPs)
-    gke_private_cluster: false
-
-    # Master authorized networks (CIDR blocks that can access the API server)
-    # Leave empty to allow all IPs (not recommended for production)
-    gke_master_authorized_networks: []
-    # Example:
-    # gke_master_authorized_networks:
-    #   - display_name: "Office"
-    #     cidr_block: "203.0.113.0/24"
-
     # ============================================================
     # FEATURES
     # ============================================================
@@ -110,9 +95,6 @@ all:
 
     # Enable network policy (for pod-to-pod network security)
     gke_enable_network_policy: false
-
-    # Enable vertical pod autoscaling
-    gke_enable_vpa: false
 
     # ============================================================
     # GCP APIS TO ENABLE

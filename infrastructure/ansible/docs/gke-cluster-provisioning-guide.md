@@ -199,14 +199,13 @@ gke_services_cidr: "10.8.0.0/20"
 | `gke_create_vpc` | `false` | Create dedicated VPC |
 | `gke_vpc_name` | `"manage2soar-vpc"` | VPC name |
 | `gke_subnet_cidr` | `"10.0.0.0/20"` | Subnet CIDR |
-| `gke_private_cluster` | `false` | Private cluster (no public IPs) |
+| `gke_private_cluster` | `false` | ⚠️ Not yet implemented - Reserved for future use |
 
 ### Security
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gke_enable_workload_identity` | `true` | Enable Workload Identity |
-| `gke_master_authorized_networks` | `[]` | CIDRs that can access API |
 
 ## Playbook Tags
 
@@ -317,7 +316,7 @@ gcloud compute networks delete VPC_NAME
 
 ## Cost Estimates
 
-Approximate monthly costs (as of 2025):
+Approximate monthly costs (as of January 2026):
 
 | Configuration | Monthly Cost |
 |---------------|--------------|

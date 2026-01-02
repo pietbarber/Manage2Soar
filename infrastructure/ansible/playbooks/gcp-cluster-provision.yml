@@ -80,6 +80,13 @@
           Invalid cluster type: {{ gke_cluster_type }}
           Must be 'standard' or 'autopilot'.
 
+    - name: Verify GCP project exists and user has access
+      ansible.builtin.command:
+        cmd: "gcloud projects describe {{ gcp_project }}"
+      register: project_check
+      changed_when: false
+      failed_when: project_check.rc != 0
+
     - name: Display provisioning configuration
       ansible.builtin.debug:
         msg: |
@@ -110,7 +117,7 @@
         cmd: "gcloud services enable {{ item }} --project={{ gcp_project }}"
       loop: "{{ gcp_apis_to_enable }}"
       register: api_enable_result
-      changed_when: "'already enabled' not in api_enable_result.stderr"
+      changed_when: "'already enabled' not in api_enable_result.stdout and 'already enabled' not in api_enable_result.stderr"
       tags: [apis]
 
     - name: Wait for APIs to propagate
@@ -176,8 +183,7 @@
             disabled: "{{ not gke_enable_http_load_balancing }}"
           network_policy_config:
             disabled: "{{ not gke_enable_network_policy }}"
-        workload_identity_config:
-          workload_pool: "{{ gcp_project }}.svc.id.goog"
+        workload_identity_config: "{{ {'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit }}"
         resource_labels: "{{ gke_cluster_labels | default({}) }}"
         auth_kind: application
         state: present
@@ -201,6 +207,10 @@
       register: autopilot_result
       when: gke_cluster_type == 'autopilot'
       changed_when: autopilot_result.rc == 0
+      failed_when: >
+        autopilot_result.rc != 0 and
+        (autopilot_result.stderr is not defined or
+         'already exists' not in (autopilot_result.stderr | lower))
       tags: [cluster]
 
     # ============================================================

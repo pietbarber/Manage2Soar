@@ -54,18 +54,11 @@ gke_cluster_labels:
   managed-by: "ansible"
 
 # ============================================================
-# MAINTENANCE WINDOW
+# FUTURE ENHANCEMENTS
 # ============================================================
-# Define when automatic maintenance can occur
-# Format: RFC3339 timestamp for start, duration in hours
-# gke_maintenance_start_time: "2026-01-01T09:00:00Z"
-# gke_maintenance_duration: "4h"
-
-# ============================================================
-# RESOURCE QUOTAS
-# ============================================================
-# Optional: Set resource quotas for the cluster
-# gke_resource_quotas:
-#   cpu: "100"
-#   memory: "200Gi"
-#   pods: "500"
+# The following features are planned but not yet implemented:
+# - Maintenance windows
+# - Resource quotas
+# - Private clusters
+# - VPA (Vertical Pod Autoscaling)
+# See https://github.com/pietbarber/Manage2Soar/issues for status
