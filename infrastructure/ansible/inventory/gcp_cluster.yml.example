@@ -29,7 +29,7 @@ all:
     # ============================================================
     # WARNING: YOU MUST CHANGE THIS VALUE.
     # Set this to your actual GCP project ID (e.g. "my-real-gcp-project").
-    gcp_project: ""
+    gcp_project: "REQUIRED-SET-YOUR-PROJECT-ID"
     gcp_region: "us-central1"
     gcp_zone: "us-central1-c"
 
@@ -65,13 +65,14 @@ all:
     # NODE POOL CONFIGURATION (Standard clusters only)
     # ============================================================
 
-    # Default node pool name used by autoscaling and node-pool level settings.
+    # Initial/fallback node pool name used by autoscaling and node-pool level settings.
     # NOTE:
     #   - This variable does NOT create or rename the node pool by itself.
-    #   - The actual node pool name is determined by the cluster provisioning
-    #     playbook/commands (often "default-pool" for standard clusters).
-    #   - You MUST ensure this value matches the name of the node pool that
-    #     is actually created; otherwise autoscaling configuration may fail.
+    #   - The cluster provisioning playbook will normally auto-detect the
+    #     actual node pool name (often "default-pool" for standard clusters)
+    #     and overwrite this variable before it is used.
+    #   - In most cases you do NOT need to change this value. Only override it
+    #     if you disable/skip auto-detection and need to force a specific pool.
     gke_node_pool_name: "default-pool"
     gke_machine_type: "e2-medium"
     gke_disk_size_gb: 50
