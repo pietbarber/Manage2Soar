@@ -324,7 +324,7 @@ gcloud compute networks delete VPC_NAME
 
 ## Cost Estimates
 
-Approximate monthly costs (as of January 2026):
+Approximate monthly costs (subject to change; check current GCP pricing):
 
 | Configuration | Monthly Cost |
 |---------------|--------------|
