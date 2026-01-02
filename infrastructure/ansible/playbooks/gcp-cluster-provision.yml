@@ -191,6 +191,27 @@
       when: gke_cluster_type == 'standard'
       tags: [cluster]
 
+    - name: Get actual node pool name from Standard cluster
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools list
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --format="value(name)"
+      register: actual_nodepool_name
+      changed_when: false
+      when: gke_cluster_type == 'standard'
+      tags: [cluster]
+
+    - name: Set node pool name fact
+      ansible.builtin.set_fact:
+        gke_node_pool_name: "{{ actual_nodepool_name.stdout_lines[0] | default(gke_node_pool_name) }}"
+      when:
+        - gke_cluster_type == 'standard'
+        - actual_nodepool_name.stdout_lines | length > 0
+      tags: [cluster]
+
     - name: Create GKE Autopilot cluster
       ansible.builtin.command:
         cmd: >

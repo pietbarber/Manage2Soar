@@ -7,7 +7,11 @@
 # Since cluster provisioning runs from localhost (using gcloud/API),
 # no remote hosts are needed.
 #
-# Usage:
+# Usage (most local setups with gcloud CLI authentication):
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml
+#
+# Optional - For CI/CD or unattended provisioning with service account:
 #   ansible-playbook -i inventory/gcp_cluster.yml \
 #     --vault-password-file ~/.ansible_vault_pass \
 #     playbooks/gcp-cluster-provision.yml
