@@ -328,7 +328,7 @@ Approximate monthly costs (subject to change; check current GCP pricing):
 
 | Configuration | Monthly Cost |
 |---------------|--------------|
-| 2x e2-small (spot) | ~$15 |
+| 2x e2-small (spot) | ~$20 |
 | 2x e2-medium | ~$50 |
 | 2x e2-medium (spot) | ~$20 |
 | 3x e2-standard-4 | ~$200 |

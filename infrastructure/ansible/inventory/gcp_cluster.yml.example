@@ -65,14 +65,15 @@ all:
     # NODE POOL CONFIGURATION (Standard clusters only)
     # ============================================================
 
-    # Initial/fallback node pool name used by autoscaling and node-pool level settings.
+    # Fallback/default node pool name used by autoscaling and node‑pool‑level settings.
     # NOTE:
     #   - This variable does NOT create or rename the node pool by itself.
-    #   - The cluster provisioning playbook will normally auto-detect the
+    #   - The cluster provisioning playbook will normally auto‑detect the
     #     actual node pool name (often "default-pool" for standard clusters)
     #     and overwrite this variable before it is used.
-    #   - In most cases you do NOT need to change this value. Only override it
-    #     if you disable/skip auto-detection and need to force a specific pool.
+    #   - In typical setups you do not need to change this value because
+    #     auto‑detection will supply the correct name; override it only if you
+    #     intentionally disable/skip auto‑detection and must force a specific pool.
     gke_node_pool_name: "default-pool"
     gke_machine_type: "e2-medium"
     gke_disk_size_gb: 50

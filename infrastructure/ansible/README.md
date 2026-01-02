@@ -6,7 +6,7 @@ This directory contains Ansible playbooks and roles for deploying Manage2Soar. T
 |----------------|----------|------|------------|
 | **[Single-Host](#single-host-deployment)** | Small-medium clubs, self-hosted | ~$12-24/month VPS | Low |
 | **[GKE (Kubernetes)](docs/gke-deployment-guide.md)** | Large clubs, multi-tenant, high availability | ~$70-150/month | Medium |
-| **[GKE Cluster Provisioning](docs/gke-cluster-provisioning-guide.md)** | Create new GKE clusters | One-time setup | Low |
+| **[GKE Cluster Provisioning](docs/gke-cluster-provisioning-guide.md)** | Create new GKE clusters | See cluster costs | Low |
 
 ## Complete GKE Workflow
 

@@ -20,11 +20,17 @@
 # Only needed if you're NOT using gcloud CLI authentication.
 # For CI/CD pipelines or automated provisioning, provide a service account.
 #
-# The service account needs these roles:
-#   - roles/container.admin (create/manage GKE clusters)
-#   - roles/compute.admin (create VPCs, subnets, firewall rules)
-#   - roles/iam.serviceAccountUser (for node service account)
-#   - roles/serviceusage.serviceUsageAdmin (enable APIs)
+# The service account needs roles that follow the principle of least privilege.
+# Example (development / small projects):
+#   - roles/container.clusterAdmin        (create/manage GKE clusters)
+#   - roles/compute.networkAdmin          (manage VPCs, subnets, routes)
+#   - roles/compute.securityAdmin         (manage firewall rules)
+#   - roles/compute.instanceAdmin.v1      (create/manage VM instances as needed)
+#   - roles/iam.serviceAccountUser        (impersonate node service account)
+#   - roles/serviceusage.serviceUsageAdmin (enable required APIs, if not handled elsewhere)
+#
+# For production CI/CD, prefer custom IAM roles that include only the specific
+# permissions your provisioning playbooks require, instead of broad *Admin roles.
 
 # Option 1: Path to service account JSON key file
 # vault_gcp_service_account_file: "/path/to/service-account.json"
