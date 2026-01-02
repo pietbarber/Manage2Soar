@@ -1,0 +1,345 @@
+# GKE Cluster Provisioning Playbook
+#
+# This playbook provisions Google Kubernetes Engine (GKE) clusters using
+# the google.cloud Ansible collection. It supports both Standard and
+# Autopilot cluster types.
+#
+# Prerequisites:
+#   1. Install required Ansible collections:
+#      ansible-galaxy collection install google.cloud
+#      ansible-galaxy collection install community.general
+#
+#   2. Authenticate with GCP:
+#      gcloud auth application-default login
+#
+#   3. Copy and configure inventory:
+#      cp inventory/gcp_cluster.yml.example inventory/gcp_cluster.yml
+#      # Edit inventory/gcp_cluster.yml with your project settings
+#
+# Usage:
+#   # Provision a new GKE cluster
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml
+#
+#   # Dry run (check what would be created)
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml --check
+#
+#   # Provision with custom settings
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml \
+#     -e gke_cluster_name=my-cluster \
+#     -e gke_machine_type=e2-standard-4
+#
+#   # Provision Autopilot cluster
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml \
+#     -e gke_cluster_type=autopilot
+#
+# Tags:
+#   - apis: Enable required GCP APIs
+#   - network: VPC and subnet creation
+#   - cluster: GKE cluster creation
+#   - nodepool: Node pool configuration (Standard only)
+#   - verify: Verification and status checks
+
+---
+- name: Provision GKE Cluster
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    # ============================================================
+    # VALIDATION
+    # ============================================================
+    - name: Validate GCP project is defined
+      ansible.builtin.assert:
+        that:
+          - gcp_project is defined
+          - gcp_project | length > 0
+        fail_msg: |
+          GCP project is not configured.
+          Please set gcp_project in inventory/gcp_cluster.yml
+
+    - name: Validate GCP project is not placeholder
+      ansible.builtin.assert:
+        that:
+          - gcp_project not in ['your-gcp-project-id', 'CHANGEME', 'changeme', 'example-project', '']
+          - gcp_project | lower is not match('^your-')
+        fail_msg: |
+          GCP project is set to a placeholder value: {{ gcp_project }}
+          Please set gcp_project to your actual GCP project ID.
+
+    - name: Validate cluster type
+      ansible.builtin.assert:
+        that:
+          - gke_cluster_type in ['standard', 'autopilot']
+        fail_msg: |
+          Invalid cluster type: {{ gke_cluster_type }}
+          Must be 'standard' or 'autopilot'.
+
+    - name: Verify GCP project exists and user has access
+      ansible.builtin.command:
+        cmd: "gcloud projects describe {{ gcp_project }}"
+      register: project_check
+      changed_when: false
+      failed_when: project_check.rc != 0
+
+    - name: Display provisioning configuration
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GKE Cluster Provisioning Configuration
+          ========================================
+          Project: {{ gcp_project }}
+          Region: {{ gcp_region }}
+          Zone: {{ gcp_zone }}
+          Cluster Name: {{ gke_cluster_name }}
+          Cluster Type: {{ gke_cluster_type }}
+          {% if gke_cluster_type == 'standard' %}
+          Machine Type: {{ gke_machine_type }}
+          Initial Nodes: {{ gke_initial_node_count }}
+          Autoscaling: {{ gke_enable_autoscaling }} ({{ gke_min_nodes }}-{{ gke_max_nodes }})
+          Spot VMs: {{ gke_use_spot_vms }}
+          {% endif %}
+          Create VPC: {{ gke_create_vpc }}
+          Workload Identity: {{ gke_enable_workload_identity }}
+          ========================================
+
+  tasks:
+    # ============================================================
+    # ENABLE GCP APIS
+    # ============================================================
+    - name: Enable required GCP APIs
+      ansible.builtin.command:
+        cmd: "gcloud services enable {{ item }} --project={{ gcp_project }}"
+      loop: "{{ gcp_apis_to_enable }}"
+      register: api_enable_result
+      changed_when: "'already enabled' not in item.stdout | default('') and 'already enabled' not in item.stderr | default('')"
+      tags: [apis]
+
+    - name: Wait for APIs to propagate
+      ansible.builtin.pause:
+        seconds: 30
+      when: api_enable_result.results | selectattr('changed', 'equalto', true) | list | length > 0
+      tags: [apis]
+
+    # ============================================================
+    # VPC NETWORKING (Optional)
+    # ============================================================
+    - name: Create VPC network
+      google.cloud.gcp_compute_network:
+        name: "{{ gke_vpc_name }}"
+        project: "{{ gcp_project }}"
+        auto_create_subnetworks: false
+        routing_config:
+          routing_mode: REGIONAL
+        auth_kind: application
+        state: present
+      register: gke_vpc
+      when: gke_create_vpc | bool
+      tags: [network]
+
+    - name: Create VPC subnet
+      google.cloud.gcp_compute_subnetwork:
+        name: "{{ gke_subnet_name }}"
+        project: "{{ gcp_project }}"
+        region: "{{ gcp_region }}"
+        network: "{{ gke_vpc.selfLink }}"
+        ip_cidr_range: "{{ gke_subnet_cidr }}"
+        secondary_ip_ranges:
+          - range_name: "pods"
+            ip_cidr_range: "{{ gke_pods_cidr }}"
+          - range_name: "services"
+            ip_cidr_range: "{{ gke_services_cidr }}"
+        auth_kind: application
+        state: present
+      register: gke_subnet
+      when: gke_create_vpc | bool
+      tags: [network]
+
+    # ============================================================
+    # GKE CLUSTER CREATION
+    # ============================================================
+    - name: Create GKE Standard cluster
+      google.cloud.gcp_container_cluster:
+        name: "{{ gke_cluster_name }}"
+        project: "{{ gcp_project }}"
+        location: "{{ gcp_zone }}"
+        initial_node_count: "{{ gke_initial_node_count }}"
+        node_config:
+          machine_type: "{{ gke_machine_type }}"
+          disk_size_gb: "{{ gke_disk_size_gb }}"
+          disk_type: "{{ gke_disk_type }}"
+          oauth_scopes:
+            - "https://www.googleapis.com/auth/devstorage.read_only"
+            - "https://www.googleapis.com/auth/logging.write"
+            - "https://www.googleapis.com/auth/monitoring"
+          spot: "{{ gke_use_spot_vms | bool }}"
+        network: "{{ gke_vpc.selfLink if (gke_vpc is defined and gke_vpc.selfLink is defined) else 'default' }}"
+        subnetwork: "{{ gke_subnet.selfLink if (gke_subnet is defined and gke_subnet.selfLink is defined) else omit }}"
+        addons_config:
+          http_load_balancing:
+            disabled: "{{ not gke_enable_http_load_balancing }}"
+          network_policy_config:
+            disabled: "{{ not gke_enable_network_policy }}"
+        workload_identity_config: "{{ {'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit }}"
+        resource_labels: "{{ gke_cluster_labels | default({}) }}"
+        auth_kind: application
+        state: present
+      register: gke_cluster_result
+      when: gke_cluster_type == 'standard'
+      tags: [cluster]
+
+    - name: Get actual node pool name from Standard cluster
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools list
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --format="value(name)"
+      register: actual_nodepool_name
+      changed_when: false
+      when: gke_cluster_type == 'standard'
+      tags: [cluster]
+
+    - name: Set node pool name fact
+      ansible.builtin.set_fact:
+        gke_node_pool_name: "{{ actual_nodepool_name.stdout_lines[0] | default(gke_node_pool_name) }}"
+      when:
+        - gke_cluster_type == 'standard'
+        - actual_nodepool_name.stdout_lines | length > 0
+      tags: [cluster]
+
+    - name: Validate node pool name exists
+      ansible.builtin.assert:
+        that:
+          - gke_node_pool_name is defined
+          - gke_node_pool_name | length > 0
+        fail_msg: "Node pool name could not be determined for autoscaling configuration"
+      when: gke_cluster_type == 'standard'
+      tags: [cluster]
+
+    - name: Create GKE Autopilot cluster
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters create-auto {{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --region={{ gcp_region }}
+          {% if gke_create_vpc %}
+          --network={{ gke_vpc_name }}
+          --subnetwork={{ gke_subnet_name }}
+          {% endif %}
+          {% if gke_enable_workload_identity %}
+          --workload-pool={{ gcp_project }}.svc.id.goog
+          {% endif %}
+      register: autopilot_result
+      when: gke_cluster_type == 'autopilot'
+      changed_when: autopilot_result.rc == 0
+      failed_when: >
+        autopilot_result.rc != 0 and
+        'already exists' not in (autopilot_result.stderr | default('') | lower) and
+        'already exists' not in (autopilot_result.stdout | default('') | lower)
+      tags: [cluster]
+
+    # ============================================================
+    # AUTOSCALING (Standard clusters)
+    # ============================================================
+    - name: Get node pool information
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools describe {{ gke_node_pool_name }}
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+      register: nodepool_check
+      changed_when: false
+      failed_when: false
+      when: gke_cluster_type == 'standard' and gke_enable_autoscaling
+      tags: [cluster, autoscaling]
+
+    - name: Configure node pool autoscaling
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools update {{ gke_node_pool_name }}
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --enable-autoscaling
+          --min-nodes={{ gke_min_nodes }}
+          --max-nodes={{ gke_max_nodes }}
+      when:
+        - gke_cluster_type == 'standard'
+        - gke_enable_autoscaling | bool
+        - nodepool_check.rc == 0
+      register: autoscaling_result
+      changed_when: autoscaling_result.rc == 0
+      failed_when: >
+        autoscaling_result.rc != 0 and
+        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower) and
+        'already configured' not in (autoscaling_result.stderr | default('') | lower)
+      tags: [cluster, autoscaling]
+
+    # ============================================================
+    # GET CREDENTIALS
+    # ============================================================
+    - name: Get cluster credentials
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters get-credentials {{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          {% if gke_cluster_type == 'autopilot' %}
+          --region={{ gcp_region }}
+          {% else %}
+          --zone={{ gcp_zone }}
+          {% endif %}
+      changed_when: false
+      tags: [verify]
+
+    # ============================================================
+    # VERIFICATION
+    # ============================================================
+    - name: Verify kubectl access
+      ansible.builtin.command:
+        cmd: kubectl cluster-info
+      register: kubectl_result
+      changed_when: false
+      tags: [verify]
+
+    - name: Get cluster nodes
+      ansible.builtin.command:
+        cmd: kubectl get nodes -o wide
+      register: nodes_result
+      changed_when: false
+      tags: [verify]
+
+    - name: Display cluster status
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          GKE Cluster Provisioned Successfully!
+          ========================================
+          Cluster: {{ gke_cluster_name }}
+          Type: {{ gke_cluster_type }}
+          Location: {{ gcp_zone if gke_cluster_type == 'standard' else gcp_region }}
+
+          Cluster Info:
+          {{ kubectl_result.stdout }}
+
+          Nodes:
+          {{ nodes_result.stdout }}
+
+          ========================================
+          Next Steps:
+          1. Deploy your application:
+             ansible-playbook -i inventory/gcp_app.yml \
+               --vault-password-file ~/.ansible_vault_pass \
+               playbooks/gcp-app-deploy.yml
+
+          2. Or use kubectl directly:
+             kubectl get pods --all-namespaces
+          ========================================
+      tags: [verify]

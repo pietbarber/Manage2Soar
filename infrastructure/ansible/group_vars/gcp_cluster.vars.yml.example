@@ -1,0 +1,64 @@
+# GKE Cluster Provisioning Variables
+#
+# COPY THIS FILE AND CONFIGURE:
+#   mkdir -p group_vars/gcp_cluster
+#   cp group_vars/gcp_cluster.vars.yml.example group_vars/gcp_cluster/vars.yml
+#
+# This file contains non-secret configuration for GKE cluster provisioning.
+# For secrets (service account keys), use vault.yml
+
+---
+# ============================================================
+# GCP PROJECT (Required - must match inventory)
+# ============================================================
+# This should match the gcp_project in your inventory file.
+# Defining it here allows override via group_vars.
+# gcp_project: "your-gcp-project-id"
+
+# ============================================================
+# CLUSTER OVERRIDES
+# ============================================================
+# Override any inventory defaults here. Common overrides:
+
+# gke_cluster_name: "my-custom-cluster"
+# gke_cluster_type: "autopilot"  # or "standard"
+# gke_machine_type: "e2-standard-2"
+# gke_initial_node_count: 3
+
+# ============================================================
+# ENVIRONMENT-SPECIFIC CONFIGURATION
+# ============================================================
+# Use this section to define environment-specific settings.
+# Example: staging vs production clusters
+
+# For staging (cost-optimized):
+# gke_use_spot_vms: true
+# gke_machine_type: "e2-small"
+# gke_min_nodes: 1
+# gke_max_nodes: 2
+
+# For production (reliability-focused):
+# gke_use_spot_vms: false
+# gke_machine_type: "e2-standard-4"
+# gke_min_nodes: 2
+# gke_max_nodes: 10
+# gke_private_cluster: true
+
+# ============================================================
+# LABELS AND TAGS
+# ============================================================
+# Labels applied to the cluster for organization/billing
+gke_cluster_labels:
+  environment: "production"
+  project: "manage2soar"
+  managed-by: "ansible"
+
+# ============================================================
+# FUTURE ENHANCEMENTS
+# ============================================================
+# The following features are planned but not yet implemented:
+# - Maintenance windows
+# - Resource quotas
+# - Private clusters
+# - VPA (Vertical Pod Autoscaling)
+# See https://github.com/pietbarber/Manage2Soar/issues for status

@@ -1,0 +1,52 @@
+# GKE Cluster Provisioning Vault Secrets
+#
+# COPY THIS FILE AND ENCRYPT:
+#   cd infrastructure/ansible
+#   mkdir -p group_vars/gcp_cluster
+#   cp group_vars/gcp_cluster.vault.yml.example group_vars/gcp_cluster/vault.yml
+#   ansible-vault encrypt group_vars/gcp_cluster/vault.yml
+#
+# This file contains secrets for GKE cluster provisioning.
+# It should be encrypted with ansible-vault before committing.
+#
+# IMPORTANT: For most use cases, you don't need secrets here!
+# The playbook uses your gcloud CLI authentication by default.
+# Only add service account credentials if you need unattended/CI provisioning.
+
+---
+# ============================================================
+# GCP AUTHENTICATION
+# ============================================================
+# The provisioning playbook currently uses your local gcloud CLI
+# authentication (`auth_kind: application`) and does NOT consume any
+# service account credentials from this vault file.
+#
+# For CI/CD or unattended provisioning, ensure that:
+#   - gcloud is installed in the environment, and
+#   - gcloud is authenticated with an account that has sufficient
+#     permissions to create and manage the GKE cluster and related
+#     resources.
+#
+# The service account needs roles that follow the principle of least privilege.
+# Example (development / small projects):
+#   - roles/container.clusterAdmin        (create/manage GKE clusters)
+#   - roles/compute.networkAdmin          (manage VPCs, subnets, routes)
+#   - roles/compute.securityAdmin         (manage firewall rules)
+#   - roles/compute.instanceAdmin.v1      (create/manage VM instances as needed)
+#   - roles/iam.serviceAccountUser        (impersonate node service account)
+#   - roles/serviceusage.serviceUsageAdmin (enable required APIs, if not handled elsewhere)
+#
+# WARNING: These example roles are broad and overly permissive for production use.
+#          For production environments, create custom IAM roles that include only
+#          the specific permissions your provisioning playbooks require, instead
+#          of relying on broad *Admin roles.
+#
+# If support for service account JSON keys is added in the future,
+# corresponding variables will be documented here.
+
+# ============================================================
+# These are rarely needed for cluster provisioning.
+# Most secrets are for the application deployment (gcp_app vault).
+
+# Master authorized network for your IP (if you want to restrict API access)
+# vault_admin_ip_cidr: "203.0.113.50/32"

@@ -1,11 +1,27 @@
 # Manage2Soar Ansible Deployment
 
-This directory contains Ansible playbooks and roles for deploying Manage2Soar. Two deployment options are available:
+This directory contains Ansible playbooks and roles for deploying Manage2Soar. Three deployment options are available:
 
 | Deployment Type | Best For | Cost | Complexity |
 |----------------|----------|------|------------|
 | **[Single-Host](#single-host-deployment)** | Small-medium clubs, self-hosted | ~$12-24/month VPS | Low |
 | **[GKE (Kubernetes)](docs/gke-deployment-guide.md)** | Large clubs, multi-tenant, high availability | ~$70-150/month | Medium |
+| **[GKE Cluster Provisioning](docs/gke-cluster-provisioning-guide.md)** | Create new GKE clusters | See cluster costs | Low |
+
+## Complete GKE Workflow
+
+For GKE deployments, use these playbooks in order:
+
+```bash
+# Step 1: Provision GKE cluster (one-time)
+ansible-playbook -i inventory/gcp_cluster.yml \
+  playbooks/gcp-cluster-provision.yml
+
+# Step 2: Deploy application to cluster
+ansible-playbook -i inventory/gcp_app.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-app-deploy.yml
+```
 
 ---
 
@@ -230,35 +246,43 @@ ansible-playbook -i inventory/single_host.yml \
 ```
 infrastructure/ansible/
 ├── docs/
-│   └── gke-deployment-guide.md    # GKE deployment documentation
+│   ├── gke-deployment-guide.md         # GKE app deployment documentation
+│   └── gke-cluster-provisioning-guide.md  # GKE cluster provisioning docs
 ├── inventory/
-│   ├── single_host.yml.example    # Single-host inventory template
-│   └── gcp_app.yml.example        # GKE inventory template (copy to gcp_app.yml)
+│   ├── single_host.yml.example         # Single-host inventory template
+│   ├── gcp_app.yml.example             # GKE app deployment inventory
+│   └── gcp_cluster.yml.example         # GKE cluster provisioning inventory
 ├── group_vars/
-│   ├── single_host/               # Single-host config (gitignored)
-│   │   ├── vars.yml               # Non-secret variables
-│   │   └── vault.yml              # Encrypted secrets
-│   ├── gcp_app/                   # GKE config (gitignored)
-│   │   ├── vars.yml               # GCP/GKE variables
-│   │   └── vault.yml              # Encrypted secrets
+│   ├── single_host/                    # Single-host config (gitignored)
+│   │   ├── vars.yml                    # Non-secret variables
+│   │   └── vault.yml                   # Encrypted secrets
+│   ├── gcp_app/                        # GKE app config (gitignored)
+│   │   ├── vars.yml                    # GCP/GKE variables
+│   │   └── vault.yml                   # Encrypted secrets
+│   ├── gcp_cluster/                    # GKE cluster config (gitignored)
+│   │   ├── vars.yml                    # Cluster variables
+│   │   └── vault.yml                   # Optional secrets
 │   ├── single_host.vars.yml.example
 │   ├── single_host.vault.yml.example
-│   ├── gcp_app.vars.yml.example   # GKE variables template
-│   └── gcp_app.vault.yml.example  # GKE secrets template
+│   ├── gcp_app.vars.yml.example        # GKE app variables template
+│   ├── gcp_app.vault.yml.example       # GKE app secrets template
+│   ├── gcp_cluster.vars.yml.example    # GKE cluster variables template
+│   └── gcp_cluster.vault.yml.example   # GKE cluster secrets template
 ├── playbooks/
-│   ├── single-host.yml            # Single-host deployment
-│   ├── gcp-app-deploy.yml         # GKE deployment
-│   ├── test-postgresql.yml        # PostgreSQL testing
-│   ├── test-nginx.yml             # NGINX testing
-│   └── test-m2s-app.yml           # Application testing
+│   ├── single-host.yml                 # Single-host deployment
+│   ├── gcp-app-deploy.yml              # GKE app deployment
+│   ├── gcp-cluster-provision.yml       # GKE cluster provisioning
+│   ├── test-postgresql.yml             # PostgreSQL testing
+│   ├── test-nginx.yml                  # NGINX testing
+│   └── test-m2s-app.yml                # Application testing
 └── roles/
-    ├── gke-deploy/                # GKE deployment role
-    ├── postgresql/                # Database role
-    ├── nginx/                     # Web server role
-    ├── m2s-app/                   # Django application role
-    ├── postfix/                   # Mail server (optional)
-    ├── opendkim/                  # DKIM signing (optional)
-    └── rspamd/                    # Spam filtering (optional)
+    ├── gke-deploy/                     # GKE deployment role
+    ├── postgresql/                     # Database role
+    ├── nginx/                          # Web server role
+    ├── m2s-app/                        # Django application role
+    ├── postfix/                        # Mail server (optional)
+    ├── opendkim/                       # DKIM signing (optional)
+    └── rspamd/                         # Spam filtering (optional)
 ```
 
 ## Roles

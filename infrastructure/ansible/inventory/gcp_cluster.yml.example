@@ -1,0 +1,122 @@
+# GKE Cluster Provisioning Inventory
+#
+# COPY THIS FILE AND CONFIGURE:
+#   cp inventory/gcp_cluster.yml.example inventory/gcp_cluster.yml
+#
+# This inventory is used for provisioning GKE clusters.
+# Since cluster provisioning runs from localhost (using gcloud/API),
+# no remote hosts are needed.
+#
+# Usage (most local setups with gcloud CLI authentication):
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     playbooks/gcp-cluster-provision.yml
+#
+# Optional - For CI/CD or unattended provisioning with service account:
+#   ansible-playbook -i inventory/gcp_cluster.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/gcp-cluster-provision.yml
+
+---
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  vars:
+    # ============================================================
+    # GCP PROJECT CONFIGURATION
+    # ============================================================
+    # WARNING: YOU MUST CHANGE THIS VALUE.
+    # Set this to your actual GCP project ID (e.g. "my-real-gcp-project").
+    gcp_project: "REQUIRED-SET-YOUR-PROJECT-ID"
+    gcp_region: "us-central1"
+    gcp_zone: "us-central1-c"
+
+    # ============================================================
+    # GKE CLUSTER CONFIGURATION
+    # ============================================================
+
+    # Cluster name (must be unique within project/zone)
+    gke_cluster_name: "manage2soar-cluster"
+
+    # Cluster type: "standard" or "autopilot"
+    # - standard: Full control over nodes, node pools, and scaling
+    # - autopilot: Google manages nodes, pay per pod resource usage
+    gke_cluster_type: "standard"
+
+    # ============================================================
+    # NETWORKING
+    # ============================================================
+
+    # Create new VPC or use existing
+    # Set to true to create a dedicated VPC for the cluster
+    # Set to false to use the default VPC
+    gke_create_vpc: false
+
+    # VPC configuration (only used if gke_create_vpc: true)
+    gke_vpc_name: "manage2soar-vpc"
+    gke_subnet_name: "manage2soar-subnet"
+    gke_subnet_cidr: "10.0.0.0/20"
+    gke_pods_cidr: "10.4.0.0/14"
+    gke_services_cidr: "10.8.0.0/20"
+
+    # ============================================================
+    # NODE POOL CONFIGURATION (Standard clusters only)
+    # ============================================================
+
+    # Initial/default node pool name used for post-creation autoscaling configuration.
+    # NOTE:
+    #   - This variable does NOT create or rename the node pool by itself.
+    #   - After cluster creation, the playbook will auto-detect the actual
+    #     node pool name (often "default-pool" for standard clusters) and
+    #     update this variable before configuring autoscaling.
+    #   - Treat this value as an initial fallback. In typical setups you can
+    #     leave it at "default-pool" and rely on auto-detection.
+    #   - Only change this if you need to force a specific existing node pool
+    #     name (for example when auto-detection is disabled or does not work
+    #     in your environment).
+    gke_node_pool_name: "default-pool"
+    gke_machine_type: "e2-medium"
+    gke_disk_size_gb: 50
+    gke_disk_type: "pd-standard"  # pd-standard, pd-ssd, pd-balanced
+
+    # Initial node count
+    gke_initial_node_count: 2
+
+    # Autoscaling
+    gke_enable_autoscaling: true
+    gke_min_nodes: 1
+    gke_max_nodes: 5
+
+    # Cost optimization
+    # Use spot/preemptible VMs (cheaper but can be terminated)
+    gke_use_spot_vms: false
+
+    # ============================================================
+    # SECURITY & ACCESS
+    # ============================================================
+
+    # Workload Identity (recommended for GCP service access)
+    gke_enable_workload_identity: true
+
+    # ============================================================
+    # FEATURES
+    # ============================================================
+
+    # Enable HTTP load balancing (required for Ingress)
+    gke_enable_http_load_balancing: true
+
+    # Enable network policy (for pod-to-pod network security)
+    gke_enable_network_policy: false
+
+    # ============================================================
+    # GCP APIS TO ENABLE
+    # ============================================================
+    # These APIs will be enabled automatically before cluster creation
+    gcp_apis_to_enable:
+      - container.googleapis.com
+      - compute.googleapis.com
+      - artifactregistry.googleapis.com
+      - cloudresourcemanager.googleapis.com
+      - iam.googleapis.com
