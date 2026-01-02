@@ -216,6 +216,19 @@
     # ============================================================
     # AUTOSCALING (Standard clusters)
     # ============================================================
+    - name: Get node pool information
+      ansible.builtin.command:
+        cmd: >
+          gcloud container node-pools describe {{ gke_node_pool_name }}
+          --cluster={{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+      register: nodepool_check
+      changed_when: false
+      failed_when: false
+      when: gke_cluster_type == 'standard' and gke_enable_autoscaling
+      tags: [cluster, autoscaling]
+
     - name: Configure node pool autoscaling
       ansible.builtin.command:
         cmd: >
