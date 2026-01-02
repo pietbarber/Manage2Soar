@@ -61,7 +61,13 @@ all:
     # NODE POOL CONFIGURATION (Standard clusters only)
     # ============================================================
 
-    # Default node pool
+    # Default node pool name used by autoscaling and node-pool level settings.
+    # NOTE:
+    #   - This variable does NOT create or rename the node pool by itself.
+    #   - The actual node pool name is determined by the cluster provisioning
+    #     playbook/commands (often "default-pool" for standard clusters).
+    #   - You MUST ensure this value matches the name of the node pool that
+    #     is actually created; otherwise autoscaling configuration may fail.
     gke_node_pool_name: "default-pool"
     gke_machine_type: "e2-medium"
     gke_disk_size_gb: 50
