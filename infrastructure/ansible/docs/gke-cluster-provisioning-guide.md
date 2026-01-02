@@ -187,7 +187,6 @@ gke_services_cidr: "10.8.0.0/20"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `gke_cluster_type` | `"standard"` | Cluster type: `standard` or `autopilot` |
-| `gke_kubernetes_version` | `""` | K8s version (empty = latest stable) |
 | `gke_initial_node_count` | `2` | Initial nodes (Standard only) |
 | `gke_machine_type` | `"e2-medium"` | Node machine type |
 | `gke_disk_size_gb` | `50` | Node disk size |
@@ -209,7 +208,6 @@ gke_services_cidr: "10.8.0.0/20"
 | `gke_create_vpc` | `false` | Create dedicated VPC |
 | `gke_vpc_name` | `"manage2soar-vpc"` | VPC name |
 | `gke_subnet_cidr` | `"10.0.0.0/20"` | Subnet CIDR |
-| `gke_private_cluster` | `false` | ⚠️ Not yet implemented - Reserved for future use |
 
 ### Security
 

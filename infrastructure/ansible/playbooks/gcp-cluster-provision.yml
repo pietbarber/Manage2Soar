@@ -175,7 +175,7 @@
           disk_type: "{{ gke_disk_type }}"
           oauth_scopes:
             - "https://www.googleapis.com/auth/cloud-platform"
-          spot: "{{ gke_use_spot_vms }}"
+          spot: "{{ gke_use_spot_vms | bool }}"
         network: "{{ gke_vpc.selfLink | default('default') }}"
         subnetwork: "{{ gke_subnet.selfLink | default(omit) }}"
         addons_config:
@@ -209,13 +209,8 @@
       changed_when: autopilot_result.rc == 0
       failed_when: >
         autopilot_result.rc != 0 and
-        (
-          (autopilot_result.stderr is not defined or
-           ('already exists' not in (autopilot_result.stderr | lower)))
-          and
-          (autopilot_result.stdout is not defined or
-           ('already exists' not in (autopilot_result.stdout | lower)))
-        )
+        'already exists' not in (autopilot_result.stderr | default('') | lower) and
+        'already exists' not in (autopilot_result.stdout | default('') | lower)
       tags: [cluster]
 
     # ============================================================
