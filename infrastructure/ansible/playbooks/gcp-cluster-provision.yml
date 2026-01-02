@@ -174,7 +174,9 @@
           disk_size_gb: "{{ gke_disk_size_gb }}"
           disk_type: "{{ gke_disk_type }}"
           oauth_scopes:
-            - "https://www.googleapis.com/auth/cloud-platform"
+            - "https://www.googleapis.com/auth/devstorage.read_only"
+            - "https://www.googleapis.com/auth/logging.write"
+            - "https://www.googleapis.com/auth/monitoring"
           spot: "{{ gke_use_spot_vms | bool }}"
         network: "{{ gke_vpc.selfLink | default('default') }}"
         subnetwork: "{{ gke_subnet.selfLink | default(omit) }}"
@@ -268,8 +270,8 @@
       changed_when: autoscaling_result.rc == 0
       failed_when: >
         autoscaling_result.rc != 0 and
-        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower) and
-        'already configured' not in (autoscaling_result.stderr | default('') | lower)
+        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower()) and
+        'already configured' not in (autoscaling_result.stderr | default('') | lower())
       tags: [cluster, autoscaling]
 
     # ============================================================
