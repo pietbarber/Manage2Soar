@@ -185,7 +185,7 @@
             disabled: "{{ not gke_enable_http_load_balancing }}"
           network_policy_config:
             disabled: "{{ not gke_enable_network_policy }}"
-        workload_identity_config: "{{ ({'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else {}) }}"
+        workload_identity_config: "{{ ({'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit) }}"
         resource_labels: "{{ gke_cluster_labels | default({}) }}"
         auth_kind: application
         state: present
@@ -255,13 +255,13 @@
     - name: Configure node pool autoscaling
       ansible.builtin.command:
         cmd: >
-          gcloud container clusters update {{ gke_cluster_name }}
+          gcloud container node-pools update {{ gke_node_pool_name }}
+          --cluster={{ gke_cluster_name }}
           --project={{ gcp_project }}
           --zone={{ gcp_zone }}
           --enable-autoscaling
           --min-nodes={{ gke_min_nodes }}
           --max-nodes={{ gke_max_nodes }}
-          --node-pool={{ gke_node_pool_name }}
       when:
         - gke_cluster_type == 'standard'
         - gke_enable_autoscaling | bool
@@ -270,8 +270,8 @@
       changed_when: autoscaling_result.rc == 0
       failed_when: >
         autoscaling_result.rc != 0 and
-        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower()) and
-        'already configured' not in (autoscaling_result.stderr | default('') | lower())
+        'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower) and
+        'already configured' not in (autoscaling_result.stderr | default('') | lower)
       tags: [cluster, autoscaling]
 
     # ============================================================

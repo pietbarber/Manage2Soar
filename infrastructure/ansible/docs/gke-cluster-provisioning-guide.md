@@ -80,7 +80,7 @@ The playbook will:
 
 ### Standard Cluster (Default)
 
-Full control over nodes, node pools, and scaling. You pay for the VMs.
+Full control over nodes, node pools, and scaling. You pay for VM instances (can use spot VMs for up to 91% savings).
 
 ```yaml
 gke_cluster_type: "standard"

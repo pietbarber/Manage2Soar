@@ -15,10 +15,17 @@
 
 ---
 # ============================================================
-# GCP SERVICE ACCOUNT (Optional)
+# GCP AUTHENTICATION
 # ============================================================
-# Only needed if you're NOT using gcloud CLI authentication.
-# For CI/CD pipelines or automated provisioning, provide a service account.
+# The provisioning playbook currently uses your local gcloud CLI
+# authentication (`auth_kind: application`) and does NOT consume any
+# service account credentials from this vault file.
+#
+# For CI/CD or unattended provisioning, ensure that:
+#   - gcloud is installed in the environment, and
+#   - gcloud is authenticated with an account that has sufficient
+#     permissions to create and manage the GKE cluster and related
+#     resources.
 #
 # The service account needs roles that follow the principle of least privilege.
 # Example (development / small projects):
@@ -29,23 +36,14 @@
 #   - roles/iam.serviceAccountUser        (impersonate node service account)
 #   - roles/serviceusage.serviceUsageAdmin (enable required APIs, if not handled elsewhere)
 #
-# For production CI/CD, prefer custom IAM roles that include only the specific
-# permissions your provisioning playbooks require, instead of broad *Admin roles.
+# WARNING: These example roles are broad and overly permissive for production use.
+#          For production environments, create custom IAM roles that include only
+#          the specific permissions your provisioning playbooks require, instead
+#          of relying on broad *Admin roles.
+#
+# If support for service account JSON keys is added in the future,
+# corresponding variables will be documented here.
 
-# Option 1: Path to service account JSON key file
-# vault_gcp_service_account_file: "/path/to/service-account.json"
-
-# Option 2: Service account JSON content (inline)
-# Generate this from GCP Console > IAM > Service Accounts > Keys
-# vault_gcp_service_account_contents: |
-#   {
-#     "type": "service_account",
-#     "project_id": "your-project-id",
-#     ... (paste your service account JSON here)
-#   }
-
-# ============================================================
-# CLUSTER SECRETS (Optional)
 # ============================================================
 # These are rarely needed for cluster provisioning.
 # Most secrets are for the application deployment (gcp_app vault).
