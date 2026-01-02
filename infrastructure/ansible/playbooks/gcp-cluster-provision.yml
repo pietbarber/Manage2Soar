@@ -163,34 +163,52 @@
     # ============================================================
     # GKE CLUSTER CREATION
     # ============================================================
-    - name: Create GKE Standard cluster
-      google.cloud.gcp_container_cluster:
-        name: "{{ gke_cluster_name }}"
-        project: "{{ gcp_project }}"
-        location: "{{ gcp_zone }}"
-        initial_node_count: "{{ gke_initial_node_count }}"
-        node_config:
-          machine_type: "{{ gke_machine_type }}"
-          disk_size_gb: "{{ gke_disk_size_gb }}"
-          disk_type: "{{ gke_disk_type }}"
-          oauth_scopes:
-            - "https://www.googleapis.com/auth/devstorage.read_only"
-            - "https://www.googleapis.com/auth/logging.write"
-            - "https://www.googleapis.com/auth/monitoring"
-          spot: "{{ gke_use_spot_vms | bool }}"
-        network: "{{ gke_vpc.selfLink if (gke_vpc is defined and gke_vpc.selfLink is defined) else 'default' }}"
-        subnetwork: "{{ gke_subnet.selfLink if (gke_subnet is defined and gke_subnet.selfLink is defined) else omit }}"
-        addons_config:
-          http_load_balancing:
-            disabled: "{{ not gke_enable_http_load_balancing }}"
-          network_policy_config:
-            disabled: "{{ not gke_enable_network_policy }}"
-        workload_identity_config: "{{ {'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit }}"
-        resource_labels: "{{ gke_cluster_labels | default({}) }}"
-        auth_kind: application
-        state: present
-      register: gke_cluster_result
+    - name: Check if Standard cluster already exists
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters describe {{ gke_cluster_name }}
+          --zone={{ gcp_zone }}
+          --project={{ gcp_project }}
+          --format=json
+      register: existing_standard_cluster
+      failed_when: false
+      changed_when: false
       when: gke_cluster_type == 'standard'
+      tags: [cluster]
+
+    - name: Create GKE Standard cluster
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters create {{ gke_cluster_name }}
+          --project={{ gcp_project }}
+          --zone={{ gcp_zone }}
+          --num-nodes={{ gke_initial_node_count }}
+          --machine-type={{ gke_machine_type }}
+          --disk-size={{ gke_disk_size_gb }}
+          --disk-type={{ gke_disk_type }}
+          --scopes=gke-default
+          {% if gke_use_spot_vms %}
+          --spot
+          {% endif %}
+          {% if gke_enable_workload_identity %}
+          --workload-pool={{ gcp_project }}.svc.id.goog
+          {% endif %}
+          {% if gke_enable_http_load_balancing %}
+          --addons=HttpLoadBalancing
+          {% endif %}
+          --network=default
+          --enable-ip-alias
+          --enable-autoscaling
+          --min-nodes={{ gke_min_nodes }}
+          --max-nodes={{ gke_max_nodes }}
+          --enable-autorepair
+          --enable-autoupgrade
+          --logging=SYSTEM,WORKLOAD
+          --monitoring=SYSTEM
+      register: gke_cluster_create
+      when:
+        - gke_cluster_type == 'standard'
+        - existing_standard_cluster.rc != 0
       tags: [cluster]
 
     - name: Get actual node pool name from Standard cluster
