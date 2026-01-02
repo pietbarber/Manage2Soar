@@ -13,6 +13,16 @@ The `gcp-cluster-provision.yml` playbook creates and configures GKE clusters wit
 
 ## Quick Start
 
+### Prerequisites
+
+Before running this playbook, ensure you have:
+
+- **GCP Project** with billing enabled (required for GKE)
+- **Ansible** 2.14 or later
+- **gcloud CLI** authenticated and configured
+- **kubectl** (typically included with gcloud CLI, or install separately)
+- **google.cloud** Ansible collection (installed in Step 1 below)
+
 ### Step 1: Install Prerequisites
 
 ```bash
