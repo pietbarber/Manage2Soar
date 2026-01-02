@@ -178,14 +178,14 @@
             - "https://www.googleapis.com/auth/logging.write"
             - "https://www.googleapis.com/auth/monitoring"
           spot: "{{ gke_use_spot_vms | bool }}"
-        network: "{{ gke_vpc.selfLink | default('default') }}"
-        subnetwork: "{{ gke_subnet.selfLink | default(omit) }}"
+        network: "{{ gke_vpc.selfLink if (gke_vpc is defined and gke_vpc.selfLink is defined) else 'default' }}"
+        subnetwork: "{{ gke_subnet.selfLink if (gke_subnet is defined and gke_subnet.selfLink is defined) else omit }}"
         addons_config:
           http_load_balancing:
             disabled: "{{ not gke_enable_http_load_balancing }}"
           network_policy_config:
             disabled: "{{ not gke_enable_network_policy }}"
-        workload_identity_config: "{{ ({'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit) }}"
+        workload_identity_config: "{{ {'workload_pool': gcp_project + '.svc.id.goog'} if gke_enable_workload_identity else omit }}"
         resource_labels: "{{ gke_cluster_labels | default({}) }}"
         auth_kind: application
         state: present
@@ -212,6 +212,15 @@
       when:
         - gke_cluster_type == 'standard'
         - actual_nodepool_name.stdout_lines | length > 0
+      tags: [cluster]
+
+    - name: Validate node pool name exists
+      ansible.builtin.assert:
+        that:
+          - gke_node_pool_name is defined
+          - gke_node_pool_name | length > 0
+        fail_msg: "Node pool name could not be determined for autoscaling configuration"
+      when: gke_cluster_type == 'standard'
       tags: [cluster]
 
     - name: Create GKE Autopilot cluster

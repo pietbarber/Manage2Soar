@@ -180,8 +180,7 @@ gke_services_cidr: "10.8.0.0/20"
 |----------|-------------|---------|
 | `gcp_project` | GCP project ID | `"manage2soar"` |
 | `gke_cluster_name` | Cluster name | `"manage2soar-cluster"` |
-| `gcp_zone` | GCP zone | `"us-east1-b"` |
-
+| `gcp_zone` | GCP zone | `"us-east1-b"` || `gcp_region` | GCP region (required for Autopilot clusters) | `"us-east1"` |
 ### Cluster Configuration
 
 | Variable | Default | Description |

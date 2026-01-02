@@ -65,12 +65,12 @@ all:
     # NODE POOL CONFIGURATION (Standard clusters only)
     # ============================================================
 
-    # Initial/default node pool name used by autoscaling and node-pool-level settings.
+    # Initial/default node pool name used for post-creation autoscaling configuration.
     # NOTE:
     #   - This variable does NOT create or rename the node pool by itself.
-    #   - The cluster provisioning playbook will normally auto-detect the
-    #     actual node pool name (often "default-pool" for standard clusters),
-    #     then update/overwrite this variable before it is used.
+    #   - After cluster creation, the playbook will auto-detect the actual
+    #     node pool name (often "default-pool" for standard clusters) and
+    #     update this variable before configuring autoscaling.
     #   - Treat this value as an initial fallback. In typical setups you can
     #     leave it at "default-pool" and rely on auto-detection.
     #   - Only change this if you need to force a specific existing node pool
