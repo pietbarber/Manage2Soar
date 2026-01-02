@@ -1,6 +1,7 @@
 # GKE Cluster Provisioning Vault Secrets
 #
 # COPY THIS FILE AND ENCRYPT:
+#   cd infrastructure/ansible
 #   mkdir -p group_vars/gcp_cluster
 #   cp group_vars/gcp_cluster.vault.yml.example group_vars/gcp_cluster/vault.yml
 #   ansible-vault encrypt group_vars/gcp_cluster/vault.yml

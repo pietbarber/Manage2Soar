@@ -67,7 +67,7 @@
       ansible.builtin.assert:
         that:
           - gcp_project not in ['your-gcp-project-id', 'CHANGEME', 'changeme', 'example-project', '']
-          - "'your-' not in gcp_project | lower"
+          - gcp_project | lower is not match('^your-')
         fail_msg: |
           GCP project is set to a placeholder value: {{ gcp_project }}
           Please set gcp_project to your actual GCP project ID.
@@ -229,13 +229,14 @@
       when:
         - gke_cluster_type == 'standard'
         - gke_enable_autoscaling | bool
+        - nodepool_check.rc == 0
       register: autoscaling_result
       changed_when: autoscaling_result.rc == 0
       failed_when: >
         autoscaling_result.rc != 0 and
         'already has autoscaling' not in (autoscaling_result.stderr | default('') | lower) and
         'already configured' not in (autoscaling_result.stderr | default('') | lower)
-      tags: [nodepool]
+      tags: [cluster, autoscaling]
 
     # ============================================================
     # GET CREDENTIALS
