@@ -104,6 +104,10 @@ ansible-galaxy collection install kubernetes.core google.cloud
 gcloud auth application-default login
 gcloud auth configure-docker
 
+# Enable required GCP APIs
+gcloud services enable artifactregistry.googleapis.com --project=PROJECT_ID
+gcloud services enable container.googleapis.com --project=PROJECT_ID
+
 # Get cluster credentials
 gcloud container clusters get-credentials CLUSTER_NAME \
   --zone ZONE --project PROJECT_ID

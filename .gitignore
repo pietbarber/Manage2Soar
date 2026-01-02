@@ -233,3 +233,6 @@ infrastructure/ansible/group_vars/gcp_provisioner/vault.yml
 infrastructure/ansible/group_vars/gcp_mail/vars.yml
 infrastructure/ansible/group_vars/gcp_mail/vault.yml
 infrastructure/ansible/inventory/gcp_mail.yml
+infrastructure/ansible/group_vars/gcp_app/vars.yml
+infrastructure/ansible/group_vars/gcp_app/vault.yml
+infrastructure/ansible/inventory/gcp_app.yml
