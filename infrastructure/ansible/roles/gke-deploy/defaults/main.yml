@@ -204,16 +204,15 @@ gke_keep_manifests: false
 gke_docker_context: "."
 
 # ============================================================
-# INGRESS CONFIGURATION
+# GATEWAY API / INGRESS CONFIGURATION
 # ============================================================
 
-# Enable Ingress deployment for external access
+# Enable Gateway API deployment for external access
+# Uses GKE's Gateway API (successor to Ingress) for host-based routing
+# Single IP serves all tenants with routing based on hostname
 gke_enable_ingress: false
 
-# Ingress class (gce = GKE native)
-gke_ingress_class: "gce"
-
-# Static IP name for Ingress (will be created if doesn't exist)
+# Static IP name for Gateway (will be created if doesn't exist)
 gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 
 # Enable TLS/HTTPS using Google-managed certificates

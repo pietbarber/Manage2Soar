@@ -111,8 +111,11 @@ metadata:
 {% if gke_multi_tenant %}
     tenant: {{ gke_club_prefix }}
 {% endif %}
+{% if not (gke_enable_ingress | default(false) | bool) %}
+{# BackendConfig is only for GCE Ingress, not Gateway API #}
   annotations:
     cloud.google.com/backend-config: '{"default": "{{ gke_deployment_name }}-config"}'
+{% endif %}
 spec:
   type: NodePort
   selector:

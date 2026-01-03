@@ -1,10 +1,16 @@
-# GKE Ingress Deployment Tasks
+# GKE Gateway API Deployment Tasks
 #
 # This file handles:
 # - Static IP reservation
 # - Google-managed SSL certificate creation
-# - Ingress resource deployment
+# - Gateway resource deployment (single shared gateway)
+# - HTTPRoute deployment per tenant
 # - Verification and DNS instructions
+#
+# Architecture:
+# - One Gateway in 'default' namespace with static IP
+# - HTTPRoute per tenant in their respective namespaces
+# - Like nginx: single IP, host-based routing to different backends
 ---
 # ============================================================
 # STATIC IP RESERVATION
@@ -57,136 +63,266 @@
   tags: [ingress, ip]
 
 # ============================================================
-# GOOGLE-MANAGED SSL CERTIFICATE
+# GOOGLE-MANAGED SSL CERTIFICATE (via gcloud, not ManagedCertificate CRD)
+#
+# Gateway API does NOT support ManagedCertificate CRD.
+# We must use gcloud compute ssl-certificates instead.
 # ============================================================
 
-- name: Generate ManagedCertificate manifest
-  ansible.builtin.template:
-    src: k8s-managed-cert.yml.j2
-    dest: "/tmp/k8s-managed-cert-{{ gke_namespace }}.yml"
-    mode: '0600'
-  delegate_to: localhost
+- name: Set SSL certificate name
+  ansible.builtin.set_fact:
+    gke_ssl_cert_name: "{{ gke_ssl_cert_name | default(gke_app_name ~ '-ssl-cert') }}"
+  run_once: true
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Apply ManagedCertificate
-  ansible.builtin.command:
-    cmd: kubectl apply -f /tmp/k8s-managed-cert-{{ gke_namespace }}.yml
-  register: managed_cert_result
-  changed_when: "'created' in managed_cert_result.stdout or 'configured' in managed_cert_result.stdout"
+- name: Collect all domains for SSL certificate
+  ansible.builtin.set_fact:
+    ssl_cert_domains: >-
+      {%- set domains = [] -%}
+      {%- for tenant in gke_tenants -%}
+        {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
+        {%- for d in tenant_domains -%}
+          {%- set _ = domains.append(d) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ domains | unique | join(',') }}
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gke_multi_tenant | bool
+  tags: [ingress, tls]
+
+- name: Check if SSL certificate exists
+  ansible.builtin.shell: |
+    gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} \
+      --global \
+      --project={{ gcp_project }} \
+      --format="value(name)" 2>/dev/null || echo ""
+  register: ssl_cert_check
+  changed_when: false
   delegate_to: localhost
+  run_once: true
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Display ManagedCertificate result
+- name: Display SSL certificate status
   ansible.builtin.debug:
-    msg: "{{ managed_cert_result.stdout_lines }}"
-  when:
-    - gke_enable_tls | default(true) | bool
-    - managed_cert_result is defined
+    msg: "SSL certificate '{{ gke_ssl_cert_name }}' {{ 'exists' if ssl_cert_check.stdout | trim else 'does not exist - will be created' }}"
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Clean up ManagedCertificate manifest
-  ansible.builtin.file:
-    path: "/tmp/k8s-managed-cert-{{ gke_namespace }}.yml"
-    state: absent
-  delegate_to: localhost
-  when:
-    - gke_enable_tls | default(true) | bool
-    - not (gke_keep_manifests | default(false))
-  tags: [ingress, tls]
-
-# ============================================================
-# INGRESS DEPLOYMENT
-# ============================================================
-
-- name: Generate Ingress manifest
-  ansible.builtin.template:
-    src: k8s-ingress.yml.j2
-    dest: "/tmp/k8s-ingress-{{ gke_namespace }}.yml"
-    mode: '0600'
-  delegate_to: localhost
-  tags: [ingress, deploy]
-
-- name: Apply Ingress configuration
+- name: Create Google-managed SSL certificate
   ansible.builtin.command:
-    cmd: kubectl apply -f /tmp/k8s-ingress-{{ gke_namespace }}.yml
-  register: ingress_result
-  changed_when: "'created' in ingress_result.stdout or 'configured' in ingress_result.stdout"
+    cmd: >-
+      gcloud compute ssl-certificates create {{ gke_ssl_cert_name }}
+      --domains={{ ssl_cert_domains }}
+      --global
+      --project={{ gcp_project }}
+  register: ssl_cert_create
+  changed_when: "'Created' in ssl_cert_create.stderr"
   delegate_to: localhost
-  tags: [ingress, deploy]
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - ssl_cert_check.stdout | trim == ""
+  tags: [ingress, tls]
 
-- name: Display Ingress result
+- name: Display SSL certificate creation result
   ansible.builtin.debug:
-    msg: "{{ ingress_result.stdout_lines }}"
-  when: ingress_result is defined
-  tags: [ingress, deploy]
+    msg: "{{ ssl_cert_create.stderr_lines | default(['Certificate already exists']) }}"
+  when:
+    - gke_enable_tls | default(true) | bool
+    - ssl_cert_create is defined
+  run_once: true
+  tags: [ingress, tls]
 
-- name: Clean up Ingress manifest
+# ============================================================
+# GATEWAY DEPLOYMENT (Single shared gateway)
+# ============================================================
+
+- name: Generate Gateway manifest
+  ansible.builtin.template:
+    src: k8s-gateway.yml.j2
+    dest: "/tmp/k8s-gateway.yml"
+    mode: "0600"
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, gateway]
+
+- name: Apply Gateway configuration
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-gateway.yml
+  register: gateway_result
+  changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, gateway]
+
+- name: Display Gateway result
+  ansible.builtin.debug:
+    msg: "{{ gateway_result.stdout_lines }}"
+  when: gateway_result is defined
+  run_once: true
+  tags: [ingress, gateway]
+
+- name: Clean up Gateway manifest
   ansible.builtin.file:
-    path: "/tmp/k8s-ingress-{{ gke_namespace }}.yml"
+    path: "/tmp/k8s-gateway.yml"
     state: absent
   delegate_to: localhost
+  run_once: true
   when: not (gke_keep_manifests | default(false))
-  tags: [ingress, deploy]
+  tags: [ingress, gateway]
+
+# ============================================================
+# HTTPROUTE DEPLOYMENT (Per-tenant routes)
+# ============================================================
+
+- name: Generate HTTPRoute manifest for tenant
+  ansible.builtin.template:
+    src: k8s-httproute.yml.j2
+    dest: "/tmp/k8s-httproute-{{ ingress_tenant.prefix }}.yml"
+    mode: "0600"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, httproute]
+
+- name: Apply HTTPRoute configuration for tenant
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-httproute-{{ ingress_tenant.prefix }}.yml
+  register: httproute_result
+  changed_when: "'created' in httproute_result.stdout or 'configured' in httproute_result.stdout"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, httproute]
+
+- name: Display HTTPRoute results
+  ansible.builtin.debug:
+    msg: "{{ item.stdout_lines }}"
+  loop: "{{ httproute_result.results | default([]) }}"
+  when:
+    - gke_multi_tenant | bool
+    - item.stdout_lines is defined
+  tags: [ingress, httproute]
+
+- name: Clean up HTTPRoute manifests
+  ansible.builtin.file:
+    path: "/tmp/k8s-httproute-{{ ingress_tenant.prefix }}.yml"
+    state: absent
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when:
+    - gke_multi_tenant | bool
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, httproute]
 
 # ============================================================
 # VERIFICATION
 # ============================================================
 
-- name: Get Ingress status
+- name: Wait for Gateway to be ready
   ansible.builtin.command:
-    cmd: kubectl get ingress {{ gke_app_name }}-ingress -n {{ gke_namespace }} -o wide
-  register: ingress_status
+    cmd: kubectl get gateway {{ gke_app_name }}-gateway -n default -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}'
+  register: gateway_ready
+  until: gateway_ready.stdout == "True"
+  retries: 30
+  delay: 10
   changed_when: false
   failed_when: false
   delegate_to: localhost
+  run_once: true
   tags: [ingress, verify]
 
-- name: Get ManagedCertificate status
+- name: Get Gateway IP address
   ansible.builtin.command:
-    cmd: kubectl get managedcertificate {{ gke_app_name }}-cert -n {{ gke_namespace }} -o wide
+    cmd: kubectl get gateway {{ gke_app_name }}-gateway -n default -o jsonpath='{.status.addresses[0].value}'
+  register: gateway_ip
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, verify]
+
+- name: Update ingress IP from Gateway status
+  ansible.builtin.set_fact:
+    gke_ingress_ip: "{{ gateway_ip.stdout | trim | default(gke_ingress_ip, true) }}"
+  run_once: true
+  when: gateway_ip.stdout | trim | length > 0
+  tags: [ingress, verify]
+
+- name: Get Gateway status
+  ansible.builtin.command:
+    cmd: kubectl get gateway {{ gke_app_name }}-gateway -n default -o wide
+  register: gateway_status
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, verify]
+
+- name: Get HTTPRoute status
+  ansible.builtin.command:
+    cmd: kubectl get httproute -A -o wide
+  register: httproute_status
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, verify]
+
+- name: Get SSL certificate status
+  ansible.builtin.shell: |
+    gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} \
+      --global \
+      --project={{ gcp_project }} \
+      --format="table(name,type,managed.status,managed.domainStatus)"
   register: cert_status
   changed_when: false
   failed_when: false
   delegate_to: localhost
+  run_once: true
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, verify]
 
-- name: Collect all configured domains for this tenant
+- name: Collect all configured domains
   ansible.builtin.set_fact:
-    tenant_domains: >-
+    all_domains: >-
       {%- set domains = [] -%}
-      {%- if gke_multi_tenant | bool -%}
-        {%- for tenant in gke_tenants -%}
-          {%- if tenant.prefix == gke_club_prefix -%}
-            {%- set td = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
-            {%- for d in td -%}
-              {%- set _ = domains.append(d) -%}
-            {%- endfor -%}
-          {%- endif -%}
-        {%- endfor -%}
-      {%- else -%}
-        {%- set td = gke_domains | default([gke_domain] if gke_domain is defined else [gke_base_domain]) -%}
-        {%- for d in td -%}
+      {%- for tenant in gke_tenants -%}
+        {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
+        {%- for d in tenant_domains -%}
           {%- set _ = domains.append(d) -%}
         {%- endfor -%}
-      {%- endif -%}
+      {%- endfor -%}
       {{ domains | unique | list }}
+  run_once: true
   tags: [ingress, verify]
 
-- name: Display Ingress configuration summary
+- name: Display Gateway configuration summary
   ansible.builtin.debug:
     msg: |
       ========================================
-      Ingress Deployed Successfully!
+      Gateway API Deployed Successfully!
       ========================================
 
       Static IP: {{ gke_ingress_ip }}
-      Namespace: {{ gke_namespace }}
+      GatewayClass: gke-l7-global-external-managed
 
-      Ingress Status:
-      {{ ingress_status.stdout | default('Ingress not found') }}
+      Gateway Status:
+      {{ gateway_status.stdout | default('Gateway not found') }}
+
+      HTTPRoute Status:
+      {{ httproute_status.stdout | default('No HTTPRoutes found') }}
 
       {% if gke_enable_tls | default(true) | bool %}
       Certificate Status:
@@ -199,7 +335,7 @@
 
       Add the following DNS A records pointing to {{ gke_ingress_ip }}:
 
-      {% for domain in tenant_domains | from_json %}
+      {% for domain in all_domains %}
         {{ domain }} → {{ gke_ingress_ip }}
       {% endfor %}
 
@@ -212,17 +348,19 @@
 
       This typically takes 10-15 minutes after DNS is set up.
 
-      Check certificate status:
-        kubectl get managedcertificate -n {{ gke_namespace }}
-        kubectl describe managedcertificate {{ gke_app_name }}-cert -n {{ gke_namespace }}
+      Check status:
+        kubectl get gateway -n default
+        kubectl get httproute -A
+        gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} --global
 
       Certificate states:
-        - Provisioning: DNS not yet verified or certificate being issued
-        - Active: Certificate is ready and serving HTTPS traffic
-        - ProvisioningFailed: Check DNS configuration
+        - PROVISIONING: DNS not yet verified or certificate being issued
+        - ACTIVE: Certificate is ready and serving HTTPS traffic
+        - FAILED_NOT_VISIBLE: DNS verification failed
       {% else %}
       TLS is disabled. Traffic will be HTTP only.
       {% endif %}
 
       ========================================
+  run_once: true
   tags: [ingress, verify]
