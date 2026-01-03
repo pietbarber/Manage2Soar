@@ -7,42 +7,52 @@ This guide covers deploying Manage2Soar to Google Kubernetes Engine (GKE) using 
 ```mermaid
 graph TB
     subgraph "GKE Cluster"
-        ingress["GKE Ingress<br/>HTTPS Load Balancer"]
-
-        subgraph "Namespace: default (or tenant-*)"
-            deployment["Django Deployment<br/>2 Replicas"]
-            service["ClusterIP Service<br/>Port 8000"]
-            secrets["K8s Secret<br/>manage2soar-env"]
-            cronjobs["CronJobs<br/>Scheduled Tasks"]
+        subgraph "default namespace"
+            gateway["Gateway<br/>HTTPS Load Balancer"]
         end
 
-        ingress --> service
-        service --> deployment
-        deployment -.-> secrets
-        cronjobs -.-> secrets
+        subgraph "tenant-ssc namespace"
+            route_ssc["HTTPRoute"]
+            deployment_ssc["Django Deployment"]
+            service_ssc["Service :8000"]
+            secrets_ssc["K8s Secrets"]
+            cronjobs_ssc["CronJobs"]
+        end
+
+        subgraph "tenant-masa namespace"
+            route_masa["HTTPRoute"]
+            deployment_masa["Django Deployment"]
+            service_masa["Service :8000"]
+        end
+
+        gateway --> route_ssc --> service_ssc --> deployment_ssc
+        gateway --> route_masa --> service_masa --> deployment_masa
+        deployment_ssc -.-> secrets_ssc
+        cronjobs_ssc -.-> secrets_ssc
     end
 
     subgraph "External Services"
         gcr["Google Container Registry<br/>Docker Images"]
         gcs["Google Cloud Storage<br/>Static/Media Files"]
-        cloudsql["Cloud SQL or VM<br/>PostgreSQL"]
+        db["PostgreSQL<br/>Database"]
     end
 
-    deployment -->|Pull Image| gcr
-    deployment -->|Static/Media| gcs
-    deployment -->|Database| cloudsql
+    deployment_ssc -->|Pull Image| gcr
+    deployment_ssc -->|Static/Media| gcs
+    deployment_ssc -->|Database| db
 
-    client[Client Browser] -->|HTTPS| ingress
+    client[Client Browser] -->|HTTPS| gateway
 
-    style ingress fill:#4285F4,stroke:#1A73E8,color:#fff
-    style deployment fill:#34A853,stroke:#1E8E3E,color:#fff
-    style service fill:#FBBC04,stroke:#F9AB00,color:#000
-    style secrets fill:#EA4335,stroke:#D93025,color:#fff
-    style cronjobs fill:#9C27B0,stroke:#7B1FA2,color:#fff
-    style gcr fill:#4285F4,stroke:#1A73E8,color:#fff
-    style gcs fill:#4285F4,stroke:#1A73E8,color:#fff
-    style cloudsql fill:#4285F4,stroke:#1A73E8,color:#fff
+    style gateway fill:#4285F4,stroke:#1A73E8,color:#fff
+    style deployment_ssc fill:#34A853,stroke:#1E8E3E,color:#fff
+    style deployment_masa fill:#34A853,stroke:#1E8E3E,color:#fff
+    style route_ssc fill:#FBBC04,stroke:#F9AB00,color:#000
+    style route_masa fill:#FBBC04,stroke:#F9AB00,color:#000
+    style secrets_ssc fill:#EA4335,stroke:#D93025,color:#fff
+    style cronjobs_ssc fill:#9C27B0,stroke:#7B1FA2,color:#fff
 ```
+
+> **Note:** For detailed Gateway API and ingress configuration, see [GKE Gateway Ingress Guide](gke-gateway-ingress-guide.md).
 
 ## Comparison: Ansible vs Legacy Shell Script
 
@@ -585,6 +595,8 @@ gcloud auth configure-docker
 
 ## Related Documentation
 
+- [GKE Gateway Ingress Guide](gke-gateway-ingress-guide.md) - External HTTPS access and SSL certificates
+- [GKE Cluster Provisioning Guide](gke-cluster-provisioning-guide.md) - Create and configure GKE clusters
 - [GKE Deploy Role README](../roles/gke-deploy/README.md) - Detailed role documentation
 - [Single-Host Deployment](../README.md) - Alternative deployment for smaller clubs
 - [Main Project Documentation](../../../README.md) - Overall project information
