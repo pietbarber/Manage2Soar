@@ -149,7 +149,9 @@
   ansible.builtin.debug:
     msg: "SSL certificate '{{ gke_ssl_cert_name }}' {{ 'exists' if (ssl_cert_check is defined and ssl_cert_check.stdout | trim) else 'does not exist - will be created' }}"
   run_once: true
-  when: gke_enable_tls | default(true) | bool
+  when:
+    - gke_enable_tls | default(true) | bool
+    - ssl_cert_check is defined
   tags: [ingress, tls]
 
 - name: Create Google-managed SSL certificate
@@ -383,12 +385,6 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, verify]
 
-- name: Ensure all_domains is set for verification output
-  ansible.builtin.set_fact:
-    all_domains: "{{ all_domains | default([]) }}"
-  run_once: true
-  tags: [ingress]
-
 - name: Display Gateway configuration summary
   ansible.builtin.debug:
     msg: |
@@ -416,9 +412,13 @@
 
       Add the following DNS A records pointing to {{ gke_ingress_ip }}:
 
+      {% if all_domains is defined and all_domains | length > 0 %}
       {% for domain in all_domains %}
         {{ domain }} → {{ gke_ingress_ip }}
       {% endfor %}
+      {% else %}
+      No domains configured. Configure domains in your inventory file.
+      {% endif %}
 
       ========================================
       CERTIFICATE PROVISIONING
