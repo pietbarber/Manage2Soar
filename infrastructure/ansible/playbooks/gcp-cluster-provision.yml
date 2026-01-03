@@ -196,7 +196,7 @@
           {%- if gke_enable_http_load_balancing %}
           --addons=HttpLoadBalancing
           {%- endif %}
-          --network=default
+          --network={{ gke_vpc_name if gke_create_vpc else 'default' }}
           --enable-ip-alias
           --enable-autoscaling
           --min-nodes={{ gke_min_nodes }}
