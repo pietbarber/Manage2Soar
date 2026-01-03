@@ -210,3 +210,12 @@
 - name: Include verification tasks
   ansible.builtin.include_tasks: verify.yml
   tags: [verify]
+
+# ============================================================
+# SUPERUSER CREATION
+# ============================================================
+
+- name: Include superuser tasks
+  ansible.builtin.include_tasks: superuser.yml
+  when: gke_create_superuser | default(false) | bool
+  tags: [superuser]
