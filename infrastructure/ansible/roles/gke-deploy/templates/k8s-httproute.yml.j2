@@ -36,8 +36,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        # Service name is configurable via playbook inventory for per-tenant
-        # naming conventions (e.g. django-app-{prefix})
+        # Service name follows the deployment pattern: django-app-{prefix}
+        # Defined in k8s-deployment.yml.j2 metadata.name
         - name: django-app-{{ ingress_tenant.prefix }}
           port: {{ gke_container_port }}
 ---
@@ -65,5 +65,7 @@ spec:
         - type: RequestRedirect
           requestRedirect:
             scheme: https
+            # Port 443 is intentionally fixed as the standard external HTTPS listener port.
+            # If the Gateway's HTTPS listener port changes, update this value to match.
             port: 443
             statusCode: 301

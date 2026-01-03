@@ -79,7 +79,10 @@ all:
 
       - prefix: "masa"
         name: "Mid-Atlantic Soaring Association"
-        domain: "masa.manage2soar.com"
+        # Multi-domain example (primary + alias during migration)
+        domains:
+          - "masa.manage2soar.com"          # Primary domain
+          - "www.midatlanticsoaring.org"    # Alias (added during migration)
 
     # ============================================================
     # INGRESS (External Access)

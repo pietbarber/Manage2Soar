@@ -55,7 +55,7 @@ The deployment uses GKE Gateway API instead of traditional GCE Ingress for sever
 | Feature | GCE Ingress | Gateway API |
 |---------|-------------|-------------|
 | Cross-namespace routing | ❌ Not supported | ✅ Supported |
-| Single IP for multi-tenant | ❌ Requires multiple IPs | ✅ Single shared IP |
+| Multi-tenant across namespaces | ❌ Not supported (per-namespace only) | ✅ Single shared IP across namespaces |
 | Host-based routing | ✅ Within same namespace | ✅ Across namespaces |
 | TLS configuration | ManagedCertificate CRD | Google-managed SSL certs |
 | BackendConfig support | ✅ Supported | ❌ Not supported |
@@ -413,13 +413,13 @@ Templates are in `roles/gke-deploy/templates/`.
 
 Gateway API uses Google Cloud Global HTTPS Load Balancer:
 
-| Component | Approximate Cost |
-|-----------|-----------------|
+| Component | Approximate Monthly Cost (us-east1) |
+|-----------|-------------------------------------|
 | Forwarding Rule | ~$18/month |
 | SSL Certificate | Free (Google-managed) |
 | Data Processing | ~$0.008/GB |
 
-> **Note:** Load balancer costs are per-cluster, not per-tenant. Multi-tenant deployments share the same load balancer.
+> **Note:** Load balancer costs are per-cluster, not per-tenant. Multi-tenant deployments share the same load balancer. Costs vary by region; these estimates are for us-east1.
 
 ## Related Documentation
 

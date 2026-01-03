@@ -118,9 +118,12 @@
 - name: Validate SSL certificate domains are not empty
   ansible.builtin.fail:
     msg: |
-      TLS is enabled (gke_enable_tls=true) but no SSL certificate domains were
-      configured. Please configure at least one domain via gke_domain,
-      gke_domains, or tenant domain settings before deploying the ingress.
+      TLS is enabled (gke_enable_tls=true) but no domains were found in your
+      {% if gke_multi_tenant | bool %}
+      tenant configuration. Ensure each tenant in gke_tenants has a 'domain' or 'domains' field.
+      {% else %}
+      configuration. For single-tenant deployments, set 'gke_domain' or 'gke_domains'.
+      {% endif %}
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
@@ -179,10 +182,19 @@
 # GATEWAY DEPLOYMENT (Single shared gateway)
 # ============================================================
 
+- name: Create secure temporary directory for manifests
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: manifests
+  register: manifest_temp_dir
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, gateway]
+
 - name: Generate Gateway manifest
   ansible.builtin.template:
     src: k8s-gateway.yml.j2
-    dest: "/tmp/k8s-gateway.yml"
+    dest: "{{ manifest_temp_dir.path }}/k8s-gateway.yml"
     mode: "0600"
   delegate_to: localhost
   run_once: true
@@ -190,7 +202,7 @@
 
 - name: Apply Gateway configuration
   ansible.builtin.command:
-    cmd: kubectl apply -f /tmp/k8s-gateway.yml
+    cmd: "kubectl apply -f {{ manifest_temp_dir.path }}/k8s-gateway.yml"
   register: gateway_result
   changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
   delegate_to: localhost
@@ -206,7 +218,7 @@
 
 - name: Clean up Gateway manifest
   ansible.builtin.file:
-    path: "/tmp/k8s-gateway.yml"
+    path: "{{ manifest_temp_dir.path }}"
     state: absent
   delegate_to: localhost
   run_once: true
@@ -244,11 +256,13 @@
 
 - name: Display HTTPRoute results (multi-tenant)
   ansible.builtin.debug:
-    msg: "{{ item.stdout_lines }}"
+    msg: "{{ httproute_result_item.stdout_lines }}"
   loop: "{{ httproute_result_mt.results | default([]) }}"
+  loop_control:
+    loop_var: httproute_result_item
   when:
     - gke_multi_tenant | bool
-    - item.stdout_lines is defined
+    - httproute_result_item.stdout_lines is defined
   tags: [ingress, httproute]
 
 - name: Clean up HTTPRoute manifests (multi-tenant)
@@ -313,9 +327,6 @@
   retries: 30
   delay: 10
   changed_when: false
-  failed_when: >
-    gateway_ready.stdout != "True" and
-    gateway_ready.attempts >= gateway_ready.retries
   delegate_to: localhost
   run_once: true
   tags: [ingress, verify]
@@ -376,7 +387,7 @@
   ansible.builtin.set_fact:
     all_domains: "{{ all_domains | default([]) }}"
   run_once: true
-  tags: [ingress, verify]
+  tags: [ingress]
 
 - name: Display Gateway configuration summary
   ansible.builtin.debug:
