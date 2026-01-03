@@ -206,6 +206,7 @@
           --logging=SYSTEM,WORKLOAD
           --monitoring=SYSTEM
       register: gke_cluster_create
+      changed_when: gke_cluster_create.rc == 0
       when:
         - gke_cluster_type == 'standard'
         - existing_standard_cluster.rc != 0
