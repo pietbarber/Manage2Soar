@@ -42,31 +42,55 @@ kubectl exec -n tenant-ssc deployment/django-app-ssc -- python manage.py check -
 
 ## Step 2: Verify/Set Database Passwords
 
-The PostgreSQL users should have passwords set during initial database provisioning. If passwords weren't set correctly, use Ansible to set them:
+The PostgreSQL users should have passwords set during initial database provisioning. If passwords weren't set correctly, use Ansible to set them.
+
+### Verify Passwords in Vault
 
 ```bash
 cd infrastructure/ansible
 
 # Verify passwords are in vault
 ansible-vault view group_vars/gcp_database/vault.yml --vault-password-file ~/.ansible_vault_pass | grep vault_postgresql_password
-
-# Set passwords using Ansible (if needed)
-ansible all -i "YOUR_DB_IP," \
-  --user=$(whoami) \
-  --ssh-extra-args="-i ~/.ssh/google_compute_engine" \
-  -m community.postgresql.postgresql_user \
-  -a "name=m2s_ssc password=YOUR_SSC_PASSWORD state=present" \
-  --become --become-user=postgres
-
-ansible all -i "YOUR_DB_IP," \
-  --user=$(whoami) \
-  --ssh-extra-args="-i ~/.ssh/google_compute_engine" \
-  -m community.postgresql.postgresql_user \
-  -a "name=m2s_masa password=YOUR_MASA_PASSWORD state=present" \
-  --become --become-user=postgres
 ```
 
-**Note**: Replace `YOUR_DB_IP` with your database server's external IP, and passwords with values from vault.
+### Set Passwords Using Ansible (IaC Approach - Recommended)
+
+Create a temporary playbook that references vault variables to avoid exposing passwords in command history:
+
+```bash
+# Create a one-time password reset playbook
+cat > /tmp/set-db-passwords.yml << 'EOF'
+---
+- hosts: all
+  become: true
+  become_user: postgres
+  vars_files:
+    - group_vars/gcp_database/vault.yml
+  tasks:
+    - name: Set m2s_ssc password
+      community.postgresql.postgresql_user:
+        name: m2s_ssc
+        password: "{{ vault_postgresql_password_ssc }}"
+        state: present
+    - name: Set m2s_masa password
+      community.postgresql.postgresql_user:
+        name: m2s_masa
+        password: "{{ vault_postgresql_password_masa }}"
+        state: present
+EOF
+
+# Run the playbook
+ansible-playbook -i "YOUR_DB_IP," \
+  --user=$(whoami) \
+  --ssh-extra-args="-i ~/.ssh/google_compute_engine" \
+  --vault-password-file ~/.ansible_vault_pass \
+  /tmp/set-db-passwords.yml
+
+# Remove temporary playbook
+rm /tmp/set-db-passwords.yml
+```
+
+**Note**: Replace `YOUR_DB_IP` with your database server's external IP.
 
 ## Step 3: Create GCS Bucket for Media Storage
 
@@ -132,21 +156,28 @@ ansible-playbook -i inventory/gcp_app.yml \
   -e gke_image_tag=CURRENT_IMAGE_TAG
 ```
 
-### Option B: Manual Creation (for testing)
+### Option B: Manual Creation (for testing only)
+
+> ⚠️ **SECURITY WARNING**: The commands below expose passwords in command-line arguments,
+> which will appear in shell history, process listings, and potentially system logs.
+> **Use Option A (Ansible) for production deployments.**
+> If you must use this approach:
+> - Clear shell history after: `history -c && history -w`
+> - Use a temporary password and change it immediately via Django admin
 
 ```bash
-# SSC tenant
+# SSC tenant (testing only - see security warning above)
 kubectl exec -n tenant-ssc deployment/django-app-ssc -- sh -c \
   "DJANGO_SUPERUSER_USERNAME='admin' \
    DJANGO_SUPERUSER_EMAIL='admin@manage2soar.com' \
-   DJANGO_SUPERUSER_PASSWORD='your_password' \
+   DJANGO_SUPERUSER_PASSWORD='TEMP_PASSWORD_CHANGE_IMMEDIATELY' \
    python manage.py createsuperuser --noinput"
 
-# MASA tenant
+# MASA tenant (testing only - see security warning above)
 kubectl exec -n tenant-masa deployment/django-app-masa -- sh -c \
   "DJANGO_SUPERUSER_USERNAME='admin' \
    DJANGO_SUPERUSER_EMAIL='admin@masa.manage2soar.com' \
-   DJANGO_SUPERUSER_PASSWORD='your_password' \
+   DJANGO_SUPERUSER_PASSWORD='TEMP_PASSWORD_CHANGE_IMMEDIATELY' \
    python manage.py createsuperuser --noinput"
 ```
 
@@ -178,6 +209,12 @@ curl -H "Host: ssc.manage2soar.com" http://GATEWAY_IP/
 # Already configured in inventory/gcp_app.yml
 
 # 2. Manually patch secret if needed
+# IMPORTANT: The base64 values below are EXAMPLES for specific IP addresses:
+#   MTAuMTI4LjAuMg== = 10.128.0.2 (wrong IP)
+#   MTAuMTQyLjAuMg== = 10.142.0.2 (correct IP in this example)
+# To create base64 values for YOUR IP addresses:
+#   echo -n "YOUR_WRONG_IP" | base64    # Value to search for
+#   echo -n "YOUR_CORRECT_IP" | base64  # Value to replace with
 kubectl get secret manage2soar-env-ssc -n tenant-ssc -o yaml | \
   sed 's/MTAuMTI4LjAuMg==/MTAuMTQyLjAuMg==/' | \
   kubectl apply -f -

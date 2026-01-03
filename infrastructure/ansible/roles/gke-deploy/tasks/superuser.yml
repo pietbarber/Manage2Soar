@@ -24,6 +24,14 @@
   when: should_create_superuser
   tags: [superuser]
 
+# NOTE: The password is passed via environment variable in the kubectl exec command.
+# The no_log directive prevents Ansible from logging the command.
+# Alternative approaches considered but not implemented:
+# - Kubernetes Job with secrets: More complex, requires additional RBAC
+# - Piping password via stdin: createsuperuser doesn't support stdin password
+# The current approach is acceptable for initial deployment as the command is
+# executed within the pod context and passwords are vault-managed.
+
 - name: Create superuser using kubectl exec
   ansible.builtin.command:
     cmd: >
@@ -33,12 +41,12 @@
       sh -c "DJANGO_SUPERUSER_USERNAME='{{ django_superuser_username }}'
       DJANGO_SUPERUSER_EMAIL='{{ django_superuser_email | default('admin@' + gke_base_domain) }}'
       DJANGO_SUPERUSER_PASSWORD='{{ vault_django_superuser_password }}'
-      python manage.py createsuperuser --noinput 2>&1 || true"
+      python manage.py createsuperuser --noinput 2>&1"
   delegate_to: localhost
   run_once: true
   register: superuser_result
   changed_when: "'Superuser created successfully' in superuser_result.stdout"
-  failed_when: false
+  failed_when: superuser_result.rc != 0 and 'already exists' not in superuser_result.stdout
   no_log: true
   when: should_create_superuser
   tags: [superuser]
@@ -48,7 +56,7 @@
     msg: |
       {% if 'Superuser created successfully' in superuser_result.stdout %}
       ✓ Superuser created successfully
-      {% elif 'already exists' in superuser_result.stdout or 'already exists' in superuser_result.stderr %}
+      {% elif 'already exists' in superuser_result.stdout %}
       ℹ Superuser already exists (no changes made)
       {% else %}
       ⚠ Superuser creation completed with warnings (check logs)

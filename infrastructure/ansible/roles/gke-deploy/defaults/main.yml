@@ -246,4 +246,4 @@ gke_create_superuser: false
 # Superuser credentials (MUST be defined in vault/inventory when enabled)
 # django_superuser_username: "admin"
 # django_superuser_email: "admin@example.com"  # Optional, defaults to admin@{{ gke_base_domain }}
-# django_superuser_password: "{{ vault_django_superuser_password }}"
+# vault_django_superuser_password: Must be defined in vault.yml (NEVER in plain text)
