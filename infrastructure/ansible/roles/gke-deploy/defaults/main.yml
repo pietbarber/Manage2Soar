@@ -219,6 +219,11 @@ gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 # Google-managed certs are free, automatic, and don't require cert-manager
 gke_enable_tls: true
 
+# SSL certificate (Google-managed Certificate) resource name
+# If not specified, defaults to {{ gke_app_name }}-ssl-cert
+# Override this if you need a custom certificate name
+# gke_ssl_cert_name: "custom-cert-name"
+
 # ============================================================
 # CRONJOB CONFIGURATION
 # ============================================================

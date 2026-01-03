@@ -36,8 +36,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        # Service name is expected to follow a per-tenant convention (e.g. django-app-{prefix}),
-        # with the actual name configured externally via inventory variables.
+        # Service name is configurable via playbook inventory for per-tenant
+        # naming conventions (e.g. django-app-{prefix})
         - name: django-app-{{ ingress_tenant.prefix }}
           port: {{ gke_container_port }}
 ---

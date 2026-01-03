@@ -394,7 +394,8 @@ The Gateway API deployment uses these Jinja2 templates:
 | Template | Purpose |
 |----------|---------|
 | `k8s-gateway.yml.j2` | Shared Gateway with TLS |
-| `k8s-httproute.yml.j2` | Per-tenant routing rules |
+| `k8s-httproute.yml.j2` | Per-tenant routing rules (multi-tenant) |
+| `k8s-httproute-single.yml.j2` | Routing rules (single-tenant) |
 
 Templates are in `roles/gke-deploy/templates/`.
 

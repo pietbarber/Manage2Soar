@@ -114,6 +114,18 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
+- name: Validate SSL certificate domains are not empty
+  ansible.builtin.fail:
+    msg: |
+      TLS is enabled (gke_enable_tls=true) but no SSL certificate domains were
+      configured. Please configure at least one domain via gke_domain,
+      gke_domains, or tenant domain settings before deploying the ingress.
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - ssl_cert_domains is not defined or (ssl_cert_domains | trim == '')
+  tags: [ingress, tls]
+
 - name: Check if SSL certificate exists
   ansible.builtin.command:
     cmd: >
@@ -131,7 +143,7 @@
 
 - name: Display SSL certificate status
   ansible.builtin.debug:
-    msg: "SSL certificate '{{ gke_ssl_cert_name }}' {{ 'exists' if ssl_cert_check.stdout | trim else 'does not exist - will be created' }}"
+    msg: "SSL certificate '{{ gke_ssl_cert_name }}' {{ 'exists' if (ssl_cert_check is defined and ssl_cert_check.stdout | trim) else 'does not exist - will be created' }}"
   run_once: true
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
@@ -151,6 +163,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
+    - ssl_cert_check is defined
     - ssl_cert_check.stdout | trim == ""
   tags: [ingress, tls]
 
@@ -167,6 +180,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
+    - ssl_cert_check is defined
     - ssl_cert_check.stdout | trim == ""
   tags: [ingress, tls]
 
