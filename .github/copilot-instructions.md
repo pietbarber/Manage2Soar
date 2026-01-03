@@ -5,6 +5,33 @@
 - Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
 - **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
 
+## Infrastructure as Code (IaC) First Philosophy 🏗️
+- **CRITICAL PRINCIPLE**: This project operates as an "IaC first" shop. **Always prefer Infrastructure as Code solutions over manual commands.**
+- **What this means**:
+  - **Ansible playbooks** for infrastructure provisioning (databases, GKE clusters, storage buckets)
+  - **Kubernetes manifests** for application deployment and configuration
+  - **Versioned secrets** in Ansible Vault, never hardcoded or manually entered
+  - **Reproducible deployments** - every change should be codified and replayable
+- **When troubleshooting**:
+  1. **First**: Identify the root cause in IaC (Ansible role, K8s manifest, Dockerfile)
+  2. **Second**: Fix the IaC definition (playbook, template, manifest)
+  3. **Third**: Apply the IaC to implement the fix
+  4. **Last resort**: Manual commands only when IaC isn't feasible - but document for future automation
+- **Key IaC locations**:
+  - **Ansible playbooks**: `infrastructure/ansible/*.yml` (gcp-database, gke-deploy)
+  - **Ansible roles**: `infrastructure/ansible/roles/*/` (gke-deploy, postgresql-setup)
+  - **K8s manifests**: `k8s-*.yaml` files (deployment, cronjobs, ingress, gateway)
+  - **Secrets management**: Ansible Vault (`vault_*` variables in inventory)
+- **Examples of IaC-first approach**:
+  - Database password changes → Update Ansible vault + run `community.postgresql.postgresql_user` module
+  - Superuser creation → Use `gke-deploy` role with `gke_create_superuser: true` flag
+  - Configuration changes → Update K8s ConfigMap/Secret via manifests, not `kubectl edit`
+  - Infrastructure changes → Modify Ansible playbooks, commit, replay
+- **Documentation**: See `infrastructure/ansible/docs/` for comprehensive deployment guides
+  - `gke-gateway-ingress-guide.md` - Gateway API setup
+  - `gke-post-deployment.md` - Post-deployment configuration and troubleshooting
+  - Both guides emphasize IaC solutions over manual fixes
+
 ## Terminal Environment Setup
 - **CRITICAL**: Every new terminal window requires virtual environment activation. The first command in any new terminal session MUST be:
   ```bash

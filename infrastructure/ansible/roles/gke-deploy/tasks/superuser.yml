@@ -1,0 +1,57 @@
+---
+# Superuser Creation Tasks
+#
+# Creates Django superuser account using Kubernetes Job.
+# This ensures superuser creation is idempotent and follows IaC principles.
+
+- name: Check if superuser should be created
+  ansible.builtin.set_fact:
+    should_create_superuser: "{{ gke_create_superuser | default(false) | bool }}"
+  tags: [superuser]
+
+- name: Display superuser creation plan
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      Superuser Creation
+      ========================================
+      Create: {{ should_create_superuser }}
+      Username: {{ django_superuser_username | default('admin') }}
+      {% if should_create_superuser %}
+      Email: {{ django_superuser_email | default('admin@' + gke_base_domain) }}
+      {% endif %}
+      ========================================
+  when: should_create_superuser
+  tags: [superuser]
+
+- name: Create superuser using kubectl exec
+  ansible.builtin.command:
+    cmd: >
+      kubectl exec -n {{ gke_namespace }}
+      deployment/{{ gke_deployment_name }}
+      --
+      sh -c "DJANGO_SUPERUSER_USERNAME='{{ django_superuser_username }}'
+      DJANGO_SUPERUSER_EMAIL='{{ django_superuser_email | default('admin@' + gke_base_domain) }}'
+      DJANGO_SUPERUSER_PASSWORD='{{ vault_django_superuser_password }}'
+      python manage.py createsuperuser --noinput 2>&1 || true"
+  delegate_to: localhost
+  run_once: true
+  register: superuser_result
+  changed_when: "'Superuser created successfully' in superuser_result.stdout"
+  failed_when: false
+  no_log: true
+  when: should_create_superuser
+  tags: [superuser]
+
+- name: Display superuser creation result
+  ansible.builtin.debug:
+    msg: |
+      {% if 'Superuser created successfully' in superuser_result.stdout %}
+      ✓ Superuser created successfully
+      {% elif 'already exists' in superuser_result.stdout or 'already exists' in superuser_result.stderr %}
+      ℹ Superuser already exists (no changes made)
+      {% else %}
+      ⚠ Superuser creation completed with warnings (check logs)
+      {% endif %}
+  when: should_create_superuser and superuser_result is defined
+  tags: [superuser]
