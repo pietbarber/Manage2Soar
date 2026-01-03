@@ -204,6 +204,23 @@ gke_keep_manifests: false
 gke_docker_context: "."
 
 # ============================================================
+# INGRESS CONFIGURATION
+# ============================================================
+
+# Enable Ingress deployment for external access
+gke_enable_ingress: false
+
+# Ingress class (gce = GKE native)
+gke_ingress_class: "gce"
+
+# Static IP name for Ingress (will be created if doesn't exist)
+gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
+
+# Enable TLS/HTTPS using Google-managed certificates
+# Google-managed certs are free, automatic, and don't require cert-manager
+gke_enable_tls: true
+
+# ============================================================
 # CRONJOB CONFIGURATION
 # ============================================================
 

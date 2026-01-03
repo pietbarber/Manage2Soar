@@ -185,6 +185,15 @@
   tags: [cronjobs]
 
 # ============================================================
+# INGRESS (External Access)
+# ============================================================
+
+- name: Include ingress tasks
+  ansible.builtin.include_tasks: ingress.yml
+  when: gke_enable_ingress | bool
+  tags: [ingress]
+
+# ============================================================
 # VERIFICATION
 # ============================================================
 

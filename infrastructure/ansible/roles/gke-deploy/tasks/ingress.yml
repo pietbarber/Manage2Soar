@@ -1,0 +1,228 @@
+# GKE Ingress Deployment Tasks
+#
+# This file handles:
+# - Static IP reservation
+# - Google-managed SSL certificate creation
+# - Ingress resource deployment
+# - Verification and DNS instructions
+---
+# ============================================================
+# STATIC IP RESERVATION
+# ============================================================
+
+- name: Check if static IP exists
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(address)"
+  register: static_ip_check
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip]
+
+- name: Reserve global static IP
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses create {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+  register: static_ip_create
+  when: static_ip_check.rc != 0
+  changed_when: static_ip_create.rc == 0
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip]
+
+- name: Get static IP address
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ip_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(address)"
+  register: static_ip_address
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip]
+
+- name: Set static IP fact
+  ansible.builtin.set_fact:
+    gke_ingress_ip: "{{ static_ip_address.stdout | trim }}"
+  run_once: true
+  tags: [ingress, ip]
+
+# ============================================================
+# GOOGLE-MANAGED SSL CERTIFICATE
+# ============================================================
+
+- name: Generate ManagedCertificate manifest
+  ansible.builtin.template:
+    src: k8s-managed-cert.yml.j2
+    dest: "/tmp/k8s-managed-cert-{{ gke_namespace }}.yml"
+    mode: '0600'
+  delegate_to: localhost
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls]
+
+- name: Apply ManagedCertificate
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-managed-cert-{{ gke_namespace }}.yml
+  register: managed_cert_result
+  changed_when: "'created' in managed_cert_result.stdout or 'configured' in managed_cert_result.stdout"
+  delegate_to: localhost
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls]
+
+- name: Display ManagedCertificate result
+  ansible.builtin.debug:
+    msg: "{{ managed_cert_result.stdout_lines }}"
+  when:
+    - gke_enable_tls | default(true) | bool
+    - managed_cert_result is defined
+  tags: [ingress, tls]
+
+- name: Clean up ManagedCertificate manifest
+  ansible.builtin.file:
+    path: "/tmp/k8s-managed-cert-{{ gke_namespace }}.yml"
+    state: absent
+  delegate_to: localhost
+  when:
+    - gke_enable_tls | default(true) | bool
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, tls]
+
+# ============================================================
+# INGRESS DEPLOYMENT
+# ============================================================
+
+- name: Generate Ingress manifest
+  ansible.builtin.template:
+    src: k8s-ingress.yml.j2
+    dest: "/tmp/k8s-ingress-{{ gke_namespace }}.yml"
+    mode: '0600'
+  delegate_to: localhost
+  tags: [ingress, deploy]
+
+- name: Apply Ingress configuration
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-ingress-{{ gke_namespace }}.yml
+  register: ingress_result
+  changed_when: "'created' in ingress_result.stdout or 'configured' in ingress_result.stdout"
+  delegate_to: localhost
+  tags: [ingress, deploy]
+
+- name: Display Ingress result
+  ansible.builtin.debug:
+    msg: "{{ ingress_result.stdout_lines }}"
+  when: ingress_result is defined
+  tags: [ingress, deploy]
+
+- name: Clean up Ingress manifest
+  ansible.builtin.file:
+    path: "/tmp/k8s-ingress-{{ gke_namespace }}.yml"
+    state: absent
+  delegate_to: localhost
+  when: not (gke_keep_manifests | default(false))
+  tags: [ingress, deploy]
+
+# ============================================================
+# VERIFICATION
+# ============================================================
+
+- name: Get Ingress status
+  ansible.builtin.command:
+    cmd: kubectl get ingress {{ gke_app_name }}-ingress -n {{ gke_namespace }} -o wide
+  register: ingress_status
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  tags: [ingress, verify]
+
+- name: Get ManagedCertificate status
+  ansible.builtin.command:
+    cmd: kubectl get managedcertificate {{ gke_app_name }}-cert -n {{ gke_namespace }} -o wide
+  register: cert_status
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, verify]
+
+- name: Collect all configured domains for this tenant
+  ansible.builtin.set_fact:
+    tenant_domains: >-
+      {%- set domains = [] -%}
+      {%- if gke_multi_tenant | bool -%}
+        {%- for tenant in gke_tenants -%}
+          {%- if tenant.prefix == gke_club_prefix -%}
+            {%- set td = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
+            {%- for d in td -%}
+              {%- set _ = domains.append(d) -%}
+            {%- endfor -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- else -%}
+        {%- set td = gke_domains | default([gke_domain] if gke_domain is defined else [gke_base_domain]) -%}
+        {%- for d in td -%}
+          {%- set _ = domains.append(d) -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ domains | unique | list }}
+  tags: [ingress, verify]
+
+- name: Display Ingress configuration summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      Ingress Deployed Successfully!
+      ========================================
+
+      Static IP: {{ gke_ingress_ip }}
+      Namespace: {{ gke_namespace }}
+
+      Ingress Status:
+      {{ ingress_status.stdout | default('Ingress not found') }}
+
+      {% if gke_enable_tls | default(true) | bool %}
+      Certificate Status:
+      {{ cert_status.stdout | default('Certificate not found') }}
+      {% endif %}
+
+      ========================================
+      DNS CONFIGURATION REQUIRED
+      ========================================
+
+      Add the following DNS A records pointing to {{ gke_ingress_ip }}:
+
+      {% for domain in tenant_domains | from_json %}
+        {{ domain }} → {{ gke_ingress_ip }}
+      {% endfor %}
+
+      ========================================
+      CERTIFICATE PROVISIONING
+      ========================================
+      {% if gke_enable_tls | default(true) | bool %}
+      Google-managed SSL certificate will be automatically provisioned
+      once DNS records are configured and propagated.
+
+      This typically takes 10-15 minutes after DNS is set up.
+
+      Check certificate status:
+        kubectl get managedcertificate -n {{ gke_namespace }}
+        kubectl describe managedcertificate {{ gke_app_name }}-cert -n {{ gke_namespace }}
+
+      Certificate states:
+        - Provisioning: DNS not yet verified or certificate being issued
+        - Active: Certificate is ready and serving HTTPS traffic
+        - ProvisioningFailed: Check DNS configuration
+      {% else %}
+      TLS is disabled. Traffic will be HTTP only.
+      {% endif %}
+
+      ========================================
+  tags: [ingress, verify]
