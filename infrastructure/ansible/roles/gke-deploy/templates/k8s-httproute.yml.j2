@@ -6,6 +6,10 @@
 # service based on the hostname.
 {# Support both plural 'domains' list and singular 'domain' string - computed once #}
 {% set tenant_domains = ingress_tenant.domains | default([ingress_tenant.domain] if ingress_tenant.domain is defined else []) %}
+{# Validate that at least one domain is configured to prevent a catch-all HTTPRoute #}
+{% if tenant_domains | length == 0 %}
+{{   (ingress_tenant.domains | default(ingress_tenant.domain)) | mandatory('Tenant ' ~ ingress_tenant.prefix ~ ' must define at least one domain (via domains list or domain string) when ingress is enabled.') }}
+{% endif %}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

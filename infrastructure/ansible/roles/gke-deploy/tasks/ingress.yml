@@ -83,43 +83,35 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Collect all domains for SSL certificate (multi-tenant)
+- name: Collect all domains for SSL certificate
   ansible.builtin.set_fact:
     ssl_cert_domains: >-
       {%- set domains = [] -%}
-      {%- for tenant in gke_tenants -%}
-        {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
-        {%- for d in tenant_domains -%}
-          {%- set _ = domains.append(d) -%}
-        {%- endfor -%}
-      {%- endfor -%}
-      {{ domains | unique | join(',') }}
-  run_once: true
-  when:
-    - gke_enable_tls | default(true) | bool
-    - gke_multi_tenant | bool
-  tags: [ingress, tls]
-
-- name: Collect all domains for SSL certificate (single-tenant)
-  ansible.builtin.set_fact:
-    ssl_cert_domains: >-
-      {%- set domains = [] -%}
-      {%- if gke_domains is defined and gke_domains -%}
-        {%- if gke_domains is string -%}
-          {%- set _ = domains.append(gke_domains) -%}
-        {%- else -%}
-          {%- for d in gke_domains -%}
+      {%- if gke_multi_tenant | bool -%}
+        {#- Multi-tenant: collect from all tenants -#}
+        {%- for tenant in gke_tenants -%}
+          {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
+          {%- for d in tenant_domains -%}
             {%- set _ = domains.append(d) -%}
           {%- endfor -%}
+        {%- endfor -%}
+      {%- else -%}
+        {#- Single-tenant: use gke_domains or gke_domain -#}
+        {%- if gke_domains is defined and gke_domains -%}
+          {%- if gke_domains is string -%}
+            {%- set _ = domains.append(gke_domains) -%}
+          {%- else -%}
+            {%- for d in gke_domains -%}
+              {%- set _ = domains.append(d) -%}
+            {%- endfor -%}
+          {%- endif -%}
+        {%- elif gke_domain is defined and gke_domain -%}
+          {%- set _ = domains.append(gke_domain) -%}
         {%- endif -%}
-      {%- elif gke_domain is defined and gke_domain -%}
-        {%- set _ = domains.append(gke_domain) -%}
       {%- endif -%}
       {{ domains | unique | join(',') }}
   run_once: true
-  when:
-    - gke_enable_tls | default(true) | bool
-    - not (gke_multi_tenant | bool)
+  when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
 - name: Check if SSL certificate exists
@@ -142,6 +134,24 @@
     msg: "SSL certificate '{{ gke_ssl_cert_name }}' {{ 'exists' if ssl_cert_check.stdout | trim else 'does not exist - will be created' }}"
   run_once: true
   when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls]
+
+- name: Validate SSL certificate domains are configured
+  ansible.builtin.assert:
+    that:
+      - ssl_cert_domains is defined
+      - ssl_cert_domains | length > 0
+    fail_msg: |
+      No domains configured for SSL certificate.
+      {% if gke_multi_tenant | bool %}
+      Each tenant must define at least one domain via 'domains' list or 'domain' string in the gke_tenants variable.
+      {% else %}
+      You must define at least one domain via 'gke_domains' list or 'gke_domain' string when ingress is enabled.
+      {% endif %}
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - ssl_cert_check.stdout | trim == ""
   tags: [ingress, tls]
 
 - name: Create Google-managed SSL certificate
@@ -363,11 +373,12 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, verify]
 
-- name: Collect all configured domains
+- name: Collect all configured domains for verification
   ansible.builtin.set_fact:
     all_domains: >-
       {%- set domains = [] -%}
-      {%- if gke_tenants is defined and gke_tenants and (gke_multi_tenant | bool) -%}
+      {%- if gke_multi_tenant | bool -%}
+        {#- Multi-tenant: collect from all tenants -#}
         {%- for tenant in gke_tenants -%}
           {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
           {%- for d in tenant_domains -%}
@@ -375,19 +386,18 @@
           {%- endfor -%}
         {%- endfor -%}
       {%- else -%}
-        {%- set single_domains = [] -%}
+        {#- Single-tenant: use gke_domains or gke_domain -#}
         {%- if gke_domains is defined and gke_domains -%}
           {%- if gke_domains is string -%}
-            {%- set single_domains = [gke_domains] -%}
+            {%- set _ = domains.append(gke_domains) -%}
           {%- else -%}
-            {%- set single_domains = gke_domains -%}
+            {%- for d in gke_domains -%}
+              {%- set _ = domains.append(d) -%}
+            {%- endfor -%}
           {%- endif -%}
         {%- elif gke_domain is defined and gke_domain -%}
-          {%- set single_domains = [gke_domain] -%}
+          {%- set _ = domains.append(gke_domain) -%}
         {%- endif -%}
-        {%- for d in single_domains -%}
-          {%- set _ = domains.append(d) -%}
-        {%- endfor -%}
       {%- endif -%}
       {{ domains | unique | list }}
   run_once: true
