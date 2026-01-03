@@ -17,7 +17,7 @@
 {% endif %}
 {# Validate that at least one domain is configured to avoid a catch-all HTTPRoute #}
 {% if single_domains | length == 0 %}
-{{   (gke_domains | default(gke_domain)) | mandatory('You must define at least one of gke_domains or gke_domain for HTTPRoute hostnames when ingress is enabled.') }}
+{{   required_httproute_domains | mandatory('You must define at least one of gke_domains or gke_domain for HTTPRoute hostnames when ingress is enabled.') }}
 {% endif %}
 ---
 apiVersion: gateway.networking.k8s.io/v1

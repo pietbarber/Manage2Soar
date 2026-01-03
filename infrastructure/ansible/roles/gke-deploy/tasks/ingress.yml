@@ -39,9 +39,7 @@
   register: static_ip_create
   when: static_ip_check.rc != 0
   changed_when: static_ip_create.rc == 0
-  failed_when: >
-    static_ip_create.rc != 0 and
-    ("already exists" not in (static_ip_create.stderr | lower))
+  failed_when: static_ip_create.rc != 0
   delegate_to: localhost
   run_once: true
   tags: [ingress, ip]
@@ -79,9 +77,9 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Collect all domains for SSL certificate
+- name: Collect all domains for SSL certificate and verification
   ansible.builtin.set_fact:
-    ssl_cert_domains: >-
+    all_domains: >-
       {%- set domains = [] -%}
       {%- if gke_multi_tenant | bool -%}
         {#- Multi-tenant: collect from all tenants -#}
@@ -105,7 +103,14 @@
           {%- set _ = domains.append(gke_domain) -%}
         {%- endif -%}
       {%- endif -%}
-      {{ domains | unique | join(',') }}
+      {{ domains | unique | list }}
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls]
+
+- name: Set SSL certificate domains from all_domains
+  ansible.builtin.set_fact:
+    ssl_cert_domains: "{{ all_domains | join(',') }}"
   run_once: true
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
@@ -144,25 +149,6 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, tls]
 
-- name: Validate SSL certificate domains are configured
-  ansible.builtin.assert:
-    that:
-      - ssl_cert_domains is defined
-      - ssl_cert_domains | length > 0
-    fail_msg: |
-      No domains configured for SSL certificate.
-      {% if gke_multi_tenant | bool %}
-      Each tenant must define at least one domain via 'domains' list or 'domain' string in the gke_tenants variable.
-      {% else %}
-      You must define at least one domain via 'gke_domains' list or 'gke_domain' string when ingress is enabled.
-      {% endif %}
-  run_once: true
-  when:
-    - gke_enable_tls | default(true) | bool
-    - ssl_cert_check is defined
-    - ssl_cert_check.stdout | trim == ""
-  tags: [ingress, tls]
-
 - name: Create Google-managed SSL certificate
   ansible.builtin.command:
     cmd: >-
@@ -171,7 +157,7 @@
       --global
       --project={{ gcp_project }}
   register: ssl_cert_create
-  changed_when: "'Created' in ssl_cert_create.stderr"
+  changed_when: ssl_cert_create.rc == 0
   delegate_to: localhost
   run_once: true
   when:
@@ -346,7 +332,7 @@
 
 - name: Update ingress IP from Gateway status
   ansible.builtin.set_fact:
-    gke_ingress_ip: "{{ gateway_ip.stdout | trim | default(gke_ingress_ip, true) }}"
+    gke_ingress_ip: "{{ gateway_ip.stdout | trim }}"
   run_once: true
   when: gateway_ip.stdout | trim | length > 0
   tags: [ingress, verify]
@@ -386,33 +372,9 @@
   when: gke_enable_tls | default(true) | bool
   tags: [ingress, verify]
 
-- name: Collect all configured domains for verification
+- name: Ensure all_domains is set for verification output
   ansible.builtin.set_fact:
-    all_domains: >-
-      {%- set domains = [] -%}
-      {%- if gke_multi_tenant | bool -%}
-        {#- Multi-tenant: collect from all tenants -#}
-        {%- for tenant in gke_tenants -%}
-          {%- set tenant_domains = tenant.domains | default([tenant.domain] if tenant.domain is defined else []) -%}
-          {%- for d in tenant_domains -%}
-            {%- set _ = domains.append(d) -%}
-          {%- endfor -%}
-        {%- endfor -%}
-      {%- else -%}
-        {#- Single-tenant: use gke_domains or gke_domain -#}
-        {%- if gke_domains is defined and gke_domains -%}
-          {%- if gke_domains is string -%}
-            {%- set _ = domains.append(gke_domains) -%}
-          {%- else -%}
-            {%- for d in gke_domains -%}
-              {%- set _ = domains.append(d) -%}
-            {%- endfor -%}
-          {%- endif -%}
-        {%- elif gke_domain is defined and gke_domain -%}
-          {%- set _ = domains.append(gke_domain) -%}
-        {%- endif -%}
-      {%- endif -%}
-      {{ domains | unique | list }}
+    all_domains: "{{ all_domains | default([]) }}"
   run_once: true
   tags: [ingress, verify]
 

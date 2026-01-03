@@ -220,7 +220,7 @@ Add A records for each tenant domain:
 | `m2s.skylinesoaring.org` | A | `34.111.146.37` |
 | `m2s.midatlanticsoaring.org` | A | `34.111.146.37` |
 
-> **Note:** DNS propagation typically takes 5-15 minutes. SSL certificate provisioning begins after DNS is verified.
+> **Note:** DNS propagation typically takes 10-15 minutes. SSL certificate provisioning begins after DNS is verified and can take an additional 10-15 minutes.
 
 ## SSL Certificate Management
 
