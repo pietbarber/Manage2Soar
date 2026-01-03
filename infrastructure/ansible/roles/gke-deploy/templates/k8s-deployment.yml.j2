@@ -111,8 +111,20 @@ metadata:
 {% if gke_multi_tenant %}
     tenant: {{ gke_club_prefix }}
 {% endif %}
+{# BackendConfig is for GCE Ingress only, not Gateway API.
+   When gke_enable_ingress is true, BackendConfig is disabled by default.
+   When gke_enable_ingress is false (or undefined), BackendConfig is enabled by default.
+   Override with gke_enable_gce_backend_config for explicit control. #}
+{% set _gke_ingress_enabled = gke_enable_ingress | default(true) | bool %}
+{% if gke_enable_gce_backend_config is defined %}
+{%   set _gke_backend_config_enabled = gke_enable_gce_backend_config | bool %}
+{% else %}
+{%   set _gke_backend_config_enabled = (not _gke_ingress_enabled) %}
+{% endif %}
+{% if _gke_backend_config_enabled %}
   annotations:
     cloud.google.com/backend-config: '{"default": "{{ gke_deployment_name }}-config"}'
+{% endif %}
 spec:
   type: NodePort
   selector:

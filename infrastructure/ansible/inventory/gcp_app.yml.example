@@ -57,12 +57,39 @@ all:
     # ============================================================
     gke_multi_tenant: true
 
-    # Define tenants (or override in group_vars)
+    # Define tenants with their domains
+    # Each tenant can have:
+    #   - domain: single domain (string) - backwards compatible
+    #   - domains: multiple domains (list) - for migration scenarios
+    #
+    # Multi-domain example for customer migrations:
+    #   1. Start with primary domain (e.g., ssc.manage2soar.com)
+    #   2. Add customer's domain as alias (e.g., www.skylinesoaring.org)
+    #   3. Both domains work simultaneously during transition
+    #   4. Customer updates DNS at their own pace
     gke_tenants:
       - prefix: "ssc"
         name: "Skyline Soaring Club"
-        domain: "m2s.skylinesoaring.org"
+        # Single domain (simple)
+        domain: "ssc.manage2soar.com"
+        # OR multiple domains (for migrations):
+        # domains:
+        #   - "ssc.manage2soar.com"      # Primary domain
+        #   - "www.skylinesoaring.org"   # Alias (added during migration)
 
       - prefix: "masa"
         name: "Mid-Atlantic Soaring Association"
-        domain: "m2s.midatlanticsoaring.org"
+        # Multi-domain example (primary + alias during migration)
+        domains:
+          - "masa.manage2soar.com"          # Primary domain
+          - "www.midatlanticsoaring.org"    # Alias (added during migration)
+
+    # ============================================================
+    # INGRESS (External Access)
+    # ============================================================
+    # Enable to expose the application via domain names
+    gke_enable_ingress: false
+
+    # TLS is enabled by default using Google-managed SSL certificates
+    # These are free, automatic, and don't require cert-manager or Let's Encrypt
+    # gke_enable_tls: true  # Default

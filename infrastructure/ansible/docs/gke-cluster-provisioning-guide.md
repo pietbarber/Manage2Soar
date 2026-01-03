@@ -76,6 +76,37 @@ The playbook will:
 5. Get kubectl credentials
 6. Verify cluster access
 
+### Step 4: Enable Gateway API (Required for Ingress)
+
+If you plan to use Gateway API for external HTTPS access (recommended for multi-tenant deployments), enable it on the cluster:
+
+```bash
+gcloud container clusters update manage2soar-cluster \
+  --gateway-api=standard \
+  --zone=us-east1-b \
+  --project=your-project-id
+```
+
+This enables:
+- Gateway API CRDs
+- GatewayClass resources (`gke-l7-global-external-managed`, etc.)
+- Cross-namespace routing for multi-tenant ingress
+
+**Verify Gateway API is enabled:**
+```bash
+kubectl get gatewayclass
+```
+
+Expected output includes:
+```
+NAME                            CONTROLLER
+gke-l7-global-external-managed  cloud.google.com/l7-gke-gateway-controller
+gke-l7-gxlb                     cloud.google.com/l7-gke-gateway-controller
+gke-l7-rilb                     cloud.google.com/l7-gke-gateway-controller
+```
+
+> **Note:** Gateway API enablement is a one-time operation per cluster. See [GKE Gateway Ingress Guide](gke-gateway-ingress-guide.md) for full ingress configuration.
+
 ## Cluster Types
 
 ### Standard Cluster (Default)
@@ -334,3 +365,9 @@ Approximate monthly costs (subject to change; check current GCP pricing):
 | Autopilot (light usage) | ~$30-50 |
 
 *Note: Costs vary by region and usage. Use the [GCP Pricing Calculator](https://cloud.google.com/products/calculator) for accurate estimates.*
+
+## Related Documentation
+
+- [GKE Deployment Guide](gke-deployment-guide.md) - Deploy applications to the cluster
+- [GKE Gateway Ingress Guide](gke-gateway-ingress-guide.md) - Configure external HTTPS access
+- [Main Project Documentation](../../../README.md) - Overall project information

@@ -204,6 +204,27 @@ gke_keep_manifests: false
 gke_docker_context: "."
 
 # ============================================================
+# GATEWAY API / INGRESS CONFIGURATION
+# ============================================================
+
+# Enable Gateway API deployment for external access
+# Uses GKE's Gateway API (successor to Ingress) for host-based routing
+# Single IP serves all tenants with routing based on hostname
+gke_enable_ingress: false
+
+# Static IP name for Gateway (will be created if doesn't exist)
+gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
+
+# Enable TLS/HTTPS using Google-managed certificates
+# Google-managed certs are free, automatic, and don't require cert-manager
+gke_enable_tls: true
+
+# SSL certificate (Google-managed Certificate) resource name
+# Defaults to {{ gke_app_name }}-ssl-cert computed at runtime
+# Override this if you need a custom certificate name
+gke_ssl_cert_name: "{{ gke_app_name }}-ssl-cert"
+
+# ============================================================
 # CRONJOB CONFIGURATION
 # ============================================================
 
