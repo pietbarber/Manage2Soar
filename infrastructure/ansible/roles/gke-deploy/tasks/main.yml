@@ -187,6 +187,10 @@
 # ============================================================
 # INGRESS (External Access)
 # ============================================================
+# NOTE: Secrets are deployed before ingress, which means gke_ingress_ip
+# is undefined on first deployment and won't be included in ALLOWED_HOSTS.
+# This is acceptable - the Gateway IP will be added on the second deployment
+# or update run. DNS should point to the Gateway IP, not the IP directly.
 
 - name: Include ingress tasks
   ansible.builtin.include_tasks: ingress.yml

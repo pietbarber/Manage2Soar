@@ -38,14 +38,10 @@
       --project={{ gcp_project }}
   register: static_ip_create
   when: static_ip_check.rc != 0
-  changed_when: >
-    static_ip_create.rc == 0 and
-    ("alreadyExists" not in static_ip_create.stderr) and
-    ("already exists" not in static_ip_create.stderr)
+  changed_when: static_ip_create.rc == 0
   failed_when: >
     static_ip_create.rc != 0 and
-    ("alreadyExists" not in static_ip_create.stderr) and
-    ("already exists" not in static_ip_create.stderr)
+    ("already exists" not in (static_ip_create.stderr | lower))
   delegate_to: localhost
   run_once: true
   tags: [ingress, ip]
@@ -123,7 +119,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
-    - ssl_cert_domains is not defined or (ssl_cert_domains | trim == '')
+    - ssl_cert_domains | trim == ''
   tags: [ingress, tls]
 
 - name: Check if SSL certificate exists
@@ -331,7 +327,9 @@
   retries: 30
   delay: 10
   changed_when: false
-  failed_when: false
+  failed_when: >
+    gateway_ready.stdout != "True" and
+    gateway_ready.attempts >= gateway_ready.retries
   delegate_to: localhost
   run_once: true
   tags: [ingress, verify]
@@ -374,10 +372,11 @@
   tags: [ingress, verify]
 
 - name: Get SSL certificate status
-  ansible.builtin.shell: |
-    gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} \
-      --global \
-      --project={{ gcp_project }} \
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }}
+      --global
+      --project={{ gcp_project }}
       --format="table(name,type,managed.status,managed.domainStatus)"
   register: cert_status
   changed_when: false

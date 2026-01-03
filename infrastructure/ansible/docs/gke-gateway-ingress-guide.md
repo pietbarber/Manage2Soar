@@ -16,13 +16,13 @@ graph TB
         end
 
         subgraph "tenant-ssc namespace"
-            route_ssc["HTTPRoute<br/>m2s.skylinesoaring.org"]
+            route_ssc["HTTPRoute<br/>ssc.manage2soar.com"]
             svc_ssc["Service<br/>django-app-ssc:8000"]
             pods_ssc["Pods<br/>Django App"]
         end
 
         subgraph "tenant-masa namespace"
-            route_masa["HTTPRoute<br/>m2s.midatlanticsoaring.org"]
+            route_masa["HTTPRoute<br/>masa.manage2soar.com"]
             svc_masa["Service<br/>django-app-masa:8000"]
             pods_masa["Pods<br/>Django App"]
         end
@@ -117,11 +117,11 @@ all:
       gke_tenants:
         - prefix: "ssc"
           name: "Skyline Soaring Club"
-          domain: "m2s.skylinesoaring.org"
+          domain: "ssc.manage2soar.com"
 
         - prefix: "masa"
           name: "Mid-Atlantic Soaring Association"
-          domain: "m2s.midatlanticsoaring.org"
+          domain: "masa.manage2soar.com"
 ```
 
 ### Configuration Variables
@@ -256,7 +256,7 @@ gcloud compute ssl-certificates describe manage2soar-ssl-cert \
 gcloud compute ssl-certificates describe manage2soar-ssl-cert --global
 
 # Verify DNS is pointing correctly
-dig m2s.skylinesoaring.org +short
+dig ssc.manage2soar.com +short
 # Should return the Gateway IP
 
 # Delete and recreate certificate (if needed)
@@ -273,7 +273,7 @@ gcloud compute ssl-certificates delete manage2soar-ssl-cert --global --quiet
    gke_tenants:
      - prefix: "ssc"
        domains:
-         - "m2s.skylinesoaring.org"
+         - "ssc.manage2soar.com"
          - "new-domain.example.com"  # Add new domain
    ```
 

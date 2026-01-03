@@ -112,9 +112,9 @@ metadata:
     tenant: {{ gke_club_prefix }}
 {% endif %}
 {% if gke_enable_gce_backend_config | default(not (gke_enable_ingress | default(false) | bool)) %}
-{# BackendConfig is only for GCE Ingress, not Gateway API.
-   Controlled by gke_enable_gce_backend_config, which by default is enabled
-   when Gateway API ingress is disabled. #}
+{# BackendConfig is for GCE Ingress only, not Gateway API.
+   By default, BackendConfig is enabled when Gateway API ingress is disabled
+   (gke_enable_ingress=false). Override with gke_enable_gce_backend_config. #}
   annotations:
     cloud.google.com/backend-config: '{"default": "{{ gke_deployment_name }}-config"}'
 {% endif %}
