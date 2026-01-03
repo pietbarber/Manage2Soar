@@ -17,23 +17,23 @@
 #### GKE Deployment Role (`roles/gke-deploy`)
 
 **tasks/main.yml**:
-- Added namespace creation task before secrets (line 145-158)
+- Added namespace creation task before secrets (lines 146-159)
   - Issue: Secrets were being created before namespace existed, causing `NotFound` errors
   - Solution: Create namespace first, then secrets, then deployment
   - Tagged with `[namespace, secrets, deploy]` for flexibility
 
 **tasks/secrets.yml**:
-- Fixed GCP service account secret conditional logic (line 48-54)
+- Fixed GCP service account secret conditional logic (lines 57-59)
   - Issue: Task ran even when `gke_gcp_sa_key_file=""` (empty string) because empty string is "defined"
   - Solution: Check both `is defined` AND `length > 0`
   - Prevents errors when using Workload Identity (no key file needed)
 
 **templates/k8s-deployment.yml.j2**:
-- Made GCP credentials volume mount conditional (lines 58-62, 93-97)
+- Made GCP credentials volume mount conditional (lines 61-66, 97-101)
   - Issue: Pods failed with "secret 'gcp-sa-key' not found" when using Workload Identity
   - Solution: Only mount volume when `gke_gcp_sa_key_file` is configured
   - Allows Workload Identity (recommended) without needing service account keys
-- Made `GOOGLE_APPLICATION_CREDENTIALS` environment variable conditional (lines 48-52)
+- Made `GOOGLE_APPLICATION_CREDENTIALS` environment variable conditional (lines 49-52)
   - Issue: Django tried to load non-existent credentials file even when using Workload Identity
   - Solution: Only set env var when key file is configured
   - Application now uses Workload Identity by default in GKE

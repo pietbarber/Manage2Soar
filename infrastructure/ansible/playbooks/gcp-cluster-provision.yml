@@ -187,15 +187,15 @@
           --disk-size={{ gke_disk_size_gb }}
           --disk-type={{ gke_disk_type }}
           --scopes=gke-default
-          {% if gke_use_spot_vms %}
+          {%- if gke_use_spot_vms %}
           --spot
-          {% endif %}
-          {% if gke_enable_workload_identity %}
+          {%- endif %}
+          {%- if gke_enable_workload_identity %}
           --workload-pool={{ gcp_project }}.svc.id.goog
-          {% endif %}
-          {% if gke_enable_http_load_balancing %}
+          {%- endif %}
+          {%- if gke_enable_http_load_balancing %}
           --addons=HttpLoadBalancing
-          {% endif %}
+          {%- endif %}
           --network=default
           --enable-ip-alias
           --enable-autoscaling

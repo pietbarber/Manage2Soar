@@ -153,7 +153,7 @@
   delegate_to: localhost
   run_once: true
   register: ns_result
-  failed_when: false
+  failed_when: ns_result.rc != 0 and ('AlreadyExists' not in ns_result.stderr)
   changed_when: "'created' in ns_result.stdout"
   when: gke_namespace != 'default'
   tags: [namespace, secrets, deploy]
