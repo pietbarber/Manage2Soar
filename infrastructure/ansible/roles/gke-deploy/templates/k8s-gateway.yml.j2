@@ -21,7 +21,7 @@ metadata:
     app: {{ gke_app_name }}
     managed-by: ansible
   annotations:
-    # Use the reserved static IP
+    # Reference the reserved static IP address by name (GKE Gateway resolves the name to the actual IP)
     networking.gke.io/addresses: {{ gke_static_ip_name }}
 spec:
   gatewayClassName: gke-l7-global-external-managed
