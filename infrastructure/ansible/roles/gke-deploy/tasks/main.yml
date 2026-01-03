@@ -191,6 +191,12 @@
 # is undefined on first deployment and won't be included in ALLOWED_HOSTS.
 # This is acceptable - the Gateway IP will be added on the second deployment
 # or update run. DNS should point to the Gateway IP, not the IP directly.
+#
+# To add the Gateway IP to ALLOWED_HOSTS after initial deployment:
+#   1. Run the playbook once to deploy ingress and obtain the Gateway IP
+#   2. (Optional) Run the playbook again to update secrets with the Gateway IP
+# However, this second run is NOT required for normal operation - Django health
+# checks use the Service IP, and users access via domain names, not the Gateway IP.
 
 - name: Include ingress tasks
   ansible.builtin.include_tasks: ingress.yml

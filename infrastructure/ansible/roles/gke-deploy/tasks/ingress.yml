@@ -127,7 +127,7 @@
   run_once: true
   when:
     - gke_enable_tls | default(true) | bool
-    - ssl_cert_domains | trim == ''
+    - ssl_cert_domains is not defined or (ssl_cert_domains | trim == '')
   tags: [ingress, tls]
 
 - name: Check if SSL certificate exists

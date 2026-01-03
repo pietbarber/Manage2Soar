@@ -141,14 +141,14 @@ Each tenant can have one or more domains:
 # Single domain per tenant
 gke_tenants:
   - prefix: "ssc"
-    domain: "m2s.skylinesoaring.org"
+    domain: "ssc.manage2soar.com"
 
 # Multiple domains per tenant (for migrations)
 gke_tenants:
   - prefix: "ssc"
     domains:
-      - "m2s.skylinesoaring.org"
-      - "skyline.manage2soar.com"  # Alias during migration
+      - "ssc.manage2soar.com"
+      - "www.skylinesoaring.org"  # Alias during migration
 ```
 
 ## Deployment
@@ -194,10 +194,10 @@ kubectl get httproute -A
 
 # Expected output:
 # NAMESPACE     NAME                        HOSTNAMES                        AGE
-# tenant-ssc    manage2soar-ssc-route       ["m2s.skylinesoaring.org"]       5m
-# tenant-ssc    manage2soar-ssc-redirect    ["m2s.skylinesoaring.org"]       5m
-# tenant-masa   manage2soar-masa-route      ["m2s.midatlanticsoaring.org"]   5m
-# tenant-masa   manage2soar-masa-redirect   ["m2s.midatlanticsoaring.org"]   5m
+# tenant-ssc    manage2soar-ssc-route       ["ssc.manage2soar.com"]         5m
+# tenant-ssc    manage2soar-ssc-redirect    ["ssc.manage2soar.com"]         5m
+# tenant-masa   manage2soar-masa-route      ["masa.manage2soar.com"]        5m
+# tenant-masa   manage2soar-masa-redirect   ["masa.manage2soar.com"]        5m
 ```
 
 ## DNS Configuration
@@ -217,8 +217,8 @@ Add A records for each tenant domain:
 
 | Domain | Type | Value |
 |--------|------|-------|
-| `m2s.skylinesoaring.org` | A | `34.111.146.37` |
-| `m2s.midatlanticsoaring.org` | A | `34.111.146.37` |
+| `ssc.manage2soar.com` | A | `34.111.146.37` |
+| `masa.manage2soar.com` | A | `34.111.146.37` |
 
 > **Note:** DNS propagation typically takes 10-15 minutes. SSL certificate provisioning begins after DNS is verified and can take an additional 10-15 minutes.
 
@@ -303,17 +303,17 @@ gcloud compute ssl-certificates delete manage2soar-ssl-cert --global --quiet
 ### Test HTTP Redirect
 
 ```bash
-curl -v -H "Host: m2s.skylinesoaring.org" http://GATEWAY_IP/
+curl -v -H "Host: ssc.manage2soar.com" http://GATEWAY_IP/
 
 # Should return:
 # HTTP/1.1 301 Moved Permanently
-# Location: https://m2s.skylinesoaring.org:443/
+# Location: https://ssc.manage2soar.com:443/
 ```
 
 ### Test HTTPS (After Certificate Active)
 
 ```bash
-curl -v https://m2s.skylinesoaring.org/
+curl -v https://ssc.manage2soar.com/
 
 # Should return:
 # HTTP/2 200
@@ -324,10 +324,10 @@ curl -v https://m2s.skylinesoaring.org/
 
 ```bash
 # HTTP redirect test
-curl -v -H "Host: m2s.skylinesoaring.org" http://34.111.146.37/
+curl -v -H "Host: ssc.manage2soar.com" http://34.111.146.37/
 
 # HTTPS (will fail until certificate is active)
-curl -k -H "Host: m2s.skylinesoaring.org" https://34.111.146.37/
+curl -k -H "Host: ssc.manage2soar.com" https://34.111.146.37/
 ```
 
 ## Troubleshooting
@@ -368,10 +368,10 @@ kubectl delete backendconfig -n tenant-ssc django-app-ssc-config
 
 ```bash
 # Check DNS
-dig m2s.skylinesoaring.org +short
+dig ssc.manage2soar.com +short
 
 # Check CAA
-dig m2s.skylinesoaring.org CAA
+dig ssc.manage2soar.com CAA
 
 # CAA should be empty or include: 0 issue "pki.goog"
 ```
@@ -394,8 +394,7 @@ The Gateway API deployment uses these Jinja2 templates:
 | Template | Purpose |
 |----------|---------|
 | `k8s-gateway.yml.j2` | Shared Gateway with TLS |
-| `k8s-httproute.yml.j2` | Per-tenant routing rules (multi-tenant) |
-| `k8s-httproute-single.yml.j2` | Routing rules (single-tenant) |
+| `k8s-httproute.yml.j2` | Per-tenant routing rules (multi-tenant) || `k8s-httproute-single.yml.j2` | Routing rules (single-tenant) || `k8s-httproute-single.yml.j2` | Routing rules (single-tenant) |
 
 Templates are in `roles/gke-deploy/templates/`.
 

@@ -220,9 +220,9 @@ gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 gke_enable_tls: true
 
 # SSL certificate (Google-managed Certificate) resource name
-# If not specified, defaults to {{ gke_app_name }}-ssl-cert
+# Defaults to {{ gke_app_name }}-ssl-cert computed at runtime
 # Override this if you need a custom certificate name
-# gke_ssl_cert_name: "custom-cert-name"
+gke_ssl_cert_name: "{{ gke_app_name }}-ssl-cert"
 
 # ============================================================
 # CRONJOB CONFIGURATION
