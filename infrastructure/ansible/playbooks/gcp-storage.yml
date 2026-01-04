@@ -1,0 +1,112 @@
+# GCP Cloud Storage Bucket Provisioning Playbook
+#
+# This playbook provisions Google Cloud Storage (GCS) buckets for
+# Django media and static files in multi-tenant deployments.
+#
+# Prerequisites:
+#   1. Install required Ansible collections:
+#      ansible-galaxy collection install google.cloud
+#
+#   2. Authenticate with GCP:
+#      gcloud auth application-default login
+#
+#   3. Copy an example inventory and customize it, for example:
+#      cp inventory/gcp_app.yml.example inventory/gcp_app.yml
+#
+# Usage:
+#   # Create bucket with default settings
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     playbooks/gcp-storage.yml
+#
+#   # Create bucket with custom settings
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     playbooks/gcp-storage.yml \
+#     -e gcs_bucket_name=my-bucket \
+#     -e gcs_location=us-east1
+#
+#   # Grant service account permissions
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     playbooks/gcp-storage.yml \
+#     --tags permissions
+#
+# Tags:
+#   - bucket: Bucket creation and configuration
+#   - permissions: IAM policy and service account bindings
+#   - verify: Verification checks
+
+---
+- name: Provision GCS Storage Bucket
+  hosts: localhost
+  connection: local
+  become: false
+
+  vars:
+    # Default bucket settings (override in inventory or command line)
+    gcs_bucket_name: "{{ gke_gcs_bucket | default('manage2soar') }}"
+    gcs_project: "{{ gcp_project | default('manage2soar') }}"
+    gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
+    gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
+    # Service account defaults to the same project as GCS bucket for consistency with
+    # setup-gcs-bucket.sh behavior (when using default PROJECT_ID).
+    gcs_service_account: "{{ gke_service_account_email | default('django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}"
+
+  tasks:
+    - name: Ensure bucket exists with uniform access
+      tags: [bucket]
+      google.cloud.gcp_storage_bucket:
+        name: "{{ gcs_bucket_name }}"
+        project: "{{ gcs_project }}"
+        location: "{{ gcs_location }}"
+        storage_class: "{{ gcs_storage_class }}"
+        # Uniform bucket-level access (recommended for IAM)
+        iam_configuration:
+          uniform_bucket_level_access:
+            enabled: true
+        state: present
+        auth_kind: application
+      register: bucket_result
+
+    - name: Display bucket information
+      tags: [bucket]
+      ansible.builtin.debug:
+        msg:
+          - "Bucket Name: {{ bucket_result.name }}"
+          - "Location: {{ bucket_result.location }}"
+          - "Self Link: {{ bucket_result.selfLink }}"
+          - "Storage Class: {{ bucket_result.storageClass }}"
+
+    - name: Grant service account Storage Object Admin role
+      tags: [permissions]
+      google.cloud.gcp_storage_bucket_iam_binding:
+        bucket: "{{ gcs_bucket_name }}"
+        role: "roles/storage.objectAdmin"
+        members:
+          - "serviceAccount:{{ gcs_service_account }}"
+        project: "{{ gcs_project }}"
+        auth_kind: application
+      register: iam_result
+
+    - name: Display IAM member information
+      tags: [permissions]
+      ansible.builtin.debug:
+        msg:
+          - "Role: {{ iam_result.role }}"
+          - "Member: {{ iam_result.member }}"
+          - "Bucket: {{ iam_result.bucket }}"
+
+    - name: Verify bucket is accessible
+      tags: [verify]
+      google.cloud.gcp_storage_bucket_info:
+        name: "{{ gcs_bucket_name }}"
+        project: "{{ gcs_project }}"
+        auth_kind: application
+      register: verify_result
+
+    - name: Display verification result
+      tags: [verify]
+      ansible.builtin.debug:
+        msg:
+          - "Bucket verification successful"
+          - "Bucket name: {{ verify_result.resources[0].name }}"
+          - "Location: {{ verify_result.resources[0].location }}"
+          - "Uniform bucket-level access: {{ verify_result.resources[0].iamConfiguration.uniformBucketLevelAccess.enabled }}"
