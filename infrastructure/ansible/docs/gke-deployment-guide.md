@@ -452,6 +452,64 @@ ansible-playbook ... --skip-tags docker
 | `gke_wait_for_rollout` | `true` | Wait for rollout |
 | `gke_rollout_timeout` | `300` | Rollout timeout (seconds) |
 
+### Email Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `gke_email_backend` | `smtp.EmailBackend` | Django email backend |
+| `gke_email_host` | `localhost` | SMTP server host |
+| `gke_email_port` | `587` | SMTP server port |
+| `gke_email_use_tls` | `true` | Enable TLS encryption |
+| `gke_default_from_email` | `noreply@...` | Default sender address |
+| `gke_email_dev_mode` | `false` | **SAFETY**: Enable email dev mode |
+| `gke_email_dev_mode_redirect_to` | `""` | Redirect all emails to these addresses |
+
+**Vault secrets for email** (in `vault.yml`):
+
+```yaml
+vault_email_host_user: "your-smtp-username"
+vault_email_host_password: "your-smtp-password"
+```
+
+### Email Dev Mode (Safety Valve)
+
+> **⚠️ CRITICAL FOR STAGING/TESTING ENVIRONMENTS**
+>
+> Email Dev Mode is a safety mechanism that **redirects ALL outgoing emails** to specified test
+> addresses. This prevents accidental emails to real users during development, staging, or testing.
+> See issue [#350](https://github.com/pietbarber/Manage2Soar/pull/350) for implementation details.
+
+**When to enable:**
+- Development environments
+- Staging/QA environments
+- Initial production setup before going live
+- Testing email functionality
+
+**When to disable:**
+- Production deployments that should send real emails
+
+**Configuration for staging:**
+
+```yaml
+# In group_vars/staging/vars.yml
+gke_email_dev_mode: true
+gke_email_dev_mode_redirect_to: "devtest@yourclub.org,qa@yourclub.org"
+```
+
+**Configuration for production:**
+
+```yaml
+# In group_vars/production/vars.yml
+gke_email_dev_mode: false
+gke_email_dev_mode_redirect_to: ""  # Empty - not used
+```
+
+**Behavior when enabled:**
+- All emails are redirected to the comma-separated list in `gke_email_dev_mode_redirect_to`
+- Subject lines are prefixed with `[DEV MODE]` and include original recipient
+- Original recipients are preserved in the email body for debugging
+- No emails reach real end users
+
 See `roles/gke-deploy/defaults/main.yml` for the complete list.
 
 ## Validation and Safety

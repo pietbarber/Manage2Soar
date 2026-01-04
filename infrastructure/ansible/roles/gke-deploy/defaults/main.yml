@@ -137,6 +137,17 @@ gke_email_use_tls: true
 # Default from address
 gke_default_from_email: "noreply@{{ mail_domain | default('example.com') }}"
 
+# Email Dev Mode - SAFETY VALVE for testing/staging environments
+# When enabled, ALL outgoing emails are redirected to test addresses
+# CRITICAL: Set to false for production deployments
+# See issue #350 for implementation details
+gke_email_dev_mode: false
+
+# Comma-separated list of email addresses to receive ALL emails when dev mode is enabled
+# Only used when gke_email_dev_mode is true
+# Example: "test1@example.com,test2@example.com"
+gke_email_dev_mode_redirect_to: ""
+
 # ============================================================
 # SECRETS MANAGEMENT
 # ============================================================
