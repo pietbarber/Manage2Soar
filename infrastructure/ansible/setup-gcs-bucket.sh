@@ -12,7 +12,7 @@
 #     - GCP_PROJECT         (default: manage2soar)
 #     - GCS_BUCKET_NAME     (default: manage2soar)
 #     - GCS_LOCATION        (default: us-east1)
-#     - GCS_SERVICE_ACCOUNT (default: django@skyline-soaring-storage.iam.gserviceaccount.com)
+#     - GCS_SERVICE_ACCOUNT (default: django@${GCP_PROJECT:-manage2soar}.iam.gserviceaccount.com)
 #
 #   Examples:
 #     # Use a different project and bucket name
@@ -77,7 +77,7 @@ EXISTING_MEMBERS="$(gcloud storage buckets get-iam-policy "gs://${BUCKET_NAME}" 
     --project="${PROJECT_ID}" \
     --format="get(bindings[role=roles/storage.objectAdmin].members[])" 2>/dev/null || true)"
 
-if grep -q "serviceAccount:${SERVICE_ACCOUNT}" <<<"${EXISTING_MEMBERS}"; then
+if grep -qF "serviceAccount:${SERVICE_ACCOUNT}" <<<"${EXISTING_MEMBERS}"; then
     echo "✓ IAM binding roles/storage.objectAdmin for ${SERVICE_ACCOUNT} already exists"
 else
     echo "Granting roles/storage.objectAdmin to ${SERVICE_ACCOUNT}..."
