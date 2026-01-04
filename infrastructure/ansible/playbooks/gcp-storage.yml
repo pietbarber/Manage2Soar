@@ -1,0 +1,106 @@
+# GCP Cloud Storage Bucket Provisioning Playbook
+#
+# This playbook provisions Google Cloud Storage (GCS) buckets for
+# Django media and static files in multi-tenant deployments.
+#
+# Prerequisites:
+#   1. Install required Ansible collections:
+#      ansible-galaxy collection install google.cloud
+#
+#   2. Authenticate with GCP:
+#      gcloud auth application-default login
+#
+#   3. Configure inventory with bucket settings
+#
+# Usage:
+#   # Create bucket with default settings
+#   ansible-playbook -i inventory/gcp-production.yml \
+#     playbooks/gcp-storage.yml
+#
+#   # Create bucket with custom settings
+#   ansible-playbook -i inventory/gcp-production.yml \
+#     playbooks/gcp-storage.yml \
+#     -e gcs_bucket_name=my-bucket \
+#     -e gcs_location=us-east1
+#
+#   # Grant service account permissions
+#   ansible-playbook -i inventory/gcp-production.yml \
+#     playbooks/gcp-storage.yml \
+#     --tags permissions
+#
+# Tags:
+#   - bucket: Bucket creation and configuration
+#   - permissions: IAM policy and service account bindings
+#   - verify: Verification checks
+
+---
+- name: Provision GCS Storage Bucket
+  hosts: localhost
+  connection: local
+  become: false
+
+  vars:
+    # Default bucket settings (override in inventory or command line)
+    gcs_bucket_name: "{{ gke_gcs_bucket | default('manage2soar') }}"
+    gcs_project: "{{ gcp_project | default('manage2soar') }}"
+    gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
+    gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
+    gcs_service_account: "{{ gke_service_account_email | default('django@skyline-soaring-storage.iam.gserviceaccount.com') }}"
+
+  tasks:
+    - name: Ensure bucket exists with uniform access
+      tags: [bucket]
+      google.cloud.gcp_storage_bucket:
+        name: "{{ gcs_bucket_name }}"
+        project: "{{ gcs_project }}"
+        location: "{{ gcs_location }}"
+        storage_class: "{{ gcs_storage_class }}"
+        # Uniform bucket-level access (recommended for IAM)
+        iam_configuration:
+          uniform_bucket_level_access:
+            enabled: true
+        state: present
+        auth_kind: application
+      register: bucket_result
+
+    - name: Display bucket information
+      tags: [bucket]
+      ansible.builtin.debug:
+        msg:
+          - "Bucket Name: {{ bucket_result.name }}"
+          - "Location: {{ bucket_result.location }}"
+          - "Self Link: {{ bucket_result.selfLink }}"
+          - "Storage Class: {{ bucket_result.storageClass }}"
+
+    - name: Grant service account Storage Object Admin role
+      tags: [permissions]
+      google.cloud.gcp_storage_bucket_iam_binding:
+        bucket: "{{ gcs_bucket_name }}"
+        role: "roles/storage.objectAdmin"
+        members:
+          - "serviceAccount:{{ gcs_service_account }}"
+        project: "{{ gcs_project }}"
+        auth_kind: application
+      register: iam_result
+
+    - name: Display IAM binding information
+      tags: [permissions]
+      ansible.builtin.debug:
+        msg:
+          - "Role: {{ iam_result.role }}"
+          - "Members: {{ iam_result.members }}"
+          - "Bucket: {{ iam_result.bucket }}"
+
+    - name: Verify bucket is accessible
+      tags: [verify]
+      ansible.builtin.command:
+        cmd: "gcloud storage buckets describe gs://{{ gcs_bucket_name }} --project={{ gcs_project }}"
+      register: verify_result
+      changed_when: false
+
+    - name: Display verification result
+      tags: [verify]
+      ansible.builtin.debug:
+        msg:
+          - "Bucket verification successful"
+          - "{{ verify_result.stdout_lines }}"
