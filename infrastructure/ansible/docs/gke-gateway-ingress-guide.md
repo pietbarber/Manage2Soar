@@ -163,6 +163,8 @@ ansible-playbook -i inventory/gcp_app.yml \
   playbooks/gcp-app-deploy.yml
 ```
 
+> **After Deployment**: Complete post-deployment setup including database migrations, GCS bucket creation, and superuser creation. See [Post-Deployment Steps Guide](gke-post-deployment.md) for detailed instructions.
+
 ### What Gets Created
 
 1. **Gateway** (in `default` namespace)

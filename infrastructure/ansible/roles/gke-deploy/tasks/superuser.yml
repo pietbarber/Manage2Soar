@@ -1,0 +1,85 @@
+---
+# Superuser Creation Tasks
+#
+# Creates Django superuser account using kubectl exec on the Django deployment.
+# This ensures superuser creation is idempotent and follows IaC principles.
+#
+# NOTE: This file is conditionally included from main.yml based on gke_create_superuser.
+# The when conditions below provide additional safety but are not strictly required.
+
+- name: Check if superuser should be created
+  ansible.builtin.set_fact:
+    should_create_superuser: "{{ gke_create_superuser | default(false) | bool }}"
+  tags: [superuser]
+
+- name: Display superuser creation plan
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      Superuser Creation
+      ========================================
+      Create: {{ should_create_superuser }}
+      Username: {{ django_superuser_username | default('admin') }}
+      {% if should_create_superuser %}
+      Email: {{ django_superuser_email | default('admin@' + gke_base_domain) }}
+      {% endif %}
+      ========================================
+  when: should_create_superuser
+  tags: [superuser]
+
+# NOTE: The password is passed via environment variable in the kubectl exec command.
+# The no_log directive prevents Ansible from logging the command.
+#
+# SECURITY CONSIDERATION: The password may briefly appear in process listings (ps, /proc)
+# on both the Ansible control node and Kubernetes node. This is acceptable for initial
+# deployment because:
+# - The exposure window is very short (command execution time)
+# - Passwords are vault-managed and can be rotated
+# - Alternative approaches have significant complexity tradeoffs:
+#   * Kubernetes Job with Secrets: Requires additional RBAC, secret management
+#   * Pod-mounted secretRef: Requires deployment restart, not suitable for one-time setup
+#   * stdin piping: Django's createsuperuser doesn't support stdin password input
+#
+# LIMITATION: The changed_when/failed_when conditions parse Django's output messages.
+# If Django changes these messages in future versions, these conditions may need updating.
+# Current patterns: 'Superuser created successfully', 'already exists'
+
+- name: Create superuser using kubectl exec
+  ansible.builtin.command:
+    # Using argv to avoid shell injection vulnerabilities from variable interpolation
+    argv:
+      - kubectl
+      - exec
+      - -n
+      - "{{ gke_namespace }}"
+      - "deployment/{{ gke_deployment_name }}"
+      - --
+      - env
+      - "DJANGO_SUPERUSER_USERNAME={{ django_superuser_username | default('admin') }}"
+      - "DJANGO_SUPERUSER_EMAIL={{ django_superuser_email | default('admin@' + gke_base_domain) }}"
+      - "DJANGO_SUPERUSER_PASSWORD={{ vault_django_superuser_password }}"
+      - python
+      - manage.py
+      - createsuperuser
+      - --noinput
+  delegate_to: localhost
+  run_once: true
+  register: superuser_result
+  changed_when: "'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr"
+  failed_when: superuser_result.rc != 0 and 'already exists' not in superuser_result.stdout and 'already exists' not in superuser_result.stderr
+  no_log: true
+  when: should_create_superuser
+  tags: [superuser]
+
+- name: Display superuser creation result
+  ansible.builtin.debug:
+    msg: |
+      {% if 'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr %}
+      ✓ Superuser created successfully
+      {% elif 'already exists' in superuser_result.stdout or 'already exists' in superuser_result.stderr %}
+      ℹ Superuser already exists (no changes made)
+      {% else %}
+      ⚠ Superuser creation completed with warnings (check logs)
+      {% endif %}
+  when: should_create_superuser and superuser_result is defined
+  tags: [superuser]

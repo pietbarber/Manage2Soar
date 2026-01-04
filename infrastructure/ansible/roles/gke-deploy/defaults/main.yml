@@ -233,3 +233,17 @@ gke_deploy_cronjobs: true
 
 # CronJob image (defaults to same as deployment)
 gke_cronjob_image: "{{ gke_image_name }}:{{ gke_computed_image_tag }}"
+
+# ============================================================
+# SUPERUSER CONFIGURATION
+# ============================================================
+
+# Enable automatic superuser creation
+# When true, creates a Django superuser account on first deployment
+# Safe to run multiple times - will skip if user already exists
+gke_create_superuser: false
+
+# Superuser credentials (MUST be defined in vault/inventory when enabled)
+# django_superuser_username: "admin"
+# django_superuser_email: "admin@example.com"  # Optional, defaults to admin@{{ gke_base_domain }}
+# vault_django_superuser_password: Must be defined in vault.yml (NEVER in plain text)
