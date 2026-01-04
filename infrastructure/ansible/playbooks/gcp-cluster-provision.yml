@@ -142,7 +142,30 @@
       when: gke_create_vpc | bool
       tags: [network]
 
-    - name: Create VPC subnet
+    # For IPv6 support, we need to use gcloud command to create dual-stack subnet
+    # The google.cloud.gcp_compute_subnetwork module doesn't fully support IPv6 yet
+    - name: Create dual-stack VPC subnet (IPv6 enabled)
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute networks subnets create {{ gke_subnet_name }}
+          --project={{ gcp_project }}
+          --region={{ gcp_region }}
+          --network={{ gke_vpc_name }}
+          --range={{ gke_subnet_cidr }}
+          --stack-type=IPV4_IPV6
+          --ipv6-access-type=EXTERNAL
+          --secondary-range=pods={{ gke_pods_cidr }},services={{ gke_services_cidr }}
+      register: subnet_create_ipv6
+      when:
+        - gke_create_vpc | bool
+        - gke_enable_ipv6 | default(false) | bool
+      changed_when: subnet_create_ipv6.rc == 0
+      failed_when: >
+        subnet_create_ipv6.rc != 0 and
+        'already exists' not in (subnet_create_ipv6.stderr | default('') | lower)
+      tags: [network]
+
+    - name: Create VPC subnet (IPv4 only)
       google.cloud.gcp_compute_subnetwork:
         name: "{{ gke_subnet_name }}"
         project: "{{ gcp_project }}"
@@ -157,7 +180,9 @@
         auth_kind: application
         state: present
       register: gke_subnet
-      when: gke_create_vpc | bool
+      when:
+        - gke_create_vpc | bool
+        - not (gke_enable_ipv6 | default(false) | bool)
       tags: [network]
 
     # ============================================================
@@ -197,7 +222,16 @@
           --addons=HttpLoadBalancing
           {%- endif %}
           --network={{ gke_vpc_name if gke_create_vpc else 'default' }}
+          {%- if gke_create_vpc %}
+          --subnetwork={{ gke_subnet_name }}
+          --cluster-secondary-range-name=pods
+          --services-secondary-range-name=services
+          {%- endif %}
           --enable-ip-alias
+          {%- if gke_enable_ipv6 | default(false) %}
+          --stack-type=IPV4_IPV6
+          --ipv6-access-type=EXTERNAL
+          {%- endif %}
           --enable-autoscaling
           --min-nodes={{ gke_min_nodes }}
           --max-nodes={{ gke_max_nodes }}

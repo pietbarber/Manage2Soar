@@ -240,6 +240,14 @@ gke_enable_ingress: false
 # Static IP name for Gateway (will be created if doesn't exist)
 gke_static_ip_name: "{{ gke_cluster_name }}-ingress-ip"
 
+# Enable IPv6 for Gateway/Ingress
+# When true, reserves both IPv4 and IPv6 global static IPs
+# Requires GKE cluster with IPv6 enabled (--stack-type=IPV4_IPV6)
+gke_enable_ipv6: false
+
+# Static IPv6 IP name for Gateway (only used when gke_enable_ipv6 is true)
+gke_static_ipv6_name: "{{ gke_cluster_name }}-ingress-ipv6"
+
 # Enable TLS/HTTPS using Google-managed certificates
 # Google-managed certs are free, automatic, and don't require cert-manager
 gke_enable_tls: true

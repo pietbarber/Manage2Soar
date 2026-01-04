@@ -21,10 +21,15 @@ metadata:
     app: {{ gke_app_name }}
     managed-by: ansible
   annotations:
-    # Reference the reserved static IP address by name (GKE Gateway resolves the name to the actual IP)
+    # Reference the reserved static IP address(es) by name (GKE Gateway resolves the name to the actual IP)
     # If gke_static_ip_name is not set, GKE will auto-assign an ephemeral IP address
 {% if gke_static_ip_name is defined and gke_static_ip_name | trim %}
+{% if gke_enable_ipv6 | default(false) | bool and gke_static_ipv6_name is defined and gke_static_ipv6_name | trim %}
+    # Dual-stack: Reference both IPv4 and IPv6 static addresses
+    networking.gke.io/addresses: {{ gke_static_ip_name }},{{ gke_static_ipv6_name }}
+{% else %}
     networking.gke.io/addresses: {{ gke_static_ip_name }}
+{% endif %}
 {% endif %}
 spec:
   gatewayClassName: gke-l7-global-external-managed
