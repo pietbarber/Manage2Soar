@@ -170,7 +170,7 @@ ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-app-deploy.yml \
   --tags superuser \
-  -e gke_image_tag=CURRENT_IMAGE_TAG
+  -e gke_image_tag=<YOUR_CURRENT_IMAGE_TAG>
 ```
 
 ### Option B: Interactive Creation (for testing only)
@@ -203,6 +203,7 @@ kubectl get pods -n tenant-masa
 kubectl get gateway manage2soar-gateway -n default -o jsonpath='{.status.addresses[0].value}' && echo
 
 # Test access (replace with your domain or use /etc/hosts)
+# If using /etc/hosts, add a line like: <GATEWAY_IP> ssc.manage2soar.com
 curl -H "Host: ssc.manage2soar.com" http://GATEWAY_IP/
 ```
 
