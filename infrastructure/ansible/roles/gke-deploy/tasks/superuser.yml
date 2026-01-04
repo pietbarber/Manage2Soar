@@ -1,7 +1,7 @@
 ---
 # Superuser Creation Tasks
 #
-# Creates Django superuser account using Kubernetes Job.
+# Creates Django superuser account using kubectl exec on the Django deployment.
 # This ensures superuser creation is idempotent and follows IaC principles.
 
 - name: Check if superuser should be created

@@ -58,8 +58,10 @@ ansible-vault view group_vars/gcp_database/vault.yml --vault-password-file ~/.an
 Create a temporary playbook that references vault variables to avoid exposing passwords in command history:
 
 ```bash
-# Create a one-time password reset playbook
-cat > /tmp/set-db-passwords.yml << 'EOF'
+cd infrastructure/ansible
+
+# Create a one-time password reset playbook in the ansible directory
+cat > set-db-passwords.yml << 'EOF'
 ---
 - hosts: all
   become: true
@@ -79,15 +81,15 @@ cat > /tmp/set-db-passwords.yml << 'EOF'
         state: present
 EOF
 
-# Run the playbook
+# Run the playbook (must be run from infrastructure/ansible directory)
 ansible-playbook -i "YOUR_DB_IP," \
   --user=$(whoami) \
   --ssh-extra-args="-i ~/.ssh/google_compute_engine" \
   --vault-password-file ~/.ansible_vault_pass \
-  /tmp/set-db-passwords.yml
+  set-db-passwords.yml
 
 # Remove temporary playbook
-rm /tmp/set-db-passwords.yml
+rm set-db-passwords.yml
 ```
 
 **Note**: Replace `YOUR_DB_IP` with your database server's external IP.
@@ -203,12 +205,25 @@ curl -H "Host: ssc.manage2soar.com" http://GATEWAY_IP/
 
 **Cause**: Ansible variable precedence - `gke_db_host` defaults evaluate before inventory vars
 
-**Fix**:
+**Fix (IaC Approach - Recommended)**:
 ```bash
 # 1. Update inventory to use postgresql_host (not gke_db_host)
-# Already configured in inventory/gcp_app.yml
+# Edit inventory/gcp_app.yml:
+#   postgresql_host: "YOUR_CORRECT_IP"
 
-# 2. Manually patch secret if needed
+# 2. Re-run deployment to regenerate secrets with correct IP
+cd infrastructure/ansible
+ansible-playbook -i inventory/gcp_app.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-app-deploy.yml \
+  --tags secrets
+
+# 3. Restart pods to pick up new secret
+kubectl delete pods -n tenant-ssc --all
+```
+
+**Emergency Fix (manual - only when IaC isn't immediately possible)**:
+```bash
 # IMPORTANT: The base64 values below are EXAMPLES for specific IP addresses:
 #   MTAuMTI4LjAuMg== = 10.128.0.2 (wrong IP)
 #   MTAuMTQyLjAuMg== = 10.142.0.2 (correct IP in this example)
@@ -219,8 +234,9 @@ kubectl get secret manage2soar-env-ssc -n tenant-ssc -o yaml | \
   sed 's/MTAuMTI4LjAuMg==/MTAuMTQyLjAuMg==/' | \
   kubectl apply -f -
 
-# 3. Restart pods to pick up new secret
 kubectl delete pods -n tenant-ssc --all
+
+# NOTE: Document this manual fix and update IaC to prevent recurrence!
 ```
 
 ### Issue: Password Authentication Failed
