@@ -30,8 +30,11 @@ PROJECT_ID="${GCP_PROJECT:-manage2soar}"
 # after the new certificate is active.
 CERT_NAME="manage2soar-ssl-cert-v2"
 OLD_CERT_NAME="manage2soar-ssl-cert"
-DOMAINS="ssc.manage2soar.com,masa.manage2soar.com"
-GATEWAY_NAME="manage2soar-gateway"
+# Comma-separated list of domains for the certificate. Add new tenants here or
+# override via CERT_DOMAINS environment variable.
+DOMAINS="${CERT_DOMAINS:-ssc.manage2soar.com,masa.manage2soar.com}"
+# Gateway name - override via GATEWAY_NAME environment variable if using a different Gateway.
+GATEWAY_NAME="${GATEWAY_NAME:-manage2soar-gateway}"
 
 echo "==========================================="
 echo "SSL Certificate Provisioning"

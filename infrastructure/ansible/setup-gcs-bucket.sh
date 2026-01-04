@@ -43,7 +43,13 @@ LOCATION="${GCS_LOCATION:-us-east1}"
 # a different service account (for example, one in the `manage2soar`
 # project), override this value via the GCS_SERVICE_ACCOUNT environment
 # variable rather than editing this script directly.
-SERVICE_ACCOUNT="${GCS_SERVICE_ACCOUNT:-django@skyline-soaring-storage.iam.gserviceaccount.com}"
+# By default, the service account email is derived from the PROJECT_ID used above.
+# This keeps the shell script and Ansible playbook behavior aligned so that both
+# default to the same project (manage2soar) unless explicitly overridden.
+# If your deployment uses a different service account (for example, a shared
+# infra project like skyline-soaring-storage), override this value via the
+# GCS_SERVICE_ACCOUNT environment variable rather than editing this script directly.
+SERVICE_ACCOUNT="${GCS_SERVICE_ACCOUNT:-django@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 echo "==========================================="
 echo "GCS Bucket Setup for Manage2Soar"
