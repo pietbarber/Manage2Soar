@@ -50,3 +50,32 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+{% if gke_multi_tenant | default(false) | bool %}
+---
+# ReferenceGrants for multi-tenant cross-namespace routing
+# Required for HTTPRoutes in tenant namespaces to reference the Gateway in default namespace
+# See: https://gateway-api.sigs.k8s.io/api-types/referencegrant/
+{% for tenant in gke_tenants %}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-{{ tenant.name }}-to-gateway
+  namespace: default
+  labels:
+    app: {{ gke_app_name }}
+    managed-by: ansible
+    tenant: {{ tenant.name }}
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: tenant-{{ tenant.name }}
+  to:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ gke_app_name }}-gateway
+{% if not loop.last %}
+---
+{% endif %}
+{% endfor %}
+{% endif %}
