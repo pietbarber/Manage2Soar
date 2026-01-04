@@ -477,35 +477,57 @@ vault_email_host_password: "your-smtp-password"
 >
 > Email Dev Mode is a safety mechanism that **redirects ALL outgoing emails** to specified test
 > addresses. This prevents accidental emails to real users during development, staging, or testing.
-> See issue [#350](https://github.com/pietbarber/Manage2Soar/pull/350) for implementation details.
+> See issues [#350](https://github.com/pietbarber/Manage2Soar/pull/350) and [#457](https://github.com/pietbarber/Manage2Soar/issues/457) for implementation details.
 
 **When to enable:**
 - Development environments
 - Staging/QA environments
 - Initial production setup before going live
 - Testing email functionality
+- Onboarding a new tenant while others are already in production
 
 **When to disable:**
 - Production deployments that should send real emails
 
-**Configuration for staging:**
+#### Global Configuration
 
-```yaml
-# In group_vars/staging/vars.yml
-gke_email_dev_mode: true
-gke_email_dev_mode_redirect_to: "devtest@yourclub.org,qa@yourclub.org"
-```
-
-**Configuration for production:**
+Set globally for all tenants:
 
 ```yaml
 # In group_vars/production/vars.yml
-gke_email_dev_mode: false
-gke_email_dev_mode_redirect_to: ""  # Empty - not used
+gke_email_dev_mode: false          # Production - send real emails
+gke_email_dev_mode_redirect_to: ""
 ```
 
+#### Per-Tenant Override (Multi-Tenant)
+
+In multi-tenant deployments, you can override email dev mode per-tenant. This is useful when
+one club is ready for production emails while another is still in development.
+
+```yaml
+# In group_vars/gcp_app/vars.yml
+gke_email_dev_mode: false  # Global default: production mode
+
+gke_tenants:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    domain: "m2s.skylinesoaring.org"
+    # SSC is ready for production - uses global default (false)
+
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+    domain: "m2s.midatlanticsoaring.org"
+    # MASA is still dragging their feet - override to dev mode
+    email_dev_mode: true
+    email_dev_mode_redirect_to: "masa-testing@example.com"
+```
+
+**Priority order:**
+1. Per-tenant `email_dev_mode` in tenant config (highest priority)
+2. Global `gke_email_dev_mode` (fallback)
+
 **Behavior when enabled:**
-- All emails are redirected to the comma-separated list in `gke_email_dev_mode_redirect_to`
+- All emails are redirected to the comma-separated list in `email_dev_mode_redirect_to`
 - Subject lines are prefixed with `[DEV MODE]` and include original recipient
 - Original recipients are preserved in the email body for debugging
 - No emails reach real end users

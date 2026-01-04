@@ -140,11 +140,25 @@ gke_default_from_email: "noreply@{{ mail_domain | default('example.com') }}"
 # Email Dev Mode - SAFETY VALVE for testing/staging environments
 # When enabled, ALL outgoing emails are redirected to test addresses
 # CRITICAL: Set to false for production deployments
-# See issue #350 for implementation details
+# See issues #350 and #457 for implementation details
+#
+# MULTI-TENANT: Per-tenant override is supported. Add email_dev_mode and
+# email_dev_mode_redirect_to to individual tenant configs in gke_tenants:
+#
+#   gke_tenants:
+#     - prefix: "ssc"
+#       name: "Skyline Soaring Club"
+#       # Uses global gke_email_dev_mode (production ready)
+#
+#     - prefix: "masa"
+#       name: "Mid-Atlantic Soaring Association"
+#       email_dev_mode: true  # Override: MASA still in dev mode
+#       email_dev_mode_redirect_to: "masa-test@example.com"
+#
 gke_email_dev_mode: false
 
 # Comma-separated list of email addresses to receive ALL emails when dev mode is enabled
-# Only used when gke_email_dev_mode is true
+# Only used when gke_email_dev_mode is true (or per-tenant email_dev_mode is true)
 # Example: "test1@example.com,test2@example.com"
 gke_email_dev_mode_redirect_to: ""
 
