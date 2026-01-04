@@ -38,19 +38,27 @@
 
 - name: Create superuser using kubectl exec
   ansible.builtin.command:
-    cmd: >
-      kubectl exec -n {{ gke_namespace }}
-      deployment/{{ gke_deployment_name }}
-      --
-      sh -c "DJANGO_SUPERUSER_USERNAME='{{ django_superuser_username }}'
-      DJANGO_SUPERUSER_EMAIL='{{ django_superuser_email | default('admin@' + gke_base_domain) }}'
-      DJANGO_SUPERUSER_PASSWORD='{{ vault_django_superuser_password }}'
-      python manage.py createsuperuser --noinput 2>&1"
+    # Using argv to avoid shell injection vulnerabilities from variable interpolation
+    argv:
+      - kubectl
+      - exec
+      - -n
+      - "{{ gke_namespace }}"
+      - "deployment/{{ gke_deployment_name }}"
+      - --
+      - env
+      - "DJANGO_SUPERUSER_USERNAME={{ django_superuser_username }}"
+      - "DJANGO_SUPERUSER_EMAIL={{ django_superuser_email | default('admin@' + gke_base_domain) }}"
+      - "DJANGO_SUPERUSER_PASSWORD={{ vault_django_superuser_password }}"
+      - python
+      - manage.py
+      - createsuperuser
+      - --noinput
   delegate_to: localhost
   run_once: true
   register: superuser_result
   changed_when: "'Superuser created successfully' in superuser_result.stdout"
-  failed_when: superuser_result.rc != 0 and 'already exists' not in superuser_result.stdout
+  failed_when: superuser_result.rc != 0 and 'already exists' not in superuser_result.stdout and 'already exists' not in superuser_result.stderr
   no_log: true
   when: should_create_superuser
   tags: [superuser]
