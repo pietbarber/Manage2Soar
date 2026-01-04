@@ -160,6 +160,8 @@
     - not gcp_vm_exists
     - gcp_vm_provision
     - gcp_enable_ipv6 | default(false) | bool
+    - gcp_subnetwork is defined
+    - gcp_subnetwork | length > 0
 
 # ============================================================
 # GET EXISTING VM INFO

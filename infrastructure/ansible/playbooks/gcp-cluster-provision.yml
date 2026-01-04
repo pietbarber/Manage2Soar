@@ -80,6 +80,15 @@
           Invalid cluster type: {{ gke_cluster_type }}
           Must be 'standard' or 'autopilot'.
 
+    - name: Validate IPv6 requires custom VPC
+      ansible.builtin.assert:
+        that:
+          - not (gke_enable_ipv6 | default(false) | bool) or (gke_create_vpc | default(false) | bool)
+        fail_msg: |
+          IPv6 dual-stack requires a custom VPC.
+          Auto-mode VPCs (default network) do not support IPv6.
+          Please set gke_create_vpc: true when gke_enable_ipv6: true
+
     - name: Verify GCP project exists and user has access
       ansible.builtin.command:
         cmd: "gcloud projects describe {{ gcp_project }}"
