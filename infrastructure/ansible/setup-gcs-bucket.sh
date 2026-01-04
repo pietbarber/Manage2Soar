@@ -18,7 +18,15 @@ set -euo pipefail
 # Configuration
 PROJECT_ID="${GCP_PROJECT:-manage2soar}"
 BUCKET_NAME="${GCS_BUCKET_NAME:-manage2soar}"
+# Default GCS location is us-east1 to match the primary Manage2Soar GKE/GCS region.
+# Override GCS_LOCATION in environment or inventory if deploying to a different region.
 LOCATION="${GCS_LOCATION:-us-east1}"
+# Note: The default service account intentionally lives in the
+# `skyline-soaring-storage` project, which is our dedicated GCS/infra
+# project used by the Manage2Soar deployment. If your deployment uses
+# a different service account (for example, one in the `manage2soar`
+# project), override this value via the GCS_SERVICE_ACCOUNT environment
+# variable rather than editing this script directly.
 SERVICE_ACCOUNT="${GCS_SERVICE_ACCOUNT:-django@skyline-soaring-storage.iam.gserviceaccount.com}"
 
 echo "==========================================="

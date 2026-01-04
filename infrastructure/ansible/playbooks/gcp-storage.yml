@@ -45,7 +45,7 @@
     gcs_project: "{{ gcp_project | default('manage2soar') }}"
     gcs_location: "{{ gke_gcs_location | default('us-east1') }}"
     gcs_storage_class: "{{ gke_gcs_storage_class | default('STANDARD') }}"
-    gcs_service_account: "{{ gke_service_account_email | default('django@skyline-soaring-storage.iam.gserviceaccount.com') }}"
+    gcs_service_account: "{{ gke_service_account_email | default('django@' ~ gcs_project ~ '.iam.gserviceaccount.com') }}"
 
   tasks:
     - name: Ensure bucket exists with uniform access

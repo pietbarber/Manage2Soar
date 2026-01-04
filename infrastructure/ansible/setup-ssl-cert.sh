@@ -18,6 +18,10 @@ set -euo pipefail
 
 # Configuration
 PROJECT_ID="${GCP_PROJECT:-manage2soar}"
+# v2 suffix indicates this certificate is for the new manage2soar.com domains.
+# The original certificate (manage2soar-ssl-cert) was for deprecated domains
+# (m2s.skylinesoaring.org, m2s.midatlanticsoaring.org) and should be deleted
+# after the new certificate is active.
 CERT_NAME="manage2soar-ssl-cert-v2"
 OLD_CERT_NAME="manage2soar-ssl-cert"
 DOMAINS="ssc.manage2soar.com,masa.manage2soar.com"
