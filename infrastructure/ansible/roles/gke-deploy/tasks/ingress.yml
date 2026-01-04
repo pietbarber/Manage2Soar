@@ -110,14 +110,21 @@
   changed_when: false
   delegate_to: localhost
   run_once: true
-  when: gke_enable_ipv6 | default(false) | bool
+  when:
+    - gke_enable_ipv6 | default(false) | bool
+    - >
+      (static_ipv6_check is defined and static_ipv6_check.rc == 0) or
+      (static_ipv6_create is defined and static_ipv6_create.rc == 0)
   tags: [ingress, ip, ipv6]
 
 - name: Set static IPv6 fact
   ansible.builtin.set_fact:
     gke_ingress_ipv6: "{{ static_ipv6_address.stdout | trim }}"
   run_once: true
-  when: gke_enable_ipv6 | default(false) | bool
+  when:
+    - gke_enable_ipv6 | default(false) | bool
+    - static_ipv6_address is defined
+    - static_ipv6_address.stdout is defined
   tags: [ingress, ip, ipv6]
 
 - name: Display IP addresses for DNS configuration
