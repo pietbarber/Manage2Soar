@@ -37,12 +37,6 @@ BUCKET_NAME="${GCS_BUCKET_NAME:-manage2soar}"
 # Default GCS location is us-east1 to match the primary Manage2Soar GKE/GCS region.
 # Override GCS_LOCATION in environment or inventory if deploying to a different region.
 LOCATION="${GCS_LOCATION:-us-east1}"
-# Note: The default service account intentionally lives in the
-# `skyline-soaring-storage` project, which is our dedicated GCS/infra
-# project used by the Manage2Soar deployment. If your deployment uses
-# a different service account (for example, one in the `manage2soar`
-# project), override this value via the GCS_SERVICE_ACCOUNT environment
-# variable rather than editing this script directly.
 # By default, the service account email is derived from the PROJECT_ID used above.
 # This keeps the shell script and Ansible playbook behavior aligned so that both
 # default to the same project (manage2soar) unless explicitly overridden.
@@ -79,12 +73,11 @@ echo
 echo "Step 2: Granting IAM permissions..."
 
 # Check if the IAM binding already exists to keep this step idempotent
-EXISTING_ROLE="$(gcloud storage buckets get-iam-policy "gs://${BUCKET_NAME}" \
+EXISTING_MEMBERS="$(gcloud storage buckets get-iam-policy "gs://${BUCKET_NAME}" \
     --project="${PROJECT_ID}" \
-    --format="value(bindings.role)" \
-    --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:${SERVICE_ACCOUNT}" 2>/dev/null || true)"
+    --format="get(bindings[role=roles/storage.objectAdmin].members[])" 2>/dev/null || true)"
 
-if [[ "${EXISTING_ROLE}" == "roles/storage.objectAdmin" ]]; then
+if grep -q "serviceAccount:${SERVICE_ACCOUNT}" <<<"${EXISTING_MEMBERS}"; then
     echo "✓ IAM binding roles/storage.objectAdmin for ${SERVICE_ACCOUNT} already exists"
 else
     echo "Granting roles/storage.objectAdmin to ${SERVICE_ACCOUNT}..."
