@@ -55,7 +55,7 @@
       - "deployment/{{ gke_deployment_name }}"
       - --
       - env
-      - "DJANGO_SUPERUSER_USERNAME={{ django_superuser_username }}"
+      - "DJANGO_SUPERUSER_USERNAME={{ django_superuser_username | default('admin') }}"
       - "DJANGO_SUPERUSER_EMAIL={{ django_superuser_email | default('admin@' + gke_base_domain) }}"
       - "DJANGO_SUPERUSER_PASSWORD={{ vault_django_superuser_password }}"
       - python
