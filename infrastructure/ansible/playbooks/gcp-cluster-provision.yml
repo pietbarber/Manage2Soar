@@ -238,8 +238,8 @@
           {%- endif %}
           --enable-ip-alias
           {%- if gke_enable_ipv6 | default(false) %}
-          --stack-type=IPV4_IPV6
-          --ipv6-access-type=EXTERNAL
+          --enable-dataplane-v2
+          --stack-type=ipv4-ipv6
           {%- endif %}
           --enable-autoscaling
           --min-nodes={{ gke_min_nodes }}
