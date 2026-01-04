@@ -65,20 +65,29 @@ cat > set-db-passwords.yml << 'EOF'
 ---
 - hosts: all
   become: true
-  become_user: postgres
+  become_user: postgres  # Requires 'postgres' system user with DB admin privileges
   vars_files:
     - group_vars/gcp_database/vault.yml
+  vars:
+    # PostgreSQL connection parameters - uses local socket by default
+    # Change to 127.0.0.1 if socket auth is not configured
+    db_host: ""
+    db_port: 5432
   tasks:
     - name: Set m2s_ssc password
       community.postgresql.postgresql_user:
         name: m2s_ssc
         password: "{{ vault_postgresql_password_ssc }}"
         state: present
+        login_host: "{{ db_host | default(omit, true) }}"
+        login_port: "{{ db_port }}"
     - name: Set m2s_masa password
       community.postgresql.postgresql_user:
         name: m2s_masa
         password: "{{ vault_postgresql_password_masa }}"
         state: present
+        login_host: "{{ db_host | default(omit, true) }}"
+        login_port: "{{ db_port }}"
 EOF
 
 # Run the playbook (must be run from infrastructure/ansible directory)
@@ -158,29 +167,23 @@ ansible-playbook -i inventory/gcp_app.yml \
   -e gke_image_tag=CURRENT_IMAGE_TAG
 ```
 
-### Option B: Manual Creation (for testing only)
+### Option B: Interactive Creation (for testing only)
 
-> ⚠️ **SECURITY WARNING**: The commands below expose passwords in command-line arguments,
-> which will appear in shell history, process listings, and potentially system logs.
+> ⚠️ **SECURITY WARNING**: Avoid passing passwords in command-line arguments or environment
+> variables, as they can appear in shell history, process listings, and system logs.
 > **Use Option A (Ansible) for production deployments.**
 > If you must use this approach:
-> - Clear shell history after: `history -c && history -w`
-> - Use a temporary password and change it immediately via Django admin
+> - Run `createsuperuser` interactively inside the pod
+> - Use a strong password and rotate it via Django admin as soon as possible
 
 ```bash
-# SSC tenant (testing only - see security warning above)
-kubectl exec -n tenant-ssc deployment/django-app-ssc -- sh -c \
-  "DJANGO_SUPERUSER_USERNAME='admin' \
-   DJANGO_SUPERUSER_EMAIL='admin@manage2soar.com' \
-   DJANGO_SUPERUSER_PASSWORD='TEMP_PASSWORD_CHANGE_IMMEDIATELY' \
-   python manage.py createsuperuser --noinput"
+# SSC tenant (testing only - interactive prompt for password)
+kubectl exec -it -n tenant-ssc deployment/django-app-ssc -- \
+  python manage.py createsuperuser
 
-# MASA tenant (testing only - see security warning above)
-kubectl exec -n tenant-masa deployment/django-app-masa -- sh -c \
-  "DJANGO_SUPERUSER_USERNAME='admin' \
-   DJANGO_SUPERUSER_EMAIL='admin@masa.manage2soar.com' \
-   DJANGO_SUPERUSER_PASSWORD='TEMP_PASSWORD_CHANGE_IMMEDIATELY' \
-   python manage.py createsuperuser --noinput"
+# MASA tenant (testing only - interactive prompt for password)
+kubectl exec -it -n tenant-masa deployment/django-app-masa -- \
+  python manage.py createsuperuser
 ```
 
 ## Step 6: Verify Application Access
@@ -224,15 +227,17 @@ kubectl delete pods -n tenant-ssc --all
 
 **Emergency Fix (manual - only when IaC isn't immediately possible)**:
 ```bash
-# IMPORTANT: The base64 values below are EXAMPLES for specific IP addresses:
-#   MTAuMTI4LjAuMg== = 10.128.0.2 (wrong IP)
-#   MTAuMTQyLjAuMg== = 10.142.0.2 (correct IP in this example)
+# IMPORTANT: The base64 values below are EXAMPLES for specific IP addresses.
 # To create base64 values for YOUR IP addresses:
-#   echo -n "YOUR_WRONG_IP" | base64    # Value to search for
-#   echo -n "YOUR_CORRECT_IP" | base64  # Value to replace with
-kubectl get secret manage2soar-env-ssc -n tenant-ssc -o yaml | \
-  sed 's/MTAuMTI4LjAuMg==/MTAuMTQyLjAuMg==/' | \
-  kubectl apply -f -
+#   echo -n "YOUR_CORRECT_IP" | base64  # New value for DB_HOST
+
+# First, inspect current DB_HOST value in the secret
+kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.DB_HOST}' | base64 -d; echo
+
+# Patch only the DB_HOST field (replace MTAuMTQyLjAuMg== with YOUR base64 IP)
+kubectl patch secret manage2soar-env-ssc -n tenant-ssc \
+  --type='json' \
+  -p='[{"op":"replace","path":"/data/DB_HOST","value":"MTAuMTQyLjAuMg=="}]'
 
 kubectl delete pods -n tenant-ssc --all
 

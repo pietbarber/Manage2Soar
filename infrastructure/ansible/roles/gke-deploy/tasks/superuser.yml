@@ -31,6 +31,10 @@
 # - Piping password via stdin: createsuperuser doesn't support stdin password
 # The current approach is acceptable for initial deployment as the command is
 # executed within the pod context and passwords are vault-managed.
+#
+# LIMITATION: The changed_when/failed_when conditions parse Django's output messages.
+# If Django changes these messages in future versions, these conditions may need updating.
+# Current patterns: 'Superuser created successfully', 'already exists'
 
 - name: Create superuser using kubectl exec
   ansible.builtin.command:
