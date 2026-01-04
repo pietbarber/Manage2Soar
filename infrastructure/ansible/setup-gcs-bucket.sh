@@ -47,12 +47,23 @@ echo
 
 # Step 2: Grant Storage Object Admin role to service account
 echo "Step 2: Granting IAM permissions..."
-echo "Granting roles/storage.objectAdmin to ${SERVICE_ACCOUNT}..."
-gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
-    --member="serviceAccount:${SERVICE_ACCOUNT}" \
-    --role="roles/storage.objectAdmin" \
-    --project="${PROJECT_ID}"
-echo "✓ IAM permissions granted successfully"
+
+# Check if the IAM binding already exists to keep this step idempotent
+EXISTING_ROLE="$(gcloud storage buckets get-iam-policy "gs://${BUCKET_NAME}" \
+    --project="${PROJECT_ID}" \
+    --format="value(bindings.role)" \
+    --filter="bindings.role=roles/storage.objectAdmin AND bindings.members=serviceAccount:${SERVICE_ACCOUNT}" 2>/dev/null || true)"
+
+if [[ "${EXISTING_ROLE}" == "roles/storage.objectAdmin" ]]; then
+    echo "✓ IAM binding roles/storage.objectAdmin for ${SERVICE_ACCOUNT} already exists"
+else
+    echo "Granting roles/storage.objectAdmin to ${SERVICE_ACCOUNT}..."
+    gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+        --member="serviceAccount:${SERVICE_ACCOUNT}" \
+        --role="roles/storage.objectAdmin" \
+        --project="${PROJECT_ID}"
+    echo "✓ IAM permissions granted successfully"
+fi
 echo
 
 # Step 3: Verify setup

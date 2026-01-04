@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   - gcloud CLI installed and authenticated
-#   - DNS records must be pointing to Gateway IP (34.111.146.37)
+#   - DNS records must be pointing to the current Gateway IP (verify via IaC docs, e.g. gke-gateway-ingress-guide.md)
 #   - Appropriate GCP project permissions
 #
 # Usage:
@@ -49,14 +49,24 @@ echo
 # Step 2: Update Gateway to use new certificate
 echo "Step 2: Updating Gateway to use new certificate..."
 echo "Patching Gateway ${GATEWAY_NAME} in default namespace..."
-kubectl patch gateway "${GATEWAY_NAME}" -n default --type='json' -p='[
+
+# Validate Gateway exists before patching
+if kubectl get gateway "${GATEWAY_NAME}" -n default >/dev/null 2>&1; then
+    # Note: Assumes HTTPS listener is at index 0 in spec.listeners array.
+    # If Gateway listener order changes, this path may need adjustment.
+    kubectl patch gateway "${GATEWAY_NAME}" -n default --type='json' -p='[
   {
     "op": "replace",
     "path": "/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs",
     "value": "'"${CERT_NAME}"'"
   }
 ]'
-echo "✓ Gateway updated successfully"
+    echo "✓ Gateway updated successfully"
+else
+    echo "✗ Gateway ${GATEWAY_NAME} not found in namespace 'default'."
+    echo "   Ensure the Gateway exists and is in the correct namespace, then re-run this script."
+    exit 1
+fi
 echo
 
 # Step 3: Check certificate provisioning status
