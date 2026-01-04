@@ -3,6 +3,9 @@
 #
 # Creates Django superuser account using kubectl exec on the Django deployment.
 # This ensures superuser creation is idempotent and follows IaC principles.
+#
+# NOTE: This file is conditionally included from main.yml based on gke_create_superuser.
+# The when conditions below provide additional safety but are not strictly required.
 
 - name: Check if superuser should be created
   ansible.builtin.set_fact:
@@ -26,11 +29,16 @@
 
 # NOTE: The password is passed via environment variable in the kubectl exec command.
 # The no_log directive prevents Ansible from logging the command.
-# Alternative approaches considered but not implemented:
-# - Kubernetes Job with secrets: More complex, requires additional RBAC
-# - Piping password via stdin: createsuperuser doesn't support stdin password
-# The current approach is acceptable for initial deployment as the command is
-# executed within the pod context and passwords are vault-managed.
+#
+# SECURITY CONSIDERATION: The password may briefly appear in process listings (ps, /proc)
+# on both the Ansible control node and Kubernetes node. This is acceptable for initial
+# deployment because:
+# - The exposure window is very short (command execution time)
+# - Passwords are vault-managed and can be rotated
+# - Alternative approaches have significant complexity tradeoffs:
+#   * Kubernetes Job with Secrets: Requires additional RBAC, secret management
+#   * Pod-mounted secretRef: Requires deployment restart, not suitable for one-time setup
+#   * stdin piping: Django's createsuperuser doesn't support stdin password input
 #
 # LIMITATION: The changed_when/failed_when conditions parse Django's output messages.
 # If Django changes these messages in future versions, these conditions may need updating.
@@ -66,9 +74,9 @@
 - name: Display superuser creation result
   ansible.builtin.debug:
     msg: |
-      {% if 'Superuser created successfully' in superuser_result.stdout %}
+      {% if 'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr %}
       ✓ Superuser created successfully
-      {% elif 'already exists' in superuser_result.stdout %}
+      {% elif 'already exists' in superuser_result.stdout or 'already exists' in superuser_result.stderr %}
       ℹ Superuser already exists (no changes made)
       {% else %}
       ⚠ Superuser creation completed with warnings (check logs)

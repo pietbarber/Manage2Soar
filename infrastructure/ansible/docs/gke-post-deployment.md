@@ -103,6 +103,12 @@ rm set-db-passwords.yml
 
 **Note**: Replace `YOUR_DB_IP` with your database server's external IP.
 
+> **For Managed Database Services (e.g., Cloud SQL)**: The playbook above requires SSH access
+> to the database server, which isn't available with managed services. For Cloud SQL:
+> - Use Cloud SQL Admin API or `gcloud sql users set-password` command
+> - Or connect via Cloud SQL Proxy from a bastion host with psql
+> - Passwords should still be stored in Ansible Vault for consistency
+
 ## Step 3: Create GCS Bucket for Media Storage
 
 Django uses Google Cloud Storage for media files (profile photos, avatars, etc.):
@@ -227,17 +233,17 @@ kubectl delete pods -n tenant-ssc --all
 
 **Emergency Fix (manual - only when IaC isn't immediately possible)**:
 ```bash
-# IMPORTANT: The base64 values below are EXAMPLES for specific IP addresses.
-# To create base64 values for YOUR IP addresses:
-#   echo -n "YOUR_CORRECT_IP" | base64  # New value for DB_HOST
+# IMPORTANT: Generate YOUR OWN base64 value - do not copy the placeholder below!
+# To create base64 value for your IP address:
+#   echo -n "YOUR_CORRECT_IP" | base64  # e.g., echo -n "10.142.0.2" | base64
 
 # First, inspect current DB_HOST value in the secret
 kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.DB_HOST}' | base64 -d; echo
 
-# Patch only the DB_HOST field (replace MTAuMTQyLjAuMg== with YOUR base64 IP)
+# Patch only the DB_HOST field (replace placeholder with YOUR base64-encoded IP)
 kubectl patch secret manage2soar-env-ssc -n tenant-ssc \
   --type='json' \
-  -p='[{"op":"replace","path":"/data/DB_HOST","value":"MTAuMTQyLjAuMg=="}]'
+  -p='[{"op":"replace","path":"/data/DB_HOST","value":"<YOUR_BASE64_ENCODED_IP>"}]'
 
 kubectl delete pods -n tenant-ssc --all
 
