@@ -10,7 +10,13 @@
 #   - Appropriate GCP project permissions
 #
 # Usage:
+#   # Run against the default project (manage2soar):
 #   ./setup-ssl-cert.sh
+#
+#   # Override the GCP project via environment variable (preferred IaC-friendly pattern):
+#   GCP_PROJECT=my-gcp-project-id ./setup-ssl-cert.sh
+#
+#   If GCP_PROJECT is not set, the script defaults to the 'manage2soar' project.
 #
 # This is an IaC script - commit changes and version control this file.
 

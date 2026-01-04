@@ -10,21 +10,22 @@
 #   2. Authenticate with GCP:
 #      gcloud auth application-default login
 #
-#   3. Configure inventory with bucket settings
+#   3. Copy an example inventory and customize it, for example:
+#      cp inventory/gcp_app.yml.example inventory/gcp_app.yml
 #
 # Usage:
 #   # Create bucket with default settings
-#   ansible-playbook -i inventory/gcp-production.yml \
+#   ansible-playbook -i inventory/gcp_app.yml \
 #     playbooks/gcp-storage.yml
 #
 #   # Create bucket with custom settings
-#   ansible-playbook -i inventory/gcp-production.yml \
+#   ansible-playbook -i inventory/gcp_app.yml \
 #     playbooks/gcp-storage.yml \
 #     -e gcs_bucket_name=my-bucket \
 #     -e gcs_location=us-east1
 #
 #   # Grant service account permissions
-#   ansible-playbook -i inventory/gcp-production.yml \
+#   ansible-playbook -i inventory/gcp_app.yml \
 #     playbooks/gcp-storage.yml \
 #     --tags permissions
 #

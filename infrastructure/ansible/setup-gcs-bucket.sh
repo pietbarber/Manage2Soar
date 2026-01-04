@@ -8,6 +8,22 @@
 #   - gcloud CLI installed and authenticated
 #   - Appropriate GCP project permissions
 #
+#   Configurable environment variables (with defaults):
+#     - GCP_PROJECT         (default: manage2soar)
+#     - GCS_BUCKET_NAME     (default: manage2soar)
+#     - GCS_LOCATION        (default: us-east1)
+#     - GCS_SERVICE_ACCOUNT (default: django@skyline-soaring-storage.iam.gserviceaccount.com)
+#
+#   Examples:
+#     # Use a different project and bucket name
+#     GCP_PROJECT=my-gcp-project GCS_BUCKET_NAME=my-m2s-bucket ./setup-gcs-bucket.sh
+#
+#     # Deploy to a different region
+#     GCS_LOCATION=us-central1 ./setup-gcs-bucket.sh
+#
+#     # Use a different service account
+#     GCS_SERVICE_ACCOUNT=django@my-project.iam.gserviceaccount.com ./setup-gcs-bucket.sh
+#
 # Usage:
 #   ./setup-gcs-bucket.sh
 #
