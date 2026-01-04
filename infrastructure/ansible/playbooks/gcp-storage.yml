@@ -86,24 +86,27 @@
         auth_kind: application
       register: iam_result
 
-    - name: Display IAM binding information
+    - name: Display IAM member information
       tags: [permissions]
       ansible.builtin.debug:
         msg:
           - "Role: {{ iam_result.role }}"
-          - "Members: {{ iam_result.members }}"
+          - "Member: {{ iam_result.member }}"
           - "Bucket: {{ iam_result.bucket }}"
 
     - name: Verify bucket is accessible
       tags: [verify]
-      ansible.builtin.command:
-        cmd: "gcloud storage buckets describe gs://{{ gcs_bucket_name }} --project={{ gcs_project }}"
+      google.cloud.gcp_storage_bucket_info:
+        name: "{{ gcs_bucket_name }}"
+        project: "{{ gcs_project }}"
+        auth_kind: application
       register: verify_result
-      changed_when: false
 
     - name: Display verification result
       tags: [verify]
       ansible.builtin.debug:
         msg:
           - "Bucket verification successful"
-          - "{{ verify_result.stdout_lines }}"
+          - "Bucket name: {{ verify_result.resources[0].name }}"
+          - "Location: {{ verify_result.resources[0].location }}"
+          - "Uniform bucket-level access: {{ verify_result.resources[0].iamConfiguration.uniformBucketLevelAccess.enabled }}"

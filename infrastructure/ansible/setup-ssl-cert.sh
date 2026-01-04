@@ -63,14 +63,43 @@ echo
 echo "Step 2: Updating Gateway to use new certificate..."
 echo "Patching Gateway ${GATEWAY_NAME} in default namespace..."
 
+# Validate kubectl is installed
+if ! command -v kubectl >/dev/null 2>&1; then
+    echo "✗ Error: kubectl is required but not installed."
+    echo "   Install kubectl before running this script: https://kubernetes.io/docs/tasks/tools/"
+    exit 1
+fi
+
+# Validate jq is installed (needed for dynamic listener detection)
+if ! command -v jq >/dev/null 2>&1; then
+    echo "✗ Error: jq is required but not installed."
+    echo "   Install jq before running this script: https://stedolan.github.io/jq/download/"
+    exit 1
+fi
+
 # Validate Gateway exists before patching
 if kubectl get gateway "${GATEWAY_NAME}" -n default >/dev/null 2>&1; then
-    # Note: Assumes HTTPS listener is at index 0 in spec.listeners array.
-    # If Gateway listener order changes, this path may need adjustment.
+    # Determine the index of the HTTPS listener dynamically to avoid relying on fragile ordering.
+    HTTPS_LISTENER_INDEX="$(kubectl get gateway "${GATEWAY_NAME}" -n default -o json \
+        | jq -r '
+            .spec.listeners
+            | to_entries[]
+            | select(.value.protocol == "HTTPS")
+            | .key
+        ' | head -n 1)"
+
+    if [[ -z "${HTTPS_LISTENER_INDEX}" ]]; then
+        echo "✗ No HTTPS listener found on Gateway ${GATEWAY_NAME} in namespace 'default'."
+        echo "   Ensure the Gateway has an HTTPS listener defined before running this script."
+        exit 1
+    fi
+
+    echo "Using HTTPS listener at index ${HTTPS_LISTENER_INDEX} for certificate update."
+
     kubectl patch gateway "${GATEWAY_NAME}" -n default --type='json' -p='[
   {
     "op": "replace",
-    "path": "/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs",
+    "path": "/spec/listeners/'"${HTTPS_LISTENER_INDEX}"'/tls/options/networking.gke.io~1pre-shared-certs",
     "value": "'"${CERT_NAME}"'"
   }
 ]'

@@ -25,7 +25,12 @@
 #     GCS_SERVICE_ACCOUNT=django@my-project.iam.gserviceaccount.com ./setup-gcs-bucket.sh
 #
 # Usage:
+#   # Option 1: make the script executable once, then run directly:
+#   chmod +x setup-gcs-bucket.sh
 #   ./setup-gcs-bucket.sh
+#
+#   # Option 2: run via bash without changing file permissions:
+#   bash setup-gcs-bucket.sh
 #
 # This is an IaC script - commit changes and version control this file.
 
