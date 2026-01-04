@@ -15,8 +15,15 @@ IPv6 dual-stack enables both IPv4 and IPv6 connectivity for:
 ### GCP Requirements
 
 1. **Custom VPC**: Auto-mode VPCs don't support IPv6. You must create a custom VPC.
-2. **Project Quotas**: Ensure IPv6 quota is available in your region.
-3. **API Access**: Compute Engine API must be enabled.
+2. **Dataplane V2**: IPv6 requires GKE Dataplane V2 (Cilium). This is automatically enabled when `gke_enable_ipv6: true`.
+3. **Project Quotas**: Ensure IPv6 quota is available in your region.
+4. **API Access**: Compute Engine API must be enabled.
+
+### Important gcloud Notes
+
+- When creating clusters with IPv6, use lowercase values: `--stack-type=ipv4-ipv6`
+- The `--ipv6-access-type` flag is only needed when creating a new subnet with `--create-subnetwork`
+- When using an existing dual-stack subnet, the IPv6 access type is inherited from the subnet
 
 ### DNS Requirements
 
