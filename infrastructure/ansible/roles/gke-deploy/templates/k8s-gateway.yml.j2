@@ -64,17 +64,17 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
-  name: allow-{{ tenant.name }}-to-gateway
+  name: allow-{{ tenant.prefix }}-to-gateway
   namespace: default
   labels:
     app: {{ gke_app_name }}
     managed-by: ansible
-    tenant: {{ tenant.name }}
+    tenant: {{ tenant.prefix }}
 spec:
   from:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
-    namespace: tenant-{{ tenant.name }}
+    namespace: tenant-{{ tenant.prefix }}
   to:
   - group: gateway.networking.k8s.io
     kind: Gateway
