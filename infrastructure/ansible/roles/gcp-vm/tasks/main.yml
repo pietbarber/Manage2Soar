@@ -129,7 +129,7 @@
       --boot-disk-type={{ gcp_boot_disk_type }}
       --network={{ gcp_network }}
       --subnet={{ gcp_subnetwork }}
-      --stack-type=IPV4_IPV6
+      --stack-type=ipv4-ipv6
       --ipv6-network-tier=PREMIUM
       {%- if gcp_external_ip %}
       {%- if gcp_static_address is defined and gcp_static_address.address is defined %}
@@ -171,6 +171,30 @@
   ansible.builtin.set_fact:
     gcp_vm_instance: "{{ existing_vms.resources | selectattr('name', 'equalto', gcp_vm_name) | first }}"
   when: gcp_vm_exists
+
+# After IPv6 VM creation, we need to fetch VM details since gcloud doesn't return them
+- name: Get VM details after IPv6 creation
+  google.cloud.gcp_compute_instance_info:
+    zone: "{{ gcp_zone }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    filters:
+      - "name = {{ gcp_vm_name }}"
+  register: new_vm_info
+  delegate_to: localhost
+  become: false
+  when:
+    - gcp_vm_instance_ipv6 is defined
+    - gcp_vm_instance_ipv6.changed
+
+- name: Set VM instance from new IPv6 VM
+  ansible.builtin.set_fact:
+    gcp_vm_instance: "{{ new_vm_info.resources | first }}"
+  when:
+    - new_vm_info is defined
+    - new_vm_info.resources is defined
+    - new_vm_info.resources | length > 0
 
 # ============================================================
 # REGISTER VM IP
