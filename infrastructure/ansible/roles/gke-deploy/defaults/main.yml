@@ -81,7 +81,9 @@ gke_django_allowed_hosts: "CONFIGURE_ALLOWED_HOSTS"
 # ============================================================
 
 # Database host (internal GCP IP recommended)
-# Default uses RFC 5737 documentation IP - must be overridden in inventory
+# BREAKING CHANGE: Previous default was 10.128.0.2 (GCP default network internal IP).
+# New default uses RFC 5737 documentation IP (192.0.2.1) to force explicit configuration.
+# All real deployments MUST override this via `postgresql_host` in inventory/group_vars.
 gke_db_host: "{{ postgresql_host | default('192.0.2.1') }}"
 
 # Database port

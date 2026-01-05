@@ -89,6 +89,15 @@
           Auto-mode VPCs (default network) do not support IPv6.
           Please set gke_create_vpc: true when gke_enable_ipv6: true
 
+    - name: Validate IPv6 not used with Autopilot
+      ansible.builtin.assert:
+        that:
+          - not ((gke_enable_ipv6 | default(false) | bool) and (gke_cluster_type | default('standard')) == 'autopilot')
+        fail_msg: |
+          IPv6 dual-stack is only implemented for Standard GKE clusters in this playbook.
+          Autopilot clusters may support IPv6, but the flags are not yet configured.
+          Please use gke_cluster_type: standard when gke_enable_ipv6: true
+
     - name: Verify GCP project exists and user has access
       ansible.builtin.command:
         cmd: "gcloud projects describe {{ gcp_project }}"
@@ -153,6 +162,10 @@
 
     # For IPv6 support, we need to use gcloud command to create dual-stack subnet
     # The google.cloud.gcp_compute_subnetwork module doesn't fully support IPv6 yet
+    #
+    # IMPORTANT: If subnet already exists as IPv4-only, attempting to create it as dual-stack
+    # will fail with a different error than "already exists". Manual intervention required:
+    # either delete the subnet or use a different name.
     - name: Create dual-stack VPC subnet (IPv6 enabled)
       ansible.builtin.command:
         cmd: >

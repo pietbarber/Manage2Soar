@@ -21,7 +21,8 @@ IPv6 dual-stack enables both IPv4 and IPv6 connectivity for:
 
 ### Important gcloud Notes
 
-- When creating clusters with IPv6, use lowercase values: `--stack-type=ipv4-ipv6`
+- gcloud accepts both lowercase (`ipv4-ipv6`) and uppercase (`IPV4_IPV6`) for `--stack-type`
+- The playbooks use **lowercase for clusters/VMs** (`ipv4-ipv6`) and **uppercase for subnets** (`IPV4_IPV6`) based on gcloud examples
 - The `--ipv6-access-type` flag is only needed when creating a new subnet with `--create-subnetwork`
 - When using an existing dual-stack subnet, the IPv6 access type is inherited from the subnet
 
