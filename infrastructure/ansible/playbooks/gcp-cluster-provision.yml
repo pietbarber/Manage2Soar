@@ -80,6 +80,24 @@
           Invalid cluster type: {{ gke_cluster_type }}
           Must be 'standard' or 'autopilot'.
 
+    - name: Validate IPv6 requires custom VPC
+      ansible.builtin.assert:
+        that:
+          - not (gke_enable_ipv6 | default(false) | bool) or (gke_create_vpc | default(false) | bool)
+        fail_msg: |
+          IPv6 dual-stack requires a custom VPC.
+          Auto-mode VPCs (default network) do not support IPv6.
+          Please set gke_create_vpc: true when gke_enable_ipv6: true
+
+    - name: Validate IPv6 not used with Autopilot
+      ansible.builtin.assert:
+        that:
+          - not ((gke_enable_ipv6 | default(false) | bool) and (gke_cluster_type | default('standard')) == 'autopilot')
+        fail_msg: |
+          IPv6 dual-stack is only implemented for Standard GKE clusters in this playbook.
+          Autopilot clusters may support IPv6, but the flags are not yet configured.
+          Please use gke_cluster_type: standard when gke_enable_ipv6: true
+
     - name: Verify GCP project exists and user has access
       ansible.builtin.command:
         cmd: "gcloud projects describe {{ gcp_project }}"
@@ -142,7 +160,34 @@
       when: gke_create_vpc | bool
       tags: [network]
 
-    - name: Create VPC subnet
+    # For IPv6 support, we need to use gcloud command to create dual-stack subnet
+    # The google.cloud.gcp_compute_subnetwork module doesn't fully support IPv6 yet
+    #
+    # IMPORTANT: If subnet already exists as IPv4-only, attempting to create it as dual-stack
+    # will fail with a different error than "already exists". Manual intervention required:
+    # either delete the subnet or use a different name.
+    - name: Create dual-stack VPC subnet (IPv6 enabled)
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute networks subnets create {{ gke_subnet_name }}
+          --project={{ gcp_project }}
+          --region={{ gcp_region }}
+          --network={{ gke_vpc_name }}
+          --range={{ gke_subnet_cidr }}
+          --stack-type=IPV4_IPV6
+          --ipv6-access-type=EXTERNAL
+          --secondary-range=pods={{ gke_pods_cidr }},services={{ gke_services_cidr }}
+      register: subnet_create_ipv6
+      when:
+        - gke_create_vpc | bool
+        - gke_enable_ipv6 | default(false) | bool
+      changed_when: subnet_create_ipv6.rc == 0
+      failed_when: >
+        subnet_create_ipv6.rc != 0 and
+        'already exists' not in (subnet_create_ipv6.stderr | default('') | lower)
+      tags: [network]
+
+    - name: Create VPC subnet (IPv4 only)
       google.cloud.gcp_compute_subnetwork:
         name: "{{ gke_subnet_name }}"
         project: "{{ gcp_project }}"
@@ -157,7 +202,9 @@
         auth_kind: application
         state: present
       register: gke_subnet
-      when: gke_create_vpc | bool
+      when:
+        - gke_create_vpc | bool
+        - not (gke_enable_ipv6 | default(false) | bool)
       tags: [network]
 
     # ============================================================
@@ -197,7 +244,16 @@
           --addons=HttpLoadBalancing
           {%- endif %}
           --network={{ gke_vpc_name if gke_create_vpc else 'default' }}
+          {%- if gke_create_vpc %}
+          --subnetwork={{ gke_subnet_name }}
+          --cluster-secondary-range-name=pods
+          --services-secondary-range-name=services
+          {%- endif %}
           --enable-ip-alias
+          {%- if gke_enable_ipv6 | default(false) %}
+          --enable-dataplane-v2
+          --stack-type=ipv4-ipv6
+          {%- endif %}
           --enable-autoscaling
           --min-nodes={{ gke_min_nodes }}
           --max-nodes={{ gke_max_nodes }}

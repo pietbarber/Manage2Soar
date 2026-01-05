@@ -46,6 +46,7 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  become: false
   tags: [gcp-provision]
   vars_files:
     - ../group_vars/gcp_provisioner/vars.yml
@@ -101,13 +102,11 @@
       tags: [gcp-provision, preflight]
 
     - name: Check Compute Engine API availability
-      google.cloud.gcp_compute_zone_info:
-        zone: "{{ gcp_zone | default('us-east1-b') }}"
-        project: "{{ gcp_project }}"
-        auth_kind: "{{ gcp_auth_kind | default('application') }}"
-        service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+      ansible.builtin.command:
+        cmd: gcloud compute zones describe {{ gcp_zone | default('us-east1-b') }} --project={{ gcp_project }} --format='value(name)'
       register: gcp_compute_check
       ignore_errors: true
+      changed_when: false
       tags: [gcp-provision, preflight]
 
     - name: Validate Compute Engine API

@@ -1,7 +1,7 @@
 # GKE Gateway API Deployment Tasks
 #
 # This file handles:
-# - Static IP reservation
+# - Static IP reservation (IPv4 and optionally IPv6)
 # - Google-managed SSL certificate creation
 # - Gateway resource deployment (single shared gateway)
 # - HTTPRoute deployment per tenant
@@ -13,7 +13,7 @@
 # - Like nginx: single IP, host-based routing to different backends
 ---
 # ============================================================
-# STATIC IP RESERVATION
+# STATIC IP RESERVATION (IPv4)
 # ============================================================
 
 - name: Check if static IP exists
@@ -60,6 +60,84 @@
 - name: Set static IP fact
   ansible.builtin.set_fact:
     gke_ingress_ip: "{{ static_ip_address.stdout | trim }}"
+  run_once: true
+  tags: [ingress, ip]
+
+# ============================================================
+# STATIC IP RESERVATION (IPv6) - Only when gke_enable_ipv6 is true
+# ============================================================
+
+- name: Check if static IPv6 exists
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ipv6_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(address)"
+  register: static_ipv6_check
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_ipv6 | default(false) | bool
+  tags: [ingress, ip, ipv6]
+
+- name: Reserve global static IPv6
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses create {{ gke_static_ipv6_name }}
+      --global
+      --project={{ gcp_project }}
+      --ip-version=IPV6
+  register: static_ipv6_create
+  when:
+    - gke_enable_ipv6 | default(false) | bool
+    - static_ipv6_check.rc != 0
+  changed_when: static_ipv6_create.rc == 0
+  failed_when: static_ipv6_create.rc != 0
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip, ipv6]
+
+- name: Get static IPv6 address
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute addresses describe {{ gke_static_ipv6_name }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(address)"
+  register: static_ipv6_address
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when:
+    - gke_enable_ipv6 | default(false) | bool
+    - >
+      (static_ipv6_check is defined and static_ipv6_check.rc == 0) or
+      (static_ipv6_create is defined and static_ipv6_create.rc == 0)
+  tags: [ingress, ip, ipv6]
+
+- name: Set static IPv6 fact
+  ansible.builtin.set_fact:
+    gke_ingress_ipv6: "{{ static_ipv6_address.stdout | trim }}"
+  run_once: true
+  when:
+    - gke_enable_ipv6 | default(false) | bool
+    - static_ipv6_address is defined
+    - static_ipv6_address.stdout is defined
+  tags: [ingress, ip, ipv6]
+
+- name: Display IP addresses for DNS configuration
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      IP ADDRESSES FOR DNS CONFIGURATION
+      ========================================
+      IPv4 (A record): {{ gke_ingress_ip }}
+      {% if gke_enable_ipv6 | default(false) | bool and gke_ingress_ipv6 is defined %}
+      IPv6 (AAAA record): {{ gke_ingress_ipv6 }}
+      {% endif %}
+      ========================================
   run_once: true
   tags: [ingress, ip]
 
