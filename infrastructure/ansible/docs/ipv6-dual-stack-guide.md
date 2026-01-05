@@ -252,9 +252,74 @@ Request a quota increase if needed.
 
 ### "Gateway not accepting IPv6 traffic"
 
-1. Verify the static IPv6 address exists
-2. Check the Gateway annotation includes both IP names
-3. Ensure DNS AAAA records are propagated
+**Known Issue**: GKE Gateway API does not automatically create IPv6 forwarding rules.
+
+**Workaround**: Manually create IPv6 forwarding rules pointing to the Gateway's target proxies:
+
+```bash
+# Get Gateway name and target proxy names
+GATEWAY_NAME="manage2soar-gateway"
+HTTPS_PROXY=$(gcloud compute target-https-proxies list \
+  --filter="name~gkegw.*${GATEWAY_NAME}" \
+  --format="value(name)")
+HTTP_PROXY=$(gcloud compute target-http-proxies list \
+  --filter="name~gkegw.*${GATEWAY_NAME}" \
+  --format="value(name)")
+
+# Create IPv6 forwarding rules
+gcloud compute forwarding-rules create ${GATEWAY_NAME}-ipv6-https \
+  --address=manage2soar-cluster-ingress-ipv6 \
+  --target-https-proxy=${HTTPS_PROXY} \
+  --ports=443 \
+  --global \
+  --ip-version=IPV6
+
+gcloud compute forwarding-rules create ${GATEWAY_NAME}-ipv6-http \
+  --address=manage2soar-cluster-ingress-ipv6 \
+  --target-http-proxy=${HTTP_PROXY} \
+  --ports=80 \
+  --global \
+  --ip-version=IPV6
+```
+
+**Verification**:
+```bash
+# Verify forwarding rules exist
+gcloud compute forwarding-rules list \
+  --filter="IPAddress~2600:" \
+  --format="table(name,IPAddress,target,portRange)"
+
+# Test IPv6 connectivity (requires IPv6-enabled network)
+curl -6 https://your-domain.com
+```
+
+**Note**: This workaround is required because the GKE Gateway controller only provisions IPv4 forwarding rules automatically. The IPv6 forwarding rules must be created manually to achieve full dual-stack parity.
+
+### "Gateway health checks failing"
+
+GKE Gateway API creates health checks with path `/` by default. If your application redirects `/` (e.g., SECURE_SSL_REDIRECT in Django), the health checks will fail with 301 responses.
+
+**Solution**: Update health check path to an endpoint that returns 200:
+
+```bash
+# Find the health check name
+gcloud compute backend-services list \
+  --format="value(name,healthChecks)" | grep your-service
+
+# Update the health check path
+gcloud compute health-checks update http <health-check-name> \
+  --global \
+  --request-path=/health/
+```
+
+**Verification**:
+```bash
+# Check backend health
+gcloud compute backend-services get-health <backend-service-name> \
+  --global
+
+# Should show healthState: HEALTHY for all backends
+```
 
 ## Rollback
 

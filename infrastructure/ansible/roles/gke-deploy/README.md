@@ -242,6 +242,46 @@ kubectl rollout undo deployment/django-app -n NAMESPACE
 kubectl rollout undo deployment/django-app -n NAMESPACE --to-revision=3
 ```
 
+## Known Limitations & Manual Steps
+
+### IPv6 Forwarding Rules
+
+When deploying with `gke_enable_ipv6: true`, GKE Gateway API does not automatically create IPv6 forwarding rules. After Gateway deployment, you must manually create them:
+
+```bash
+# See infrastructure/ansible/docs/ipv6-dual-stack-guide.md for complete instructions
+gcloud compute forwarding-rules create manage2soar-gateway-ipv6-https \
+  --address=manage2soar-cluster-ingress-ipv6 \
+  --target-https-proxy=<gateway-https-proxy-name> \
+  --ports=443 --global --ip-version=IPV6
+```
+
+**Future Enhancement**: Consider adding post-Gateway task to detect and create IPv6 forwarding rules automatically.
+
+### Gateway Health Check Paths
+
+GKE Gateway API creates health checks with path `/` by default. If your application redirects this path (e.g., `SECURE_SSL_REDIRECT=True`), health checks will fail. After Gateway deployment, update health check paths:
+
+```bash
+# See infrastructure/ansible/docs/gke-post-deployment.md for complete instructions
+gcloud compute health-checks update http <health-check-name> \
+  --global --request-path=/health/
+```
+
+**Future Enhancement**: Consider adding post-Gateway task to update health check paths automatically.
+
+### Gateway SSL Certificate References
+
+If multiple managed certificates exist, the Gateway may reference an older certificate. After Gateway deployment, verify the correct certificate is used:
+
+```bash
+kubectl patch gateway manage2soar-gateway \
+  --type=json \
+  -p='[{"op": "replace", "path": "/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs", "value": "manage2soar-ssl-cert-v2"}]'
+```
+
+**Future Enhancement**: Consider adding validation task to ensure Gateway references the ACTIVE certificate.
+
 ## License
 
 MIT

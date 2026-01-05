@@ -307,6 +307,69 @@ DATABASES = {
    ```
 3. Increase `progressDeadlineSeconds` in deployment (default: 600s)
 
+### Issue: Gateway Health Checks Failing (503 Service Unavailable)
+
+**Symptom**: Gateway returns 503 errors even though pods are healthy. Backend services show `healthState: UNHEALTHY`.
+
+**Cause**: GKE Gateway API creates health checks with path `/` by default. If your application:
+- Redirects `/` to HTTPS (e.g., Django's `SECURE_SSL_REDIRECT=True`)
+- Requires authentication for `/`
+- Returns non-200 status for `/`
+
+The health checks will fail because they receive 301/302 redirects or 403/401 responses instead of 200 OK.
+
+**Fix**: Update health check paths to use a dedicated health endpoint (e.g., `/health/`):
+
+```bash
+# Find backend service and health check names
+gcloud compute backend-services list \
+  --project=manage2soar \
+  --format="table(name,healthChecks)"
+
+# Update health check path for each backend
+gcloud compute health-checks update http <health-check-name> \
+  --global \
+  --project=manage2soar \
+  --request-path=/health/
+
+# Verify backends become healthy (takes 30-60 seconds)
+gcloud compute backend-services get-health <backend-service-name> \
+  --global \
+  --project=manage2soar
+```
+
+**Expected**: After 30-60 seconds, backends should show `healthState: HEALTHY` and 503 errors should resolve.
+
+**IaC Improvement**: Consider adding a post-Gateway deployment task to automatically update health check paths. Currently this must be done manually after Gateway provisioning.
+
+### Issue: Gateway Using Wrong SSL Certificate
+
+**Symptom**: SSL errors even though managed certificate shows `ACTIVE` status.
+
+**Cause**: Gateway may be referencing an old certificate name if multiple certificates exist.
+
+**Fix**: Update Gateway annotation to use the correct certificate:
+
+```bash
+# List available certificates
+gcloud compute ssl-certificates list \
+  --project=manage2soar \
+  --format="table(name,managed.status,managed.domains)"
+
+# Update Gateway to use the ACTIVE certificate
+kubectl patch gateway manage2soar-gateway \
+  --type=json \
+  -p='[{"op": "replace", "path": "/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs", "value": "manage2soar-ssl-cert-v2"}]'
+
+# Wait 1-2 minutes for load balancer to update
+```
+
+**Verification**:
+```bash
+curl -I https://ssc.manage2soar.com
+# Should return 200 OK (not SSL_ERROR_SYSCALL)
+```
+
 ### Issue: Pods Have Old Secrets After Update
 
 **Symptom**: Pods running but using old environment variables
