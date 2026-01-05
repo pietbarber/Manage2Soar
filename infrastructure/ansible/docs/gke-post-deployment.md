@@ -27,7 +27,7 @@ Verify pods can reach the database with correct credentials:
 # Check database host in secrets
 kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.DB_HOST}' | base64 -d && echo
 
-# Should show internal database IP (e.g., 10.142.0.2)
+# Should show internal database IP (e.g., 10.0.0.7)
 # If wrong, see troubleshooting section below
 ```
 
@@ -211,7 +211,7 @@ curl -H "Host: ssc.manage2soar.com" http://GATEWAY_IP/
 
 ### Issue: Wrong Database IP in Secrets
 
-**Symptom**: Connection timeout to 10.128.0.2 instead of correct database IP
+**Symptom**: Connection timeout to 192.0.2.1 instead of correct database IP
 
 **Cause**: Ansible variable precedence - `gke_db_host` defaults evaluate before inventory vars
 
@@ -236,7 +236,7 @@ kubectl delete pods -n tenant-ssc --all
 ```bash
 # IMPORTANT: Generate YOUR OWN base64 value - do not copy the placeholder below!
 # To create base64 value for your IP address:
-#   echo -n "YOUR_CORRECT_IP" | base64  # e.g., echo -n "10.142.0.2" | base64
+#   echo -n "YOUR_CORRECT_IP" | base64  # e.g., echo -n "10.0.0.7" | base64
 
 # First, inspect current DB_HOST value in the secret
 kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.DB_HOST}' | base64 -d; echo

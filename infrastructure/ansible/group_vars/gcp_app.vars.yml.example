@@ -84,7 +84,7 @@ gke_memory_limit: "384Mi"
 
 # Database host (use internal GCP IP for production)
 # Get from: gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].networkIP)'
-gke_db_host: "10.128.0.2"
+postgresql_host: "192.0.2.1"
 
 # Database port
 gke_db_port: 5432

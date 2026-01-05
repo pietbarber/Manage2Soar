@@ -153,7 +153,7 @@ gke_django_allowed_hosts: "your-domain.com,www.your-domain.com"
 gke_replicas: 2
 
 # Database Connection
-gke_db_host: "10.128.0.2"  # Internal IP of your PostgreSQL
+gke_db_host: "192.0.2.1"  # Internal IP of your PostgreSQL
 gke_db_name: "m2s"
 gke_db_user: "m2s"
 ```

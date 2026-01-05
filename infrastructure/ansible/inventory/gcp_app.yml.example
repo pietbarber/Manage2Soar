@@ -50,7 +50,9 @@ all:
     # ============================================================
     # DATABASE (internal GCP IP)
     # ============================================================
-    gke_db_host: "10.128.0.2"
+    # Replace with your actual database internal IP
+    # Get from: gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].networkIP)'
+    postgresql_host: "192.0.2.1"
 
     # ============================================================
     # MULTI-TENANT
