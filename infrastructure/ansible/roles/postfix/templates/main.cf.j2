@@ -119,9 +119,8 @@ smtpd_relay_restrictions =
 # NOTE: OpenDKIM socket is at /var/spool/postfix/opendkim/opendkim.sock (inside Postfix chroot)
 milter_default_action = tempfail
 milter_protocol = 6
-smtpd_milters = unix:/opendkim/opendkim.sock, inet:localhost:11332
+smtpd_milters = unix:/opendkim/opendkim.sock
 # Only OpenDKIM for non-SMTP mail (sendmail, pickup queue).
-# Rspamd excluded: spam filtering only needed for external SMTP, not local mail.
 non_smtpd_milters = unix:/opendkim/opendkim.sock
 
 # ============================================================
