@@ -52,11 +52,27 @@ vault_postgresql_password_masa: "masa-database-password"
 # GOOGLE OAUTH (OPTIONAL)
 # ============================================================
 
+# For single-tenant deployments:
 # Only needed if using Google OAuth for user authentication
 # Get these from: https://console.cloud.google.com/apis/credentials
-
 # vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
 # vault_google_oauth_client_secret: "your-client-secret"
+
+# For multi-tenant deployments (one set per tenant):
+# Each tenant should have its own OAuth2 project with tenant-specific redirect URIs
+# Example redirect URI: https://ssc.manage2soar.com/complete/google-oauth2/
+#
+# SSC (Skyline Soaring Club)
+# vault_google_oauth_client_id_ssc: "ssc-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret_ssc: "ssc-client-secret"
+#
+# MASA (Mid-Atlantic Soaring Association)
+# vault_google_oauth_client_id_masa: "masa-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret_masa: "masa-client-secret"
+#
+# NFSS (Northern Florida Soaring Society)
+# vault_google_oauth_client_id_nfss: "nfss-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret_nfss: "nfss-client-secret"
 
 # ============================================================
 # ADDITIONAL SECRETS
