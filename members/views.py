@@ -515,7 +515,8 @@ def pydenticon_view(request, username):
         raise Http404("Invalid path")
 
     # If file doesn't exist, generate it
-    file_path = os.path.join("generated_avatars", filename)
+    # Use the validated filename (username is already validated by regex)
+    file_path = str(Path("generated_avatars") / filename)
     if not full_path_resolved.exists():
         try:
             generate_identicon(username, file_path)
