@@ -358,8 +358,10 @@ else:
     EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.smtp2go.com")
     EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
     EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
-    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+    # Only set EMAIL_HOST_USER/PASSWORD if provided (trusted IP relay doesn't need auth)
+    if os.getenv("EMAIL_HOST_USER"):
+        EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+        EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
     # Email timeout in seconds (default 30, increased for slow mail servers)
     EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "30"))
 
