@@ -493,43 +493,37 @@ def pydenticon_view(request, username):
     Note: In production, this endpoint should be served by nginx/Apache or CDN
     rather than Django for better performance and proper handling of ranges/etags.
     """
-    # Validate username to prevent path traversal attacks (allowlist approach)
+    # Validate username with strict allowlist (only alphanumeric, underscore, hyphen)
     if not re.match(r"^[a-zA-Z0-9_-]+$", username):
         raise Http404("Invalid username")
 
-    # Construct safe path using only validated, sanitized components
-    # This breaks the taint flow for CodeQL by not deriving from user input
-    avatar_dir = Path(settings.MEDIA_ROOT) / "generated_avatars"
+    # Define base path for generated avatars
+    base_path = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
 
-    # Ensure base directory exists (security requirement)
-    try:
-        avatar_dir_resolved = avatar_dir.resolve(strict=True)
-    except (ValueError, OSError):
+    # Ensure base directory exists
+    if not os.path.isdir(base_path):
         raise Http404("Avatar directory not found")
 
-    # Build safe filename from validated username only (no user input derivation)
-    safe_filename = f"profile_{username}.png"
+    # Construct filename and full path, then normalize
+    # Using os.path.normpath + startswith pattern that CodeQL recognizes as safe
+    filename = f"profile_{username}.png"
+    fullpath = os.path.normpath(os.path.join(base_path, filename))
 
-    # Construct the final path from the validated base and safe filename
-    # This is a fresh construction, not derived from any user-provided path
-    safe_path = avatar_dir_resolved / safe_filename
-
-    # Double-check containment (defense in depth)
-    if not safe_path.is_relative_to(avatar_dir_resolved):
+    # CRITICAL: Verify normalized path is within base directory (CodeQL-recognized pattern)
+    if not fullpath.startswith(base_path + os.sep):
         raise Http404("Invalid path")
 
     # If file doesn't exist, generate it
-    file_path_for_generation = str(Path("generated_avatars") / safe_filename)
-    if not safe_path.exists():
+    relative_path = os.path.join("generated_avatars", filename)
+    if not os.path.exists(fullpath):
         try:
-            generate_identicon(username, file_path_for_generation)
+            generate_identicon(username, relative_path)
         except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
 
-    # Use FileResponse for better file serving (handles ranges, etags, etc.)
-    # Open the sanitized, validated path
+    # Serve the file - open using the validated, normalized path
     try:
-        file_handle = safe_path.open("rb")
+        file_handle = open(fullpath, "rb")  # noqa: SIM115
         return FileResponse(
             file_handle,
             content_type="image/png",
