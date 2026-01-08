@@ -320,8 +320,9 @@ def membership_application_detail(request, application_id):
                         )
 
                     # Redirect back to application review page
-                    return HttpResponseRedirect(
-                        f"/membership/review/{application.application_id}/"
+                    return redirect(
+                        "members:membership_application_detail",
+                        application_id=application.application_id,
                     )
 
             except Exception as e:
@@ -521,7 +522,7 @@ def membership_waitlist(request):
                 )
 
         # Redirect back to waitlist management page
-        return HttpResponseRedirect("/membership/manage-waitlist/")
+        return redirect("members:membership_waitlist")
 
     # Get all waitlisted applications in order
     waitlisted_applications = MembershipApplication.objects.filter(
@@ -578,8 +579,9 @@ def membership_application_status(request, application_id):
             )
 
         # Redirect back to status page to prevent re-submission
-        return HttpResponseRedirect(
-            f"/membership/application-status/{application.application_id}/"
+        return redirect(
+            "members:membership_application_status",
+            application_id=application.application_id,
         )
 
     # Basic security - only show limited information

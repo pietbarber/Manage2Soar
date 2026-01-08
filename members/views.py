@@ -505,7 +505,7 @@ def pydenticon_view(request, username):
     # Security: Ensure the resolved path is within the expected directory
     # Use pathlib's resolve() for strict path validation
     try:
-        avatar_dir_resolved = avatar_dir.resolve(strict=False)
+        avatar_dir_resolved = avatar_dir.resolve(strict=True)
         full_path_resolved = full_path.resolve(strict=False)
 
         # Verify the file is within the avatar directory
@@ -516,7 +516,11 @@ def pydenticon_view(request, username):
 
     # If file doesn't exist, generate it
     # Use the validated filename (username is already validated by regex)
-    file_path = str(Path("generated_avatars") / filename)
+    # Build safe path for generation using only validated components
+    safe_filename = f"profile_{username}.png"  # Reconstruct from validated username
+    file_path = str(Path("generated_avatars") / safe_filename)
+
+    # Use the validated resolved path for file operations
     if not full_path_resolved.exists():
         try:
             generate_identicon(username, file_path)
@@ -524,9 +528,11 @@ def pydenticon_view(request, username):
             raise Http404("Avatar could not be generated")
 
     # Use FileResponse for better file serving (handles ranges, etags, etc.)
+    # Open using the validated resolved path
     try:
+        file_handle = full_path_resolved.open("rb")
         return FileResponse(
-            full_path_resolved.open("rb"),
+            file_handle,
             content_type="image/png",
             headers={"Cache-Control": "max-age=86400"},  # Cache for 1 day
         )
