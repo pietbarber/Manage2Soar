@@ -121,6 +121,7 @@ def land_flight_now(request, flight_id):
                 flight, flight.glider, flight.launch_time, landing_time
             )
         except ValidationError as e:
+            # ValidationError is user-facing and safe to expose (not a stack trace)
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
         flight.landing_time = landing_time
@@ -167,6 +168,7 @@ def launch_flight_now(request, flight_id):
                 flight, flight.glider, launch_time, flight.landing_time
             )
         except ValidationError as e:
+            # ValidationError is user-facing and safe to expose (not a stack trace)
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
         flight.launch_time = launch_time

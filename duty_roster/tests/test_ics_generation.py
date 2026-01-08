@@ -150,9 +150,13 @@ class TestGenerateDutyIcs:
         uid2 = str(list(c for c in cal2.walk() if c.name == "VEVENT")[0].get("uid"))
 
         # UIDs should be different (timestamp makes them unique)
-        # But they should both contain the domain
-        assert "testsoaring.org" in uid1
-        assert "testsoaring.org" in uid2
+        # But they should both contain the domain as a proper suffix (not just substring)
+        assert uid1.endswith(
+            "@testsoaring.org"
+        ), f"UID should end with @testsoaring.org: {uid1}"
+        assert uid2.endswith(
+            "@testsoaring.org"
+        ), f"UID should end with @testsoaring.org: {uid2}"
 
     def test_custom_location(self, site_config):
         """ICS should use provided location."""

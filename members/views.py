@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from datetime import date, timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
@@ -496,21 +497,26 @@ def pydenticon_view(request, username):
     if not re.match(r"^[a-zA-Z0-9_-]+$", username):
         raise Http404("Invalid username")
 
-    # Generate the file path where the identicon should be
+    # Generate the file path where the identicon should be (using Path for security)
     filename = f"profile_{username}.png"
-    avatar_dir = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
-    full_path = os.path.join(avatar_dir, filename)
+    avatar_dir = Path(settings.MEDIA_ROOT) / "generated_avatars"
+    full_path = avatar_dir / filename
 
     # Security: Ensure the resolved path is within the expected directory
-    # Defense-in-depth check against path traversal using os.path for CodeQL visibility
-    real_avatar_dir = os.path.realpath(avatar_dir)
-    real_full_path = os.path.realpath(full_path)
-    if not real_full_path.startswith(real_avatar_dir + os.sep):
+    # Use pathlib's resolve() for strict path validation
+    try:
+        avatar_dir_resolved = avatar_dir.resolve(strict=False)
+        full_path_resolved = full_path.resolve(strict=False)
+
+        # Verify the file is within the avatar directory
+        if not full_path_resolved.is_relative_to(avatar_dir_resolved):
+            raise Http404("Invalid path")
+    except (ValueError, OSError):
         raise Http404("Invalid path")
 
     # If file doesn't exist, generate it
     file_path = os.path.join("generated_avatars", filename)
-    if not os.path.exists(full_path):
+    if not full_path_resolved.exists():
         try:
             generate_identicon(username, file_path)
         except (IOError, OSError, ValueError):
@@ -519,7 +525,7 @@ def pydenticon_view(request, username):
     # Use FileResponse for better file serving (handles ranges, etags, etc.)
     try:
         return FileResponse(
-            open(full_path, "rb"),
+            full_path_resolved.open("rb"),
             content_type="image/png",
             headers={"Cache-Control": "max-age=86400"},  # Cache for 1 day
         )
