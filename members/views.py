@@ -3,7 +3,6 @@ import logging
 import os
 import re
 from datetime import date, timedelta
-from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
