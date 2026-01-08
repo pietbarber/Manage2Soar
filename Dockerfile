@@ -37,8 +37,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
 RUN if [ -f package.json ]; then npm run vendor:tablesort || true; fi
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Static files are collected post-deployment by Ansible with GCS credentials
+# (see roles/gke-deploy/tasks/deploy.yml)
 
 # Gunicorn entrypoint
 CMD ["gunicorn", "manage2soar.wsgi:application", "--bind", "0.0.0.0:8000", "--workers=3"]
