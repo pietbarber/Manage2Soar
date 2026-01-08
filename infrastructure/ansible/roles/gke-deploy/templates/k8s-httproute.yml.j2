@@ -65,7 +65,6 @@ spec:
         - type: RequestRedirect
           requestRedirect:
             scheme: https
-            # Port 443 is intentionally fixed as the standard external HTTPS listener port.
-            # If the Gateway's HTTPS listener port changes, update this value to match.
-            port: 443
+            # Note: Port is not specified - GKE Gateway API automatically uses port 443 for HTTPS redirects
+            # Explicitly specifying port in RequestRedirect filter is not supported by GKE
             statusCode: 301
