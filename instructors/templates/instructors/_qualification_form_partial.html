@@ -151,9 +151,9 @@ document.addEventListener('DOMContentLoaded', function() {
           this.parentNode.appendChild(iconPreview);
         }
         iconPreview.src = iconUrl;
-        iconPreview.alt = selectedOption.textContent;
+        iconPreview.setAttribute('alt', selectedOption.textContent);
         iconPreview.style.display = 'inline-block';
-        iconPreview.title = selectedOption.textContent;
+        iconPreview.setAttribute('title', selectedOption.textContent);
       } else {
         const iconPreview = document.getElementById('modal-qualification-icon-preview');
         if (iconPreview) {

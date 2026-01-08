@@ -319,7 +319,11 @@ def membership_application_detail(request, application_id):
                             f"Application {application.application_id} notes updated by {request.user}"
                         )
 
-                    return HttpResponseRedirect(request.path)
+                    # Redirect back to application review page
+                    return redirect(
+                        "members:membership_application_detail",
+                        application_id=application.application_id,
+                    )
 
             except Exception as e:
                 logger.error(f"Error processing application review: {e}")
@@ -517,7 +521,8 @@ def membership_waitlist(request):
                     request, "There was an error reordering the waiting list."
                 )
 
-        return HttpResponseRedirect(request.path)
+        # Redirect back to waitlist management page
+        return redirect("members:membership_waitlist")
 
     # Get all waitlisted applications in order
     waitlisted_applications = MembershipApplication.objects.filter(
@@ -574,7 +579,10 @@ def membership_application_status(request, application_id):
             )
 
         # Redirect back to status page to prevent re-submission
-        return HttpResponseRedirect(request.path)
+        return redirect(
+            "members:membership_application_status",
+            application_id=application.application_id,
+        )
 
     # Basic security - only show limited information
     context = {

@@ -492,34 +492,39 @@ def pydenticon_view(request, username):
     Note: In production, this endpoint should be served by nginx/Apache or CDN
     rather than Django for better performance and proper handling of ranges/etags.
     """
-    # Validate username to prevent path traversal attacks
+    # Validate username with strict allowlist (only alphanumeric, underscore, hyphen)
     if not re.match(r"^[a-zA-Z0-9_-]+$", username):
         raise Http404("Invalid username")
 
-    # Generate the file path where the identicon should be
-    filename = f"profile_{username}.png"
-    avatar_dir = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
-    full_path = os.path.join(avatar_dir, filename)
+    # Define base path for generated avatars
+    base_path = os.path.join(settings.MEDIA_ROOT, "generated_avatars")
 
-    # Security: Ensure the resolved path is within the expected directory
-    # Defense-in-depth check against path traversal using os.path for CodeQL visibility
-    real_avatar_dir = os.path.realpath(avatar_dir)
-    real_full_path = os.path.realpath(full_path)
-    if not real_full_path.startswith(real_avatar_dir + os.sep):
+    # Ensure base directory exists
+    if not os.path.isdir(base_path):
+        raise Http404("Avatar directory not found")
+
+    # Construct filename and full path, then normalize
+    # Using os.path.normpath + startswith pattern that CodeQL recognizes as safe
+    filename = f"profile_{username}.png"
+    fullpath = os.path.normpath(os.path.join(base_path, filename))
+
+    # CRITICAL: Verify normalized path is within base directory (CodeQL-recognized pattern)
+    if not fullpath.startswith(base_path + os.sep):
         raise Http404("Invalid path")
 
     # If file doesn't exist, generate it
-    file_path = os.path.join("generated_avatars", filename)
-    if not os.path.exists(full_path):
+    relative_path = os.path.join("generated_avatars", filename)
+    if not os.path.exists(fullpath):
         try:
-            generate_identicon(username, file_path)
+            generate_identicon(username, relative_path)
         except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
 
-    # Use FileResponse for better file serving (handles ranges, etags, etc.)
+    # Serve the file - open using the validated, normalized path
     try:
+        file_handle = open(fullpath, "rb")  # noqa: SIM115
         return FileResponse(
-            open(full_path, "rb"),
+            file_handle,
             content_type="image/png",
             headers={"Cache-Control": "max-age=86400"},  # Cache for 1 day
         )

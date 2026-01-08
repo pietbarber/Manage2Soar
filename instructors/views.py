@@ -729,7 +729,9 @@ def log_ground_instruction(request):
             if qualification_form.is_valid():
                 qualification_form.save()
                 messages.success(request, "Qualification assigned successfully.")
-                return redirect(f"{request.path}?student={student.id}")
+                # Build redirect URL safely with validated student ID
+                redirect_url = reverse("instructors:log_ground_instruction")
+                return redirect(f"{redirect_url}?student={student.id}")
             else:
                 messages.error(request, "Please correct the qualification form errors.")
             # Initialize ground instruction forms for re-rendering
