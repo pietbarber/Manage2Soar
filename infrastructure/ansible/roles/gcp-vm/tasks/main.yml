@@ -261,6 +261,27 @@
   become: false
   when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
 
+- name: Create SMTP firewall rule
+  google.cloud.gcp_compute_firewall:
+    name: "{{ gcp_firewall_name_prefix }}-allow-smtp"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    network:
+      selfLink: "global/networks/{{ gcp_network }}"
+    allowed:
+      - ip_protocol: tcp
+        ports:
+          - "587"  # SMTP submission port
+          - "25"   # SMTP port
+    source_ranges: "{{ gcp_smtp_allowed_sources | default([]) }}"
+    target_tags: "{{ gcp_network_tags }}"
+    description: "Allow SMTP connections from trusted sources (GKE cluster, application servers)"
+    state: present
+  delegate_to: localhost
+  become: false
+  when: gcp_create_firewall_rules and gcp_smtp_allowed_sources is defined and gcp_smtp_allowed_sources | length > 0
+
 # ============================================================
 # WAIT FOR VM TO BE READY
 # ============================================================
