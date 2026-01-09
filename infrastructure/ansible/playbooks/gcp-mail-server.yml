@@ -49,6 +49,7 @@
   gather_facts: false
   tags: [gcp-provision]
   vars_files:
+    - ../group_vars/all.yml
     - ../group_vars/gcp_mail/vars.yml
     - ../group_vars/gcp_mail/vault.yml
 
@@ -90,6 +91,7 @@
   gather_facts: true
   tags: [configure]
   vars_files:
+    - ../group_vars/all.yml
     - ../group_vars/gcp_mail/vars.yml
     - ../group_vars/gcp_mail/vault.yml
 
