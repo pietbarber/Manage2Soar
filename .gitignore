@@ -188,7 +188,6 @@ email-tests/
 # Local scripts and sensitive data
 scripts/reset_spr_data.py
 membership.json
-skyline-soaring-storage.json
 managed-cert.yaml
 ingress.yaml
 bandit-results.json
@@ -237,4 +236,9 @@ infrastructure/ansible/group_vars/gcp_app/vars.yml
 infrastructure/ansible/group_vars/gcp_app/vault.yml
 infrastructure/ansible/inventory/gcp_app.yml
 infrastructure/ansible/inventory/gcp_cluster.yml
+
+# GCS Service Account Keys - DO NOT COMMIT THESE TO GIT
+# PRODUCTION (ACTIVE - use this): manage2soar project service account
 manage2soar-django-key.json
+# LEGACY (DO NOT USE for production): old skyline-soaring-storage project
+skyline-soaring-storage.json
