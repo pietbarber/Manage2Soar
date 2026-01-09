@@ -13,6 +13,9 @@ __pycache__/
 *.log
 *.sqlite3
 *.db
+# Exclude local environment files (use K8s secrets instead)
+.env
+.env.*
 # Exclude git history
 .git/
 # Exclude node_modules
