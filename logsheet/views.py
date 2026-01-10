@@ -602,9 +602,7 @@ def view_flight(request, pk):
 def list_logsheets(request):
     query = request.GET.get("q", "")
     # Default to current year
-    from datetime import datetime
-
-    year = request.GET.get("year", str(datetime.now().year))
+    year = request.GET.get("year", str(timezone.now().year))
     logsheets = Logsheet.objects.all()
 
     if year:
