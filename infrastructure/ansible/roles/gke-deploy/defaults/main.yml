@@ -215,7 +215,7 @@ gke_apply_config: true
 gke_wait_for_rollout: true
 
 # Rollout timeout (seconds)
-gke_rollout_timeout: 300
+gke_rollout_timeout: 600  # 10 minutes - increased from 5 to handle slow startups and image pulls
 
 # Run database migrations
 gke_run_migrations: false

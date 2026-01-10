@@ -20,6 +20,11 @@ metadata:
     app.kubernetes.io/version: "{{ gke_computed_image_tag | trim }}"
 spec:
   replicas: {{ gke_replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Keep all old pods running until new ones are ready
   selector:
     matchLabels:
       app: {{ gke_deployment_name }}
@@ -85,10 +90,10 @@ spec:
           readinessProbe:
             tcpSocket:
               port: {{ gke_container_port }}
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
       volumes:
         - name: static-files
           emptyDir: {}
