@@ -206,6 +206,12 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.user.user_details",  # Update user fields
 )
 
+# Issue #462: Protect member names from being overwritten by Google OAuth data.
+# The user_details pipeline step would otherwise update first_name/last_name
+# from the Google account on every login. These fields should remain independent
+# and editable only by the member or admin.
+SOCIAL_AUTH_PROTECTED_USER_FIELDS = ["first_name", "last_name"]
+
 
 MESSAGE_TAGS = {
     messages.ERROR: "danger",  # maps Django "error" to Bootstrap "danger"
