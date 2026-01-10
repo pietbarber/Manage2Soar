@@ -134,6 +134,9 @@ def _get_email_context(slot, config, site_url):
         "last_instructor_flight_date": last_instructor_flight_date,
         "total_flights": total_flights,
         "slot": slot,
+        # Instruction request details
+        "instruction_types_display": slot.get_instruction_types_text(),
+        "student_notes": slot.student_notes,
     }
 
 

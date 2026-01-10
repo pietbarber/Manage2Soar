@@ -217,13 +217,65 @@
         {% endfor %}
       </div>
     </div>
-    {% else %}
-    <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}" class="mb-3">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-success w-100">
-        <i class="bi bi-hand-index me-2" aria-hidden="true"></i>Request Instruction
-      </button>
-    </form>
+    {% elif instruction_request_form %}
+    {# Expandable instruction request form #}
+    <div class="card border-success mb-3">
+      <div class="card-header bg-success text-white py-2" id="instruction-request-header">
+        <button class="btn btn-link text-white text-decoration-none w-100 d-flex justify-content-between align-items-center p-0"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#instruction-request-form"
+                aria-expanded="false"
+                aria-controls="instruction-request-form">
+          <span>
+            <i class="bi bi-hand-index me-2" aria-hidden="true"></i>Request Instruction
+          </span>
+          <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="collapse" id="instruction-request-form">
+        <div class="card-body">
+          <form method="post" action="{% url 'duty_roster:request_instruction' year=day.year month=day.month day=day.day %}">
+            {% csrf_token %}
+
+            {# Instruction Type Checkboxes #}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">What type of instruction are you requesting?</label>
+              <div class="row">
+                {% for choice in instruction_request_form.instruction_types %}
+                <div class="col-12 col-sm-6 mb-2">
+                  <div class="form-check">
+                    {{ choice.tag }}
+                    <label class="form-check-label" for="{{ choice.id_for_label }}">
+                      {{ choice.choice_label }}
+                    </label>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% if instruction_request_form.instruction_types.help_text %}
+              <small class="form-text text-muted">{{ instruction_request_form.instruction_types.help_text }}</small>
+              {% endif %}
+            </div>
+
+            {# Notes textarea #}
+            <div class="mb-3">
+              <label for="{{ instruction_request_form.student_notes.id_for_label }}" class="form-label fw-semibold">
+                Additional Details <span class="text-muted fw-normal">(optional)</span>
+              </label>
+              {{ instruction_request_form.student_notes }}
+              {% if instruction_request_form.student_notes.help_text %}
+              <small class="form-text text-muted">{{ instruction_request_form.student_notes.help_text }}</small>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-success w-100">
+              <i class="bi bi-check-circle me-2" aria-hidden="true"></i>Submit Request
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
     {% endif %}
   {% endif %}
 

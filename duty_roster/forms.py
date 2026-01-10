@@ -198,9 +198,29 @@ class DutyAssignmentForm(forms.ModelForm):
 class InstructionRequestForm(forms.ModelForm):
     """Form for students to request instruction on a duty day."""
 
+    # Custom field for instruction types as checkboxes
+    instruction_types = forms.MultipleChoiceField(
+        choices=InstructionSlot.INSTRUCTION_TYPE_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        required=False,
+        help_text="Select the type(s) of instruction you're requesting",
+    )
+
+    student_notes = forms.CharField(
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Tell the instructor what you'd like to work on...",
+            }
+        ),
+        required=False,
+        help_text="Additional details about your instruction request",
+    )
+
     class Meta:
         model = InstructionSlot
-        fields = []  # No fields needed - assignment and student set in view
+        fields = ["instruction_types", "student_notes"]
 
     def __init__(self, *args, assignment=None, student=None, **kwargs):
         super().__init__(*args, **kwargs)

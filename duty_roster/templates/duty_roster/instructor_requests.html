@@ -50,6 +50,12 @@
                       <div class="d-flex justify-content-between align-items-start">
                         <div>
                           <strong>{{ slot.student.full_display_name }}</strong>
+                          {% if slot.instruction_types %}
+                            <br><small><i class="fas fa-graduation-cap me-1 text-success"></i><strong>{{ slot.get_instruction_types_text }}</strong></small>
+                          {% endif %}
+                          {% if slot.student_notes %}
+                            <br><small class="text-muted"><i class="fas fa-comment me-1"></i>{{ slot.student_notes|truncatewords:20 }}</small>
+                          {% endif %}
                           {% if slot.student.phone %}
                             <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                           {% endif %}
@@ -145,6 +151,12 @@
                   <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
                       <strong>{{ slot.student.full_display_name }}</strong>
+                      {% if slot.instruction_types %}
+                        <br><small><i class="fas fa-graduation-cap me-1 text-success"></i>{{ slot.get_instruction_types_text }}</small>
+                      {% endif %}
+                      {% if slot.student_notes %}
+                        <br><small class="text-muted"><i class="fas fa-comment me-1"></i>{{ slot.student_notes|truncatewords:15 }}</small>
+                      {% endif %}
                       {% if slot.student.phone %}
                         <br><small class="text-muted"><i class="fas fa-phone me-1"></i>{{ slot.student.phone }}</small>
                       {% endif %}
