@@ -524,20 +524,17 @@ class SiteConfiguration(models.Model):
                         alt_val = int(alt_str)
                         if alt_val < 0:
                             errors["quick_altitude_buttons"] = (
-                                "Altitude values must be positive integers. Invalid value: "
-                                + alt_str
+                                f"Altitude values must be positive integers. Invalid value: {alt_str}"
                             )
                             break
                         if alt_val > 7000:
                             errors["quick_altitude_buttons"] = (
-                                "Altitude values must be 7000 feet or less (matching form field range). Invalid value: "
-                                + alt_str
+                                f"Altitude values must be 7000 feet or less (matching form field range). Invalid value: {alt_str}"
                             )
                             break
                     except ValueError:
                         errors["quick_altitude_buttons"] = (
-                            "Altitude values must be integers. Invalid value: "
-                            + alt_str
+                            f"Altitude values must be integers. Invalid value: {alt_str}"
                         )
                         break
 
