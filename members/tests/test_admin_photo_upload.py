@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
+from django.core.exceptions import ValidationError
 from PIL import Image
 
 from members.admin import MemberAdmin
@@ -134,8 +135,6 @@ class TestAdminPhotoUpload:
         self, member_admin, test_member
     ):
         """Verify ValidationError is raised when thumbnail generation fails."""
-        from django.core.exceptions import ValidationError
-
         request = MagicMock()
         form = MagicMock()
         form.changed_data = ["profile_photo"]
