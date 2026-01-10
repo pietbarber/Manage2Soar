@@ -637,7 +637,7 @@ def list_logsheets(request):
     )
     # Always include the current year so users can access historical logsheets
     # even when no logsheets exist for the current year (fixes issue #466)
-    current_year = datetime.now().year
+    current_year = timezone.now().year
     db_years.add(current_year)
     available_years = sorted(db_years, reverse=True)
 

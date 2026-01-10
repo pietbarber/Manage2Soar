@@ -1,5 +1,6 @@
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
 from logsheet.models import Airfield, Logsheet, Towplane, TowplaneCloseout
 
@@ -64,8 +65,6 @@ def test_year_selector_includes_current_year_when_no_current_year_logsheets(
     no logsheets exist for the current year. This ensures users can navigate
     to historical logsheets. (Fixes issue #466)
     """
-    from datetime import datetime
-
     airfield = Airfield.objects.create(name="Test Field")
     # Create a logsheet from a previous year only
     Logsheet.objects.create(
@@ -81,7 +80,7 @@ def test_year_selector_includes_current_year_when_no_current_year_logsheets(
     assert response.status_code == 200
     # The available_years context should include the current year
     available_years = list(response.context["available_years"])
-    current_year = datetime.now().year
+    current_year = timezone.now().year
     assert current_year in available_years
     # Should also include the year of the existing logsheet
     assert 2024 in available_years
@@ -95,8 +94,6 @@ def test_year_selector_works_with_no_logsheets_at_all(client, active_member):
     Test that the year selector shows the current year even when there are
     no logsheets in the database at all.
     """
-    from datetime import datetime
-
     # Ensure no logsheets exist
     Logsheet.objects.all().delete()
 
@@ -106,7 +103,7 @@ def test_year_selector_works_with_no_logsheets_at_all(client, active_member):
 
     assert response.status_code == 200
     available_years = list(response.context["available_years"])
-    current_year = datetime.now().year
+    current_year = timezone.now().year
     # Current year should be in available_years
     assert current_year in available_years
     assert len(available_years) == 1
