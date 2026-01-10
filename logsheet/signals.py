@@ -199,7 +199,6 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
             message = f"Maintenance issue resolved for {instance.glider or instance.towplane} by {resolver}: {instance.description[:100]}"
             try:
                 url = reverse("logsheet:maintenance_issues")
-
             except Exception:
                 url = None
 

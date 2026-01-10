@@ -78,9 +78,9 @@ def test_maintenance_issue_sends_email_immediately():
         mock_send_mail.assert_called_once()
         call_kwargs = mock_send_mail.call_args[1]
 
-        # Check email subject contains grounded warning
+        # Check email subject contains grounded warning and full aircraft string
         assert "GROUNDED" in call_kwargs["subject"]
-        assert "N123AB" in call_kwargs["subject"] or "Discus" in call_kwargs["subject"]
+        assert str(glider) in call_kwargs["subject"]
 
         # Check recipient
         assert "meister@example.com" in call_kwargs["recipient_list"]
@@ -177,8 +177,8 @@ def test_maintenance_notification_dedupe():
     )
 
     with patch("logsheet.signals.send_mail"):  # Mock to avoid actual email
-        # Create the same issue twice (simulate duplicate saves)
-        # Issue #463: Both will trigger immediate notifications
+        # Create two separate issues with identical descriptions
+        # Issue #463: Both creations will trigger immediate notifications
         MaintenanceIssue.objects.create(
             glider=glider,
             reported_by=meister,
