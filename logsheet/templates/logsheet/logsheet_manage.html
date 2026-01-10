@@ -700,7 +700,7 @@ window.attachModalButtonHandlers = function() {
 
   // Quick altitude buttons (configurable via SiteConfiguration)
   const altSelect = document.getElementById('id_release_altitude');
-  const altitudeButtons = modalBody.querySelectorAll('.altitude-quick-btn');
+  const altitudeButtons = document.querySelectorAll('.altitude-quick-btn');
 
   altitudeButtons.forEach(function(btn) {
     const clonedBtn = cloneButton(btn);

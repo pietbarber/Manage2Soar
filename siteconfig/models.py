@@ -514,6 +514,33 @@ class SiteConfiguration(models.Model):
             errors["instruction_surge_threshold"] = (
                 "Instruction surge threshold must be at least 1."
             )
+
+        # Validate quick altitude buttons (Issue #467)
+        if self.quick_altitude_buttons:
+            for alt_str in self.quick_altitude_buttons.split(","):
+                alt_str = alt_str.strip()
+                if alt_str:
+                    try:
+                        alt_val = int(alt_str)
+                        if alt_val < 0:
+                            errors["quick_altitude_buttons"] = (
+                                "Altitude values must be positive integers. Invalid value: "
+                                + alt_str
+                            )
+                            break
+                        if alt_val > 7000:
+                            errors["quick_altitude_buttons"] = (
+                                "Altitude values must be 7000 feet or less (matching form field range). Invalid value: "
+                                + alt_str
+                            )
+                            break
+                    except ValueError:
+                        errors["quick_altitude_buttons"] = (
+                            "Altitude values must be integers. Invalid value: "
+                            + alt_str
+                        )
+                        break
+
         if errors:
             raise ValidationError(errors)
 
