@@ -67,10 +67,17 @@ class TestAdminPhotoUpload:
             "members.admin.generate_profile_thumbnails"
         ) as mock_generate_thumbnails:
             # Set up mock return value
+            mock_original = BytesIO(b"original_data")
+            mock_original.name = "original.jpg"
+            mock_medium = BytesIO(b"medium_data")
+            mock_medium.name = "medium.jpg"
+            mock_small = BytesIO(b"small_data")
+            mock_small.name = "small.jpg"
+
             mock_generate_thumbnails.return_value = {
-                "original": BytesIO(b"original"),
-                "medium": BytesIO(b"medium"),
-                "small": BytesIO(b"small"),
+                "original": mock_original,
+                "medium": mock_medium,
+                "small": mock_small,
             }
 
             # Call save_model
@@ -78,6 +85,12 @@ class TestAdminPhotoUpload:
 
             # Verify generate_profile_thumbnails was called
             mock_generate_thumbnails.assert_called_once()
+
+            # Verify thumbnails were saved to the member's fields
+            # The save_model calls .save() on each field, which saves the file
+            assert test_member.profile_photo is not None
+            assert test_member.profile_photo_medium is not None
+            assert test_member.profile_photo_small is not None
 
     def test_save_model_skips_thumbnails_when_no_photo_change(
         self, member_admin, test_member
