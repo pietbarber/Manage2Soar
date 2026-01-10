@@ -602,9 +602,7 @@ def view_flight(request, pk):
 def list_logsheets(request):
     query = request.GET.get("q", "")
     # Default to current year
-    from datetime import datetime
-
-    year = request.GET.get("year", str(datetime.now().year))
+    year = request.GET.get("year", str(timezone.now().year))
     logsheets = Logsheet.objects.all()
 
     if year:
@@ -629,12 +627,17 @@ def list_logsheets(request):
 
     from django.db.models.functions import ExtractYear
 
-    available_years = (
+    # Get years from existing logsheets
+    db_years = set(
         Logsheet.objects.annotate(year=ExtractYear("log_date"))
         .values_list("year", flat=True)
         .distinct()
-        .order_by("-year")
     )
+    # Always include the current year so users can access historical logsheets
+    # even when no logsheets exist for the current year (fixes issue #466)
+    current_year = timezone.now().year
+    db_years.add(current_year)
+    available_years = sorted(db_years, reverse=True)
 
     from .forms import CreateLogsheetForm
 
