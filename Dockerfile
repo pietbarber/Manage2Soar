@@ -1,6 +1,6 @@
 # Dockerfile for Django + Gunicorn
 #FROM python:3.13-slim-alpine
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 WORKDIR /app
 
