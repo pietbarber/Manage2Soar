@@ -1,0 +1,31 @@
+{% if grounded %}⚠️ AIRCRAFT GROUNDED{% else %}🔧 MAINTENANCE ISSUE REPORTED{% endif %}
+================================================================================
+
+Aircraft: {{ aircraft }}
+Type: {{ aircraft_type }}
+{% if grounded %}
+*** THIS AIRCRAFT IS GROUNDED UNTIL THE ISSUE IS RESOLVED ***
+{% endif %}
+
+ISSUE DESCRIPTION
+-----------------
+{{ description }}
+
+
+DETAILS
+-------
+Reported By: {{ reported_by }}
+Reported On: {{ logsheet_date }}
+Status: {% if grounded %}GROUNDED{% else %}Squawk (operational with issue){% endif %}
+
+
+VIEW MAINTENANCE ISSUES
+-----------------------
+{{ maintenance_url }}
+
+
+---
+You are receiving this email because you are listed as an aircraft meister for {{ aircraft }}.
+
+{{ club_name }}
+{{ site_url }}

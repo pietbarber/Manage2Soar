@@ -823,7 +823,15 @@ class Logsheet(models.Model):
                     )
 
             # --- Notify maintenance officers about all unresolved issues on this logsheet ---
-            # This handles issues created before finalization that didn't send notifications
+            # This serves as a fallback/safety net for in-app notifications.
+            # Issue #463: The signal now sends emails immediately on issue creation.
+            # This block ensures in-app notifications exist even if:
+            # 1. Issues were created before Issue #463 fix was deployed
+            # 2. Signal email sending failed
+            # 3. Auto-generated issues (oil changes, 100hr) that were just created above
+            #
+            # Note: The signal also creates in-app notifications, but the deduplication
+            # logic below ensures we don't create duplicates.
             from notifications.models import Notification
 
             unresolved_issues = MaintenanceIssue.objects.filter(

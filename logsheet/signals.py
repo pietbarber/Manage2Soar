@@ -1,10 +1,13 @@
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.template.loader import render_to_string
 from django.urls import reverse
 
 from notifications.models import Notification
+from utils.email import send_mail
 
 from .models import Flight, MaintenanceIssue
 
@@ -30,22 +33,117 @@ def _create_notification_if_not_exists(user, message, url=None):
         return None
 
 
+def _get_club_config():
+    """Get SiteConfiguration for email context."""
+    from siteconfig.models import SiteConfiguration
+
+    return SiteConfiguration.objects.first()
+
+
+def _get_absolute_club_logo_url(config):
+    """Get absolute URL for club logo."""
+    if not config or not config.club_logo:
+        return None
+    site_url = getattr(settings, "SITE_URL", "")
+    if site_url and config.club_logo:
+        return f"{site_url.rstrip('/')}{config.club_logo.url}"
+    return None
+
+
+def _send_maintenance_issue_email(issue, meisters):
+    """Send email notification to meisters about a new maintenance issue.
+
+    Issue #463: Send maintenance issue emails immediately when created,
+    rather than waiting for logsheet finalization.
+    """
+    if not meisters:
+        return
+
+    config = _get_club_config()
+    aircraft = issue.glider or issue.towplane
+    aircraft_type = "Glider" if issue.glider else "Towplane"
+
+    try:
+        maintenance_url = reverse("logsheet:maintenance_issues")
+        site_url = getattr(settings, "SITE_URL", "")
+        if site_url:
+            maintenance_url = f"{site_url.rstrip('/')}{maintenance_url}"
+    except Exception:
+        maintenance_url = None
+
+    context = {
+        "aircraft": str(aircraft),
+        "aircraft_type": aircraft_type,
+        "description": issue.description,
+        "grounded": issue.grounded,
+        "reported_by": (
+            issue.reported_by.full_display_name if issue.reported_by else "Unknown"
+        ),
+        "logsheet_date": (
+            issue.logsheet.log_date.strftime("%B %d, %Y") if issue.logsheet else "N/A"
+        ),
+        "club_name": config.club_name if config else "Soaring Club",
+        "club_logo_url": _get_absolute_club_logo_url(config),
+        "site_url": getattr(settings, "SITE_URL", None),
+        "maintenance_url": maintenance_url,
+    }
+
+    # Render email templates
+    html_message = render_to_string(
+        "logsheet/emails/maintenance_issue_notification.html", context
+    )
+    text_message = render_to_string(
+        "logsheet/emails/maintenance_issue_notification.txt", context
+    )
+
+    # Build recipient list
+    recipient_emails = [
+        meister.member.email
+        for meister in meisters
+        if meister.member and meister.member.email
+    ]
+
+    if not recipient_emails:
+        logger.warning("No valid email addresses for meisters of aircraft %s", aircraft)
+        return
+
+    # Build subject line
+    subject_prefix = "⚠️ GROUNDED: " if issue.grounded else "🔧 "
+    club_name = config.club_name if config else "Club"
+    subject = f"{subject_prefix}[{club_name}] Maintenance Issue - {aircraft}"
+
+    try:
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipient_emails,
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(
+            "Sent maintenance issue email for %s to %d meister(s)",
+            aircraft,
+            len(recipient_emails),
+        )
+    except Exception as e:
+        logger.exception(
+            "Failed to send maintenance issue email for %s: %s", aircraft, e
+        )
+
+
 @receiver(post_save, sender=MaintenanceIssue)
 def notify_meisters_on_issue(sender, instance, created, **kwargs):
-    # Notify assigned AircraftMeister members on creation and important updates.
+    """Notify assigned AircraftMeister members on creation and important updates.
+
+    Issue #463: Send email immediately when a maintenance issue is created,
+    rather than waiting for logsheet finalization. This ensures meisters are
+    notified promptly about aircraft problems.
+    """
     try:
         # On create: notify all meisters assigned to the affected aircraft
-        # ONLY if the logsheet is finalized (prevents premature notifications during editing)
+        # Issue #463: Send email IMMEDIATELY (don't wait for finalization)
         if created:
-            # Check if logsheet is finalized before sending notifications
-            if instance.logsheet and not instance.logsheet.finalized:
-                logger.debug(
-                    "notify_meisters_on_issue: skipped notification for issue %s because logsheet %s is not finalized",
-                    instance.pk,
-                    instance.logsheet.pk,
-                )
-                return
-
             if instance.glider:
                 meisters = instance.glider.aircraftmeister_set.select_related(
                     "member"
@@ -60,8 +158,11 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
             if not meisters:
                 return
 
+            # Send email notification immediately (Issue #463)
+            _send_maintenance_issue_email(instance, meisters)
+
+            # Also create in-app notifications
             message = f"Maintenance issue reported for {instance.glider or instance.towplane}: {instance.description[:100]}"
-            # The maintenance view lists all issues; can't link to a PK-specific page per repo note
             try:
                 url = reverse("logsheet:maintenance_issues")
             except Exception:
@@ -98,6 +199,7 @@ def notify_meisters_on_issue(sender, instance, created, **kwargs):
             message = f"Maintenance issue resolved for {instance.glider or instance.towplane} by {resolver}: {instance.description[:100]}"
             try:
                 url = reverse("logsheet:maintenance_issues")
+
             except Exception:
                 url = None
 
