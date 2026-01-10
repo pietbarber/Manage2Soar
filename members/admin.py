@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import HttpResponse
 from django.utils.html import format_html
@@ -16,6 +17,7 @@ from utils.admin_helpers import AdminHelperMixin
 
 from .models import Badge, Biography, Member, MemberBadge
 from .models_applications import MembershipApplication
+from .utils.image_processing import generate_profile_thumbnails
 
 # --- Register or replace social_django admin entries with helpful admin banners ---
 try:
@@ -424,6 +426,35 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
         """
         updated = queryset.update(is_active=False)
         self.message_user(request, f"Marked {updated} members as inactive.")
+
+    def save_model(self, request, obj, form, change):
+        """Generate thumbnails when a profile photo is uploaded via admin.
+
+        Issue #479: When uploading photos via admin interface, thumbnails
+        were not being generated. This ensures the same processing happens
+        as when members upload their own photos.
+        """
+        if "profile_photo" in form.changed_data and obj.profile_photo:
+            try:
+                thumbnails = generate_profile_thumbnails(obj.profile_photo)
+
+                # Get base filename from original
+                base_name = obj.profile_photo.name.split("/")[-1]
+
+                # Save original (processed version for consistency)
+                obj.profile_photo.save(base_name, thumbnails["original"], save=False)
+
+                # Save medium thumbnail (200x200)
+                obj.profile_photo_medium.save(
+                    base_name, thumbnails["medium"], save=False
+                )
+
+                # Save small thumbnail (64x64)
+                obj.profile_photo_small.save(base_name, thumbnails["small"], save=False)
+            except (ValidationError, ValueError) as e:
+                raise ValidationError(f"Photo processing failed: {e}")
+
+        super().save_model(request, obj, form, change)
 
 
 # --- MembershipApplication Admin ---
