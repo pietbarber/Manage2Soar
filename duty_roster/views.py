@@ -1499,8 +1499,7 @@ def request_instruction(request, year, month, day):
             f"Instruction request submitted for {day_date.strftime('%B %d, %Y')}. "
             "The instructor will review your request.",
         )
-
-        _notify_instructor_new_request(slot)
+        # HTML email sent via signal (send_student_signup_notification)
 
     else:
         for error in form.non_field_errors():
@@ -1675,7 +1674,7 @@ def instructor_respond(request, slot_id):
                 request,
                 f"Accepted {slot.student.full_display_name} for {slot.assignment.date.strftime('%B %d')}.",
             )
-            _notify_student_accepted(slot)
+            # HTML email sent via signal (send_request_response_email)
 
             # Check if we now have 3+ students and need surge instructor
             _check_surge_instructor_needed(slot.assignment)
@@ -1686,41 +1685,16 @@ def instructor_respond(request, slot_id):
                 request,
                 f"Declined {slot.student.full_display_name} for {slot.assignment.date.strftime('%B %d')}.",
             )
-            _notify_student_rejected(slot)
+            # HTML email sent via signal (send_request_response_email)
 
     return redirect("duty_roster:instructor_requests")
 
 
 # =============================================================================
 # Instruction Notification Helpers
+# Note: Most instruction notifications are now handled via signals.py
+# using HTML email templates. Only cancellation notification remains here.
 # =============================================================================
-
-
-def _notify_instructor_new_request(slot):
-    """Notify instructor about a new instruction request."""
-    instructor = slot.instructor
-    if not instructor or not instructor.email:
-        return
-
-    try:
-        subject = (
-            f"New Instruction Request for {slot.assignment.date.strftime('%B %d, %Y')}"
-        )
-        message = (
-            f"{slot.student.full_display_name} has requested instruction on "
-            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
-            f"Please log in to Manage2Soar to accept or decline this request."
-        )
-
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [instructor.email],
-            fail_silently=True,
-        )
-    except Exception:
-        logger.exception("Failed to send instructor notification")
 
 
 def _notify_instructor_cancellation(slot):
@@ -1748,72 +1722,6 @@ def _notify_instructor_cancellation(slot):
         )
     except Exception:
         logger.exception("Failed to send cancellation notification")
-
-
-def _notify_student_accepted(slot):
-    """Notify student that their instruction request was accepted."""
-    student = slot.student
-    if not student.email:
-        return
-
-    try:
-        instructor_name = (
-            slot.instructor.full_display_name if slot.instructor else "The instructor"
-        )
-        subject = (
-            f"Instruction Confirmed for {slot.assignment.date.strftime('%B %d, %Y')}"
-        )
-        message = (
-            f"Good news! {instructor_name} has accepted your instruction request for "
-            f"{slot.assignment.date.strftime('%A, %B %d, %Y')}.\n\n"
-        )
-
-        if slot.instructor_note:
-            message += f"Note from instructor: {slot.instructor_note}\n\n"
-
-        message += "See you at the field!"
-
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [student.email],
-            fail_silently=True,
-        )
-    except Exception:
-        logger.exception("Failed to send student acceptance notification")
-
-
-def _notify_student_rejected(slot):
-    """Notify student that their instruction request was declined."""
-    student = slot.student
-    if not student.email:
-        return
-
-    try:
-        subject = f"Instruction Request Declined for {slot.assignment.date.strftime('%B %d, %Y')}"
-        message = (
-            f"Unfortunately, your instruction request for "
-            f"{slot.assignment.date.strftime('%A, %B %d, %Y')} has been declined.\n\n"
-        )
-
-        if slot.instructor_note:
-            message += f"Note from instructor: {slot.instructor_note}\n\n"
-
-        message += (
-            "Please check the duty calendar for other available days, "
-            "or contact another instructor."
-        )
-
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [student.email],
-            fail_silently=True,
-        )
-    except Exception:
-        logger.exception("Failed to send student rejection notification")
 
 
 def _check_surge_instructor_needed(assignment):
