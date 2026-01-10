@@ -67,8 +67,9 @@ def test_year_selector_includes_current_year_when_no_current_year_logsheets(
     """
     airfield = Airfield.objects.create(name="Test Field")
     # Create a logsheet from a previous year only
+    previous_year = timezone.now().year - 2
     Logsheet.objects.create(
-        log_date="2024-06-15",
+        log_date=f"{previous_year}-06-15",
         airfield=airfield,
         created_by=active_member,
     )
@@ -83,7 +84,8 @@ def test_year_selector_includes_current_year_when_no_current_year_logsheets(
     current_year = timezone.now().year
     assert current_year in available_years
     # Should also include the year of the existing logsheet
-    assert 2024 in available_years
+    created_logsheet_year = Logsheet.objects.first().log_date.year
+    assert created_logsheet_year in available_years
     # Current year should be first (sorted descending)
     assert available_years[0] == current_year
 
