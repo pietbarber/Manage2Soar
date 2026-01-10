@@ -441,7 +441,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                 # Get base filename from original
                 base_name = obj.profile_photo.name.split("/")[-1]
 
-                # Save original (processed version for consistency)
+                # Save processed "original": resized/optimized (max 800x800) version replaces the upload
                 obj.profile_photo.save(base_name, thumbnails["original"], save=False)
 
                 # Save medium thumbnail (200x200) using same base filename as form upload
