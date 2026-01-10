@@ -233,3 +233,118 @@ def test_surge_threshold_positive_integers():
     config.refresh_from_db()
     assert config.tow_surge_threshold == 1
     assert config.instruction_surge_threshold == 1
+
+
+# Quick Altitude Buttons Tests (Issue #467)
+@pytest.mark.django_db
+def test_quick_altitude_list_default():
+    """Test default altitude button configuration (2000,3000)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.com",
+        club_abbreviation="TC",
+        quick_altitude_buttons="2000,3000",
+    )
+    result = config.get_quick_altitude_list()
+    assert result == [(2000, "2K"), (3000, "3K")]
+
+
+@pytest.mark.django_db
+def test_quick_altitude_list_custom_formatting():
+    """Test altitude label formatting for various values."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.com",
+        club_abbreviation="TC",
+        quick_altitude_buttons="300,1000,1500,2000,3000",
+    )
+    result = config.get_quick_altitude_list()
+    assert result == [
+        (300, "300"),  # Below 1000 -> plain number
+        (1000, "1K"),  # Exactly 1000 -> "1K"
+        (1500, "1.5K"),  # 1500 -> "1.5K"
+        (2000, "2K"),  # 2000 -> "2K"
+        (3000, "3K"),  # 3000 -> "3K"
+    ]
+
+
+@pytest.mark.django_db
+def test_quick_altitude_list_edge_cases():
+    """Test edge cases: empty string, whitespace, invalid values."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.com",
+        club_abbreviation="TC",
+    )
+
+    # Empty string
+    config.quick_altitude_buttons = ""
+    assert config.get_quick_altitude_list() == []
+
+    # Only whitespace
+    config.quick_altitude_buttons = "  ,  ,  "
+    assert config.get_quick_altitude_list() == []
+
+    # Invalid values mixed with valid
+    config.quick_altitude_buttons = "invalid,2000,abc,3000"
+    result = config.get_quick_altitude_list()
+    assert result == [(2000, "2K"), (3000, "3K")]
+
+    # All invalid values
+    config.quick_altitude_buttons = "abc,def,xyz"
+    assert config.get_quick_altitude_list() == []
+
+
+@pytest.mark.django_db
+def test_quick_altitude_list_with_spaces():
+    """Test that spaces around values are handled correctly."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.com",
+        club_abbreviation="TC",
+        quick_altitude_buttons="500, 1200,  2500  ",
+    )
+    result = config.get_quick_altitude_list()
+    assert result == [
+        (500, "500"),
+        (1200, "1.2K"),
+        (2500, "2.5K"),
+    ]
+
+
+@pytest.mark.django_db
+def test_quick_altitude_validation_positive_integers():
+    """Test that clean() validates altitude values are positive."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.com",
+        club_abbreviation="TC",
+    )
+
+    # Negative values should fail validation
+    config.quick_altitude_buttons = "2000,-100,3000"
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "positive integers" in str(exc_info.value)
+
+    # Non-integer values should fail validation
+    config.quick_altitude_buttons = "2000,abc,3000"
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "must be integers" in str(exc_info.value)
+
+    # Values over 7000 should fail validation
+    config.quick_altitude_buttons = "2000,8000,3000"
+    with pytest.raises(ValidationError) as exc_info:
+        config.full_clean()
+    assert "quick_altitude_buttons" in exc_info.value.error_dict
+    assert "7000 feet or less" in str(exc_info.value)
+
+    # Valid values should pass
+    config.quick_altitude_buttons = "300,1000,2000,3000"
+    config.full_clean()  # Should not raise
+    config.save()
+    config.refresh_from_db()
+    assert config.quick_altitude_buttons == "300,1000,2000,3000"
