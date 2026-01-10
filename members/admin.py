@@ -444,14 +444,18 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                 # Save original (processed version for consistency)
                 obj.profile_photo.save(base_name, thumbnails["original"], save=False)
 
-                # Save medium thumbnail (200x200) with prefix for consistency
+                # Save medium thumbnail (200x200) using same base filename as form upload
                 obj.profile_photo_medium.save(
-                    f"medium_{base_name}", thumbnails["medium"], save=False
+                    base_name,
+                    thumbnails["medium"],
+                    save=False,
                 )
 
-                # Save small thumbnail (64x64) with prefix for consistency
+                # Save small thumbnail (64x64) using same base filename as form upload
                 obj.profile_photo_small.save(
-                    f"small_{base_name}", thumbnails["small"], save=False
+                    base_name,
+                    thumbnails["small"],
+                    save=False,
                 )
             except (ValidationError, ValueError) as e:
                 raise ValidationError(f"Photo processing failed: {e}")
