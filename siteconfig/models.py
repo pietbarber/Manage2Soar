@@ -334,6 +334,13 @@ class SiteConfiguration(models.Model):
         help_text="Don't charge for glider rental on retrieve flights (some clubs don't charge rental for the ferry flight back).",
     )
 
+    # Quick altitude buttons for flight form (Issue #467)
+    quick_altitude_buttons = models.CharField(
+        max_length=100,
+        default="2000,3000",
+        help_text="Comma-separated list of altitude values (in feet) for quick-select buttons on flight forms. Example: 300,1000,1500,2000,3000",
+    )
+
     # Notification dedupe: number of minutes to suppress duplicate redaction
     # notifications for the same member URL. Editable by the Webmaster in the
     # admin SiteConfiguration UI. If blank/zero, falls back to settings or
@@ -466,6 +473,31 @@ class SiteConfiguration(models.Model):
         self.save(
             update_fields=["visiting_pilot_token", "visiting_pilot_token_created"]
         )
+
+    def get_quick_altitude_list(self):
+        """Return a list of (value, label) tuples for quick altitude buttons.
+
+        Parses the comma-separated quick_altitude_buttons field and returns
+        a list of tuples suitable for template rendering.
+        Example: "2000,3000" -> [(2000, "2K"), (3000, "3K")]
+        """
+        altitudes = []
+        for alt_str in self.quick_altitude_buttons.split(","):
+            alt_str = alt_str.strip()
+            if alt_str:
+                try:
+                    alt_val = int(alt_str)
+                    # Format label: 2000 -> "2K", 300 -> "300", 1500 -> "1.5K"
+                    if alt_val >= 1000 and alt_val % 1000 == 0:
+                        label = f"{alt_val // 1000}K"
+                    elif alt_val >= 1000:
+                        label = f"{alt_val / 1000:.1f}K".replace(".0K", "K")
+                    else:
+                        label = str(alt_val)
+                    altitudes.append((alt_val, label))
+                except ValueError:
+                    continue  # Skip invalid entries
+        return altitudes
 
     def clean(self):
         if SiteConfiguration.objects.exclude(id=self.id).exists():

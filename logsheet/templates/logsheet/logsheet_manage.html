@@ -698,23 +698,22 @@ window.attachModalButtonHandlers = function() {
     });
   }
 
-  // 2K/3K buttons for release altitude
+  // Quick altitude buttons (configurable via SiteConfiguration)
   const altSelect = document.getElementById('id_release_altitude');
-  const alt2kBtn = cloneButton(document.getElementById('alt-2k-btn'));
-  const alt3kBtn = cloneButton(document.getElementById('alt-3k-btn'));
+  const altitudeButtons = modalBody.querySelectorAll('.altitude-quick-btn');
 
-  if (alt2kBtn && altSelect) {
-    alt2kBtn.addEventListener('click', function() {
-      altSelect.value = '2000';
-      altSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-  }
-  if (alt3kBtn && altSelect) {
-    alt3kBtn.addEventListener('click', function() {
-      altSelect.value = '3000';
-      altSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-  }
+  altitudeButtons.forEach(function(btn) {
+    const clonedBtn = cloneButton(btn);
+    if (clonedBtn && altSelect) {
+      clonedBtn.addEventListener('click', function() {
+        const altitude = clonedBtn.getAttribute('data-altitude');
+        if (altitude) {
+          altSelect.value = altitude;
+          altSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
+  });
 };
 
 // Handle "Launch them now" and "Landing now" button clicks

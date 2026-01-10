@@ -1,5 +1,6 @@
 {% load static %}
 {% load member_extras %}
+{% load siteconfig_tags %}
 
 <!-- Include CSS for this modal -->
 <link rel="stylesheet" href="{% static 'css/flight-forms.css' %}">
@@ -249,8 +250,14 @@
           </label>
           <div class="input-group">
             {{ form.release_altitude }}
-            <button type="button" class="btn btn-outline-info btn-sm" id="alt-2k-btn">2K</button>
-            <button type="button" class="btn btn-outline-info btn-sm" id="alt-3k-btn">3K</button>
+            {% get_siteconfig as siteconfig %}
+            {% for alt_value, alt_label in siteconfig.get_quick_altitude_list %}
+              <button type="button" class="btn btn-outline-info btn-sm altitude-quick-btn" data-altitude="{{ alt_value }}">{{ alt_label }}</button>
+            {% empty %}
+              {# Fallback if no config exists #}
+              <button type="button" class="btn btn-outline-info btn-sm altitude-quick-btn" data-altitude="2000">2K</button>
+              <button type="button" class="btn btn-outline-info btn-sm altitude-quick-btn" data-altitude="3000">3K</button>
+            {% endfor %}
             {% if form.release_altitude.errors %}
               <div class="invalid-feedback">
                 {% for error in form.release_altitude.errors %}{{ error }}{% endfor %}
