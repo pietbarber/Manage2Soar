@@ -12,7 +12,7 @@ COPY requirements.txt ./
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends ca-certificates build-essential libpq-dev curl gnupg \
+    && apt-get install -y --no-install-recommends ca-certificates build-essential libpq-dev libffi-dev curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
