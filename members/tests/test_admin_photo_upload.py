@@ -129,3 +129,33 @@ class TestAdminPhotoUpload:
 
             # Should NOT call generate_profile_thumbnails
             mock_generate_thumbnails.assert_not_called()
+
+    def test_save_model_raises_validation_error_on_processing_failure(
+        self, member_admin, test_member
+    ):
+        """Verify ValidationError is raised when thumbnail generation fails."""
+        from django.core.exceptions import ValidationError
+
+        request = MagicMock()
+        form = MagicMock()
+        form.changed_data = ["profile_photo"]
+
+        # Create a test image and attach to member
+        test_image = create_test_image(400, 400)
+        test_member.profile_photo = test_image
+
+        with patch(
+            "members.admin.generate_profile_thumbnails"
+        ) as mock_generate_thumbnails:
+            # Simulate thumbnail generation failure
+            mock_generate_thumbnails.side_effect = ValueError(
+                "Invalid image format or aspect ratio"
+            )
+
+            # Should raise ValidationError with helpful message
+            with pytest.raises(ValidationError) as exc_info:
+                member_admin.save_model(request, test_member, form, change=True)
+
+            # Verify error message is helpful for admins
+            assert "Photo processing failed" in str(exc_info.value)
+            assert "Invalid image format" in str(exc_info.value)
