@@ -188,7 +188,7 @@ def kiosk_bind_device(request, token):
     # Store token in cookie for auto-reauth (1 year expiry)
     response.set_cookie(
         "kiosk_token",
-        token,
+        kiosk_token.token,  # Use DB value, not user-supplied parameter
         max_age=365 * 24 * 60 * 60,
         httponly=False,  # JS needs to read this for fingerprint verification
         samesite="Lax",
@@ -272,7 +272,7 @@ def kiosk_verify_device(request, token):
 
     response.set_cookie(
         "kiosk_token",
-        token,
+        kiosk_token.token,  # Use DB value, not user-supplied parameter
         max_age=365 * 24 * 60 * 60,
         httponly=False,
         samesite="Lax",
