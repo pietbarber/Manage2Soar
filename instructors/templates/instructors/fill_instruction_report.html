@@ -434,6 +434,23 @@ function isSafeImageUrl(url) {
   return false;
 }
 
+/**
+ * Sanitizes text for use in HTML attributes.
+ * Escapes characters that could be interpreted as HTML entities.
+ * Note: This is defense-in-depth; textContent is already safe text.
+ * @param {string} text - The text to sanitize
+ * @returns {string} - Sanitized text safe for attribute values
+ */
+function escapeForAttribute(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // Enhanced qualification dropdown with icons
 document.addEventListener('DOMContentLoaded', function() {
   const qualSelect = document.querySelector('.qualification-select');
@@ -456,9 +473,11 @@ document.addEventListener('DOMContentLoaded', function() {
           this.parentNode.appendChild(iconPreview);
         }
         iconPreview.src = iconUrl;
-        iconPreview.setAttribute('alt', selectedOption.textContent);
+        // Use escapeForAttribute for defense-in-depth (textContent is already safe)
+        const safeText = escapeForAttribute(selectedOption.textContent);
+        iconPreview.setAttribute('alt', safeText);
         iconPreview.style.display = 'inline-block';
-        iconPreview.setAttribute('title', selectedOption.textContent);
+        iconPreview.setAttribute('title', safeText);
       } else {
         const iconPreview = document.getElementById('qualification-icon-preview');
         if (iconPreview) {

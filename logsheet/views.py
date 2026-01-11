@@ -26,6 +26,31 @@ from .forms import (
     MaintenanceIssueForm,
     TowplaneCloseoutFormSet,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def get_validation_message(validation_error):
+    """
+    Extract user-facing message from a Django ValidationError.
+
+    This helper ensures we only expose the message text, not any
+    internal exception details. ValidationError messages are designed
+    to be shown to users (e.g., "This glider is already scheduled...").
+
+    Args:
+        validation_error: Django ValidationError instance
+
+    Returns:
+        str: The user-facing error message
+    """
+    if hasattr(validation_error, "message"):
+        return str(validation_error.message)
+    if hasattr(validation_error, "messages") and validation_error.messages:
+        return "; ".join(validation_error.messages)
+    return str(validation_error)
+
+
 from .models import (
     AircraftMeister,
     Flight,
@@ -121,8 +146,10 @@ def land_flight_now(request, flight_id):
                 flight, flight.glider, flight.launch_time, landing_time
             )
         except ValidationError as e:
-            # ValidationError is user-facing and safe to expose (not a stack trace)
-            return JsonResponse({"success": False, "error": str(e)}, status=400)
+            # Use helper to extract only user-facing message (not stack trace)
+            return JsonResponse(
+                {"success": False, "error": get_validation_message(e)}, status=400
+            )
 
         flight.landing_time = landing_time
         flight.save(update_fields=["landing_time"])
@@ -168,8 +195,10 @@ def launch_flight_now(request, flight_id):
                 flight, flight.glider, launch_time, flight.landing_time
             )
         except ValidationError as e:
-            # ValidationError is user-facing and safe to expose (not a stack trace)
-            return JsonResponse({"success": False, "error": str(e)}, status=400)
+            # Use helper to extract only user-facing message (not stack trace)
+            return JsonResponse(
+                {"success": False, "error": get_validation_message(e)}, status=400
+            )
 
         flight.launch_time = launch_time
         flight.save(update_fields=["launch_time"])
