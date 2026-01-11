@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1
-Authlib==1.6.5
+Authlib==1.6.6
 bandit==1.8.6
 black==25.9.0
 boolean.py==5.0
@@ -29,7 +29,7 @@ django-storages==1.14.6
 django-tinymce==4.1.0
 django-widget-tweaks==1.5.0
 dparse==0.6.4
-filelock==3.20.1
+filelock==3.20.3
 flake8==7.3.0
 google-api-core==2.25.1
 google-api-python-client==2.182.0

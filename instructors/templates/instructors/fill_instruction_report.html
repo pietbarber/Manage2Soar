@@ -307,6 +307,7 @@
   <i class="bi bi-chevron-up"></i>
 </button>
 
+<script src="{% static 'instructors/js/security-helpers.js' %}"></script>
 <script>
 // Show/hide back to top button
 window.addEventListener('scroll', function() {
@@ -393,48 +394,8 @@ function submitFlightInstruction() {
   return true; // Allow form submission
 }
 
-// Validate URL is safe (relative path, http/https, or limited data:image/* formats)
-function isSafeImageUrl(url) {
-  if (!url || typeof url !== 'string') return false;
-  url = url.trim();
-  if (!url) return false;
-
-  // Allow relative paths (no protocol)
-  if (url.startsWith('/') || url.startsWith('./')) return true;
-
-  // Allow http/https URLs
-  if (url.startsWith('http://') || url.startsWith('https://')) return true;
-
-  // Allow only specific safe data: URLs for inline images (explicitly exclude SVG)
-  const lowerUrl = url.toLowerCase();
-  if (lowerUrl.startsWith('data:image/')) {
-    const allowedDataPrefixes = [
-      'data:image/png;',
-      'data:image/png,',
-      'data:image/jpeg;',
-      'data:image/jpeg,',
-      'data:image/jpg;',
-      'data:image/jpg,',
-      'data:image/gif;',
-      'data:image/gif,',
-      'data:image/webp;',
-      'data:image/webp,',
-    ];
-
-    for (const prefix of allowedDataPrefixes) {
-      if (lowerUrl.startsWith(prefix)) {
-        return true;
-      }
-    }
-
-    // Any other data:image/* (including SVG) is not allowed
-    return false;
-  }
-
-  return false;
-}
-
 // Enhanced qualification dropdown with icons
+// Note: isSafeImageUrl and escapeForAttribute are loaded from security-helpers.js
 document.addEventListener('DOMContentLoaded', function() {
   const qualSelect = document.querySelector('.qualification-select');
   if (qualSelect) {
@@ -456,9 +417,11 @@ document.addEventListener('DOMContentLoaded', function() {
           this.parentNode.appendChild(iconPreview);
         }
         iconPreview.src = iconUrl;
-        iconPreview.setAttribute('alt', selectedOption.textContent);
+        // Use escapeForAttribute for defense-in-depth (textContent is already safe)
+        const safeText = escapeForAttribute(selectedOption.textContent);
+        iconPreview.setAttribute('alt', safeText);
         iconPreview.style.display = 'inline-block';
-        iconPreview.setAttribute('title', selectedOption.textContent);
+        iconPreview.setAttribute('title', safeText);
       } else {
         const iconPreview = document.getElementById('qualification-icon-preview');
         if (iconPreview) {
