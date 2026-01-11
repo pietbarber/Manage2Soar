@@ -157,10 +157,23 @@ class GliderAdmin(AdminHelperMixin, admin.ModelAdmin):
                 )
             },
         ),
+        (
+            "Ownership",
+            {
+                "fields": ("owners",),
+                "description": "Select members who own this glider (for privately-owned gliders)",
+            },
+        ),
         ("Photo", {"fields": ("photo", "photo_preview")}),
         (
-            "100hr Inspection",
-            {"fields": ("requires_100hr_inspection", "next_100hr_due")},
+            "Maintenance & Hours",
+            {
+                "fields": (
+                    "initial_hours",
+                    "requires_100hr_inspection",
+                    "next_100hr_due",
+                )
+            },
         ),
     )
 
