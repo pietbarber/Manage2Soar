@@ -15,7 +15,7 @@ from tinymce.widgets import TinyMCE
 
 from utils.admin_helpers import AdminHelperMixin
 
-from .models import Badge, Biography, Member, MemberBadge
+from .models import Badge, Biography, KioskAccessLog, KioskToken, Member, MemberBadge
 from .models_applications import MembershipApplication
 from .utils.image_processing import generate_profile_thumbnails
 
@@ -729,3 +729,187 @@ class MembershipApplicationAdmin(AdminHelperMixin, VersionAdmin, admin.ModelAdmi
         "Applications are never deleted to preserve club records. Use the web interface at "
         "/members/applications/ for application review workflow."
     )
+
+
+# =============================================================================
+# Kiosk Token Admin (Issue #364)
+# =============================================================================
+
+
+@admin.register(KioskToken)
+class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
+    """Admin interface for managing kiosk authentication tokens."""
+
+    list_display = (
+        "name",
+        "user",
+        "is_active",
+        "is_device_bound_display",
+        "last_used_at",
+        "created_at",
+    )
+    list_filter = ("is_active", "landing_page")
+    search_fields = ("name", "user__username", "user__first_name", "user__last_name")
+    readonly_fields = (
+        "token",
+        "device_fingerprint",
+        "created_at",
+        "last_used_at",
+        "last_used_ip",
+        "magic_url_display",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("name", "user", "is_active", "landing_page"),
+            },
+        ),
+        (
+            "Magic URL",
+            {
+                "fields": ("magic_url_display",),
+                "description": "Bookmark this URL on the kiosk device for passwordless access.",
+            },
+        ),
+        (
+            "Device Binding",
+            {
+                "fields": ("device_fingerprint",),
+                "description": "Device fingerprint is set automatically on first use.",
+            },
+        ),
+        (
+            "Usage Tracking",
+            {
+                "fields": ("last_used_at", "last_used_ip", "created_at"),
+            },
+        ),
+        (
+            "Notes",
+            {
+                "fields": ("notes",),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+    actions = ["revoke_tokens", "regenerate_tokens", "unbind_devices"]
+
+    @admin.display(description="Device Bound", boolean=True)
+    def is_device_bound_display(self, obj):
+        return obj.is_device_bound()
+
+    @admin.display(description="Magic URL")
+    def magic_url_display(self, obj):
+        if obj.pk:
+            from django.conf import settings
+            from django.contrib.sites.models import Site
+
+            try:
+                current_site = Site.objects.get_current()
+                domain = current_site.domain
+            except Site.DoesNotExist:
+                domain = "[Configure Django Sites framework]"
+
+            # Determine protocol for magic URL display
+            # Prefer SECURE_SSL_REDIRECT setting over DEBUG flag to handle
+            # staging/internal deployments correctly
+            if getattr(settings, "SECURE_SSL_REDIRECT", False):
+                protocol = "https"
+            elif settings.DEBUG:
+                protocol = "http"
+            else:
+                # Production without SSL redirect (e.g., behind load balancer)
+                protocol = "https"
+
+            url = obj.get_magic_url()
+            full_url = f"{protocol}://{domain}{url}"
+            return format_html(
+                '<a href="{url}" target="_blank">{url}</a><br>'
+                '<small class="text-muted">Copy this URL and bookmark it on the kiosk device.</small>',
+                url=full_url,
+            )
+        return "Save to generate URL"
+
+    @admin.action(description="Revoke selected tokens")
+    def revoke_tokens(self, request, queryset):
+        count = queryset.update(is_active=False)
+        self.message_user(request, f"Revoked {count} kiosk token(s).")
+
+    @admin.action(description="Regenerate tokens (new URLs)")
+    def regenerate_tokens(self, request, queryset):
+        count = 0
+        for token in queryset:
+            token.regenerate_token()
+            count += 1
+        self.message_user(
+            request,
+            f"Regenerated {count} token(s). Update bookmarks on affected devices.",
+        )
+
+    @admin.action(description="Unbind devices (allow re-binding)")
+    def unbind_devices(self, request, queryset):
+        count = queryset.update(device_fingerprint=None)
+        self.message_user(
+            request,
+            f"Unbound {count} device(s). Tokens can now be bound to new devices.",
+        )
+
+    admin_helper_message = (
+        "Kiosk Tokens: Manage passwordless authentication for dedicated kiosk devices. "
+        "Each token is bound to a specific device fingerprint for security. "
+        "Use 'Regenerate tokens' if a token URL is compromised, or 'Unbind devices' "
+        "to allow a token to be used on a replacement device."
+    )
+
+
+@admin.register(KioskAccessLog)
+class KioskAccessLogAdmin(admin.ModelAdmin):
+    """Admin interface for viewing kiosk access audit logs."""
+
+    list_display = (
+        "timestamp",
+        "kiosk_token",
+        "status",
+        "ip_address",
+        "short_fingerprint",
+    )
+    list_filter = ("status", "timestamp", "kiosk_token")
+    search_fields = ("token_value", "ip_address", "user_agent", "details")
+    readonly_fields = (
+        "kiosk_token",
+        "token_value",
+        "timestamp",
+        "ip_address",
+        "user_agent",
+        "device_fingerprint",
+        "status",
+        "details",
+    )
+    date_hierarchy = "timestamp"
+    ordering = ("-timestamp",)
+
+    def has_add_permission(self, request):
+        """Logs are created automatically, not manually."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Logs are read-only."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """
+        Prevent deletion of kiosk access audit logs via admin.
+
+        Audit logs are intended to be append-only to preserve the integrity of
+        security investigations. If cleanup or retention management is needed,
+        it should be implemented via a controlled archival/retention process
+        (e.g., management command), not ad-hoc admin deletions.
+        """
+        return False
+
+    @admin.display(description="Fingerprint")
+    def short_fingerprint(self, obj):
+        if obj.device_fingerprint:
+            return obj.device_fingerprint[:12] + "..."
+        return "-"

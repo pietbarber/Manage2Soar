@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Kiosk Access{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        {{ title }}
+                    </h4>
+                </div>
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-shield-x text-danger" style="font-size: 4rem;"></i>
+                    <p class="lead mt-4">{{ message }}</p>
+                    <hr>
+                    <p class="text-muted small">
+                        If you believe this is an error, please contact the club administrator.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

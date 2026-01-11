@@ -263,3 +263,30 @@ def can_view_personal_info_tag(context, member):
     request = context.get("request")
     user = getattr(request, "user", None) if request else None
     return can_view_personal_info(user, member)
+
+
+@register.simple_tag(takes_context=True)
+def is_kiosk_session(context):
+    """
+    Check if the current session is a kiosk session (Issue #364).
+
+    Returns True if the user logged in via kiosk token, which means
+    we should hide the logout button and treat them specially.
+
+    Usage: {% is_kiosk_session as kiosk_mode %}
+           {% if not kiosk_mode %}...logout button...{% endif %}
+    """
+    request = context.get("request")
+    if not request:
+        return False
+
+    # Check if kiosk cookies are present
+    has_kiosk_token = bool(request.COOKIES.get("kiosk_token"))
+    has_kiosk_fingerprint = bool(request.COOKIES.get("kiosk_fingerprint"))
+
+    # Kiosk session is defined strictly by presence of kiosk cookies
+    # (Not by membership_status - that's set for the user account itself)
+    # Note: This only checks cookie presence, not validity or token active status.
+    # Revoked tokens may still show "(Kiosk)" indicator until cookies expire.
+    # This is acceptable for UI purposes - middleware handles actual authentication.
+    return has_kiosk_token and has_kiosk_fingerprint

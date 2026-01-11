@@ -97,6 +97,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "utils.middleware.KioskAutoLoginMiddleware",  # Issue #364: Kiosk auto-reauth
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -441,12 +442,24 @@ if not DEBUG:
         "1",
         "yes",
     )
+
+    # Secure kiosk cookies - only sent over HTTPS (Issue #364)
+    KIOSK_COOKIE_SECURE = os.getenv("KIOSK_COOKIE_SECURE", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 else:
     # Development settings - disable all HTTPS enforcement
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    # KIOSK_COOKIE_SECURE should be True in production to prevent session hijacking
+    # WARNING: Deploying with DEBUG=True in production will set this to False,
+    # creating a security vulnerability. Middleware logs warnings if cookies are
+    # sent over insecure connections.
+    KIOSK_COOKIE_SECURE = False
 
 
 LOGGING = {
