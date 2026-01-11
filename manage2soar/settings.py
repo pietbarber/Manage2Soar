@@ -442,12 +442,20 @@ if not DEBUG:
         "1",
         "yes",
     )
+
+    # Secure kiosk cookies - only sent over HTTPS (Issue #364)
+    KIOSK_COOKIE_SECURE = os.getenv("KIOSK_COOKIE_SECURE", "True").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 else:
     # Development settings - disable all HTTPS enforcement
     SECURE_HSTS_SECONDS = 0
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    KIOSK_COOKIE_SECURE = False
 
 
 LOGGING = {

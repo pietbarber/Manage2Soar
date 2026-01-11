@@ -401,7 +401,7 @@ class KioskAccessLogTests(TestCase):
 
     def test_access_log_created_on_failure(self):
         """Failed login attempt should create access log."""
-        response = self.client.get("/members/kiosk/nonexistent_token/")
+        self.client.get("/members/kiosk/nonexistent_token/")
 
         logs = KioskAccessLog.objects.filter(status="invalid_token")
         self.assertGreater(logs.count(), 0)
@@ -469,7 +469,6 @@ class KioskSecurityTests(TestCase):
         )
 
         old_url = token.get_magic_url()
-        old_token_value = token.token
 
         # Regenerate
         token.regenerate_token()

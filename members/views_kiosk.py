@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 
+from django.conf import settings
 from django.contrib.auth import login
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -203,7 +204,7 @@ def kiosk_bind_device(request, token):
         max_age=365 * 24 * 60 * 60,
         httponly=True,  # Protect from XSS - JS doesn't need to read this
         samesite="Lax",
-        secure=request.is_secure(),
+        secure=settings.KIOSK_COOKIE_SECURE,
     )
 
     # Store fingerprint hash in cookie for verification
@@ -213,7 +214,7 @@ def kiosk_bind_device(request, token):
         max_age=365 * 24 * 60 * 60,
         httponly=True,
         samesite="Lax",
-        secure=request.is_secure(),
+        secure=settings.KIOSK_COOKIE_SECURE,
     )
 
     return response
@@ -284,7 +285,7 @@ def kiosk_verify_device(request, token):
         max_age=365 * 24 * 60 * 60,
         httponly=True,  # Protect from XSS - JS doesn't need to read this
         samesite="Lax",
-        secure=request.is_secure(),
+        secure=settings.KIOSK_COOKIE_SECURE,
     )
 
     response.set_cookie(
@@ -293,7 +294,7 @@ def kiosk_verify_device(request, token):
         max_age=365 * 24 * 60 * 60,
         httponly=True,
         samesite="Lax",
-        secure=request.is_secure(),
+        secure=settings.KIOSK_COOKIE_SECURE,
     )
 
     return response
