@@ -46,7 +46,7 @@ def log_kiosk_access(
         kiosk_token=kiosk_token,
         token_value=token_value[:64] if token_value else "",
         ip_address=get_client_ip(request),
-        user_agent=request.headers.get("user-agent", "")[:500],
+        user_agent=request.headers.get("user-agent", "")[:256],
         device_fingerprint=fingerprint[:64] if fingerprint else "",
         status=status,
         details=details,
@@ -69,13 +69,13 @@ def kiosk_login(request, token):
         kiosk_token = KioskToken.objects.get(token=token)
     except KioskToken.DoesNotExist:
         log_kiosk_access(token, None, request, "invalid_token")
-        logger.warning(f"Invalid kiosk token attempted: {token[:16]}...")
+        logger.warning("Invalid kiosk token attempted: %s", token[:16])
         return render(
             request,
             "members/kiosk/error.html",
             {
-                "title": "Invalid Token",
-                "message": "This kiosk access link is invalid or has expired.",
+                "title": "Access Denied",
+                "message": "This kiosk access link is not available.",
             },
             status=403,
         )
@@ -83,13 +83,13 @@ def kiosk_login(request, token):
     # Check if token is active
     if not kiosk_token.is_active:
         log_kiosk_access(token, kiosk_token, request, "inactive_token")
-        logger.warning(f"Inactive kiosk token attempted: {kiosk_token.name}")
+        logger.warning("Inactive kiosk token attempted: %s", kiosk_token.name)
         return render(
             request,
             "members/kiosk/error.html",
             {
-                "title": "Token Revoked",
-                "message": "This kiosk access link has been revoked by an administrator.",
+                "title": "Access Denied",
+                "message": "This kiosk access link is not available.",
             },
             status=403,
         )
@@ -133,7 +133,7 @@ def kiosk_bind_device(request, token):
             token=token, is_active=True
         )
     except KioskToken.DoesNotExist:
-        return JsonResponse({"error": "Invalid or inactive token"}, status=403)
+        return JsonResponse({"error": "Access denied"}, status=403)
 
     # Get fingerprint from request
     try:
@@ -160,9 +160,7 @@ def kiosk_bind_device(request, token):
                 "Attempted to rebind to different device",
             )
             logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
-            return JsonResponse(
-                {"error": "This token is bound to a different device"}, status=403
-            )
+            return JsonResponse({"error": "Device verification failed"}, status=403)
     else:
         # Bind the device
         kiosk_token.bind_device(fingerprint_hash)
@@ -172,7 +170,7 @@ def kiosk_bind_device(request, token):
             request,
             "bound",
             fingerprint_hash,
-            f"Device bound: {request.headers.get('user-agent', '')[:200]}",
+            f"Device bound: {request.headers.get('user-agent', '')[:100]}",
         )
         logger.info("Device bound to kiosk token: %s", kiosk_token.name)
 
@@ -232,7 +230,7 @@ def kiosk_verify_device(request, token):
     try:
         kiosk_token = KioskToken.objects.get(token=token, is_active=True)
     except KioskToken.DoesNotExist:
-        return JsonResponse({"error": "Invalid or inactive token"}, status=403)
+        return JsonResponse({"error": "Access denied"}, status=403)
 
     # Get fingerprint from request
     try:
@@ -258,9 +256,7 @@ def kiosk_verify_device(request, token):
             "Device verification failed",
         )
         logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
-        return JsonResponse(
-            {"error": "This token is bound to a different device"}, status=403
-        )
+        return JsonResponse({"error": "Device verification failed"}, status=403)
 
     # Log the user in
     user = kiosk_token.user
