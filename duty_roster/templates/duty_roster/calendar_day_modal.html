@@ -199,7 +199,7 @@
   </div>
   {% endif %}
 
-  {# Student Instruction Request Button - NO checkbox, just the button #}
+  {# Student Instruction Request Form with type checkboxes and notes #}
   {% if user.is_authenticated and assignment.instructor and day >= today %}
     {% if user_has_instruction_request %}
     <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
