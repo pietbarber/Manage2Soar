@@ -490,7 +490,7 @@ class KioskToken(models.Model):
         max_length=64,
         unique=True,
         editable=False,
-        help_text="Cryptographic token for magic URL (auto-generated, 64 chars = ~256 bits entropy from secrets.token_urlsafe(48))",
+        help_text="Cryptographic token for magic URL (auto-generated, 64 chars = ~288 bits entropy from secrets.token_urlsafe(48))",
     )
     name = models.CharField(
         max_length=100,

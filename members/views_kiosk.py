@@ -89,7 +89,7 @@ def kiosk_login(request, token):
             "members/kiosk/error.html",
             {
                 "title": "Access Denied",
-                "message": "This kiosk access link is not available.",
+                "message": "This kiosk access link has been disabled. Please contact an administrator.",
             },
             status=403,
         )
@@ -127,8 +127,8 @@ def kiosk_bind_device(request, token):
     the device fingerprint.
     """
     try:
-        # Use select_for_update() to prevent TOCTOU race condition
-        # Lock the row until transaction commits
+        # Use select_for_update() to prevent concurrent binding attempts
+        # Lock the row for this token until the surrounding transaction commits
         kiosk_token = KioskToken.objects.select_for_update().get(
             token=token, is_active=True
         )
@@ -208,10 +208,9 @@ def kiosk_bind_device(request, token):
     )
 
     # Store fingerprint hash in cookie for verification
-    # Assert fingerprint exists (guaranteed after bind_device call)
-    assert (
-        kiosk_token.device_fingerprint is not None
-    ), "Fingerprint must be set after binding"
+    # Ensure fingerprint exists (guaranteed after bind_device call)
+    if kiosk_token.device_fingerprint is None:
+        raise RuntimeError("Fingerprint must be set after binding")
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after binding

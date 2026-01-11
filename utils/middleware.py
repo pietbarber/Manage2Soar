@@ -73,19 +73,15 @@ class KioskAutoLoginMiddleware:
         # Import here to avoid circular imports
         from members.models import KioskAccessLog, KioskToken
 
-        # Cache token lookup on request to prevent duplicate queries
-        cache_key = f"_kiosk_token_{token_value}"
-        if hasattr(request, cache_key):
-            kiosk_token = getattr(request, cache_key)
-        else:
-            try:
-                kiosk_token = KioskToken.objects.select_related("user").get(
-                    token=token_value, is_active=True
-                )
-                setattr(request, cache_key, kiosk_token)
-            except KioskToken.DoesNotExist:
-                logger.debug("Kiosk auto-login failed: invalid token")
-                return None
+        # Look up the kiosk token for this request
+        try:
+            kiosk_token = KioskToken.objects.select_related("user").get(
+                token=token_value,
+                is_active=True,
+            )
+        except KioskToken.DoesNotExist:
+            logger.debug("Kiosk auto-login failed: invalid token")
+            return None
 
         # Validate fingerprint matches
         if not kiosk_token.validate_fingerprint(fingerprint_hash):

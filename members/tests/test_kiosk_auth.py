@@ -336,7 +336,7 @@ class KioskAutoLoginMiddlewareTests(TestCase):
         client.cookies["kiosk_fingerprint"] = self.fingerprint_hash
 
         # Access a protected page (member list requires authentication)
-        response = client.get("/members/", follow=True)
+        client.get("/members/", follow=True)
 
         # Should be authenticated now
         user = get_user(client)
@@ -444,7 +444,7 @@ class KioskSecurityTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("different device", response.json()["error"])
+        self.assertIn("Device verification failed", response.json()["error"])
 
     def test_revoked_token_cannot_authenticate(self):
         """Revoked token should not allow authentication."""
@@ -458,7 +458,11 @@ class KioskSecurityTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, "revoked", status_code=403)
+        self.assertContains(
+            response,
+            "This kiosk access link is not available.",
+            status_code=403,
+        )
 
     def test_token_regeneration_invalidates_old_url(self):
         """After regeneration, old URL should not work."""
