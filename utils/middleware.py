@@ -78,7 +78,7 @@ class KioskAutoLoginMiddleware:
                 token=token_value, is_active=True
             )
         except KioskToken.DoesNotExist:
-            logger.debug(f"Kiosk auto-login failed: invalid token")
+            logger.debug("Kiosk auto-login failed: invalid token")
             return None
 
         # Validate fingerprint matches

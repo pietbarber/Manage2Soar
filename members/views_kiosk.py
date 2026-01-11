@@ -145,7 +145,7 @@ def kiosk_bind_device(request, token):
                 fingerprint_hash,
                 "Attempted to rebind to different device",
             )
-            logger.warning(f"Fingerprint mismatch for kiosk token: {kiosk_token.name}")
+            logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
             return JsonResponse(
                 {"error": "This token is bound to a different device"}, status=403
             )
@@ -160,7 +160,7 @@ def kiosk_bind_device(request, token):
             fingerprint_hash,
             f"Device bound: {request.headers.get('user-agent', '')[:200]}",
         )
-        logger.info(f"Device bound to kiosk token: {kiosk_token.name}")
+        logger.info("Device bound to kiosk token: %s", kiosk_token.name)
 
     # Log the user in
     user = kiosk_token.user
@@ -244,7 +244,7 @@ def kiosk_verify_device(request, token):
             fingerprint_hash,
             "Device verification failed",
         )
-        logger.warning(f"Fingerprint mismatch for kiosk token: {kiosk_token.name}")
+        logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
         return JsonResponse(
             {"error": "This token is bound to a different device"}, status=403
         )

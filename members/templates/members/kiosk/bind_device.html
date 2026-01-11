@@ -127,9 +127,11 @@
         }
 
         // Audio context fingerprint
+        let audioContext = null;
+        let oscillator = null;
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioContext.createOscillator();
             const analyser = audioContext.createAnalyser();
             const gainNode = audioContext.createGain();
             const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -143,10 +145,16 @@
 
             oscillator.start(0);
             components.push(audioContext.sampleRate);
-            oscillator.stop();
-            audioContext.close();
         } catch (e) {
             components.push('audio-error');
+        } finally {
+            // Ensure cleanup even if error occurs
+            try {
+                if (oscillator) oscillator.stop();
+                if (audioContext) audioContext.close();
+            } catch (cleanupError) {
+                // Ignore cleanup errors
+            }
         }
 
         // Combine all components into a single string
