@@ -1,6 +1,5 @@
 """Tests for validation helper functions in logsheet.views."""
 
-import pytest
 from django.core.exceptions import ValidationError
 
 from logsheet.views import get_validation_message
