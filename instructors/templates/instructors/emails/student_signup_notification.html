@@ -78,6 +78,39 @@
                         </td>
                     </tr>
 
+                    {% if instruction_types_display or student_notes %}
+                    <!-- Instruction Request Details card -->
+                    <tr>
+                        <td style="padding: 0 24px 16px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fefcbf; border-radius: 6px; border-left: 4px solid #d69e2e;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h2 style="margin: 0 0 12px 0; color: #744210; font-size: 18px; font-weight: 600;">
+                                            Request Details
+                                        </h2>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            {% if instruction_types_display %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px; width: 140px; vertical-align: top;">Type(s):</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 500;">
+                                                    {{ instruction_types_display }}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if student_notes %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px; vertical-align: top;">Notes:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px;">{{ student_notes }}</td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
                     {% if is_rated_pilot %}
                     <!-- Rated pilot currency card -->
                     <tr>

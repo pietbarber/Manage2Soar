@@ -150,6 +150,17 @@ class InstructionSlot(models.Model):
     4. If rejected, student is notified and can try another date
     """
 
+    # Instruction type choices - what kind of instruction the student wants
+    INSTRUCTION_TYPE_CHOICES = [
+        ("field_check", "Field Check"),
+        ("general", "General Instruction"),
+        ("flight_review", "Flight Review (BFR)"),
+        ("wings", "WINGS Program"),
+        ("pre_solo", "Pre-Solo Practice"),
+        ("checkride_prep", "Checkride Preparation"),
+        ("other", "Other (see notes)"),
+    ]
+
     assignment = models.ForeignKey(
         "DutyAssignment", on_delete=models.CASCADE, related_name="instruction_slots"
     )
@@ -163,6 +174,17 @@ class InstructionSlot(models.Model):
         on_delete=models.SET_NULL,
         related_name="assigned_students",
         help_text="The instructor assigned to work with this student",
+    )
+
+    # Student's instruction request details
+    instruction_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of instruction types requested (e.g., ['field_check', 'general'])",
+    )
+    student_notes = models.TextField(
+        blank=True,
+        help_text="Additional notes from student about what they want to work on",
     )
 
     # Student's request status (from student's perspective)
@@ -209,6 +231,18 @@ class InstructionSlot(models.Model):
 
     def __str__(self):
         return f"{self.student.full_display_name} for {self.assignment.date} ({self.status})"
+
+    def get_instruction_types_display(self):
+        """Return human-readable list of instruction types requested."""
+        type_map = dict(self.INSTRUCTION_TYPE_CHOICES)
+        return [type_map.get(t, t) for t in self.instruction_types]
+
+    def get_instruction_types_text(self):
+        """Return comma-separated string of instruction types."""
+        types = self.get_instruction_types_display()
+        if not types:
+            return "Not specified"
+        return ", ".join(types)
 
     def accept(self, instructor, note=""):
         """Instructor accepts this student's request."""

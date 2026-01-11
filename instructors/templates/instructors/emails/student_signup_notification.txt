@@ -11,7 +11,13 @@ Name: {{ student.full_display_name }}
 {% if student.email %}Email: {{ student.email }}
 {% endif %}{% if student.phone %}Phone: {{ student.phone }}
 {% endif %}
-{% if is_rated_pilot %}
+{% if instruction_types_display or student_notes %}
+REQUEST DETAILS
+---------------
+{% if instruction_types_display %}Type(s): {{ instruction_types_display }}
+{% endif %}{% if student_notes %}Notes: {{ student_notes }}
+{% endif %}
+{% endif %}{% if is_rated_pilot %}
 FLIGHT CURRENCY
 ---------------
 {% if last_flight_date %}Last Flight: {{ last_flight_date|date:"M d, Y" }}

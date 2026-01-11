@@ -407,7 +407,9 @@ def calendar_day_detail(request, year, month, day):
 
     # Check if user already has a non-cancelled instruction request for this day
     user_has_instruction_request = False
+    instruction_request_form = None
     if request.user.is_authenticated and assignment:
+        from .forms import InstructionRequestForm
         from .models import InstructionSlot
 
         user_has_instruction_request = (
@@ -418,6 +420,16 @@ def calendar_day_detail(request, year, month, day):
             .exclude(status="cancelled")
             .exists()
         )
+
+        # Only show form if user doesn't already have a request and an instructor is assigned
+        if (
+            not user_has_instruction_request
+            and (assignment.instructor or assignment.surge_instructor)
+            and day_date >= date.today()
+        ):
+            instruction_request_form = InstructionRequestForm(
+                assignment=assignment, student=request.user
+            )
 
     return render(
         request,
@@ -434,6 +446,7 @@ def calendar_day_detail(request, year, month, day):
             "show_tow_surge_alert": show_tow_surge_alert,
             "today": date.today(),
             "user_has_instruction_request": user_has_instruction_request,
+            "instruction_request_form": instruction_request_form,
         },
     )
 
