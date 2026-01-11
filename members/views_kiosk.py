@@ -190,7 +190,7 @@ def kiosk_bind_device(request, token):
         "kiosk_token",
         kiosk_token.token,  # Use DB value, not user-supplied parameter
         max_age=365 * 24 * 60 * 60,
-        httponly=False,  # JS needs to read this for fingerprint verification
+        httponly=True,  # Protect from XSS - JS doesn't need to read this
         samesite="Lax",
         secure=request.is_secure(),
     )
@@ -274,7 +274,7 @@ def kiosk_verify_device(request, token):
         "kiosk_token",
         kiosk_token.token,  # Use DB value, not user-supplied parameter
         max_age=365 * 24 * 60 * 60,
-        httponly=False,
+        httponly=True,  # Protect from XSS - JS doesn't need to read this
         samesite="Lax",
         secure=request.is_secure(),
     )

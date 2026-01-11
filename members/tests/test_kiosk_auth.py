@@ -58,7 +58,6 @@ class KioskTokenModelTests(TestCase):
             device_fingerprint="abc123",
         )
         old_token = token.token
-        old_fingerprint = token.device_fingerprint
 
         new_token = token.regenerate_token()
 
@@ -477,7 +476,7 @@ class KioskSecurityTests(TestCase):
         token.regenerate_token()
 
         # Old URL should fail
-        response = self.client.get(f"/members/kiosk/{old_token_value}/")
+        response = self.client.get(old_url)
         self.assertEqual(response.status_code, 403)
 
         # New URL should work

@@ -807,7 +807,7 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
             try:
                 current_site = Site.objects.get_current()
                 domain = current_site.domain
-            except Exception:
+            except Site.DoesNotExist:
                 domain = "your-domain.com"
 
             url = obj.get_magic_url()

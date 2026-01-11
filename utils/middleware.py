@@ -2,7 +2,6 @@
 Custom middleware for health checks and other utilities.
 """
 
-import hashlib
 import logging
 
 from django.conf import settings

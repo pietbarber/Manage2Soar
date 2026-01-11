@@ -284,12 +284,6 @@ def is_kiosk_session(context):
     has_kiosk_token = bool(request.COOKIES.get("kiosk_token"))
     has_kiosk_fingerprint = bool(request.COOKIES.get("kiosk_fingerprint"))
 
-    # Also check if user is a Role Account (belt and suspenders)
-    user = getattr(request, "user", None)
-    is_role_account = (
-        user
-        and user.is_authenticated
-        and getattr(user, "membership_status", None) == "Role Account"
-    )
-
-    return (has_kiosk_token and has_kiosk_fingerprint) or is_role_account
+    # Kiosk session is defined strictly by presence of kiosk cookies
+    # (Not by membership_status - that's set for the user account itself)
+    return has_kiosk_token and has_kiosk_fingerprint
