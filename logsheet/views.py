@@ -26,6 +26,20 @@ from .forms import (
     MaintenanceIssueForm,
     TowplaneCloseoutFormSet,
 )
+from .models import (
+    AircraftMeister,
+    Flight,
+    Glider,
+    Logsheet,
+    LogsheetCloseout,
+    LogsheetPayment,
+    MaintenanceDeadline,
+    MaintenanceIssue,
+    MemberCharge,
+    RevisionLog,
+    Towplane,
+    TowplaneCloseout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,29 +58,11 @@ def get_validation_message(validation_error):
     Returns:
         str: The user-facing error message
     """
-    if hasattr(validation_error, "message"):
-        return str(validation_error.message)
+    # Access .messages directly - Django ValidationError always has this
     if hasattr(validation_error, "messages") and validation_error.messages:
-        return "; ".join(validation_error.messages)
-    return str(validation_error)
-
-
-from .models import (
-    AircraftMeister,
-    Flight,
-    Glider,
-    Logsheet,
-    LogsheetCloseout,
-    LogsheetPayment,
-    MaintenanceDeadline,
-    MaintenanceIssue,
-    MemberCharge,
-    RevisionLog,
-    Towplane,
-    TowplaneCloseout,
-)
-
-logger = logging.getLogger(__name__)
+        return "; ".join(str(m) for m in validation_error.messages)
+    # Fallback: generic message instead of str(exception) to avoid stack trace exposure
+    return "Validation failed"
 
 
 @require_POST
