@@ -248,8 +248,13 @@
           <label for="{{ form.release_altitude.id_for_label }}" class="form-label fw-semibold">
             <i class="bi bi-graph-up me-1"></i>Release Altitude (AGL)
           </label>
-          <div class="input-group">
-            {{ form.release_altitude }}
+          {{ form.release_altitude }}
+          {% if form.release_altitude.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.release_altitude.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+          <div class="mt-2">
             {% get_siteconfig as siteconfig %}
             {% if siteconfig %}
               {% for alt_value, alt_label in siteconfig.get_quick_altitude_list %}
@@ -263,11 +268,6 @@
               {# Fallback if no config exists #}
               <button type="button" class="btn btn-outline-info btn-sm altitude-quick-btn" data-altitude="2000">2K</button>
               <button type="button" class="btn btn-outline-info btn-sm altitude-quick-btn" data-altitude="3000">3K</button>
-            {% endif %}
-            {% if form.release_altitude.errors %}
-              <div class="invalid-feedback">
-                {% for error in form.release_altitude.errors %}{{ error }}{% endfor %}
-              </div>
             {% endif %}
           </div>
           <div class="form-text">
