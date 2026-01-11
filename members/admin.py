@@ -803,13 +803,12 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
     def magic_url_display(self, obj):
         if obj.pk:
             from django.conf import settings
-            from django.contrib.sites.models import Site
 
-            try:
-                current_site = Site.objects.get_current()
-                domain = current_site.domain
-            except Site.DoesNotExist:
-                domain = "[Configure Django Sites framework]"
+            # Get domain from settings or use placeholder
+            # Note: We avoid django.contrib.sites to keep dependencies minimal
+            domain = getattr(settings, "ALLOWED_HOSTS", ["localhost"])[0]
+            if domain == "*":
+                domain = "localhost:8001" if settings.DEBUG else "example.com"
 
             # Determine protocol for magic URL display
             # Prefer SECURE_SSL_REDIRECT setting over DEBUG flag to handle
