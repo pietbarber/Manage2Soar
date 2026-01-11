@@ -73,13 +73,19 @@ class KioskAutoLoginMiddleware:
         # Import here to avoid circular imports
         from members.models import KioskAccessLog, KioskToken
 
-        try:
-            kiosk_token = KioskToken.objects.select_related("user").get(
-                token=token_value, is_active=True
-            )
-        except KioskToken.DoesNotExist:
-            logger.debug("Kiosk auto-login failed: invalid token")
-            return None
+        # Cache token lookup on request to prevent duplicate queries
+        cache_key = f"_kiosk_token_{token_value}"
+        if hasattr(request, cache_key):
+            kiosk_token = getattr(request, cache_key)
+        else:
+            try:
+                kiosk_token = KioskToken.objects.select_related("user").get(
+                    token=token_value, is_active=True
+                )
+                setattr(request, cache_key, kiosk_token)
+            except KioskToken.DoesNotExist:
+                logger.debug("Kiosk auto-login failed: invalid token")
+                return None
 
         # Validate fingerprint matches
         if not kiosk_token.validate_fingerprint(fingerprint_hash):
@@ -91,7 +97,7 @@ class KioskAutoLoginMiddleware:
                 kiosk_token=kiosk_token,
                 token_value=token_value[:64],
                 ip_address=self._get_client_ip(request),
-                user_agent=request.headers.get("user-agent", "")[:500],
+                user_agent=request.headers.get("user-agent", "")[:256],
                 device_fingerprint=fingerprint_hash[:64],
                 status="fingerprint_mismatch",
                 details="Auto-reauth fingerprint mismatch",
@@ -106,7 +112,7 @@ class KioskAutoLoginMiddleware:
             kiosk_token=kiosk_token,
             token_value=token_value[:64],
             ip_address=self._get_client_ip(request),
-            user_agent=request.headers.get("user-agent", "")[:500],
+            user_agent=request.headers.get("user-agent", "")[:256],
             device_fingerprint=fingerprint_hash[:64],
             status="success",
             details="Auto-reauth via middleware",

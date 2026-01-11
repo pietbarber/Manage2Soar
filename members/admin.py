@@ -808,7 +808,7 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
                 current_site = Site.objects.get_current()
                 domain = current_site.domain
             except Site.DoesNotExist:
-                domain = "your-domain.com"
+                domain = "[Configure Django Sites framework]"
 
             url = obj.get_magic_url()
             full_url = f"https://{domain}{url}"
