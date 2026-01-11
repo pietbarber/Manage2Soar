@@ -198,7 +198,7 @@ def kiosk_bind_device(request, token):
     # Store fingerprint hash in cookie for verification
     response.set_cookie(
         "kiosk_fingerprint",
-        fingerprint_hash,
+        kiosk_token.device_fingerprint,  # Use DB value after binding
         max_age=365 * 24 * 60 * 60,
         httponly=True,
         samesite="Lax",
@@ -281,7 +281,7 @@ def kiosk_verify_device(request, token):
 
     response.set_cookie(
         "kiosk_fingerprint",
-        fingerprint_hash,
+        kiosk_token.device_fingerprint,  # Use DB value after validation
         max_age=365 * 24 * 60 * 60,
         httponly=True,
         samesite="Lax",
