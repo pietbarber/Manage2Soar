@@ -460,7 +460,7 @@ class KioskSecurityTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertContains(
             response,
-            "This kiosk access link is not available.",
+            "This kiosk access link has been disabled. Please contact an administrator.",
             status_code=403,
         )
 

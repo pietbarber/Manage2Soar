@@ -563,14 +563,28 @@ class KioskToken(models.Model):
         """Check if token is bound to a device."""
         return bool(self.device_fingerprint)
 
-    def validate_fingerprint(self, fingerprint):
+    def should_allow_fingerprint(self, fingerprint):
         """
-        Validate a device fingerprint against the bound fingerprint.
-        Returns True if not bound (first use) or if fingerprints match.
+        Determine whether this token should be accepted for the given device
+        fingerprint.
+
+        Returns True if:
+        - the token is not yet bound (first use; caller may bind the device), or
+        - the stored fingerprint matches the provided fingerprint.
         """
         if not self.device_fingerprint:
             return True  # Not yet bound, will be bound on this request
         return self.device_fingerprint == fingerprint
+
+    def validate_fingerprint(self, fingerprint):
+        """
+        Backwards-compatible wrapper for should_allow_fingerprint().
+
+        This method historically both validated fingerprints for already-bound
+        devices and allowed the first binding when no fingerprint was stored.
+        New code should prefer should_allow_fingerprint() for clarity.
+        """
+        return self.should_allow_fingerprint(fingerprint)
 
     def record_usage(self, ip_address=None):
         """Record that this token was used."""

@@ -153,21 +153,22 @@ def kiosk_bind_device(request, token):
     # Hash the fingerprint for storage
     fingerprint_hash = hashlib.sha256(fingerprint.encode()).hexdigest()
 
-    # Check if already bound to a different device
-    if kiosk_token.is_device_bound():
-        if not kiosk_token.validate_fingerprint(fingerprint_hash):
-            log_kiosk_access(
-                token,
-                kiosk_token,
-                request,
-                "fingerprint_mismatch",
-                fingerprint_hash,
-                "Attempted to rebind to different device",
-            )
-            logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
-            return JsonResponse({"error": "Device verification failed"}, status=403)
-    else:
-        # Bind the device
+    # Validate fingerprint first to prevent TOCTOU race condition
+    # This checks if fingerprint matches (for bound) or allows first binding (for unbound)
+    if not kiosk_token.validate_fingerprint(fingerprint_hash):
+        log_kiosk_access(
+            token,
+            kiosk_token,
+            request,
+            "fingerprint_mismatch",
+            fingerprint_hash,
+            "Attempted to rebind to different device",
+        )
+        logger.warning("Fingerprint mismatch for kiosk token: %s", kiosk_token.name)
+        return JsonResponse({"error": "Device verification failed"}, status=403)
+
+    # If not yet bound, bind this device now
+    if not kiosk_token.is_device_bound():
         kiosk_token.bind_device(fingerprint_hash)
         log_kiosk_access(
             token,
@@ -193,6 +194,10 @@ def kiosk_bind_device(request, token):
         token, kiosk_token, request, "success", fingerprint_hash, "Device binding login"
     )
 
+    # Ensure fingerprint exists (guaranteed after bind_device call)
+    if kiosk_token.device_fingerprint is None:
+        raise RuntimeError("Fingerprint must be set after binding")
+
     # Set cookie for auto-reauth
     response = JsonResponse(
         {
@@ -213,9 +218,6 @@ def kiosk_bind_device(request, token):
     )
 
     # Store fingerprint hash in cookie for verification
-    # Ensure fingerprint exists (guaranteed after bind_device call)
-    if kiosk_token.device_fingerprint is None:
-        raise RuntimeError("Fingerprint must be set after binding")
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after binding
@@ -279,6 +281,10 @@ def kiosk_verify_device(request, token):
         token, kiosk_token, request, "success", fingerprint_hash, "Device verification"
     )
 
+    # Ensure fingerprint exists (guaranteed after validation)
+    if kiosk_token.device_fingerprint is None:
+        raise RuntimeError("Fingerprint must exist for bound token")
+
     # Set cookies for auto-reauth
     response = JsonResponse(
         {
@@ -296,9 +302,7 @@ def kiosk_verify_device(request, token):
         secure=settings.KIOSK_COOKIE_SECURE,
     )
 
-    # Ensure fingerprint exists (guaranteed after validation)
-    if kiosk_token.device_fingerprint is None:
-        raise RuntimeError("Fingerprint must exist for bound token")
+    # Refresh fingerprint cookie
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after validation

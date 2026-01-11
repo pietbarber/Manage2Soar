@@ -76,6 +76,7 @@ async function collectFingerprint() {
     // Audio context fingerprint
     let audioContext = null;
     let oscillator = null;
+    let oscillatorStarted = false;
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         oscillator = audioContext.createOscillator();
@@ -91,6 +92,7 @@ async function collectFingerprint() {
         gainNode.connect(audioContext.destination);
 
         oscillator.start(0);
+        oscillatorStarted = true;
 
         // Wait briefly for audio context to stabilize before capturing sample rate
         // This ensures consistent fingerprinting across different browsers/devices
@@ -102,8 +104,8 @@ async function collectFingerprint() {
     } finally {
         // Ensure cleanup even if error occurs
         try {
-            if (oscillator) oscillator.stop();
-            if (audioContext) audioContext.close();
+            if (oscillator && oscillatorStarted) oscillator.stop();
+            if (audioContext && audioContext.state !== 'closed') audioContext.close();
         } catch (cleanupError) {
             // Ignore cleanup errors
         }

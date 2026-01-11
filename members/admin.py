@@ -802,6 +802,7 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
     @admin.display(description="Magic URL")
     def magic_url_display(self, obj):
         if obj.pk:
+            from django.conf import settings
             from django.contrib.sites.models import Site
 
             try:
@@ -810,8 +811,12 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
             except Site.DoesNotExist:
                 domain = "[Configure Django Sites framework]"
 
+            # Determine protocol based on production setting
+            # In production, SECURE_SSL_REDIRECT enforces HTTPS
+            protocol = "https" if not settings.DEBUG else "http"
+
             url = obj.get_magic_url()
-            full_url = f"https://{domain}{url}"
+            full_url = f"{protocol}://{domain}{url}"
             return format_html(
                 '<a href="{url}" target="_blank">{url}</a><br>'
                 '<small class="text-muted">Copy this URL and bookmark it on the kiosk device.</small>',
