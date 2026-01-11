@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verify Device - {{ kiosk_token.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-shield-check me-2"></i>
+                        Kiosk Device Verification
+                    </h4>
+                </div>
+                <div class="card-body text-center py-5">
+                    <div id="status-verifying">
+                        <div class="spinner-border text-info mb-3" role="status">
+                            <span class="visually-hidden">Verifying device...</span>
+                        </div>
+                        <h5>Verifying device identity...</h5>
+                        <p class="text-muted">Please wait while we confirm this is the authorized device.</p>
+                    </div>
+
+                    <div id="status-success" class="d-none">
+                        <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                        <h4 class="mt-3 text-success">Device Verified!</h4>
+                        <p class="text-muted">Welcome back. Redirecting...</p>
+                    </div>
+
+                    <div id="status-error" class="d-none">
+                        <i class="bi bi-shield-x text-danger" style="font-size: 4rem;"></i>
+                        <h4 class="mt-3 text-danger">Device Mismatch</h4>
+                        <p id="error-message" class="text-muted">
+                            This token is registered to a different device.
+                        </p>
+                        <hr>
+                        <p class="small text-muted">
+                            If the original device is no longer available, please contact
+                            the club administrator to reset the token binding.
+                        </p>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <small class="text-muted">
+                        <i class="bi bi-laptop me-1"></i>
+                        Token: <strong>{{ kiosk_token.name }}</strong>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/**
+ * Device Verification for Kiosk Authentication (Issue #364)
+ *
+ * Verifies that the current device matches the bound fingerprint.
+ */
+(function() {
+    'use strict';
+
+    /**
+     * Collect device fingerprint components (same as binding page)
+     */
+    async function collectFingerprint() {
+        const components = [];
+
+        // User Agent
+        components.push(navigator.userAgent);
+
+        // Screen properties
+        components.push(screen.width + 'x' + screen.height);
+        components.push(screen.colorDepth);
+        components.push(window.devicePixelRatio || 1);
+
+        // Timezone
+        components.push(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        components.push(new Date().getTimezoneOffset());
+
+        // Platform
+        components.push(navigator.platform);
+        components.push(navigator.language);
+        components.push(navigator.languages ? navigator.languages.join(',') : '');
+
+        // Hardware concurrency (CPU cores)
+        components.push(navigator.hardwareConcurrency || 'unknown');
+
+        // Device memory (if available)
+        components.push(navigator.deviceMemory || 'unknown');
+
+        // Canvas fingerprint
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 200;
+            canvas.height = 50;
+
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#f60';
+            ctx.fillRect(125, 1, 62, 20);
+            ctx.fillStyle = '#069';
+            ctx.fillText('Manage2Soar Kiosk', 2, 15);
+            ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+            ctx.fillText('Fingerprint', 4, 35);
+
+            components.push(canvas.toDataURL());
+        } catch (e) {
+            components.push('canvas-error');
+        }
+
+        // WebGL fingerprint
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (gl) {
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                if (debugInfo) {
+                    components.push(gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL));
+                    components.push(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
+                }
+                components.push(gl.getParameter(gl.VERSION));
+            }
+        } catch (e) {
+            components.push('webgl-error');
+        }
+
+        // Audio context fingerprint
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const analyser = audioContext.createAnalyser();
+            const gainNode = audioContext.createGain();
+            const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+            gainNode.gain.value = 0;
+            oscillator.type = 'triangle';
+            oscillator.connect(analyser);
+            analyser.connect(scriptProcessor);
+            scriptProcessor.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.start(0);
+            components.push(audioContext.sampleRate);
+            oscillator.stop();
+            audioContext.close();
+        } catch (e) {
+            components.push('audio-error');
+        }
+
+        const fingerprintString = components.join('|||');
+        return fingerprintString;
+    }
+
+    /**
+     * Send fingerprint to server for verification
+     */
+    async function verifyDevice(fingerprint) {
+        const response = await fetch('{% url "members:kiosk_verify_device" token=token %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fingerprint: fingerprint }),
+        });
+
+        return await response.json();
+    }
+
+    /**
+     * Show success state and redirect
+     */
+    function showSuccess(redirectUrl) {
+        document.getElementById('status-verifying').classList.add('d-none');
+        document.getElementById('status-success').classList.remove('d-none');
+
+        setTimeout(function() {
+            window.location.href = redirectUrl;
+        }, 1000);
+    }
+
+    /**
+     * Show error state
+     */
+    function showError(message) {
+        document.getElementById('status-verifying').classList.add('d-none');
+        document.getElementById('status-error').classList.remove('d-none');
+        if (message) {
+            document.getElementById('error-message').textContent = message;
+        }
+    }
+
+    /**
+     * Main initialization
+     */
+    async function init() {
+        try {
+            const fingerprint = await collectFingerprint();
+            const result = await verifyDevice(fingerprint);
+
+            if (result.success) {
+                showSuccess(result.redirect);
+            } else {
+                showError(result.error);
+            }
+        } catch (error) {
+            console.error('Device verification error:', error);
+            showError('Failed to verify device. Please try again.');
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+{% endblock %}

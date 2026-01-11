@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import views, views_applications
+from . import views, views_applications, views_kiosk
 from .views import tinymce_image_upload
 
 app_name = "members"
@@ -26,6 +26,22 @@ urlpatterns = [
         "<int:member_id>/toggle-redaction/",
         views.toggle_redaction,
         name="toggle_redaction",
+    ),
+    # Kiosk authentication URLs (Issue #364)
+    path(
+        "kiosk/<str:token>/",
+        views_kiosk.kiosk_login,
+        name="kiosk_login",
+    ),
+    path(
+        "kiosk/<str:token>/bind/",
+        views_kiosk.kiosk_bind_device,
+        name="kiosk_bind_device",
+    ),
+    path(
+        "kiosk/<str:token>/verify/",
+        views_kiosk.kiosk_verify_device,
+        name="kiosk_verify_device",
     ),
     # Visiting pilot URLs
     path(

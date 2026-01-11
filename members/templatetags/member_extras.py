@@ -263,3 +263,33 @@ def can_view_personal_info_tag(context, member):
     request = context.get("request")
     user = getattr(request, "user", None) if request else None
     return can_view_personal_info(user, member)
+
+
+@register.simple_tag(takes_context=True)
+def is_kiosk_session(context):
+    """
+    Check if the current session is a kiosk session (Issue #364).
+
+    Returns True if the user logged in via kiosk token, which means
+    we should hide the logout button and treat them specially.
+
+    Usage: {% is_kiosk_session as kiosk_mode %}
+           {% if not kiosk_mode %}...logout button...{% endif %}
+    """
+    request = context.get("request")
+    if not request:
+        return False
+
+    # Check if kiosk cookies are present
+    has_kiosk_token = bool(request.COOKIES.get("kiosk_token"))
+    has_kiosk_fingerprint = bool(request.COOKIES.get("kiosk_fingerprint"))
+
+    # Also check if user is a Role Account (belt and suspenders)
+    user = getattr(request, "user", None)
+    is_role_account = (
+        user
+        and user.is_authenticated
+        and getattr(user, "membership_status", None) == "Role Account"
+    )
+
+    return (has_kiosk_token and has_kiosk_fingerprint) or is_role_account

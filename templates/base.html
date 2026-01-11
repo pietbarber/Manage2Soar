@@ -1,6 +1,7 @@
 {% load static %}
 
 {% load siteconfig_tags %}
+{% load member_extras %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -216,12 +217,14 @@
 
         <!-- Right side: Welcome + Logout -->
         {% if user.is_authenticated %}
+        {% is_kiosk_session as kiosk_mode %}
         <div class="d-flex align-items-center me-3">
           <a href="{% url 'members:member_view' member_id=user.pk %}" class="profile-bubble" title="View My Profile">
             <img src="{{ user.profile_image_url_small }}" class="nav-avatar" alt="Profile Photo">
           </a>
           <span class="navbar-text ms-2">
             Welcome, {{ user.full_display_name }}
+            {% if kiosk_mode %}<small class="text-warning ms-1">(Kiosk)</small>{% endif %}
           </span>
           {% if user.is_staff or user.webmaster or user.rostermeister or user.member_manager or user.instructor %}
             <a href="/admin/" class="ms-3" title="Admin interface" data-bs-toggle="tooltip" data-bs-placement="bottom">
@@ -229,10 +232,12 @@
             </a>
           {% endif %}
         </div>
+        {% if not kiosk_mode %}
         <form action="{% url 'logout' %}" method="post" class="d-flex">
           {% csrf_token %}
           <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
         </form>
+        {% endif %}
         {% else %}
         <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">Login</a>
         {% endif %}

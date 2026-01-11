@@ -454,4 +454,170 @@ class MemberBadge(models.Model):
         return f"{self.member} - {self.badge.name}"
 
 
+#########################
+# KioskToken Model (Issue #364)
+#
+# Enables passwordless authentication for dedicated kiosk devices (e.g., club laptop).
+# Uses a magic URL with device fingerprinting for security.
+#
+# Fields:
+# - user: The role account this token authenticates as
+# - token: Cryptographically secure token (used in magic URL)
+# - name: Human-readable identifier (e.g., "Club Laptop")
+# - device_fingerprint: Hash of device characteristics for binding
+# - is_active: Can be revoked by admin
+# - created_at/last_used_at: For auditing
+# - landing_page: Where to redirect after authentication
+
+
+class KioskToken(models.Model):
+    """Token for passwordless kiosk device authentication."""
+
+    LANDING_PAGE_CHOICES = [
+        ("logsheet:today", "Today's Logsheet"),
+        ("logsheet:index", "All Logsheets"),
+        ("duty_roster:my_duties", "Duty Roster"),
+        ("members:member_list", "Member List"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="kiosk_tokens",
+        help_text="The role account this token authenticates as",
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        help_text="Cryptographic token for magic URL (auto-generated)",
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Human-readable name (e.g., 'Club Laptop', 'Field Tablet')",
+    )
+    device_fingerprint = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="SHA-256 hash of device characteristics (set on first use)",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Uncheck to immediately revoke this token",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(blank=True, null=True)
+    last_used_ip = models.GenericIPAddressField(blank=True, null=True)
+    landing_page = models.CharField(
+        max_length=50,
+        choices=LANDING_PAGE_CHOICES,
+        default="logsheet:today",
+        help_text="Page to redirect to after authentication",
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Admin notes about this token/device",
+    )
+
+    class Meta:
+        verbose_name = "Kiosk Token"
+        verbose_name_plural = "Kiosk Tokens"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        status = "Active" if self.is_active else "Revoked"
+        return f"{self.name} ({status})"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = self._generate_token()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_token():
+        """Generate a cryptographically secure token."""
+        import secrets
+
+        return secrets.token_urlsafe(48)
+
+    def regenerate_token(self):
+        """Generate a new token, invalidating the old URL."""
+        self.token = self._generate_token()
+        self.device_fingerprint = None  # Require re-binding
+        self.save()
+        return self.token
+
+    def get_magic_url(self):
+        """Return the magic URL for this token."""
+        from django.urls import reverse
+
+        return reverse("members:kiosk_login", kwargs={"token": self.token})
+
+    def bind_device(self, fingerprint):
+        """Bind this token to a specific device fingerprint."""
+        self.device_fingerprint = fingerprint
+        self.save(update_fields=["device_fingerprint"])
+
+    def is_device_bound(self):
+        """Check if token is bound to a device."""
+        return bool(self.device_fingerprint)
+
+    def validate_fingerprint(self, fingerprint):
+        """
+        Validate a device fingerprint against the bound fingerprint.
+        Returns True if not bound (first use) or if fingerprints match.
+        """
+        if not self.device_fingerprint:
+            return True  # Not yet bound, will be bound on this request
+        return self.device_fingerprint == fingerprint
+
+    def record_usage(self, ip_address=None):
+        """Record that this token was used."""
+        from django.utils import timezone
+
+        self.last_used_at = timezone.now()
+        if ip_address:
+            self.last_used_ip = ip_address
+        self.save(update_fields=["last_used_at", "last_used_ip"])
+
+
+class KioskAccessLog(models.Model):
+    """Audit log for kiosk token access attempts."""
+
+    STATUS_CHOICES = [
+        ("success", "Success"),
+        ("invalid_token", "Invalid Token"),
+        ("inactive_token", "Inactive Token"),
+        ("fingerprint_mismatch", "Fingerprint Mismatch"),
+        ("bound", "Device Bound"),
+    ]
+
+    kiosk_token = models.ForeignKey(
+        KioskToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="access_logs",
+    )
+    token_value = models.CharField(
+        max_length=64,
+        help_text="Token value attempted (for failed lookups)",
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True)
+    device_fingerprint = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    details = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Kiosk Access Log"
+        verbose_name_plural = "Kiosk Access Logs"
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.status}"
+
+
 # Import MembershipApplication model from separate file to keep models.py manageable
