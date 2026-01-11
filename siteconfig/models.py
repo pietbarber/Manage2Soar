@@ -337,7 +337,7 @@ class SiteConfiguration(models.Model):
     # Quick altitude buttons for flight form (Issue #467)
     quick_altitude_buttons = models.CharField(
         max_length=100,
-        default="2000,3000",
+        default="300,1000,1500,2000,3000",
         help_text="Comma-separated list of altitude values (in feet) for quick-select buttons on flight forms. Example: 300,1000,1500,2000,3000",
     )
 
