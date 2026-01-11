@@ -464,9 +464,12 @@ class ChargeableItemAdmin(AdminHelperMixin, admin.ModelAdmin):
     @admin.display(description="Price")
     def price_display(self, obj):
         """Display price with unit."""
+        # Format the price first, then pass to format_html
+        # (format_html doesn't support format specifiers like {:.2f})
+        formatted_price = f"{obj.price:.2f}"
         if obj.unit == ChargeableItem.UnitType.HOUR:
-            return format_html("${:.2f}/hour", obj.price)
-        return format_html("${:.2f}", obj.price)
+            return format_html("${}/hour", formatted_price)
+        return format_html("${}", formatted_price)
 
     def _has_webmaster_permission(self, request):
         """Check if user has webmaster-level permission."""
