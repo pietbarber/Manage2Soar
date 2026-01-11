@@ -11,6 +11,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import login
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -119,6 +120,7 @@ def kiosk_login(request, token):
 
 
 @require_POST
+@transaction.atomic
 def kiosk_bind_device(request, token):
     """
     Bind a kiosk token to a specific device fingerprint.
@@ -291,10 +293,9 @@ def kiosk_verify_device(request, token):
         secure=settings.KIOSK_COOKIE_SECURE,
     )
 
-    # Assert fingerprint exists (guaranteed after validation)
-    assert (
-        kiosk_token.device_fingerprint is not None
-    ), "Fingerprint must exist for bound token"
+    # Ensure fingerprint exists (guaranteed after validation)
+    if kiosk_token.device_fingerprint is None:
+        raise RuntimeError("Fingerprint must exist for bound token")
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after validation

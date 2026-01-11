@@ -144,6 +144,11 @@
             gainNode.connect(audioContext.destination);
 
             oscillator.start(0);
+
+            // Wait briefly for audio context to stabilize before capturing sample rate
+            // This ensures consistent fingerprinting across different browsers/devices
+            await new Promise(resolve => setTimeout(resolve, 10));
+
             components.push(audioContext.sampleRate);
         } catch (e) {
             components.push('audio-error');
