@@ -32,7 +32,16 @@ def get_client_ip(request):
 def log_kiosk_access(
     token_value, kiosk_token, request, status, fingerprint="", details=""
 ):
-    """Log a kiosk access attempt for auditing."""
+    """Log a kiosk access attempt for auditing with rate limiting."""
+    # Rate limiting: Only log once per session + status combination
+    # This prevents log spam while still capturing unique events
+    session_key = request.session.session_key or "no-session"
+    rate_limit_key = f"kiosk_log_{session_key}_{status}"
+
+    # Check if we've logged this recently (within session)
+    if rate_limit_key in request.session:
+        return  # Skip duplicate logs
+
     KioskAccessLog.objects.create(
         kiosk_token=kiosk_token,
         token_value=token_value[:64] if token_value else "",
@@ -42,6 +51,9 @@ def log_kiosk_access(
         status=status,
         details=details,
     )
+
+    # Mark as logged in session to prevent duplicates
+    request.session[rate_limit_key] = True
 
 
 @require_GET
@@ -115,7 +127,11 @@ def kiosk_bind_device(request, token):
     the device fingerprint.
     """
     try:
-        kiosk_token = KioskToken.objects.get(token=token, is_active=True)
+        # Use select_for_update() to prevent TOCTOU race condition
+        # Lock the row until transaction commits
+        kiosk_token = KioskToken.objects.select_for_update().get(
+            token=token, is_active=True
+        )
     except KioskToken.DoesNotExist:
         return JsonResponse({"error": "Invalid or inactive token"}, status=403)
 
