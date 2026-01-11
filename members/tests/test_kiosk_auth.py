@@ -222,6 +222,8 @@ class KioskBindDeviceTests(TestCase):
 
         # Check access log was created
         log = KioskAccessLog.objects.filter(kiosk_token=self.token).last()
+        self.assertIsNotNone(log)
+        assert log is not None  # Type narrowing for Pylance
         self.assertEqual(log.status, "bound")
 
     def test_bind_device_missing_fingerprint(self):
