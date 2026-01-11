@@ -811,9 +811,16 @@ class KioskTokenAdmin(AdminHelperMixin, admin.ModelAdmin):
             except Site.DoesNotExist:
                 domain = "[Configure Django Sites framework]"
 
-            # Determine protocol based on production setting
-            # In production, SECURE_SSL_REDIRECT enforces HTTPS
-            protocol = "https" if not settings.DEBUG else "http"
+            # Determine protocol for magic URL display
+            # Prefer SECURE_SSL_REDIRECT setting over DEBUG flag to handle
+            # staging/internal deployments correctly
+            if getattr(settings, "SECURE_SSL_REDIRECT", False):
+                protocol = "https"
+            elif settings.DEBUG:
+                protocol = "http"
+            else:
+                # Production without SSL redirect (e.g., behind load balancer)
+                protocol = "https"
 
             url = obj.get_magic_url()
             full_url = f"{protocol}://{domain}{url}"
@@ -891,8 +898,15 @@ class KioskAccessLogAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Allow deletion for cleanup, but maybe restrict in future."""
-        return request.user.is_superuser
+        """
+        Prevent deletion of kiosk access audit logs via admin.
+
+        Audit logs are intended to be append-only to preserve the integrity of
+        security investigations. If cleanup or retention management is needed,
+        it should be implemented via a controlled archival/retention process
+        (e.g., management command), not ad-hoc admin deletions.
+        """
+        return False
 
     @admin.display(description="Fingerprint")
     def short_fingerprint(self, obj):

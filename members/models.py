@@ -583,6 +583,10 @@ class KioskToken(models.Model):
         This method historically both validated fingerprints for already-bound
         devices and allowed the first binding when no fingerprint was stored.
         New code should prefer should_allow_fingerprint() for clarity.
+
+        DEPRECATED: Use should_allow_fingerprint() instead for clearer semantics.
+        This method will be maintained for backwards compatibility but may be
+        removed in a future major version.
         """
         return self.should_allow_fingerprint(fingerprint)
 

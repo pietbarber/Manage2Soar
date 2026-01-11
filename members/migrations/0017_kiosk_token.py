@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                     "token",
                     models.CharField(
                         editable=False,
-                        help_text="Cryptographic token for magic URL (auto-generated)",
+                        help_text="Cryptographic token for magic URL (~288 bits entropy, auto-generated)",
                         max_length=64,
                         unique=True,
                     ),

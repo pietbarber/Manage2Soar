@@ -91,8 +91,9 @@ async function collectFingerprint() {
         scriptProcessor.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
-        oscillator.start(0);
+        // Set flag BEFORE start() to ensure cleanup works even if start() fails
         oscillatorStarted = true;
+        oscillator.start(0);
 
         // Wait briefly for audio context to stabilize before capturing sample rate
         // This ensures consistent fingerprinting across different browsers/devices
@@ -136,3 +137,12 @@ function getCsrfToken() {
     }
     return cookieValue;
 }
+
+/**
+ * Retrieves the CSRF token from cookies.
+ *
+ * Reads the 'csrftoken' cookie value for inclusion in AJAX requests
+ * requiring CSRF protection.
+ *
+ * @returns {string|null} The CSRF token value, or null if not found.
+ */

@@ -286,4 +286,7 @@ def is_kiosk_session(context):
 
     # Kiosk session is defined strictly by presence of kiosk cookies
     # (Not by membership_status - that's set for the user account itself)
+    # Note: This only checks cookie presence, not validity or token active status.
+    # Revoked tokens may still show "(Kiosk)" indicator until cookies expire.
+    # This is acceptable for UI purposes - middleware handles actual authentication.
     return has_kiosk_token and has_kiosk_fingerprint

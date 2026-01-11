@@ -343,6 +343,10 @@ class KioskAutoLoginMiddlewareTests(TestCase):
         self.assertTrue(user.is_authenticated)
         self.assertEqual(user.username, "kiosk-laptop")
 
+        # Verify successful auto-reauth created access log for audit trail
+        logs = KioskAccessLog.objects.filter(kiosk_token=self.token, status="success")
+        self.assertGreater(logs.count(), 0)
+
     def test_no_auto_login_with_invalid_token(self):
         """Middleware should not auto-login with invalid token."""
         client = Client()
@@ -368,6 +372,12 @@ class KioskAutoLoginMiddlewareTests(TestCase):
 
         # Should redirect to login
         self.assertIn("/login/", response.request["PATH_INFO"])
+
+        # Verify fingerprint_mismatch access log was created for security audit
+        logs = KioskAccessLog.objects.filter(
+            kiosk_token=self.token, status="fingerprint_mismatch"
+        )
+        self.assertGreater(logs.count(), 0)
 
 
 class KioskAccessLogTests(TestCase):

@@ -75,6 +75,9 @@ class KioskAutoLoginMiddleware:
 
         # Look up the kiosk token for this request
         try:
+            # Query with select_related to reduce database hits
+            # Note: token field has unique=True index. Consider caching valid
+            # tokens if this becomes a performance bottleneck in production.
             kiosk_token = KioskToken.objects.select_related("user").get(
                 token=token_value,
                 is_active=True,
@@ -113,6 +116,8 @@ class KioskAutoLoginMiddleware:
             status="success",
             details="Auto-reauth via middleware",
         )
+        # Note: Consider implementing rate limiting for success logs if database
+        # growth becomes an issue (e.g., log once per session vs every request)
 
         return kiosk_token.user
 

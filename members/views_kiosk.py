@@ -154,7 +154,9 @@ def kiosk_bind_device(request, token):
     fingerprint_hash = hashlib.sha256(fingerprint.encode()).hexdigest()
 
     # Validate fingerprint first to prevent TOCTOU race condition
-    # This checks if fingerprint matches (for bound) or allows first binding (for unbound)
+    # Note: validate_fingerprint has dual semantics - it validates bound tokens
+    # AND allows unbound tokens (for first-time binding). Consider using
+    # should_allow_fingerprint() for clarity in new code.
     if not kiosk_token.validate_fingerprint(fingerprint_hash):
         log_kiosk_access(
             token,
@@ -196,7 +198,10 @@ def kiosk_bind_device(request, token):
 
     # Ensure fingerprint exists (guaranteed after bind_device call)
     if kiosk_token.device_fingerprint is None:
-        raise RuntimeError("Fingerprint must be set after binding")
+        raise RuntimeError(
+            f"Device fingerprint is not set after binding for kiosk token "
+            f"'{kiosk_token.name}' (token={kiosk_token.token})"
+        )
 
     # Set cookie for auto-reauth
     response = JsonResponse(
@@ -255,7 +260,8 @@ def kiosk_verify_device(request, token):
     # Hash the fingerprint
     fingerprint_hash = hashlib.sha256(fingerprint.encode()).hexdigest()
 
-    # Validate fingerprint
+    # Validate fingerprint (Note: validate_fingerprint is backwards-compatible
+    # wrapper with dual semantics. Consider using should_allow_fingerprint())
     if not kiosk_token.validate_fingerprint(fingerprint_hash):
         log_kiosk_access(
             token,

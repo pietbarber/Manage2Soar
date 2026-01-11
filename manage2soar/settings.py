@@ -455,6 +455,10 @@ else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    # KIOSK_COOKIE_SECURE should be True in production to prevent session hijacking
+    # WARNING: Deploying with DEBUG=True in production will set this to False,
+    # creating a security vulnerability. Middleware logs warnings if cookies are
+    # sent over insecure connections.
     KIOSK_COOKIE_SECURE = False
 
 
