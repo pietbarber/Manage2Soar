@@ -50,17 +50,16 @@ function isSafeImageUrl(url) {
 
 /**
  * Sanitizes text for use in HTML attributes.
- * Escapes characters that could be interpreted as HTML entities.
+ * Uses the browser's built-in escaping via textContent/innerHTML,
+ * which is more robust than manual string replacement.
  * Note: This is defense-in-depth; textContent is already safe text.
  * @param {string} text - The text to sanitize
  * @returns {string} - Sanitized text safe for attribute values
  */
 function escapeForAttribute(text) {
   if (typeof text !== 'string') return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+  // Use DOM-based escaping - more robust than manual replacement
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
