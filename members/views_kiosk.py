@@ -208,6 +208,10 @@ def kiosk_bind_device(request, token):
     )
 
     # Store fingerprint hash in cookie for verification
+    # Assert fingerprint exists (guaranteed after bind_device call)
+    assert (
+        kiosk_token.device_fingerprint is not None
+    ), "Fingerprint must be set after binding"
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after binding
@@ -288,6 +292,10 @@ def kiosk_verify_device(request, token):
         secure=settings.KIOSK_COOKIE_SECURE,
     )
 
+    # Assert fingerprint exists (guaranteed after validation)
+    assert (
+        kiosk_token.device_fingerprint is not None
+    ), "Fingerprint must exist for bound token"
     response.set_cookie(
         "kiosk_fingerprint",
         kiosk_token.device_fingerprint,  # Use DB value after validation
