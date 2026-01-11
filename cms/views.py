@@ -72,10 +72,14 @@ def get_accessible_top_level_pages(user):
     from .models import Page
 
     # Use annotate to compute counts in a single query, avoiding N+1 queries
+    # IMPORTANT: Use distinct=True to prevent Cartesian product when counting multiple relations
     top_pages_qs = (
         Page.objects.filter(parent__isnull=True)
         .prefetch_related("role_permissions")
-        .annotate(doc_count=Count("documents"), child_count=Count("children"))
+        .annotate(
+            doc_count=Count("documents", distinct=True),
+            child_count=Count("children", distinct=True),
+        )
         .order_by("title")
     )
 
