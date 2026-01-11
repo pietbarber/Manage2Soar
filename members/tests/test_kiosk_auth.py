@@ -152,7 +152,7 @@ class KioskLoginViewTests(TestCase):
         """Invalid token should return 403 error page."""
         response = self.client.get("/members/kiosk/invalid_token_123/")
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, "Invalid Token", status_code=403)
+        self.assertContains(response, "Access Denied", status_code=403)
 
     def test_inactive_token_returns_403(self):
         """Inactive/revoked token should return 403."""

@@ -54,6 +54,9 @@ def log_kiosk_access(
     )
 
     # Mark as logged in session to prevent duplicates
+    # Note: This will create a session if one doesn't exist yet.
+    # This is intentional for kiosk rate limiting to work across
+    # multiple access attempts within the same browser session.
     request.session[rate_limit_key] = True
 
 
