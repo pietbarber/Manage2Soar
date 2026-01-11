@@ -9,10 +9,9 @@ import hashlib
 import json
 import logging
 
-from django.contrib import messages
 from django.contrib.auth import login
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 

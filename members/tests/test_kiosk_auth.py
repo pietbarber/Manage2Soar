@@ -11,10 +11,9 @@ Tests cover:
 """
 
 import json
-from unittest.mock import patch
 
 from django.contrib.auth import get_user
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from members.models import KioskAccessLog, KioskToken, Member
