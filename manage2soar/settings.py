@@ -494,7 +494,7 @@ TINYMCE_DEFAULT_CONFIG = {
     "plugins": "image link media code lists table fullscreen advlist autolink anchor searchreplace visualblocks insertdatetime help wordcount",
     "toolbar": (
         "undo redo | blocks | bold italic underline | alignleft aligncenter alignright alignjustify | "
-        "bullist numlist outdent indent | link image media | table | code | fullscreen | help"
+        "bullist numlist outdent indent | link image media insertpdf | table | code | fullscreen | help"
     ),
     "image_caption": True,
     "automatic_uploads": True,
@@ -526,7 +526,17 @@ TINYMCE_DEFAULT_CONFIG = {
     "content_style": """
         table { width: 100% !important; max-width: 100% !important; table-layout: fixed !important; }
         td, th { word-break: break-word; white-space: normal !important; }
+        .pdf-container { margin: 1em 0; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background-color: #f9f9f9; }
+        .pdf-container iframe { max-width: 100%; border: none; border-radius: 4px; }
     """,
+    # Issue #341: Extended valid elements to allow PDF embedding iframes
+    # This ensures TinyMCE doesn't strip the iframe when saving
+    "extended_valid_elements": (
+        "iframe[src|width|height|frameborder|sandbox|referrerpolicy|loading|title|allow|allowfullscreen],"
+        "div[class|style]"
+    ),
+    # Allow iframes inside div.pdf-container and p inside div
+    "valid_children": "+div[iframe|p],+body[div]",
     "promotion": False,  # Disable TinyMCE 'Upgrade' button
     "license_key": "gpl",  # Use GPL license for open source projects
 }

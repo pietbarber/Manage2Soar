@@ -1,8 +1,10 @@
 /**
  * TinyMCE YouTube Embed Fix for Issue #277 and #422
+ * PDF Embedding for Issue #273, #341
  *
  * Extends TinyMCE configuration to add media_url_resolver and video_template_callback
  * for proper YouTube embedding with referrer policy.
+ * Also adds PDF insertion button that bypasses TinyMCE content filtering.
  *
  * IMPORTANT: TinyMCE 6.x uses CALLBACK-STYLE API, not Promise-style!
  * Signature: (data, resolve, reject) => { resolve({ html: '...' }); }
@@ -23,6 +25,46 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Validate URL for PDF embedding (security check)
+     * Only allows HTTP/HTTPS URLs to prevent XSS via javascript: or data: URIs
+     */
+    function isValidPdfUrl(url) {
+        if (!url || typeof url !== 'string') return false;
+        url = url.trim();
+        try {
+            var urlObj = new URL(url);
+            // Only allow http and https protocols
+            if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+                return false;
+            }
+            // Check if it looks like a PDF URL (optional but helpful)
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Generate PDF embed HTML with proper iframe attributes
+     * Note: We don't use sandbox for PDFs because Chrome's built-in PDF viewer
+     * doesn't work with sandboxed iframes. The browser's PDF viewer has its own
+     * security model that provides adequate protection.
+     */
+    function generatePdfEmbedHtml(url) {
+        var escapedUrl = escapeHtml(url);
+        return '<div class="pdf-container">' +
+            '<iframe src="' + escapedUrl + '" ' +
+            'width="100%" height="600" ' +
+            'frameborder="0" ' +
+            'loading="lazy" ' +
+            'title="Embedded PDF document">' +
+            '</iframe>' +
+            '<p><small><a href="' + escapedUrl + '" target="_blank" rel="noopener noreferrer">' +
+            'Open PDF in new tab</a></small></p>' +
+            '</div>';
     }
 
     /**
@@ -134,13 +176,42 @@
         // Add iframe_template_callback with referrer policy for Error 153 fix
         config.iframe_template_callback = iframeTemplateCallback;
 
-        // Add setup callback to inject YouTube notice into media dialog
+        // Add setup callback to inject YouTube notice and PDF button
         var originalSetup = config.setup;
         config.setup = function (editor) {
             // Call original setup if it exists
             if (typeof originalSetup === 'function') {
                 originalSetup(editor);
             }
+
+            // Register PDF insert button (Issue #273, #341)
+            editor.ui.registry.addButton('insertpdf', {
+                text: '📄 Insert PDF',
+                tooltip: 'Insert an embedded PDF document',
+                onAction: function () {
+                    var url = prompt('Enter the PDF URL (must be https:// or http://):');
+                    if (url) {
+                        url = url.trim();
+                        if (isValidPdfUrl(url)) {
+                            // Check if URL ends with .pdf and warn if not
+                            if (!url.toLowerCase().endsWith('.pdf')) {
+                                var proceed = confirm(
+                                    'This URL does not end with .pdf\n\n' +
+                                    'If this is not a PDF file, it may not display correctly.\n\n' +
+                                    'Continue anyway?'
+                                );
+                                if (!proceed) return;
+                            }
+                            var html = generatePdfEmbedHtml(url);
+                            // Use insertContent with format:'raw' to bypass content filtering
+                            // This is critical - without it, TinyMCE strips the iframe
+                            editor.insertContent(html, { format: 'raw' });
+                        } else {
+                            alert('Invalid URL. Please enter a valid http:// or https:// URL.');
+                        }
+                    }
+                }
+            });
 
             // Add notice to media dialog when it opens
             editor.on('OpenWindow', function (e) {
