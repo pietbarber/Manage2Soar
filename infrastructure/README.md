@@ -228,7 +228,7 @@ dev_mode_enabled: false
 dev_mode_redirect_to: ""
 ```
 
-Then redeploy with `ansible-playbook playbooks/mail-server.yml --tags sync,mail`.
+Then redeploy with `ansible-playbook playbooks/mail-server.yml --tags sync`.
 
 ### Pre-Deployment Checklist
 

@@ -15,7 +15,7 @@ This role installs its own Python dependencies:
 - `python3-requests` - For HTTP API calls to Django
 - `python3-yaml` - For reading config.yml
 
-**Why explicit dependencies?** This role can be run independently with `--tags sync` without requiring the `common` role to be executed first.
+**Why explicit dependencies?** This role is tagged as both `sync` and `mail`, and can be run independently of the `common` role. Using `--tags sync` will run only this sync role, while `--tags sync,mail` will also execute other mail server roles such as Postfix, OpenDKIM, and Rspamd.
 
 ## Files Generated
 
