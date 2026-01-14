@@ -26,4 +26,26 @@ rules {
     description = "{{ club.name }} member whitelist - bypass spam checks (requires SPF pass)";
   }
 {% endfor %}
+
+  # ============================================================
+  # Bypass Lists (Issue #492)
+  # ============================================================
+  # Some mailing lists (e.g., treasurer@, webmaster@) need to receive mail
+  # from anyone, not just whitelisted senders. This allows external services
+  # like Zelle, password reset emails, etc. to reach these addresses.
+  #
+  # SPF PASS is still required (prevents spoofing), but sender whitelist
+  # is bypassed for recipients listed in bypass_lists.map
+  M2S_BYPASS_LISTS {
+    valid_dkim = false;
+    # Still require SPF PASS (prevents spoofing)
+    valid_spf = "allow";
+    domains = false;
+    from = false;
+    prefilter = true;
+    action = "no action";
+    # Match any sender when recipient is in bypass list
+    rcpt_map = "file:///etc/rspamd/local.d/whitelists/bypass_lists.map";
+    description = "Bypass whitelist for service accounts (treasurer, webmaster, etc.) - requires SPF pass";
+  }
 }

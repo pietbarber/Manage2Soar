@@ -199,6 +199,19 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
+        (
+            "Mail Server Configuration",
+            {
+                "fields": ("manual_whitelist",),
+                "description": (
+                    "Email whitelist for trusted non-members. Enter one email address per line. "
+                    "These addresses can send to mailing lists alongside club members. "
+                    "Use for former members, vendors, partners, or other trusted contacts. "
+                    "Example: bob@example.com"
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     @admin.action(description="Regenerate visiting pilot security token")
@@ -321,12 +334,13 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
         "name",
         "description",
         "is_active",
+        "bypass_whitelist",
         "criteria_display",
         "subscriber_count",
         "sort_order",
     )
-    list_editable = ("is_active", "sort_order")
-    list_filter = ("is_active",)
+    list_editable = ("is_active", "bypass_whitelist", "sort_order")
+    list_filter = ("is_active", "bypass_whitelist")
     search_fields = ("name", "description")
     ordering = ("sort_order", "name")
 
@@ -348,6 +362,16 @@ class MailingListAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": ("criteria_select",),
                 "description": "Select which members should be included in this list. "
                 "Members matching ANY selected criterion will be subscribed.",
+            },
+        ),
+        (
+            "Whitelist Bypass",
+            {
+                "fields": ("bypass_whitelist",),
+                "description": "⚠️ Enable this to allow mail from ANY sender "
+                "(not just club members). Use for service accounts like treasurer@ "
+                "or webmaster@ that need to receive external verification emails. "
+                "SPF PASS is still required, but spam may get through.",
             },
         ),
         (
