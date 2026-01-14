@@ -349,3 +349,160 @@ class TestEmailListsAPI:
         assert do.email in data["lists"]["operations-team"]
         # Regular member should not be
         assert regular.email not in data["lists"]["operations-team"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_bypass_lists_returned(self, api_client, membership_statuses):
+        """Test that lists with bypass_whitelist=True are in bypass_lists."""
+        # Create a list with bypass_whitelist=True
+        MailingList.objects.create(
+            name="treasurer",
+            criteria=[MailingListCriterion.TREASURER],
+            is_active=True,
+            bypass_whitelist=True,
+        )
+        # Create a normal list (bypass_whitelist=False by default)
+        MailingList.objects.create(
+            name="members",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            is_active=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "bypass_lists" in data
+        assert "treasurer" in data["bypass_lists"]
+        assert "members" not in data["bypass_lists"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_inactive_bypass_list_not_returned(self, api_client, membership_statuses):
+        """Test that inactive lists with bypass_whitelist=True are not returned."""
+        MailingList.objects.create(
+            name="inactive-bypass",
+            criteria=[MailingListCriterion.TREASURER],
+            is_active=False,
+            bypass_whitelist=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "inactive-bypass" not in data["bypass_lists"]
+        assert "inactive-bypass" not in data["lists"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_manual_whitelist_included(self, api_client, membership_statuses):
+        """Test that manual whitelist entries are included in whitelist."""
+        from siteconfig.models import SiteConfiguration
+
+        # Create a SiteConfiguration with manual whitelist
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            manual_whitelist="bob@example.com\ncarol@example.com",
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "bob@example.com" in data["whitelist"]
+        assert "carol@example.com" in data["whitelist"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_manual_whitelist_handles_empty_lines(
+        self, api_client, membership_statuses
+    ):
+        """Test that manual whitelist handles empty lines and whitespace."""
+        from siteconfig.models import SiteConfiguration
+
+        # Create a SiteConfiguration with messy whitelist
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            manual_whitelist="""
+                bob@example.com
+
+                carol@example.com
+                invalid-not-an-email
+                  spaced@example.com
+            """,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "bob@example.com" in data["whitelist"]
+        assert "carol@example.com" in data["whitelist"]
+        assert "spaced@example.com" in data["whitelist"]
+        # Invalid entries (no @) should be filtered out
+        assert "invalid-not-an-email" not in data["whitelist"]
+        # Empty strings should not be present
+        assert "" not in data["whitelist"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_manual_whitelist_combined_with_members(
+        self, api_client, active_member, membership_statuses
+    ):
+        """Test that manual whitelist is combined with member emails."""
+        from siteconfig.models import SiteConfiguration
+
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            manual_whitelist="external@example.com",
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        # Both member and manual whitelist should be present
+        assert active_member.email in data["whitelist"]
+        assert "external@example.com" in data["whitelist"]
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_manual_whitelist_deduplicates(
+        self, api_client, active_member, membership_statuses
+    ):
+        """Test that duplicate emails in whitelist are deduplicated."""
+        from siteconfig.models import SiteConfiguration
+
+        # Add active_member's email to manual whitelist (should dedupe)
+        SiteConfiguration.objects.create(
+            club_name="Test Club",
+            manual_whitelist=f"{active_member.email}\n{active_member.email}",
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        # Should only appear once
+        count = data["whitelist"].count(active_member.email.lower())
+        assert count == 1
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_empty_bypass_lists_when_none_enabled(
+        self, api_client, membership_statuses
+    ):
+        """Test that bypass_lists is an empty array when no lists have bypass enabled."""
+        # Create normal lists without bypass_whitelist
+        MailingList.objects.create(
+            name="members",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            is_active=True,
+        )
+        MailingList.objects.create(
+            name="instructors",
+            criteria=[MailingListCriterion.INSTRUCTOR],
+            is_active=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "bypass_lists" in data
+        assert data["bypass_lists"] == []
+        assert isinstance(data["bypass_lists"], list)

@@ -60,6 +60,12 @@ class MailingList(models.Model):
         default=True,
         help_text="Inactive lists are not included in API responses",
     )
+    bypass_whitelist = models.BooleanField(
+        default=False,
+        help_text="Allow this list to receive mail from ANYONE, not just whitelisted "
+        "senders (still requires SPF PASS). Use for service accounts like treasurer@ "
+        "or webmaster@ that need to receive verification emails from external services.",
+    )
     criteria = models.JSONField(
         default=list,
         help_text="List of criteria codes that determine membership (OR logic)",
@@ -414,6 +420,14 @@ class SiteConfiguration(models.Model):
     membership_auto_approve = models.BooleanField(
         default=False,
         help_text="Automatically approve new membership applications (bypass manual review)",
+    )
+
+    # Mail Server Configuration
+    manual_whitelist = models.TextField(
+        blank=True,
+        default="",
+        help_text="Email addresses allowed to send to mailing lists (one per line). "
+        "Use for trusted non-members like former members, vendors, or partners.",
     )
 
     def generate_visiting_pilot_token(self):
