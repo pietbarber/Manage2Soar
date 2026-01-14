@@ -207,6 +207,39 @@ class TestMailingListModel:
         )
         assert str(ml) == "str-test"
 
+    def test_bypass_whitelist_default_false(self):
+        """Test that bypass_whitelist defaults to False (Issue #492)."""
+        ml = MailingList.objects.create(
+            name="default-bypass",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+        )
+        assert ml.bypass_whitelist is False
+
+    def test_bypass_whitelist_can_be_enabled(self):
+        """Test that bypass_whitelist can be set to True (Issue #492)."""
+        ml = MailingList.objects.create(
+            name="bypass-enabled",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            bypass_whitelist=True,
+        )
+        assert ml.bypass_whitelist is True
+
+    def test_bypass_whitelist_persists(self):
+        """Test that bypass_whitelist value persists across save/load (Issue #492)."""
+        ml = MailingList.objects.create(
+            name="bypass-persist",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            bypass_whitelist=True,
+        )
+        ml.refresh_from_db()
+        assert ml.bypass_whitelist is True
+
+        # Test updating to False
+        ml.bypass_whitelist = False
+        ml.save()
+        ml.refresh_from_db()
+        assert ml.bypass_whitelist is False
+
 
 @pytest.mark.django_db
 class TestMailingListSubscribers:

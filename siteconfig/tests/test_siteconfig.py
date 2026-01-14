@@ -26,6 +26,46 @@ def test_update_siteconfiguration():
     assert c.club_name == "New Name"
 
 
+@pytest.mark.django_db
+def test_manual_whitelist_field():
+    """Test that manual_whitelist field can be created and updated (Issue #492)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        manual_whitelist="user1@example.com\nuser2@example.com",
+    )
+    assert config.manual_whitelist == "user1@example.com\nuser2@example.com"
+
+
+@pytest.mark.django_db
+def test_manual_whitelist_default_empty():
+    """Test that manual_whitelist defaults to empty string (Issue #492)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club", domain_name="example.org", club_abbreviation="TC"
+    )
+    assert config.manual_whitelist == ""
+
+
+@pytest.mark.django_db
+def test_manual_whitelist_persists():
+    """Test that manual_whitelist value persists across save/load (Issue #492)."""
+    config = SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="example.org",
+        club_abbreviation="TC",
+        manual_whitelist="admin@example.com\nwebmaster@example.org",
+    )
+    config.refresh_from_db()
+    assert config.manual_whitelist == "admin@example.com\nwebmaster@example.org"
+
+    # Test updating
+    config.manual_whitelist = "new@example.com"
+    config.save()
+    config.refresh_from_db()
+    assert config.manual_whitelist == "new@example.com"
+
+
 # MembershipStatus Tests
 @pytest.mark.django_db
 def test_create_membership_status():
