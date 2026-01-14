@@ -153,9 +153,9 @@ club_domains:
 # M2S API authentication token - stored in vault.yml for security
 m2s_api_key: "{{ vault_m2s_api_key }}"
 
-  # Add more tenants as needed:
-  # - prefix: "nfss"
-  #   name: "Northern Florida Soaring Society"
+# Add more tenants as needed:
+# - prefix: "nfss"
+#   name: "Northern Florida Soaring Society"
 
 # ============================================================
 # SMTP AUTHENTICATION (Optional)
