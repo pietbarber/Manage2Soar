@@ -3,6 +3,22 @@
 # M2S Mail Sync Role - Dynamic List Updates
 # ============================================================
 # Syncs mailing list membership from M2S API to Postfix
+#
+# DESIGN NOTE: This role explicitly installs its own Python dependencies
+# (python3-requests, python3-yaml) even though the 'common' role also
+# installs them. This makes the role self-contained and allows it to be
+# run independently with --tags sync without requiring the common role.
+# This follows IaC best practices: roles should not have hidden dependencies.
+
+- name: Install Python dependencies for sync script
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-requests
+      - python3-yaml
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
 
 - name: Create sync script directory
   ansible.builtin.file:
