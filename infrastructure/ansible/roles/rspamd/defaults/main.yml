@@ -6,6 +6,10 @@
 # NOTE: Rspamd is only deployed when mail_server_receive_enabled: true
 # in the playbook. This role has no separate enable flag.
 
+# Mail domain for rejection messages
+# Defaults to m2s_domain for single-host deployments
+mail_domain: "{{ m2s_domain }}"
+
 # Spam action thresholds
 # Higher thresholds = less aggressive (fewer false positives)
 rspamd_reject_score: 15
