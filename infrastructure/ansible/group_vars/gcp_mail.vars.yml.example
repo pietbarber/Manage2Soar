@@ -143,9 +143,19 @@ club_domains:
   - prefix: "masa"
     name: "Mid-Atlantic Soaring Association"
 
-  # Add more tenants as needed:
-  # - prefix: "nfss"
-  #   name: "Northern Florida Soaring Society"
+# ============================================================
+# M2S API KEY (for mail sync)
+# ============================================================
+# API key for authenticating with the M2S Django API to fetch
+# mailing list membership. Get this from Django admin:
+# https://yourcluburl.manage2soar.com/admin/authtoken/tokenproxy/
+
+# M2S API authentication token - stored in vault.yml for security
+m2s_api_key: "{{ vault_m2s_api_key }}"
+
+# Add more tenants as needed:
+# - prefix: "nfss"
+#   name: "Northern Florida Soaring Society"
 
 # ============================================================
 # SMTP AUTHENTICATION (Optional)
