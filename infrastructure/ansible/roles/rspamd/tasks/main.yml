@@ -116,8 +116,10 @@
       # Message for temporary failures (milter unavailable)
       tempfail = "Temporary mail system error. Please try again in a few minutes.";
 
-      # Message for soft reject (greylisting - but we have it disabled)
+      # Example message for soft reject/greylisting (kept commented out because greylisting is disabled)
       # soft_reject = "Message temporarily rejected. Please try again later.";
+    owner: _rspamd
+    group: _rspamd
     mode: "0644"
   notify: Restart Rspamd
 
