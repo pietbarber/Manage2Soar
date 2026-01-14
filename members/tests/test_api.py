@@ -481,3 +481,28 @@ class TestEmailListsAPI:
         # Should only appear once
         count = data["whitelist"].count(active_member.email.lower())
         assert count == 1
+
+    @override_settings(M2S_MAIL_API_KEY="test-api-key-12345")
+    def test_empty_bypass_lists_when_none_enabled(
+        self, api_client, membership_statuses
+    ):
+        """Test that bypass_lists is an empty array when no lists have bypass enabled."""
+        # Create normal lists without bypass_whitelist
+        MailingList.objects.create(
+            name="members",
+            criteria=[MailingListCriterion.ACTIVE_MEMBER],
+            is_active=True,
+        )
+        MailingList.objects.create(
+            name="instructors",
+            criteria=[MailingListCriterion.INSTRUCTOR],
+            is_active=True,
+        )
+
+        url = reverse("api_email_lists")
+        response = api_client.get(url, HTTP_X_API_KEY="test-api-key-12345")
+        data = response.json()
+
+        assert "bypass_lists" in data
+        assert data["bypass_lists"] == []
+        assert isinstance(data["bypass_lists"], list)

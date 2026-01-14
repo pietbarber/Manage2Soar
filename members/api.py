@@ -108,11 +108,18 @@ def email_lists(request):
     manual_emails = []
     config = SiteConfiguration.objects.first()
     if config and config.manual_whitelist:
-        manual_emails = [
-            line.strip().lower()
-            for line in config.manual_whitelist.strip().split("\n")
-            if line.strip() and "@" in line.strip()
-        ]
+        from django.core.exceptions import ValidationError
+        from django.core.validators import validate_email
+
+        for line in config.manual_whitelist.strip().split("\n"):
+            email = line.strip().lower()
+            if email:
+                try:
+                    validate_email(email)
+                    manual_emails.append(email)
+                except ValidationError:
+                    # Silently skip invalid emails - they won't be included
+                    pass
 
     # Combine and dedupe whitelist
     whitelist = sorted(set(member_emails + manual_emails))

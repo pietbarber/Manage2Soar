@@ -443,7 +443,8 @@ def main():
 
     # Generate and update bypass lists map (Issue #492)
     # This lists recipients that bypass sender whitelist enforcement
-    if 'rspamd_whitelist_dir' in config and clubs_bypass_lists:
+    # Always write the file (even when empty) to clear stale data
+    if 'rspamd_whitelist_dir' in config:
         bypass_file = os.path.join(config['rspamd_whitelist_dir'], "bypass_lists.map")
         bypass_content = generate_bypass_lists_map(clubs_bypass_lists)
         if write_rspamd_whitelist(bypass_file, bypass_content):
