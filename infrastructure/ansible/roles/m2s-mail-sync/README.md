@@ -73,10 +73,10 @@ All mailing list recipients will be redirected to the specified address.
 To update only the sync configuration without touching Postfix/OpenDKIM/Rspamd:
 
 ```bash
-ansible-playbook playbooks/mail-server.yml --tags sync,mail
+ansible-playbook playbooks/mail-server.yml --tags sync
 ```
 
-**Note**: The `mail` tag is included to ensure the role runs with proper context.
+This runs only the m2s-mail-sync role tasks without modifying Postfix, OpenDKIM, or Rspamd configurations.
 
 ## Troubleshooting
 
