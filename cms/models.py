@@ -92,6 +92,71 @@ class PageRolePermission(models.Model):
         return f"{self.page.title} - {self.get_role_name_display()}"
 
 
+class PageMemberPermission(models.Model):
+    """
+    Allows assigning specific members to edit specific CMS pages or folders.
+
+    This model enables fine-grained access control beyond role-based permissions,
+    allowing individual members to be granted access to specific content.
+
+    Use Cases:
+    - Aircraft manager who manages documentation for a specific aircraft
+    - Committee chair who maintains a committee-specific folder
+    - Event coordinator who updates event pages
+
+    Business Rules:
+    - Only applies to private pages (is_public=False)
+    - Works alongside role-based permissions (OR logic)
+    - Members with this permission can view AND edit the page
+    - Applies to the page and all documents attached to it
+
+    Attributes:
+        page: Foreign key to the Page this permission applies to
+        member: Foreign key to the Member granted access
+    """
+
+    page = models.ForeignKey(
+        "Page", on_delete=models.CASCADE, related_name="member_permissions"
+    )
+    member = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cms_page_permissions",
+        help_text="Member granted access to this page",
+    )
+
+    class Meta:
+        unique_together = ("page", "member")
+        verbose_name = "Page Member Permission"
+        verbose_name_plural = "Page Member Permissions"
+
+    def clean(self):
+        """
+        Validate business rules for member permissions.
+
+        Ensures that member permissions can only be added to private pages,
+        preventing invalid configurations where public pages have member restrictions.
+
+        Raises:
+            ValidationError: If attempting to add member permissions to a public page
+        """
+        from django.core.exceptions import ValidationError
+
+        if self.page_id and self.page.is_public:
+            raise ValidationError(
+                "Member permissions cannot be added to public pages. "
+                "Set the page to private (uncheck 'is_public') first."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        member_name = getattr(self.member, "get_full_name", lambda: str(self.member))()
+        return f"{self.page.title} - {member_name}"
+
+
 class Page(models.Model):
     """
     CMS Page model supporting hierarchical content with role-based access control.
@@ -261,12 +326,13 @@ class Page(models.Model):
 
     def can_user_access(self, user):
         """
-        Check if a user can access this page based on role-based access control.
+        Check if a user can access this page based on role-based or member-specific access control.
 
-        Access is granted using a three-tier system:
+        Access is granted using a four-tier system:
         1. Public pages: Accessible to everyone (including anonymous users)
-        2. Private pages without roles: Accessible to all active members
-        3. Role-restricted pages: Only accessible to members with required roles
+        2. Member-specific permissions: Explicit access granted to specific members
+        3. Private pages without restrictions: Accessible to all active members
+        4. Role-restricted pages: Only accessible to members with required roles
 
         Args:
             user: Django User instance (can be anonymous)
@@ -277,6 +343,7 @@ class Page(models.Model):
         Access Logic:
             - Public pages (is_public=True): Always accessible
             - Private pages: Requires active membership status
+            - Member permissions: Specific members granted access via PageMemberPermission
             - Role restrictions: Uses OR logic - user needs ANY of the required roles
 
         Examples:
@@ -290,6 +357,9 @@ class Page(models.Model):
             >>> page.role_permissions.add(director_role)
             >>> page.can_user_access(director)  # True
             >>> page.can_user_access(regular_member)  # False
+
+            >>> page.member_permissions.create(member=aircraft_manager)
+            >>> page.can_user_access(aircraft_manager)  # True
         """
         if self.is_public:
             return True
@@ -299,6 +369,10 @@ class Page(models.Model):
 
         if not is_active_member(user):
             return False
+
+        # Check if user has explicit member permission for this page
+        if self.has_member_permission(user):
+            return True
 
         # If no role restrictions, any active member can access
         if not self.has_role_restrictions():
@@ -312,6 +386,42 @@ class Page(models.Model):
             return True  # User already passed is_active_member check above
 
         return any(getattr(user, role, False) for role in required_roles)
+
+    def has_member_permission(self, user):
+        """
+        Check if a specific member has explicit access to this page.
+
+        Args:
+            user: Django User instance
+
+        Returns:
+            bool: True if user has explicit member permission
+
+        Note:
+            Uses prefetched data if available to avoid extra queries.
+        """
+        if not user or not user.is_authenticated:
+            return False
+
+        # Try to use prefetched data first to avoid extra queries
+        if (
+            hasattr(self, "_prefetched_objects_cache")
+            and "member_permissions" in self._prefetched_objects_cache
+        ):
+            return any(mp.member_id == user.id for mp in self.member_permissions.all())
+        return self.member_permissions.filter(member=user).exists()
+
+    def get_permitted_members(self):
+        """
+        Get the list of members with explicit access to this page.
+
+        Returns:
+            QuerySet: Members with explicit page access
+        """
+        from members.models import Member
+
+        member_ids = self.member_permissions.values_list("member_id", flat=True)
+        return Member.objects.filter(id__in=member_ids)
 
 
 def upload_document_to(instance, filename):

@@ -240,16 +240,9 @@ AUTH_PASSWORD_VALIDATORS = [
 #############################################################
 # ---- Google Cloud Storage (GCS) / django-storages config ----
 # All GCS-related settings consolidated here for clarity
+# GCS is optional - if GS_BUCKET_NAME is not set, use local storage
 #############################################################
 GS_BUCKET_NAME = os.getenv("GS_BUCKET_NAME")
-if not GS_BUCKET_NAME:
-    raise Exception(
-        "Missing required environment variable GS_BUCKET_NAME. "
-        "Set GS_BUCKET_NAME in your environment or .env file. "
-        "This is required for Google Cloud Storage integration."
-    )
-
-GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
 
 # Multi-tenant support: Club-specific storage paths
 CLUB_PREFIX = os.getenv("CLUB_PREFIX", "ssc")  # Default to Skyline Soaring Club
@@ -265,41 +258,56 @@ if not re.match(r"^[a-zA-Z0-9-]+$", CLUB_PREFIX):
 GS_MEDIA_LOCATION = os.getenv("GS_MEDIA_LOCATION", f"{CLUB_PREFIX}/media")
 GS_STATIC_LOCATION = os.getenv("GS_STATIC_LOCATION", f"{CLUB_PREFIX}/static")
 
-# Credentials for GCS
-cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if cred_path:
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(cred_path)
+# Credentials for GCS (only load if using GCS)
+if GS_BUCKET_NAME:
+    GS_PROJECT_ID = os.getenv("GS_PROJECT_ID")  # optional
+    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if cred_path:
+        GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+            cred_path
+        )
 
+    # Django 5.1+ storage backend configuration
+    # Use GCP for both media and static files (multi-tenant ready)
+    STORAGES = {
+        "default": {
+            "BACKEND": "manage2soar.storage_backends.MediaRootGCS",
+        },
+        "staticfiles": {
+            "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
+        },
+    }
 
-# Django 5.1+ storage backend configuration
-# Use GCP for both media and static files (multi-tenant ready)
-STORAGES = {
-    "default": {
-        "BACKEND": "manage2soar.storage_backends.MediaRootGCS",
-    },
-    "staticfiles": {
-        "BACKEND": "manage2soar.storage_backends.StaticRootGCS",
-    },
-}
+    GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
 
-GS_DEFAULT_ACL = os.getenv("GS_DEFAULT_ACL", "publicRead")
-
-# Multi-tenant GCP URLs
-# Development vs Production Static/Media URLs
-if DEBUG:
-    # Development: Serve static files locally
-    STATIC_URL = f"/{CLUB_PREFIX}/static/"
-    MEDIA_URL = f"/{CLUB_PREFIX}/media/"
+    # Multi-tenant GCP URLs
+    if DEBUG:
+        # Development: Serve static files locally
+        STATIC_URL = f"/{CLUB_PREFIX}/static/"
+        MEDIA_URL = f"/{CLUB_PREFIX}/media/"
+    else:
+        # Production: Serve static files from Google Cloud Storage
+        MEDIA_URL = os.getenv(
+            "MEDIA_URL",
+            f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
+        )
+        STATIC_URL = os.getenv(
+            "STATIC_URL",
+            f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
+        )
 else:
-    # Production: Serve static files from Google Cloud Storage
-    MEDIA_URL = os.getenv(
-        "MEDIA_URL",
-        f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_MEDIA_LOCATION}/",
-    )
-    STATIC_URL = os.getenv(
-        "STATIC_URL",
-        f"https://storage.googleapis.com/{GS_BUCKET_NAME}/{GS_STATIC_LOCATION}/",
-    )
+    # Local development without GCS - use Django's default file storage
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    STATIC_URL = "/static/"
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
 
 # Use TinyMCE JS from configured static storage
 TINYMCE_JS_URL = os.getenv("TINYMCE_JS_URL", f"{STATIC_URL}tinymce/tinymce.min.js")
