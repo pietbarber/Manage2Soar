@@ -82,12 +82,18 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.director, self.board_page))
 
     def test_can_edit_page_unrestricted_private_pages(self):
-        """Unrestricted private pages can be edited by any active member (since they can see them)."""
+        """
+        Regular members can VIEW unrestricted private pages, but cannot EDIT them.
+        Only officers or members with explicit permissions can edit.
+        """
         # First verify they can see the page
         self.assertTrue(self.member_page.can_user_access(self.member))
         self.assertTrue(self.member_page.can_user_access(self.director))
-        # Then verify they can edit it (token to see = ability to edit)
-        self.assertTrue(can_edit_page(self.member, self.member_page))
+
+        # Regular member can see but CANNOT edit (no edit permission)
+        self.assertFalse(can_edit_page(self.member, self.member_page))
+
+        # Director CAN edit (has officer role)
         self.assertTrue(can_edit_page(self.director, self.member_page))
 
     def test_can_create_in_directory_anonymous_user(self):
@@ -115,12 +121,18 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_create_in_directory(self.director, self.board_page))
 
     def test_can_create_in_directory_unrestricted_parent(self):
-        """Any active member can create under unrestricted private parents (since they can see them)."""
+        """
+        Regular members can VIEW unrestricted private pages, but cannot EDIT/CREATE under them.
+        Only officers (director/secretary/webmaster) or members with explicit permissions can edit.
+        """
         # First verify they can see the parent page
         self.assertTrue(self.member_page.can_user_access(self.member))
         self.assertTrue(self.member_page.can_user_access(self.director))
-        # Then verify they can create under it
-        self.assertTrue(can_create_in_directory(self.member, self.member_page))
+
+        # Regular member can see but CANNOT create under it (no edit permission)
+        self.assertFalse(can_create_in_directory(self.member, self.member_page))
+
+        # Director CAN create under it (has officer role)
         self.assertTrue(can_create_in_directory(self.director, self.member_page))
 
     def test_can_create_in_directory_root_level(self):
@@ -160,6 +172,15 @@ class EditPageViewTests(TestCase):
         self.webmaster.webmaster = True
         self.webmaster.save()
 
+        self.director = User.objects.create_user(
+            username="director",
+            email="director@test.com",
+            password="testpass123",
+            membership_status="Full Member",
+        )
+        self.director.director = True
+        self.director.save()
+
     def test_edit_page_requires_authentication(self):
         """Edit page redirects anonymous users to login."""
         url = reverse("cms:edit_page", kwargs={"page_id": self.page.id})
@@ -180,8 +201,8 @@ class EditPageViewTests(TestCase):
         self.assertEqual(response.status_code, 403)  # View returns 403, not redirect
 
     def test_edit_page_permission_granted(self):
-        """Edit page allows access to users with permission."""
-        self.client.force_login(self.member)
+        """Edit page allows access to users with edit permission (officers)."""
+        self.client.force_login(self.director)
         url = reverse("cms:edit_page", kwargs={"page_id": self.page.id})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -200,8 +221,8 @@ class EditPageViewTests(TestCase):
         self.assertContains(response, "Edit Page")
 
     def test_edit_page_post_updates_content(self):
-        """POST to edit page updates the page content."""
-        self.client.force_login(self.member)
+        """POST to edit page updates the page content (requires edit permission)."""
+        self.client.force_login(self.director)
         url = reverse("cms:edit_page", kwargs={"page_id": self.page.id})
 
         form_data = {
@@ -224,7 +245,7 @@ class EditPageViewTests(TestCase):
 
     def test_edit_page_context_variables(self):
         """Edit page includes required context variables."""
-        self.client.force_login(self.member)
+        self.client.force_login(self.director)
         url = reverse("cms:edit_page", kwargs={"page_id": self.page.id})
         response = self.client.get(url)
 
@@ -265,6 +286,15 @@ class CreatePageViewTests(TestCase):
         self.webmaster.webmaster = True
         self.webmaster.save()
 
+        self.director = User.objects.create_user(
+            username="director",
+            email="director@test.com",
+            password="testpass123",
+            membership_status="Full Member",
+        )
+        self.director.director = True
+        self.director.save()
+
     def test_create_page_requires_authentication(self):
         """Create page redirects anonymous users to login."""
         url = reverse("cms:create_page")
@@ -300,14 +330,18 @@ class CreatePageViewTests(TestCase):
         self.assertEqual(response.status_code, 403)  # View returns 403, not redirect
 
     def test_create_page_post_creates_new_page(self):
-        """POST to create page creates a new page."""
+        """
+        POST to create page requires EDIT permission on parent.
+        Regular members cannot create under unrestricted private pages without explicit permission.
+        """
+        # Regular member cannot create (no edit permission)
         self.client.force_login(self.member)
         url = reverse("cms:create_page") + f"?parent={self.parent_page.id}"
 
         form_data = {
             "title": "New Page",
             "slug": "new-page",
-            "parent": self.parent_page.id,  # Include parent in form data
+            "parent": self.parent_page.id,
             "content": "<p>New content</p>",
             "is_public": False,
             "documents-TOTAL_FORMS": "0",
@@ -316,7 +350,11 @@ class CreatePageViewTests(TestCase):
             "documents-MAX_NUM_FORMS": "1000",
         }
 
-        # Member can create under unrestricted private parent page (following 'token to see = ability to edit' logic)
+        response = self.client.post(url, data=form_data)
+        self.assertEqual(response.status_code, 403)  # Should fail - no edit permission
+
+        # Director CAN create (has officer role)
+        self.client.force_login(self.director)
         response = self.client.post(url, data=form_data)
         self.assertEqual(response.status_code, 302)  # Should succeed
 
@@ -606,24 +644,36 @@ class MemberSpecificPermissionTests(TestCase):
         self.webmaster.save()
 
     def test_member_permission_grants_access(self):
-        """Specific member permission grants access to restricted page."""
-        # Regular member cannot access role-restricted page
+        """Specific member permission grants EDIT access, not VIEW access."""
+        # Regular member cannot VIEW role-restricted page
         self.assertFalse(self.role_restricted_page.can_user_access(self.regular_member))
+
+        # Regular member cannot EDIT role-restricted page
+        self.assertFalse(self.role_restricted_page.can_user_edit(self.regular_member))
 
         # Grant specific permission to aircraft_manager
         PageMemberPermission.objects.create(
             page=self.role_restricted_page, member=self.aircraft_manager
         )
 
-        # Now aircraft_manager can access the page
-        self.assertTrue(
+        # Aircraft manager can now EDIT the page
+        self.assertTrue(self.role_restricted_page.can_user_edit(self.aircraft_manager))
+
+        # But aircraft manager still cannot VIEW (role restriction applies to VIEW)
+        self.assertFalse(
             self.role_restricted_page.can_user_access(self.aircraft_manager)
         )
-        # Regular member still cannot
+
+        # Regular member still cannot VIEW or EDIT
         self.assertFalse(self.role_restricted_page.can_user_access(self.regular_member))
+        self.assertFalse(self.role_restricted_page.can_user_edit(self.regular_member))
 
     def test_member_permission_grants_edit_access(self):
         """Specific member permission allows editing the page."""
+        # Regular member cannot edit role-restricted page
+        self.assertFalse(can_edit_page(self.regular_member, self.role_restricted_page))
+        self.assertFalse(self.role_restricted_page.can_user_edit(self.regular_member))
+
         # Grant specific permission
         PageMemberPermission.objects.create(
             page=self.role_restricted_page, member=self.aircraft_manager
@@ -631,32 +681,46 @@ class MemberSpecificPermissionTests(TestCase):
 
         # Aircraft manager can now edit the page
         self.assertTrue(can_edit_page(self.aircraft_manager, self.role_restricted_page))
+        self.assertTrue(self.role_restricted_page.can_user_edit(self.aircraft_manager))
+
+        # But VIEW access is still role-restricted
+        self.assertFalse(
+            self.role_restricted_page.can_user_access(self.aircraft_manager)
+        )
+
         # Regular member still cannot
         self.assertFalse(can_edit_page(self.regular_member, self.role_restricted_page))
 
     def test_member_permission_on_private_page_without_roles(self):
-        """Member permission works on private pages without role restrictions."""
-        # Create a new private page with only member permission
+        """Member permission grants EDIT access, VIEW is controlled by roles."""
+        # Create a new private page without role restrictions
         private_only_page = Page.objects.create(
             title="Private Only", slug="private-only-test", is_public=False
         )
 
-        # All active members can access by default (no roles = open to all members)
+        # All active members can VIEW by default (no roles = open to all members)
         self.assertTrue(private_only_page.can_user_access(self.regular_member))
 
-        # Add a role restriction to make it restricted
-        PageRolePermission.objects.create(page=private_only_page, role_name="director")
+        # But only officers can EDIT by default
+        self.assertFalse(private_only_page.can_user_edit(self.regular_member))
 
-        # Now regular member cannot access
-        self.assertFalse(private_only_page.can_user_access(self.regular_member))
-
-        # Grant specific permission to regular member
+        # Grant EDIT permission to regular member
         PageMemberPermission.objects.create(
             page=private_only_page, member=self.regular_member
         )
 
-        # Now they can access again
+        # Now they can EDIT (but could already VIEW)
+        self.assertTrue(private_only_page.can_user_edit(self.regular_member))
         self.assertTrue(private_only_page.can_user_access(self.regular_member))
+
+        # Add a role restriction to control VIEW access
+        PageRolePermission.objects.create(page=private_only_page, role_name="director")
+
+        # Now regular member cannot VIEW (role restriction)
+        self.assertFalse(private_only_page.can_user_access(self.regular_member))
+
+        # But they can still EDIT (member permission)
+        self.assertTrue(private_only_page.can_user_edit(self.regular_member))
 
     def test_member_permission_cannot_be_added_to_public_page(self):
         """Member permissions cannot be added to public pages."""
@@ -728,9 +792,14 @@ class MemberSpecificPermissionTests(TestCase):
         )
         PageRolePermission.objects.create(page=child, role_name="director")
 
-        # Aircraft manager can access parent
-        self.assertTrue(parent.can_user_access(self.aircraft_manager))
-        # But not child (no inherited permissions)
+        # Aircraft manager can EDIT parent (member permission)
+        self.assertTrue(parent.can_user_edit(self.aircraft_manager))
+        # But aircraft manager cannot VIEW parent (role restriction applies)
+        self.assertFalse(parent.can_user_access(self.aircraft_manager))
+
+        # Aircraft manager cannot EDIT child (no inherited permissions)
+        self.assertFalse(child.can_user_edit(self.aircraft_manager))
+        # And still cannot VIEW child (role restriction)
         self.assertFalse(child.can_user_access(self.aircraft_manager))
 
         # Director can access both
