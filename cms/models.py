@@ -1,3 +1,5 @@
+import threading
+
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
@@ -5,6 +7,9 @@ from tinymce.models import HTMLField
 
 from utils.upload_document_obfuscated import upload_document_obfuscated
 from utils.upload_entropy import upload_homepage_gallery
+
+# Thread-local storage for recursion guards
+_thread_locals = threading.local()
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -99,9 +104,9 @@ class PageMemberPermission(models.Model):
     This model enables fine-grained EDIT access control beyond role-based permissions,
     allowing individual members to be granted editing rights to specific content.
 
-    IMPORTANT: This grants EDIT permissions, not VIEW permissions.
-    Members with this permission can edit the page in Django admin,
-    but VIEW access is still controlled by role-based permissions.
+    IMPORTANT: This grants EDIT permissions, which also allow VIEW access.
+    Members with this permission can edit the page in Django admin AND view it
+    through the normal UI, overriding any role-based VIEW restrictions.
 
     Use Cases:
     - Aircraft manager who manages documentation for a specific aircraft folder
@@ -111,7 +116,7 @@ class PageMemberPermission(models.Model):
     Business Rules:
     - Only applies to private pages (is_public=False)
     - Grants EDIT rights (via Django admin) in addition to officers
-    - VIEW access is separate - controlled by PageRolePermission
+    - EDIT permission grants VIEW access, overriding role-based VIEW restrictions
     - Applies to the page and all documents attached to it
 
     Example Workflow:
@@ -380,15 +385,20 @@ class Page(models.Model):
 
         # Users with EDIT permission should also be able to VIEW
         # (editors need to see what they're editing)
-        # Guard against potential future infinite recursion if can_user_edit()
-        # is changed to call back into can_user_access()
-        if not getattr(self, "_checking_access_via_edit", False):
-            self._checking_access_via_edit = True
+        # Use thread-local storage to guard against recursion in a thread-safe manner
+        import threading
+
+        if not hasattr(_thread_locals, "checking_access_via_edit"):
+            _thread_locals.checking_access_via_edit = set()
+
+        page_key = (id(self), id(user) if user else None)
+        if page_key not in _thread_locals.checking_access_via_edit:
+            _thread_locals.checking_access_via_edit.add(page_key)
             try:
                 if self.can_user_edit(user):
                     return True
             finally:
-                self._checking_access_via_edit = False
+                _thread_locals.checking_access_via_edit.discard(page_key)
 
         # Check if user is an active member
         from members.utils import is_active_member
@@ -440,14 +450,15 @@ class Page(models.Model):
         if not user or not user.is_authenticated:
             return False
 
-        # Check if user has explicit member permission for this page
-        if self.has_member_permission(user):
-            return True
-
-        # Check if user is superuser or has officer roles (director, secretary, webmaster)
+        # Check superuser first (cheap attribute check, avoids DB queries)
         if getattr(user, "is_superuser", False):
             return True
 
+        # Check if user has explicit member permission for this page (may require DB query)
+        if self.has_member_permission(user):
+            return True
+
+        # Check if user has officer roles (director, secretary, webmaster)
         if any(
             getattr(user, role, False)
             for role in ["director", "secretary", "webmaster"]
