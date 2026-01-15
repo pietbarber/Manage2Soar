@@ -10,7 +10,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from cms.models import Document, Page, PageRolePermission
+from cms.models import Document, Page, PageMemberPermission, PageRolePermission
 from cms.views import can_create_in_directory, can_edit_page
 
 User = get_user_model()
@@ -553,3 +553,205 @@ def test_permission_function_edge_cases():
 
     with pytest.raises(AttributeError):
         can_edit_page(user, None)
+
+
+class MemberSpecificPermissionTests(TestCase):
+    """
+    Test member-specific page permissions (Issue #489).
+
+    Tests the PageMemberPermission model that allows assigning specific
+    members to edit specific pages or folders.
+    """
+
+    def setUp(self):
+        # Create test pages
+        self.public_page = Page.objects.create(
+            title="Public Page", slug="member-perm-public", is_public=True
+        )
+        self.private_page = Page.objects.create(
+            title="Private Page", slug="member-perm-private", is_public=False
+        )
+        self.role_restricted_page = Page.objects.create(
+            title="Role Restricted", slug="member-perm-role-restricted", is_public=False
+        )
+        PageRolePermission.objects.create(
+            page=self.role_restricted_page, role_name="director"
+        )
+
+        # Create test users
+        self.regular_member = User.objects.create_user(
+            username="regular_member_489",
+            email="regular489@test.com",
+            membership_status="Full Member",
+        )
+        self.aircraft_manager = User.objects.create_user(
+            username="aircraft_manager_489",
+            email="aircraft489@test.com",
+            membership_status="Full Member",
+        )
+        self.director = User.objects.create_user(
+            username="director_489",
+            email="director489@test.com",
+            membership_status="Full Member",
+        )
+        self.director.director = True
+        self.director.save()
+
+        self.webmaster = User.objects.create_user(
+            username="webmaster_489",
+            email="webmaster489@test.com",
+            membership_status="Full Member",
+        )
+        self.webmaster.webmaster = True
+        self.webmaster.save()
+
+    def test_member_permission_grants_access(self):
+        """Specific member permission grants access to restricted page."""
+        # Regular member cannot access role-restricted page
+        self.assertFalse(self.role_restricted_page.can_user_access(self.regular_member))
+
+        # Grant specific permission to aircraft_manager
+        PageMemberPermission.objects.create(
+            page=self.role_restricted_page, member=self.aircraft_manager
+        )
+
+        # Now aircraft_manager can access the page
+        self.assertTrue(
+            self.role_restricted_page.can_user_access(self.aircraft_manager)
+        )
+        # Regular member still cannot
+        self.assertFalse(self.role_restricted_page.can_user_access(self.regular_member))
+
+    def test_member_permission_grants_edit_access(self):
+        """Specific member permission allows editing the page."""
+        # Grant specific permission
+        PageMemberPermission.objects.create(
+            page=self.role_restricted_page, member=self.aircraft_manager
+        )
+
+        # Aircraft manager can now edit the page
+        self.assertTrue(can_edit_page(self.aircraft_manager, self.role_restricted_page))
+        # Regular member still cannot
+        self.assertFalse(can_edit_page(self.regular_member, self.role_restricted_page))
+
+    def test_member_permission_on_private_page_without_roles(self):
+        """Member permission works on private pages without role restrictions."""
+        # Create a new private page with only member permission
+        private_only_page = Page.objects.create(
+            title="Private Only", slug="private-only-test", is_public=False
+        )
+
+        # All active members can access by default (no roles = open to all members)
+        self.assertTrue(private_only_page.can_user_access(self.regular_member))
+
+        # Add a role restriction to make it restricted
+        PageRolePermission.objects.create(page=private_only_page, role_name="director")
+
+        # Now regular member cannot access
+        self.assertFalse(private_only_page.can_user_access(self.regular_member))
+
+        # Grant specific permission to regular member
+        PageMemberPermission.objects.create(
+            page=private_only_page, member=self.regular_member
+        )
+
+        # Now they can access again
+        self.assertTrue(private_only_page.can_user_access(self.regular_member))
+
+    def test_member_permission_cannot_be_added_to_public_page(self):
+        """Member permissions cannot be added to public pages."""
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            perm = PageMemberPermission(
+                page=self.public_page, member=self.aircraft_manager
+            )
+            perm.full_clean()  # Should raise ValidationError
+
+    def test_member_permission_unique_constraint(self):
+        """Cannot add same member twice to same page."""
+        from django.db import IntegrityError
+
+        PageMemberPermission.objects.create(
+            page=self.private_page, member=self.aircraft_manager
+        )
+
+        with self.assertRaises(IntegrityError):
+            PageMemberPermission.objects.create(
+                page=self.private_page, member=self.aircraft_manager
+            )
+
+    def test_has_member_permission_method(self):
+        """Test the has_member_permission helper method."""
+        self.assertFalse(self.private_page.has_member_permission(self.aircraft_manager))
+
+        PageMemberPermission.objects.create(
+            page=self.private_page, member=self.aircraft_manager
+        )
+
+        self.assertTrue(self.private_page.has_member_permission(self.aircraft_manager))
+        self.assertFalse(self.private_page.has_member_permission(self.regular_member))
+
+    def test_has_member_permission_anonymous_user(self):
+        """Anonymous users never have member permissions."""
+        from django.contrib.auth.models import AnonymousUser
+
+        self.assertFalse(self.private_page.has_member_permission(AnonymousUser()))
+
+    def test_get_permitted_members(self):
+        """Test retrieving list of permitted members."""
+        # Add two members
+        PageMemberPermission.objects.create(
+            page=self.private_page, member=self.aircraft_manager
+        )
+        PageMemberPermission.objects.create(
+            page=self.private_page, member=self.regular_member
+        )
+
+        permitted = self.private_page.get_permitted_members()
+        self.assertEqual(permitted.count(), 2)
+        self.assertIn(self.aircraft_manager, permitted)
+        self.assertIn(self.regular_member, permitted)
+
+    def test_member_permission_inheritance_not_automatic(self):
+        """Child pages do not automatically inherit parent member permissions."""
+        # Create parent with member permission
+        parent = Page.objects.create(
+            title="Parent", slug="parent-perm-test", is_public=False
+        )
+        PageRolePermission.objects.create(page=parent, role_name="director")
+        PageMemberPermission.objects.create(page=parent, member=self.aircraft_manager)
+
+        # Create child page with same role restriction
+        child = Page.objects.create(
+            title="Child", slug="child-perm-test", parent=parent, is_public=False
+        )
+        PageRolePermission.objects.create(page=child, role_name="director")
+
+        # Aircraft manager can access parent
+        self.assertTrue(parent.can_user_access(self.aircraft_manager))
+        # But not child (no inherited permissions)
+        self.assertFalse(child.can_user_access(self.aircraft_manager))
+
+        # Director can access both
+        self.assertTrue(parent.can_user_access(self.director))
+        self.assertTrue(child.can_user_access(self.director))
+
+    def test_can_create_in_directory_with_member_permission(self):
+        """Members with explicit permission can create pages under that directory."""
+        # Create a directory with role restriction
+        directory = Page.objects.create(
+            title="Aircraft Docs", slug="aircraft-docs-test", is_public=False
+        )
+        PageRolePermission.objects.create(page=directory, role_name="director")
+
+        # Regular member cannot create under it
+        self.assertFalse(can_create_in_directory(self.regular_member, directory))
+
+        # Grant permission to aircraft_manager
+        PageMemberPermission.objects.create(
+            page=directory, member=self.aircraft_manager
+        )
+
+        # Now aircraft_manager can create under it
+        self.assertTrue(can_create_in_directory(self.aircraft_manager, directory))

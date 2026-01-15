@@ -7,6 +7,7 @@ from .models import (
     HomePageContent,
     HomePageImage,
     Page,
+    PageMemberPermission,
     PageRolePermission,
     SiteFeedback,
     VisitorContact,
@@ -44,6 +45,15 @@ class PageRolePermissionInline(admin.TabularInline):
     verbose_name_plural = "🔒 Role Permissions (For Private Pages Only)"
 
 
+class PageMemberPermissionInline(admin.TabularInline):
+    model = PageMemberPermission
+    extra = 1
+    fields = ("member",)
+    autocomplete_fields = ["member"]
+    verbose_name = "Member Permission"
+    verbose_name_plural = "👤 Individual Member Permissions (For Private Pages Only)"
+
+
 @admin.register(Page)
 class PageAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
@@ -52,8 +62,12 @@ class PageAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
     def get_queryset(self, request):
-        """Prefetch role permissions to prevent N+1 queries in list view"""
-        return super().get_queryset(request).prefetch_related("role_permissions")
+        """Prefetch role and member permissions to prevent N+1 queries in list view"""
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("role_permissions", "member_permissions")
+        )
 
     list_display = (
         "title",
@@ -61,12 +75,17 @@ class PageAdmin(admin.ModelAdmin):
         "parent",
         "is_public",
         "role_summary",
+        "member_summary",
         "updated_at",
     )
     search_fields = ("title", "slug")
     list_filter = ("is_public", "parent")
     prepopulated_fields = {"slug": ("title",)}
-    inlines = [PageRolePermissionInline, DocumentInline]  # Move role permissions first
+    inlines = [
+        PageRolePermissionInline,
+        PageMemberPermissionInline,
+        DocumentInline,
+    ]
 
     # Custom fieldsets to organize the form
     fieldsets = (
@@ -86,8 +105,8 @@ class PageAdmin(admin.ModelAdmin):
 
     admin_helper_message = (
         "<b>CMS Pages:</b> Use this to create arbitrary pages and directories under /cms/. "
-        "Set access control: Public (everyone), Private (active members), or Role-based (specific positions). "
-        "Leave 'Parent' blank for top-level pages."
+        "Set access control: Public (everyone), Private (active members), Role-based (specific positions), "
+        "or assign specific members. Leave 'Parent' blank for top-level pages."
     )
 
     @admin.display(description="Role Restrictions")
@@ -105,6 +124,28 @@ class PageAdmin(admin.ModelAdmin):
             return ", ".join(roles).title()
         else:
             return f"{len(roles)} roles required"
+
+    @admin.display(description="Assigned Members")
+    def member_summary(self, obj):
+        """Display summary of member-specific permissions in list view.
+
+        Note: This method relies on prefetch_related('member_permissions__member')
+        in get_queryset() to prevent N+1 queries. If the prefetch is modified or
+        removed, performance will degrade.
+        """
+        if obj.is_public:
+            return "-"
+
+        # Use prefetched data to avoid N+1 queries
+        members = list(obj.member_permissions.all())
+        if not members:
+            return "-"
+
+        if len(members) == 1:
+            member = members[0].member
+            return member.full_display_name
+        else:
+            return f"{len(members)} members"
 
     def has_module_permission(self, request):
         """Allow webmasters access to CMS admin."""
