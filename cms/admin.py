@@ -172,16 +172,19 @@ class PageAdmin(admin.ModelAdmin):
         """
         Allow webmasters, directors, secretaries, and members with explicit
         permissions to edit CMS pages.
-        """
-        # Superusers always have permission
-        if request.user.is_superuser:
-            return True
 
+        For object-level checks, delegate to Page.can_user_edit(), which already
+        handles superuser access and role-based permissions.
+        """
         # If editing a specific page, use its can_user_edit() method
+        # (which handles superuser checks internally)
         if obj is not None:
             return obj.can_user_edit(request.user)
 
-        # For list view, allow if user has any edit rights
+        # For list view, allow superusers and users with any edit rights
+        if request.user.is_superuser:
+            return True
+
         return request.user.is_authenticated and (
             getattr(request.user, "webmaster", False)
             or getattr(request.user, "director", False)

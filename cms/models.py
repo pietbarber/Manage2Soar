@@ -337,7 +337,7 @@ class Page(models.Model):
         """
         Check if a user can VIEW this page based on role-based access control.
 
-        Access is granted using a three-tier system:
+        Access is granted using a four-tier system:
         1. Public pages: Accessible to everyone (including anonymous users)
         2. Private pages without restrictions: Accessible to all active members
         3. Role-restricted pages: Only accessible to members with required roles
@@ -380,8 +380,15 @@ class Page(models.Model):
 
         # Users with EDIT permission should also be able to VIEW
         # (editors need to see what they're editing)
-        if self.can_user_edit(user):
-            return True
+        # Guard against potential future infinite recursion if can_user_edit()
+        # is changed to call back into can_user_access()
+        if not getattr(self, "_checking_access_via_edit", False):
+            self._checking_access_via_edit = True
+            try:
+                if self.can_user_edit(user):
+                    return True
+            finally:
+                self._checking_access_via_edit = False
 
         # Check if user is an active member
         from members.utils import is_active_member
