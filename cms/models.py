@@ -341,6 +341,7 @@ class Page(models.Model):
         1. Public pages: Accessible to everyone (including anonymous users)
         2. Private pages without restrictions: Accessible to all active members
         3. Role-restricted pages: Only accessible to members with required roles
+        4. Users with EDIT permission: Can also VIEW (editors need to see content)
 
         Args:
             user: Django User instance (can be anonymous)
@@ -352,10 +353,11 @@ class Page(models.Model):
             - Public pages (is_public=True): Always accessible
             - Private pages: Requires active membership status
             - Role restrictions: Uses OR logic - user needs ANY of the required roles
+            - EDIT permission: Users who can edit can also view
 
         Note:
-            This method controls VIEW access only. For EDIT permissions, see
-            can_user_edit() and PageMemberPermission model.
+            This method controls VIEW access. For EDIT-only permission checks,
+            see can_user_edit() and PageMemberPermission model.
 
         Examples:
             >>> page.is_public = True
@@ -368,8 +370,17 @@ class Page(models.Model):
             >>> page.role_permissions.add(director_role)
             >>> page.can_user_access(director)  # True
             >>> page.can_user_access(regular_member)  # False
+
+            >>> # User with EDIT permission can VIEW
+            >>> page.member_permissions.create(member=aircraft_manager)
+            >>> page.can_user_access(aircraft_manager)  # True (via EDIT permission)
         """
         if self.is_public:
+            return True
+
+        # Users with EDIT permission should also be able to VIEW
+        # (editors need to see what they're editing)
+        if self.can_user_edit(user):
             return True
 
         # Check if user is an active member
@@ -396,7 +407,7 @@ class Page(models.Model):
         Check if a user can EDIT this page.
 
         Edit permissions are granted to:
-        1. Superusers and staff with cms.change_page permission
+        1. Superusers
         2. Directors, Secretaries, and Webmasters (club officers)
         3. Members with explicit edit permission via PageMemberPermission
 
@@ -407,8 +418,8 @@ class Page(models.Model):
             bool: True if user can edit this page, False otherwise
 
         Note:
-            This is separate from VIEW permissions (can_user_access).
-            PageMemberPermission grants EDIT rights, not VIEW rights.
+            Users with EDIT permission can also VIEW the page (see can_user_access).
+            PageMemberPermission grants EDIT rights, and editors can see their content.
 
         Examples:
             >>> # Officer can always edit
@@ -417,7 +428,7 @@ class Page(models.Model):
             >>> # Aircraft manager granted edit permission
             >>> page.member_permissions.create(member=aircraft_manager)
             >>> page.can_user_edit(aircraft_manager)  # True
-            >>> page.can_user_access(aircraft_manager)  # Depends on role restrictions
+            >>> page.can_user_access(aircraft_manager)  # True (via EDIT permission)
         """
         if not user or not user.is_authenticated:
             return False

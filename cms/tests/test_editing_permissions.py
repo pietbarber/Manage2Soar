@@ -644,7 +644,10 @@ class MemberSpecificPermissionTests(TestCase):
         self.webmaster.save()
 
     def test_member_permission_grants_access(self):
-        """Specific member permission grants EDIT access, not VIEW access."""
+        """
+        Specific member permission grants EDIT access, which also allows VIEW.
+        This ensures editors can see the content they're editing.
+        """
         # Regular member cannot VIEW role-restricted page
         self.assertFalse(self.role_restricted_page.can_user_access(self.regular_member))
 
@@ -659,8 +662,8 @@ class MemberSpecificPermissionTests(TestCase):
         # Aircraft manager can now EDIT the page
         self.assertTrue(self.role_restricted_page.can_user_edit(self.aircraft_manager))
 
-        # But aircraft manager still cannot VIEW (role restriction applies to VIEW)
-        self.assertFalse(
+        # Aircraft manager can also VIEW (EDIT permission grants VIEW access)
+        self.assertTrue(
             self.role_restricted_page.can_user_access(self.aircraft_manager)
         )
 
@@ -669,7 +672,7 @@ class MemberSpecificPermissionTests(TestCase):
         self.assertFalse(self.role_restricted_page.can_user_edit(self.regular_member))
 
     def test_member_permission_grants_edit_access(self):
-        """Specific member permission allows editing the page."""
+        """Specific member permission allows editing and viewing the page."""
         # Regular member cannot edit role-restricted page
         self.assertFalse(can_edit_page(self.regular_member, self.role_restricted_page))
         self.assertFalse(self.role_restricted_page.can_user_edit(self.regular_member))
@@ -683,8 +686,8 @@ class MemberSpecificPermissionTests(TestCase):
         self.assertTrue(can_edit_page(self.aircraft_manager, self.role_restricted_page))
         self.assertTrue(self.role_restricted_page.can_user_edit(self.aircraft_manager))
 
-        # But VIEW access is still role-restricted
-        self.assertFalse(
+        # Aircraft manager can also VIEW (EDIT permission grants VIEW access)
+        self.assertTrue(
             self.role_restricted_page.can_user_access(self.aircraft_manager)
         )
 
@@ -692,7 +695,10 @@ class MemberSpecificPermissionTests(TestCase):
         self.assertFalse(can_edit_page(self.regular_member, self.role_restricted_page))
 
     def test_member_permission_on_private_page_without_roles(self):
-        """Member permission grants EDIT access, VIEW is controlled by roles."""
+        """
+        Member permission grants EDIT access, which also allows VIEW.
+        Demonstrates that EDIT permission overrides role restrictions for viewing.
+        """
         # Create a new private page without role restrictions
         private_only_page = Page.objects.create(
             title="Private Only", slug="private-only-test", is_public=False
@@ -709,15 +715,15 @@ class MemberSpecificPermissionTests(TestCase):
             page=private_only_page, member=self.regular_member
         )
 
-        # Now they can EDIT (but could already VIEW)
+        # Now they can EDIT (and could already VIEW)
         self.assertTrue(private_only_page.can_user_edit(self.regular_member))
         self.assertTrue(private_only_page.can_user_access(self.regular_member))
 
         # Add a role restriction to control VIEW access
         PageRolePermission.objects.create(page=private_only_page, role_name="director")
 
-        # Now regular member cannot VIEW (role restriction)
-        self.assertFalse(private_only_page.can_user_access(self.regular_member))
+        # Regular member can still VIEW because EDIT permission overrides role restrictions
+        self.assertTrue(private_only_page.can_user_access(self.regular_member))
 
         # But they can still EDIT (member permission)
         self.assertTrue(private_only_page.can_user_edit(self.regular_member))
@@ -794,8 +800,8 @@ class MemberSpecificPermissionTests(TestCase):
 
         # Aircraft manager can EDIT parent (member permission)
         self.assertTrue(parent.can_user_edit(self.aircraft_manager))
-        # But aircraft manager cannot VIEW parent (role restriction applies)
-        self.assertFalse(parent.can_user_access(self.aircraft_manager))
+        # Aircraft manager can also VIEW parent (EDIT permission grants VIEW)
+        self.assertTrue(parent.can_user_access(self.aircraft_manager))
 
         # Aircraft manager cannot EDIT child (no inherited permissions)
         self.assertFalse(child.can_user_edit(self.aircraft_manager))
