@@ -153,8 +153,7 @@ class PageMemberPermission(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        member_name = getattr(self.member, "get_full_name", lambda: str(self.member))()
-        return f"{self.page.title} - {member_name}"
+        return f"{self.page.title} - {self.member.full_display_name}"
 
 
 class Page(models.Model):

@@ -138,8 +138,7 @@ class PageAdmin(admin.ModelAdmin):
 
         if len(members) == 1:
             member = members[0].member
-            name = getattr(member, "get_full_name", lambda: str(member))()
-            return name or str(member)
+            return member.full_display_name
         else:
             return f"{len(members)} members"
 
