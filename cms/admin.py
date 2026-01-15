@@ -127,7 +127,12 @@ class PageAdmin(admin.ModelAdmin):
 
     @admin.display(description="Assigned Members")
     def member_summary(self, obj):
-        """Display summary of member-specific permissions in list view"""
+        """Display summary of member-specific permissions in list view.
+
+        Note: This method relies on prefetch_related('member_permissions__member')
+        in get_queryset() to prevent N+1 queries. If the prefetch is modified or
+        removed, performance will degrade.
+        """
         if obj.is_public:
             return "-"
 
