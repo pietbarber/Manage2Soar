@@ -19,7 +19,9 @@ def upload_document_obfuscated(instance, filename):
     ext = ext.strip()
     if ext:
         ext_name = get_valid_filename(ext.lstrip(".")) or ""
-        ext_name = "".join(ch for ch in ext_name if ch.isalnum() or ch == ".")
+        ext_name = "".join(ch for ch in ext_name if ch.isalnum())
+        if "script" in ext_name.lower():
+            ext_name = ""
         ext = f".{ext_name}" if ext_name else ""
     else:
         ext = ""
@@ -28,8 +30,10 @@ def upload_document_obfuscated(instance, filename):
         safe_name = "file"
     else:
         safe_name = stripped_name.replace(" ", "_")
-        safe_name = re.sub(r"(?u)[^-\w.]", "", safe_name)
+        safe_name = re.sub(r"(?u)[^-\w]", "", safe_name)
         if safe_name in {"", ".", ".."}:
             safe_name = "file"
+    if not ext and "script" in base_filename.lower():
+        safe_name = "file"
     token = secrets.token_urlsafe(8)
     return f"cms/{page_slug}/{safe_name}-{token}{ext}"

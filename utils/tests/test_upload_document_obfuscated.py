@@ -75,7 +75,7 @@ def test_upload_document_obfuscated_handles_multiple_dots(monkeypatch):
     instance = make_instance()
     result = upload_document_obfuscated(instance, "Board.Agenda.2025.pdf")
 
-    assert result == "cms/test-page/Board.Agenda.2025-xfds3Fj.pdf"
+    assert result == "cms/test-page/BoardAgenda2025-xfds3Fj.pdf"
 
 
 def test_upload_document_obfuscated_handles_extension_edge_cases(monkeypatch):
@@ -90,5 +90,5 @@ def test_upload_document_obfuscated_handles_extension_edge_cases(monkeypatch):
 
     assert no_extension == "cms/test-page/README-xfds3Fj"
     assert upper_extension == "cms/test-page/Board-xfds3Fj.PDF"
-    assert tarball == "cms/test-page/archive.tar-xfds3Fj.gz"
-    assert malicious_ext == "cms/test-page/report-xfds3Fj.pdfscript"
+    assert tarball == "cms/test-page/archivetar-xfds3Fj.gz"
+    assert malicious_ext == "cms/test-page/file-xfds3Fj"
