@@ -101,14 +101,32 @@ opendkim-genkey -b 2048 -d domain.com -s m2s-new -D /tmp/
 
 ### Restoring from GCS Backup
 ```bash
-# 1. Download encrypted backup
+# 1. List available backups
+gsutil ls gs://{bucket}/dkim-keys/
+
+# Output will show timestamped files like:
+# gs://{bucket}/dkim-keys/dkim-keys-20260116T235900.tar.gz.enc
+# gs://{bucket}/dkim-keys/dkim-keys-20260115T120000.tar.gz.enc
+# Choose the timestamp you want to restore
+
+# 2. Download encrypted backup (replace {timestamp} with actual value)
 gsutil cp gs://{bucket}/dkim-keys/dkim-keys-{timestamp}.tar.gz.enc /tmp/
 
-# 2. Decrypt backup
+# 3. Decrypt backup
+# Option A: Use the vault variable directly (requires vault password)
+ansible-vault view --vault-password-file ~/.ansible_vault_pass group_vars/gcp_mail/vault.yml | \
+  grep vault_dkim_backup_encryption_key | \
+  cut -d':' -f2 | \
+  xargs -I {} openssl enc -d -aes-256-cbc -pbkdf2 \
+    -in /tmp/dkim-keys-{timestamp}.tar.gz.enc \
+    -out /tmp/dkim-keys.tar.gz \
+    -pass pass:{}
+
+# Option B: Manually provide the password
 openssl enc -d -aes-256-cbc -pbkdf2 \
   -in /tmp/dkim-keys-{timestamp}.tar.gz.enc \
   -out /tmp/dkim-keys.tar.gz \
-  -pass pass:{vault_dkim_backup_encryption_key}
+  -pass pass:"your-encryption-password-here"
 
 # 3. Extract keys
 tar xzf /tmp/dkim-keys.tar.gz -C /tmp/dkim-restore/
@@ -140,7 +158,14 @@ After deploying keys, add these DNS records for each domain:
 **DMARC Record:**
 - Type: TXT
 - Name: `_dmarc`
-- Value: `v=DMARC1; p=quarantine; rua=mailto:dmarc@{domain}`
+- Value (initial monitoring): `v=DMARC1; p=none; rua=mailto:dmarc@{domain}`
+
+**DMARC Policy Progression:**
+Start with `p=none` in production to monitor DMARC aggregate reports without affecting delivery. Verify that all legitimate email has correct SPF/DKIM alignment. After 1-4 weeks of monitoring and fixing any issues, gradually move to stricter policies:
+
+- **Monitoring** (start here): `v=DMARC1; p=none; rua=mailto:dmarc@{domain}`
+- **Quarantine** (after verification): `v=DMARC1; p=quarantine; rua=mailto:dmarc@{domain}`
+- **Reject** (production hardened): `v=DMARC1; p=reject; rua=mailto:dmarc@{domain}`
 
 ## Related Documentation
 
