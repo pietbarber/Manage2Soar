@@ -30,10 +30,13 @@ def upload_document_obfuscated(instance, filename):
         safe_name = "file"
     else:
         safe_name = stripped_name.replace(" ", "_")
+        # Intentionally strip dots and other non-word characters from the base filename.
+        # This avoids extension confusion (e.g., "evil.php.txt" -> "evilphp-<token>.txt").
+        # The actual extension is handled separately via os.path.splitext() and cleaned above.
         safe_name = re.sub(r"(?u)[^-\w]", "", safe_name)
         if safe_name in {"", ".", ".."}:
             safe_name = "file"
-    if not ext and "script" in base_filename.lower():
+    if "script" in base_filename.lower():
         safe_name = "file"
     token = secrets.token_urlsafe(8)
     return f"cms/{page_slug}/{safe_name}-{token}{ext}"

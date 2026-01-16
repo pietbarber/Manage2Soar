@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from utils.upload_document_obfuscated import upload_document_obfuscated
 
 
@@ -11,20 +13,22 @@ def make_instance_without_page():
     return SimpleNamespace(page=None)
 
 
-def test_upload_document_obfuscated_appends_token_and_preserves_extension(
-    monkeypatch,
-):
+@pytest.fixture
+def fixed_token(monkeypatch):
     monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
+    return "xfds3Fj"
 
+
+def test_upload_document_obfuscated_appends_token_and_preserves_extension(
+    fixed_token,
+):
     instance = make_instance()
     result = upload_document_obfuscated(instance, "Board-Agenda-2025.pdf")
 
     assert result == "cms/test-page/Board-Agenda-2025-xfds3Fj.pdf"
 
 
-def test_upload_document_obfuscated_sanitizes_filename(monkeypatch):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
+def test_upload_document_obfuscated_sanitizes_filename(fixed_token):
     instance = make_instance("restricted")
     filename = "../evil/Board Agenda (final).pdf"
 
@@ -37,10 +41,8 @@ def test_upload_document_obfuscated_sanitizes_filename(monkeypatch):
 
 
 def test_upload_document_obfuscated_defaults_uncategorized_without_page(
-    monkeypatch,
+    fixed_token,
 ):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
     instance = make_instance_without_page()
     result = upload_document_obfuscated(instance, "Board-Agenda-2025.pdf")
 
@@ -48,10 +50,8 @@ def test_upload_document_obfuscated_defaults_uncategorized_without_page(
 
 
 def test_upload_document_obfuscated_falls_back_to_file_on_empty_name(
-    monkeypatch,
+    fixed_token,
 ):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
     instance = make_instance()
     result = upload_document_obfuscated(instance, "   .pdf")
 
@@ -59,28 +59,24 @@ def test_upload_document_obfuscated_falls_back_to_file_on_empty_name(
 
 
 def test_upload_document_obfuscated_falls_back_on_special_char_name(
-    monkeypatch,
+    fixed_token,
 ):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
     instance = make_instance()
     result = upload_document_obfuscated(instance, "!@#$.pdf")
 
     assert result == "cms/test-page/file-xfds3Fj.pdf"
 
 
-def test_upload_document_obfuscated_handles_multiple_dots(monkeypatch):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
+def test_upload_document_obfuscated_handles_multiple_dots(fixed_token):
     instance = make_instance()
     result = upload_document_obfuscated(instance, "Board.Agenda.2025.pdf")
 
     assert result == "cms/test-page/BoardAgenda2025-xfds3Fj.pdf"
 
 
-def test_upload_document_obfuscated_handles_extension_edge_cases(monkeypatch):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
-
+def test_upload_document_obfuscated_handles_extension_edge_cases(
+    fixed_token,
+):
     instance = make_instance()
 
     no_extension = upload_document_obfuscated(instance, "README")
