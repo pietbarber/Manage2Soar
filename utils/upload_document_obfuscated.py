@@ -11,6 +11,7 @@ def upload_document_obfuscated(instance, filename):
 
     Note: uses os.path.splitext(), so only the last extension is preserved
     (e.g., archive.tar.gz becomes archive.tar-<token>.gz).
+    Existing files uploaded with the old token-only naming remain unchanged.
     """
     page_slug = instance.page.slug if instance.page else "uncategorized"
     base_filename = os.path.basename(filename)
