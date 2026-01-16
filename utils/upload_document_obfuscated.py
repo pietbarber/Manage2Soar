@@ -15,12 +15,9 @@ def upload_document_obfuscated(instance, filename):
     base_filename = os.path.basename(filename)
     name, ext = os.path.splitext(base_filename)
     ext = ext.strip()
-    if ext:
-        if "script" in ext.lower():
-            ext = ""
-        else:
-            ext_name = re.sub(r"[^A-Za-z0-9]", "", ext.lstrip("."))
-            ext = f".{ext_name}" if ext_name else ""
+    if ext and "script" not in ext.lower():
+        ext_name = re.sub(r"[^A-Za-z0-9]", "", ext.lstrip("."))
+        ext = f".{ext_name}" if ext_name else ""
     else:
         ext = ""
     stripped_name = name.strip()

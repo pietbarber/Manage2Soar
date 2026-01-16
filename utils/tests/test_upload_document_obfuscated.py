@@ -15,7 +15,10 @@ def make_instance_without_page():
 
 @pytest.fixture
 def fixed_token(monkeypatch):
-    monkeypatch.setattr("secrets.token_urlsafe", lambda _length: "xfds3Fj")
+    monkeypatch.setattr(
+        "utils.upload_document_obfuscated.secrets.token_urlsafe",
+        lambda _length: "xfds3Fj",
+    )
     return "xfds3Fj"
 
 
@@ -88,7 +91,6 @@ def test_upload_document_obfuscated_handles_extension_edge_cases(
     assert upper_extension == "cms/test-page/Board-xfds3Fj.PDF"
     assert tarball == "cms/test-page/archivetar-xfds3Fj.gz"
     assert malicious_ext == "cms/test-page/file-xfds3Fj"
-    assert "." not in malicious_ext.rsplit("/", 1)[-1]
 
 
 def test_upload_document_obfuscated_sanitizes_control_chars_and_unicode(
