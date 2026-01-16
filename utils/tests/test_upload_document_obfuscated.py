@@ -103,3 +103,24 @@ def test_upload_document_obfuscated_sanitizes_control_chars_and_unicode(
 
     assert null_byte == "cms/test-page/BoardAgenda-xfds3Fj.pdf"
     assert rlo == "cms/test-page/BoardAgenda-xfds3Fj.pdf"
+
+
+def test_upload_document_obfuscated_handles_absolute_and_windows_paths(
+    fixed_token,
+):
+    """Verify os.path.basename() strips absolute and Windows-style paths."""
+    instance = make_instance()
+
+    # Unix absolute path
+    unix_abs = upload_document_obfuscated(instance, "/etc/passwd.pdf")
+    # Windows-style path (note: on Linux, backslash is a valid char, so
+    # os.path.basename won't strip it, but the regex sanitization will remove it)
+    windows_path = upload_document_obfuscated(instance, "C:\\evil\\file.pdf")
+
+    assert unix_abs == "cms/test-page/passwd-xfds3Fj.pdf"
+    assert "/etc" not in unix_abs
+    # On Linux, backslashes are kept by basename but stripped by regex sanitization.
+    # The entire "C:\evil\file" becomes the base name, and ".pdf" is the extension.
+    # After sanitization, "C:\evil\file" becomes "Cevilfile" (backslashes removed).
+    assert windows_path == "cms/test-page/Cevilfile-xfds3Fj.pdf"
+    assert "\\" not in windows_path
