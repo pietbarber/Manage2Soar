@@ -78,6 +78,15 @@
   - `mcp_github_github_get_issue` (tool doesn't exist)
   - GitHub search syntax like `"number:70"` or `"is:issue 70"` (fails in search)
 - This eliminates the "three different attempts" pattern - use Method 1 first, then Method 2 if needed.
+
+## Security Scanning & CodeQL Alerts
+- **CRITICAL**: When user mentions security vulnerabilities, CodeQL alerts, code scanning issues, or dependabot alerts, ALWAYS use the GitHub API to fetch alert details:
+  ```bash
+  gh api repos/pietbarber/Manage2Soar/code-scanning/alerts --jq '.[] | select(.state == "open") | {number: .number, rule_id: .rule.id, severity: .rule.severity, file: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line, message: .most_recent_instance.message.text}'
+  ```
+- **DO NOT** ask the user to copy/paste alert details - fetch them directly with the `gh` command
+- **Pattern**: Fetch alerts → Analyze code → Fix vulnerabilities → Commit with alert numbers in message
+- **Workflow**: Create feature branch → Fix issues → Push → Create PR (avoid committing directly to main)
 ## Testing & Coverage
 - All Django apps must have comprehensive test coverage using pytest and pytest-django.
 - Use `pytest --cov` or the VS Code "Run test with coverage" feature to ensure all code paths are tested.
