@@ -61,7 +61,6 @@
     group: opendkim
     mode: "0750"
   loop: "{{ dkim_additional_domains | default([]) }}"
-  when: dkim_additional_domains is defined and dkim_additional_domains | length > 0
 
 - name: Generate DKIM keys for additional domains
   ansible.builtin.command:
@@ -73,7 +72,6 @@
       -D {{ opendkim_keys_dir }}/{{ item }}/
     creates: "{{ opendkim_keys_dir }}/{{ item }}/{{ dkim_selector }}.private"
   loop: "{{ dkim_additional_domains | default([]) }}"
-  when: dkim_additional_domains is defined and dkim_additional_domains | length > 0
 
 - name: Set ownership on DKIM private keys for additional domains
   ansible.builtin.file:
@@ -82,7 +80,6 @@
     group: opendkim
     mode: "0600"
   loop: "{{ dkim_additional_domains | default([]) }}"
-  when: dkim_additional_domains is defined and dkim_additional_domains | length > 0
 
 - name: Create OpenDKIM config
   ansible.builtin.template:
