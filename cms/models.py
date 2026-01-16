@@ -386,19 +386,24 @@ class Page(models.Model):
         # Users with EDIT permission should also be able to VIEW
         # (editors need to see what they're editing)
         # Use thread-local storage to guard against recursion in a thread-safe manner
-        import threading
+        checking_access_via_edit = getattr(
+            _thread_locals, "checking_access_via_edit", None
+        )
+        if checking_access_via_edit is None:
+            checking_access_via_edit = set()
+            _thread_locals.checking_access_via_edit = checking_access_via_edit
 
-        if not hasattr(_thread_locals, "checking_access_via_edit"):
-            _thread_locals.checking_access_via_edit = set()
-
-        page_key = (id(self), id(user) if user else None)
-        if page_key not in _thread_locals.checking_access_via_edit:
-            _thread_locals.checking_access_via_edit.add(page_key)
+        page_key = (
+            self.pk,
+            user.pk if user and getattr(user, "pk", None) is not None else None,
+        )
+        if page_key not in checking_access_via_edit:
+            checking_access_via_edit.add(page_key)
             try:
                 if self.can_user_edit(user):
                     return True
             finally:
-                _thread_locals.checking_access_via_edit.discard(page_key)
+                checking_access_via_edit.discard(page_key)
 
         # Check if user is an active member
         from members.utils import is_active_member

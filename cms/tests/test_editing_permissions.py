@@ -728,6 +728,10 @@ class MemberSpecificPermissionTests(TestCase):
         # But they can still EDIT (member permission)
         self.assertTrue(private_only_page.can_user_edit(self.regular_member))
 
+        # NOTE: E2E testing of member permissions in browser UI (with TinyMCE editor)
+        # should be added to e2e_tests/e2e/ to verify end-to-end functionality.
+        # See `.github/copilot-instructions.md` for E2E testing patterns.
+
     def test_member_permission_cannot_be_added_to_public_page(self):
         """Member permissions cannot be added to public pages."""
         from django.core.exceptions import ValidationError
