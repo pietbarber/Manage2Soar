@@ -88,3 +88,16 @@ def test_upload_document_obfuscated_handles_extension_edge_cases(
     assert upper_extension == "cms/test-page/Board-xfds3Fj.PDF"
     assert tarball == "cms/test-page/archivetar-xfds3Fj.gz"
     assert malicious_ext == "cms/test-page/file-xfds3Fj"
+    assert "." not in malicious_ext.rsplit("/", 1)[-1]
+
+
+def test_upload_document_obfuscated_sanitizes_control_chars_and_unicode(
+    fixed_token,
+):
+    instance = make_instance()
+
+    null_byte = upload_document_obfuscated(instance, "Board\x00Agenda.pdf")
+    rlo = upload_document_obfuscated(instance, "Board\u202eAgenda.pdf")
+
+    assert null_byte == "cms/test-page/BoardAgenda-xfds3Fj.pdf"
+    assert rlo == "cms/test-page/BoardAgenda-xfds3Fj.pdf"

@@ -2,8 +2,6 @@ import os
 import re
 import secrets
 
-from django.utils.text import get_valid_filename
-
 
 def upload_document_obfuscated(instance, filename):
     """
@@ -18,11 +16,11 @@ def upload_document_obfuscated(instance, filename):
     name, ext = os.path.splitext(base_filename)
     ext = ext.strip()
     if ext:
-        ext_name = get_valid_filename(ext.lstrip(".")) or ""
-        ext_name = "".join(ch for ch in ext_name if ch.isalnum())
-        if "script" in ext_name.lower():
-            ext_name = ""
-        ext = f".{ext_name}" if ext_name else ""
+        if "script" in ext.lower():
+            ext = ""
+        else:
+            ext_name = re.sub(r"[^A-Za-z0-9]", "", ext.lstrip("."))
+            ext = f".{ext_name}" if ext_name else ""
     else:
         ext = ""
     stripped_name = name.strip()
@@ -34,7 +32,7 @@ def upload_document_obfuscated(instance, filename):
         # This avoids extension confusion (e.g., "evil.php.txt" -> "evilphp-<token>.txt").
         # The actual extension is handled separately via os.path.splitext() and cleaned above.
         safe_name = re.sub(r"(?u)[^-\w]", "", safe_name)
-        if safe_name in {"", ".", ".."}:
+        if not safe_name:
             safe_name = "file"
     if "script" in base_filename.lower():
         safe_name = "file"
