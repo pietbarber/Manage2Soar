@@ -514,15 +514,18 @@ def pydenticon_view(request, username):
 
     # If file doesn't exist, generate it
     relative_path = os.path.join("generated_avatars", filename)
-    if not os.path.exists(fullpath):
+    # Use try-except to avoid TOCTOU vulnerability
+    try:
+        file_handle = open(fullpath, "rb")  # noqa: SIM115
+    except FileNotFoundError:
         try:
             generate_identicon(username, relative_path)
+            file_handle = open(fullpath, "rb")  # noqa: SIM115
         except (IOError, OSError, ValueError):
             raise Http404("Avatar could not be generated")
 
-    # Serve the file - open using the validated, normalized path
+    # Serve the file
     try:
-        file_handle = open(fullpath, "rb")  # noqa: SIM115
         return FileResponse(
             file_handle,
             content_type="image/png",

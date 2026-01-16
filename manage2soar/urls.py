@@ -47,12 +47,13 @@ def service_worker_view(request):
     build_hash = os.environ.get("BUILD_HASH", "")
 
     if not build_hash:
-        if os.path.exists(sw_path):
+        # Use try-except to avoid TOCTOU vulnerability
+        try:
             mtime = os.path.getmtime(sw_path)
             build_hash = hashlib.md5(
                 str(mtime).encode(), usedforsecurity=False
             ).hexdigest()[:8]
-        else:
+        except (FileNotFoundError, OSError):
             # Fall back to date-based hash (changes daily)
             build_hash = hashlib.md5(
                 str(date.today()).encode(), usedforsecurity=False

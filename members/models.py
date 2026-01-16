@@ -380,7 +380,12 @@ class Member(AbstractUser):
             if not (hasattr(settings, "TESTING") and settings.TESTING):
                 filename = f"profile_{self.username}.png"
                 file_path = os.path.join("generated_avatars", filename)
-                if not os.path.exists(os.path.join("media", file_path)):
+                full_path = os.path.join("media", file_path)
+                # Use try-except to avoid TOCTOU vulnerability
+                try:
+                    with open(full_path, "rb"):
+                        pass  # File exists, do nothing
+                except FileNotFoundError:
                     generate_identicon(self.username, file_path)
                 self.profile_photo = file_path
 
