@@ -128,16 +128,18 @@ openssl enc -d -aes-256-cbc -pbkdf2 \
   -out /tmp/dkim-keys.tar.gz \
   -pass pass:"your-encryption-password-here"
 
-# 3. Extract keys
+# 4. Extract keys
+mkdir -p /tmp/dkim-restore/
 tar xzf /tmp/dkim-keys.tar.gz -C /tmp/dkim-restore/
 
-# 4. Encrypt with Ansible Vault and move to repository
-for domain in $(ls /tmp/dkim-restore/); do
-  mkdir -p roles/opendkim/files/dkim-keys/$domain
-  cp /tmp/dkim-restore/$domain/m2s.txt roles/opendkim/files/dkim-keys/$domain/
+# 5. Encrypt with Ansible Vault and move to repository
+find /tmp/dkim-restore/ -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d '' domain_dir; do
+  domain_name=$(basename "$domain_dir")
+  mkdir -p "roles/opendkim/files/dkim-keys/$domain_name"
+  cp "$domain_dir/m2s.txt" "roles/opendkim/files/dkim-keys/$domain_name/"
   ansible-vault encrypt --vault-password-file ~/.ansible_vault_pass \
-    --output roles/opendkim/files/dkim-keys/$domain/m2s.private \
-    /tmp/dkim-restore/$domain/m2s.private
+    --output "roles/opendkim/files/dkim-keys/$domain_name/m2s.private" \
+    "$domain_dir/m2s.private"
 done
 ```
 

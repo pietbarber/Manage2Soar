@@ -158,6 +158,12 @@
 # NOTE: Backup runs every time when gcs_backup_bucket is defined.
 # To control backup frequency, omit gcs_backup_bucket variable or
 # run playbook with --skip-tags opendkim-backup when you don't want backups.
+#
+# STORAGE RETENTION: Each backup uses a timestamped filename and will
+# accumulate in gs://{{ gcs_backup_bucket }}/dkim-keys/ over time.
+# It is strongly recommended to configure a GCS bucket lifecycle policy
+# (managed via IaC) to automatically delete old DKIM backups after an
+# appropriate retention period (e.g., keep the last 30 days).
 
 - name: GCS DKIM backup workflow
   block:
@@ -168,6 +174,10 @@
           - vault_dkim_backup_encryption_key | length > 0
         fail_msg: "vault_dkim_backup_encryption_key must be defined in vault.yml for GCS backups"
 
+    - name: Capture backup timestamp for consistent filenames
+      ansible.builtin.set_fact:
+        dkim_backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+
     - name: Create temporary directory for DKIM key backup
       ansible.builtin.tempfile:
         state: directory
@@ -177,8 +187,8 @@
     - name: Create tar archive of DKIM keys
       ansible.builtin.shell: |
         set -euo pipefail
-        tar czf {{ backup_temp_dir.path }}/dkim-keys-{{ ansible_date_time.iso8601_basic_short }}.tar.gz \
-          -C {{ opendkim_keys_dir }} .
+        tar czf "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz" \
+          -C "{{ opendkim_keys_dir }}" .
       register: tar_result
       changed_when: tar_result.rc == 0
 
@@ -186,9 +196,9 @@
       ansible.builtin.shell: |
         set -euo pipefail
         openssl enc -aes-256-cbc -salt -pbkdf2 \
-          -in {{ backup_temp_dir.path }}/dkim-keys-{{ ansible_date_time.iso8601_basic_short }}.tar.gz \
-          -out {{ backup_temp_dir.path }}/dkim-keys-{{ ansible_date_time.iso8601_basic_short }}.tar.gz.enc \
-          -pass pass:{{ vault_dkim_backup_encryption_key }}
+          -in "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz" \
+          -out "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz.enc" \
+          -pass pass:"{{ vault_dkim_backup_encryption_key }}"
       register: encrypt_result
       changed_when: encrypt_result.rc == 0
       no_log: true
@@ -196,9 +206,8 @@
     - name: Upload encrypted DKIM backup to GCS
       ansible.builtin.shell: |
         set -euo pipefail
-        gsutil cp {{ backup_temp_dir.path }}/dkim-keys-{{ ansible_date_time.iso8601_basic_short }}.tar.gz.enc \
-          gs://{{ gcs_backup_bucket }}/dkim-keys/
-        gsutil ls gs://{{ gcs_backup_bucket }}/dkim-keys/dkim-keys-{{ ansible_date_time.iso8601_basic_short }}.tar.gz.enc > /dev/null
+        gsutil cp "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz.enc" \
+          "gs://{{ gcs_backup_bucket }}/dkim-keys/"
       register: gcs_upload_result
       changed_when: gcs_upload_result.rc == 0
 
@@ -208,7 +217,8 @@
       ansible.builtin.file:
         path: "{{ backup_temp_dir.path }}"
         state: absent
-      when: backup_temp_dir is defined
+      when: backup_temp_dir is defined and backup_temp_dir.path is defined
+      failed_when: false
   tags: [opendkim-backup]
 
 - name: Create OpenDKIM config
