@@ -108,7 +108,14 @@ def test_upload_document_obfuscated_sanitizes_control_chars_and_unicode(
 def test_upload_document_obfuscated_handles_absolute_and_windows_paths(
     fixed_token,
 ):
-    """Verify os.path.basename() strips absolute and Windows-style paths."""
+    """
+    Verify os.path.basename() strips absolute and Windows-style paths.
+
+    Note: This function assumes Unix-style path handling. On Windows,
+    os.path.basename("C:\\evil\\file.pdf") would correctly extract "file.pdf",
+    but on Linux/Unix, backslashes are treated as regular filename characters.
+    The regex sanitization removes them regardless of platform.
+    """
     instance = make_instance()
 
     # Unix absolute path
@@ -124,3 +131,22 @@ def test_upload_document_obfuscated_handles_absolute_and_windows_paths(
     # After sanitization, "C:\evil\file" becomes "Cevilfile" (backslashes removed).
     assert windows_path == "cms/test-page/Cevilfile-xfds3Fj.pdf"
     assert "\\" not in windows_path
+
+
+def test_upload_document_obfuscated_trusts_page_slug(fixed_token):
+    """
+    Verify that page slugs are used as-is in the path.
+
+    Django's SlugField enforces safe characters (letters, numbers, hyphens,
+    underscores), so we trust the slug without additional sanitization.
+    This test documents that assumption.
+    """
+    # Standard slug with hyphens (normal case)
+    instance = make_instance("board-documents-2025")
+    result = upload_document_obfuscated(instance, "agenda.pdf")
+    assert result == "cms/board-documents-2025/agenda-xfds3Fj.pdf"
+
+    # Slug with underscores (also valid per SlugField)
+    instance_underscore = make_instance("board_docs")
+    result_underscore = upload_document_obfuscated(instance_underscore, "notes.pdf")
+    assert result_underscore == "cms/board_docs/notes-xfds3Fj.pdf"

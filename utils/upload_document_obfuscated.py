@@ -7,6 +7,14 @@ def upload_document_obfuscated(instance, filename):
     """
     Store restricted files under cms/<page-slug>/<filename-randomized> preserving extension.
 
+    Platform notes:
+    - Assumes Unix-style path handling. On Linux, backslashes in Windows-style paths
+      (e.g., "C:\\evil\\file.pdf") are treated as regular characters and will be
+      sanitized out by the regex, not as path separators.
+    - Unicode letters/digits are allowed in filenames via the (?u) regex flag,
+      supporting international characters (e.g., "文档.pdf" -> "文档-<token>.pdf").
+    - Page slugs are assumed to be safe (Django's SlugField enforces this).
+
     Note: uses os.path.splitext(), so only the last extension is preserved
     (e.g., archive.tar.gz becomes archive.tar-<token>.gz).
     Existing files uploaded with the old token-only naming remain unchanged.
@@ -30,6 +38,7 @@ def upload_document_obfuscated(instance, filename):
         # Intentionally strip dots and other non-word characters from the base filename.
         # This avoids extension confusion (e.g., "evil.php.txt" -> "evilphp-<token>.txt").
         # The actual extension is handled separately via os.path.splitext() and cleaned above.
+        # The (?u) flag enables Unicode support, allowing international characters in filenames.
         safe_name = re.sub(r"(?u)[^-\w]", "", safe_name)
         if not safe_name:
             safe_name = "file"
