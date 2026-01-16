@@ -75,7 +75,7 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.webmaster, self.public_page))
 
     def test_can_edit_page_role_restricted_pages(self):
-        """Role-restricted pages follow 'token to see = ability to edit' logic."""
+        """Officers and members with explicit permissions can edit role-restricted pages."""
         # Member cannot see/edit board page
         self.assertFalse(can_edit_page(self.member, self.board_page))
         # Director can see/edit board page
@@ -437,7 +437,7 @@ class RoleBasedEditingIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_edit_and_view_permissions_aligned(self):
-        """Editing permissions align with viewing permissions ('token to see = ability to edit')."""
+        """Users with EDIT permission can also VIEW (editors need to see their content)."""
         # If user cannot see page, they cannot edit it
         self.assertFalse(self.director_page.can_user_access(self.member))
         self.assertFalse(can_edit_page(self.member, self.director_page))
