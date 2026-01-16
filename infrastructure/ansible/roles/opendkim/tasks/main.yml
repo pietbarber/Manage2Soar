@@ -49,6 +49,38 @@
     mode: "0600"
   loop: "{{ club_domains }}"
 
+# ============================================================
+# Additional Domains (beyond club_domains pattern)
+# ============================================================
+
+- name: Create key directories for additional domains
+  ansible.builtin.file:
+    path: "{{ opendkim_keys_dir }}/{{ item }}"
+    state: directory
+    owner: opendkim
+    group: opendkim
+    mode: "0750"
+  loop: "{{ dkim_additional_domains | default([]) }}"
+
+- name: Generate DKIM keys for additional domains
+  ansible.builtin.command:
+    cmd: >
+      opendkim-genkey
+      -b {{ dkim_key_size }}
+      -d {{ item }}
+      -s {{ dkim_selector }}
+      -D {{ opendkim_keys_dir }}/{{ item }}/
+    creates: "{{ opendkim_keys_dir }}/{{ item }}/{{ dkim_selector }}.private"
+  loop: "{{ dkim_additional_domains | default([]) }}"
+
+- name: Set ownership on DKIM private keys for additional domains
+  ansible.builtin.file:
+    path: "{{ opendkim_keys_dir }}/{{ item }}/{{ dkim_selector }}.private"
+    owner: opendkim
+    group: opendkim
+    mode: "0600"
+  loop: "{{ dkim_additional_domains | default([]) }}"
+
 - name: Create OpenDKIM config
   ansible.builtin.template:
     src: opendkim.conf.j2
