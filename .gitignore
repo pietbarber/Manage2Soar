@@ -242,3 +242,9 @@ infrastructure/ansible/inventory/gcp_cluster.yml
 manage2soar-django-key.json
 # LEGACY (DO NOT USE for production): old skyline-soaring-storage project
 skyline-soaring-storage.json
+infrastructure/ansible/roles/opendkim/files/dkim-keys/masa.manage2soar.com/m2s.private
+infrastructure/ansible/roles/opendkim/files/dkim-keys/skylinesoaring.org/m2s.private
+infrastructure/ansible/roles/opendkim/files/dkim-keys/masa.manage2soar.com/m2s.txt
+infrastructure/ansible/roles/opendkim/files/dkim-keys/skylinesoaring.org/m2s.txt
+infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.private
+infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.txt
