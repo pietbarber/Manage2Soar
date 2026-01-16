@@ -125,9 +125,12 @@ class PageAdmin(admin.ModelAdmin):
         else:
             return f"{len(roles)} roles required"
 
-    @admin.display(description="Assigned Members")
+    @admin.display(description="Additional Editors")
     def member_summary(self, obj):
-        """Display summary of member-specific permissions in list view.
+        """Display summary of members with explicit EDIT permissions.
+
+        Shows members who can edit this page beyond the standard officers
+        (directors, secretaries, webmasters).
 
         Note: This method relies on prefetch_related('member_permissions__member')
         in get_queryset() to prevent N+1 queries. If the prefetch is modified or
@@ -166,9 +169,26 @@ class PageAdmin(admin.ModelAdmin):
         )
 
     def has_change_permission(self, request, obj=None):
-        """Allow webmasters to edit CMS pages."""
-        return super().has_change_permission(request, obj) or (
-            request.user.is_authenticated and getattr(request.user, "webmaster", False)
+        """
+        Allow webmasters, directors, secretaries, and members with explicit
+        permissions to edit CMS pages.
+
+        For object-level checks, delegate to Page.can_user_edit(), which already
+        handles superuser access and role-based permissions.
+        """
+        # If editing a specific page, use its can_user_edit() method
+        # (which handles superuser checks internally)
+        if obj is not None:
+            return obj.can_user_edit(request.user)
+
+        # For list view, allow superusers and users with any edit rights
+        if request.user.is_superuser:
+            return True
+
+        return request.user.is_authenticated and (
+            getattr(request.user, "webmaster", False)
+            or getattr(request.user, "director", False)
+            or getattr(request.user, "secretary", False)
         )
 
     def has_delete_permission(self, request, obj=None):

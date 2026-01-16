@@ -627,7 +627,7 @@ DocumentFormSet = inlineformset_factory(
 
 
 def can_edit_page(user, page):
-    """Check if user can edit a specific CMS page based on role-based permissions."""
+    """Check if user can edit a specific CMS page (includes member permissions)."""
     if user is None or not user.is_authenticated:
         return False
 
@@ -639,12 +639,12 @@ def can_edit_page(user, page):
     if page.is_public:
         return False
 
-    # Private pages: "token to see = ability to edit" - if user can access it, they can edit it
-    return page.can_user_access(user)
+    # Private pages: check EDIT permissions (includes member permissions)
+    return page.can_user_edit(user)
 
 
 def can_create_in_directory(user, parent_page=None):
-    """Check if user can create pages in a directory (uses parent page permissions)."""
+    """Check if user can create pages in a directory (uses parent page EDIT permissions)."""
     if user is None or not user.is_authenticated:
         return False
 
@@ -660,8 +660,9 @@ def can_create_in_directory(user, parent_page=None):
     if parent_page.is_public:
         return False
 
-    # Private parent pages: "token to see = ability to create under" - if user can access parent, they can create under it
-    return parent_page.can_user_access(user)
+    # Private parent pages: user needs EDIT permission on parent to create children
+    # This uses the new can_user_edit() which checks member permissions
+    return parent_page.can_user_edit(user)
 
 
 @active_member_required

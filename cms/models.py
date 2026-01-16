@@ -1,3 +1,5 @@
+import threading
+
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
@@ -5,6 +7,9 @@ from tinymce.models import HTMLField
 
 from utils.upload_document_obfuscated import upload_document_obfuscated
 from utils.upload_entropy import upload_homepage_gallery
+
+# Thread-local storage for recursion guards
+_thread_locals = threading.local()
 
 # --- CMS Arbitrary Page and Document Models ---
 
@@ -94,25 +99,35 @@ class PageRolePermission(models.Model):
 
 class PageMemberPermission(models.Model):
     """
-    Allows assigning specific members to edit specific CMS pages or folders.
+    Allows assigning specific members EDIT permissions for specific CMS pages or folders.
 
-    This model enables fine-grained access control beyond role-based permissions,
-    allowing individual members to be granted access to specific content.
+    This model enables fine-grained EDIT access control beyond role-based permissions,
+    allowing individual members to be granted editing rights to specific content.
+
+    IMPORTANT: This grants EDIT permissions, which also allow VIEW access.
+    Members with this permission can edit the page in Django admin AND view it
+    through the normal UI, overriding any role-based VIEW restrictions.
 
     Use Cases:
-    - Aircraft manager who manages documentation for a specific aircraft
+    - Aircraft manager who manages documentation for a specific aircraft folder
     - Committee chair who maintains a committee-specific folder
     - Event coordinator who updates event pages
 
     Business Rules:
     - Only applies to private pages (is_public=False)
-    - Works alongside role-based permissions (OR logic)
-    - Members with this permission can view AND edit the page
+    - Grants EDIT rights (via Django admin) in addition to officers
+    - EDIT permission grants VIEW access, overriding role-based VIEW restrictions
     - Applies to the page and all documents attached to it
+
+    Example Workflow:
+    1. Director creates "PW5 Aircraft" folder (private, no role restrictions)
+    2. Director adds Kevin Barrett via PageMemberPermission
+    3. All active members can VIEW the folder (no role restrictions)
+    4. Only officers + Kevin Barrett can EDIT the folder
 
     Attributes:
         page: Foreign key to the Page this permission applies to
-        member: Foreign key to the Member granted access
+        member: Foreign key to the Member granted EDIT access
     """
 
     page = models.ForeignKey(
@@ -325,13 +340,13 @@ class Page(models.Model):
 
     def can_user_access(self, user):
         """
-        Check if a user can access this page based on role-based or member-specific access control.
+        Check if a user can VIEW this page based on role-based access control.
 
         Access is granted using a four-tier system:
         1. Public pages: Accessible to everyone (including anonymous users)
-        2. Member-specific permissions: Explicit access granted to specific members
-        3. Private pages without restrictions: Accessible to all active members
-        4. Role-restricted pages: Only accessible to members with required roles
+        2. Private pages without restrictions: Accessible to all active members
+        3. Role-restricted pages: Only accessible to members with required roles
+        4. Users with EDIT permission: Can also VIEW (editors need to see content)
 
         Args:
             user: Django User instance (can be anonymous)
@@ -342,8 +357,12 @@ class Page(models.Model):
         Access Logic:
             - Public pages (is_public=True): Always accessible
             - Private pages: Requires active membership status
-            - Member permissions: Specific members granted access via PageMemberPermission
             - Role restrictions: Uses OR logic - user needs ANY of the required roles
+            - EDIT permission: Users who can edit can also view
+
+        Note:
+            This method controls VIEW access. For EDIT-only permission checks,
+            see can_user_edit() and PageMemberPermission model.
 
         Examples:
             >>> page.is_public = True
@@ -357,21 +376,40 @@ class Page(models.Model):
             >>> page.can_user_access(director)  # True
             >>> page.can_user_access(regular_member)  # False
 
+            >>> # User with EDIT permission can VIEW
             >>> page.member_permissions.create(member=aircraft_manager)
-            >>> page.can_user_access(aircraft_manager)  # True
+            >>> page.can_user_access(aircraft_manager)  # True (via EDIT permission)
         """
         if self.is_public:
             return True
+
+        # Users with EDIT permission should also be able to VIEW
+        # (editors need to see what they're editing)
+        # Use thread-local storage to guard against recursion in a thread-safe manner
+        checking_access_via_edit = getattr(
+            _thread_locals, "checking_access_via_edit", None
+        )
+        if checking_access_via_edit is None:
+            checking_access_via_edit = set()
+            _thread_locals.checking_access_via_edit = checking_access_via_edit
+
+        page_key = (
+            self.pk,
+            user.pk if user and getattr(user, "pk", None) is not None else None,
+        )
+        if page_key not in checking_access_via_edit:
+            checking_access_via_edit.add(page_key)
+            try:
+                if self.can_user_edit(user):
+                    return True
+            finally:
+                checking_access_via_edit.discard(page_key)
 
         # Check if user is an active member
         from members.utils import is_active_member
 
         if not is_active_member(user):
             return False
-
-        # Check if user has explicit member permission for this page
-        if self.has_member_permission(user):
-            return True
 
         # If no role restrictions, any active member can access
         if not self.has_role_restrictions():
@@ -386,9 +424,57 @@ class Page(models.Model):
 
         return any(getattr(user, role, False) for role in required_roles)
 
+    def can_user_edit(self, user):
+        """
+        Check if a user can EDIT this page.
+
+        Edit permissions are granted to:
+        1. Superusers
+        2. Directors, Secretaries, and Webmasters (club officers)
+        3. Members with explicit edit permission via PageMemberPermission
+
+        Args:
+            user: Django User instance
+
+        Returns:
+            bool: True if user can edit this page, False otherwise
+
+        Note:
+            Users with EDIT permission can also VIEW the page (see can_user_access).
+            PageMemberPermission grants EDIT rights, and editors can see their content.
+
+        Examples:
+            >>> # Officer can always edit
+            >>> page.can_user_edit(director)  # True
+
+            >>> # Aircraft manager granted edit permission
+            >>> page.member_permissions.create(member=aircraft_manager)
+            >>> page.can_user_edit(aircraft_manager)  # True
+            >>> page.can_user_access(aircraft_manager)  # True (via EDIT permission)
+        """
+        if not user or not user.is_authenticated:
+            return False
+
+        # Check superuser first (cheap attribute check, avoids DB queries)
+        if getattr(user, "is_superuser", False):
+            return True
+
+        # Check if user has explicit member permission for this page (may require DB query)
+        if self.has_member_permission(user):
+            return True
+
+        # Check if user has officer roles (director, secretary, webmaster)
+        if any(
+            getattr(user, role, False)
+            for role in ["director", "secretary", "webmaster"]
+        ):
+            return True
+
+        return False
+
     def has_member_permission(self, user):
         """
-        Check if a specific member has explicit access to this page.
+        Check if a specific member has explicit EDIT permission for this page.
 
         Args:
             user: Django User instance
@@ -398,6 +484,7 @@ class Page(models.Model):
 
         Note:
             Uses prefetched data if available to avoid extra queries.
+            This method checks EDIT permissions, not VIEW permissions.
         """
         if not user or not user.is_authenticated:
             return False
