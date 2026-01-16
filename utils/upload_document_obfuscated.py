@@ -24,6 +24,8 @@ def upload_document_obfuscated(instance, filename):
     if stripped_name in {"", ".", ".."}:
         safe_name = "file"
     else:
+        # Convert spaces to underscores first so they survive the sanitization step
+        # (the regex `(?u)[^-\w]` keeps underscores since \w includes them).
         safe_name = stripped_name.replace(" ", "_")
         # Intentionally strip dots and other non-word characters from the base filename.
         # This avoids extension confusion (e.g., "evil.php.txt" -> "evilphp-<token>.txt").
