@@ -203,27 +203,29 @@
 
 - name: Configure lifecycle policy when enabled
   block:
-    - name: Set desired lifecycle rules
+    - name: Parse current lifecycle rules if present
       ansible.builtin.set_fact:
-        gcs_backup_desired_lifecycle_rules:
-          - action:
-              type: SetStorageClass
-              storageClass: COLDLINE
-            condition:
-              age: "{{ gcs_backup_coldline_days | int }}"
-          - action:
-              type: Delete
-            condition:
-              age: "{{ gcs_backup_delete_days | int }}"
+        gcs_current_lifecycle_rules: "{{ gcs_bucket_info.lifecycle.rule | default([]) }}"
+
+    - name: Check if lifecycle needs update
+      ansible.builtin.set_fact:
+        gcs_lifecycle_needs_update: >
+          {{
+            (gcs_current_lifecycle_rules | length == 0) or
+            (gcs_current_lifecycle_rules | selectattr('action.type', 'equalto', 'SetStorageClass') | selectattr('condition.age', 'equalto', gcs_backup_coldline_days | int) | list | length == 0) or
+            (gcs_current_lifecycle_rules | selectattr('action.type', 'equalto', 'Delete') | selectattr('condition.age', 'equalto', gcs_backup_delete_days | int) | list | length == 0)
+          }}
 
     - name: Create lifecycle policy temp file
       ansible.builtin.tempfile:
         state: file
         prefix: gcs-backup-lifecycle-
         suffix: .json
+        mode: "0600"
       register: gcs_backup_lifecycle_file
       delegate_to: localhost
       become: false
+      when: gcs_lifecycle_needs_update | bool
 
     - name: Write lifecycle policy content
       ansible.builtin.copy:
@@ -243,6 +245,7 @@
           }
       delegate_to: localhost
       become: false
+      when: gcs_lifecycle_needs_update | bool
 
     - name: Apply lifecycle policy
       ansible.builtin.command:
@@ -255,7 +258,7 @@
           - "--lifecycle-file={{ gcs_backup_lifecycle_file.path }}"
       delegate_to: localhost
       become: false
-      when: (gcs_bucket_info.lifecycle.rule | default([])) != (gcs_backup_desired_lifecycle_rules | default([]))
+      when: gcs_lifecycle_needs_update | bool
   when:
     - gcs_backup_coldline_days is defined
     - gcs_backup_delete_days is defined

@@ -2,11 +2,13 @@
 # Defaults for GCS backup bucket provisioning
 
 # GCS/KMS project and location
-gcs_backup_project: "manage2soar"
+# MUST be set per environment; no production-like default is safe here.
+gcs_backup_project: ""
 gcs_backup_location: "us-east1"
 
 # Bucket configuration
-gcs_backup_bucket: "m2s-database-backups-manage2soar"
+# MUST be set per environment; no production-like default is safe here.
+gcs_backup_bucket: ""
 gcs_backup_storage_class: "STANDARD"
 
 # KMS configuration
