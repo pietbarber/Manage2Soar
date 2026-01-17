@@ -261,6 +261,27 @@
   become: false
   when: gcp_create_firewall_rules and gcp_allow_ssh and gcp_ssh_allowed_sources | length > 0
 
+- name: Create SSH-from-IAP firewall rule
+  google.cloud.gcp_compute_firewall:
+    name: "{{ gcp_firewall_name_prefix }}-allow-ssh-from-iap"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    network:
+      selfLink: "global/networks/{{ gcp_network }}"
+    allowed:
+      - ip_protocol: tcp
+        ports:
+          - "22"
+    source_ranges:
+      - "{{ gcp_iap_ssh_range }}"
+    target_tags: "{{ gcp_network_tags }}"
+    description: "Allow SSH from Cloud Identity-Aware Proxy for browser SSH"
+    state: present
+  delegate_to: localhost
+  become: false
+  when: gcp_create_firewall_rules and gcp_allow_iap_ssh
+
 - name: Create SMTP firewall rule
   google.cloud.gcp_compute_firewall:
     name: "{{ gcp_firewall_name_prefix }}-allow-smtp"

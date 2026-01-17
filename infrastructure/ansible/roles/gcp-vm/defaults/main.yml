@@ -80,6 +80,15 @@ gcp_allow_ssh: true
 #   - "203.0.113.0/24"  # Office VPN
 gcp_ssh_allowed_sources: []
 
+# Enable SSH access from Cloud Identity-Aware Proxy (IAP)
+# Required for browser-based SSH via GCP Console
+# This provides emergency "last hope" access when other SSH methods fail
+gcp_allow_iap_ssh: true
+
+# IAP IP range for browser SSH (fixed Google range)
+# See: https://cloud.google.com/iap/docs/using-tcp-forwarding#create-firewall-rule
+gcp_iap_ssh_range: "35.235.240.0/20"
+
 # SSH public keys to add to VM metadata
 # Format: "username:ssh-rsa AAAA... user@host"
 # IMPORTANT: Override this in group_vars with your actual SSH public keys
