@@ -5,8 +5,10 @@ Tests JavaScript functionality: button rendering, click handlers, and
 dynamic button configuration from SiteConfiguration.
 """
 
+from datetime import date
+
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
-from logsheet.models import Equipment, EquipmentType, Logsheet
+from logsheet.models import Airfield, Glider, Logsheet
 from siteconfig.models import SiteConfiguration
 
 
@@ -19,19 +21,26 @@ class TestLogsheetAltitudeButtons(DjangoPlaywrightTestCase):
         self.member = self.create_test_member(username="testpilot", is_superuser=True)
         self.login(username="testpilot")
 
-        # Create test equipment
-        glider_type = EquipmentType.objects.create(name="Glider")
-        self.glider = Equipment.objects.create(
-            registration="N123",
-            type=glider_type,
-            club_owned=True,
+        # Create test airfield
+        self.airfield = Airfield.objects.create(
+            identifier="TEST", name="Test Airfield", is_active=True
+        )
+
+        # Create test glider
+        self.glider = Glider.objects.create(
+            make="Schleicher",
+            model="ASK-21",
+            n_number="N123AB",
+            competition_number="XY",
+            seats=2,
             is_active=True,
         )
 
         # Create test logsheet
         self.logsheet = Logsheet.objects.create(
-            date="2026-01-10",
-            status="open",
+            log_date=date(2026, 1, 10),
+            airfield=self.airfield,
+            created_by=self.member,
             duty_officer=self.member,
         )
 
