@@ -416,9 +416,8 @@ document.addEventListener('DOMContentLoaded', function() {
           iconPreview.style.verticalAlign = 'middle';
           this.parentNode.appendChild(iconPreview);
         }
-        iconPreview.src = iconUrl;
-        // Use direct property assignment instead of setAttribute to avoid CodeQL XSS false positive
-        // textContent is safe but setAttribute() is flagged by CodeQL as potential XSS vector
+        // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
+        iconPreview.setAttribute('src', iconUrl);
         iconPreview.alt = selectedOption.textContent || '';
         iconPreview.style.display = 'inline-block';
         iconPreview.title = selectedOption.textContent || '';
