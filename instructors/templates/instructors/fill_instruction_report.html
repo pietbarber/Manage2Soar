@@ -237,14 +237,30 @@
                     <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
                       <strong>Qualification</strong>
                     </label>
-                    <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
-                      <option value="">Select a qualification...</option>
-                      {% for qual in all_qualifications %}
-                        <option value="{{ qual.pk }}" data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}" data-name="{{ qual.name }}">
-                          {{ qual.name }}
-                        </option>
-                      {% endfor %}
-                    </select>
+                    <div class="d-flex align-items-center gap-2">
+                      <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
+                        <option value="">Select a qualification...</option>
+                        {% for qual in all_qualifications %}
+                          <option value="{{ qual.pk }}">
+                            {{ qual.name }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                      {# Pre-render all qualification icons - show/hide with CSS based on selection #}
+                      <div class="qualification-icon-container">
+                        {% for qual in all_qualifications %}
+                          {% if qual.icon %}
+                            <img src="{{ qual.icon.url }}"
+                                 alt="{{ qual.name }} icon"
+                                 title="{{ qual.name }}"
+                                 class="qualification-icon qual-icon-{{ qual.pk }}"
+                                 width="24"
+                                 height="24"
+                                 style="display: none; vertical-align: middle;">
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
                   </div>
                   <div class="col-md-2">
                     <label class="form-label"><strong>Status</strong></label>
@@ -394,39 +410,21 @@ function submitFlightInstruction() {
   return true; // Allow form submission
 }
 
-// Enhanced qualification dropdown with icons
-// Note: isSafeImageUrl and escapeForAttribute are loaded from security-helpers.js
+// Enhanced qualification dropdown with icons - rewritten to avoid DOM text reads
 document.addEventListener('DOMContentLoaded', function() {
   const qualSelect = document.querySelector('.qualification-select');
   if (qualSelect) {
-    // Update display when selection changes
     qualSelect.addEventListener('change', function() {
-      const selectedOption = this.options[this.selectedIndex];
-      const iconUrl = selectedOption.getAttribute('data-icon');
+      // Hide all icons
+      document.querySelectorAll('.qualification-icon').forEach(icon => {
+        icon.style.display = 'none';
+      });
 
-      if (iconUrl && this.value && isSafeImageUrl(iconUrl)) {
-        // Show icon next to the dropdown when selection is made
-        let iconPreview = document.getElementById('qualification-icon-preview');
-        if (!iconPreview) {
-          iconPreview = document.createElement('img');
-          iconPreview.id = 'qualification-icon-preview';
-          iconPreview.className = 'qualification-icon ms-2';
-          iconPreview.width = 24;
-          iconPreview.height = 24;
-          iconPreview.style.verticalAlign = 'middle';
-          this.parentNode.appendChild(iconPreview);
-        }
-        // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
-        iconPreview.setAttribute('src', iconUrl);
-        // Use data attribute (not textContent) to avoid DOM-to-HTML XSS pattern per CodeQL guidance
-        const qualName = selectedOption.getAttribute('data-name') || 'Qualification';
-        iconPreview.setAttribute('alt', qualName);
-        iconPreview.style.display = 'inline-block';
-        iconPreview.setAttribute('title', qualName);
-      } else {
-        const iconPreview = document.getElementById('qualification-icon-preview');
-        if (iconPreview) {
-          iconPreview.style.display = 'none';
+      // Show selected icon (if one exists)
+      if (this.value) {
+        const selectedIcon = document.querySelector('.qual-icon-' + this.value);
+        if (selectedIcon) {
+          selectedIcon.style.display = 'inline-block';
         }
       }
     });
