@@ -72,19 +72,20 @@ all:
     gke_tenants:
       - prefix: "ssc"
         name: "Skyline Soaring Club"
-        # Single domain (simple)
-        domain: "ssc.manage2soar.com"
-        # OR multiple domains (for migrations):
-        # domains:
-        #   - "ssc.manage2soar.com"      # Primary domain
-        #   - "www.skylinesoaring.org"   # Alias (added during migration)
+        # Multi-domain example (production domains for skylinesoaring.org)
+        domains:
+          - "ssc.manage2soar.com"          # Testing/staging domain
+          - "skylinesoaring.org"            # Production apex domain
+          - "www.skylinesoaring.org"        # Production www subdomain
 
       - prefix: "masa"
         name: "Mid-Atlantic Soaring Association"
-        # Multi-domain example (primary + alias during migration)
-        domains:
-          - "masa.manage2soar.com"          # Primary domain
-          - "www.midatlanticsoaring.org"    # Alias (added during migration)
+        # Single domain (simple)
+        domain: "masa.manage2soar.com"
+        # OR multiple domains (for migrations):
+        # domains:
+        #   - "masa.manage2soar.com"          # Primary domain
+        #   - "www.midatlanticsoaring.org"    # Alias (added during migration)
 
     # ============================================================
     # INGRESS (External Access)

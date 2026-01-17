@@ -344,11 +344,11 @@ AUTHENTICATION_BACKENDS = (
 )
 
 
-# Or your real domain in production
-# ALLOWED_HOSTS = ['10.76.0.0', '127.0.0.1',
-# 'localhost', 'm2s.skylinesoaring.org', '.skylinesoaring.org']
-
-ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS configuration
+# Multi-tenant system: Populated via DJANGO_ALLOWED_HOSTS environment variable
+# The IaC deployment (Ansible) dynamically builds this from tenant domain configurations
+# Never hardcode specific club domains here - breaks multi-tenant model
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Trust X-Forwarded-Proto header for HTTPS detection (required for OAuth2 redirect URI to use https)
 # Only enable in production behind a reverse proxy (causes issues in development)
