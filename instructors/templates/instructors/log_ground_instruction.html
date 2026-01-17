@@ -363,7 +363,7 @@
                   <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
                     <option value="">Select a qualification...</option>
                     {% for qual in all_qualifications %}
-                      <option value="{{ qual.pk }}" data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}">
+                      <option value="{{ qual.pk }}" data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}" data-name="{{ qual.name }}">
                         {{ qual.name }}
                       </option>
                     {% endfor %}
@@ -583,11 +583,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
         iconPreview.setAttribute('src', iconUrl);
-        // Use setAttribute (not innerHTML) - explicitly setting attributes, not HTML - fixes CodeQL alert #60
-        const optionText = selectedOption.textContent || '';
-        iconPreview.setAttribute('alt', optionText);
+        // Use data attribute (not textContent) to avoid DOM-to-HTML XSS pattern per CodeQL guidance
+        const qualName = selectedOption.getAttribute('data-name') || 'Qualification';
+        iconPreview.setAttribute('alt', qualName);
         iconPreview.style.display = 'inline-block';
-        iconPreview.setAttribute('title', optionText);
+        iconPreview.setAttribute('title', qualName);
       } else {
         const iconPreview = document.getElementById('qualification-icon-preview');
         if (iconPreview) {
