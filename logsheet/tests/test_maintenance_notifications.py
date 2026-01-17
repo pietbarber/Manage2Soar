@@ -23,7 +23,7 @@ def test_maintenance_issue_create_notifies_meisters_immediately():
     # Create a logsheet (required for maintenance issues)
     airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
     logsheet = Logsheet.objects.create(
-        log_date=date(2026, 10, 22),
+        log_date=date(2025, 10, 22),
         airfield=airfield,
         created_by=meister,
         finalized=False,

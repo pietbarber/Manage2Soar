@@ -422,6 +422,8 @@ class TestEmailContent:
                 html_content = alternative[0]
                 break
 
+        assert html_content is not None
+
         # Check student details in HTML
         assert student_member.full_display_name in html_content
         assert student_member.email in html_content
@@ -456,6 +458,8 @@ class TestEmailContent:
                 html_content = alternative[0]
                 break
 
+        assert html_content is not None
+
         # Check date appears in email
         assert (
             formatted_date in html_content
@@ -489,6 +493,8 @@ class TestInstructionRequestDetails:
                 html_content = alternative[0]
                 break
 
+        assert html_content is not None
+
         # HTML should contain instruction types
         assert "Request Details" in html_content
         assert "Field Check" in html_content
@@ -521,6 +527,8 @@ class TestInstructionRequestDetails:
                 html_content = alternative[0]
                 break
 
+        assert html_content is not None
+
         # HTML should contain notes
         assert "pattern tows and steep turns" in html_content
 
@@ -548,6 +556,8 @@ class TestInstructionRequestDetails:
             if alternative[1] == "text/html":
                 html_content = alternative[0]
                 break
+
+        assert html_content is not None
 
         # Should NOT show Request Details section when empty
         assert "Request Details" not in html_content
