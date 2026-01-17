@@ -114,11 +114,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
         iconPreview.setAttribute('src', iconUrl);
-        // Use textContent assignment (safe, not parsed as HTML) - fixes CodeQL alert #55
-        const safeText = (selectedOption.textContent || '').trim();
-        iconPreview.alt = safeText;
+        // Use setAttribute (not innerHTML) - explicitly setting attributes, not HTML - fixes CodeQL alert #58
+        const optionText = selectedOption.textContent || '';
+        iconPreview.setAttribute('alt', optionText);
         iconPreview.style.display = 'inline-block';
-        iconPreview.title = safeText;
+        iconPreview.setAttribute('title', optionText);
       } else {
         const iconPreview = document.getElementById('modal-qualification-icon-preview');
         if (iconPreview) {
