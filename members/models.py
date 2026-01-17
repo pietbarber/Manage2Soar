@@ -517,7 +517,7 @@ class KioskToken(models.Model):
     landing_page = models.CharField(
         max_length=50,
         choices=LANDING_PAGE_CHOICES,
-        default="logsheet:today",
+        default="logsheet:index",
         help_text="Page to redirect to after authentication",
     )
     notes = models.TextField(

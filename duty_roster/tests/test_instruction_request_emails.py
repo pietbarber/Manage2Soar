@@ -613,7 +613,7 @@ class TestInstructionRequestDetails:
         )
 
         assert slot.get_instruction_types_display() == []
-        assert slot.get_instruction_types_text() == "Not specified"
+        assert slot.get_instruction_types_text() == ""
 
 
 @pytest.mark.django_db
