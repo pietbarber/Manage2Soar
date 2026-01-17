@@ -1,9 +1,9 @@
 ---
 # GCS backup bucket provisioning vars
 
-gcs_backup_project: "skyline-soaring-storage"
+gcs_backup_project: "manage2soar"
 gcs_backup_location: "us-east1"
-gcs_backup_bucket: "m2s-database-backups"
+gcs_backup_bucket: "m2s-database-backups-manage2soar"
 gcs_backup_storage_class: "STANDARD"
 
 # KMS configuration
