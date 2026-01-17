@@ -248,3 +248,5 @@ infrastructure/ansible/roles/opendkim/files/dkim-keys/masa.manage2soar.com/m2s.t
 infrastructure/ansible/roles/opendkim/files/dkim-keys/skylinesoaring.org/m2s.txt
 infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.private
 infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.txt
+infrastructure/ansible/group_vars/gcp_database_servers/vault.yml
+infrastructure/ansible/group_vars/gcp_database_servers/vars.yml

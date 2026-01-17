@@ -9,14 +9,26 @@
 
 set -euo pipefail
 
+# Ensure working directory is accessible for the postgres user
+cd /
+
 # Configuration
 BACKUP_DIR="{{ postgresql_backup_dir }}/daily"
-DB_NAME="{{ postgresql_db }}"
 RETENTION_DAYS="{{ postgresql_backup_retention_days }}"
 DATE=$(date +%Y-%m-%d_%H%M%S)
-# Using .pgdump extension to clearly indicate PostgreSQL custom format (pg_dump -Fc)
-# Alternatives: .dump, .backup - all work, but .pgdump is most descriptive
-BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
+{% if postgresql_multi_tenant %}
+BACKUP_LABEL="m2s_all"
+BASE_EXT="sql"
+BACKUP_FILE="${BACKUP_DIR}/${BACKUP_LABEL}_${DATE}.${BASE_EXT}"
+{% else %}
+BACKUP_LABEL="{{ postgresql_db }}"
+BASE_EXT="pgdump"
+BACKUP_FILE="${BACKUP_DIR}/${BACKUP_LABEL}_${DATE}.${BASE_EXT}"
+{% endif %}
+FILE_EXT="${BASE_EXT}"
+{% if postgresql_backup_encryption_enabled %}
+FILE_EXT="${BASE_EXT}.enc"
+{% endif %}
 {% if postgresql_backup_encryption_enabled %}
 ENCRYPTED_FILE="${BACKUP_FILE}.enc"
 PASSPHRASE_FILE="/var/lib/postgresql/.backup_passphrase"
@@ -25,11 +37,17 @@ PASSPHRASE_FILE="/var/lib/postgresql/.backup_passphrase"
 GCS_BUCKET="{{ postgresql_backup_gcs_bucket }}"
 {% endif %}
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${DB_NAME}"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${BACKUP_LABEL}"
 
+{% if postgresql_multi_tenant %}
+# Create full cluster backup with globals and all databases
+# Running as postgres user via cron, uses peer authentication
+pg_dumpall > "${BACKUP_FILE}"
+{% else %}
 # Create backup using pg_dump with custom format (already compressed)
 # Running as postgres user via cron, uses peer authentication
-pg_dump -Fc "${DB_NAME}" > "${BACKUP_FILE}"
+pg_dump -Fc "${BACKUP_LABEL}" > "${BACKUP_FILE}"
+{% endif %}
 
 # Verify backup was created and has content
 if [[ -s "${BACKUP_FILE}" ]]; then
@@ -78,7 +96,7 @@ BACKUP_FILE="${ENCRYPTED_FILE}"
 {% endif %}
 
 # Create latest symlink
-ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${DB_NAME}_latest{% if postgresql_backup_encryption_enabled %}.enc{% else %}.pgdump{% endif %}"
+ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${BACKUP_LABEL}_latest.${FILE_EXT}"
 
 {% if postgresql_backup_gcs_enabled %}
 # ============================================================
@@ -102,10 +120,10 @@ fi
 
 # Remove old local backups
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing local backups older than ${RETENTION_DAYS} days"
-find "${BACKUP_DIR}" -name "${DB_NAME}_*.{% if postgresql_backup_encryption_enabled %}enc{% else %}pgdump{% endif %}" -type f -mtime +${RETENTION_DAYS} -delete
+find "${BACKUP_DIR}" -name "${BACKUP_LABEL}_*.${FILE_EXT}" -type f -mtime +${RETENTION_DAYS} -delete
 
 # Count remaining backups
-BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${DB_NAME}_*.{% if postgresql_backup_encryption_enabled %}enc{% else %}pgdump{% endif %}" -type f | wc -l)
+BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${BACKUP_LABEL}_*.${FILE_EXT}" -type f | wc -l)
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup complete. ${BACKUP_COUNT} local backups retained."
 
 {% if postgresql_backup_gcs_enabled %}

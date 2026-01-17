@@ -1,0 +1,28 @@
+---
+# Defaults for GCS backup bucket provisioning
+
+# GCS/KMS project and location
+#gcs_backup_project: "skyline-soaring-storage"
+#gcs_backup_location: "us-east1"
+
+# Bucket configuration
+#gcs_backup_bucket: "m2s-database-backups"
+#gcs_backup_storage_class: "STANDARD"
+
+# KMS configuration
+#gcs_backup_kms_keyring: "m2s-backups"
+#gcs_backup_kms_key: "database-backups"
+#gcs_backup_kms_rotation_period: "90d"
+#gcs_backup_kms_next_rotation_time: ""
+
+# IAM configuration
+# Service account on the VM that uploads backups (objectCreator on bucket)
+#gcs_backup_vm_service_account: "287727517244-compute@developer.gserviceaccount.com"
+
+# Optional lifecycle policy
+#gcs_backup_coldline_days: 30
+#gcs_backup_delete_days: 365
+
+# Authentication method
+#gcp_auth_kind: "application"
+#gcp_service_account_file: ""
