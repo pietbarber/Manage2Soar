@@ -241,8 +241,9 @@ class InstructionSlot(models.Model):
         """Return comma-separated string of instruction types."""
         types = self.get_instruction_types_display()
         if not types:
-            return "Not specified"
-        return ", ".join(types)
+            return ""
+        # Filter out any None values for type safety
+        return ", ".join(t for t in types if t is not None)
 
     def accept(self, instructor, note=""):
         """Instructor accepts this student's request."""

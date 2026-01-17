@@ -60,9 +60,14 @@ class TestAdminPhotoUpload:
         form = MagicMock()
         form.changed_data = ["profile_photo"]
 
-        # Create a test image and attach to member
+        # Create a real test image using Django's file handling
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
         test_image = create_test_image(400, 400)
-        test_member.profile_photo = test_image
+        uploaded_file = SimpleUploadedFile(
+            "test_photo.jpg", test_image.read(), content_type="image/jpeg"
+        )
+        test_member.profile_photo = uploaded_file
 
         with patch(
             "members.admin.generate_profile_thumbnails"
@@ -81,17 +86,32 @@ class TestAdminPhotoUpload:
                 "small": mock_small,
             }
 
-            # Call save_model
-            member_admin.save_model(request, test_member, form, change=True)
+            # Mock the ImageField.save() method to avoid actual file I/O
+            with patch.object(test_member.profile_photo, "save") as mock_photo_save:
+                with patch.object(
+                    test_member.profile_photo_medium, "save"
+                ) as mock_medium_save:
+                    with patch.object(
+                        test_member.profile_photo_small, "save"
+                    ) as mock_small_save:
+                        # Call save_model
+                        member_admin.save_model(request, test_member, form, change=True)
 
-            # Verify generate_profile_thumbnails was called
-            mock_generate_thumbnails.assert_called_once()
+                        # Verify generate_profile_thumbnails was called with the uploaded photo
+                        mock_generate_thumbnails.assert_called_once()
 
-            # Verify thumbnails were saved to the member's fields
-            # The save_model calls .save() on each field, which saves the file
-            assert test_member.profile_photo is not None
-            assert test_member.profile_photo_medium is not None
-            assert test_member.profile_photo_small is not None
+                        # Verify the save() method was called on thumbnail fields
+                        # Note: profile_photo.save() is called twice - once for the processed
+                        # original and once during obj.save(). We just verify it was called.
+                        assert mock_photo_save.called
+                        mock_medium_save.assert_called_once()
+                        mock_small_save.assert_called_once()
+
+                        # Verify the first call to profile_photo.save() was with processed original
+                        first_call_args = mock_photo_save.call_args_list[0]
+                        assert first_call_args[0][0] == "test_photo.jpg"  # filename
+                        assert first_call_args[0][1] == mock_original  # BytesIO content
+                        assert first_call_args[1]["save"] is False  # save=False
 
     def test_save_model_skips_thumbnails_when_no_photo_change(
         self, member_admin, test_member
@@ -139,9 +159,14 @@ class TestAdminPhotoUpload:
         form = MagicMock()
         form.changed_data = ["profile_photo"]
 
-        # Create a test image and attach to member
+        # Create a real test image using Django's file handling
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
         test_image = create_test_image(400, 400)
-        test_member.profile_photo = test_image
+        uploaded_file = SimpleUploadedFile(
+            "test_photo.jpg", test_image.read(), content_type="image/jpeg"
+        )
+        test_member.profile_photo = uploaded_file
 
         with patch(
             "members.admin.generate_profile_thumbnails"

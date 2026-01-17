@@ -17,6 +17,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from members.models import KioskAccessLog, KioskToken, Member
+from siteconfig.models import MembershipStatus
 
 
 class KioskTokenModelTests(TestCase):
@@ -159,7 +160,9 @@ class KioskLoginViewTests(TestCase):
         url = self.inactive_token.get_magic_url()
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
-        self.assertContains(response, "Token Revoked", status_code=403)
+        self.assertContains(
+            response, "This kiosk access link has been disabled", status_code=403
+        )
 
     def test_unbound_token_shows_binding_page(self):
         """Unbound token should show the device binding page."""
@@ -194,6 +197,7 @@ class KioskBindDeviceTests(TestCase):
             user=cls.role_user,
             name="Test Kiosk",
             is_active=True,
+            landing_page="logsheet:index",
         )
 
     def test_bind_device_success(self):
@@ -269,6 +273,7 @@ class KioskVerifyDeviceTests(TestCase):
             name="Bound Kiosk",
             is_active=True,
             device_fingerprint=cls.fingerprint_hash,
+            landing_page="logsheet:index",
         )
 
     def test_verify_matching_fingerprint(self):
@@ -309,6 +314,14 @@ class KioskAutoLoginMiddlewareTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        # Ensure Role Account membership status exists and is active
+        status, created = MembershipStatus.objects.get_or_create(
+            name="Role Account", defaults={"is_active": True}
+        )
+        if not status.is_active:
+            status.is_active = True
+            status.save()
+
         cls.role_user = Member.objects.create_user(
             username="kiosk-laptop",
             email="kiosk@example.com",
@@ -325,6 +338,7 @@ class KioskAutoLoginMiddlewareTests(TestCase):
             name="Bound Kiosk",
             is_active=True,
             device_fingerprint=cls.fingerprint_hash,
+            landing_page="logsheet:index",
         )
 
     def test_auto_login_with_valid_cookies(self):
@@ -395,6 +409,7 @@ class KioskAccessLogTests(TestCase):
             user=cls.role_user,
             name="Test Kiosk",
             is_active=True,
+            landing_page="logsheet:index",
         )
 
     def test_access_log_created_on_success(self):

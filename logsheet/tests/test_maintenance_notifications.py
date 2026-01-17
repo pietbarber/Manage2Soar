@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import patch
 
 import pytest
@@ -22,7 +23,10 @@ def test_maintenance_issue_create_notifies_meisters_immediately():
     # Create a logsheet (required for maintenance issues)
     airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=meister, finalized=False
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=meister,
+        finalized=False,
     )
 
     # Mock send_mail to avoid actual email sending
@@ -61,7 +65,10 @@ def test_maintenance_issue_sends_email_immediately():
 
     airfield = Airfield.objects.create(name="Test Field Email", identifier="TSTE")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=meister, finalized=False
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=meister,
+        finalized=False,
     )
 
     with patch("logsheet.signals.send_mail") as mock_send_mail:
@@ -101,7 +108,10 @@ def test_maintenance_issue_email_squawk_no_grounded_prefix():
 
     airfield = Airfield.objects.create(name="Test Field Squawk", identifier="TSQU")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=meister, finalized=False
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=meister,
+        finalized=False,
     )
 
     with patch("logsheet.signals.send_mail") as mock_send_mail:
@@ -132,7 +142,10 @@ def test_maintenance_issue_resolve_notifies_meisters():
     # Create a logsheet
     airfield = Airfield.objects.create(name="Test Field 2", identifier="TST2")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=meister, finalized=True
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=meister,
+        finalized=True,
     )
 
     # Create issue - will immediately create notification and send email (Issue #463)
@@ -173,7 +186,10 @@ def test_maintenance_notification_dedupe():
     # Create a logsheet
     airfield = Airfield.objects.create(name="Test Field 3", identifier="TST3")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=meister, finalized=False
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=meister,
+        finalized=False,
     )
 
     with patch("logsheet.signals.send_mail"):  # Mock to avoid actual email
@@ -215,7 +231,10 @@ def test_maintenance_issue_no_email_when_no_meisters():
 
     airfield = Airfield.objects.create(name="Test Field No Meister", identifier="TSNM")
     logsheet = Logsheet.objects.create(
-        log_date="2025-10-22", airfield=airfield, created_by=reporter, finalized=False
+        log_date=date(2025, 10, 22),
+        airfield=airfield,
+        created_by=reporter,
+        finalized=False,
     )
 
     with patch("logsheet.signals.send_mail") as mock_send_mail:
