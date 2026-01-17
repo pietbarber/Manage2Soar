@@ -30,24 +30,63 @@
     mode: "0750"
   loop: "{{ club_domains }}"
 
-- name: Generate DKIM keys for each club domain
+# ============================================================
+# DKIM Key Management (Hybrid: Deploy from files OR Generate)
+# ============================================================
+# Try to deploy keys from Ansible files (if they exist).
+# Fall back to on-server generation if files are not present.
+# This supports both IaC deployments and fresh installations.
+
+- name: Check if DKIM private key files exist in Ansible for club domains
+  ansible.builtin.stat:
+    path: "{{ role_path }}/files/dkim-keys/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+  loop: "{{ club_domains }}"
+  register: club_key_files_check
+  delegate_to: localhost
+  become: false
+
+- name: Deploy DKIM private keys for club domains from Ansible vault (if available)
+  ansible.builtin.copy:
+    src: "dkim-keys/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    decrypt: yes
+    owner: opendkim
+    group: opendkim
+    mode: "0600"
+  loop: "{{ club_key_files_check.results }}"
+  when: item.stat.exists
+  notify: Restart OpenDKIM
+
+- name: Deploy DKIM public keys for club domains (if available)
+  ansible.builtin.copy:
+    src: "dkim-keys/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.txt"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  loop: "{{ club_key_files_check.results }}"
+  when: item.stat.exists
+
+- name: Generate DKIM keys for club domains (fallback if not in Ansible files)
   ansible.builtin.command:
     cmd: >
       opendkim-genkey
       -b {{ dkim_key_size }}
-      -d {{ item.prefix }}.{{ mail_domain }}
+      -d {{ item.item.prefix }}.{{ mail_domain }}
       -s {{ dkim_selector }}
-      -D {{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/
-    creates: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
-  loop: "{{ club_domains }}"
+      -D {{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/
+    creates: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+  loop: "{{ club_key_files_check.results }}"
+  when: not item.stat.exists
 
-- name: Set ownership on DKIM private keys
+- name: Set ownership on generated DKIM private keys for club domains
   ansible.builtin.file:
-    path: "{{ opendkim_keys_dir }}/{{ item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
+    path: "{{ opendkim_keys_dir }}/{{ item.item.prefix }}.{{ mail_domain }}/{{ dkim_selector }}.private"
     owner: opendkim
     group: opendkim
     mode: "0600"
-  loop: "{{ club_domains }}"
+  loop: "{{ club_key_files_check.results }}"
+  when: not item.stat.exists
 
 # ============================================================
 # Additional Domains (beyond club_domains pattern)
@@ -62,24 +101,131 @@
     mode: "0750"
   loop: "{{ dkim_additional_domains | default([]) }}"
 
-- name: Generate DKIM keys for additional domains
+- name: Check if DKIM private key files exist in Ansible for additional domains
+  ansible.builtin.stat:
+    path: "{{ role_path }}/files/dkim-keys/{{ item }}/{{ dkim_selector }}.private"
+  loop: "{{ dkim_additional_domains | default([]) }}"
+  register: additional_key_files_check
+  delegate_to: localhost
+  become: false
+
+- name: Deploy DKIM private keys for additional domains from Ansible vault (if available)
+  ansible.builtin.copy:
+    src: "dkim-keys/{{ item.item }}/{{ dkim_selector }}.private"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
+    decrypt: yes
+    owner: opendkim
+    group: opendkim
+    mode: "0600"
+  loop: "{{ additional_key_files_check.results }}"
+  when: item.stat.exists
+  notify: Restart OpenDKIM
+
+- name: Deploy DKIM public keys for additional domains (if available)
+  ansible.builtin.copy:
+    src: "dkim-keys/{{ item.item }}/{{ dkim_selector }}.txt"
+    dest: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.txt"
+    owner: opendkim
+    group: opendkim
+    mode: "0644"
+  loop: "{{ additional_key_files_check.results }}"
+  when: item.stat.exists
+
+- name: Generate DKIM keys for additional domains (fallback if not in Ansible files)
   ansible.builtin.command:
     cmd: >
       opendkim-genkey
       -b {{ dkim_key_size }}
-      -d {{ item }}
+      -d {{ item.item }}
       -s {{ dkim_selector }}
-      -D {{ opendkim_keys_dir }}/{{ item }}/
-    creates: "{{ opendkim_keys_dir }}/{{ item }}/{{ dkim_selector }}.private"
-  loop: "{{ dkim_additional_domains | default([]) }}"
+      -D {{ opendkim_keys_dir }}/{{ item.item }}/
+    creates: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
+  loop: "{{ additional_key_files_check.results }}"
+  when: not item.stat.exists
 
-- name: Set ownership on DKIM private keys for additional domains
+- name: Set ownership on generated DKIM private keys for additional domains
   ansible.builtin.file:
-    path: "{{ opendkim_keys_dir }}/{{ item }}/{{ dkim_selector }}.private"
+    path: "{{ opendkim_keys_dir }}/{{ item.item }}/{{ dkim_selector }}.private"
     owner: opendkim
     group: opendkim
     mode: "0600"
-  loop: "{{ dkim_additional_domains | default([]) }}"
+  loop: "{{ additional_key_files_check.results }}"
+  when: not item.stat.exists
+
+# ============================================================
+# GCS Backup (Optional - requires gcs_backup_bucket variable)
+# ============================================================
+# NOTE: Backup runs every time when gcs_backup_bucket is defined.
+# To control backup frequency, omit gcs_backup_bucket variable or
+# run playbook with --skip-tags opendkim-backup when you don't want backups.
+#
+# STORAGE RETENTION: Each backup uses a timestamped filename and will
+# accumulate in gs://{{ gcs_backup_bucket }}/dkim-keys/ over time.
+# It is strongly recommended to configure a GCS bucket lifecycle policy
+# (managed via IaC) to automatically delete old DKIM backups after an
+# appropriate retention period (e.g., keep the last 30 days).
+
+- name: GCS DKIM backup workflow
+  block:
+    - name: Validate GCS backup encryption key is defined
+      ansible.builtin.assert:
+        that:
+          - vault_dkim_backup_encryption_key is defined
+          - vault_dkim_backup_encryption_key | length > 0
+        fail_msg: "vault_dkim_backup_encryption_key must be defined in vault.yml for GCS backups"
+
+    - name: Capture backup timestamp for consistent filenames
+      ansible.builtin.set_fact:
+        dkim_backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+
+    - name: Create temporary directory for DKIM key backup
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: dkim-backup
+      register: backup_temp_dir
+
+    - name: Create tar archive of DKIM keys
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar czf "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz" \
+          -C "{{ opendkim_keys_dir }}" .
+      register: tar_result
+      changed_when: tar_result.rc == 0
+
+    - name: Encrypt DKIM key archive with OpenSSL
+      ansible.builtin.shell: |
+        set -euo pipefail
+        openssl enc -aes-256-cbc -salt -pbkdf2 \
+          -in "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz" \
+          -out "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz.enc" \
+          -pass pass:"{{ vault_dkim_backup_encryption_key }}"
+      register: encrypt_result
+      changed_when: encrypt_result.rc == 0
+      no_log: true
+
+    - name: Remove unencrypted DKIM key archive after encryption
+      ansible.builtin.file:
+        path: "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz"
+        state: absent
+      when: encrypt_result is succeeded
+
+    - name: Upload encrypted DKIM backup to GCS
+      ansible.builtin.shell: |
+        set -euo pipefail
+        gsutil cp "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz.enc" \
+          "gs://{{ gcs_backup_bucket }}/dkim-keys/"
+      register: gcs_upload_result
+      changed_when: gcs_upload_result.rc == 0
+
+  when: gcs_backup_bucket is defined
+  always:
+    - name: Clean up temporary backup directory
+      ansible.builtin.file:
+        path: "{{ backup_temp_dir.path }}"
+        state: absent
+      when: backup_temp_dir is defined and backup_temp_dir.get('path') is defined
+      failed_when: false
+  tags: [opendkim-backup]
 
 - name: Create OpenDKIM config
   ansible.builtin.template:
