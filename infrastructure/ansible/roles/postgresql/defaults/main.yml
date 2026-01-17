@@ -115,13 +115,16 @@ postgresql_backup_gcs_bucket: ""
 
 # Enable client-side encryption before GCS upload
 # Uses OpenSSL AES-256-CBC with PBKDF2 key derivation
-# STRONGLY RECOMMENDED: Set to true for production
-postgresql_backup_encryption_enabled: true
-
-# Encryption method (currently only openssl supported)
-postgresql_backup_encryption_method: "openssl"
+# RECOMMENDED: Enable for production when postgresql_backup_gcs_enabled is true
+# NOTE: Encryption is primarily useful for GCS uploads. For local-only backups,
+# rely on filesystem encryption or physical server security instead.
+postgresql_backup_encryption_enabled: false
 
 # GCS lifecycle policy settings (for cost optimization)
+# NOTE: These values are for reference/documentation. GCS lifecycle rules
+# (Coldline transition, deletion) must be configured manually via gcloud
+# commands or Terraform. This role does not automatically apply lifecycle
+# policies to the GCS bucket.
 # Move backups to Coldline storage after N days
 postgresql_backup_gcs_coldline_days: 30
 
@@ -130,7 +133,7 @@ postgresql_backup_gcs_delete_days: 0
 
 # Backup encryption passphrase must be set in vault
 # vault_postgresql_backup_passphrase: "64+ character random string"
-# Deployed to /root/.backup_passphrase (mode 0400, owner root)
+# Deployed to /var/lib/postgresql/.backup_passphrase (mode 0400, owner postgres)
 
 # ============================================================
 # ADDITIONAL DATABASES/USERS

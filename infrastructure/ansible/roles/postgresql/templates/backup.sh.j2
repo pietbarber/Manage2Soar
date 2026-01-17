@@ -19,7 +19,7 @@ DATE=$(date +%Y-%m-%d_%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
 {% if postgresql_backup_encryption_enabled %}
 ENCRYPTED_FILE="${BACKUP_FILE}.enc"
-PASSPHRASE_FILE="/root/.backup_passphrase"
+PASSPHRASE_FILE="/var/lib/postgresql/.backup_passphrase"
 {% endif %}
 {% if postgresql_backup_gcs_enabled %}
 GCS_BUCKET="{{ postgresql_backup_gcs_bucket }}"
@@ -60,11 +60,6 @@ openssl enc -aes-256-cbc -salt -pbkdf2 \
   -out "${ENCRYPTED_FILE}" \
   -pass file:"${PASSPHRASE_FILE}"
 
-if [[ $? -ne 0 ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Encryption failed"
-    exit 1
-fi
-
 # Verify encrypted file was created
 if [[ -s "${ENCRYPTED_FILE}" ]]; then
     ENCRYPTED_SIZE=$(du -h "${ENCRYPTED_FILE}" | cut -f1)
@@ -74,9 +69,9 @@ else
     exit 1
 fi
 
-# Delete unencrypted backup file (security best practice)
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing unencrypted backup file"
-rm -f "${BACKUP_FILE}"
+# Securely delete unencrypted backup file (defense-in-depth security)
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Securely removing unencrypted backup file"
+shred -uz "${BACKUP_FILE}"
 
 # Update references to use encrypted file for local retention
 BACKUP_FILE="${ENCRYPTED_FILE}"
@@ -98,9 +93,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Uploading backup to GCS bucket: gs://${GCS_
 # - IAM: write-only for database server service account
 # - Lifecycle policy: move to Coldline after {{ postgresql_backup_gcs_coldline_days }} days
 # - Versioning enabled for accidental deletion protection
-gsutil cp "${BACKUP_FILE}" "gs://${GCS_BUCKET}/postgresql/"
-
-if [[ $? -eq 0 ]]; then
+if gsutil cp "${BACKUP_FILE}" "gs://${GCS_BUCKET}/postgresql/"; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - GCS upload completed successfully"
 else
     echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: GCS upload failed, but local backup is available"
