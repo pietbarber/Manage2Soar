@@ -101,6 +101,37 @@ postgresql_backup_retention_days: 7
 postgresql_backup_hour: 2
 postgresql_backup_minute: 0
 
+# GCS Backup Configuration (Multi-Layer Encryption Strategy)
+# Layer 1: Client-side OpenSSL encryption (CRITICAL)
+# Layer 2: GCS server-side CMEK encryption (Cloud KMS)
+# Layer 3: GCS bucket hardening (IAM, versioning, lifecycle)
+
+# Enable GCS backup upload (requires google-cloud-sdk and service account)
+postgresql_backup_gcs_enabled: false
+
+# GCS bucket name for backup storage
+# Example: "m2s-database-backups"
+postgresql_backup_gcs_bucket: ""
+
+# Enable client-side encryption before GCS upload
+# Uses OpenSSL AES-256-CBC with PBKDF2 key derivation
+# STRONGLY RECOMMENDED: Set to true for production
+postgresql_backup_encryption_enabled: true
+
+# Encryption method (currently only openssl supported)
+postgresql_backup_encryption_method: "openssl"
+
+# GCS lifecycle policy settings (for cost optimization)
+# Move backups to Coldline storage after N days
+postgresql_backup_gcs_coldline_days: 30
+
+# Delete backups older than N days (0 = never delete)
+postgresql_backup_gcs_delete_days: 0
+
+# Backup encryption passphrase must be set in vault
+# vault_postgresql_backup_passphrase: "64+ character random string"
+# Deployed to /root/.backup_passphrase (mode 0400, owner root)
+
 # ============================================================
 # ADDITIONAL DATABASES/USERS
 # ============================================================

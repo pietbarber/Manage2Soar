@@ -1,6 +1,11 @@
 #!/bin/bash
-# M2S PostgreSQL Backup Script
+# M2S PostgreSQL Backup Script with Multi-Layer Encryption
 # Managed by Ansible - do not edit manually
+#
+# Security Layers:
+# 1. Client-side OpenSSL AES-256-CBC encryption (CRITICAL)
+# 2. GCS server-side CMEK encryption via Cloud KMS
+# 3. GCS bucket hardening (IAM, versioning, lifecycle)
 
 set -euo pipefail
 
@@ -12,6 +17,13 @@ DATE=$(date +%Y-%m-%d_%H%M%S)
 # Using .pgdump extension to clearly indicate PostgreSQL custom format (pg_dump -Fc)
 # Alternatives: .dump, .backup - all work, but .pgdump is most descriptive
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.pgdump"
+{% if postgresql_backup_encryption_enabled %}
+ENCRYPTED_FILE="${BACKUP_FILE}.enc"
+PASSPHRASE_FILE="/root/.backup_passphrase"
+{% endif %}
+{% if postgresql_backup_gcs_enabled %}
+GCS_BUCKET="{{ postgresql_backup_gcs_bucket }}"
+{% endif %}
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting backup of ${DB_NAME}"
 
@@ -28,13 +40,81 @@ else
     exit 1
 fi
 
-# Create latest symlink
-ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${DB_NAME}_latest.pgdump"
+{% if postgresql_backup_encryption_enabled %}
+# ============================================================
+# LAYER 1: CLIENT-SIDE ENCRYPTION (CRITICAL SECURITY)
+# ============================================================
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Encrypting backup with OpenSSL AES-256-CBC"
 
-# Remove old backups
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing backups older than ${RETENTION_DAYS} days"
-find "${BACKUP_DIR}" -name "${DB_NAME}_*.pgdump" -type f -mtime +${RETENTION_DAYS} -delete
+if [[ ! -f "${PASSPHRASE_FILE}" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Encryption passphrase file not found: ${PASSPHRASE_FILE}"
+    exit 1
+fi
+
+# Encrypt with AES-256-CBC using PBKDF2 key derivation
+# -salt: Add salt for better security
+# -pbkdf2: Use PBKDF2 for key derivation (more secure than default)
+# -pass file: Read passphrase from secure file
+openssl enc -aes-256-cbc -salt -pbkdf2 \
+  -in "${BACKUP_FILE}" \
+  -out "${ENCRYPTED_FILE}" \
+  -pass file:"${PASSPHRASE_FILE}"
+
+if [[ $? -ne 0 ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Encryption failed"
+    exit 1
+fi
+
+# Verify encrypted file was created
+if [[ -s "${ENCRYPTED_FILE}" ]]; then
+    ENCRYPTED_SIZE=$(du -h "${ENCRYPTED_FILE}" | cut -f1)
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Encryption completed: ${ENCRYPTED_FILE} (${ENCRYPTED_SIZE})"
+else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: Encrypted file is empty or was not created"
+    exit 1
+fi
+
+# Delete unencrypted backup file (security best practice)
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing unencrypted backup file"
+rm -f "${BACKUP_FILE}"
+
+# Update references to use encrypted file for local retention
+BACKUP_FILE="${ENCRYPTED_FILE}"
+{% endif %}
+
+# Create latest symlink
+ln -sf "${BACKUP_FILE}" "${BACKUP_DIR}/${DB_NAME}_latest{% if postgresql_backup_encryption_enabled %}.enc{% else %}.pgdump{% endif %}"
+
+{% if postgresql_backup_gcs_enabled %}
+# ============================================================
+# LAYER 2 & 3: GCS UPLOAD (SERVER-SIDE CMEK + BUCKET HARDENING)
+# ============================================================
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Uploading backup to GCS bucket: gs://${GCS_BUCKET}/postgresql/"
+
+# Upload to GCS (bucket has CMEK encryption configured)
+# Bucket security:
+# - CMEK via Cloud KMS (automatic key rotation)
+# - Private bucket (no public access)
+# - IAM: write-only for database server service account
+# - Lifecycle policy: move to Coldline after {{ postgresql_backup_gcs_coldline_days }} days
+# - Versioning enabled for accidental deletion protection
+gsutil cp "${BACKUP_FILE}" "gs://${GCS_BUCKET}/postgresql/"
+
+if [[ $? -eq 0 ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - GCS upload completed successfully"
+else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - WARNING: GCS upload failed, but local backup is available"
+fi
+{% endif %}
+
+# Remove old local backups
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Removing local backups older than ${RETENTION_DAYS} days"
+find "${BACKUP_DIR}" -name "${DB_NAME}_*.{% if postgresql_backup_encryption_enabled %}enc{% else %}pgdump{% endif %}" -type f -mtime +${RETENTION_DAYS} -delete
 
 # Count remaining backups
-BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${DB_NAME}_*.pgdump" -type f | wc -l)
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup complete. ${BACKUP_COUNT} backups retained."
+BACKUP_COUNT=$(find "${BACKUP_DIR}" -name "${DB_NAME}_*.{% if postgresql_backup_encryption_enabled %}enc{% else %}pgdump{% endif %}" -type f | wc -l)
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup complete. ${BACKUP_COUNT} local backups retained."
+
+{% if postgresql_backup_gcs_enabled %}
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup also uploaded to gs://${GCS_BUCKET}/postgresql/"
+{% endif %}
