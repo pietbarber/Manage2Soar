@@ -253,7 +253,7 @@ kubectl get pods -n tenant-ssc
 
 ### Database Migration Rollback
 
-**CAUTION**: Database rollbacks are complex. Consult [Database Operations](database-operations.md) runbook.
+**CAUTION**: Database rollbacks are complex. Consult the [GKE Post-Deployment guide](../../infrastructure/ansible/docs/gke-post-deployment.md) and Ansible database playbook documentation.
 
 ```bash
 # List applied migrations
@@ -548,9 +548,10 @@ For deployment issues:
 ## References
 
 - [Ansible Playbook Guide](ansible-playbook-guide.md)
-- [Database Operations](database-operations.md)
-- [Kubernetes Cheat Sheet](kubernetes-cheatsheet.md)
 - [GKE Deployment Guide](../../infrastructure/ansible/docs/gke-deployment-guide.md)
+- [GKE Post-Deployment](../../infrastructure/ansible/docs/gke-post-deployment.md)
+- Database Operations Runbook (planned for future)
+- Kubernetes Command Cheat Sheet (planned for future)
 
 ---
 

@@ -9,18 +9,18 @@ This directory contains operational runbooks for system administrators managing 
 | Runbook | Description | When to Use |
 |---------|-------------|-------------|
 | [Deployment & Updates](deployment-updates.md) | Deploy new versions, rollbacks, zero-downtime updates | Weekly deployments, hotfixes |
-| [Database Operations](database-operations.md) | PostgreSQL backups, migrations, troubleshooting | Database changes, recovery |
 | [Troubleshooting Guide](troubleshooting.md) | Common issues and solutions | Production incidents |
-| [Security Operations](security-operations.md) | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
-| [Disaster Recovery](disaster-recovery.md) | System restore, data recovery | Critical outages |
+| [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
+| Database Operations *(coming soon)* | PostgreSQL backups, migrations, troubleshooting | Database changes, recovery |
+| Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
+| Disaster Recovery *(coming soon)* | System restore, data recovery | Critical outages |
 
 ### Reference Materials
 
 | Document | Description |
 |----------|-------------|
-| [Monitoring & Alerts](monitoring-alerts.md) | Key metrics, log analysis, performance diagnosis |
-| [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks |
-| [Kubernetes Cheat Sheet](kubernetes-cheatsheet.md) | Common kubectl commands for GKE |
+| Monitoring & Alerts *(coming soon)* | Key metrics, log analysis, performance diagnosis |
+| Kubernetes Cheat Sheet *(coming soon)* | Common kubectl commands for GKE |
 
 ## 🏗️ IaC-First Philosophy
 

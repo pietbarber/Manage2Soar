@@ -12,7 +12,8 @@ When something goes wrong, run these first:
 
 ```bash
 # Pod status
-kubectl get pods -n tenant-ssc -n tenant-masa
+kubectl get pods -n tenant-ssc
+kubectl get pods -n tenant-masa
 
 # Recent errors
 kubectl logs -n tenant-ssc deployment/django-app-ssc --tail=100 | grep -i error
@@ -702,10 +703,12 @@ kubectl logs -n tenant-ssc deployment/django-app-ssc | grep -i "operationalerror
 # Export to file
 kubectl logs -n tenant-ssc deployment/django-app-ssc > /tmp/ssc-logs.txt
 
-# All pods in namespace
-for pod in $(kubectl get pods -n tenant-ssc -o name); do
-  echo "=== $pod ===" >> /tmp/all-logs.txt
-  kubectl logs -n tenant-ssc $pod >> /tmp/all-logs.txt
+# All pods in namespace (both tenants)
+for ns in tenant-ssc tenant-masa; do
+  for pod in $(kubectl get pods -n $ns -o name); do
+    echo "=== $ns/$pod ===" >> /tmp/all-logs.txt
+    kubectl logs -n $ns $pod >> /tmp/all-logs.txt
+  done
 done
 ```
 
@@ -720,7 +723,8 @@ done
 # health-check.sh
 
 echo "=== Pod Status ==="
-kubectl get pods -n tenant-ssc -n tenant-masa
+kubectl get pods -n tenant-ssc
+kubectl get pods -n tenant-masa
 
 echo -e "\n=== Recent Errors ==="
 kubectl logs -n tenant-ssc deployment/django-app-ssc --tail=20 | grep -i error || echo "No errors"
@@ -734,7 +738,8 @@ curl -s -o /dev/null -w "SSC: %{http_code}\n" https://ssc.manage2soar.com/
 curl -s -o /dev/null -w "MASA: %{http_code}\n" https://masa.manage2soar.com/
 
 echo -e "\n=== CronJobs ==="
-kubectl get cronjobs -n tenant-ssc -n tenant-masa
+kubectl get cronjobs -n tenant-ssc
+kubectl get cronjobs -n tenant-masa
 ```
 
 ---
@@ -753,10 +758,10 @@ kubectl get cronjobs -n tenant-ssc -n tenant-masa
 ## References
 
 - [Deployment & Updates](deployment-updates.md)
-- [Database Operations](database-operations.md)
 - [Ansible Playbook Guide](ansible-playbook-guide.md)
 - [CronJob Architecture](../cronjob-architecture.md)
 - [GKE Post-Deployment](../../infrastructure/ansible/docs/gke-post-deployment.md)
+- Database Operations Runbook (planned for future)
 
 ---
 

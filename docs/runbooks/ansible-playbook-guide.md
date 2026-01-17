@@ -10,13 +10,13 @@ This guide documents all Ansible playbooks in `infrastructure/ansible/playbooks/
 
 | Playbook | Purpose | Frequency | Tags |
 |----------|---------|-----------|------|
-| [gcp-app-deploy.yml](#gcp-app-deploy) | Deploy Django app to GKE | Weekly | `secrets`, `build`, `deploy` |
-| [gcp-database.yml](#gcp-database) | Provision/configure PostgreSQL | Monthly | `gcp-provision`, `postgresql`, `ssl` |
-| [gcp-cluster-provision.yml](#gcp-cluster-provision) | Create GKE cluster | Once | `cluster`, `network` |
-| [gcp-storage.yml](#gcp-storage) | Setup GCS buckets for media | Once | `storage`, `permissions` |
-| [gcp-backup-storage.yml](#gcp-backup-storage) | Setup backup GCS buckets | Once | `backup`, `lifecycle` |
-| [mail-server.yml](#mail-server) | Configure email server | Monthly | `postfix`, `ssl` |
-| [single-host.yml](#single-host) | Deploy all-in-one server | Varies | `nginx`, `postgresql`, `app` |
+| [gcp-app-deploy.yml](#gcp-app-deployyml) | Deploy Django app to GKE | Weekly | `secrets`, `build`, `deploy` |
+| [gcp-database.yml](#gcp-databaseyml) | Provision/configure PostgreSQL | Monthly | `gcp-provision`, `postgresql`, `ssl` |
+| [gcp-cluster-provision.yml](#gcp-cluster-provisionyml) | Create GKE cluster | Once | `cluster`, `network` |
+| [gcp-storage.yml](#gcp-storageyml) | Setup GCS buckets for media | Once | `storage`, `permissions` |
+| [gcp-backup-storage.yml](#gcp-backup-storageyml) | Setup backup GCS buckets | Once | `backup`, `lifecycle` |
+| [mail-server.yml](#mail-serveryml) | Configure email server | Monthly | `postfix`, `ssl` |
+| [single-host.yml](#single-hostyml) | Deploy all-in-one server | Varies | `nginx`, `postgresql`, `app` |
 
 ## 🎯 Quick Start Commands
 
