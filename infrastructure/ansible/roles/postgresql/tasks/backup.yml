@@ -96,7 +96,7 @@
     src: backup.sh.j2
     dest: "/usr/local/bin/m2s-pg-backup.sh"
     owner: root
-    group: root
+    group: postgres
     mode: "0750"
   become: true
 

@@ -1,0 +1,362 @@
+---
+- name: Validate required backup variables
+  ansible.builtin.assert:
+    that:
+      - gcs_backup_project | length > 0
+      - gcs_backup_location | length > 0
+      - gcs_backup_bucket | length > 0
+      - gcs_backup_kms_keyring | length > 0
+      - gcs_backup_kms_key | length > 0
+    fail_msg: "gcs-backup role requires gcs_backup_project, gcs_backup_location, gcs_backup_bucket, gcs_backup_kms_keyring, and gcs_backup_kms_key"
+  delegate_to: localhost
+  become: false
+
+- name: Get enabled GCP services
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - services
+      - list
+      - --enabled
+      - "--project={{ gcs_backup_project }}"
+      - "--format=value(config.name)"
+  register: gcs_enabled_services
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Enable Cloud KMS API
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - services
+      - enable
+      - cloudkms.googleapis.com
+      - "--project={{ gcs_backup_project }}"
+  when: "'cloudkms.googleapis.com' not in gcs_enabled_services.stdout_lines"
+  delegate_to: localhost
+  become: false
+
+- name: Enable Cloud Storage API
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - services
+      - enable
+      - storage.googleapis.com
+      - "--project={{ gcs_backup_project }}"
+  when: "'storage.googleapis.com' not in gcs_enabled_services.stdout_lines"
+  delegate_to: localhost
+  become: false
+
+- name: Determine KMS next rotation time when not provided
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - "import datetime; print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=90)).strftime('%Y-%m-%dT%H:%M:%SZ'))"
+  register: kms_next_rotation_time
+  changed_when: false
+  when: gcs_backup_kms_next_rotation_time | default('') | length == 0
+  delegate_to: localhost
+  become: false
+
+- name: Set KMS rotation time fact
+  ansible.builtin.set_fact:
+    gcs_backup_kms_rotation_time: "{{ gcs_backup_kms_next_rotation_time | default(kms_next_rotation_time.stdout if kms_next_rotation_time is defined else '') }}"
+
+- name: Check if KMS keyring exists
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keyrings
+      - describe
+      - "{{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - "--project={{ gcs_backup_project }}"
+  register: kms_keyring_check
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Create KMS keyring
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keyrings
+      - create
+      - "{{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - "--project={{ gcs_backup_project }}"
+  when: kms_keyring_check.rc != 0
+  delegate_to: localhost
+  become: false
+
+- name: Check if KMS key exists
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keys
+      - describe
+      - "{{ gcs_backup_kms_key }}"
+      - "--keyring={{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - "--project={{ gcs_backup_project }}"
+  register: kms_key_check
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Create KMS key with rotation
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keys
+      - create
+      - "{{ gcs_backup_kms_key }}"
+      - "--keyring={{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - --purpose=encryption
+      - "--rotation-period={{ gcs_backup_kms_rotation_period }}"
+      - "--next-rotation-time={{ gcs_backup_kms_rotation_time }}"
+      - "--project={{ gcs_backup_project }}"
+  when: kms_key_check.rc != 0
+  delegate_to: localhost
+  become: false
+
+- name: Ensure backup bucket exists with uniform access
+  google.cloud.gcp_storage_bucket:
+    name: "{{ gcs_backup_bucket }}"
+    project: "{{ gcs_backup_project }}"
+    location: "{{ gcs_backup_location }}"
+    storage_class: "{{ gcs_backup_storage_class | default('STANDARD') }}"
+    iam_configuration:
+      uniform_bucket_level_access:
+        enabled: true
+    state: present
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+  delegate_to: localhost
+  become: false
+
+- name: Get bucket configuration
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - storage
+      - buckets
+      - describe
+      - "gs://{{ gcs_backup_bucket }}"
+      - --format=json
+  register: gcs_bucket_info_raw
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Parse bucket configuration
+  ansible.builtin.set_fact:
+    gcs_bucket_info: "{{ gcs_bucket_info_raw.stdout | from_json }}"
+
+- name: Enforce public access prevention
+  ansible.builtin.command:
+    argv:
+      - gsutil
+      - pap
+      - set
+      - enforced
+      - "gs://{{ gcs_backup_bucket }}"
+  when: gcs_bucket_info.iamConfiguration.publicAccessPrevention | default('') != 'enforced'
+  delegate_to: localhost
+  become: false
+
+- name: Set default CMEK encryption key on bucket
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - storage
+      - buckets
+      - update
+      - "gs://{{ gcs_backup_bucket }}"
+      - "--default-encryption-key=projects/{{ gcs_backup_project }}/locations/{{ gcs_backup_location }}/keyRings/{{ gcs_backup_kms_keyring }}/cryptoKeys/{{ gcs_backup_kms_key }}"
+  when: gcs_bucket_info.encryption.defaultKmsKeyName | default('') != 'projects/' ~ gcs_backup_project ~ '/locations/' ~ gcs_backup_location ~ '/keyRings/' ~ gcs_backup_kms_keyring ~ '/cryptoKeys/' ~ gcs_backup_kms_key
+  delegate_to: localhost
+  become: false
+
+- name: Enable bucket versioning
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - storage
+      - buckets
+      - update
+      - "gs://{{ gcs_backup_bucket }}"
+      - --versioning
+  when: not (gcs_bucket_info.versioning.enabled | default(false))
+  delegate_to: localhost
+  become: false
+
+- name: Configure lifecycle policy when enabled
+  block:
+    - name: Parse current lifecycle rules if present
+      ansible.builtin.set_fact:
+        gcs_current_lifecycle_rules: "{{ gcs_bucket_info.lifecycle.rule | default([]) }}"
+
+    - name: Check if lifecycle needs update
+      ansible.builtin.set_fact:
+        gcs_lifecycle_needs_update: >
+          {{
+            (gcs_current_lifecycle_rules | length == 0) or
+            (gcs_current_lifecycle_rules | selectattr('action.type', 'equalto', 'SetStorageClass') | selectattr('condition.age', 'equalto', gcs_backup_coldline_days | int) | list | length == 0) or
+            (gcs_current_lifecycle_rules | selectattr('action.type', 'equalto', 'Delete') | selectattr('condition.age', 'equalto', gcs_backup_delete_days | int) | list | length == 0)
+          }}
+
+    - name: Create lifecycle policy temp file
+      ansible.builtin.tempfile:
+        state: file
+        prefix: gcs-backup-lifecycle-
+        suffix: .json
+        mode: "0600"
+      register: gcs_backup_lifecycle_file
+      delegate_to: localhost
+      become: false
+      when: gcs_lifecycle_needs_update | bool
+
+    - name: Write lifecycle policy content
+      ansible.builtin.copy:
+        dest: "{{ gcs_backup_lifecycle_file.path }}"
+        content: |
+          {
+            "rule": [
+              {
+                "action": {"type": "SetStorageClass", "storageClass": "COLDLINE"},
+                "condition": {"age": {{ gcs_backup_coldline_days }} }
+              },
+              {
+                "action": {"type": "Delete"},
+                "condition": {"age": {{ gcs_backup_delete_days }} }
+              }
+            ]
+          }
+      delegate_to: localhost
+      become: false
+      when: gcs_lifecycle_needs_update | bool
+
+    - name: Apply lifecycle policy
+      ansible.builtin.command:
+        argv:
+          - gcloud
+          - storage
+          - buckets
+          - update
+          - "gs://{{ gcs_backup_bucket }}"
+          - "--lifecycle-file={{ gcs_backup_lifecycle_file.path }}"
+      delegate_to: localhost
+      become: false
+      when: gcs_lifecycle_needs_update | bool
+  when:
+    - gcs_backup_coldline_days is defined
+    - gcs_backup_delete_days is defined
+  always:
+    - name: Remove lifecycle policy temp file
+      ansible.builtin.file:
+        path: "{{ gcs_backup_lifecycle_file.path | default('') }}"
+        state: absent
+      when: gcs_backup_lifecycle_file is defined and gcs_backup_lifecycle_file.path is defined
+      delegate_to: localhost
+      become: false
+
+- name: Get GCS project number
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - projects
+      - describe
+      - "{{ gcs_backup_project }}"
+      - --format=value(projectNumber)
+  register: gcs_project_number
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Set GCS service account fact
+  ansible.builtin.set_fact:
+    gcs_service_account_email: "service-{{ gcs_project_number.stdout }}@gs-project-accounts.iam.gserviceaccount.com"
+
+- name: Get KMS key IAM policy
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keys
+      - get-iam-policy
+      - "{{ gcs_backup_kms_key }}"
+      - "--keyring={{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - "--project={{ gcs_backup_project }}"
+      - --format=json
+  register: kms_key_policy_raw
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Parse KMS key IAM policy
+  ansible.builtin.set_fact:
+    kms_key_policy: "{{ kms_key_policy_raw.stdout | from_json }}"
+
+- name: Grant GCS service account KMS encrypt/decrypt permission
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - kms
+      - keys
+      - add-iam-policy-binding
+      - "{{ gcs_backup_kms_key }}"
+      - "--keyring={{ gcs_backup_kms_keyring }}"
+      - "--location={{ gcs_backup_location }}"
+      - "--member=serviceAccount:{{ gcs_service_account_email }}"
+      - --role=roles/cloudkms.cryptoKeyEncrypterDecrypter
+      - "--project={{ gcs_backup_project }}"
+  when: "('serviceAccount:' ~ gcs_service_account_email) not in (kms_key_policy.bindings | selectattr('role','equalto','roles/cloudkms.cryptoKeyEncrypterDecrypter') | map(attribute='members') | list | flatten | default([]))"
+  delegate_to: localhost
+  become: false
+
+- name: Get bucket IAM policy
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - storage
+      - buckets
+      - get-iam-policy
+      - "gs://{{ gcs_backup_bucket }}"
+      - --format=json
+  register: gcs_bucket_policy_raw
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Parse bucket IAM policy
+  ansible.builtin.set_fact:
+    gcs_bucket_policy: "{{ gcs_bucket_policy_raw.stdout | from_json }}"
+
+- name: Grant VM service account write-only access to bucket
+  ansible.builtin.command:
+    argv:
+      - gcloud
+      - storage
+      - buckets
+      - add-iam-policy-binding
+      - "gs://{{ gcs_backup_bucket }}"
+      - "--member=serviceAccount:{{ gcs_backup_vm_service_account }}"
+      - --role=roles/storage.objectCreator
+  when:
+    - gcs_backup_vm_service_account is defined
+    - gcs_backup_vm_service_account | length > 0
+    - "('serviceAccount:' ~ gcs_backup_vm_service_account) not in (gcs_bucket_policy.bindings | selectattr('role','equalto','roles/storage.objectCreator') | map(attribute='members') | list | flatten | default([]))"
+  delegate_to: localhost
+  become: false

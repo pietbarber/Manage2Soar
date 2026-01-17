@@ -1,0 +1,22 @@
+---
+# GCS backup bucket provisioning vars
+
+gcs_backup_project: "project-name"
+gcs_backup_location: "us-east1"
+gcs_backup_bucket: "m2s-db-backups-manage2soar"
+gcs_backup_storage_class: "STANDARD"
+
+# KMS configuration
+gcs_backup_kms_keyring: "m2s-backups"
+gcs_backup_kms_key: "database-backups"
+gcs_backup_kms_rotation_period: "90d"
+# Optional: set explicit next rotation time
+#gcs_backup_kms_next_rotation_time: "2026-04-16T00:00:00Z"
+
+# VM service account (write-only bucket access)
+# MUST be set per environment (no safe global default)
+gcs_backup_vm_service_account: ""
+
+# Optional lifecycle policy
+gcs_backup_coldline_days: 30
+gcs_backup_delete_days: 365
