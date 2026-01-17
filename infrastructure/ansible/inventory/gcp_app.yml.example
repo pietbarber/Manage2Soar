@@ -54,6 +54,12 @@ all:
     # Get from: gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].networkIP)'
     postgresql_host: "192.0.2.1"
 
+    # Optional: Connection pooling for persistent database connections
+    # Default: 300 seconds (5 minutes) - reuse connections to reduce overhead
+    # 0 = new connection per request (no pooling)
+    # 600 = 10 minutes (aggressive pooling for high-traffic sites)
+    # postgresql_conn_max_age: 300
+
     # ============================================================
     # MULTI-TENANT
     # ============================================================
