@@ -98,6 +98,14 @@ gke_db_user: "{{ postgresql_user | default('m2s') }}"
 # Database SSL mode
 gke_db_sslmode: "{{ 'require' if (postgresql_ssl_enabled | default(false)) else 'prefer' }}"
 
+# Database connection max age (seconds)
+# Enables Django's persistent connections to reduce connection overhead.
+# 0 = new connection per request (default Django behavior)
+# 300 = reuse connections for 5 minutes (recommended for production)
+# 600 = reuse connections for 10 minutes (aggressive pooling)
+# None = infinite lifetime (use with caution, can lead to stale connections)
+gke_db_conn_max_age: "{{ postgresql_conn_max_age | default(300) }}"
+
 # ============================================================
 # GOOGLE CLOUD STORAGE
 # ============================================================
