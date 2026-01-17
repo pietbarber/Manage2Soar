@@ -18,6 +18,56 @@
     mode: "0750"
   become: true
 
+- name: Install google-cloud-sdk (for GCS backup uploads)
+  block:
+    - name: Add Google Cloud SDK APT key
+      ansible.builtin.apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: Add Google Cloud SDK repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://packages.cloud.google.com/apt cloud-sdk main"
+        state: present
+        filename: google-cloud-sdk
+
+    - name: Install google-cloud-sdk package
+      ansible.builtin.apt:
+        name: google-cloud-sdk
+        state: present
+        update_cache: true
+  become: true
+  when: postgresql_backup_gcs_enabled | default(false)
+
+- name: Deploy backup encryption passphrase
+  ansible.builtin.copy:
+    content: "{{ vault_postgresql_backup_passphrase }}"
+    dest: /root/.backup_passphrase
+    owner: root
+    group: root
+    mode: "0400"
+  become: true
+  no_log: true
+  when:
+    - postgresql_backup_encryption_enabled | default(true)
+    - vault_postgresql_backup_passphrase is defined
+
+- name: Verify passphrase file exists (encryption check)
+  ansible.builtin.stat:
+    path: /root/.backup_passphrase
+  register: passphrase_file_check
+  become: true
+  when: postgresql_backup_encryption_enabled | default(true)
+
+- name: Assert passphrase file exists when encryption enabled
+  ansible.builtin.assert:
+    that:
+      - passphrase_file_check.stat.exists
+      - passphrase_file_check.stat.mode == '0400'
+    fail_msg: "Encryption enabled but passphrase file not found or has incorrect permissions"
+    success_msg: "Backup encryption passphrase deployed correctly"
+  when: postgresql_backup_encryption_enabled | default(true)
+
 - name: Deploy backup script
   ansible.builtin.template:
     src: backup.sh.j2
