@@ -196,6 +196,7 @@ pushy-enhanced-v3-template.sh
 pushy-enhanced-v2.sh
 pushy-enhanced-v3.sh
 run-dev-server.sh
+infrastructure/ansible/group_vars/gcs_backup/vars.yml
 
 # ============================================================
 # Infrastructure / Ansible secrets

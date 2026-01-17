@@ -16,8 +16,9 @@ gcs_backup_kms_rotation_period: "90d"
 gcs_backup_kms_next_rotation_time: ""
 
 # IAM configuration
-# Service account on the VM that uploads backups (objectCreator on bucket)
-gcs_backup_vm_service_account: "287727517244-compute@developer.gserviceaccount.com"
+# Service account on the VM that uploads backups (objectCreator on bucket).
+# MUST be set per environment; no global default is safe here.
+gcs_backup_vm_service_account: ""
 
 # Optional lifecycle policy
 gcs_backup_coldline_days: 30

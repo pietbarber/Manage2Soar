@@ -54,7 +54,7 @@
     argv:
       - python3
       - -c
-      - "import datetime; print((datetime.datetime.utcnow()+datetime.timedelta(days=90)).strftime('%Y-%m-%dT%H:%M:%SZ'))"
+      - "import datetime; print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=90)).strftime('%Y-%m-%dT%H:%M:%SZ'))"
   register: kms_next_rotation_time
   changed_when: false
   when: gcs_backup_kms_next_rotation_time | default('') | length == 0
@@ -203,6 +203,19 @@
 
 - name: Configure lifecycle policy when enabled
   block:
+    - name: Set desired lifecycle rules
+      ansible.builtin.set_fact:
+        gcs_backup_desired_lifecycle_rules:
+          - action:
+              type: SetStorageClass
+              storageClass: COLDLINE
+            condition:
+              age: "{{ gcs_backup_coldline_days | int }}"
+          - action:
+              type: Delete
+            condition:
+              age: "{{ gcs_backup_delete_days | int }}"
+
     - name: Create lifecycle policy temp file
       ansible.builtin.tempfile:
         state: file
@@ -242,6 +255,7 @@
           - "--lifecycle-file={{ gcs_backup_lifecycle_file.path }}"
       delegate_to: localhost
       become: false
+      when: (gcs_bucket_info.lifecycle.rule | default([])) != (gcs_backup_desired_lifecycle_rules | default([]))
   when:
     - gcs_backup_coldline_days is defined
     - gcs_backup_delete_days is defined
@@ -305,7 +319,7 @@
       - "--member=serviceAccount:{{ gcs_service_account_email }}"
       - --role=roles/cloudkms.cryptoKeyEncrypterDecrypter
       - "--project={{ gcs_backup_project }}"
-  when: "gcs_service_account_email not in (kms_key_policy.bindings | selectattr('role','equalto','roles/cloudkms.cryptoKeyEncrypterDecrypter') | map(attribute='members') | list | flatten | default([]))"
+  when: "('serviceAccount:' ~ gcs_service_account_email) not in (kms_key_policy.bindings | selectattr('role','equalto','roles/cloudkms.cryptoKeyEncrypterDecrypter') | map(attribute='members') | list | flatten | default([]))"
   delegate_to: localhost
   become: false
 
@@ -340,6 +354,6 @@
   when:
     - gcs_backup_vm_service_account is defined
     - gcs_backup_vm_service_account | length > 0
-    - "gcs_backup_vm_service_account not in (gcs_bucket_policy.bindings | selectattr('role','equalto','roles/storage.objectCreator') | map(attribute='members') | list | flatten | default([]))"
+    - "('serviceAccount:' ~ gcs_backup_vm_service_account) not in (gcs_bucket_policy.bindings | selectattr('role','equalto','roles/storage.objectCreator') | map(attribute='members') | list | flatten | default([]))"
   delegate_to: localhost
   become: false
