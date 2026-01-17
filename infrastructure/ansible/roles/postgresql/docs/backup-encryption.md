@@ -161,10 +161,12 @@ gcloud iam service-accounts keys create ~/m2s-database-backup-key.json \
 
 # Copy key to database server (secure transfer)
 scp ~/m2s-database-backup-key.json pb@DATABASE_SERVER_IP:/tmp/
-ssh pb@DATABASE_SERVER_IP "sudo mv /tmp/m2s-database-backup-key.json /root/.gcs-backup-key.json && sudo chmod 400 /root/.gcs-backup-key.json"
+ssh pb@DATABASE_SERVER_IP "sudo mv /tmp/m2s-database-backup-key.json /var/lib/postgresql/.gcs-backup-key.json"
+ssh pb@DATABASE_SERVER_IP "sudo chown postgres:postgres /var/lib/postgresql/.gcs-backup-key.json"
+ssh pb@DATABASE_SERVER_IP "sudo chmod 400 /var/lib/postgresql/.gcs-backup-key.json"
 
-# Activate service account on database server
-ssh pb@DATABASE_SERVER_IP "sudo gcloud auth activate-service-account --key-file=/root/.gcs-backup-key.json"
+# Activate service account on database server as postgres user (backup script user)
+ssh pb@DATABASE_SERVER_IP "sudo -u postgres gcloud auth activate-service-account --key-file=/var/lib/postgresql/.gcs-backup-key.json"
 
 # Remove local copy
 rm ~/m2s-database-backup-key.json
@@ -255,15 +257,15 @@ ansible -i inventory/gcp_database.yml gcp_database -m shell \
 ```bash
 # Run backup manually
 ansible -i inventory/gcp_database.yml gcp_database -m shell \
-  -a "/usr/local/bin/m2s-pg-backup.sh" --become -u postgres
+  -a "/usr/local/bin/m2s-pg-backup.sh" --become --become-user postgres
 
 # Check local backup directory
 ansible -i inventory/gcp_database.yml gcp_database -m shell \
   -a "ls -lh /var/backups/postgresql/daily/" --become
 
-# Check GCS bucket
+# Check GCS bucket (run as postgres user - backup script context)
 ansible -i inventory/gcp_database.yml gcp_database -m shell \
-  -a "gsutil ls gs://m2s-database-backups/postgresql/" --become
+  -a "gsutil ls gs://m2s-database-backups/postgresql/" --become --become-user postgres
 ```
 
 ## Restoration Procedures
@@ -298,8 +300,8 @@ ssh pb@DATABASE_SERVER_IP "sudo -u postgres psql -c 'CREATE DATABASE m2s OWNER m
 # 7. Restore from backup
 ssh pb@DATABASE_SERVER_IP "sudo -u postgres pg_restore -d m2s /tmp/m2s_restore.pgdump"
 
-# 8. Clean up decrypted file
-ssh pb@DATABASE_SERVER_IP "sudo rm -f /tmp/m2s_restore.pgdump"
+# 8. Clean up decrypted file (secure deletion)
+ssh pb@DATABASE_SERVER_IP "sudo shred -u /tmp/m2s_restore.pgdump"
 
 # 9. Restart application
 # For single-host: sudo systemctl restart gunicorn
@@ -319,11 +321,15 @@ BACKUP_TIMESTAMP="2026-01-16_020000"
 gsutil cp "gs://m2s-database-backups/postgresql/m2s_${BACKUP_TIMESTAMP}.pgdump.enc" /tmp/
 
 # 3. Retrieve passphrase from Ansible Vault
+# Option 1: Using yq (more reliable YAML parsing)
 ansible-vault view --vault-password-file ~/.ansible_vault_pass \
   group_vars/gcp_database/vault.yml | \
-  grep vault_postgresql_backup_passphrase | \
-  cut -d':' -f2 | \
-  tr -d ' ' > /tmp/passphrase.txt
+  yq -r '.vault_postgresql_backup_passphrase' > /tmp/passphrase.txt
+
+# Option 2: Manual extraction (if yq not available)
+# ansible-vault view --vault-password-file ~/.ansible_vault_pass \
+#   group_vars/gcp_database/vault.yml
+# Then manually copy the passphrase value to /tmp/passphrase.txt
 
 chmod 600 /tmp/passphrase.txt
 
@@ -344,9 +350,9 @@ scp /tmp/m2s_restore.pgdump pb@NEW_DATABASE_SERVER:/tmp/
 ssh pb@NEW_DATABASE_SERVER "sudo -u postgres createdb m2s -O m2s"
 ssh pb@NEW_DATABASE_SERVER "sudo -u postgres pg_restore -d m2s /tmp/m2s_restore.pgdump"
 
-# 8. Clean up sensitive files
-rm -f /tmp/passphrase.txt /tmp/m2s_${BACKUP_TIMESTAMP}.pgdump.enc /tmp/m2s_restore.pgdump
-ssh pb@NEW_DATABASE_SERVER "sudo rm -f /tmp/m2s_restore.pgdump"
+# 8. Clean up sensitive files (secure deletion)
+shred -u /tmp/passphrase.txt /tmp/m2s_${BACKUP_TIMESTAMP}.pgdump.enc /tmp/m2s_restore.pgdump
+ssh pb@NEW_DATABASE_SERVER "sudo shred -u /tmp/m2s_restore.pgdump"
 
 # 9. Update application connection strings to new database server
 # Update Ansible inventory and redeploy
@@ -368,8 +374,8 @@ pg_restore -d m2s -t members_member /tmp/m2s_restore.pgdump
 # 4. Verify restore
 psql -d m2s -c "SELECT COUNT(*) FROM members_member;"
 
-# 5. Clean up
-rm -f /tmp/m2s_restore.pgdump
+# 5. Clean up (secure deletion)
+shred -u /tmp/m2s_restore.pgdump
 ```
 
 ## Monitoring & Maintenance
@@ -414,7 +420,7 @@ ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml \
 
 # 4. Test backup with new passphrase
 ansible -i inventory/gcp_database.yml gcp_database -m shell \
-  -a "/usr/local/bin/m2s-pg-backup.sh" --become -u postgres
+  -a "/usr/local/bin/m2s-pg-backup.sh" --become --become-user=postgres
 
 # 5. Old backups remain encrypted with old passphrase
 # Document old passphrase for disaster recovery until old backups expire
@@ -445,9 +451,11 @@ gcloud kms keys describe database-backups \
 
 **Example**: 50GB database, daily backups, 365-day retention
 
-- Daily backups for 30 days: 50GB × 30 × $0.023 = $34.50/month
-- Coldline backups 30-365 days: 50GB × 335 × $0.006 = $100.50/month
+- Standard storage (days 1-30): 1,500GB total (30 backups × 50GB) × $0.023/GB = $34.50/month
+- Coldline storage (days 31-365): 16,750GB total (335 backups × 50GB) × $0.006/GB = $100.50/month
 - **Total**: ~$135/month storage cost
+
+Note: Cost is for total stored data across all backup files, not per-file pricing.
 
 **Optimization Tips**:
 

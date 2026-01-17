@@ -20,14 +20,15 @@
 
 - name: Install google-cloud-sdk (for GCS backup uploads)
   block:
-    - name: Add Google Cloud SDK APT key
-      ansible.builtin.apt_key:
+    - name: Download Google Cloud SDK APT key
+      ansible.builtin.get_url:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
+        dest: /usr/share/keyrings/google-cloud-sdk-archive-keyring.gpg
+        mode: "0644"
 
     - name: Add Google Cloud SDK repository
       ansible.builtin.apt_repository:
-        repo: "deb https://packages.cloud.google.com/apt cloud-sdk main"
+        repo: "deb [signed-by=/usr/share/keyrings/google-cloud-sdk-archive-keyring.gpg] https://packages.cloud.google.com/apt cloud-sdk main"
         state: present
         filename: google-cloud-sdk
 
@@ -39,12 +40,31 @@
   become: true
   when: postgresql_backup_gcs_enabled | default(false)
 
+- name: Validate GCS bucket configuration
+  ansible.builtin.assert:
+    that:
+      - postgresql_backup_gcs_bucket is defined
+      - postgresql_backup_gcs_bucket | length > 0
+    fail_msg: "GCS backup enabled but postgresql_backup_gcs_bucket is not set. Please configure the bucket name."
+    success_msg: "GCS backup bucket configured: {{ postgresql_backup_gcs_bucket }}"
+  when: postgresql_backup_gcs_enabled | default(false)
+
+- name: Validate encryption passphrase length
+  ansible.builtin.assert:
+    that:
+      - vault_postgresql_backup_passphrase | length >= 64
+    fail_msg: "Encryption passphrase must be at least 64 characters. Current length: {{ vault_postgresql_backup_passphrase | length }}"
+    success_msg: "Encryption passphrase meets minimum length requirement (64+ characters)"
+  when:
+    - postgresql_backup_encryption_enabled | default(false)
+    - vault_postgresql_backup_passphrase is defined
+
 - name: Deploy backup encryption passphrase
   ansible.builtin.copy:
     content: "{{ vault_postgresql_backup_passphrase }}"
-    dest: /root/.backup_passphrase
-    owner: root
-    group: root
+    dest: /var/lib/postgresql/.backup_passphrase
+    owner: postgres
+    group: postgres
     mode: "0400"
   become: true
   no_log: true
@@ -54,7 +74,7 @@
 
 - name: Verify passphrase file exists (encryption check)
   ansible.builtin.stat:
-    path: /root/.backup_passphrase
+    path: /var/lib/postgresql/.backup_passphrase
   register: passphrase_file_check
   become: true
   when: postgresql_backup_encryption_enabled | default(true)
@@ -62,11 +82,14 @@
 - name: Assert passphrase file exists when encryption enabled
   ansible.builtin.assert:
     that:
+      - vault_postgresql_backup_passphrase is defined
       - passphrase_file_check.stat.exists
       - passphrase_file_check.stat.mode == '0400'
-    fail_msg: "Encryption enabled but passphrase file not found or has incorrect permissions"
+    fail_msg: "Encryption enabled but passphrase file not found, misconfigured, or has incorrect permissions. Set vault_postgresql_backup_passphrase in Ansible Vault."
     success_msg: "Backup encryption passphrase deployed correctly"
-  when: postgresql_backup_encryption_enabled | default(true)
+  when:
+    - postgresql_backup_encryption_enabled | default(true)
+    - passphrase_file_check is defined
 
 - name: Deploy backup script
   ansible.builtin.template:
