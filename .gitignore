@@ -251,3 +251,11 @@ infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.pr
 infrastructure/ansible/roles/opendkim/files/dkim-keys/ssc.manage2soar.com/m2s.txt
 infrastructure/ansible/group_vars/gcp_database_servers/vault.yml
 infrastructure/ansible/group_vars/gcp_database_servers/vars.yml
+infrastructure/ansible/group_vars/gcs_backup/vault.yml
+infrastructure/ansible/group_vars/gcs_backup/vars.yml
+
+# Catch-all for any future group_vars that might contain secrets
+infrastructure/ansible/group_vars/gcp_*/vault.yml
+infrastructure/ansible/group_vars/gcp_*/vars.yml
+infrastructure/ansible/group_vars/gcs_*/vault.yml
+infrastructure/ansible/group_vars/gcs_*/vars.yml
