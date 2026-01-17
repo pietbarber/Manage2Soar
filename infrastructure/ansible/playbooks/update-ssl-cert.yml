@@ -1,0 +1,166 @@
+---
+# Update SSL Certificate with New Domains
+#
+# This playbook updates the Google-managed SSL certificate to include
+# all domains defined in the inventory configuration (gke_tenants.domains).
+# It deletes the existing certificate and creates a new one with all domains.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml \
+#     --vault-password-file ~/.ansible_vault_pass \
+#     playbooks/update-ssl-cert.yml
+
+- name: Update SSL Certificate for GKE Cluster
+  hosts: gcp_app_primary
+  gather_facts: false
+
+  tasks:
+    - name: Collect all tenant domains from inventory
+      ansible.builtin.set_fact:
+        all_tenant_domains: >-
+          {%- set domains = [] -%}
+          {%- if gke_multi_tenant | default(false) | bool -%}
+            {%- for tenant in gke_tenants -%}
+              {%- if tenant.domains is defined -%}
+                {%- for domain in tenant.domains -%}
+                  {%- set _ = domains.append(domain) -%}
+                {%- endfor -%}
+              {%- elif tenant.domain is defined -%}
+                {%- set _ = domains.append(tenant.domain) -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- else -%}
+            {%- if gke_domains is defined -%}
+              {%- set domains = gke_domains -%}
+            {%- elif gke_domain is defined -%}
+              {%- set _ = domains.append(gke_domain) -%}
+            {%- endif -%}
+          {%- endif -%}
+          {{ domains | unique | list }}
+      run_once: true
+      delegate_to: localhost
+      tags: [confirm]
+
+    - name: Confirm SSL certificate update
+      ansible.builtin.pause:
+        prompt: |
+
+          ========================================
+          SSL Certificate Update Plan
+          ========================================
+          Current certificate: {{ gke_ssl_cert_name }}
+
+          Domains to include in new certificate:
+          {% for domain in all_tenant_domains %}
+            - {{ domain }}
+          {% endfor %}
+
+          This will:
+          1. Delete existing certificate ({{ gke_ssl_cert_name }})
+          2. Create new certificate with {{ all_tenant_domains | length }} domain(s)
+          3. Trigger Google Certificate Manager provisioning (5-10 minutes)
+          4. Update Gateway to reference new certificate
+
+          IMPORTANT: Existing sites will continue to work during provisioning.
+          The Gateway will use the old certificate until the new one is ACTIVE.
+
+          Press ENTER to continue or Ctrl+C to abort...
+
+      delegate_to: localhost
+      run_once: true
+      tags: [confirm]
+
+    - name: Get GKE cluster credentials
+      ansible.builtin.command:
+        cmd: >
+          gcloud container clusters get-credentials {{ gke_cluster_name }}
+          --zone {{ gke_cluster_zone }}
+          --project {{ gcp_project }}
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+      tags: [gke-auth]
+
+    - name: Delete old SSL certificate
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute ssl-certificates delete {{ gke_ssl_cert_name }}
+          --global
+          --project={{ gcp_project }}
+          --quiet
+      register: ssl_cert_delete
+      changed_when: ssl_cert_delete.rc == 0
+      failed_when: false  # Don't fail if certificate doesn't exist
+      delegate_to: localhost
+      run_once: true
+      tags: [ssl-cert]
+
+    - name: Display deletion result
+      ansible.builtin.debug:
+        msg: |
+          {{ 'Certificate deleted successfully' if ssl_cert_delete.rc == 0 else 'Certificate did not exist or was already deleted' }}
+      run_once: true
+      tags: [ssl-cert]
+
+    # Import SSL certificate and Gateway tasks from gke-deploy role
+    - name: Import ingress tasks to recreate SSL certificate and update Gateway
+      ansible.builtin.import_role:
+        name: gke-deploy
+        tasks_from: ingress
+      vars:
+        # Skip unnecessary tasks - only run TLS and Gateway
+        gke_build_image: false
+        gke_push_image: false
+        gke_apply_config: true
+        gke_run_migrations: false
+      tags: [ssl-cert, gateway]
+
+    - name: Wait for certificate provisioning to start
+      ansible.builtin.command:
+        cmd: >
+          gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }}
+          --global
+          --project={{ gcp_project }}
+          --format="value(managed.status)"
+      register: ssl_cert_status
+      until: ssl_cert_status.stdout | trim in ['PROVISIONING', 'ACTIVE']
+      retries: 5
+      delay: 10
+      delegate_to: localhost
+      run_once: true
+      tags: [verify]
+
+    - name: Display provisioning instructions
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          SSL Certificate Provisioning Started
+          ========================================
+          Certificate: {{ gke_ssl_cert_name }}
+          Status: {{ ssl_cert_status.stdout | trim }}
+
+          Monitor provisioning with:
+            gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }} \
+              --global --project={{ gcp_project }} \
+              --format="yaml(managed.domainStatus)"
+
+          Typical provisioning time: 5-10 minutes per domain
+
+          Domain status progression:
+            PROVISIONING → ACTIVE (success)
+            PROVISIONING → FAILED_NOT_VISIBLE (DNS issue)
+
+          Next steps:
+          1. Verify DNS records point to Gateway IP: {{ gke_gateway_ip | default('34.13.120.184') }}
+          2. Wait for all domains to show ACTIVE status
+          3. Test each domain with: curl -I https://<your-domain>
+          4. Update HTTPRoutes to include new domains (see below)
+
+          HTTPRoute Update:
+          Run the full deployment to update HTTPRoutes with new domains:
+            ansible-playbook -i inventory/gcp_app.yml \
+              --vault-password-file ~/.ansible_vault_pass \
+              playbooks/gcp-app-deploy.yml
+          ========================================
+      run_once: true
+      tags: [verify]

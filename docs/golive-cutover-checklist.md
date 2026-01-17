@@ -61,19 +61,33 @@
   - [ ] Update DNS A/AAAA records to point to GKE ingress IP
   - [ ] DNS change timestamp: __________
   - [ ] Old IP: _________________
-  - [ ] New IP: _________________
+  - [ ] New IP: 34.13.120.184 (manage2soar-gateway)
   - [ ] Wait for DNS propagation (5-10 minutes with low TTL)
+
+- [ ] **SSL Certificate Provisioning** (T+17)
+  - [ ] Run SSL cert playbook: `ansible-playbook -i inventory/gcp_app.yml --vault-password-file ~/.ansible_vault_pass playbooks/update-ssl-cert.yml`
+  - [ ] Wait for Google to provision certificates (5-10 minutes)
+  - [ ] Monitor status: `gcloud compute ssl-certificates describe manage2soar-ssl-cert-v2 --global --format="yaml(managed.domainStatus)"`
+  - [ ] Verify all domains show ACTIVE status
+  - [ ] Timestamp: __________
 
 - [ ] **DNS Verification** (T+20)
   - [ ] Verify DNS resolves to new IP: `dig skylinesoaring.org`
   - [ ] Test from multiple locations: https://www.whatsmydns.net
   - [ ] Verify both apex and www subdomain
+  - [ ] Test SSL: `curl -I https://skylinesoaring.org`
 
 ### Phase 4: Application Activation (T+20 to T+25)
 
-- [ ] **Enable Application** (T+20)
-  - [ ] Verify pods are running: `kubectl get pods -n manage2soar`
-  - [ ] Check pod logs for errors: `kubectl logs -n manage2soar -l app=manage2soar`
+- [ ] **Disable Email Dev Mode** (T+20)
+  - [ ] Verify EMAIL_DEV_MODE is set to `false` in production Kubernetes secrets
+  - [ ] Check current setting: `kubectl get secret django-secrets -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d`
+  - [ ] If enabled, update and restart pods
+  - [ ] Verify emails will send to real addresses
+
+- [ ] **Enable Application** (T+21)
+  - [ ] Verify pods are running: `kubectl get pods -n tenant-ssc`
+  - [ ] Check pod logs for errors: `kubectl logs -n tenant-ssc -l app=manage2soar`
   - [ ] Enable CronJobs: verify distributed locking is working
   - [ ] Timestamp: __________
 
