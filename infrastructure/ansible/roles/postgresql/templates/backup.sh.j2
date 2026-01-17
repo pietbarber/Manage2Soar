@@ -25,9 +25,10 @@ BACKUP_LABEL="{{ postgresql_db }}"
 BASE_EXT="pgdump"
 BACKUP_FILE="${BACKUP_DIR}/${BACKUP_LABEL}_${DATE}.${BASE_EXT}"
 {% endif %}
-FILE_EXT="${BASE_EXT}"
 {% if postgresql_backup_encryption_enabled %}
 FILE_EXT="${BASE_EXT}.enc"
+{% else %}
+FILE_EXT="${BASE_EXT}"
 {% endif %}
 {% if postgresql_backup_encryption_enabled %}
 ENCRYPTED_FILE="${BACKUP_FILE}.enc"

@@ -1,9 +1,9 @@
 ---
 # GCS Backup Bucket + KMS + IAM Provisioning
 #
-# Usage:
-#   cp group_vars/gcs_backup/vars.yml.example group_vars/gcs_backup/vars.yml
-#   ansible-playbook playbooks/gcp-backup-storage.yml
+# Usage (from repository root):
+#   cp infrastructure/ansible/group_vars/gcs_backup/vars.yml.example infrastructure/ansible/group_vars/gcs_backup/vars.yml
+#   ansible-playbook infrastructure/ansible/playbooks/gcp-backup-storage.yml
 
 - name: Provision GCS backup bucket and KMS
   hosts: localhost
@@ -11,7 +11,7 @@
   become: false
 
   vars_files:
-    - group_vars/gcs_backup/vars.yml
+    - ../group_vars/gcs_backup/vars.yml
 
   roles:
     - role: gcs-backup

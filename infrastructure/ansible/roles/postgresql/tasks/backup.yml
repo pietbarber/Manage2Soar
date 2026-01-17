@@ -23,13 +23,8 @@
     - name: Download Google Cloud SDK APT key
       ansible.builtin.get_url:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        dest: /tmp/google-cloud-sdk-archive-keyring.gpg
+        dest: /usr/share/keyrings/google-cloud-sdk-archive-keyring.gpg
         mode: "0644"
-
-    - name: Install Google Cloud SDK keyring
-      ansible.builtin.command:
-        cmd: gpg --yes --dearmor -o /usr/share/keyrings/google-cloud-sdk-archive-keyring.gpg /tmp/google-cloud-sdk-archive-keyring.gpg
-        creates: /usr/share/keyrings/google-cloud-sdk-archive-keyring.gpg
 
     - name: Add Google Cloud SDK repository
       ansible.builtin.apt_repository:
