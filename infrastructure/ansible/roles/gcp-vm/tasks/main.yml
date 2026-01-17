@@ -15,6 +15,16 @@
       GCP project ID is required.
       Please set gcp_project in your group_vars or inventory.
 
+- name: Enable Cloud IAP API for browser SSH access
+  ansible.builtin.command:
+    cmd: gcloud services enable iap.googleapis.com --project={{ gcp_project }}
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  when: gcp_allow_iap_ssh
+  tags:
+    - gcp-apis
+
 - name: Check if VM already exists
   google.cloud.gcp_compute_instance_info:
     zone: "{{ gcp_zone }}"
