@@ -98,6 +98,12 @@ gcp_iap_ssh_range: "35.235.240.0/20"
 #   - "admin:ssh-rsa AAAAB3Nz... admin@workstation"
 gcp_ssh_public_keys: []
 
+# Additional VM metadata
+# Note: Browser SSH requires enable-guest-attributes=TRUE
+gcp_vm_metadata:
+  enable-oslogin: "FALSE"
+  enable-guest-attributes: "TRUE"
+
 # Ansible SSH connection settings (optional)
 # If not set, Ansible will use your local username
 # gcp_ansible_user: "pb"

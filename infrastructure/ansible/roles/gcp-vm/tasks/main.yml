@@ -125,7 +125,7 @@
     service_accounts:
       - email: "{{ gcp_service_account_email | default(omit) }}"
         scopes: "{{ gcp_scopes }}"
-    metadata: "{{ {'ssh-keys': (gcp_ssh_public_keys | join('\n'))} if gcp_ssh_public_keys | length > 0 else omit }}"
+    metadata: "{{ gcp_vm_metadata | combine({'ssh-keys': (gcp_ssh_public_keys | join('\n'))}) if gcp_ssh_public_keys | length > 0 else gcp_vm_metadata }}"
     state: present
   register: gcp_vm_instance
   delegate_to: localhost
@@ -163,9 +163,7 @@
       {%- if gcp_labels is defined and gcp_labels | length > 0 %}
       --labels={{ gcp_labels | dict2items | map(attribute='key') | zip(gcp_labels | dict2items | map(attribute='value')) | map('join', '=') | join(',') }}
       {%- endif %}
-      {%- if gcp_ssh_public_keys is defined and gcp_ssh_public_keys | length > 0 %}
-      --metadata=ssh-keys="{{ gcp_ssh_public_keys | join('\n') }}"
-      {%- endif %}
+      --metadata=enable-oslogin={{ gcp_vm_metadata['enable-oslogin'] }},enable-guest-attributes={{ gcp_vm_metadata['enable-guest-attributes'] }}{% if gcp_ssh_public_keys is defined and gcp_ssh_public_keys | length > 0 %},ssh-keys="{{ gcp_ssh_public_keys | join('\n') }}"{% endif %}
       {%- if gcp_service_account_email is defined and gcp_service_account_email | length > 0 %}
       --service-account={{ gcp_service_account_email }}
       {%- endif %}
