@@ -68,10 +68,8 @@
   changed_when: "'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr"
   failed_when: >
     superuser_result.rc != 0 and
-    'already exists' not in superuser_result.stdout and
-    'already exists' not in superuser_result.stderr and
-    'already taken' not in superuser_result.stdout and
-    'already taken' not in superuser_result.stderr
+    'already exists' not in (superuser_result.stdout + superuser_result.stderr) and
+    'already taken' not in (superuser_result.stdout + superuser_result.stderr)
   no_log: true
   when: should_create_superuser
   tags: [superuser]
@@ -81,7 +79,7 @@
     msg: |
       {% if 'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr %}
       ✓ Superuser created successfully
-      {% elif 'already exists' in superuser_result.stdout or 'already exists' in superuser_result.stderr or 'already taken' in superuser_result.stdout or 'already taken' in superuser_result.stderr %}
+      {% elif 'already exists' in (superuser_result.stdout + superuser_result.stderr) or 'already taken' in (superuser_result.stdout + superuser_result.stderr) %}
       ℹ Superuser already exists (no changes made)
       {% else %}
       ⚠ Superuser creation completed with warnings (check logs)
