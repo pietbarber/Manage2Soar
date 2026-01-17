@@ -30,6 +30,7 @@
         {% for qual in all_qualifications %}
           <option value="{{ qual.pk }}"
                   data-icon="{% if qual.icon %}{{ qual.icon.url }}{% endif %}"
+                  data-name="{{ qual.name }}"
                   {% if form.qualification.value == qual.pk %}selected{% endif %}>
             {{ qual.name }}
           </option>
@@ -114,11 +115,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
         iconPreview.setAttribute('src', iconUrl);
-        // Use setAttribute (not innerHTML) - explicitly setting attributes, not HTML - fixes CodeQL alert #58
-        const optionText = selectedOption.textContent || '';
-        iconPreview.setAttribute('alt', optionText);
+        // Use data attribute (not textContent) to avoid DOM-to-HTML XSS pattern per CodeQL guidance
+        const qualName = selectedOption.getAttribute('data-name') || 'Qualification';
+        iconPreview.setAttribute('alt', qualName);
         iconPreview.style.display = 'inline-block';
-        iconPreview.setAttribute('title', optionText);
+        iconPreview.setAttribute('title', qualName);
       } else {
         const iconPreview = document.getElementById('modal-qualification-icon-preview');
         if (iconPreview) {
