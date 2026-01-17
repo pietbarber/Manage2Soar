@@ -400,6 +400,8 @@ class TestEmailListsAPI:
         # Create a SiteConfiguration with manual whitelist
         SiteConfiguration.objects.create(
             club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
             manual_whitelist="bob@example.com\ncarol@example.com",
         )
 
@@ -420,6 +422,8 @@ class TestEmailListsAPI:
         # Create a SiteConfiguration with messy whitelist
         SiteConfiguration.objects.create(
             club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
             manual_whitelist="""
                 bob@example.com
 
@@ -450,6 +454,8 @@ class TestEmailListsAPI:
 
         SiteConfiguration.objects.create(
             club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
             manual_whitelist="external@example.com",
         )
 
@@ -471,6 +477,8 @@ class TestEmailListsAPI:
         # Add active_member's email to manual whitelist (should dedupe)
         SiteConfiguration.objects.create(
             club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
             manual_whitelist=f"{active_member.email}\n{active_member.email}",
         )
 

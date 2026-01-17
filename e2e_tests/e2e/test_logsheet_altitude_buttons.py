@@ -45,14 +45,11 @@ class TestLogsheetAltitudeButtons(DjangoPlaywrightTestCase):
         )
 
         # Ensure SiteConfiguration exists with default altitude buttons
-        self.config, _ = SiteConfiguration.objects.get_or_create(
-            id=1,
-            defaults={
-                "club_name": "Test Club",
-                "domain_name": "test.com",
-                "club_abbreviation": "TC",
-                "quick_altitude_buttons": "2000,3000",
-            },
+        self.config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
+            quick_altitude_buttons="2000,3000",
         )
 
     def test_altitude_buttons_render_with_default_config(self):
