@@ -19,7 +19,7 @@ dkim-keys/
 
 ## Security
 
-- **ALL KEYS ARE GITIGNORED** - Keys are never committed to the repository for security
+- **ALL KEYS ARE GITIGNORED** - Keys are gitignored from the public repository for security
 - **Private keys** (`m2s.private`) are encrypted with Ansible Vault using the vault password in `~/.ansible_vault_pass`
 - **Public keys** (`m2s.txt`) contain the public DKIM key portion
 - Keys are deployed to the mail server at `/etc/opendkim/keys/{domain}/` with proper ownership (opendkim:opendkim) and permissions (0600 for private, 0644 for public)
@@ -41,7 +41,7 @@ This supports three use cases:
 
 ### Primary: Ansible Vault (IaC)
 - Keys stored in this directory, encrypted with Ansible Vault
-- Version controlled in git repository
+- Version controlled in your local/private git copy (gitignored from public repository)
 - Deployed automatically by OpenDKIM Ansible role
 - Source of truth for all DKIM keys
 
@@ -77,10 +77,12 @@ ansible-vault encrypt --vault-password-file ~/.ansible_vault_pass \
 # 4. Add domain to group_vars/gcp_mail/vars.yml
 #    Either club_domains or dkim_additional_domains
 
-# 5. Commit to git and redeploy
-git add roles/opendkim/files/dkim-keys/newdomain.com/
-git commit -m "Add DKIM keys for newdomain.com"
+# 5. Deploy with Ansible
 ansible-playbook -i inventory/gcp_mail.yml playbooks/gcp-mail-server.yml --tags opendkim
+
+# Note: Keys are gitignored from the public repository. If you maintain a
+# private fork or local git tracking for your infrastructure, you can commit
+# these vault-encrypted keys. For the public repository, keys remain local only.
 ```
 
 ### Rotating Keys
@@ -113,16 +115,22 @@ gsutil ls gs://{bucket}/dkim-keys/
 gsutil cp gs://{bucket}/dkim-keys/dkim-keys-{timestamp}.tar.gz.enc /tmp/
 
 # 3. Decrypt backup
-# Option A: Use the vault variable directly (requires vault password)
+# Option A: Use the vault variable securely (requires vault password; preferred for IaC)
+KEY_FILE=$(mktemp)
+chmod 600 "$KEY_FILE"
 ansible-vault view --vault-password-file ~/.ansible_vault_pass group_vars/gcp_mail/vault.yml | \
   grep vault_dkim_backup_encryption_key | \
   cut -d':' -f2 | \
-  xargs -I {} openssl enc -d -aes-256-cbc -pbkdf2 \
-    -in /tmp/dkim-keys-{timestamp}.tar.gz.enc \
-    -out /tmp/dkim-keys.tar.gz \
-    -pass pass:{}
+  tr -d ' ' > "$KEY_FILE"
 
-# Option B: Manually provide the password
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -in /tmp/dkim-keys-{timestamp}.tar.gz.enc \
+  -out /tmp/dkim-keys.tar.gz \
+  -pass file:"$KEY_FILE"
+
+rm -f "$KEY_FILE"  # securely delete the temporary key file
+
+# Option B: Manually provide the password (interactive / ad-hoc use)
 openssl enc -d -aes-256-cbc -pbkdf2 \
   -in /tmp/dkim-keys-{timestamp}.tar.gz.enc \
   -out /tmp/dkim-keys.tar.gz \

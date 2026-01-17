@@ -203,6 +203,12 @@
       changed_when: encrypt_result.rc == 0
       no_log: true
 
+    - name: Remove unencrypted DKIM key archive after encryption
+      ansible.builtin.file:
+        path: "{{ backup_temp_dir.path }}/dkim-keys-{{ dkim_backup_timestamp }}.tar.gz"
+        state: absent
+      when: encrypt_result is succeeded
+
     - name: Upload encrypted DKIM backup to GCS
       ansible.builtin.shell: |
         set -euo pipefail
@@ -217,7 +223,7 @@
       ansible.builtin.file:
         path: "{{ backup_temp_dir.path }}"
         state: absent
-      when: backup_temp_dir is defined and backup_temp_dir.path is defined
+      when: backup_temp_dir is defined and backup_temp_dir.get('path') is defined
       failed_when: false
   tags: [opendkim-backup]
 
