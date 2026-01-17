@@ -583,9 +583,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // URL is validated by isSafeImageUrl() before reaching here, so setAttribute is safe
         iconPreview.setAttribute('src', iconUrl);
-        iconPreview.alt = selectedOption.textContent || '';
+        // Use textContent assignment (safe, not parsed as HTML) - fixes CodeQL alert #57
+        const safeText = (selectedOption.textContent || '').trim();
+        iconPreview.alt = safeText;
         iconPreview.style.display = 'inline-block';
-        iconPreview.title = selectedOption.textContent || '';
+        iconPreview.title = safeText;
       } else {
         const iconPreview = document.getElementById('qualification-icon-preview');
         if (iconPreview) {
