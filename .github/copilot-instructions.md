@@ -87,6 +87,7 @@
 - **DO NOT** ask the user to copy/paste alert details - fetch them directly with the `gh` command
 - **Pattern**: Fetch alerts → Analyze code → Fix vulnerabilities → Commit with alert numbers in message
 - **Workflow**: Create feature branch → Fix issues → Push → Create PR (avoid committing directly to main)
+- **ALERT REFERENCES**: When referencing CodeQL alert numbers in PR descriptions or commit messages, use `# 64` (with space) instead of `#64` to avoid auto-linking to GitHub issues. Example: "Fixes alert # 64, # 65, and # 66" not "Fixes #64, #65, #66".
 ## Testing & Coverage
 - All Django apps must have comprehensive test coverage using pytest and pytest-django.
 - Use `pytest --cov` or the VS Code "Run test with coverage" feature to ensure all code paths are tested.
