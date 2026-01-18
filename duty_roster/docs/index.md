@@ -62,7 +62,7 @@ The **Duty Roster** app manages scheduling and assignments for Duty Officers (DO
 ## Styling
 
 - Uses Bootstrap 5 for layout and forms
-- Custom styles in `static/css/baseline.css` and `static/css/calendar.css`
+- Custom styles in `static/css/baseline.css`
 - Calendar uses color coding for roles and assignments
 
 ---
