@@ -435,13 +435,16 @@ function submitFlightInstruction() {
   // Check if there's qualification data to include
   const qualFields = document.getElementById('qualificationFormFields');
 
-  if (qualFields && qualFields.querySelector('select[name="qualification"]').value) {
-    // Copy qualification data to main form as hidden fields
+  if (qualFields) {
     const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
-    const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
-    const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
-    const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
-    const notes = qualFields.querySelector('textarea[name="notes"]');
+
+    // Only proceed if qualification select exists and has a value
+    if (qualificationSelect && qualificationSelect.value) {
+      // Copy qualification data to main form as hidden fields
+      const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
+      const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
+      const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
+      const notes = qualFields.querySelector('textarea[name="notes"]');
 
     // Null checks for all qualification fields
     if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
@@ -468,6 +471,7 @@ function submitFlightInstruction() {
       input.value = field.value;
       mainForm.appendChild(input);
     });
+    }
   }
 
   // Explicitly submit the form
