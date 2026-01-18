@@ -594,10 +594,10 @@ class KioskActiveMemberDecoratorTests(TestCase):
         session = self.client.session
         self.assertTrue(session.get("is_kiosk_authenticated"))
 
-        # Access a view with @active_member_required (member_dashboard)
+        # Access a view with @active_member_required (member_list)
         # Role account has inactive membership_status but should be allowed
-        dashboard_url = reverse("members:member_dashboard")
-        response = self.client.get(dashboard_url)
+        member_list_url = reverse("members:member_list")
+        response = self.client.get(member_list_url)
         self.assertEqual(
             response.status_code,
             200,
@@ -614,8 +614,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         self.assertFalse(session.get("is_kiosk_authenticated", False))
 
         # Access a view with @active_member_required
-        dashboard_url = reverse("members:member_dashboard")
-        response = self.client.get(dashboard_url)
+        member_list_url = reverse("members:member_list")
+        response = self.client.get(member_list_url)
         self.assertEqual(
             response.status_code, 403, "Inactive user should be denied access"
         )
@@ -630,8 +630,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         self.assertFalse(session.get("is_kiosk_authenticated", False))
 
         # Access a view with @active_member_required
-        dashboard_url = reverse("members:member_dashboard")
-        response = self.client.get(dashboard_url)
+        member_list_url = reverse("members:member_list")
+        response = self.client.get(member_list_url)
         self.assertEqual(
             response.status_code, 200, "Active member should be allowed access"
         )
@@ -667,8 +667,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         )
 
         # Access a view with @active_member_required
-        dashboard_url = reverse("members:member_dashboard")
-        response = self.client.get(dashboard_url)
+        member_list_url = reverse("members:member_list")
+        response = self.client.get(member_list_url)
         self.assertEqual(
             response.status_code,
             403,
@@ -702,8 +702,8 @@ class KioskActiveMemberDecoratorTests(TestCase):
         self.assertFalse(user.is_authenticated)
 
         # Access any page - middleware should auto-reauth via cookies
-        dashboard_url = reverse("members:member_dashboard")
-        response = self.client.get(dashboard_url)
+        member_list_url = reverse("members:member_list")
+        response = self.client.get(member_list_url)
 
         # Verify user is now authenticated
         user = get_user(self.client)
