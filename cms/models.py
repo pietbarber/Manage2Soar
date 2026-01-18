@@ -338,7 +338,7 @@ class Page(models.Model):
         """
         return list(self.role_permissions.values_list("role_name", flat=True))
 
-    def can_user_access(self, user):
+    def can_user_access(self, user, request=None):
         """
         Check if a user can VIEW this page based on role-based access control.
 
@@ -350,6 +350,7 @@ class Page(models.Model):
 
         Args:
             user: Django User instance (can be anonymous)
+            request: Optional HttpRequest object (needed for kiosk session detection)
 
         Returns:
             bool: True if the user can access this page, False otherwise
@@ -405,10 +406,14 @@ class Page(models.Model):
             finally:
                 checking_access_via_edit.discard(page_key)
 
-        # Check if user is an active member
-        from members.utils import is_active_member
+        # Check if user is an active member or authenticated via kiosk
+        from members.utils import is_active_member, is_kiosk_session
 
-        if not is_active_member(user):
+        # Allow kiosk sessions to view member content (Issue #486)
+        if request and is_kiosk_session(request):
+            # Kiosk sessions can view member content
+            pass
+        elif not is_active_member(user):
             return False
 
         # If no role restrictions, any active member can access

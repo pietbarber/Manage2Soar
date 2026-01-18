@@ -57,12 +57,13 @@ def get_role_display_names(page):
     return [role_choices_dict.get(role, role.title()) for role in role_names]
 
 
-def get_accessible_top_level_pages(user):
+def get_accessible_top_level_pages(user, request=None):
     """
     Get accessible top-level CMS pages for a user with optimized queries.
 
     Args:
         user: The user to check access for
+        request: Optional HttpRequest object (needed for kiosk session detection)
 
     Returns:
         list: List of page dictionaries with metadata
@@ -86,7 +87,7 @@ def get_accessible_top_level_pages(user):
     pages = []
     for p in top_pages_qs:
         # Use the page's built-in access control method
-        can_view = p.can_user_access(user)
+        can_view = p.can_user_access(user, request)
 
         # Only include pages the user can access
         if not can_view:
@@ -137,7 +138,7 @@ def cms_page(request, **kwargs):
     # page is now the deepest resolved page
     # Access control: check if user can access this page based on role restrictions
     assert page is not None
-    if not page.can_user_access(request.user):
+    if not page.can_user_access(request.user, request):
         # Use Django's helper to redirect to login (handles encoding)
         return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
     # Build subpage metadata (doc counts and last-updated timestamps) to
@@ -154,7 +155,7 @@ def cms_page(request, **kwargs):
     )
     for child in children:
         # Skip pages the user cannot access (security filtering)
-        if not child.can_user_access(request.user):
+        if not child.can_user_access(request.user, request):
             continue
 
         # last updated is the later of the page's updated_at and latest document upload
@@ -237,8 +238,12 @@ def homepage(request):
 
     # Try to render legacy HomePageContent for the appropriate audience
     page = None
+    from members.utils import is_kiosk_session
+
+    # Show member content if: authenticated + (kiosk session OR active membership)
     if user.is_authenticated and (
-        user.is_superuser
+        is_kiosk_session(request)
+        or user.is_superuser
         or getattr(user, "membership_status", None) in allowed_statuses
     ):
         page = HomePageContent.objects.filter(
@@ -259,7 +264,7 @@ def homepage(request):
         )
 
     # Fallback: show CMS index of top-level pages using optimized helper function
-    pages = get_accessible_top_level_pages(request.user)
+    pages = get_accessible_top_level_pages(request.user, request)
     return render(request, "cms/index.html", {"pages": pages})
 
 
@@ -269,7 +274,7 @@ def cms_resources_index(request):
     Always shows the navigable directory index of CMS pages/resources.
     """
     # Use helper function to get accessible pages with optimized queries
-    pages = get_accessible_top_level_pages(request.user)
+    pages = get_accessible_top_level_pages(request.user, request)
     return render(
         request,
         "cms/index.html",
