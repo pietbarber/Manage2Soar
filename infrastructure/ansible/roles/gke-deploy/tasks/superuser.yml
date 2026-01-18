@@ -68,8 +68,8 @@
   changed_when: "'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr"
   failed_when: >
     superuser_result.rc != 0 and
-    'already exists' not in (superuser_result.stdout + superuser_result.stderr) and
-    'already taken' not in (superuser_result.stdout + superuser_result.stderr)
+    'already exists' not in (superuser_result.stdout | default('') + superuser_result.stderr | default('')) and
+    'already taken' not in (superuser_result.stdout | default('') + superuser_result.stderr | default(''))
   no_log: true
   when: should_create_superuser
   tags: [superuser]
@@ -77,9 +77,10 @@
 - name: Display superuser creation result
   ansible.builtin.debug:
     msg: |
-      {% if 'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr %}
+      {% set combined_output = (superuser_result.stdout | default('')) + (superuser_result.stderr | default('')) %}
+      {% if 'Superuser created successfully' in combined_output %}
       ✓ Superuser created successfully
-      {% elif 'already exists' in (superuser_result.stdout + superuser_result.stderr) or 'already taken' in (superuser_result.stdout + superuser_result.stderr) %}
+      {% elif 'already exists' in combined_output or 'already taken' in combined_output %}
       ℹ Superuser already exists (no changes made)
       {% else %}
       ⚠ Superuser creation completed with warnings (check logs)
