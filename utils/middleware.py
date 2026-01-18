@@ -57,6 +57,8 @@ class KioskAutoLoginMiddleware:
                     # Successfully authenticated via kiosk token
                     user.backend = "django.contrib.auth.backends.ModelBackend"
                     login(request, user)
+                    # Set session flag to indicate kiosk authentication (Issue #486)
+                    request.session["is_kiosk_authenticated"] = True
                     logger.debug(
                         f"Kiosk auto-login successful for user: {user.username}"
                     )
