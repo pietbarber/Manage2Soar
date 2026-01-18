@@ -285,5 +285,3 @@ def is_kiosk_session(context):
         return False
 
     return check_kiosk_session(request)
-    # This is acceptable for UI purposes - middleware handles actual authentication.
-    return has_kiosk_token and has_kiosk_fingerprint
