@@ -446,31 +446,31 @@ function submitFlightInstruction() {
       const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
       const notes = qualFields.querySelector('textarea[name="notes"]');
 
-    // Null checks for all qualification fields
-    if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
-      console.error('Missing qualification form fields');
-      return false;
-    }
+      // Null checks for all qualification fields
+      if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
+        console.error('Missing qualification form fields');
+        return false;
+      }
 
-    // Remove any existing qualification fields
-    mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
+      // Remove any existing qualification fields
+      mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
 
-    // Add qualification data as hidden fields
-    const hiddenFields = [
-      {name: 'qual_qualification', value: qualificationSelect.value},
-      {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
-      {name: 'qual_date_awarded', value: dateAwarded.value},
-      {name: 'qual_expiration_date', value: expirationDate.value},
-      {name: 'qual_notes', value: notes.value}
-    ];
+      // Add qualification data as hidden fields
+      const hiddenFields = [
+        {name: 'qual_qualification', value: qualificationSelect.value},
+        {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
+        {name: 'qual_date_awarded', value: dateAwarded.value},
+        {name: 'qual_expiration_date', value: expirationDate.value},
+        {name: 'qual_notes', value: notes.value}
+      ];
 
-    hiddenFields.forEach(field => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = field.name;
-      input.value = field.value;
-      mainForm.appendChild(input);
-    });
+      hiddenFields.forEach(field => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = field.name;
+        input.value = field.value;
+        mainForm.appendChild(input);
+      });
     }
   }
 
