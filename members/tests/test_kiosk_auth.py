@@ -510,3 +510,215 @@ class KioskSecurityTests(TestCase):
         new_url = token.get_magic_url()
         response = self.client.get(new_url)
         self.assertEqual(response.status_code, 200)
+
+
+class KioskActiveMemberDecoratorTests(TestCase):
+    """
+    Tests for @active_member_required decorator interaction with kiosk sessions (Issue #486).
+
+    These tests verify that kiosk-authenticated users bypass membership_status checks
+    while non-kiosk users still require valid membership_status.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        """Create test users and membership statuses."""
+        # Create active membership status
+        MembershipStatus.objects.create(
+            name="Full Member", is_active=True, display_order=1
+        )
+        # Create inactive membership status
+        MembershipStatus.objects.create(
+            name="Inactive", is_active=False, display_order=99
+        )
+        # Create role account status
+        MembershipStatus.objects.create(
+            name="Role Account", is_active=False, display_order=100
+        )
+
+    def setUp(self):
+        """Create test data for each test."""
+        # Create role account for kiosk (no valid membership_status)
+        self.kiosk_user = Member.objects.create_user(
+            username="club-laptop",
+            email="invalid@invalid",
+            password=None,
+            first_name="Club",
+            last_name="Laptop",
+            membership_status="Role Account",
+        )
+
+        # Create kiosk token for the role account
+        self.kiosk_token = KioskToken.objects.create(
+            user=self.kiosk_user, name="Test Kiosk", is_active=True
+        )
+
+        # Bind device with fingerprint
+        fingerprint_hash = "test_fingerprint_hash_" + "a" * 40
+        self.kiosk_token.bind_device(fingerprint_hash)
+
+        # Create normal user with inactive membership_status
+        self.inactive_user = Member.objects.create_user(
+            username="inactive",
+            email="inactive@example.com",
+            password="testpass123",
+            first_name="Inactive",
+            last_name="User",
+            membership_status="Inactive",
+        )
+
+        # Create normal user with active membership_status
+        self.active_user = Member.objects.create_user(
+            username="active",
+            email="active@example.com",
+            password="testpass123",
+            first_name="Active",
+            last_name="User",
+            membership_status="Full Member",
+        )
+
+    def test_kiosk_session_bypasses_membership_check(self):
+        """Kiosk-authenticated users should access @active_member_required views."""
+        # Bind device and log in via kiosk
+        bind_url = reverse(
+            "members:kiosk_bind_device", kwargs={"token": self.kiosk_token.token}
+        )
+        response = self.client.post(
+            bind_url,
+            data=json.dumps({"fingerprint": "test_fingerprint_" + "a" * 40}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify session flag is set
+        session = self.client.session
+        self.assertTrue(session.get("is_kiosk_authenticated"))
+
+        # Access a view with @active_member_required (member_dashboard)
+        # Role account has inactive membership_status but should be allowed
+        dashboard_url = reverse("members:member_dashboard")
+        response = self.client.get(dashboard_url)
+        self.assertEqual(
+            response.status_code,
+            200,
+            "Kiosk session should bypass membership_status check",
+        )
+
+    def test_non_kiosk_inactive_member_denied(self):
+        """Non-kiosk users with inactive membership_status should be denied."""
+        # Log in as inactive user via normal Django authentication
+        self.client.login(username="inactive", password="testpass123")
+
+        # Verify NO kiosk session flag
+        session = self.client.session
+        self.assertFalse(session.get("is_kiosk_authenticated", False))
+
+        # Access a view with @active_member_required
+        dashboard_url = reverse("members:member_dashboard")
+        response = self.client.get(dashboard_url)
+        self.assertEqual(
+            response.status_code, 403, "Inactive user should be denied access"
+        )
+
+    def test_non_kiosk_active_member_allowed(self):
+        """Non-kiosk users with active membership_status should be allowed."""
+        # Log in as active user via normal Django authentication
+        self.client.login(username="active", password="testpass123")
+
+        # Verify NO kiosk session flag
+        session = self.client.session
+        self.assertFalse(session.get("is_kiosk_authenticated", False))
+
+        # Access a view with @active_member_required
+        dashboard_url = reverse("members:member_dashboard")
+        response = self.client.get(dashboard_url)
+        self.assertEqual(
+            response.status_code, 200, "Active member should be allowed access"
+        )
+
+    def test_stale_kiosk_cookies_with_oauth_login_denied(self):
+        """
+        Security test: Users with stale kiosk cookies but non-kiosk authentication
+        should NOT bypass membership_status checks (Issue #486).
+
+        Scenario:
+        1. User authenticates via kiosk, gets cookies
+        2. Kiosk token is revoked
+        3. User logs out, logs in via OAuth2 with inactive membership_status
+        4. Old kiosk cookies still present in browser
+        5. Should be DENIED because session flag not set (middleware didn't auth via kiosk)
+        """
+        # Set stale kiosk cookies manually (simulating leftover from previous session)
+        self.client.cookies["kiosk_token"] = self.kiosk_token.token
+        # Assert fingerprint is set (device was bound in setUp)
+        self.assertIsNotNone(self.kiosk_token.device_fingerprint)
+        fingerprint = self.kiosk_token.device_fingerprint
+        assert fingerprint is not None  # Type narrowing for Pylance
+        self.client.cookies["kiosk_fingerprint"] = fingerprint
+
+        # Log in as inactive user via Django authentication (simulating OAuth2)
+        self.client.login(username="inactive", password="testpass123")
+
+        # Verify session has NO kiosk flag (middleware didn't authenticate via kiosk)
+        session = self.client.session
+        self.assertFalse(
+            session.get("is_kiosk_authenticated", False),
+            "Session should not have kiosk flag for non-kiosk authentication",
+        )
+
+        # Access a view with @active_member_required
+        dashboard_url = reverse("members:member_dashboard")
+        response = self.client.get(dashboard_url)
+        self.assertEqual(
+            response.status_code,
+            403,
+            "Stale kiosk cookies should NOT bypass membership check",
+        )
+
+    def test_kiosk_middleware_sets_session_flag(self):
+        """Middleware should set is_kiosk_authenticated session flag on auto-reauth."""
+        # First, bind device and log in to set cookies
+        bind_url = reverse(
+            "members:kiosk_bind_device", kwargs={"token": self.kiosk_token.token}
+        )
+        response = self.client.post(
+            bind_url,
+            data=json.dumps({"fingerprint": "test_fingerprint_" + "a" * 40}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Extract cookies from response
+        kiosk_token_cookie = response.cookies.get("kiosk_token")
+        kiosk_fingerprint_cookie = response.cookies.get("kiosk_fingerprint")
+        self.assertIsNotNone(kiosk_token_cookie)
+        self.assertIsNotNone(kiosk_fingerprint_cookie)
+
+        # Log out (clears session but cookies remain)
+        self.client.logout()
+
+        # Verify user is not authenticated
+        user = get_user(self.client)
+        self.assertFalse(user.is_authenticated)
+
+        # Access any page - middleware should auto-reauth via cookies
+        dashboard_url = reverse("members:member_dashboard")
+        response = self.client.get(dashboard_url)
+
+        # Verify user is now authenticated
+        user = get_user(self.client)
+        self.assertTrue(user.is_authenticated)
+
+        # Verify session flag is set by middleware
+        session = self.client.session
+        self.assertTrue(
+            session.get("is_kiosk_authenticated"),
+            "Middleware should set is_kiosk_authenticated flag on auto-reauth",
+        )
+
+        # Verify access is granted
+        self.assertEqual(
+            response.status_code,
+            200,
+            "Auto-reauthed kiosk session should have access",
+        )

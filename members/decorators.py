@@ -3,18 +3,7 @@ from functools import wraps
 from django.shortcuts import redirect, render
 
 from .utils import is_active_member
-
-
-def is_kiosk_session(request):
-    """
-    Check if the current request is from a kiosk session (Issue #364, #486).
-
-    Returns True if the user logged in via kiosk token (has kiosk cookies).
-    Kiosk sessions should bypass membership_status checks.
-    """
-    has_kiosk_token = bool(request.COOKIES.get("kiosk_token"))
-    has_kiosk_fingerprint = bool(request.COOKIES.get("kiosk_fingerprint"))
-    return has_kiosk_token and has_kiosk_fingerprint
+from .utils.kiosk import is_kiosk_session
 
 
 def active_member_required(view_func):

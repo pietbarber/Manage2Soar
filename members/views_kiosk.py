@@ -188,6 +188,9 @@ def kiosk_bind_device(request, token):
     user.backend = "django.contrib.auth.backends.ModelBackend"
     login(request, user)
 
+    # Set session flag to indicate kiosk authentication (Issue #486)
+    request.session["is_kiosk_authenticated"] = True
+
     # Record usage
     kiosk_token.record_usage(get_client_ip(request))
 
