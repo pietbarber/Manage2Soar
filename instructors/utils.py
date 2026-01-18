@@ -3,6 +3,7 @@
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Count, F, Max, Sum, Value
 from django.db.models.fields import DurationField
 from django.db.models.functions import Coalesce
@@ -10,7 +11,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from logsheet.models import Flight
-from siteconfig.models import MailingList, SiteConfiguration
+from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 
@@ -271,18 +272,22 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
     from_email = f"noreply@{domain_name}"
 
     # Check for instructors mailing list to CC
+    # Use the mailing list alias (e.g., instructors@skylinesoaring.org) instead of
+    # expanding to individual subscriber emails. This allows the mail server to handle
+    # the distribution and ensures the alias appears in the CC field.
     cc_emails = []
     try:
-        instructors_list = MailingList.objects.filter(
-            name__iexact="instructors", is_active=True
-        ).first()
-        if instructors_list:
-            cc_emails = instructors_list.get_subscriber_emails()
-            # Remove the student from CC if they happen to be on the list
-            if report.student.email in cc_emails:
-                cc_emails.remove(report.student.email)
+        # Try to get from settings first, otherwise construct from domain
+        instructors_list = getattr(settings, "INSTRUCTORS_MAILING_LIST", "")
+        if instructors_list and "@" in instructors_list:
+            cc_emails = [instructors_list]
+        elif config and config.domain_name:
+            cc_emails = [f"instructors@{config.domain_name}"]
+        else:
+            # Fallback to default (shouldn't happen in production)
+            cc_emails = [f"instructors@{domain_name}"]
     except Exception as e:
-        logger.warning(f"Could not get instructors mailing list: {e!s}")
+        logger.warning(f"Could not construct instructors mailing list address: {e!s}")
 
     # Send the email
     try:
@@ -294,10 +299,8 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
             html_message=html_message,
             cc=cc_emails if cc_emails else None,
         )
-        logger.info(
-            f"Sent instruction report email to {report.student.email}"
-            f"{' (CC: instructors)' if cc_emails else ''}"
-        )
+        cc_info = f" (CC: {', '.join(cc_emails)})" if cc_emails else ""
+        logger.info(f"Sent instruction report email to {report.student.email}{cc_info}")
         return 1
     except Exception as e:
         logger.exception(f"Failed to send instruction report email: {e!s}")

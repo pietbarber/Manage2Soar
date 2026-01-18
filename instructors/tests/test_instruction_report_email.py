@@ -302,12 +302,8 @@ class TestInstructionReportEmail:
         self,
         site_config,
         instruction_report,
-        instructors_mailing_list,
-        instructor_member,
-        second_instructor,
-        active_membership_status,
     ):
-        """Test that instructors mailing list is CC'd."""
+        """Test that instructors mailing list alias is CC'd (not individual emails)."""
         mail.outbox.clear()
 
         send_instruction_report_email(instruction_report)
@@ -315,9 +311,11 @@ class TestInstructionReportEmail:
         email = mail.outbox[0]
         # Student should be in TO
         assert instruction_report.student.email in email.to
-        # Instructors should be in CC (at least one)
+        # Instructors mailing list alias should be in CC
         assert email.cc is not None
-        assert len(email.cc) > 0
+        assert len(email.cc) == 1
+        # Should use the alias, not expand to individual emails
+        assert email.cc[0] == f"instructors@{site_config.domain_name}"
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -326,12 +324,18 @@ class TestInstructionReportEmail:
     def test_student_not_in_cc_if_also_instructor(
         self,
         site_config,
-        instructors_mailing_list,
         instructor_member,
-        active_membership_status,
     ):
-        """Test that student is not CC'd if they happen to be on instructors list."""
+        """Test that instructors mailing list alias is used (not individual emails).
+
+        This test verifies that we send to the instructors@domain alias rather than
+        expanding to individual instructor emails. The mail server handles distribution,
+        so there's no need to check if the student is on the list - the mail server
+        will handle that.
+        """
         # Make the instructor a student for this report
+        from members.models import Member
+
         student_instructor = instructor_member
         other_instructor = Member.objects.create(
             username="other_instructor",
@@ -342,6 +346,10 @@ class TestInstructionReportEmail:
             instructor=True,
             is_active=True,
         )
+        from datetime import date
+
+        from instructors.models import InstructionReport
+
         report = InstructionReport.objects.create(
             student=student_instructor,
             instructor=other_instructor,
@@ -354,24 +362,33 @@ class TestInstructionReportEmail:
         email = mail.outbox[0]
         # Student should be in TO
         assert student_instructor.email in email.to
-        # Student should NOT be in CC
-        if email.cc:
-            assert student_instructor.email not in email.cc
+        # CC should contain the mailing list alias, not individual emails
+        assert email.cc is not None
+        assert len(email.cc) == 1
+        assert email.cc[0] == f"instructors@{site_config.domain_name}"
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         EMAIL_DEV_MODE=False,
     )
     def test_no_cc_when_no_instructors_list(self, site_config, instruction_report):
-        """Test that no CC is added when no instructors mailing list exists."""
-        # Ensure no instructors mailing list exists
+        """Test that instructors alias is always CC'd (doesn't depend on MailingList object).
+
+        The new behavior is to always send to instructors@domain alias, regardless of
+        whether a MailingList object exists in the database. The mail server handles
+        distribution. If the alias doesn't exist on the mail server, the email will bounce.
+        """
+        # Delete the MailingList object (if it exists) - shouldn't affect CC behavior
         MailingList.objects.filter(name__iexact="instructors").delete()
         mail.outbox.clear()
 
         send_instruction_report_email(instruction_report)
 
         email = mail.outbox[0]
-        assert email.cc is None or len(email.cc) == 0
+        # Should still CC the instructors alias
+        assert email.cc is not None
+        assert len(email.cc) == 1
+        assert email.cc[0] == f"instructors@{site_config.domain_name}"
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
