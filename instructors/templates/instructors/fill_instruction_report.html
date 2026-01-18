@@ -398,8 +398,8 @@ function submitQualificationOnly() {
       return false;
     }
 
-    // Remove any existing fields (except form_type)
-    qualForm.querySelectorAll('input:not([name="form_type"]), select, textarea').forEach(field => field.remove());
+    // Remove any existing fields (except form_type and csrfmiddlewaretoken)
+    qualForm.querySelectorAll('input:not([name="form_type"]):not([name="csrfmiddlewaretoken"]), select, textarea').forEach(field => field.remove());
 
     // Create and append copies as hidden fields
     const fieldsToClone = [
