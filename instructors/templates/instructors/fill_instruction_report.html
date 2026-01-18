@@ -159,142 +159,6 @@
           </div>
         </div>
 
-        <!-- Student Qualifications Management Card -->
-        <div class="card contact-info mb-4">
-          <div class="card-header bg-info text-white">
-            <h5 class="mb-0">
-              <i class="bi bi-award me-2"></i>Student Qualifications
-            </h5>
-          </div>
-          <div class="card-body">
-            <!-- Existing Qualifications -->
-            <div class="row mb-3">
-              <div class="col-md-12">
-                <h6 class="fw-bold text-primary mb-3">
-                  <i class="bi bi-check-circle me-2"></i>Current Qualifications
-                </h6>
-                {% if existing_qualifications %}
-                  <div class="row g-2">
-                    {% for qual in existing_qualifications %}
-                      <div class="col-md-6 col-lg-4">
-                        <div class="card border-start border-3 {% if qual.is_qualified %}border-success{% else %}border-warning{% endif %} h-100">
-                          <div class="card-body py-2 px-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                              <div class="d-flex align-items-center">
-                                {% if qual.qualification.icon %}
-                                  <img src="{{ qual.qualification.icon.url }}" alt="{{ qual.qualification.code }}"
-                                       class="qualification-icon me-2" width="24" height="24">
-                                {% else %}
-                                  <i class="bi bi-award text-muted me-2" style="font-size: 1.2rem;"></i>
-                                {% endif %}
-                                <div>
-                                  <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
-                                <small class="text-muted">
-                                  {% if qual.date_awarded %}
-                                    Awarded: {{ qual.date_awarded|date:"M j, Y" }}
-                                  {% endif %}
-                                  {% if qual.expiration_date %}
-                                    <br>Expires: {{ qual.expiration_date|date:"M j, Y" }}
-                                  {% endif %}
-                                </small>
-                                </div>
-                              </div>
-                              <div>
-                                {% if qual.is_qualified %}
-                                  <span class="badge bg-success">Active</span>
-                                {% else %}
-                                  <span class="badge bg-warning text-dark">Inactive</span>
-                                {% endif %}
-                              </div>
-                            </div>
-                            {% if qual.notes %}
-                              <small class="text-muted d-block mt-1">{{ qual.notes }}</small>
-                            {% endif %}
-                          </div>
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <div class="text-center py-3 text-muted">
-                    <i class="bi bi-info-circle fs-4 mb-2 d-block"></i>
-                    <p class="mb-0">No qualifications assigned yet.</p>
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-
-            <!-- Add New Qualification -->
-            <div class="border-top pt-3">
-              <h6 class="fw-bold text-primary mb-3">
-                <i class="bi bi-plus-circle me-2"></i>Assign New Qualification
-              </h6>
-              <form method="post" id="qualificationForm">
-                {% csrf_token %}
-                <input type="hidden" name="form_type" value="qualification">
-                <div class="row g-3">
-                  <div class="col-md-4">
-                    <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
-                      <strong>Qualification</strong>
-                    </label>
-                    <div class="d-flex align-items-center gap-2">
-                      <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
-                        <option value="">Select a qualification...</option>
-                        {% for qual in all_qualifications %}
-                          <option value="{{ qual.pk }}">
-                            {{ qual.name }}
-                          </option>
-                        {% endfor %}
-                      </select>
-                      {# Pre-render all qualification icons - show/hide with CSS based on selection #}
-                      <div class="qualification-icon-container">
-                        {% for qual in all_qualifications %}
-                          {% if qual.icon %}
-                            <img src="{{ qual.icon.url }}"
-                                 alt="{{ qual.name }} icon"
-                                 title="{{ qual.name }}"
-                                 class="qualification-icon qual-icon-{{ qual.pk }}"
-                                 width="24"
-                                 height="24"
-                                 style="display: none; vertical-align: middle;">
-                          {% endif %}
-                        {% endfor %}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label"><strong>Status</strong></label>
-                    <div class="form-check">
-                      {{ qualification_form.is_qualified|add_class:"form-check-input" }}
-                      <label class="form-check-label" for="{{ qualification_form.is_qualified.id_for_label }}">
-                        {{ qualification_form.is_qualified.label }}
-                      </label>
-                    </div>
-                  </div>
-                  <div class="col-md-3">
-                    <label for="{{ qualification_form.date_awarded.id_for_label }}" class="form-label">
-                      <strong>{{ qualification_form.date_awarded.label }}</strong>
-                    </label>
-                    {{ qualification_form.date_awarded|add_class:"form-control" }}
-                  </div>
-                  <div class="col-md-3">
-                    <label for="{{ qualification_form.expiration_date.id_for_label }}" class="form-label">
-                      <strong>{{ qualification_form.expiration_date.label }}</strong>
-                    </label>
-                    {{ qualification_form.expiration_date|add_class:"form-control" }}
-                  </div>
-                  <div class="col-12">
-                    <label for="{{ qualification_form.notes.id_for_label }}" class="form-label">
-                      <strong>Notes (optional)</strong>
-                    </label>
-                    {{ qualification_form.notes|add_class:"form-control" }}
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-
         <!-- Action Buttons following guide pattern -->
         <div class="d-flex justify-content-between align-items-center">
           <div>
@@ -317,6 +181,157 @@
     </div>
   </div>
 </div>
+
+<!-- Student Qualifications Management Card (outside main form to avoid field name conflicts) -->
+{% if student and qualification_form %}
+<div class="container-fluid mb-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+      <div class="card contact-info mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-award me-2"></i>Student Qualifications
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Existing Qualifications -->
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <h6 class="fw-bold text-primary mb-3">
+                <i class="bi bi-check-circle me-2"></i>Current Qualifications
+              </h6>
+              {% if existing_qualifications %}
+                <div class="row g-2">
+                  {% for qual in existing_qualifications %}
+                    <div class="col-md-6 col-lg-4">
+                      <div class="card border-start border-3 {% if qual.is_qualified %}border-success{% else %}border-warning{% endif %} h-100">
+                        <div class="card-body py-2 px-3">
+                          <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                              {% if qual.qualification.icon %}
+                                <img src="{{ qual.qualification.icon.url }}" alt="{{ qual.qualification.code }}"
+                                     class="qualification-icon me-2" width="24" height="24">
+                              {% else %}
+                                <i class="bi bi-award text-muted me-2" style="font-size: 1.2rem;"></i>
+                              {% endif %}
+                              <div>
+                                <h6 class="card-title mb-1 fs-6">{{ qual.qualification.name }}</h6>
+                              <small class="text-muted">
+                                {% if qual.date_awarded %}
+                                  Awarded: {{ qual.date_awarded|date:"M j, Y" }}
+                                {% endif %}
+                                {% if qual.expiration_date %}
+                                  <br>Expires: {{ qual.expiration_date|date:"M j, Y" }}
+                                {% endif %}
+                              </small>
+                              </div>
+                            </div>
+                            <div>
+                              {% if qual.is_qualified %}
+                                <span class="badge bg-success">Active</span>
+                              {% else %}
+                                <span class="badge bg-warning text-dark">Inactive</span>
+                              {% endif %}
+                            </div>
+                          </div>
+                          {% if qual.notes %}
+                            <small class="text-muted d-block mt-1">{{ qual.notes }}</small>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="text-center py-3 text-muted">
+                  <i class="bi bi-info-circle fs-4 mb-2 d-block"></i>
+                  <p class="mb-0">No qualifications assigned yet.</p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Add New Qualification -->
+          <div class="border-top pt-3">
+            <h6 class="fw-bold text-primary mb-3">
+              <i class="bi bi-plus-circle me-2"></i>Assign New Qualification
+            </h6>
+            <div id="qualificationFormFields">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label for="{{ qualification_form.qualification.id_for_label }}" class="form-label">
+                    <strong>Qualification</strong>
+                  </label>
+                  <div class="d-flex align-items-center gap-2">
+                    <select name="qualification" id="{{ qualification_form.qualification.id_for_label }}" class="form-select qualification-select">
+                      <option value="">Select a qualification...</option>
+                      {% for qual in all_qualifications %}
+                        <option value="{{ qual.pk }}">
+                          {{ qual.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    {# Pre-render all qualification icons - show/hide with CSS based on selection #}
+                    <div class="qualification-icon-container">
+                      {% for qual in all_qualifications %}
+                        {% if qual.icon %}
+                          <img src="{{ qual.icon.url }}"
+                               alt="{{ qual.name }} icon"
+                               title="{{ qual.name }}"
+                               class="qualification-icon qual-icon-{{ qual.pk }}"
+                               width="24"
+                               height="24"
+                               style="display: none; vertical-align: middle;">
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label"><strong>Status</strong></label>
+                  <div class="form-check">
+                    {{ qualification_form.is_qualified|add_class:"form-check-input" }}
+                    <label class="form-check-label" for="{{ qualification_form.is_qualified.id_for_label }}">
+                      {{ qualification_form.is_qualified.label }}
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label for="{{ qualification_form.date_awarded.id_for_label }}" class="form-label">
+                    <strong>{{ qualification_form.date_awarded.label }}</strong>
+                  </label>
+                  {{ qualification_form.date_awarded|add_class:"form-control" }}
+                </div>
+                <div class="col-md-3">
+                  <label for="{{ qualification_form.expiration_date.id_for_label }}" class="form-label">
+                    <strong>{{ qualification_form.expiration_date.label }}</strong>
+                  </label>
+                  {{ qualification_form.expiration_date|add_class:"form-control" }}
+                </div>
+                <div class="col-12">
+                  <label for="{{ qualification_form.notes.id_for_label }}" class="form-label">
+                    <strong>Notes (optional)</strong>
+                  </label>
+                  {{ qualification_form.notes|add_class:"form-control" }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Standalone Qualification Form (hidden, for "Add Qualification Only" button) -->
+{% if student and qualification_form %}
+<form method="post" id="qualificationFormStandalone" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="qualification">
+  <!-- The actual form fields are in the UI above, we'll copy them here on submit -->
+</form>
+{% endif %}
 
 <!-- Back to top button following guide pattern -->
 <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="display: none;" id="backToTop">
@@ -366,48 +381,102 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Form submission handlers
 function submitQualificationOnly() {
-  const qualForm = document.getElementById('qualificationForm');
-  if (qualForm) {
+  const qualForm = document.getElementById('qualificationFormStandalone');
+  const qualFields = document.getElementById('qualificationFormFields');
+
+  if (qualForm && qualFields) {
+    // Copy all qualification field values to the standalone form
+    const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
+    const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
+    const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
+    const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
+    const notes = qualFields.querySelector('textarea[name="notes"]');
+
+    // Null checks for all required fields
+    if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
+      console.error('Missing qualification form fields');
+      return false;
+    }
+
+    // Remove any existing fields (except form_type)
+    qualForm.querySelectorAll('input:not([name="form_type"]), select, textarea').forEach(field => field.remove());
+
+    // Create and append copies as hidden fields
+    const fieldsToClone = [
+      {name: 'qualification', value: qualificationSelect.value},
+      {name: 'is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
+      {name: 'date_awarded', value: dateAwarded.value},
+      {name: 'expiration_date', value: expirationDate.value},
+      {name: 'notes', value: notes.value}
+    ];
+
+    fieldsToClone.forEach(field => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = field.name;
+      input.value = field.value;
+      qualForm.appendChild(input);
+    });
+
     qualForm.submit();
   }
   return false;
 }
 
 function submitFlightInstruction() {
-  // Check if there's qualification data to include
   const mainForm = document.querySelector('form.needs-validation');
-  const qualForm = document.getElementById('qualificationForm');
 
-  if (qualForm && qualForm.querySelector('select[name="qualification"]').value) {
-    // Copy qualification data to main form as hidden fields
-    const qualificationSelect = qualForm.querySelector('select[name="qualification"]');
-    const isQualifiedCheck = qualForm.querySelector('input[name="is_qualified"]');
-    const dateAwarded = qualForm.querySelector('input[name="date_awarded"]');
-    const expirationDate = qualForm.querySelector('input[name="expiration_date"]');
-    const notes = qualForm.querySelector('textarea[name="notes"]');
-
-    // Remove any existing qualification fields
-    mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
-
-    // Add qualification data as hidden fields
-    const hiddenFields = [
-      {name: 'qual_qualification', value: qualificationSelect.value},
-      {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
-      {name: 'qual_date_awarded', value: dateAwarded.value},
-      {name: 'qual_expiration_date', value: expirationDate.value},
-      {name: 'qual_notes', value: notes.value}
-    ];
-
-    hiddenFields.forEach(field => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = field.name;
-      input.value = field.value;
-      mainForm.appendChild(input);
-    });
+  // Check form validity
+  if (!mainForm.checkValidity()) {
+    mainForm.classList.add('was-validated');
+    return false; // Prevent submission if invalid
   }
 
-  return true; // Allow form submission
+  // Check if there's qualification data to include
+  const qualFields = document.getElementById('qualificationFormFields');
+
+  if (qualFields) {
+    const qualificationSelect = qualFields.querySelector('select[name="qualification"]');
+
+    // Only proceed if qualification select exists and has a value
+    if (qualificationSelect && qualificationSelect.value) {
+      // Copy qualification data to main form as hidden fields
+      const isQualifiedCheck = qualFields.querySelector('input[name="is_qualified"]');
+      const dateAwarded = qualFields.querySelector('input[name="date_awarded"]');
+      const expirationDate = qualFields.querySelector('input[name="expiration_date"]');
+      const notes = qualFields.querySelector('textarea[name="notes"]');
+
+      // Null checks for all qualification fields
+      if (!qualificationSelect || !isQualifiedCheck || !dateAwarded || !expirationDate || !notes) {
+        console.error('Missing qualification form fields');
+        return false;
+      }
+
+      // Remove any existing qualification fields
+      mainForm.querySelectorAll('input[name^="qual_"]').forEach(field => field.remove());
+
+      // Add qualification data as hidden fields
+      const hiddenFields = [
+        {name: 'qual_qualification', value: qualificationSelect.value},
+        {name: 'qual_is_qualified', value: isQualifiedCheck.checked ? 'on' : ''},
+        {name: 'qual_date_awarded', value: dateAwarded.value},
+        {name: 'qual_expiration_date', value: expirationDate.value},
+        {name: 'qual_notes', value: notes.value}
+      ];
+
+      hiddenFields.forEach(field => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = field.name;
+        input.value = field.value;
+        mainForm.appendChild(input);
+      });
+    }
+  }
+
+  // Explicitly submit the form
+  mainForm.submit();
+  return false; // Prevent default button action since we're calling submit() explicitly
 }
 
 // Enhanced qualification dropdown with icons - rewritten to avoid DOM text reads
