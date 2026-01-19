@@ -112,7 +112,6 @@ def find_list_from_recipients(recipients, preferred_domain=None):
             f"find_list_from_recipients: {e}\n"
         )
         return None
-    return None
 
 def main():
     """
@@ -166,18 +165,34 @@ def main():
         # Extract envelope sender from rewritten From header
         from_header = msg.get("From", "")
         _, envelope_sender = parseaddr(from_header)
-        # Ensure we never use an empty envelope sender; fall back to original sender
+        # Ensure we never use an empty envelope sender; prefer verified mailing list addresses
         if not envelope_sender:
-            if sender:
-                envelope_sender = sender
-            else:
-                # Last-resort fallback to a local postmaster address
-                envelope_sender = "postmaster@localhost"
+            sys.stderr.write(
+                "Warning: Rewritten From header is empty or unparsable; "
+                "this indicates a potential bug in rewrite_headers. "
+                "Falling back to a verified mailing list envelope sender.\n"
+            )
+            fallback_sender = None
+            # Prefer the detected original mailing list recipient if it is known
+            if original_to and original_to.lower() in MAILING_LISTS:
+                fallback_sender = original_to.lower()
+            # Otherwise, choose a deterministic address from the configured mailing lists
+            elif MAILING_LISTS:
+                fallback_sender = sorted(MAILING_LISTS)[0]
+            # Absolute last-resort: local postmaster
+            if not fallback_sender:
+                fallback_sender = "postmaster@localhost"
+            envelope_sender = fallback_sender
         smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
         smtp.quit()
         sys.exit(0)
+    except smtplib.SMTPException as e:
+        # More specific logging for SMTP-related failures (including connection issues)
+        sys.stderr.write(f"SMTP reinject failed: {e}\n")
+        sys.exit(75)  # EX_TEMPFAIL
     except Exception as e:
-        sys.stderr.write(f"Reinject failed: {e}\n")
+        # Fallback for any non-SMTP unexpected errors
+        sys.stderr.write(f"Reinject failed (unexpected error): {e}\n")
         sys.exit(75)  # EX_TEMPFAIL
 
 if __name__ == '__main__':

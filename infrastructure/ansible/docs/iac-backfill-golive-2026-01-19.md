@@ -30,7 +30,7 @@ During the production go-live on 2026-01-19, several manual "hackety hack" fixes
 
 **IaC Fix**: Removed all debug file logging from `roles/postfix/templates/maillist-rewriter.py.j2`. Script now only logs errors to stderr (captured by Postfix mail.log).
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 ---
 
@@ -46,7 +46,7 @@ During the production go-live on 2026-01-19, several manual "hackety hack" fixes
 - Security considerations
 - Version history
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 ---
 
@@ -71,7 +71,7 @@ gcloud compute firewall-rules create m2s-mail-allow-smtp \
 - Port 25: Open to internet for mailing list inbound mail
 - Port 587: Effectively restricted by UFW to GKE cluster nodes only
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 **Verification**:
 ```bash
@@ -345,7 +345,7 @@ gcloud compute target-https-proxies update gkegw1-84of-default-manage2soar-gatew
 - SSL policy is shared across all Gateway listeners (all domains use the same TLS settings)
 - **Expected SSL Labs Grade**: A (was B due to TLS 1.0/1.1 support)
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 **Verification**:
 ```bash
@@ -558,7 +558,7 @@ smtpd_tls_security_level = may
 - TLS warnings in mail.log are cosmetic - mail flow works correctly
 - When Let's Encrypt is implemented (issue #529), update paths back to `/etc/letsencrypt/live/...`
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 **Verification**:
 ```bash
@@ -624,7 +624,7 @@ try:
 - The fix extracts the email address from the rewritten From header (`members-bounces@skylinesoaring.org`) and uses it as the envelope sender
 - This ensures both the header From and envelope MAIL FROM match the verified domain
 
-**Status**: ✅ Fixed in commit [TODO]
+**Status**: ✅ Fixed and applied via IaC
 
 **Verification** (2026-01-19 17:15):
 ```bash

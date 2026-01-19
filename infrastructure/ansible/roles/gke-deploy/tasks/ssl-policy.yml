@@ -75,6 +75,7 @@
       --project={{ gcp_project }}
   when:
     - target_proxy_name.stdout | length > 0
+    - current_ssl_policy.stdout is defined
     - current_ssl_policy.stdout != ('global/sslPolicies/' + gke_ssl_policy_name)
   delegate_to: localhost
   become: false
