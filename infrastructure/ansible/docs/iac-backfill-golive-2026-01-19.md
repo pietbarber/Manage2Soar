@@ -3,6 +3,24 @@
 ## Overview
 During the production go-live on 2026-01-19, several manual "hackety hack" fixes were applied to get the system operational. This document tracks those fixes and the corresponding IaC backfill to ensure they're properly codified in Ansible.
 
+## Summary of Issues Documented
+
+| # | Issue | Status | Priority |
+|---|-------|--------|----------|
+| 1 | Debug log file (666 permissions) | ✅ Fixed | Security |
+| 2 | Maillist-rewriter undocumented | ✅ Fixed | Documentation |
+| 3 | Port 25 firewall manual rule | ✅ Fixed | IaC completeness |
+| 4 | Postfix configuration | ✅ Already in IaC | Verification |
+| 5 | Django ALLOWED_HOSTS | ✅ Already in IaC | Lessons learned |
+| 6 | Let's Encrypt/port 80 | ⚠️ Deferred | Low priority |
+| 7 | Multi-domain mail support | ✅ Already in IaC | Verification |
+| 8 | SSL/TLS policy (TLS 1.0/1.1) | ✅ Fixed | Security |
+| 9 | EMAIL_DEV_MODE config | ⚠️ Needs validation | **CRITICAL** |
+
+**KEY TAKEAWAY**: Always use IaC first. Manual fixes create technical debt and risk. All manual changes should be immediately followed by IaC backfill and documentation.
+
+---
+
 ## 1. ✅ Debug Logging Removed
 **Issue**: Temporary debug file `/tmp/maillist-rewriter-debug.log` created with 666 permissions for troubleshooting header rewriting.
 
@@ -372,6 +390,128 @@ Manual fixes often bypass security review. Always check:
 
 ---
 
+## 9. ⚠️ CRITICAL: Email Dev Mode Configuration
+**Issue**: EMAIL_DEV_MODE setting must be carefully managed to prevent accidental email redirection in production.
+
+**Risk**: If `email_dev_mode: true` is deployed to production pods, ALL emails (including real member notifications) will be redirected to dev addresses, breaking production functionality.
+
+**Current Configuration Status**:
+
+**✅ CORRECT - Production Tenant (inventory/gcp_app.yml - SOURCE OF TRUTH)**:
+```yaml
+gke_tenants:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    domains:
+      - "ssc.manage2soar.com"
+      - "skylinesoaring.org"
+      - "www.skylinesoaring.org"
+    email_dev_mode: false              # ✅ PRODUCTION: Send real emails
+    email_dev_mode_redirect_to: ""
+```
+
+**⚠️ CONFLICTING - Group Vars (group_vars/gcp_app/vars.yml - NOT USED)**:
+```yaml
+gke_tenants:
+  - prefix: "ssc"
+    name: "Skyline Soaring Club"
+    domain: "ssc.manage2soar.com"
+    email_dev_mode: true               # ⚠️ WRONG: Should be false for production
+    email_dev_mode_redirect_to: "pb@pietbarber.com,..."
+```
+
+**How Ansible Template Resolution Works** (from `roles/gke-deploy/templates/k8s-secrets.yml.j2`):
+```jinja
+{%- set ns = namespace(
+  email_dev_mode = gke_email_dev_mode | default(false),
+  email_dev_mode_redirect_to = gke_email_dev_mode_redirect_to | default('')
+) -%}
+
+{%- for tenant in gke_tenants -%}
+  {#- Per-tenant setting OVERRIDES global setting -#}
+  {%- if tenant.email_dev_mode is defined -%}
+    {%- set ns.email_dev_mode = tenant.email_dev_mode -%}
+  {%- endif -%}
+{%- endfor -%}
+
+EMAIL_DEV_MODE: "{{ ns.email_dev_mode | string | lower }}"
+```
+
+**Configuration Precedence (Highest to Lowest)**:
+1. **inventory/gcp_app.yml** per-tenant `email_dev_mode` ← **CURRENTLY USED** ✅
+2. **inventory/gcp_app.yml** global `gke_email_dev_mode`
+3. **group_vars/** files (only if not defined in inventory)
+4. **roles/gke-deploy/defaults/main.yml** (defaults to `false`)
+
+**Why This Is Confusing**:
+- Inventory files **override** group_vars (Ansible precedence rules)
+- The `gke_tenants` list in `group_vars/gcp_app/vars.yml` is **completely ignored** because `gke_tenants` is also defined in `inventory/gcp_app.yml`
+- Developers might edit group_vars thinking it will take effect, but it won't
+
+**IaC Status**: ⚠️ Configuration works correctly but has misleading conflicting values
+
+**Required Actions**:
+1. ✅ **Verify inventory is correct** (DONE - `email_dev_mode: false` for SSC)
+2. ⚠️ **Update or remove conflicting group_vars** to prevent confusion:
+   ```bash
+   # Option 1: Update group_vars to match inventory (for documentation)
+   sed -i 's/email_dev_mode: true/email_dev_mode: false  # IGNORED - see inventory\/gcp_app.yml/' \
+     infrastructure/ansible/group_vars/gcp_app/vars.yml
+
+   # Option 2: Add warning comment
+   # "NOTE: gke_tenants in group_vars is OVERRIDDEN by inventory/gcp_app.yml"
+   ```
+3. ⚠️ **Add pre-deployment validation** to CI/CD pipeline:
+   ```bash
+   # Check that SSC production has email_dev_mode: false
+   grep -A 10 'prefix: "ssc"' inventory/gcp_app.yml | grep -q 'email_dev_mode: false' || \
+     (echo "ERROR: SSC production must have email_dev_mode: false" && exit 1)
+   ```
+4. ⚠️ **Document in deployment runbooks**: "Always verify inventory/gcp_app.yml before deploying"
+
+**Verification Commands**:
+```bash
+# Check inventory configuration (source of truth for deployments)
+grep -A 10 "prefix: \"ssc\"" infrastructure/ansible/inventory/gcp_app.yml | grep email_dev_mode
+
+# Expected output: email_dev_mode: false
+
+# Check deployed pod environment variable
+kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
+# Expected output: false
+
+# Check deployed pod EMAIL_DEV_MODE_REDIRECT_TO (should be empty for production)
+kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE_REDIRECT_TO}' | base 64 -d
+# Expected output: (empty string)
+```
+
+**Testing in Staging**:
+```bash
+# Deploy to staging with dev mode enabled
+# inventory/gcp_app.yml for MASA tenant:
+gke_tenants:
+  - prefix: "masa"
+    name: "Mid-Atlantic Soaring Association"
+    domain: "masa.manage2soar.com"
+    email_dev_mode: true               # DEV: Still in testing
+    email_dev_mode_redirect_to: "masa-test@manage2soar.com"
+
+# Verify dev mode in MASA staging pod
+kubectl get secret manage2soar-env-masa -n tenant-masa -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
+# Expected output: true
+```
+
+**Deployment Safety Checklist**:
+- [ ] Review `inventory/gcp_app.yml` email_dev_mode settings before every production deployment
+- [ ] Verify email_dev_mode: false for production tenants (ssc with skylinesoaring.org)
+- [ ] Verify email_dev_mode: true for staging/test tenants (masa)
+- [ ] After deployment, check pod environment variables (kubectl get secret)
+- [ ] Test email delivery to confirm emails go to real recipients, not dev addresses
+
+**Status**: ⚠️ Configuration conflict needs resolution + deployment validation needed
+
+---
+
 ## Next Steps
 
 1. ✅ Remove debug log file from mail server:
@@ -400,7 +540,29 @@ Manual fixes often bypass security review. Always check:
    git add infrastructure/ansible/roles/gke-deploy/tasks/main.yml
    git add infrastructure/ansible/group_vars/gcp_mail/vars.yml
    git add infrastructure/ansible/inventory/gcp_app.yml
-   git commit -m "IaC backfill: Production go-live fixes (maillist-rewriter, firewall, TLS policy, docs)"
+   git commit -m "IaC backfill: Production go-live fixes (9 issues documented)
+
+- Removes insecure debug logging from maillist-rewriter (666 permissions)
+- Documents maillist-rewriter architecture and troubleshooting
+- Adds port 25 firewall documentation for inbound mailing lists
+- Verifies multi-domain mail support (virtual_domains, sync script, API)
+- Creates SSL policy automation (modern-tls-policy, TLS 1.2+ only)
+- Documents Let's Encrypt/port 80 challenge experience (deferred)
+- **CRITICAL**: Documents EMAIL_DEV_MODE configuration conflicts and validation needs
+- Complete IaC backfill notes with 9 sections and lessons learned
+
+See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
+   ```
+
+6. ⚠️ **CRITICAL: Verify EMAIL_DEV_MODE before next deployment**:
+   ```bash
+   # Check production tenant configuration
+   grep -A 10 "prefix: \"ssc\"" infrastructure/ansible/inventory/gcp_app.yml | grep email_dev_mode
+   # MUST show: email_dev_mode: false
+
+   # After deployment, verify pod environment
+   kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
+   # MUST show: false
    ```
 
 ---
