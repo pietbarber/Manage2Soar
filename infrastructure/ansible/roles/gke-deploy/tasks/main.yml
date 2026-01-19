@@ -204,6 +204,18 @@
   tags: [ingress]
 
 # ============================================================
+# SSL POLICY (TLS 1.2+ ONLY)
+# ============================================================
+
+- name: Include SSL policy tasks
+  ansible.builtin.include_tasks: ssl-policy.yml
+  when:
+    - gke_enable_ingress | bool
+    - gke_enable_tls | default(true) | bool
+    - gke_ssl_policy_enabled | default(true) | bool
+  tags: [ingress, ssl-policy]
+
+# ============================================================
 # VERIFICATION
 # ============================================================
 

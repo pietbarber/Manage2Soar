@@ -1,0 +1,93 @@
+---
+# ============================================================
+# SSL Policy Configuration for GKE Gateway
+# ============================================================
+# Ensures TLS 1.2+ only (disables TLS 1.0 and 1.1)
+#
+# Note: Gateway API doesn't directly support SSL policies, so we
+# need to apply them to the underlying GCP target-https-proxy
+# that GKE creates automatically.
+
+- name: Check if SSL policy exists
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute ssl-policies describe {{ gke_ssl_policy_name }}
+      --global
+      --project={{ gcp_project }}
+      --format=json
+  register: ssl_policy_check
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Create modern TLS policy (TLS 1.2+ only)
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute ssl-policies create {{ gke_ssl_policy_name }}
+      --profile {{ gke_ssl_policy_profile }}
+      --min-tls-version {{ gke_ssl_policy_min_tls }}
+      --project={{ gcp_project }}
+      --global
+  when: ssl_policy_check.rc != 0
+  delegate_to: localhost
+  become: false
+  register: ssl_policy_created
+
+- name: Display SSL policy creation result
+  ansible.builtin.debug:
+    msg: "SSL policy '{{ gke_ssl_policy_name }}' created with profile {{ gke_ssl_policy_profile }}, min TLS {{ gke_ssl_policy_min_tls }}"
+  when: ssl_policy_created is changed
+
+- name: Find Gateway target-https-proxy
+  ansible.builtin.shell:
+    cmd: >
+      gcloud compute target-https-proxies list
+      --filter="name~{{ gke_app_name }}-gateway"
+      --project={{ gcp_project }}
+      --format="value(name)"
+      | head -1
+  register: target_proxy_name
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Get current SSL policy on target proxy
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute target-https-proxies describe {{ target_proxy_name.stdout }}
+      --global
+      --project={{ gcp_project }}
+      --format="value(sslPolicy)"
+  register: current_ssl_policy
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  become: false
+  when: target_proxy_name.stdout | length > 0
+
+- name: Attach SSL policy to Gateway target proxy
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute target-https-proxies update {{ target_proxy_name.stdout }}
+      --ssl-policy {{ gke_ssl_policy_name }}
+      --global
+      --project={{ gcp_project }}
+  when:
+    - target_proxy_name.stdout | length > 0
+    - current_ssl_policy.stdout != ('global/sslPolicies/' + gke_ssl_policy_name)
+  delegate_to: localhost
+  become: false
+  register: ssl_policy_attached
+
+- name: Display SSL policy attachment result
+  ansible.builtin.debug:
+    msg: "SSL policy '{{ gke_ssl_policy_name }}' attached to target proxy '{{ target_proxy_name.stdout }}'"
+  when: ssl_policy_attached is changed
+
+- name: Display SSL policy already configured
+  ansible.builtin.debug:
+    msg: "SSL policy '{{ gke_ssl_policy_name }}' already attached to target proxy"
+  when:
+    - target_proxy_name.stdout | length > 0
+    - current_ssl_policy.stdout == ('global/sslPolicies/' + gke_ssl_policy_name)
