@@ -4,10 +4,10 @@ Mailman-style header rewriter for Postfix (Content Filter)
 Rewrites From header to list address and sets Reply-To to original sender
 Uses X-Original-To header to find the original list recipient before alias expansion
 """
-import sys
 import email
-from email.utils import parseaddr, formataddr
 import smtplib
+import sys
+from email.utils import formataddr, parseaddr
 
 # List of mailing list addresses this server handles
 # Format: set of lowercase email addresses
