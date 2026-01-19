@@ -142,7 +142,11 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                         recipients_str = ','.join(sorted(set(sanitized)))
                         lines.append(f"{list_name}@{domain}  {recipients_str}")
                         # Add Mailman-style -bounces alias (routes to admin, NOT to list members to avoid bounce storms)
+{% if admin_email is defined and admin_email %}
                         lines.append(f"{list_name}-bounces@{domain}  {{ admin_email }}")
+{% else %}
+                        # admin_email not set; skipping -bounces alias to avoid invalid entry
+{% endif %}
 
         lines.append("")
 
@@ -370,10 +374,14 @@ def main():
         if data:
             # Support both single 'domain' and multiple 'domains'
             # This provides backward compatibility with old configs
-            domains = club.get('domains', [club.get('domain')])
-            if not domains or not domains[0]:
-                print(f"[{datetime.now()}] WARNING: Club {club['prefix']} has no domains configured")
-                continue
+            domains = club.get('domains')
+            if not domains:
+                # Backward compatibility: fall back to single 'domain' key
+                legacy_domain = club.get('domain')
+                if not legacy_domain:
+                    print(f"[{datetime.now()}] WARNING: Club {club['prefix']} has no domains configured")
+                    continue
+                domains = [legacy_domain]
 
             # Store data for each domain
             for domain in domains:

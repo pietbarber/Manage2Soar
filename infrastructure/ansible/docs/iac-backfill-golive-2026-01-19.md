@@ -556,7 +556,7 @@ smtpd_tls_security_level = may
 - Self-signed certs work fine for inbound SMTP with `security_level = may`
 - Major mail providers (Gmail, Outlook) still accept connections with self-signed certs
 - TLS warnings in mail.log are cosmetic - mail flow works correctly
-- When Let's Encrypt is implemented (issue #529), update paths back to `/etc/letsencrypt/live/...`
+- When Let's Encrypt is implemented via IaC, update paths back to `/etc/letsencrypt/live/...`
 
 **Status**: ✅ Fixed and applied via IaC
 
@@ -695,9 +695,6 @@ ssh mail.manage2soar.com 'sudo tail -30 /var/log/mail.log | grep "status=sent"'
 
 See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
    ```
-- Documents Let's Encrypt/port 80 challenge experience (deferred)
-- **CRITICAL**: Documents EMAIL_DEV_MODE configuration conflicts and validation needs
-- Complete IaC backfill notes with 9 sections and lessons learned
 
 6. ⚠️ **CRITICAL: Verify EMAIL_DEV_MODE before next deployment**:
    ```bash

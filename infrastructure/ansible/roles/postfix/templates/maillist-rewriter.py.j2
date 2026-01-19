@@ -107,10 +107,7 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         # Otherwise return first match
         return matches[0] if matches else None
     except Exception as e:
-        sys.stderr.write(
-            f"maillist-rewriter: error reading /etc/postfix/virtual in "
-            f"find_list_from_recipients: {e}\n"
-        )
+        sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
         return None
 
 def main():
@@ -177,6 +174,7 @@ def main():
             if original_to and original_to.lower() in MAILING_LISTS:
                 fallback_sender = original_to.lower()
             # Otherwise, choose a deterministic address from the configured mailing lists
+            # Note: sorted() on a set returns a sorted list, which is deterministic in Python 3.7+
             elif MAILING_LISTS:
                 fallback_sender = sorted(MAILING_LISTS)[0]
             # Absolute last-resort: local postmaster

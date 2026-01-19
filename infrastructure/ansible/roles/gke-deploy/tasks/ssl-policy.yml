@@ -46,8 +46,25 @@
       --filter="name~{{ gke_app_name }}-gateway"
       --project={{ gcp_project }}
       --format="value(name)"
-      | head -1
-  register: target_proxy_name
+  register: target_proxy_list
+  delegate_to: localhost
+  become: false
+
+- name: Validate exactly one target proxy found
+  ansible.builtin.set_fact:
+    target_proxy_name: "{{ target_proxy_list.stdout_lines[0] if target_proxy_list.stdout_lines | length == 1 else '' }}"
+
+- name: Warn if multiple or no proxies found
+  ansible.builtin.debug:
+    msg: |
+      WARNING: Expected exactly 1 target proxy, found {{ target_proxy_list.stdout_lines | length }}.
+      {% if target_proxy_list.stdout_lines | length > 1 %}
+      Multiple proxies: {{ target_proxy_list.stdout_lines | join(', ') }}
+      Using first match: {{ target_proxy_list.stdout_lines[0] }}
+      {% else %}
+      No proxies found matching filter.
+      {% endif %}
+  when: target_proxy_list.stdout_lines | length != 1
   changed_when: false
   delegate_to: localhost
   become: false
