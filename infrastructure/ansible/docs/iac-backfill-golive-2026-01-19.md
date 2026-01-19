@@ -16,6 +16,8 @@ During the production go-live on 2026-01-19, several manual "hackety hack" fixes
 | 7 | Multi-domain mail support | ✅ Already in IaC | Verification |
 | 8 | SSL/TLS policy (TLS 1.0/1.1) | ✅ Fixed | Security |
 | 9 | EMAIL_DEV_MODE config | ⚠️ Needs validation | **CRITICAL** |
+| 10 | **Postfix TLS cert paths (BROKE MAIL)** | ✅ Fixed | **CRITICAL** |
+| 11 | **Envelope sender not rewritten (BROKE LISTS)** | ✅ Fixed | **CRITICAL** |
 
 **KEY TAKEAWAY**: Always use IaC first. Manual fixes create technical debt and risk. All manual changes should be immediately followed by IaC backfill and documentation.
 
@@ -512,6 +514,143 @@ kubectl get secret manage2soar-env-masa -n tenant-masa -o jsonpath='{.data.EMAIL
 
 ---
 
+## 10. ✅ CRITICAL: Postfix TLS Certificate Paths (Broke Inbound Mail)
+**Issue**: Postfix was configured to use non-existent Let's Encrypt certificates at `/etc/letsencrypt/live/mail.manage2soar.com/fullchain.pem`, causing TLS to fail and **blocking ALL inbound mail from Gmail and other major providers**.
+
+**Discovery**: 2026-01-19 16:19 - User sent email to members@skylinesoaring.org from Gmail, never received. Mail logs showed:
+```
+postfix/smtpd[112504]: warning: cannot get RSA certificate from file "/etc/letsencrypt/live/mail.manage2soar.com/fullchain.pem": disabling TLS support
+postfix/smtpd[112504]: connect from mail-lf1-f50.google.com[209.85.167.50]
+postfix/smtpd[112504]: lost connection after STARTTLS from mail-lf1-f50.google.com[209.85.167.50]
+```
+
+**Root Cause**:
+- Ansible template `roles/postfix/templates/main.cf.j2` had hardcoded Let's Encrypt paths
+- Let's Encrypt setup was deferred (see issue #6), but template wasn't updated
+- Self-signed certificates exist at `/etc/ssl/certs/ssl-cert-snakeoil.pem` but Postfix wasn't using them
+- Gmail requires STARTTLS for delivery - when TLS fails, connection drops, mail rejected
+
+**Impact**: 🔴 **CRITICAL** - Mailing lists completely broken, no inbound mail from Gmail, Outlook, or any provider requiring TLS
+
+**Manual Fix Applied** (2026-01-19 16:45):
+```bash
+ssh mail.manage2soar.com 'sudo postconf -e "smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem" && \
+  sudo postconf -e "smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key" && \
+  sudo postfix reload'
+```
+
+**IaC Fix**: Updated `roles/postfix/templates/main.cf.j2` to use self-signed certificates:
+```jinja
+# TLS SETTINGS - Uses self-signed certificates (Let's Encrypt deferred)
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level = may
+```
+
+**Related Issues**:
+- Issue #6 documented Let's Encrypt deferral but didn't update Postfix template
+- This created a "time bomb" - template referenced non-existent certificates
+- Self-signed certs are acceptable for inbound SMTP (SMTP2Go handles outbound TLS)
+
+**Important Notes**:
+- Self-signed certs work fine for inbound SMTP with `security_level = may`
+- Major mail providers (Gmail, Outlook) still accept connections with self-signed certs
+- TLS warnings in mail.log are cosmetic - mail flow works correctly
+- When Let's Encrypt is implemented (issue #529), update paths back to `/etc/letsencrypt/live/...`
+
+**Status**: ✅ Fixed in commit [TODO]
+
+**Verification**:
+```bash
+# Check Postfix is using correct cert paths
+ssh mail.manage2soar.com 'sudo postconf | grep "^smtpd_tls_cert_file\|^smtpd_tls_key_file"'
+# Expected output:
+# smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+# smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+
+# Test inbound mail delivery
+echo "Test from $(date)" | mail -s "TLS test" members@skylinesoaring.org
+
+# Check mail.log for successful TLS connection (should NOT see "lost connection after STARTTLS")
+ssh mail.manage2soar.com 'sudo tail -20 /var/log/mail.log | grep -i starttls'
+```
+
+---
+
+## 11. ✅ CRITICAL: Maillist-Rewriter Envelope Sender Not Rewritten
+**Issue**: The maillist-rewriter script was rewriting the From **header** to `webmaster-bounces@skylinesoaring.org`, but **NOT** rewriting the envelope sender (MAIL FROM), which remained as the original sender (e.g., `pb@pietbarber.com`). SMTP2Go checks **both** the envelope sender AND the From header domain for verification, causing all mailing list emails to be rejected.
+
+**Discovery**: 2026-01-19 17:01 - Email to members@skylinesoaring.org was accepted by mail server and processed by maillist-rewriter, but SMTP2Go rejected ALL 101 recipients:
+```
+postfix/smtp[113291]: 4A669425AD: to=<imran.akram@gmail.com>, relay=mail.smtp2go.com[45.79.71.155]:587,
+  delay=123, dsn=5.0.0, status=bounced (host mail.smtp2go.com[45.79.71.155] said:
+  550-From header sender domain not verified (pietbarber.com)
+  550-On your Sending > Verified Senders page
+  550 verify the sender domain or email to be allowed to send. (in reply to end of DATA command))
+```
+
+**Root Cause**:
+- Script was calling `smtp.sendmail(sender, recipients, msg.as_bytes())` where `sender` was the original envelope sender
+- From **header** was correctly rewritten to `Piet Barber via Members <members-bounces@skylinesoaring.org>`
+- But envelope sender (MAIL FROM) was still `pb@pietbarber.com`
+- SMTP2Go verified senders checks envelope sender domain, not just From header
+- Since `pietbarber.com` wasn't verified in SMTP2Go, all emails were rejected
+
+**Impact**: 🔴 **CRITICAL** - ALL mailing list emails rejected by SMTP2Go, completely breaking list functionality
+
+**Manual Fix Applied** (2026-01-19 17:14):
+```bash
+ssh mail.manage2soar.com "sudo sed -i.bak 's/smtp.sendmail(sender, recipients, msg.as_bytes())/# Use rewritten From header as envelope sender\n        from_header = msg.get(\"From\", \"\")\n        _, envelope_sender = parseaddr(from_header)\n        smtp.sendmail(envelope_sender, recipients, msg.as_bytes())/' /usr/local/bin/maillist-rewriter.py"
+```
+
+**IaC Fix**: Updated `roles/postfix/templates/maillist-rewriter.py.j2`:
+```python
+# Reinject to port 10025 (bypasses content_filter)
+# CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification
+# SMTP2Go checks both envelope sender AND From header domain
+try:
+    smtp = smtplib.SMTP('127.0.0.1', 10025)
+    # Extract envelope sender from rewritten From header
+    from_header = msg.get("From", "")
+    _, envelope_sender = parseaddr(from_header)
+    smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
+    smtp.quit()
+    sys.exit(0)
+```
+
+**Important Notes**:
+- The envelope sender (MAIL FROM) is different from the From header
+- SMTP relay services like SMTP2Go, SendGrid, Mailgun check **envelope sender domain** for verification
+- The fix extracts the email address from the rewritten From header (`members-bounces@skylinesoaring.org`) and uses it as the envelope sender
+- This ensures both the header From and envelope MAIL FROM match the verified domain
+
+**Status**: ✅ Fixed in commit [TODO]
+
+**Verification** (2026-01-19 17:15):
+```bash
+# Sent test email to webmaster@skylinesoaring.org
+# Logs show successful reinjection with rewritten envelope sender:
+postfix/qmgr[113244]: 52005425AC: from=<webmaster-bounces@ssc.manage2soar.com>, size=5809, nrcpt=4 (queue active)
+postfix/smtp[114034]: 52005425AC: to=<bclarkfairfax@gmail.com>, relay=mail.smtp2go.com[45.79.170.99]:587,
+  delay=0.81, dsn=2.0.0, status=sent (250 OK id=1vhsr7-FnQW0hPugdQ-KFqD)
+
+# ✅ SMTP2Go accepted! All 4 recipients delivered successfully.
+```
+
+**Testing**:
+```bash
+# Send test email from external address (not gmail/same domain to avoid suppression)
+echo "Test message from $(date)" | mail -s "Envelope sender test" webmaster@skylinesoaring.org
+
+# Check mail.log for envelope sender
+ssh mail.manage2soar.com 'sudo tail -30 /var/log/mail.log | grep "from=<webmaster-bounces"'
+
+# Verify SMTP2Go accepted
+ssh mail.manage2soar.com 'sudo tail -30 /var/log/mail.log | grep "status=sent"'
+```
+
+---
+
 ## Next Steps
 
 1. ✅ Remove debug log file from mail server:
@@ -536,17 +675,29 @@ kubectl get secret manage2soar-env-masa -n tenant-masa -o jsonpath='{.data.EMAIL
    git add infrastructure/ansible/docs/maillist-rewriter.md
    git add infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md
    git add infrastructure/ansible/roles/postfix/templates/maillist-rewriter.py.j2
+   git add infrastructure/ansible/roles/postfix/templates/main.cf.j2
    git add infrastructure/ansible/roles/gke-deploy/tasks/ssl-policy.yml
    git add infrastructure/ansible/roles/gke-deploy/tasks/main.yml
    git add infrastructure/ansible/group_vars/gcp_mail/vars.yml
    git add infrastructure/ansible/inventory/gcp_app.yml
-   git commit -m "IaC backfill: Production go-live fixes (9 issues documented)
+   git commit -m "IaC backfill: Production go-live fixes (11 issues documented)
 
 - Removes insecure debug logging from maillist-rewriter (666 permissions)
 - Documents maillist-rewriter architecture and troubleshooting
 - Adds port 25 firewall documentation for inbound mailing lists
 - Verifies multi-domain mail support (virtual_domains, sync script, API)
 - Creates SSL policy automation (modern-tls-policy, TLS 1.2+ only)
+- Documents Let's Encrypt/port 80 challenge experience (deferred)
+- **CRITICAL**: Documents EMAIL_DEV_MODE configuration conflicts and validation needs
+- **CRITICAL**: Fixes Postfix TLS cert paths (was blocking ALL inbound mail from Gmail)
+- **CRITICAL**: Fixes maillist-rewriter envelope sender (was blocking ALL list emails via SMTP2Go)
+- Complete IaC backfill notes with 11 sections and lessons learned
+
+See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
+   ```
+
+See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
+   ```
 - Documents Let's Encrypt/port 80 challenge experience (deferred)
 - **CRITICAL**: Documents EMAIL_DEV_MODE configuration conflicts and validation needs
 - Complete IaC backfill notes with 9 sections and lessons learned
@@ -564,6 +715,106 @@ See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
    kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
    # MUST show: false
    ```
+
+---
+
+## 12. ✅ CRITICAL: From Header Domain Preservation (Cosmetic but Confusing)
+**Issue**: Maillist-rewriter was using wrong domain in rewritten From headers. Emails sent to `webmaster@skylinesoaring.org` were rewritten to `webmaster-bounces@ssc.manage2soar.com` instead of preserving the `@skylinesoaring.org` domain. This confused recipients seeing the staging domain in production emails.
+
+**Discovery**: 2026-01-19 17:33 - User sent test email to `webmaster@skylinesoaring.org`, received with From: "Piet Barber via Webmaster <webmaster-bounces@ssc.manage2soar.com>" but expected `@skylinesoaring.org`.
+
+**Root Cause**:
+- Content filters don't receive `X-Original-To` header (added later in mail flow)
+- Script fell back to reverse-lookup in `/etc/postfix/virtual`
+- Virtual file had `webmaster@ssc.manage2soar.com` listed BEFORE `webmaster@skylinesoaring.org`
+- Reverse-lookup found first match (ssc.manage2soar.com) and used that domain
+
+**Manual Fix Applied** (2026-01-19 17:38):
+1. Verified content filter doesn't receive `X-Original-To` with debug logging
+   ```bash
+   # Added debug logging to see headers
+   sudo sed -i '/original_to = msg.get/a\    sys.stderr.write(f"DEBUG Headers: To={msg.get(\"To\")}, X-Original-To={msg.get(\"X-Original-To\")}, Delivered-To={msg.get(\"Delivered-To\")}\\n")' /usr/local/bin/maillist-rewriter.py
+
+   # Sent test email, confirmed: X-Original-To=None
+   ```
+
+2. Discovered `To` header IS available: `To=Skyline Soaring Webmaster <webmaster@skylinesoaring.org>`
+
+**IaC Fix** (2026-01-19 17:38):
+Updated `infrastructure/ansible/roles/postfix/templates/maillist-rewriter.py.j2`:
+
+```python
+# Before: Only checked X-Original-To (which content filters don't receive)
+original_to = msg.get('X-Original-To') or msg.get('Delivered-To')
+if not original_to:
+    original_to = find_list_from_recipients(recipients)
+
+# After: Check To header first (reliable for content filters)
+original_to = None
+
+# Try To header first (most reliable for content filters)
+to_header = msg.get('To')
+if to_header:
+    _, to_addr = parseaddr(to_header)
+    if to_addr and to_addr.lower() in MAILING_LISTS:
+        original_to = to_addr.lower()
+
+# Extract preferred domain from To header for fallback
+preferred_domain = None
+if to_header:
+    _, to_addr = parseaddr(to_header)
+    if to_addr and '@' in to_addr:
+        preferred_domain = to_addr.split('@')[1]
+
+if not original_to:
+    # Fallback with domain preference
+    original_to = find_list_from_recipients(recipients, preferred_domain)
+```
+
+Updated `find_list_from_recipients()` to accept and prioritize `preferred_domain`:
+```python
+def find_list_from_recipients(recipients, preferred_domain=None):
+    # ... find all matches ...
+    matches = []
+    for list_addr in MAILING_LISTS:
+        # ... check if recipients match ...
+        if set(recipients) == set(alias_recipients):
+            matches.append(list_addr)
+
+    # Prefer matches with preferred_domain
+    if preferred_domain and matches:
+        for match in matches:
+            if match.endswith('@' + preferred_domain):
+                return match
+
+    return matches[0] if matches else None
+```
+
+**Verification** (2026-01-19 17:38):
+```bash
+# Deploy updated script
+cd infrastructure/ansible
+ansible-playbook -i inventory/hosts.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/mail-server.yml --tags postfix
+
+# Test email sent to webmaster@skylinesoaring.org
+# Mail log shows:
+from=<webmaster-bounces@skylinesoaring.org>  # ✅ Correct domain!
+
+# Previously showed:
+from=<webmaster-bounces@ssc.manage2soar.com>  # ❌ Wrong domain
+```
+
+**Impact**:
+- **Before**: Production emails showed staging domain (@ssc.manage2soar.com) - confusing for recipients
+- **After**: Emails preserve the original domain (@skylinesoaring.org) - clear and professional
+- **Technical**: Envelope sender and From header now match the original To address domain
+
+**Files Modified**:
+- `infrastructure/ansible/roles/postfix/templates/maillist-rewriter.py.j2` (IaC fix)
+
+**Status**: ✅ Fixed in IaC, deployed, tested and verified working
 
 ---
 

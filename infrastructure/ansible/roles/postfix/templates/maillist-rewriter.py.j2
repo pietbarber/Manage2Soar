@@ -73,15 +73,17 @@ def rewrite_headers(msg, recipient):
 
     return msg
 
-def find_list_from_recipients(recipients):
+def find_list_from_recipients(recipients, preferred_domain=None):
     """
     Reverse-lookup: find which mailing list these recipients belong to
     by checking the virtual aliases file
+    If preferred_domain is specified, prefer list addresses with that domain
     """
     try:
         with open('/etc/postfix/virtual', 'r') as f:
             virtual_content = f.read()
 
+        matches = []
         # Try each list address
         for list_addr in MAILING_LISTS:
             # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
@@ -93,7 +95,17 @@ def find_list_from_recipients(recipients):
                         alias_recipients = [r.strip() for r in parts[1].split(',')]
                         # Check if our recipients match this list's recipients
                         if set(recipients) == set(alias_recipients):
-                            return list_addr
+                            matches.append(list_addr)
+                            break
+
+        # If we have a preferred domain, try to find a match with that domain first
+        if preferred_domain and matches:
+            for match in matches:
+                if match.endswith('@' + preferred_domain):
+                    return match
+
+        # Otherwise return first match
+        return matches[0] if matches else None
     except Exception as e:
         pass
     return None
@@ -116,21 +128,41 @@ def main():
     msg = email.message_from_bytes(original_msg)
 
     # Find original list recipient from X-Original-To or Delivered-To headers
-    # These are added before alias expansion
-    original_to = msg.get('X-Original-To') or msg.get('Delivered-To')
+    # Note: Content filters don't receive X-Original-To, so check To header
+    original_to = None
+
+    # Try To header first (most reliable for content filters)
+    to_header = msg.get('To')
+    if to_header:
+        # Parse To header to extract email address
+        _, to_addr = parseaddr(to_header)
+        if to_addr and to_addr.lower() in MAILING_LISTS:
+            original_to = to_addr.lower()
+
+    # Extract preferred domain from To header for fallback
+    preferred_domain = None
+    if to_header:
+        _, to_addr = parseaddr(to_header)
+        if to_addr and '@' in to_addr:
+            preferred_domain = to_addr.split('@')[1]
 
     if not original_to:
-        # Fallback: reverse-lookup via virtual aliases file
-        original_to = find_list_from_recipients(recipients)
+        # Fallback: reverse-lookup via virtual aliases file with domain preference
+        original_to = find_list_from_recipients(recipients, preferred_domain)
 
     # Rewrite if this is going to a mailing list
     if original_to and original_to.lower() in MAILING_LISTS:
         msg = rewrite_headers(msg, original_to)
 
     # Reinject to port 10025 (bypasses content_filter)
+    # CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification
+    # SMTP2Go checks both envelope sender AND From header domain
     try:
         smtp = smtplib.SMTP('127.0.0.1', 10025)
-        smtp.sendmail(sender, recipients, msg.as_bytes())
+        # Extract envelope sender from rewritten From header
+        from_header = msg.get("From", "")
+        _, envelope_sender = parseaddr(from_header)
+        smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
         smtp.quit()
         sys.exit(0)
     except Exception as e:
