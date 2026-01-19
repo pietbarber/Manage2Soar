@@ -107,7 +107,11 @@ def find_list_from_recipients(recipients, preferred_domain=None):
         # Otherwise return first match
         return matches[0] if matches else None
     except Exception as e:
-        pass
+        sys.stderr.write(
+            f"maillist-rewriter: error reading /etc/postfix/virtual in "
+            f"find_list_from_recipients: {e}\n"
+        )
+        return None
     return None
 
 def main():
@@ -162,6 +166,13 @@ def main():
         # Extract envelope sender from rewritten From header
         from_header = msg.get("From", "")
         _, envelope_sender = parseaddr(from_header)
+        # Ensure we never use an empty envelope sender; fall back to original sender
+        if not envelope_sender:
+            if sender:
+                envelope_sender = sender
+            else:
+                # Last-resort fallback to a local postmaster address
+                envelope_sender = "postmaster@localhost"
         smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
         smtp.quit()
         sys.exit(0)

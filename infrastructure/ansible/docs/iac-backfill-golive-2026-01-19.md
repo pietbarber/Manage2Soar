@@ -483,7 +483,7 @@ kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_D
 # Expected output: false
 
 # Check deployed pod EMAIL_DEV_MODE_REDIRECT_TO (should be empty for production)
-kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE_REDIRECT_TO}' | base 64 -d
+kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE_REDIRECT_TO}' | base64 -d
 # Expected output: (empty string)
 ```
 
@@ -695,15 +695,9 @@ ssh mail.manage2soar.com 'sudo tail -30 /var/log/mail.log | grep "status=sent"'
 
 See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
    ```
-
-See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
-   ```
 - Documents Let's Encrypt/port 80 challenge experience (deferred)
 - **CRITICAL**: Documents EMAIL_DEV_MODE configuration conflicts and validation needs
 - Complete IaC backfill notes with 9 sections and lessons learned
-
-See infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md for details."
-   ```
 
 6. ⚠️ **CRITICAL: Verify EMAIL_DEV_MODE before next deployment**:
    ```bash
