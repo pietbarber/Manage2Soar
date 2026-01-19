@@ -72,7 +72,7 @@
 - name: Get current SSL policy on target proxy
   ansible.builtin.command:
     cmd: >
-      gcloud compute target-https-proxies describe {{ target_proxy_name.stdout }}
+      gcloud compute target-https-proxies describe {{ target_proxy_name }}
       --global
       --project={{ gcp_project }}
       --format="value(sslPolicy)"
@@ -81,17 +81,17 @@
   failed_when: false
   delegate_to: localhost
   become: false
-  when: target_proxy_name.stdout | length > 0
+  when: target_proxy_name | length > 0
 
 - name: Attach SSL policy to Gateway target proxy
   ansible.builtin.command:
     cmd: >
-      gcloud compute target-https-proxies update {{ target_proxy_name.stdout }}
+      gcloud compute target-https-proxies update {{ target_proxy_name }}
       --ssl-policy {{ gke_ssl_policy_name }}
       --global
       --project={{ gcp_project }}
   when:
-    - target_proxy_name.stdout | length > 0
+    - target_proxy_name | length > 0
     - current_ssl_policy.stdout is defined
     - current_ssl_policy.stdout != ('global/sslPolicies/' + gke_ssl_policy_name)
   delegate_to: localhost
@@ -100,12 +100,12 @@
 
 - name: Display SSL policy attachment result
   ansible.builtin.debug:
-    msg: "SSL policy '{{ gke_ssl_policy_name }}' attached to target proxy '{{ target_proxy_name.stdout }}'"
+    msg: "SSL policy '{{ gke_ssl_policy_name }}' attached to target proxy '{{ target_proxy_name }}'"
   when: ssl_policy_attached is changed
 
 - name: Display SSL policy already configured
   ansible.builtin.debug:
     msg: "SSL policy '{{ gke_ssl_policy_name }}' already attached to target proxy"
   when:
-    - target_proxy_name.stdout | length > 0
+    - target_proxy_name | length > 0
     - current_ssl_policy.stdout == ('global/sslPolicies/' + gke_ssl_policy_name)
