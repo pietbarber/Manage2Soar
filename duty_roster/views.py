@@ -78,7 +78,7 @@ def blackout_manage(request):
     today = now().date()
 
     def generate_calendar(year, month):
-        cal = calendar.Calendar()
+        cal = calendar.Calendar(firstweekday=6)  # 6 = Sunday as first day of week
         month_days = cal.itermonthdates(year, month)
         weeks, week = [], []
         for day in month_days:
