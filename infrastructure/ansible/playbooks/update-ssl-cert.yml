@@ -11,8 +11,10 @@
 #     playbooks/update-ssl-cert.yml
 
 - name: Update SSL Certificate for GKE Cluster
-  hosts: gcp_app_primary
+  hosts: localhost
+  connection: local
   gather_facts: false
+  become: false
 
   tasks:
     - name: Collect all tenant domains from inventory
