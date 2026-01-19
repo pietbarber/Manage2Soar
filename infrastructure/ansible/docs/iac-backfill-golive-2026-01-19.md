@@ -132,6 +132,218 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 ---
 
+## 6. ⚠️ Let's Encrypt / Port 80 for Mail Server (Partially Complete)
+**Issue**: Mail server (mail.manage2soar.com) was using self-signed TLS certificates for SMTP connections. While SMTP2Go relay worked fine (they handle TLS), proper TLS certificates improve email deliverability and avoid warnings in mail logs.
+
+**Discovery**: Attempting to provision Let's Encrypt certificates required opening port 80 for HTTP-01 challenge validation. This was unexpected - most people think "mail server = port 25/587 only", but Let's Encrypt needs HTTP access to verify domain ownership.
+
+**Manual Fix Attempted**:
+```bash
+# Create GCP firewall rule for Let's Encrypt
+gcloud compute firewall-rules create m2s-mail-allow-http \
+  --allow tcp:80 \
+  --source-ranges 0.0.0.0/0 \
+  --target-tags m2s-mail,smtp-relay \
+  --project manage2soar
+
+# Try to provision certificate
+ssh mail.manage2soar.com
+sudo certbot certonly --standalone \
+  --email pb@pietbarber.com \
+  --domains mail.manage2soar.com \
+  --agree-tos
+```
+
+**Current Status**: ⚠️ Partially working
+- GCP firewall rule created for port 80 (allows 0.0.0.0/0)
+- Port connectivity issues persisted (possibly UFW or service binding conflicts)
+- Mail server continues using self-signed certificates
+- TLS warnings in logs but **not blocking mail flow** (SMTP2Go relay handles actual TLS for outbound mail)
+
+**IaC Status**:
+- ✅ GCP firewall rule manually created but **not yet in Ansible** (needs backfill)
+- ⚠️ UFW configuration may need port 80 rule
+- ⚠️ Certbot/Let's Encrypt setup not automated in Ansible
+- ⚠️ Postfix TLS certificate configuration commented out in templates
+
+**Why This Matters**:
+- Self-signed certs cause TLS warnings in mail.log (cosmetic but concerning in audits)
+- Some strict SMTP servers may reject connections with invalid certificates
+- Let's Encrypt is free and automated, but requires HTTP-01 or DNS-01 challenge
+
+**Possible Solutions**:
+1. **HTTP-01 Challenge** (current approach - partially working):
+   - Requires port 80 open to internet
+   - certbot standalone mode temporarily binds port 80
+   - May conflict with nginx/apache if running
+
+2. **DNS-01 Challenge** (alternative - recommended):
+   - Uses DNS TXT records instead of HTTP
+   - No port 80 required
+   - Requires Google Cloud DNS API access or manual TXT record updates
+   - certbot-dns-google plugin available
+
+3. **Self-Signed Acceptable** (current workaround):
+   - Mail relay to SMTP2Go works fine with self-signed certs
+   - SMTP2Go handles actual TLS for outbound delivery
+   - Only affects direct SMTP connections to mail.manage2soar.com
+
+**Recommended IaC Backfill**:
+- Add GCP firewall rule for port 80 to `roles/gcp-vm/tasks/main.yml`
+- Document decision: Use self-signed certs (simple) vs Let's Encrypt (better but complex)
+- If Let's Encrypt desired: Add certbot role with DNS-01 challenge (more reliable than HTTP-01)
+
+**Status**: ⚠️ Deferred (mail working with self-signed certs, low priority)
+
+---
+
+## 7. ✅ Multi-Domain Mail Support
+**Issue**: Production domain (skylinesoaring.org) and its www subdomain needed to receive mailing list mail, requiring updates to multiple mail infrastructure components.
+
+**Changes Required**:
+1. **Postfix virtual_domains**: Accept mail for skylinesoaring.org and www.skylinesoaring.org (not just ssc.manage2soar.com)
+2. **M2S sync script**: Handle clubs with multiple domains (domains array, not single domain string)
+3. **Django API**: Return mailing list data for all configured domains
+
+**IaC Status**: ✅ Already implemented in roles/templates
+
+**Key Files**:
+- `roles/postfix/templates/virtual_domains.j2`:
+  ```jinja
+  {% for club in club_domains %}
+  {# Legacy format: club.prefix.mail_domain #}
+  {{ club.prefix }}.{{ mail_domain }}    OK
+  {# Additional domains (if configured) #}
+  {% if club.domains is defined %}
+  {% for domain in club.domains %}
+  {{ domain }}    OK
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+  ```
+
+- `roles/m2s-mail-sync/templates/sync-aliases.py.j2`:
+  - Supports both `club.domain` (string) and `club.domains` (array) for backward compatibility
+  - Line 373: `domains = club.get('domains', [club.get('domain')])`
+  - Generates virtual aliases for each domain separately
+
+- `roles/m2s-mail-sync/templates/sync-config.yml.j2`:
+  ```yaml
+  clubs:
+    - prefix: "ssc"
+      domains:
+        - "ssc.manage2soar.com"
+        - "skylinesoaring.org"
+        - "www.skylinesoaring.org"
+      api_url: "https://skylinesoaring.org/members/api/email-lists/"
+  ```
+
+**Configuration Location**: `group_vars/gcp_mail/vars.yml`
+```yaml
+club_domains:
+  - prefix: "ssc"
+    domains:
+      - "ssc.manage2soar.com"
+      - "skylinesoaring.org"
+      - "www.skylinesoaring.org"
+    api_url: "https://skylinesoaring.org/members/api/email-lists/"
+    auth_token: "{{ m2s_api_key }}"
+```
+
+**Django API** (`members/api.py`):
+- The `/members/api/email-lists/` endpoint returns list data agnostic of domain
+- Mail sync script applies same lists to all domains configured for the club
+- Example: `members@skylinesoaring.org` and `members@www.skylinesoaring.org` get identical subscriber lists
+
+**Important Notes**:
+- Multi-domain support is per-club (one club can have multiple domains)
+- Each domain gets its own virtual alias entries
+- Whitelist is shared across all domains for a club (not domain-specific)
+- Backward compatible with single `domain` string (legacy config)
+
+**Status**: ✅ Already in IaC (no backfill needed)
+
+**Verification**:
+```bash
+# Check Postfix accepts mail for all domains
+ssh mail.manage2soar.com 'sudo postmap -q skylinesoaring.org /etc/postfix/virtual_domains'
+ssh mail.manage2soar.com 'sudo postmap -q www.skylinesoaring.org /etc/postfix/virtual_domains'
+
+# Check virtual aliases generated for all domains
+ssh mail.manage2soar.com 'sudo grep -A 2 "^members@skylinesoaring.org" /etc/postfix/virtual'
+
+# Test mail delivery to production domain
+echo "Test" | mail -s "Multi-domain test" members@skylinesoaring.org
+```
+
+---
+
+## 8. ✅ SSL/TLS Policy (Disable TLS 1.0/1.1)
+**Issue**: Production site (skylinesoaring.org) received SSL Labs grade B due to supporting insecure TLS 1.0 and TLS 1.1 protocols. Google Cloud Load Balancer (created by GKE Gateway) uses default SSL policy which allows TLS 1.0/1.1 for backward compatibility.
+
+**Security Risk**: TLS 1.0 (1999) and TLS 1.1 (2006) have known vulnerabilities and are deprecated by all major browsers and security standards (PCI-DSS, NIST, etc.). Clients using these old protocols can be subject to downgrade attacks.
+
+**Manual Fix Applied**:
+```bash
+# Create modern TLS policy (TLS 1.2+ only)
+gcloud compute ssl-policies create modern-tls-policy \
+  --profile MODERN \
+  --min-tls-version 1.2 \
+  --project manage2soar \
+  --global
+
+# Find Gateway's auto-generated target-https-proxy
+gcloud compute target-https-proxies list \
+  --filter="name~manage2soar-gateway" \
+  --project manage2soar
+
+# Attach SSL policy to target proxy
+gcloud compute target-https-proxies update gkegw1-84of-default-manage2soar-gateway-8zychhgoas3u \
+  --ssl-policy modern-tls-policy \
+  --global \
+  --project manage2soar
+```
+
+**IaC Fix**:
+- Created `roles/gke-deploy/tasks/ssl-policy.yml` - Ansible tasks to:
+  1. Create `modern-tls-policy` SSL policy if it doesn't exist
+  2. Find the Gateway's auto-generated target-https-proxy name
+  3. Attach SSL policy to the proxy (idempotent - only updates if needed)
+- Updated `roles/gke-deploy/tasks/main.yml` to include SSL policy tasks after ingress deployment
+- Added configuration variables to `inventory/gcp_app.yml`:
+  ```yaml
+  gke_ssl_policy_enabled: true
+  gke_ssl_policy_name: "modern-tls-policy"
+  gke_ssl_policy_profile: "MODERN"      # MODERN (TLS 1.2+) or RESTRICTED
+  gke_ssl_policy_min_tls: "1.2"         # 1.2 or 1.3
+  ```
+
+**Important Notes**:
+- Gateway API doesn't directly support SSL policies - they must be applied to the underlying GCP target-https-proxy
+- Target proxy name is auto-generated by GKE (e.g., `gkegw1-84of-default-manage2soar-gateway-8zychhgoas3u`)
+- Ansible task dynamically finds the proxy name by filtering on Gateway name
+- SSL policy is shared across all Gateway listeners (all domains use the same TLS settings)
+- **Expected SSL Labs Grade**: A (was B due to TLS 1.0/1.1 support)
+
+**Status**: ✅ Fixed in commit [TODO]
+
+**Verification**:
+```bash
+# Check SSL policy exists
+gcloud compute ssl-policies describe modern-tls-policy --global --project=manage2soar
+
+# Verify attached to target proxy
+gcloud compute target-https-proxies describe <proxy-name> \
+  --global \
+  --project=manage2soar \
+  --format="value(sslPolicy)"
+
+# Test with SSL Labs
+# https://www.ssllabs.com/ssltest/analyze.html?d=skylinesoaring.org
+```
+
+---
+
 ## Lessons Learned
 
 ### 1. Infrastructure as Code First Philosophy
@@ -184,8 +396,11 @@ Manual fixes often bypass security review. Always check:
    git add infrastructure/ansible/docs/maillist-rewriter.md
    git add infrastructure/ansible/docs/iac-backfill-golive-2026-01-19.md
    git add infrastructure/ansible/roles/postfix/templates/maillist-rewriter.py.j2
+   git add infrastructure/ansible/roles/gke-deploy/tasks/ssl-policy.yml
+   git add infrastructure/ansible/roles/gke-deploy/tasks/main.yml
    git add infrastructure/ansible/group_vars/gcp_mail/vars.yml
-   git commit -m "IaC backfill: Production go-live fixes (maillist-rewriter, firewall, docs)"
+   git add infrastructure/ansible/inventory/gcp_app.yml
+   git commit -m "IaC backfill: Production go-live fixes (maillist-rewriter, firewall, TLS policy, docs)"
    ```
 
 ---
@@ -217,6 +432,20 @@ kubectl get secret manage2soar-env-ssc -n tenant-ssc \
 # Verify pods are using correct value
 kubectl get pods -n tenant-ssc -l app=django-app-ssc -o name | head -1 | \
   xargs -I {} kubectl exec {} -n tenant-ssc -- printenv DJANGO_ALLOWED_HOSTS
+
+# Check SSL policy
+gcloud compute ssl-policies describe modern-tls-policy --global --project=manage2soar
+
+# Find target proxy
+gcloud compute target-https-proxies list \
+  --filter="name~manage2soar" \
+  --project=manage2soar
+
+# Verify SSL policy attached
+gcloud compute target-https-proxies describe <proxy-name> \
+  --global \
+  --project=manage2soar \
+  | grep sslPolicy
 ```
 
 ### Test Mailing Lists
