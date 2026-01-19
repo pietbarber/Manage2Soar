@@ -140,6 +140,15 @@
     mode: "0640"
   when: smtp_auth_users is defined and smtp_auth_users | length > 0
 
+- name: Install mailing list header rewriter script
+  ansible.builtin.template:
+    src: maillist-rewriter.py.j2
+    dest: /usr/local/bin/maillist-rewriter.py
+    mode: "0755"
+    owner: root
+    group: root
+  notify: Restart Postfix
+
 - name: Add postfix to sasl group
   ansible.builtin.user:
     name: postfix

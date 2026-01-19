@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""
+Mailman-style header rewriter for Postfix (Content Filter)
+Rewrites From header to list address and sets Reply-To to original sender
+Uses X-Original-To header to find the original list recipient before alias expansion
+"""
+import sys
+import email
+from email.utils import parseaddr, formataddr
+import smtplib
+
+# List of mailing list addresses this server handles
+# Format: set of lowercase email addresses
+MAILING_LISTS = {
+{% for club in club_domains %}
+{% if club.domains is defined %}
+{% for domain in club.domains %}
+    'members@{{ domain }}',
+    'instructors@{{ domain }}',
+    'towpilots@{{ domain }}',
+    'directors@{{ domain }}',
+    'board@{{ domain }}',
+    'private-owners@{{ domain }}',
+    'treasurer@{{ domain }}',
+    'webmaster@{{ domain }}',
+{% endfor %}
+{% else %}
+    'members@{{ club.prefix }}.{{ mail_domain }}',
+    'instructors@{{ club.prefix }}.{{ mail_domain }}',
+    'towpilots@{{ club.prefix }}.{{ mail_domain }}',
+    'directors@{{ club.prefix }}.{{ mail_domain }}',
+    'board@{{ club.prefix }}.{{ mail_domain }}',
+    'private-owners@{{ club.prefix }}.{{ mail_domain }}',
+    'treasurer@{{ club.prefix }}.{{ mail_domain }}',
+    'webmaster@{{ club.prefix }}.{{ mail_domain }}',
+{% endif %}
+{% endfor %}
+}
+
+def rewrite_headers(msg, recipient):
+    """
+    Rewrite headers Mailman-style:
+    - Save original From to Reply-To
+    - Rewrite From to list-bounces address with original name
+    """
+    original_from = msg.get('From', '')
+    original_name, original_email = parseaddr(original_from)
+
+    # Get list address from recipient
+    recipient_lower = recipient.lower()
+
+    # Extract list name and domain (e.g., "webmaster" from "webmaster@domain.com")
+    list_local, list_domain = recipient_lower.split('@', 1)
+    list_name_display = list_local.replace('-', ' ').title()
+
+    # Create Mailman-style bounces address (e.g., webmaster-bounces@domain.com)
+    list_bounces_addr = f"{list_local}-bounces@{list_domain}"
+
+    # Create new From with format: "Original Name via List Name" <list-bounces@domain.com>
+    if original_name:
+        new_from_name = f"{original_name} via {list_name_display}"
+    else:
+        new_from_name = f"{list_name_display} List"
+
+    # Replace From header
+    if 'From' in msg:
+        del msg['From']
+    msg['From'] = formataddr((new_from_name, list_bounces_addr))
+
+    # Add Reply-To if not already present
+    if not msg.get('Reply-To'):
+        msg['Reply-To'] = original_from
+
+    return msg
+
+def find_list_from_recipients(recipients):
+    """
+    Reverse-lookup: find which mailing list these recipients belong to
+    by checking the virtual aliases file
+    """
+    try:
+        with open('/etc/postfix/virtual', 'r') as f:
+            virtual_content = f.read()
+
+        # Try each list address
+        for list_addr in MAILING_LISTS:
+            # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
+            for line in virtual_content.split('\n'):
+                if line.startswith(list_addr):
+                    # Extract the recipient list after the address
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        alias_recipients = [r.strip() for r in parts[1].split(',')]
+                        # Check if our recipients match this list's recipients
+                        if set(recipients) == set(alias_recipients):
+                            return list_addr
+    except Exception as e:
+        pass
+    return None
+
+def main():
+    """
+    Content filter: Read email from stdin, rewrite headers, reinject to port 10025
+    Args: nexthop sender recipient1 recipient2 ...
+    """
+    # Debug logging to file
+    import datetime
+    debug_file = '/tmp/maillist-rewriter-debug.log'
+
+    if len(sys.argv) < 4:
+        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender recipient...\n")
+        sys.exit(1)
+
+    nexthop = sys.argv[1]
+    sender = sys.argv[2]
+    recipients = sys.argv[3:]
+
+    # Read message from stdin
+    original_msg = sys.stdin.buffer.read()
+    msg = email.message_from_bytes(original_msg)
+
+    # Debug logging to file
+    with open(debug_file, 'a') as f:
+        f.write(f"\n{datetime.datetime.now().isoformat()} - Script called\n")
+        f.write(f"Recipients: {recipients}\n")
+        f.write(f"Sender: {sender}\n")
+        f.write(f"X-Original-To: {msg.get('X-Original-To')}\n")
+        f.write(f"Delivered-To: {msg.get('Delivered-To')}\n")
+
+    # Find original list recipient from X-Original-To or Delivered-To headers
+    # These are added before alias expansion
+    original_to = msg.get('X-Original-To') or msg.get('Delivered-To')
+
+    if not original_to:
+        # Fallback: reverse-lookup via virtual aliases file
+        original_to = find_list_from_recipients(recipients)
+        if original_to:
+            with open(debug_file, 'a') as f:
+                f.write(f"Found list via reverse lookup: {original_to}\n")
+
+    # More debug logging
+    with open(debug_file, 'a') as f:
+        f.write(f"Original To: {original_to}\n")
+        f.write(f"MAILING_LISTS has {len(MAILING_LISTS)} entries\n")
+        f.write(f"Is original_to in MAILING_LISTS: {original_to and original_to.lower() in MAILING_LISTS}\n")
+
+    # Rewrite if this is going to a mailing list
+    if original_to and original_to.lower() in MAILING_LISTS:
+        with open(debug_file, 'a') as f:
+            f.write(f"REWRITING headers for {original_to}\n")
+        msg = rewrite_headers(msg, original_to)
+    else:
+        with open(debug_file, 'a') as f:
+            f.write(f"NOT rewriting - not a list recipient\n")
+
+    # Reinject to port 10025 (bypasses content_filter)
+    try:
+        smtp = smtplib.SMTP('127.0.0.1', 10025)
+        smtp.sendmail(sender, recipients, msg.as_bytes())
+        smtp.quit()
+        with open(debug_file, 'a') as f:
+            f.write("Successfully reinjected\n")
+        sys.exit(0)
+    except Exception as e:
+        with open(debug_file, 'a') as f:
+            f.write(f"Reinject failed: {e}\n")
+        sys.stderr.write(f"Reinject failed: {e}\n")
+        sys.exit(75)  # EX_TEMPFAIL
+
+if __name__ == '__main__':
+    main()

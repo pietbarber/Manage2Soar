@@ -141,6 +141,8 @@ def generate_virtual_aliases(clubs_data, dev_mode=None):
                     else:
                         recipients_str = ','.join(sorted(set(sanitized)))
                         lines.append(f"{list_name}@{domain}  {recipients_str}")
+                        # Add Mailman-style -bounces alias (routes to admin, NOT to list members to avoid bounce storms)
+                        lines.append(f"{list_name}-bounces@{domain}  {{ admin_email }}")
 
         lines.append("")
 
@@ -247,12 +249,13 @@ def generate_bypass_lists_map(clubs_bypass_lists):
     ]
 
     for club_prefix, data in clubs_bypass_lists.items():
-        domain = data['domain']
+        domains = data['domains']
         bypass_lists = data.get('bypass_lists', [])
         if bypass_lists:
             lines.append(f"# {club_prefix} bypass lists")
             for list_name in bypass_lists:
-                lines.append(f"{list_name}@{domain}")
+                for domain in domains:
+                    lines.append(f"{list_name}@{domain}")
 
     return '\n'.join(lines)
 
@@ -365,20 +368,31 @@ def main():
     for club in config['clubs']:
         data = fetch_club_lists(club, default_auth_token)
         if data:
-            clubs_data[club['domain']] = data
+            # Support both single 'domain' and multiple 'domains'
+            # This provides backward compatibility with old configs
+            domains = club.get('domains', [club.get('domain')])
+            if not domains or not domains[0]:
+                print(f"[{datetime.now()}] WARNING: Club {club['prefix']} has no domains configured")
+                continue
+
+            # Store data for each domain
+            for domain in domains:
+                clubs_data[domain] = data
+
+            # Use first domain for whitelist tracking (all domains share same whitelist)
             clubs_whitelist_data[club['prefix']] = {
-                'domain': club['domain'],
+                'domains': domains,
                 'whitelist': data.get('whitelist', [])
             }
             # Track bypass lists for this club
             bypass_lists = data.get('bypass_lists', [])
             if bypass_lists:
                 clubs_bypass_lists[club['prefix']] = {
-                    'domain': club['domain'],
+                    'domains': domains,
                     'bypass_lists': bypass_lists
                 }
                 print(f"[{datetime.now()}] Bypass lists for {club['prefix']}: {', '.join(bypass_lists)}")
-            print(f"[{datetime.now()}] Fetched {len(data.get('lists', {}))} lists for {club['prefix']}")
+            print(f"[{datetime.now()}] Fetched {len(data.get('lists', {}))} lists for {club['prefix']} ({len(domains)} domains)")
 
     if not clubs_data:
         print(f"[{datetime.now()}] WARNING: No club data fetched, keeping existing aliases")
