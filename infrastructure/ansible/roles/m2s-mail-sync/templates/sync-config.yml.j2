@@ -26,7 +26,15 @@ dev_mode:
 clubs:
 {% for club in club_domains %}
   - prefix: "{{ club.prefix }}"
-    domain: "{{ club.prefix }}.{{ mail_domain }}"
+{% if club.domains is defined %}
+    domains:
+{% for domain in club.domains %}
+      - "{{ domain }}"
+{% endfor %}
+{% else %}
+    domains:
+      - "{{ club.prefix }}.{{ mail_domain }}"
+{% endif %}
     api_url: "{{ club.api_url }}"
     auth_token: "{{ club.auth_token | default(m2s_api_key) }}"
 {% endfor %}

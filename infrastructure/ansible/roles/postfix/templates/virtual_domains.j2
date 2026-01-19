@@ -5,5 +5,12 @@
 # DO NOT EDIT MANUALLY - changes will be overwritten
 
 {% for club in club_domains %}
+{# Legacy format: club.prefix.mail_domain #}
 {{ club.prefix }}.{{ mail_domain }}    OK
+{# Additional domains (if configured) #}
+{% if club.domains is defined %}
+{% for domain in club.domains %}
+{{ domain }}    OK
+{% endfor %}
+{% endif %}
 {% endfor %}

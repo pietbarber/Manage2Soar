@@ -8,11 +8,14 @@
 # ==========================================================================
 
 # SMTP - inbound from internet (port 25)
+# Add original recipient header for content filter
 smtp      inet  n       -       y       -       -       smtpd
+  -o content_filter=maillist-rewriter:dummy
 
 # Submission - authenticated sending (port 587)
 # Modified to allow relay from trusted mynetworks without TLS/AUTH
 # (GCP blocks outbound port 25, so GKE pods must use 587)
+# Add original recipient header for content filter
 submission inet n       -       y       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_tls_security_level=may
@@ -25,6 +28,7 @@ submission inet n       -       y       -       -       smtpd
   -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
   -o smtpd_relay_restrictions=permit_mynetworks,permit_sasl_authenticated,reject
   -o milter_macro_daemon_name=ORIGINATING
+  -o content_filter=maillist-rewriter:dummy
 
 # Pickup service
 pickup    unix  n       -       y       60      1       pickup
@@ -74,3 +78,23 @@ lmtp      unix  -       -       y       -       -       lmtp
 anvil     unix  -       -       y       -       1       anvil
 scache    unix  -       -       y       -       1       scache
 postlog   unix-dgram n  -       n       -       1       postlogd
+
+# ============================================================
+# MAILING LIST HEADER REWRITER (Content Filter)
+# ============================================================
+# Rewrites From headers to list address and adds Reply-To
+# pointing to original sender (Mailman-style)
+maillist-rewriter unix  -       n       n       -       10      pipe
+  flags=Rq user=nobody argv=/usr/local/bin/maillist-rewriter.py ${nexthop} ${sender} ${recipient}
+
+# Reinjection port (after content filter)
+127.0.0.1:10025 inet n  -       y       -       -       smtpd
+  -o syslog_name=postfix/reinject
+  -o content_filter=
+  -o receive_override_options=no_header_body_checks
+  -o smtpd_helo_restrictions=
+  -o smtpd_client_restrictions=
+  -o smtpd_sender_restrictions=
+  -o smtpd_recipient_restrictions=permit_mynetworks,reject
+  -o mynetworks=127.0.0.0/8
+  -o smtpd_authorized_xforward_hosts=127.0.0.0/8

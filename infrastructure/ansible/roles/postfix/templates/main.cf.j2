@@ -30,6 +30,9 @@ mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 {{ trusted_relay_ips |
 mailbox_size_limit = 0
 recipient_delimiter = +
 
+# Add X-Original-To header before alias expansion (for content filter)
+always_add_missing_headers = yes
+
 # ============================================================
 # VIRTUAL DOMAINS AND ALIASES
 # ============================================================
@@ -45,16 +48,15 @@ virtual_alias_maps = hash:{{ postfix_config_dir }}/virtual
 # TLS SETTINGS
 # ============================================================
 # Enable TLS for both sending and receiving
-# Uses Let's Encrypt certificates obtained by certbot
+# Uses self-signed certificates (Let's Encrypt deferred - see docs/iac-backfill-golive-2026-01-19.md)
 
 # Incoming TLS
-smtpd_tls_cert_file = /etc/letsencrypt/live/{{ mail_hostname }}/fullchain.pem
-smtpd_tls_key_file = /etc/letsencrypt/live/{{ mail_hostname }}/privkey.pem
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
 smtpd_tls_security_level = may
 smtpd_tls_loglevel = 1
 
-# Outgoing TLS
-smtp_tls_security_level = may
+# Outgoing TLS (configured in relay section below)
 smtp_tls_loglevel = 1
 
 # ============================================================
@@ -146,10 +148,9 @@ smtpd_client_connection_rate_limit = 30
 # ============================================================
 # HEADER REWRITING (Mailing Lists)
 # ============================================================
-# Rewrite From headers for mailing list traffic.
-# SMTP2GO requires verified sender domains, so we rewrite
-# external From addresses to use our domain.
-header_checks = pcre:{{ postfix_config_dir }}/header_checks
+# From header rewriting is applied only to port 587 (submission)
+# via master.cf override. This ensures external mail TO lists
+# (port 25) is not rewritten, only outbound mail FROM Django.
 
 # Add mailing list headers (List-Id, List-Post, Precedence) on outbound mail
 smtp_header_checks = pcre:{{ postfix_config_dir }}/smtp_header_checks

@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""
+Mailman-style header rewriter for Postfix (Content Filter)
+Rewrites From header to list address and sets Reply-To to original sender
+Uses X-Original-To header to find the original list recipient before alias expansion
+"""
+import email
+import smtplib
+import sys
+from email.utils import formataddr, parseaddr
+
+# List of mailing list addresses this server handles
+# Format: set of lowercase email addresses
+MAILING_LISTS = {
+{% for club in club_domains %}
+{% if club.domains is defined %}
+{% for domain in club.domains %}
+    'members@{{ domain }}',
+    'instructors@{{ domain }}',
+    'towpilots@{{ domain }}',
+    'directors@{{ domain }}',
+    'board@{{ domain }}',
+    'private-owners@{{ domain }}',
+    'treasurer@{{ domain }}',
+    'webmaster@{{ domain }}',
+{% endfor %}
+{% else %}
+    'members@{{ club.prefix }}.{{ mail_domain }}',
+    'instructors@{{ club.prefix }}.{{ mail_domain }}',
+    'towpilots@{{ club.prefix }}.{{ mail_domain }}',
+    'directors@{{ club.prefix }}.{{ mail_domain }}',
+    'board@{{ club.prefix }}.{{ mail_domain }}',
+    'private-owners@{{ club.prefix }}.{{ mail_domain }}',
+    'treasurer@{{ club.prefix }}.{{ mail_domain }}',
+    'webmaster@{{ club.prefix }}.{{ mail_domain }}',
+{% endif %}
+{% endfor %}
+}
+
+def rewrite_headers(msg, recipient):
+    """
+    Rewrite headers Mailman-style:
+    - Save original From to Reply-To
+    - Rewrite From to list-bounces address with original name
+    """
+    original_from = msg.get('From', '')
+    original_name, original_email = parseaddr(original_from)
+
+    # Get list address from recipient
+    recipient_lower = recipient.lower()
+
+    # Extract list name and domain (e.g., "webmaster" from "webmaster@domain.com")
+    list_local, list_domain = recipient_lower.split('@', 1)
+    list_name_display = list_local.replace('-', ' ').title()
+
+    # Create Mailman-style bounces address (e.g., webmaster-bounces@domain.com)
+    list_bounces_addr = f"{list_local}-bounces@{list_domain}"
+
+    # Create new From with format: "Original Name via List Name" <list-bounces@domain.com>
+    if original_name:
+        new_from_name = f"{original_name} via {list_name_display}"
+    else:
+        new_from_name = f"{list_name_display} List"
+
+    # Replace From header
+    if 'From' in msg:
+        del msg['From']
+    msg['From'] = formataddr((new_from_name, list_bounces_addr))
+
+    # Add Reply-To if not already present
+    if not msg.get('Reply-To'):
+        msg['Reply-To'] = original_from
+
+    return msg
+
+def find_list_from_recipients(recipients, preferred_domain=None):
+    """
+    Reverse-lookup: find which mailing list these recipients belong to
+    by checking the virtual aliases file
+    If preferred_domain is specified, prefer list addresses with that domain
+    """
+    try:
+        with open('/etc/postfix/virtual', 'r') as f:
+            virtual_content = f.read()
+
+        matches = []
+        # Try each list address
+        for list_addr in MAILING_LISTS:
+            # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
+            for line in virtual_content.split('\n'):
+                if line.startswith(list_addr):
+                    # Extract the recipient list after the address
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        alias_recipients = [r.strip() for r in parts[1].split(',')]
+                        # Check if our recipients match this list's recipients
+                        if set(recipients) == set(alias_recipients):
+                            matches.append(list_addr)
+                            break
+
+        # If we have a preferred domain, try to find a match with that domain first
+        if preferred_domain and matches:
+            for match in matches:
+                if match.endswith('@' + preferred_domain):
+                    return match
+
+        # Otherwise return first match
+        return matches[0] if matches else None
+    except Exception as e:
+        sys.stderr.write(f"maillist-rewriter: error reading /etc/postfix/virtual in find_list_from_recipients: {e}\n")
+
+def main():
+    """
+    Content filter: Read email from stdin, rewrite headers, reinject to port 10025
+    Args: nexthop sender recipient1 recipient2 ...
+    """
+    if len(sys.argv) < 4:
+        sys.stderr.write("Usage: maillist-rewriter.py nexthop sender recipient...\n")
+        sys.exit(1)
+
+    nexthop = sys.argv[1]
+    sender = sys.argv[2]
+    recipients = sys.argv[3:]
+
+    # Read message from stdin
+    original_msg = sys.stdin.buffer.read()
+    msg = email.message_from_bytes(original_msg)
+
+    # Find original list recipient from X-Original-To or Delivered-To headers
+    # Note: Content filters don't receive X-Original-To, so check To header
+    original_to = None
+
+    # Try To header first (most reliable for content filters)
+    to_header = msg.get('To')
+    if to_header:
+        # Parse To header to extract email address
+        _, to_addr = parseaddr(to_header)
+        if to_addr and to_addr.lower() in MAILING_LISTS:
+            original_to = to_addr.lower()
+
+    # Extract preferred domain from To header for fallback
+    preferred_domain = None
+    if to_header:
+        _, to_addr = parseaddr(to_header)
+        if to_addr and '@' in to_addr:
+            preferred_domain = to_addr.split('@')[1]
+
+    if not original_to:
+        # Fallback: reverse-lookup via virtual aliases file with domain preference
+        original_to = find_list_from_recipients(recipients, preferred_domain)
+
+    # Rewrite if this is going to a mailing list
+    if original_to and original_to.lower() in MAILING_LISTS:
+        msg = rewrite_headers(msg, original_to)
+
+    # Reinject to port 10025 (bypasses content_filter)
+    # CRITICAL: Use rewritten From header as envelope sender for SMTP2Go verification
+    # SMTP2Go checks both envelope sender AND From header domain
+    try:
+        smtp = smtplib.SMTP('127.0.0.1', 10025)
+        # Extract envelope sender from rewritten From header
+        from_header = msg.get("From", "")
+        _, envelope_sender = parseaddr(from_header)
+        # Ensure we never use an empty envelope sender; prefer verified mailing list addresses
+        if not envelope_sender:
+            sys.stderr.write("maillist-rewriter: Warning: Rewritten From header is empty or unparsable; this indicates a potential bug in rewrite_headers. Falling back to a verified mailing list envelope sender.\n")
+            fallback_sender = None
+            # Prefer the detected original mailing list recipient if it is known
+            if original_to and original_to.lower() in MAILING_LISTS:
+                fallback_sender = original_to.lower()
+            # Otherwise, choose a stable fallback address by sorting the configured mailing lists.
+            # Note: MAILING_LISTS is an unordered set; determinism comes from explicitly sorting
+            # the set contents here, not from any inherent ordering of the set itself.
+            elif MAILING_LISTS:
+                fallback_sender = sorted(MAILING_LISTS)[0]
+            # Absolute last-resort: local postmaster
+            if not fallback_sender:
+                fallback_sender = "postmaster@localhost"
+            # Final safety check: ensure fallback_sender is a non-empty, syntactically valid email-like string
+            if not isinstance(fallback_sender, str) or not fallback_sender or "@" not in fallback_sender:
+                sys.stderr.write("maillist-rewriter: Error: fallback envelope sender is invalid; using postmaster@localhost as last resort.\n")
+                fallback_sender = "postmaster@localhost"
+            envelope_sender = fallback_sender
+        smtp.sendmail(envelope_sender, recipients, msg.as_bytes())
+        smtp.quit()
+        sys.exit(0)
+    except smtplib.SMTPException as e:
+        # More specific logging for SMTP-related failures (including connection issues)
+        sys.stderr.write(f"SMTP reinject failed: {e}\n")
+        sys.exit(75)  # EX_TEMPFAIL
+    except Exception as e:
+        # Fallback for any non-SMTP unexpected errors
+        sys.stderr.write(f"Reinject failed (unexpected error): {e}\n")
+        sys.exit(75)  # EX_TEMPFAIL
+
+if __name__ == '__main__':
+    main()
