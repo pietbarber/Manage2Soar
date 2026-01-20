@@ -95,6 +95,13 @@
     - ../group_vars/gcp_mail/vars.yml
     - ../group_vars/gcp_mail/vault.yml
 
+  vars:
+    # Paths
+    postfix_config_dir: /etc/postfix
+    opendkim_config_dir: /etc/opendkim
+    opendkim_keys_dir: /etc/opendkim/keys
+    m2s_sync_dir: /opt/m2s-mail-sync
+
   pre_tasks:
     - name: Validate required variables
       ansible.builtin.assert:
@@ -151,6 +158,9 @@
 
     - role: opendkim
       tags: [opendkim, dkim, mail]
+
+    - role: m2s-mail-sync
+      tags: [mail-sync, mail]
 
   post_tasks:
     - name: Create DKIM keys output directory

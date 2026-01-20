@@ -70,8 +70,13 @@ smtpd_sasl_local_domain = $mydomain
 broken_sasl_auth_clients = yes
 
 # ============================================================
-# SECURITY RESTRICTIONS
+# SMTP RESTRICTIONS (Issue #533 - Mail Spam Protection)
 # ============================================================
+
+# Restriction classes (reusable restriction rules)
+# This defines a named restriction that can be referenced in access maps
+smtpd_restriction_classes = whitelist_required
+whitelist_required = check_sender_access hash:{{ postfix_config_dir }}/sender_whitelist, reject
 
 # Who can connect
 smtpd_client_restrictions =
@@ -99,6 +104,7 @@ smtpd_sender_restrictions =
 smtpd_recipient_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
+    check_recipient_access hash:{{ postfix_config_dir }}/recipient_whitelist_check,
     reject_unauth_destination,
     reject_unknown_recipient_domain,
     reject_non_fqdn_recipient

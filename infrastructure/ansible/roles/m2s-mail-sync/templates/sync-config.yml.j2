@@ -11,6 +11,7 @@ default_auth_token: "{{ m2s_api_key }}"
 # Postfix configuration paths
 postfix_virtual_file: "{{ postfix_config_dir }}/virtual"
 postfix_whitelist_file: "{{ postfix_config_dir }}/sender_whitelist"
+postfix_recipient_check_file: "{{ postfix_config_dir }}/recipient_whitelist_check"
 
 # Rspamd whitelist directory (per-club whitelist files stored here)
 rspamd_whitelist_dir: "/etc/rspamd/local.d/whitelists"

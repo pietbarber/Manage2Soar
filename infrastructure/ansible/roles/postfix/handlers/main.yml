@@ -26,6 +26,11 @@
     cmd: postmap {{ postfix_config_dir }}/sender_whitelist
   changed_when: true
 
+- name: Postmap recipient whitelist check
+  ansible.builtin.command:
+    cmd: postmap {{ postfix_config_dir }}/recipient_whitelist_check
+  changed_when: true
+
 - name: Postmap SASL passwords
   ansible.builtin.command:
     cmd: postmap {{ postfix_config_dir }}/sasl_passwd
