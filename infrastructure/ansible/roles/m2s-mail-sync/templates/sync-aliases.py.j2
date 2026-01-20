@@ -286,7 +286,11 @@ def generate_recipient_whitelist_check(clubs_data, clubs_bypass_lists):
         "# This file enforces sender whitelist for mailing lists.",
         "# Only lists with bypass_whitelist=false are included here.",
         "#",
-        "# Format: recipient_email  check_sender_access hash:/etc/postfix/sender_whitelist,reject",
+        "# Format: recipient_email  whitelist_required",
+        "#",
+        "# The whitelist_required restriction class is defined in main.cf as:",
+        "#   smtpd_restriction_classes = whitelist_required",
+        "#   whitelist_required = check_sender_access hash:/etc/postfix/sender_whitelist, reject",
         "#",
         "# If sender is in whitelist → OK (continue processing)",
         "# If sender is NOT in whitelist → REJECT (554 error)",
@@ -318,7 +322,7 @@ def generate_recipient_whitelist_check(clubs_data, clubs_bypass_lists):
                 continue
 
             # Enforce whitelist for this recipient
-            lines.append(f"{recipient}  check_sender_access hash:/etc/postfix/sender_whitelist,reject")
+            lines.append(f"{recipient}  whitelist_required")
 
         lines.append("")
 
