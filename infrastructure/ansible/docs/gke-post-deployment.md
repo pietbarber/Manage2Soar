@@ -407,8 +407,59 @@ Once superuser is created:
    - Verify SSC and MASA have separate databases
    - Confirm data isolation between tenants
 
+## Mail Server Configuration for GKE
+
+⚠️ **CRITICAL**: The mail server's `trusted_relay_ips` must include your GKE **pod CIDR**, not just node IPs!
+
+### Why This Matters
+
+Django pods connect to the mail server using their internal IP addresses from the GKE pod network (typically `10.x.x.x`). If the mail server's `mynetworks` only includes node NAT IPs, email sending will fail with authentication errors.
+
+### Configure Trusted Relay IPs
+
+1. **Find Your GKE Pod CIDR**:
+   ```bash
+   gcloud container clusters describe CLUSTER_NAME --zone=ZONE \
+     --format="value(clusterIpv4Cidr)"
+   # Example output: 10.4.0.0/14
+   ```
+
+2. **Update `group_vars/gcp_mail/vars.yml`**:
+   ```yaml
+   trusted_relay_ips:
+     - "10.x.x.x/14"     # GKE pod CIDR (internal addresses) - REQUIRED
+     # Optionally add individual GKE node NAT IPs if needed
+     # - "X.X.X.X"       # GKE node 1 NAT IP
+     # - "X.X.X.X"       # GKE node 2 NAT IP
+   ```
+
+3. **Apply Configuration**:
+   ```bash
+   cd infrastructure/ansible
+   ansible-playbook -i inventory/gcp_mail.yml playbooks/gcp-mail-server.yml \
+     --vault-password-file ~/.ansible_vault_pass
+   ```
+
+### Verify Email Works
+
+```bash
+# From Django pod
+kubectl exec -n tenant-ssc deployment/django-app-ssc -- \
+  python manage.py shell -c "from django.core.mail import send_mail; \
+  send_mail('Test', 'Body', 'noreply@ssc.manage2soar.com', ['your@email.com'])"
+```
+
+### Troubleshooting
+
+**Symptom**: `relay access denied` or `authentication failed` errors
+
+**Cause**: Mail server doesn't trust pod IPs, requires SASL auth
+
+**Fix**: Add GKE pod CIDR to `trusted_relay_ips` as shown above
+
 ## References
 
 - [Gateway API Deployment Guide](gke-gateway-ingress-guide.md)
 - [Database Provisioning](../playbooks/gcp-database.yml)
 - [Superuser IaC Implementation](../roles/gke-deploy/tasks/superuser.yml)
+- [Mail Server Configuration](../group_vars/gcp_mail.vars.yml.example)

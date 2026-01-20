@@ -170,6 +170,23 @@ m2s_api_key: "{{ vault_m2s_api_key }}"
 #     password: "{{ vault_smtp_password }}"
 
 # ============================================================
+# TRUSTED RELAY IPS
+# ============================================================
+# IPs/networks that can relay mail without SASL authentication.
+# CRITICAL: Must include GKE pod CIDR for Django app to send email!
+#
+# To find your GKE pod CIDR:
+#   gcloud container clusters describe CLUSTER_NAME --zone=ZONE \
+#     --format="value(clusterIpv4Cidr)"
+#
+# Example output: 10.4.0.0/14
+trusted_relay_ips:
+  - "10.0.0.0/14"     # GKE pod CIDR (internal addresses) - REQUIRED
+  # Optionally add individual GKE node NAT IPs if needed
+  # - "X.X.X.X"       # GKE node 1 NAT IP
+  # - "X.X.X.X"       # GKE node 2 NAT IP
+
+# ============================================================
 # TLS SETTINGS (Optional)
 # ============================================================
 # By default, we skip TLS cert setup since we're just relaying to SMTP2Go.
