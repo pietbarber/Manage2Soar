@@ -99,6 +99,7 @@ smtpd_sender_restrictions =
 smtpd_recipient_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
+    check_recipient_access hash:{{ postfix_config_dir }}/recipient_whitelist_check,
     reject_unauth_destination,
     reject_unknown_recipient_domain,
     reject_non_fqdn_recipient
