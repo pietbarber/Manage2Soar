@@ -786,7 +786,7 @@ class Logsheet(models.Model):
                 # (Assume initial_hours + sum of all durations for this glider)
                 from django.db.models import DurationField, ExpressionWrapper, F, Sum
 
-                flights = g.flights_as_pilot.all().filter(
+                flights = g.flight_set.all().filter(
                     logsheet__log_date__lte=self.log_date
                 )
                 total_seconds = (
