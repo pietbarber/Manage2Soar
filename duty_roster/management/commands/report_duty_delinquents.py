@@ -178,12 +178,27 @@ class Command(BaseCronJobCommand):
         """
         Check if member has performed any duty since cutoff_date.
 
-        Only checks ACTUAL duty performed (logsheet assignments and flights),
+        Only checks ACTUAL duty performed (flight activity and logsheet assignments),
         not scheduled duty (DutyAssignment). Being scheduled but not showing up
         doesn't count as performing duty.
+
+        Checks Flight records first (instructor/tow pilot activity), then Logsheet
+        duty assignments. This order matches the web view implementation.
         """
 
-        # Check Logsheet duty assignments (actual operations)
+        # Check Flight records for instructors and tow pilots first
+        # (actual flight activity is the most direct form of duty)
+        flight_duty = Flight.objects.filter(
+            Q(instructor=member) | Q(tow_pilot=member),
+            logsheet__log_date__gte=cutoff_date,
+            logsheet__finalized=True,
+        ).exists()
+
+        if flight_duty:
+            return True
+
+        # Also check Logsheet duty assignments (actual operations)
+        # (they may have served duty but not flown)
         logsheet_duty = Logsheet.objects.filter(
             Q(duty_officer=member)
             | Q(assistant_duty_officer=member)
@@ -195,18 +210,7 @@ class Command(BaseCronJobCommand):
             finalized=True,
         ).exists()
 
-        if logsheet_duty:
-            return True
-
-        # Also check Flight records for instructors and tow pilots
-        # (they may have flown but not been listed on the logsheet duty roster)
-        flight_duty = Flight.objects.filter(
-            Q(instructor=member) | Q(tow_pilot=member),
-            logsheet__log_date__gte=cutoff_date,
-            logsheet__finalized=True,
-        ).exists()
-
-        return flight_duty
+        return logsheet_duty
 
     def _calculate_membership_duration(self, member, today):
         """Calculate how long the member has been in the club"""
