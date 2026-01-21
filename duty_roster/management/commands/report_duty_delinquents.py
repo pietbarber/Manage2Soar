@@ -5,7 +5,6 @@ from django.db.models import Count, Q
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from duty_roster.models import DutyAssignment
 from logsheet.models import Flight, Logsheet
 from members.models import Member
 from notifications.models import Notification
