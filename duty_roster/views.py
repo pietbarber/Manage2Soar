@@ -1360,13 +1360,17 @@ def duty_delinquents_detail(request):
 def _has_performed_duty_detailed(member, cutoff_date):
     """
     Check if member has performed any duty since cutoff_date with detailed info.
+
+    Only checks ACTUAL duty performed (flight activity and logsheet assignments),
+    not scheduled duty (DutyAssignment). Being scheduled but not showing up
+    doesn't count as performing duty.
+
     For instructors and tow pilots, checks actual flight participation.
-    For duty officers and assistant duty officers, checks scheduled assignments.
+    For duty officers and assistant duty officers, checks logsheet assignments.
     """
     from django.db.models import Q
 
-    from duty_roster.models import DutyAssignment
-    from logsheet.models import Flight
+    from logsheet.models import Flight, Logsheet
 
     # Check actual flight participation for instructors and tow pilots
     # This is more important than just being scheduled
@@ -1400,55 +1404,39 @@ def _has_performed_duty_detailed(member, cutoff_date):
             "flight_count": towing_flights.count(),
         }
 
-    # For duty officers and assistant duty officers, check scheduled assignments
-    # (since this is the only way to track their participation)
-
-    # Check DutyAssignment assignments - for DO/ADO
-    duty_assignments = DutyAssignment.objects.filter(
-        Q(duty_officer=member) | Q(assistant_duty_officer=member), date__gte=cutoff_date
-    ).order_by("-date")
-
-    latest_do_assignment = duty_assignments.first()
-    if latest_do_assignment is not None:
-        role = []
-        if latest_do_assignment.duty_officer == member:
-            role.append("Duty Officer")
-        if latest_do_assignment.assistant_duty_officer == member:
-            role.append("Assistant Duty Officer")
-
-        return {
-            "has_duty": True,
-            "last_duty_date": latest_do_assignment.date,
-            "last_duty_role": f"{', '.join(role)} (Scheduled)",
-            "last_duty_type": "DutyAssignment",
-        }
-
-    # Check if instructors/tow pilots were scheduled via DutyAssignment
-    instructor_assignments = DutyAssignment.objects.filter(
-        Q(instructor=member)
+    # Check Logsheet duty assignments (actual operations) for all duty roles
+    logsheet_duty = Logsheet.objects.filter(
+        Q(duty_officer=member)
+        | Q(assistant_duty_officer=member)
+        | Q(duty_instructor=member)
         | Q(surge_instructor=member)
         | Q(tow_pilot=member)
         | Q(surge_tow_pilot=member),
-        date__gte=cutoff_date,
-    ).order_by("-date")
+        log_date__gte=cutoff_date,
+        finalized=True,
+    ).order_by("-log_date")
 
-    latest_scheduled = instructor_assignments.first()
-    if latest_scheduled is not None:
+    latest_logsheet_duty = logsheet_duty.first()
+    if latest_logsheet_duty is not None:
         roles = []
-        if latest_scheduled.instructor == member:
-            roles.append("Instructor")
-        if latest_scheduled.surge_instructor == member:
+        if latest_logsheet_duty.duty_officer == member:
+            roles.append("Duty Officer")
+        if latest_logsheet_duty.assistant_duty_officer == member:
+            roles.append("Assistant Duty Officer")
+        if latest_logsheet_duty.duty_instructor == member:
+            roles.append("Duty Instructor")
+        if latest_logsheet_duty.surge_instructor == member:
             roles.append("Surge Instructor")
-        if latest_scheduled.tow_pilot == member:
+        if latest_logsheet_duty.tow_pilot == member:
             roles.append("Tow Pilot")
-        if latest_scheduled.surge_tow_pilot == member:
+        if latest_logsheet_duty.surge_tow_pilot == member:
             roles.append("Surge Tow Pilot")
 
         return {
             "has_duty": True,
-            "last_duty_date": latest_scheduled.date,
-            "last_duty_role": f"{', '.join(roles)} (Scheduled Only)",
-            "last_duty_type": "DutyAssignment - Scheduled",
+            "last_duty_date": latest_logsheet_duty.log_date,
+            "last_duty_role": f"{', '.join(roles)}",
+            "last_duty_type": "Logsheet Duty",
         }
 
     return {

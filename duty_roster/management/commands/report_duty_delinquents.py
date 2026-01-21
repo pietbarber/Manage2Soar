@@ -6,7 +6,7 @@ from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.models import DutyAssignment
-from logsheet.models import Flight
+from logsheet.models import Flight, Logsheet
 from members.models import Member
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
@@ -176,20 +176,38 @@ class Command(BaseCronJobCommand):
                 )
 
     def _has_performed_duty(self, member, cutoff_date):
-        """Check if member has performed any duty since cutoff_date"""
+        """
+        Check if member has performed any duty since cutoff_date.
 
-        # Check DutyAssignment assignments
-        duty_assignments = DutyAssignment.objects.filter(
+        Only checks ACTUAL duty performed (logsheet assignments and flights),
+        not scheduled duty (DutyAssignment). Being scheduled but not showing up
+        doesn't count as performing duty.
+        """
+
+        # Check Logsheet duty assignments (actual operations)
+        logsheet_duty = Logsheet.objects.filter(
             Q(duty_officer=member)
             | Q(assistant_duty_officer=member)
-            | Q(instructor=member)
+            | Q(duty_instructor=member)
             | Q(surge_instructor=member)
             | Q(tow_pilot=member)
             | Q(surge_tow_pilot=member),
-            date__gte=cutoff_date,
+            log_date__gte=cutoff_date,
+            finalized=True,
         ).exists()
 
-        return duty_assignments
+        if logsheet_duty:
+            return True
+
+        # Also check Flight records for instructors and tow pilots
+        # (they may have flown but not been listed on the logsheet duty roster)
+        flight_duty = Flight.objects.filter(
+            Q(instructor=member) | Q(tow_pilot=member),
+            logsheet__log_date__gte=cutoff_date,
+            logsheet__finalized=True,
+        ).exists()
+
+        return flight_duty
 
     def _calculate_membership_duration(self, member, today):
         """Calculate how long the member has been in the club"""
