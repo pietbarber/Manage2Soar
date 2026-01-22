@@ -16,8 +16,9 @@ document.addEventListener('DOMContentLoaded', function () {
             totalElement.innerHTML = `Current total: <strong>${total}%</strong>`;
 
             // Update alert styling based on total
+            // Allow ±1% tolerance for rounding (e.g., 33% + 66% = 99%)
             alertElement.className = 'alert mt-3 mb-0';
-            if (total === 100) {
+            if (total >= 99 && total <= 100) {
                 alertElement.classList.add('alert-success');
                 statusElement.textContent = 'Perfect! You will be scheduled for duty.';
             } else if (total === 0) {
@@ -25,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 statusElement.textContent = 'You will not be scheduled for any duty.';
             } else {
                 alertElement.classList.add('alert-danger');
-                statusElement.textContent = 'Must equal 100% to be scheduled for duty.';
+                statusElement.textContent = 'Must equal 100% (±1% rounding ok) to be scheduled for duty.';
             }
         }
     }

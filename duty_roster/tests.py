@@ -1151,6 +1151,28 @@ class DutyPreferenceFormTests(TestCase):
         # All zeros (or empty) should be valid
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
 
+    def test_form_allows_99_percent_rounding(self):
+        """Test that form accepts 99% total (rounding tolerance for 33% + 66%)."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "33",  # 33% + 66% = 99% (rounding issue)
+            "duty_officer_percent": "0",
+            "ado_percent": "0",
+            "towpilot_percent": "66",
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
+        # 99% should be valid (±1% rounding tolerance)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+
     def test_view_saves_none_values_as_zero(self):
         """
         Integration test: Verify blackout_manage view handles None percentage values.
