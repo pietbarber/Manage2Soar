@@ -405,12 +405,39 @@ EMAIL_DEV_MODE = os.getenv("EMAIL_DEV_MODE", "false").lower() == "true"
 EMAIL_DEV_MODE_REDIRECT_TO = os.getenv("EMAIL_DEV_MODE_REDIRECT_TO", "")
 
 # Development vs Production URLs
+# Use environment variables to configure site URL and CSRF trusted origins
+# This allows proper multi-tenant deployment and single-host mode support
 if DEBUG:
-    CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
-    SITE_URL = "http://127.0.0.1:8000"
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv(
+            "CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000"
+        ).split(",")
+        if origin.strip()
+    ]
+    SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 else:
-    CSRF_TRUSTED_ORIGINS = ["https://m2s.skylinesoaring.org"]
-    SITE_URL = "https://m2s.skylinesoaring.org"
+    # Production: require SITE_URL and CSRF_TRUSTED_ORIGINS to be set in environment
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    SITE_URL = os.getenv("SITE_URL", "")
+
+    # Validate that SITE_URL is set in production
+    if not SITE_URL:
+        raise ValueError(
+            "SITE_URL environment variable must be set in production (DEBUG=False). "
+            "Example: SITE_URL=https://manage2soar.yourclub.org"
+        )
+
+    # Validate that CSRF_TRUSTED_ORIGINS is set in production
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ValueError(
+            "CSRF_TRUSTED_ORIGINS environment variable must be set in production (DEBUG=False). "
+            "Example: CSRF_TRUSTED_ORIGINS=https://manage2soar.yourclub.org"
+        )
 
 # Default sender address - can be overridden per-club via siteconfig
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@manage2soar.com")
