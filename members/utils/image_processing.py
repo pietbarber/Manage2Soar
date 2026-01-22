@@ -2,7 +2,7 @@ import logging
 from io import BytesIO
 
 from django.core.files.base import ContentFile
-from PIL import Image, ImageOps
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,6 @@ def resize_and_crop_profile_photo(uploaded_file):
     try:
         img = Image.open(uploaded_file)
         img_format = img.format or "JPEG"  # Default to JPEG if format missing
-        # Apply EXIF orientation before any processing to handle rotated photos
-        img = ImageOps.exif_transpose(img) or img
         img = img.convert("RGB")  # Always save in RGB for JPEG/PNG safety
     except Exception as e:
         raise ValueError(f"Invalid image file: {e}")
@@ -112,8 +110,6 @@ def generate_profile_thumbnails(uploaded_file):
         if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
         img = Image.open(uploaded_file)
-        # Apply EXIF orientation before any processing to handle rotated photos
-        img = ImageOps.exif_transpose(img) or img
         # Always convert to RGB and save as JPEG for consistency
         img = img.convert("RGB")
     except Exception as e:
