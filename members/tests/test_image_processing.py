@@ -168,3 +168,63 @@ class TestGenerateProfileThumbnails:
         result = generate_profile_thumbnails(uploaded)
 
         assert "original" in result
+
+    def test_applies_exif_orientation(self):
+        """Should respect EXIF orientation tags from phone cameras."""
+        from PIL import ImageOps
+
+        # Create a landscape image (800x600) with distinct colors to verify rotation
+        img = Image.new("RGB", (800, 600), color="red")
+        # Add a blue stripe on the right side to track orientation
+        for x in range(700, 800):
+            for y in range(600):
+                img.putpixel((x, y), (0, 0, 255))  # Blue
+
+        # Save with EXIF orientation tag indicating 90° CCW rotation
+        # (Orientation=6 means the image should be rotated 90° CW to display correctly)
+        buffer = BytesIO()
+        exif_bytes = b"\xff\xe1\x00\x16Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00"
+        # Manual EXIF construction with Orientation=6
+        img.save(buffer, format="JPEG", quality=95)
+        buffer.seek(0)
+
+        # For proper test, create image with actual EXIF orientation
+        # PIL's exif_transpose should handle this
+        img_with_exif = Image.new("RGB", (800, 600), color="red")
+        # Add blue stripe on right
+        for x in range(700, 800):
+            for y in range(600):
+                img_with_exif.putpixel((x, y), (0, 0, 255))
+
+        # Set EXIF orientation to 6 (rotate 90° CW)
+        exif = img_with_exif.getexif()
+        exif[0x0112] = 6  # Orientation tag
+        buffer = BytesIO()
+        img_with_exif.save(buffer, format="JPEG", quality=95, exif=exif)
+        buffer.seek(0)
+        buffer.name = "rotated_photo.jpg"
+
+        # Process the image
+        result = generate_profile_thumbnails(buffer)
+
+        # Verify EXIF orientation was applied
+        # After applying orientation=6, the 800x600 landscape should become 600x800 portrait
+        original_img = Image.open(result["original"])
+
+        # The image should now be portrait (taller than wide) after EXIF rotation
+        width, height = original_img.size
+        assert (
+            height > width
+        ), f"Image should be portrait after EXIF rotation, got {width}x{height}"
+
+    def test_exif_transpose_handles_missing_exif(self):
+        """Should handle images without EXIF data gracefully."""
+        # Create simple image with no EXIF data
+        uploaded = create_test_image(400, 400)
+
+        # Should process without errors
+        result = generate_profile_thumbnails(uploaded)
+
+        assert "original" in result
+        assert "medium" in result
+        assert "small" in result
