@@ -145,9 +145,10 @@ class DutyPreferenceForm(forms.ModelForm):
             + (cleaned_data.get("ado_percent") or 0)
             + (cleaned_data.get("towpilot_percent") or 0)
         )
-        if total not in (0, 100):
+        # Accept 99-100% to handle rounding (e.g., 33% + 66% = 99%)
+        if total != 0 and not (99 <= total <= 100):
             raise forms.ValidationError(
-                "Your total duty percentages must add up to 100% or be all 0."
+                "Your total duty percentages must add up to 99-100% (to accommodate rounding) or be all 0."
             )
         return cleaned_data
 
