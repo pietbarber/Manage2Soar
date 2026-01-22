@@ -1127,7 +1127,7 @@ class DutyPreferenceFormTests(TestCase):
 
         form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
         self.assertFalse(form.is_valid())
-        self.assertIn("total duty percentages must add up to 100%", str(form.errors))
+        self.assertIn("total duty percentages must add up to 99-100%", str(form.errors))
 
     def test_form_allows_all_zeros(self):
         """Test that form accepts all zeros for percentages."""
@@ -1152,7 +1152,7 @@ class DutyPreferenceFormTests(TestCase):
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
 
     def test_form_allows_99_percent_rounding(self):
-        """Test that form accepts 99% total (rounding tolerance for 33% + 66%)."""
+        """Test that form accepts 99% total (handles 33% + 66% rounding)."""
         from duty_roster.forms import DutyPreferenceForm
 
         form_data = {
@@ -1170,7 +1170,75 @@ class DutyPreferenceFormTests(TestCase):
         }
 
         form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
-        # 99% should be valid (±1% rounding tolerance)
+        # 99% should be valid (99-100% accepted for rounding)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+
+    def test_form_rejects_98_percent(self):
+        """Test that form rejects 98% (below valid range)."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "32",  # 32% + 66% = 98% (invalid)
+            "duty_officer_percent": "0",
+            "ado_percent": "0",
+            "towpilot_percent": "66",
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
+        # 98% should be invalid (only 99-100% accepted)
+        self.assertFalse(form.is_valid())
+        self.assertIn("total duty percentages", str(form.errors).lower())
+
+    def test_form_rejects_101_percent(self):
+        """Test that form rejects 101% (above valid range)."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "34",  # 34% + 67% = 101% (invalid)
+            "duty_officer_percent": "0",
+            "ado_percent": "0",
+            "towpilot_percent": "67",
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
+        # 101% should be invalid (only 99-100% accepted)
+        self.assertFalse(form.is_valid())
+        self.assertIn("total duty percentages", str(form.errors).lower())
+
+    def test_form_accepts_100_percent(self):
+        """Test that form still accepts exactly 100%."""
+        from duty_roster.forms import DutyPreferenceForm
+
+        form_data = {
+            "dont_schedule": False,
+            "scheduling_suspended": False,
+            "suspended_reason": "",
+            "preferred_day": "",
+            "comment": "",
+            "instructor_percent": "25",  # 25% + 75% = 100% (valid)
+            "duty_officer_percent": "0",
+            "ado_percent": "0",
+            "towpilot_percent": "75",
+            "max_assignments_per_month": "4",
+            "allow_weekend_double": False,
+        }
+
+        form = DutyPreferenceForm(data=form_data, member=self.full_role_member)
+        # 100% should always be valid
         self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
 
     def test_view_saves_none_values_as_zero(self):
