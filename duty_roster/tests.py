@@ -1130,7 +1130,7 @@ class DutyPreferenceFormTests(TestCase):
         self.assertIn("total duty percentages must add up to 99-100%", str(form.errors))
 
     def test_form_allows_all_zeros(self):
-        """Test that form accepts all zeros for percentages."""
+        """Test that form accepts all zeros (0% = not scheduled for duty)."""
         from duty_roster.forms import DutyPreferenceForm
 
         form_data = {

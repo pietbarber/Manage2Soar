@@ -33,8 +33,8 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         instructor_select.select_option("33")
         towpilot_select.select_option("66")
 
-        # Wait for JavaScript to update the UI
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI by waiting for the alert to be visible
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
         # Check that the alert has success styling (green)
         alert = self.page.locator("#percentageAlert")
@@ -72,7 +72,8 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         instructor_select.select_option("25")
         towpilot_select.select_option("75")
 
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
         # Verify success styling
         alert = self.page.locator("#percentageAlert")
@@ -86,9 +87,9 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         total_text = total.text_content() or ""
         assert "100%" in total_text, f"Should show 100%, got: {total_text}"
 
-    def test_98_percent_shows_error(self):
-        """Test that 98% (below valid range) shows error message (red)."""
-        member = self.create_test_member(
+    def test_below_valid_range_shows_error(self):
+        """Test that total below 99% (e.g., 75%) shows error message (red)."""
+        _ = self.create_test_member(
             username="testpilot",
             email="test@example.com",
             instructor=True,
@@ -98,24 +99,19 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
 
         self.page.goto(f"{self.live_server_url}/duty_roster/blackout/")
 
-        # Select 32% instructor, 66% towpilot (= 98%)
+        # Select 25% + 50% = 75% (below valid range)
+        # Note: dropdown options are [0, 25, 33, 50, 66, 75, 100]
+        # We can't select exactly 98%, so test with 75% as proxy for "below 99%"
         instructor_select = self.page.locator('select[name="instructor_percent"]')
         towpilot_select = self.page.locator('select[name="towpilot_percent"]')
 
-        instructor_select.select_option("33")  # First set valid total
-        towpilot_select.select_option("66")
-        self.page.wait_for_timeout(100)
-
-        # Now change to invalid (32% + 66% = 98%)
-        # Note: 32% might not be in the dropdown, so let's use 25% + 73% = 98%
-        # Actually, looking at the code, options are [0, 25, 33, 50, 66, 75, 100]
-        # So we can't get exactly 98%. Let's try 25% + 50% = 75% instead
         instructor_select.select_option("25")
         towpilot_select.select_option("50")
 
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
-        # This gives us 75%, which should show error
+        # Verify error styling for below-range total
         alert = self.page.locator("#percentageAlert")
         alert_classes = alert.get_attribute("class") or ""
         assert (
@@ -129,9 +125,9 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
             "99-100%" in status_text or "must equal" in status_text.lower()
         ), f"Should show error message, got: {status_text}"
 
-    def test_101_percent_shows_error(self):
-        """Test that 101% (above valid range) shows error message (red)."""
-        member = self.create_test_member(
+    def test_above_valid_range_shows_error(self):
+        """Test that total above 100% (e.g., 125%) shows error message (red)."""
+        _ = self.create_test_member(
             username="testpilot",
             email="test@example.com",
             instructor=True,
@@ -143,18 +139,19 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/duty_roster/blackout/")
 
         # With 3 roles, we can get over 100%
-        # Select values that total more than 100%
+        # Select 50% + 50% + 25% = 125% (above valid range)
         instructor_select = self.page.locator('select[name="instructor_percent"]')
         towpilot_select = self.page.locator('select[name="towpilot_percent"]')
         do_select = self.page.locator('select[name="duty_officer_percent"]')
 
         instructor_select.select_option("50")
         towpilot_select.select_option("50")
-        do_select.select_option("25")  # 50 + 50 + 25 = 125%
+        do_select.select_option("25")
 
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
-        # Verify error styling for over 100%
+        # Verify error styling for above-range total
         alert = self.page.locator("#percentageAlert")
         alert_classes = alert.get_attribute("class") or ""
         assert (
@@ -185,7 +182,8 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         instructor_select.select_option("0")
         towpilot_select.select_option("0")
 
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
         # Verify info styling (blue)
         alert = self.page.locator("#percentageAlert")
@@ -220,7 +218,8 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         instructor_select.select_option("33")
         towpilot_select.select_option("66")
 
-        self.page.wait_for_timeout(100)
+        # Wait for JavaScript to update the UI
+        self.page.locator("#percentageAlert").wait_for(state="visible")
 
         # Submit the form (use more specific locator to avoid logout button)
         submit_button = self.page.locator('button[type="submit"].btn-success')
@@ -229,16 +228,17 @@ class TestDutyPercentageValidation(DjangoPlaywrightTestCase):
         # Wait for page to reload/redirect
         self.page.wait_for_load_state("networkidle")
 
-        # Verify no error message appears (form was accepted)
-        # Look for success message or absence of validation errors
+        # Verify a success flash message appears indicating preferences were saved
+        # and that no error message is shown after the redirect.
         error_alerts = self.page.locator(".alert-danger")
-        error_count = error_alerts.count()
-
-        # Check for success message
-        success_alerts = self.page.locator(".alert-success")
-        success_count = success_alerts.count()
-
-        # Either we should have a success message, or no error messages
         assert (
-            success_count > 0 or error_count == 0
-        ), "Form submission with 99% should succeed"
+            error_alerts.count() == 0
+        ), "No error alerts should be shown after successful submission"
+
+        # Check for Django success message specifically about duty preferences being saved
+        success_alerts = self.page.locator(".alert-success")
+        success_texts = success_alerts.all_text_contents()
+        success_texts_lower = [text.lower() for text in success_texts]
+        assert any(
+            "duty preferences saved" in text for text in success_texts_lower
+        ), f"Expected success message indicating duty preferences were saved, got: {success_texts}"
