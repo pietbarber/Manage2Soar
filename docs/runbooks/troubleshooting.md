@@ -663,18 +663,15 @@ kubectl describe deployment django-app-ssc -n tenant-ssc | grep -A 3 "Limits:"
 
 **Increase memory limits**:
 ```bash
-# Edit deployment manifest
-vim k8s-deployment.yaml
+# Edit Ansible deployment role
+vim infrastructure/ansible/roles/gke-deploy/defaults/main.yml
 
 # Update:
-resources:
-  limits:
-    memory: 2Gi  # Increase from 1Gi
-  requests:
-    memory: 1Gi  # Increase from 512Mi
+gke_memory_limit: 2Gi  # Increase from 1Gi
+gke_memory_request: 1Gi  # Increase from 512Mi
 
-# Apply
-kubectl apply -f k8s-deployment.yaml
+# Apply via Ansible (IaC-first approach)
+ansible-playbook infrastructure/ansible/gke-deploy.yml
 ```
 
 ---

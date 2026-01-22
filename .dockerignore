@@ -27,9 +27,7 @@ roadmap.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 SECURITY.md
-k8s-deployment.yaml
 ingress.yaml
-membership.json
 setup-dev.sh
 
 # Exclude infrastructure/ansible (not needed in Docker image)

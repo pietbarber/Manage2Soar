@@ -112,7 +112,7 @@ curl http://pod-ip:8000/health/
 - `utils/middleware.py` - Health check middleware
 - `manage2soar/settings.py` - Added health check middleware to MIDDLEWARE list
 - `backend-config.yaml` - GKE health check configuration  
-- `k8s-deployment.yaml` - Service backend config annotation
+- ~~`k8s-deployment.yaml`~~ *(now managed via Ansible IaC in infrastructure/ansible/roles/gke-deploy/)*
 - Kubernetes secret: `SECURE_SSL_REDIRECT=False`
 
 ## Lessons Learned

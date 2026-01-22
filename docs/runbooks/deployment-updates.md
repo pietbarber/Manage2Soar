@@ -306,16 +306,22 @@ sequenceDiagram
 
 ### Configuration
 
-Edit `k8s-deployment.yaml` to adjust rolling update strategy:
+Edit the Ansible deployment role to adjust rolling update strategy:
 
 ```yaml
+# infrastructure/ansible/roles/gke-deploy/templates/deployment.yaml.j2
 spec:
-  replicas: 2
+  replicas: {{ gke_replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0  # Never take down all pods
       maxSurge: 1         # Allow 1 extra pod during update
+```
+
+Then apply via Ansible:
+```bash
+ansible-playbook infrastructure/ansible/gke-deploy.yml
 ```
 
 ### Verification
