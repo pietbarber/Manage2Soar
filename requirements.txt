@@ -136,4 +136,4 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.6.3
 virtualenv==20.36.1
-wheel==0.45.1
+wheel>=0.46.2
