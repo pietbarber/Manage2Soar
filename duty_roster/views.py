@@ -1247,6 +1247,7 @@ def duty_delinquents_detail(request):
     )
 
     # Step 2: Find members who have been actively flying
+    # Exclude treasurers and emeritus members from duty delinquency checks
     active_flyers = (
         eligible_members.filter(
             flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
@@ -1254,6 +1255,8 @@ def duty_delinquents_detail(request):
         )
         .annotate(flight_count=Count("flights_as_pilot", distinct=True))
         .filter(flight_count__gte=min_flights)
+        .exclude(treasurer=True)  # Exempt treasurer from duty delinquency
+        .exclude(membership_status="Emeritus Member")  # Exempt emeritus members
         .distinct()
     )
 

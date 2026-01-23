@@ -70,6 +70,7 @@ class Command(BaseCronJobCommand):
         )
 
         # Step 2: Find members who have been actively flying
+        # Exclude treasurers and emeritus members from duty delinquency checks
         recent_flight_cutoff = today - timedelta(days=lookback_months * 30)
 
         # Get members who have flown as pilot in the lookback period
@@ -80,11 +81,13 @@ class Command(BaseCronJobCommand):
             )
             .annotate(flight_count=Count("flights_as_pilot", distinct=True))
             .filter(flight_count__gte=min_flights)
+            .exclude(treasurer=True)  # Exempt treasurer from duty delinquency
+            .exclude(membership_status="Emeritus Member")  # Exempt emeritus members
             .distinct()
         )
 
         self.log_info(
-            f"Found {active_flyers.count()} actively flying members ({min_flights}+ flights)"
+            f"Found {active_flyers.count()} actively flying members ({min_flights}+ flights, excluding treasurer and emeritus)"
         )
 
         if not active_flyers.exists():
