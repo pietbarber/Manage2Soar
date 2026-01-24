@@ -732,19 +732,15 @@ class MemberSpecificPermissionTests(TestCase):
         # should be added to e2e_tests/e2e/ to verify end-to-end functionality.
         # See `.github/copilot-instructions.md` for E2E testing patterns.
 
-    def test_member_permission_can_be_added_to_public_page(self):
-        """Member permissions CAN be added to public pages (grants EDIT access only)."""
-        # Create member permission on public page (should succeed)
-        perm = PageMemberPermission.objects.create(
-            page=self.public_page, member=self.aircraft_manager
-        )
-        self.assertIsNotNone(perm.pk)
+    def test_member_permission_cannot_be_added_to_public_page(self):
+        """Member permissions cannot be added to public pages."""
+        from django.core.exceptions import ValidationError
 
-        # Verify page is still public
-        self.assertTrue(self.public_page.is_public)
-
-        # Verify member has permission
-        self.assertTrue(self.public_page.has_member_permission(self.aircraft_manager))
+        with self.assertRaises(ValidationError):
+            perm = PageMemberPermission(
+                page=self.public_page, member=self.aircraft_manager
+            )
+            perm.full_clean()  # Should raise ValidationError
 
     def test_member_permission_unique_constraint(self):
         """Cannot add same member twice to same page."""

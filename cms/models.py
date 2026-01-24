@@ -101,37 +101,29 @@ class PageMemberPermission(models.Model):
     """
     Allows assigning specific members EDIT permissions for specific CMS pages or folders.
 
-    This model enables fine-grained EDIT access control, allowing individual members
-    to be granted editing rights in Django admin, separate from VIEW permissions.
+    This model enables fine-grained EDIT access control beyond role-based permissions,
+    allowing individual members to be granted editing rights to specific content.
 
-    IMPORTANT: This grants EDIT permissions only (via Django admin).
-    - For PUBLIC pages: Grants edit rights while page remains publicly viewable
-    - For PRIVATE pages: Grants both edit rights AND view access
+    IMPORTANT: This grants EDIT permissions, which also allow VIEW access.
+    Members with this permission can edit the page in Django admin AND view it
+    through the normal UI, overriding any role-based VIEW restrictions.
 
     Use Cases:
-    - Assign content editor for public documentation (page stays public)
     - Aircraft manager who manages documentation for a specific aircraft folder
     - Committee chair who maintains a committee-specific folder
     - Event coordinator who updates event pages
 
     Business Rules:
-    - Can be applied to both public and private pages
+    - Only applies to private pages (is_public=False)
     - Grants EDIT rights (via Django admin) in addition to officers
-    - For private pages, EDIT permission also grants VIEW access
+    - EDIT permission grants VIEW access, overriding role-based VIEW restrictions
     - Applies to the page and all documents attached to it
 
-    Example Workflows:
-    1. Public page with editor:
-       - Director creates "Club Bylaws" (public)
-       - Director adds Secretary via PageMemberPermission
-       - Everyone can VIEW the bylaws (public)
-       - Only officers + Secretary can EDIT in admin
-
-    2. Private page with editor:
-       - Director creates "PW5 Aircraft" folder (private, no role restrictions)
-       - Director adds Kevin Barrett via PageMemberPermission
-       - All active members can VIEW the folder (no role restrictions)
-       - Only officers + Kevin Barrett can EDIT the folder
+    Example Workflow:
+    1. Director creates "PW5 Aircraft" folder (private, no role restrictions)
+    2. Director adds Kevin Barrett via PageMemberPermission
+    3. All active members can VIEW the folder (no role restrictions)
+    4. Only officers + Kevin Barrett can EDIT the folder
 
     Attributes:
         page: Foreign key to the Page this permission applies to
@@ -145,13 +137,35 @@ class PageMemberPermission(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="cms_page_permissions",
-        help_text="Member granted EDIT access to this page (via Django admin)",
+        help_text="Member granted access to this page",
     )
 
     class Meta:
         unique_together = ("page", "member")
         verbose_name = "Page Member Permission"
         verbose_name_plural = "Page Member Permissions"
+
+    def clean(self):
+        """
+        Validate business rules for member permissions.
+
+        Ensures that member permissions can only be added to private pages,
+        preventing invalid configurations where public pages have member restrictions.
+
+        Raises:
+            ValidationError: If attempting to add member permissions to a public page
+        """
+        from django.core.exceptions import ValidationError
+
+        if self.page_id and self.page.is_public:
+            raise ValidationError(
+                "Member permissions cannot be added to public pages. "
+                "Set the page to private (uncheck 'is_public') first."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.page.title} - {self.member.full_display_name}"
@@ -161,51 +175,30 @@ class Page(models.Model):
     """
     CMS Page model supporting hierarchical content with role-based access control.
 
-    Provides a flexible content management system with two independent access controls:
-    1. VIEW permissions (is_public flag and PageRolePermission)
-    2. EDIT permissions (PageMemberPermission for Django admin)
+    Provides a flexible content management system with three levels of access control:
+    1. Public pages - accessible to everyone
+    2. Private pages - accessible to active members only
+    3. Role-restricted pages - accessible to members with specific roles
 
     Features:
     - Hierarchical page structure with parent-child relationships
     - Rich HTML content via TinyMCE integration
     - Automatic slug generation from titles
-    - Role-based VIEW access control via PageRolePermission
-    - Member-based EDIT access control via PageMemberPermission
+    - Role-based access control via PageRolePermission
     - File attachments via Document model
 
-    View Access Control Logic:
-    - Public pages (is_public=True): No VIEW restrictions (everyone can view)
-    - Private pages (is_public=False, no roles): Active members only (VIEW restricted)
-    - Role-restricted pages (is_public=False, with roles): Specific roles only (VIEW restricted)
-
-    Edit Access Control Logic (Django Admin):
-    - Officers (directors, secretaries, webmasters) can always edit
-    - Members assigned via PageMemberPermission can edit
-    - Edit permissions work independently of VIEW permissions:
-      * Public pages can have assigned editors (page stays public)
-      * Private pages can have assigned editors (member also gains VIEW access)
-
-    Examples:
-    1. Public page with editor: "Club Bylaws" (is_public=True, member=Secretary)
-       - Everyone can VIEW the bylaws
-       - Only officers + Secretary can EDIT in admin
-
-    2. Private member-only page with editor: "Instructor Resources" (is_public=False, no roles, member=Chief Instructor)
-       - All active members can VIEW
-       - Only officers + Chief Instructor can EDIT in admin
-
-    3. Private role-restricted page with editor: "Board Minutes" (is_public=False, roles=[director], member=Secretary)
-       - Only directors can VIEW (due to role restriction)
-       - Only officers + Secretary can EDIT in admin (Secretary also gains VIEW access)
+    Access Control Logic:
+    - Public pages (is_public=True): No restrictions
+    - Private pages (is_public=False, no roles): Active members only
+    - Role-restricted pages (is_public=False, with roles): Specific roles only
 
     Attributes:
         title: Display name for the page
         slug: URL-friendly identifier (auto-generated if not provided)
         parent: Optional parent page for hierarchical structure
         content: Rich HTML content (TinyMCE field)
-        is_public: Controls VIEW access level (public vs. private)
-        role_permissions: Related PageRolePermission objects for VIEW access control
-        member_permissions: Related PageMemberPermission objects for EDIT access control
+        is_public: Controls base access level (public vs. private)
+        role_permissions: Related PageRolePermission objects for fine-grained access
     """
 
     title = models.CharField(max_length=200)
