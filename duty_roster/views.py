@@ -25,6 +25,7 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from duty_roster.utils.email import (
     get_email_config,
     get_mailing_list,
@@ -1207,23 +1208,6 @@ def propose_roster(request):
     )
 
 
-def _apply_duty_delinquent_exemptions(queryset):
-    """
-    Apply standard duty delinquency exemptions to a Member queryset.
-
-    Exempts:
-    - Treasurers (too busy with financial duties)
-    - Emeritus members (honorary status, no duty obligations)
-
-    Args:
-        queryset: A Django QuerySet of Member objects
-
-    Returns:
-        QuerySet with exemptions applied
-    """
-    return queryset.exclude(treasurer=True).exclude(membership_status="Emeritus Member")
-
-
 @user_passes_test(
     lambda u: u.is_authenticated
     and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
@@ -1265,7 +1249,7 @@ def duty_delinquents_detail(request):
 
     # Step 2: Find members who have been actively flying
     # Apply duty delinquency exemptions (treasurer, emeritus)
-    active_flyers = _apply_duty_delinquent_exemptions(
+    active_flyers = apply_duty_delinquent_exemptions(
         eligible_members.filter(
             flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
             flights_as_pilot__logsheet__finalized=True,
