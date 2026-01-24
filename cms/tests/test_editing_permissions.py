@@ -735,9 +735,10 @@ class MemberSpecificPermissionTests(TestCase):
     def test_member_permission_can_be_added_to_public_page(self):
         """Member permissions CAN be added to public pages (grants EDIT access only)."""
         # Create member permission on public page (should succeed)
-        perm = PageMemberPermission.objects.create(
-            page=self.public_page, member=self.aircraft_manager
-        )
+        # Use full_clean() to test validation path used by Django admin
+        perm = PageMemberPermission(page=self.public_page, member=self.aircraft_manager)
+        perm.full_clean()  # Should not raise ValidationError
+        perm.save()
         self.assertIsNotNone(perm.pk)
 
         # Verify page is still public
