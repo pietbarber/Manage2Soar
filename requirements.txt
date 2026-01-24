@@ -76,7 +76,7 @@ playwright==1.57.0
 pluggy==1.6.0
 pre_commit==4.3.0
 proto-plus==1.26.1
-protobuf==6.32.1
+protobuf==6.33.5
 psycopg2-binary==2.9.10
 py-serializable==2.1.0
 pyasn1==0.6.2
@@ -136,4 +136,4 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.6.3
 virtualenv==20.36.1
-wheel>=0.46.2
+wheel>=0.46.3
