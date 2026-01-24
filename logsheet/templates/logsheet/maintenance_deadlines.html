@@ -50,7 +50,8 @@
               data-deadline-id="{{ deadline.id }}"
               data-current-date="{{ deadline.due_date|date:'Y-m-d' }}"
               data-aircraft="{% if deadline.glider %}{{ deadline.glider }}{% else %}{{ deadline.towplane }}{% endif %}"
-              data-task="{{ deadline.get_description_display }}">
+              data-task="{{ deadline.get_description_display }}"
+              aria-label="Update maintenance deadline for {% if deadline.glider %}{{ deadline.glider }}{% else %}{{ deadline.towplane }}{% endif %} - {{ deadline.get_description_display }}">
               ✏️ Update
             </button>
             {% endif %}
