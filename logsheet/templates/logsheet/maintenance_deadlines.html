@@ -150,7 +150,8 @@
         method: 'POST',
         body: formData,
         headers: {
-          'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+          'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '',
+          'X-Requested-With': 'XMLHttpRequest'
         }
       })
       .then(async (response) => {
