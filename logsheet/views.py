@@ -1916,6 +1916,23 @@ def maintenance_deadlines(request):
         ),
     )
 
+    # Determine which deadlines the user can update
+    member = request.user
+    is_webmaster = member.groups.filter(name="Webmasters").exists()
+
+    # Get all aircraft this member is a meister for
+    meister_gliders = set()
+    meister_towplanes = set()
+    if not is_webmaster:
+        meister_records = AircraftMeister.objects.filter(member=member).select_related(
+            "glider", "towplane"
+        )
+        for meister in meister_records:
+            if meister.glider:
+                meister_gliders.add(meister.glider.id)
+            if meister.towplane:
+                meister_towplanes.add(meister.towplane.id)
+
     return render(
         request,
         "logsheet/maintenance_deadlines.html",
@@ -1923,7 +1940,98 @@ def maintenance_deadlines(request):
             "deadlines": sorted_deadlines,
             "today": today,
             "today_plus_30": today_plus_30,
+            "is_webmaster": is_webmaster,
+            "meister_gliders": meister_gliders,
+            "meister_towplanes": meister_towplanes,
         },
+    )
+
+
+#################################################
+# update_maintenance_deadline
+#
+# Purpose:
+# Allows maintenance officers (Aircraft Meisters) and webmasters to update
+# the due date for maintenance deadlines via AJAX POST request.
+#
+# Behavior:
+# - Validates that the user is either:
+#   * A webmaster (member of "Webmasters" group), OR
+#   * An Aircraft Meister for the specific aircraft
+# - Updates the MaintenanceDeadline.due_date with the provided date
+# - Returns JSON response with success/error status
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request with 'due_date' parameter
+# - deadline_id (int): Primary key of the MaintenanceDeadline to update
+#
+# Returns:
+# - JsonResponse: {"success": true/false, "message": str, "new_due_date": str}
+#################################################
+
+
+@active_member_required
+@require_POST
+def update_maintenance_deadline(request, deadline_id):
+    deadline = get_object_or_404(MaintenanceDeadline, pk=deadline_id)
+    member = request.user
+
+    # Check permissions: webmaster OR aircraft meister for this aircraft
+    is_webmaster = (
+        member.is_superuser or member.groups.filter(name="Webmasters").exists()
+    )
+
+    is_meister = False
+    if deadline.glider:
+        is_meister = AircraftMeister.objects.filter(
+            glider=deadline.glider, member=member
+        ).exists()
+    elif deadline.towplane:
+        is_meister = AircraftMeister.objects.filter(
+            towplane=deadline.towplane, member=member
+        ).exists()
+
+    if not (is_webmaster or is_meister):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "You are not authorized to update this deadline.",
+            },
+            status=403,
+        )
+
+    # Get and validate the new due date
+    new_due_date_str = request.POST.get("due_date")
+    if not new_due_date_str:
+        return JsonResponse(
+            {"success": False, "message": "Due date is required."}, status=400
+        )
+
+    try:
+        new_due_date = datetime.strptime(new_due_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "message": "Invalid date format. Use YYYY-MM-DD."},
+            status=400,
+        )
+
+    # Update the deadline
+    old_due_date = deadline.due_date
+    deadline.due_date = new_due_date
+    deadline.save()
+
+    aircraft_name = deadline.glider or deadline.towplane
+    logging.info(
+        f"Maintenance deadline updated by {member.username}: {aircraft_name} - "
+        f"{deadline.description_label} changed from {old_due_date} to {new_due_date}"
+    )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": f"Deadline updated successfully to {new_due_date}.",
+            "new_due_date": new_due_date.strftime("%Y-%m-%d"),
+        }
     )
 
 
