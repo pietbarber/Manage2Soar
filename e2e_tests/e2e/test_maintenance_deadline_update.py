@@ -147,7 +147,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
             n_number="N456CD",
             competition_number="CD",
         )
-        other_deadline = MaintenanceDeadline.objects.create(
+        MaintenanceDeadline.objects.create(
             glider=other_glider,
             description="annual",
             due_date=date(2026, 7, 15),
@@ -171,7 +171,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
 
     def test_regular_member_sees_no_update_buttons(self):
         """Test that regular members see no Update buttons."""
-        regular_member = self.create_test_member(username="regular", is_superuser=False)
+        self.create_test_member(username="regular", is_superuser=False)
         self.login(username="regular")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")
@@ -213,13 +213,13 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
             n_number="N456CD",
             competition_number="CD",
         )
-        other_deadline = MaintenanceDeadline.objects.create(
+        MaintenanceDeadline.objects.create(
             glider=other_glider,
             description="annual",
             due_date=date(2026, 7, 15),
         )
 
-        superuser = self.create_test_member(username="superuser", is_superuser=True)
+        self.create_test_member(username="superuser", is_superuser=True)
         self.login(username="superuser")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")

@@ -2039,7 +2039,7 @@ def update_maintenance_deadline(request, deadline_id):
     deadline.save()
 
     aircraft_name = deadline.glider or deadline.towplane
-    logging.info(
+    logger.info(
         f"Maintenance deadline updated by {member.username}: {aircraft_name} - "
         f"{deadline.description_label} changed from {old_due_date} to {new_due_date}"
     )
