@@ -161,12 +161,20 @@ class DutyDelinquentsDetailViewTests(TestCase):
 
     def test_member_with_recent_duty_not_in_report(self):
         """Member who has done recent duty should not appear"""
-        # Give delinquent member a recent duty assignment via DutyAssignment
-        DutyAssignment.objects.create(
-            date=date.today() - timedelta(days=30),
-            instructor=self.delinquent_member,
-            location=self.airfield,
-        )
+        # Simulate the delinquent member having performed recent duty via a Logsheet entry
+        # Use an existing, finalized logsheet from setUp and assign the member as duty instructor
+        # so the delinquency logic treats them as having recently served duty
+        recent_logsheet = Logsheet.objects.filter(
+            log_date__gte=date.today() - timedelta(days=90), finalized=True
+        ).first()
+
+        # Ensure we found a logsheet (using TestCase assertion for robustness)
+        self.assertIsNotNone(recent_logsheet, "No recent logsheet found in test setup")
+        assert recent_logsheet is not None  # Type narrowing for Pylance
+
+        # Update the logsheet to assign delinquent member as duty instructor
+        recent_logsheet.duty_instructor = self.delinquent_member
+        recent_logsheet.save()
 
         self.client.force_login(self.rostermeister)
         response = self.client.get(reverse("duty_roster:duty_delinquents_detail"))
@@ -234,6 +242,89 @@ class DutyDelinquentsDetailViewTests(TestCase):
         self.assertContains(response, "Great news!")
         self.assertContains(response, "No duty delinquents found")
 
+    def test_treasurer_exempt_from_delinquency(self):
+        """Treasurer should be exempt from duty delinquency report"""
+        # Create a treasurer who flies but doesn't do duty
+        treasurer = Member.objects.create(
+            username="treasurer",
+            email="treasurer@test.com",
+            first_name="Club",
+            last_name="Treasurer",
+            membership_status="Full Member",
+            treasurer=True,
+            joined_club=date.today() - timedelta(days=365),
+        )
+
+        # Create recent flights for treasurer (use different airfield to avoid conflicts)
+        treasurer_airfield = Airfield.objects.create(
+            name="Treasurer Field", identifier="TREA"
+        )
+        for i in range(5):
+            flight_date = date.today() - timedelta(days=30 * i)
+            logsheet = Logsheet.objects.create(
+                log_date=flight_date,
+                airfield=treasurer_airfield,
+                created_by=treasurer,
+                finalized=True,
+            )
+            Flight.objects.create(
+                pilot=treasurer,
+                glider=self.glider,
+                logsheet=logsheet,
+                launch_time=time(10, 0, 0),
+                landing_time=time(11, 0, 0),
+            )
+
+        self.client.force_login(self.rostermeister)
+        response = self.client.get(reverse("duty_roster:duty_delinquents_detail"))
+
+        self.assertEqual(response.status_code, 200)
+        # Treasurer should NOT appear in the delinquents report
+        self.assertNotContains(response, treasurer.full_display_name)
+        # But the regular delinquent member should still appear
+        self.assertContains(response, self.delinquent_member.full_display_name)
+
+    def test_emeritus_exempt_from_delinquency(self):
+        """Emeritus members should be exempt from duty delinquency report"""
+        # Create an emeritus member who flies but doesn't do duty
+        emeritus = Member.objects.create(
+            username="emeritus",
+            email="emeritus@test.com",
+            first_name="Emeritus",
+            last_name="Member",
+            membership_status="Emeritus Member",
+            joined_club=date.today() - timedelta(days=3650),  # Long-time member
+        )
+
+        # Create recent flights for emeritus member (use different airfield to avoid conflicts)
+        emeritus_airfield = Airfield.objects.create(
+            name="Emeritus Field", identifier="EMER"
+        )
+        for i in range(5):
+            flight_date = date.today() - timedelta(days=30 * i)
+            logsheet = Logsheet.objects.create(
+                log_date=flight_date,
+                airfield=emeritus_airfield,
+                created_by=emeritus,
+                finalized=True,
+            )
+            Flight.objects.create(
+                pilot=emeritus,
+                glider=self.glider,
+                logsheet=logsheet,
+                launch_time=time(10, 0, 0),
+                landing_time=time(11, 0, 0),
+            )
+
+        self.client.force_login(self.rostermeister)
+        response = self.client.get(reverse("duty_roster:duty_delinquents_detail"))
+
+        self.assertEqual(response.status_code, 200)
+        # Emeritus member should NOT appear in the delinquents report
+        self.assertNotContains(response, emeritus.full_display_name)
+        # But the regular delinquent member should still appear
+        self.assertContains(response, self.delinquent_member.full_display_name)
+
 
 class HelperFunctionTests(TestCase):
     def setUp(self):
@@ -255,16 +346,19 @@ class HelperFunctionTests(TestCase):
         self.assertIsNone(result["last_duty_date"])
         self.assertIsNone(result["last_duty_role"])
 
-    def test_has_performed_duty_detailed_with_duty_assignment(self):
-        """Test helper function when member has recent duty assignment"""
-        from logsheet.models import Airfield
+    def test_has_performed_duty_detailed_with_logsheet_duty(self):
+        """Test helper function when member has recent logsheet duty assignment"""
+        from logsheet.models import Airfield, Logsheet
 
         airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
         duty_date = date.today() - timedelta(days=30)
-        DutyAssignment.objects.create(
-            date=duty_date,
-            instructor=self.member,
-            location=airfield,
+        # Create actual logsheet duty (not just scheduled DutyAssignment)
+        Logsheet.objects.create(
+            log_date=duty_date,
+            airfield=airfield,
+            created_by=self.member,
+            finalized=True,
+            duty_officer=self.member,  # Member actually served as duty officer
         )
 
         cutoff_date = date.today() - timedelta(days=365)
@@ -272,8 +366,8 @@ class HelperFunctionTests(TestCase):
 
         self.assertTrue(result["has_duty"])
         self.assertEqual(result["last_duty_date"], duty_date)
-        self.assertEqual(result["last_duty_role"], "Instructor (Scheduled Only)")
-        self.assertEqual(result["last_duty_type"], "DutyAssignment - Scheduled")
+        self.assertEqual(result["last_duty_role"], "Duty Officer")
+        self.assertEqual(result["last_duty_type"], "Logsheet Duty")
 
     def test_has_performed_duty_detailed_with_instruction_flight(self):
         """Test helper function when member has performed actual instruction"""

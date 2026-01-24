@@ -25,6 +25,7 @@ from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from duty_roster.utils.email import (
     get_email_config,
     get_mailing_list,
@@ -1247,7 +1248,8 @@ def duty_delinquents_detail(request):
     )
 
     # Step 2: Find members who have been actively flying
-    active_flyers = (
+    # Apply duty delinquency exemptions (treasurer, emeritus)
+    active_flyers = apply_duty_delinquent_exemptions(
         eligible_members.filter(
             flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
             flights_as_pilot__logsheet__finalized=True,

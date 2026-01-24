@@ -482,6 +482,93 @@ class TestDutyDelinquentsCommand(TestCase):
         notification_call = mock_notification.call_args[1]
         assert notification_call["user"] == active_member_manager
 
+    def test_treasurer_exempt_from_delinquency(self):
+        """Test that treasurer is excluded from duty delinquency report."""
+        # Create treasurer who is actively flying but hasn't done duty
+        treasurer = Member.objects.create(
+            username="treasurer",
+            email="treasurer@test.com",
+            first_name="Club",
+            last_name="Treasurer",
+            membership_status="Full Member",
+            treasurer=True,  # Mark as treasurer
+            joined_club=timezone.now().date() - timedelta(days=365),
+        )
+
+        # Give treasurer flights (actively flying)
+        af_tres = Airfield.objects.create(identifier="ATres", name="Treasurer Field")
+        ls_tres = Logsheet.objects.create(
+            log_date=timezone.now().date() - timedelta(days=30),
+            airfield=af_tres,
+            created_by=treasurer,
+            finalized=True,
+        )
+
+        for i in range(5):  # Create 5 flights
+            Flight.objects.create(
+                logsheet=ls_tres,
+                pilot=treasurer,
+                flight_type="solo",
+                launch_time=time(10 + i, 0),
+                landing_time=time(11 + i, 0),
+                airfield=af_tres,
+            )
+
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch.object(self.command, "_send_delinquency_report") as mock_send:
+                self.command.handle(
+                    lookback_months=12, min_flights=3, dry_run=False, verbosity=1
+                )
+
+        # Should NOT include treasurer in delinquent list (even though they haven't done duty)
+        mock_send.assert_called_once()
+        delinquent_data = mock_send.call_args[0][0]
+        delinquent_members = [data["member"] for data in delinquent_data]
+        assert treasurer not in delinquent_members
+
+    def test_emeritus_exempt_from_delinquency(self):
+        """Test that emeritus members are excluded from duty delinquency report."""
+        # Create emeritus member who is actively flying but hasn't done duty
+        emeritus = Member.objects.create(
+            username="emeritus",
+            email="emeritus@test.com",
+            first_name="Emeritus",
+            last_name="Member",
+            membership_status="Emeritus Member",  # Honorary status
+            joined_club=timezone.now().date() - timedelta(days=3650),  # 10 years
+        )
+
+        # Give emeritus member flights (actively flying)
+        af_emer = Airfield.objects.create(identifier="AEmer", name="Emeritus Field")
+        ls_emer = Logsheet.objects.create(
+            log_date=timezone.now().date() - timedelta(days=30),
+            airfield=af_emer,
+            created_by=emeritus,
+            finalized=True,
+        )
+
+        for i in range(5):  # Create 5 flights
+            Flight.objects.create(
+                logsheet=ls_emer,
+                pilot=emeritus,
+                flight_type="solo",
+                launch_time=time(10 + i, 0),
+                landing_time=time(11 + i, 0),
+                airfield=af_emer,
+            )
+
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch.object(self.command, "_send_delinquency_report") as mock_send:
+                self.command.handle(
+                    lookback_months=12, min_flights=3, dry_run=False, verbosity=1
+                )
+
+        # Should NOT include emeritus member in delinquent list
+        mock_send.assert_called_once()
+        delinquent_data = mock_send.call_args[0][0]
+        delinquent_members = [data["member"] for data in delinquent_data]
+        assert emeritus not in delinquent_members
+
 
 class TestCleanupNotificationsCommand(TransactionTestCase):
     """Test the old notifications cleanup command."""

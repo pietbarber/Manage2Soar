@@ -5,6 +5,7 @@ from django.db.models import Count, Q
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
+from duty_roster.utils.delinquents import apply_duty_delinquent_exemptions
 from logsheet.models import Flight, Logsheet
 from members.models import Member
 from notifications.models import Notification
@@ -70,10 +71,11 @@ class Command(BaseCronJobCommand):
         )
 
         # Step 2: Find members who have been actively flying
+        # Apply duty delinquency exemptions (treasurer, emeritus)
         recent_flight_cutoff = today - timedelta(days=lookback_months * 30)
 
         # Get members who have flown as pilot in the lookback period
-        active_flyers = (
+        active_flyers = apply_duty_delinquent_exemptions(
             eligible_members.filter(
                 flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
                 flights_as_pilot__logsheet__finalized=True,
@@ -84,7 +86,7 @@ class Command(BaseCronJobCommand):
         )
 
         self.log_info(
-            f"Found {active_flyers.count()} actively flying members ({min_flights}+ flights)"
+            f"Found {active_flyers.count()} actively flying members ({min_flights}+ flights, excluding treasurer and emeritus)"
         )
 
         if not active_flyers.exists():
