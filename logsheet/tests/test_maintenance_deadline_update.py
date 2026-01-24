@@ -134,7 +134,7 @@ class TestMaintenanceDeadlinePermissions:
         assert response.status_code == 403
         data = response.json()
         assert data["success"] is False
-        assert "not authorized" in data["message"]
+        assert "not authorized" in data["error"]
 
         # Verify deadline was NOT updated
         towplane_deadline.refresh_from_db()
@@ -217,7 +217,7 @@ class TestMaintenanceDeadlinePermissions:
         assert response.status_code == 403
         data = response.json()
         assert data["success"] is False
-        assert "not authorized" in data["message"]
+        assert "not authorized" in data["error"]
 
     def test_anonymous_user_cannot_update_deadline(self, client, glider_deadline):
         """Anonymous users cannot update maintenance deadlines."""
@@ -252,7 +252,7 @@ class TestMaintenanceDeadlineValidation:
         assert response.status_code == 400
         data = response.json()
         assert data["success"] is False
-        assert "required" in data["message"].lower()
+        assert "required" in data["error"].lower()
 
     def test_invalid_date_format_returns_error(
         self, client, webmaster, glider_deadline
@@ -271,7 +271,7 @@ class TestMaintenanceDeadlineValidation:
         assert response.status_code == 400
         data = response.json()
         assert data["success"] is False
-        assert "Invalid date format" in data["message"]
+        assert "Invalid date format" in data["error"]
 
     def test_non_post_request_rejected(self, client, webmaster, glider_deadline):
         """GET requests are rejected (require_POST decorator)."""

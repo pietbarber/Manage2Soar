@@ -1978,8 +1978,8 @@ def maintenance_deadlines(request):
 #################################################
 
 
-@active_member_required
 @require_POST
+@active_member_required
 def update_maintenance_deadline(request, deadline_id):
     deadline = get_object_or_404(MaintenanceDeadline, pk=deadline_id)
     member = request.user
@@ -2004,7 +2004,7 @@ def update_maintenance_deadline(request, deadline_id):
         is_meister = AircraftMeister.objects.filter(
             glider=deadline.glider, member=member
         ).exists()
-    elif deadline.towplane:
+    if not is_meister and deadline.towplane:
         is_meister = AircraftMeister.objects.filter(
             towplane=deadline.towplane, member=member
         ).exists()
@@ -2013,7 +2013,7 @@ def update_maintenance_deadline(request, deadline_id):
         return JsonResponse(
             {
                 "success": False,
-                "message": "You are not authorized to update this deadline.",
+                "error": "You are not authorized to update this deadline.",
             },
             status=403,
         )
@@ -2022,14 +2022,14 @@ def update_maintenance_deadline(request, deadline_id):
     new_due_date_str = request.POST.get("due_date")
     if not new_due_date_str:
         return JsonResponse(
-            {"success": False, "message": "Due date is required."}, status=400
+            {"success": False, "error": "Due date is required."}, status=400
         )
 
     try:
         new_due_date = datetime.strptime(new_due_date_str, "%Y-%m-%d").date()
     except ValueError:
         return JsonResponse(
-            {"success": False, "message": "Invalid date format. Use YYYY-MM-DD."},
+            {"success": False, "error": "Invalid date format. Use YYYY-MM-DD."},
             status=400,
         )
 
