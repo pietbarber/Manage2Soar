@@ -19,8 +19,9 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 help_text=(
                     "Member granted EDIT access to this page. Applies in Django admin for "
-                    "public and private pages, and in the site editor for private pages "
-                    "(also granting VIEW access there)."
+                    "public and private pages, and in the CMS UI (including the site editor) "
+                    "for private pages. For private pages, this also grants VIEW access "
+                    "wherever Page.can_user_access() is used."
                 ),
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="cms_page_permissions",

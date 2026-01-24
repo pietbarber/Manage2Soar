@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 from django.utils.html import format_html
 
 from .models import (
@@ -66,7 +67,13 @@ class PageAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("role_permissions", "member_permissions__member")
+            .prefetch_related(
+                "role_permissions",
+                Prefetch(
+                    "member_permissions",
+                    queryset=PageMemberPermission.objects.select_related("member"),
+                ),
+            )
         )
 
     list_display = (
