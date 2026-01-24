@@ -2004,7 +2004,7 @@ def update_maintenance_deadline(request, deadline_id):
         is_meister = AircraftMeister.objects.filter(
             glider=deadline.glider, member=member
         ).exists()
-    if not is_meister and deadline.towplane:
+    if deadline.towplane and not is_meister:
         is_meister = AircraftMeister.objects.filter(
             towplane=deadline.towplane, member=member
         ).exists()

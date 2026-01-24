@@ -153,14 +153,31 @@
           'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
         }
       })
-      .then(response => {
-        if (!response.ok) {
-          // Handle HTTP error status codes
-          return response.json().then(data => {
-            throw new Error(data.error || 'Request failed');
-          });
+      .then(async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        let data = null;
+
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch (e) {
+            data = null;
+          }
         }
-        return response.json();
+
+        if (!response.ok) {
+          // Handle HTTP error status codes, preferring JSON error message when available
+          const message =
+            (data && (data.error || data.message)) ||
+            `Request failed with status ${response.status}`;
+          throw new Error(message);
+        }
+
+        if (!data) {
+          throw new Error('Invalid server response. Please try again.');
+        }
+
+        return data;
       })
       .then(data => {
         if (data.success) {
