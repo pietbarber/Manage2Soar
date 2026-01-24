@@ -752,8 +752,13 @@ class MemberSpecificPermissionTests(TestCase):
         # Verify member has permission
         self.assertTrue(self.public_page.has_member_permission(self.aircraft_manager))
 
-        # Verify member can actually EDIT the page (Issue #549 requirement)
+        # Verify member can actually EDIT the page in Django admin (Issue #549 requirement)
+        # Page.can_user_edit() returns True for PageMemberPermission holders
         self.assertTrue(self.public_page.can_user_edit(self.aircraft_manager))
+
+        # Verify site editor still restricts public page editing to webmasters only
+        # Even though can_user_edit() is True, can_edit_page() should be False
+        self.assertFalse(can_edit_page(self.aircraft_manager, self.public_page))
 
     def test_member_permission_unique_constraint(self):
         """Cannot add same member twice to same page."""
