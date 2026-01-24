@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 from django.utils.html import format_html
 
 from .models import (
@@ -51,7 +52,7 @@ class PageMemberPermissionInline(admin.TabularInline):
     fields = ("member",)
     autocomplete_fields = ["member"]
     verbose_name = "Member Permission"
-    verbose_name_plural = "👤 Individual Member Permissions (For Private Pages Only)"
+    verbose_name_plural = "✏️ Content Editors (Grant EDIT access in Django admin)"
 
 
 @admin.register(Page)
@@ -66,7 +67,13 @@ class PageAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("role_permissions", "member_permissions")
+            .prefetch_related(
+                "role_permissions",
+                Prefetch(
+                    "member_permissions",
+                    queryset=PageMemberPermission.objects.select_related("member"),
+                ),
+            )
         )
 
     list_display = (
@@ -95,9 +102,14 @@ class PageAdmin(admin.ModelAdmin):
             {
                 "fields": ("is_public",),
                 "description": (
-                    "Public pages are accessible to everyone. Private pages are accessible to active members only. "
-                    '<br><strong>For private pages:</strong> Use the "Role Permissions" section below to restrict access to specific member roles. '
-                    "If no roles are selected, all active members can access this page."
+                    "<strong>VIEW Permissions:</strong><br>"
+                    "• Public pages: Accessible to everyone<br>"
+                    "• Private pages: Accessible to active members only<br>"
+                    "• Private with Role Permissions: Restricted to specific member roles<br><br>"
+                    "<strong>EDIT Permissions:</strong><br>"
+                    "Use the 'Content Editors' section below to grant specific members EDIT access in Django admin. "
+                    "This works for both public and private pages - the page visibility remains unchanged, "
+                    "but assigned members can edit the content."
                 ),
             },
         ),
@@ -132,13 +144,14 @@ class PageAdmin(admin.ModelAdmin):
         Shows members who can edit this page beyond the standard officers
         (directors, secretaries, webmasters).
 
-        Note: This method relies on prefetch_related('member_permissions__member')
-        in get_queryset() to prevent N+1 queries. If the prefetch is modified or
-        removed, performance will degrade.
-        """
-        if obj.is_public:
-            return "-"
+        Works for both public and private pages - editors are shown regardless
+        of page visibility.
 
+        Note: This method relies on the admin queryset prefetching
+        `member_permissions` and their related `member` objects to prevent
+        N+1 queries. If that optimization is modified or removed, performance
+        may degrade.
+        """
         # Use prefetched data to avoid N+1 queries
         members = list(obj.member_permissions.all())
         if not members:

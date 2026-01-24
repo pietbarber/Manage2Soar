@@ -732,15 +732,31 @@ class MemberSpecificPermissionTests(TestCase):
         # should be added to e2e_tests/e2e/ to verify end-to-end functionality.
         # See `.github/copilot-instructions.md` for E2E testing patterns.
 
-    def test_member_permission_cannot_be_added_to_public_page(self):
-        """Member permissions cannot be added to public pages."""
-        from django.core.exceptions import ValidationError
+    def test_member_permission_can_be_added_to_public_page(self):
+        """Member permissions CAN be added to public pages (grants EDIT access only)."""
+        # Create member permission on public page (should succeed)
+        # Use full_clean() to test validation path used by Django admin
+        perm = PageMemberPermission(page=self.public_page, member=self.aircraft_manager)
+        perm.full_clean()  # Should not raise ValidationError
+        perm.save()
+        self.assertIsNotNone(perm.pk)
 
-        with self.assertRaises(ValidationError):
-            perm = PageMemberPermission(
-                page=self.public_page, member=self.aircraft_manager
-            )
-            perm.full_clean()  # Should raise ValidationError
+        # Verify page is still public
+        self.assertTrue(self.public_page.is_public)
+
+        # Verify page remains publicly viewable (anonymous users can still view)
+        self.assertTrue(self.public_page.can_user_access(AnonymousUser()))
+
+        # Verify member has permission
+        self.assertTrue(self.public_page.has_member_permission(self.aircraft_manager))
+
+        # Verify member can actually EDIT the page in Django admin (Issue #549 requirement)
+        # Page.can_user_edit() returns True for PageMemberPermission holders
+        self.assertTrue(self.public_page.can_user_edit(self.aircraft_manager))
+
+        # Verify site editor still restricts public page editing to webmasters only
+        # Even though can_user_edit() is True, can_edit_page() should be False
+        self.assertFalse(can_edit_page(self.aircraft_manager, self.public_page))
 
     def test_member_permission_unique_constraint(self):
         """Cannot add same member twice to same page."""
