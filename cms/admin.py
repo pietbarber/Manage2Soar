@@ -51,7 +51,7 @@ class PageMemberPermissionInline(admin.TabularInline):
     fields = ("member",)
     autocomplete_fields = ["member"]
     verbose_name = "Member Permission"
-    verbose_name_plural = "👤 Individual Member Permissions (For Private Pages Only)"
+    verbose_name_plural = "✏️ Content Editors (Grant EDIT access in Django admin)"
 
 
 @admin.register(Page)
@@ -95,9 +95,14 @@ class PageAdmin(admin.ModelAdmin):
             {
                 "fields": ("is_public",),
                 "description": (
-                    "Public pages are accessible to everyone. Private pages are accessible to active members only. "
-                    '<br><strong>For private pages:</strong> Use the "Role Permissions" section below to restrict access to specific member roles. '
-                    "If no roles are selected, all active members can access this page."
+                    "<strong>VIEW Permissions:</strong><br>"
+                    "• Public pages: Accessible to everyone<br>"
+                    "• Private pages: Accessible to active members only<br>"
+                    "• Private with Role Permissions: Restricted to specific member roles<br><br>"
+                    "<strong>EDIT Permissions:</strong><br>"
+                    "Use the 'Content Editors' section below to grant specific members EDIT access in Django admin. "
+                    "This works for both public and private pages - the page visibility remains unchanged, "
+                    "but assigned members can edit the content."
                 ),
             },
         ),
