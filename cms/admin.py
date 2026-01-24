@@ -66,7 +66,7 @@ class PageAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .prefetch_related("role_permissions", "member_permissions")
+            .prefetch_related("role_permissions", "member_permissions__member")
         )
 
     list_display = (
