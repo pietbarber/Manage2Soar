@@ -178,7 +178,9 @@ class Page(models.Model):
 
     Provides a flexible content management system with two independent access controls:
     1. VIEW permissions (is_public flag and PageRolePermission)
-    2. EDIT permissions (PageMemberPermission - affects both Django admin and site editor)
+    2. EDIT permissions (PageMemberPermission - affects Django admin for all pages,
+       and site editor for private pages only; public pages remain webmaster-only
+       in site editor)
 
     Features:
     - Hierarchical page structure with parent-child relationships
