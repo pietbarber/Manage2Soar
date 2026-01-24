@@ -108,13 +108,13 @@ class PageMemberPermission(models.Model):
     - Django Admin: Members listed here (plus officers) can edit both PUBLIC and
       PRIVATE pages.
     - Site Editor (cms.views.can_edit_page): PUBLIC pages are editable here only by
-      webmasters; member-based permissions from this model are evaluated by
-      Page.can_user_edit(), but the public-page restriction itself is enforced in
-      cms.views.can_edit_page(), not in Page.can_user_edit().
+      webmasters and superusers; member-based permissions from this model are
+      evaluated by Page.can_user_edit(), but the public-page restriction itself is
+      enforced in cms.views.can_edit_page(), not in Page.can_user_edit().
     - For PUBLIC pages: This permission affects who can EDIT via Django admin and
       who passes Page.can_user_edit(); the site editor still restricts PUBLIC page
-      editing to webmasters via cms.views.can_edit_page(), and the page remains
-      publicly viewable.
+      editing to webmasters and superusers via cms.views.can_edit_page(), and the
+      page remains publicly viewable.
     - For PRIVATE pages: This permission grants EDIT access in both Django admin and
       the site editor (after cms.views.can_edit_page() allows editing), and also
       grants VIEW access.
