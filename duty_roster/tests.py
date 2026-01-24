@@ -161,15 +161,16 @@ class DutyDelinquentsDetailViewTests(TestCase):
 
     def test_member_with_recent_duty_not_in_report(self):
         """Member who has done recent duty should not appear"""
-        # Give delinquent member a recent duty assignment via Logsheet
-        # (The view checks Logsheet duty, not DutyAssignment scheduled duty)
-        # Use an existing logsheet from setUp and add duty assignment to it
+        # Simulate the delinquent member having performed recent duty via a Logsheet entry
+        # Use an existing, finalized logsheet from setUp and assign the member as duty instructor
+        # so the delinquency logic treats them as having recently served duty
         recent_logsheet = Logsheet.objects.filter(
             log_date__gte=date.today() - timedelta(days=90), finalized=True
         ).first()
 
-        # Ensure we found a logsheet
-        assert recent_logsheet is not None, "No recent logsheet found in test setup"
+        # Ensure we found a logsheet (using TestCase assertion for robustness)
+        self.assertIsNotNone(recent_logsheet, "No recent logsheet found in test setup")
+        assert recent_logsheet is not None  # Type narrowing for Pylance
 
         # Update the logsheet to assign delinquent member as duty instructor
         recent_logsheet.duty_instructor = self.delinquent_member
@@ -345,16 +346,19 @@ class HelperFunctionTests(TestCase):
         self.assertIsNone(result["last_duty_date"])
         self.assertIsNone(result["last_duty_role"])
 
-    def test_has_performed_duty_detailed_with_duty_assignment(self):
-        """Test helper function when member has recent duty assignment"""
-        from logsheet.models import Airfield
+    def test_has_performed_duty_detailed_with_logsheet_duty(self):
+        """Test helper function when member has recent logsheet duty assignment"""
+        from logsheet.models import Airfield, Logsheet
 
         airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
         duty_date = date.today() - timedelta(days=30)
-        DutyAssignment.objects.create(
-            date=duty_date,
-            instructor=self.member,
-            location=airfield,
+        # Create actual logsheet duty (not just scheduled DutyAssignment)
+        Logsheet.objects.create(
+            log_date=duty_date,
+            airfield=airfield,
+            created_by=self.member,
+            finalized=True,
+            duty_officer=self.member,  # Member actually served as duty officer
         )
 
         cutoff_date = date.today() - timedelta(days=365)
@@ -362,8 +366,8 @@ class HelperFunctionTests(TestCase):
 
         self.assertTrue(result["has_duty"])
         self.assertEqual(result["last_duty_date"], duty_date)
-        self.assertEqual(result["last_duty_role"], "Instructor (Scheduled Only)")
-        self.assertEqual(result["last_duty_type"], "DutyAssignment - Scheduled")
+        self.assertEqual(result["last_duty_role"], "Duty Officer")
+        self.assertEqual(result["last_duty_type"], "Logsheet Duty")
 
     def test_has_performed_duty_detailed_with_instruction_flight(self):
         """Test helper function when member has performed actual instruction"""

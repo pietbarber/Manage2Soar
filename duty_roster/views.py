@@ -1207,6 +1207,23 @@ def propose_roster(request):
     )
 
 
+def _apply_duty_delinquent_exemptions(queryset):
+    """
+    Apply standard duty delinquency exemptions to a Member queryset.
+
+    Exempts:
+    - Treasurers (too busy with financial duties)
+    - Emeritus members (honorary status, no duty obligations)
+
+    Args:
+        queryset: A Django QuerySet of Member objects
+
+    Returns:
+        QuerySet with exemptions applied
+    """
+    return queryset.exclude(treasurer=True).exclude(membership_status="Emeritus Member")
+
+
 @user_passes_test(
     lambda u: u.is_authenticated
     and (u.rostermeister or u.member_manager or u.director or u.is_superuser)
@@ -1247,16 +1264,14 @@ def duty_delinquents_detail(request):
     )
 
     # Step 2: Find members who have been actively flying
-    # Exclude treasurers and emeritus members from duty delinquency checks
-    active_flyers = (
+    # Apply duty delinquency exemptions (treasurer, emeritus)
+    active_flyers = _apply_duty_delinquent_exemptions(
         eligible_members.filter(
             flights_as_pilot__logsheet__log_date__gte=recent_flight_cutoff,
             flights_as_pilot__logsheet__finalized=True,
         )
         .annotate(flight_count=Count("flights_as_pilot", distinct=True))
         .filter(flight_count__gte=min_flights)
-        .exclude(treasurer=True)  # Exempt treasurer from duty delinquency
-        .exclude(membership_status="Emeritus Member")  # Exempt emeritus members
         .distinct()
     )
 
