@@ -454,3 +454,17 @@ class TestMultipleMaintenanceOfficers:
 
         assert response1.json()["success"] is True
         assert response2.json()["success"] is True
+
+
+@pytest.mark.django_db
+def test_maintenance_deadline_constraint_requires_aircraft():
+    """Test that database constraint prevents creating deadlines without aircraft."""
+    from django.db import IntegrityError
+
+    with pytest.raises(IntegrityError) as exc_info:
+        MaintenanceDeadline.objects.create(
+            glider=None, towplane=None, description="annual", due_date=date(2026, 12, 1)
+        )
+
+    # Verify the error is from our constraint
+    assert "maintenance_deadline_must_have_aircraft" in str(exc_info.value)

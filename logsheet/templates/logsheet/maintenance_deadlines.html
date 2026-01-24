@@ -194,7 +194,7 @@
           // Reload page after toast to update status badges
           setTimeout(() => location.reload(), 1500);
         } else {
-          errorDiv.textContent = data.message;
+          errorDiv.textContent = data.error || data.message || 'An error occurred. Please try again.';
           errorDiv.classList.remove('d-none');
         }
       })
