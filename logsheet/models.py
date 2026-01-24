@@ -1390,6 +1390,14 @@ class MaintenanceDeadline(models.Model):
     description = models.CharField(max_length=32, choices=DeadlineType)
     due_date = models.DateField()
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(glider__isnull=True, towplane__isnull=True),
+                name="maintenance_deadline_must_have_aircraft",
+            )
+        ]
+
     @property
     def description_label(self) -> str:
         # Pylance-friendly label without relying on Django’s dynamic get_*_display

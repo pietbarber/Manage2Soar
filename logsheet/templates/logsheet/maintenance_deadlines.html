@@ -15,6 +15,9 @@
           <th>Due Date</th>
           <th>Task</th>
           <th>Status</th>
+          {% if can_update_deadlines %}
+          <th>Actions</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
@@ -27,7 +30,7 @@
               🛩️ {{ deadline.towplane }}
             {% endif %}
           </td>
-          <td>{{ deadline.due_date }}</td>
+          <td id="due-date-{{ deadline.id }}">{{ deadline.due_date }}</td>
           <td>{{ deadline.get_description_display }}</td>
           <td>
             {% if deadline.due_date < today %}
@@ -39,6 +42,21 @@
             {% endif %}
 
           </td>
+          {% if can_update_deadlines %}
+          <td>
+            {% if is_webmaster or deadline.glider and deadline.glider.id in meister_gliders or deadline.towplane and deadline.towplane.id in meister_towplanes %}
+            <button
+              class="btn btn-sm btn-primary update-deadline-btn"
+              data-deadline-id="{{ deadline.id }}"
+              data-current-date="{{ deadline.due_date|date:'Y-m-d' }}"
+              data-aircraft="{% if deadline.glider %}{{ deadline.glider }}{% else %}{{ deadline.towplane }}{% endif %}"
+              data-task="{{ deadline.get_description_display }}"
+              aria-label="Update maintenance deadline for {% if deadline.glider %}{{ deadline.glider }}{% else %}{{ deadline.towplane }}{% endif %} - {{ deadline.get_description_display }}">
+              ✏️ Update
+            </button>
+            {% endif %}
+          </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </tbody>
@@ -49,8 +67,149 @@
   {% endif %}
 </div>
 
+{% if can_update_deadlines %}
+<!-- Modal for updating maintenance deadline -->
+<div class="modal fade" id="updateDeadlineModal" tabindex="-1" aria-labelledby="updateDeadlineModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="updateDeadlineModalLabel">Update Maintenance Deadline</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Aircraft:</strong> <span id="modal-aircraft"></span></p>
+        <p><strong>Task:</strong> <span id="modal-task"></span></p>
+        <p><strong>Current Due Date:</strong> <span id="modal-current-date"></span></p>
+
+        <form id="update-deadline-form">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="new-due-date" class="form-label">New Due Date</label>
+            <input type="date" class="form-control" id="new-due-date" name="due_date" required>
+          </div>
+          <div id="update-error-message" class="alert alert-danger d-none"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="save-deadline-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap Toast for success messages -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header bg-success text-white">
+      <strong class="me-auto">✓ Success</strong>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toast-message">
+    </div>
+  </div>
+</div>
+
 <script>
   // Tablesort initialized globally; nothing else required here. If special behavior is needed,
   // listen for the 'tablesort:ready' event.
+
+  // Handle Update button clicks
+  document.addEventListener('DOMContentLoaded', function() {
+    let currentDeadlineId = null;
+    const modal = new bootstrap.Modal(document.getElementById('updateDeadlineModal'));
+    const updateUrl = "{% url 'logsheet:update_maintenance_deadline' deadline_id=0 %}".replace('/0/', '/{id}/');
+
+    // Open modal when Update button is clicked
+    document.querySelectorAll('.update-deadline-btn').forEach(button => {
+      button.addEventListener('click', function() {
+        currentDeadlineId = this.dataset.deadlineId;
+        document.getElementById('modal-aircraft').textContent = this.dataset.aircraft;
+        document.getElementById('modal-task').textContent = this.dataset.task;
+        document.getElementById('modal-current-date').textContent = this.dataset.currentDate;
+        document.getElementById('new-due-date').value = this.dataset.currentDate;
+        document.getElementById('update-error-message').classList.add('d-none');
+        modal.show();
+      });
+    });
+
+    // Handle form submission (works for both button click and Enter key)
+    document.getElementById('update-deadline-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const formData = new FormData(form);
+      const errorDiv = document.getElementById('update-error-message');
+      const submitBtn = document.getElementById('save-deadline-btn');
+
+      // Disable button during request
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      const url = updateUrl.replace('{id}', currentDeadlineId);
+
+      fetch(url, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        let data = null;
+
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch (e) {
+            data = null;
+          }
+        }
+
+        if (!response.ok) {
+          // Handle HTTP error status codes, preferring JSON error message when available
+          const message =
+            (data && (data.error || data.message)) ||
+            `Request failed with status ${response.status}`;
+          throw new Error(message);
+        }
+
+        if (!data) {
+          throw new Error('Invalid server response. Please try again.');
+        }
+
+        return data;
+      })
+      .then(data => {
+        if (data.success) {
+          // Update the table cell with new date
+          document.getElementById(`due-date-${currentDeadlineId}`).textContent = data.new_due_date;
+          modal.hide();
+
+          // Show success toast
+          document.getElementById('toast-message').textContent = data.message;
+          const toast = new bootstrap.Toast(document.getElementById('successToast'));
+          toast.show();
+
+          // Reload page after toast to update status badges
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          errorDiv.textContent = data.error || data.message || 'An error occurred. Please try again.';
+          errorDiv.classList.remove('d-none');
+        }
+      })
+      .catch(error => {
+        errorDiv.textContent = error.message || 'An error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+      })
+      .finally(() => {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      });
+    });
+  });
 </script>
+{% endif %}
 {% endblock %}

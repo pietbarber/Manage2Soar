@@ -63,6 +63,11 @@ urlpatterns = [
         name="maintenance_deadlines",
     ),
     path(
+        "maintenance-deadlines/update/<int:deadline_id>/",
+        views.update_maintenance_deadline,
+        name="update_maintenance_deadline",
+    ),
+    path(
         "equipment/glider/<int:pk>/logbook/",
         views.glider_logbook,
         name="glider_logbook",
