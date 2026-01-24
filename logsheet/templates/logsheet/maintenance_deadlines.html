@@ -15,7 +15,7 @@
           <th>Due Date</th>
           <th>Task</th>
           <th>Status</th>
-          {% if is_webmaster or meister_gliders %}
+          {% if can_update_deadlines %}
           <th>Actions</th>
           {% endif %}
         </tr>
@@ -42,9 +42,9 @@
             {% endif %}
 
           </td>
-          {% if is_webmaster or meister_gliders %}
+          {% if can_update_deadlines %}
           <td>
-            {% if is_webmaster or deadline.glider.id in meister_gliders or deadline.towplane.id in meister_towplanes %}
+            {% if is_webmaster or deadline.glider and deadline.glider.id in meister_gliders or deadline.towplane and deadline.towplane.id in meister_towplanes %}
             <button
               class="btn btn-sm btn-primary update-deadline-btn"
               data-deadline-id="{{ deadline.id }}"
@@ -66,7 +66,7 @@
   {% endif %}
 </div>
 
-{% if is_webmaster or meister_gliders or meister_towplanes %}
+{% if can_update_deadlines %}
 <!-- Modal for updating maintenance deadline -->
 <div class="modal fade" id="updateDeadlineModal" tabindex="-1" aria-labelledby="updateDeadlineModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -87,12 +87,24 @@
             <input type="date" class="form-control" id="new-due-date" name="due_date" required>
           </div>
           <div id="update-error-message" class="alert alert-danger d-none"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="save-deadline-btn">Save Changes</button>
+          </div>
         </form>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="save-deadline-btn">Save Changes</button>
-      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap Toast for success messages -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header bg-success text-white">
+      <strong class="me-auto">✓ Success</strong>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toast-message">
     </div>
   </div>
 </div>
@@ -105,6 +117,7 @@
   document.addEventListener('DOMContentLoaded', function() {
     let currentDeadlineId = null;
     const modal = new bootstrap.Modal(document.getElementById('updateDeadlineModal'));
+    const updateUrl = "{% url 'logsheet:update_maintenance_deadline' deadline_id=0 %}".replace('/0/', '/{id}/');
 
     // Open modal when Update button is clicked
     document.querySelectorAll('.update-deadline-btn').forEach(button => {
@@ -119,48 +132,62 @@
       });
     });
 
-    // Handle Save Changes button
-    document.getElementById('save-deadline-btn').addEventListener('click', function() {
-      const form = document.getElementById('update-deadline-form');
+    // Handle form submission (works for both button click and Enter key)
+    document.getElementById('update-deadline-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
       const formData = new FormData(form);
       const errorDiv = document.getElementById('update-error-message');
+      const submitBtn = document.getElementById('save-deadline-btn');
 
       // Disable button during request
-      this.disabled = true;
-      this.textContent = 'Saving...';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
 
-      fetch(`/logsheet/maintenance-deadlines/update/${currentDeadlineId}/`, {
+      const url = updateUrl.replace('{id}', currentDeadlineId);
+
+      fetch(url, {
         method: 'POST',
         body: formData,
         headers: {
           'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         }
       })
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          // Handle HTTP error status codes
+          return response.json().then(data => {
+            throw new Error(data.message || 'Request failed');
+          });
+        }
+        return response.json();
+      })
       .then(data => {
         if (data.success) {
           // Update the table cell with new date
           document.getElementById(`due-date-${currentDeadlineId}`).textContent = data.new_due_date;
           modal.hide();
 
-          // Show success message (optional - can use Bootstrap toast or alert)
-          alert(data.message);
+          // Show success toast
+          document.getElementById('toast-message').textContent = data.message;
+          const toast = new bootstrap.Toast(document.getElementById('successToast'));
+          toast.show();
 
-          // Reload page to update status badges
-          location.reload();
+          // Reload page after toast to update status badges
+          setTimeout(() => location.reload(), 1500);
         } else {
           errorDiv.textContent = data.message;
           errorDiv.classList.remove('d-none');
         }
       })
       .catch(error => {
-        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.textContent = error.message || 'An error occurred. Please try again.';
         errorDiv.classList.remove('d-none');
       })
       .finally(() => {
         // Re-enable button
-        document.getElementById('save-deadline-btn').disabled = false;
-        document.getElementById('save-deadline-btn').textContent = 'Save Changes';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
       });
     });
   });

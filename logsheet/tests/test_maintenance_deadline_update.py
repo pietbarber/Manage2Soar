@@ -345,6 +345,29 @@ class TestMaintenanceDeadlineDisplay:
         assert response.context["is_webmaster"] is False
         assert not response.context["meister_gliders"]
         assert not response.context["meister_towplanes"]
+        assert response.context["can_update_deadlines"] is False
+
+    def test_superuser_sees_update_button_for_all_aircraft(
+        self, client, glider_deadline, towplane_deadline
+    ):
+        """Superusers see Update button for all aircraft even without webmaster group."""
+        superuser = Member.objects.create(
+            username="superuser",
+            email="super@example.com",
+            membership_status="Full Member",
+            is_superuser=True,
+        )
+        client.force_login(superuser)
+
+        response = client.get(reverse("logsheet:maintenance_deadlines"))
+
+        assert response.status_code == 200
+        assert (
+            response.context["is_webmaster"] is True
+        )  # Superusers treated as webmasters
+        assert response.context["can_update_deadlines"] is True
+        # Should see two Update buttons (one for glider, one for towplane)
+        assert response.content.count(b"update-deadline-btn") >= 2
 
 
 @pytest.mark.django_db

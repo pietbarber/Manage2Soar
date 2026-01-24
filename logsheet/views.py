@@ -1918,7 +1918,9 @@ def maintenance_deadlines(request):
 
     # Determine which deadlines the user can update
     member = request.user
-    is_webmaster = member.groups.filter(name="Webmasters").exists()
+    is_webmaster = (
+        member.is_superuser or member.groups.filter(name="Webmasters").exists()
+    )
 
     # Get all aircraft this member is a meister for
     meister_gliders = set()
@@ -1933,6 +1935,11 @@ def maintenance_deadlines(request):
             if meister.towplane:
                 meister_towplanes.add(meister.towplane.id)
 
+    # Flag to show update UI (webmaster, superuser, or has any meister assignments)
+    can_update_deadlines = (
+        is_webmaster or bool(meister_gliders) or bool(meister_towplanes)
+    )
+
     return render(
         request,
         "logsheet/maintenance_deadlines.html",
@@ -1943,6 +1950,7 @@ def maintenance_deadlines(request):
             "is_webmaster": is_webmaster,
             "meister_gliders": meister_gliders,
             "meister_towplanes": meister_towplanes,
+            "can_update_deadlines": can_update_deadlines,
         },
     )
 
@@ -1980,6 +1988,16 @@ def update_maintenance_deadline(request, deadline_id):
     is_webmaster = (
         member.is_superuser or member.groups.filter(name="Webmasters").exists()
     )
+
+    # Validate that deadline has either glider or towplane
+    if not deadline.glider and not deadline.towplane:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "Invalid deadline: no aircraft associated.",
+            },
+            status=400,
+        )
 
     is_meister = False
     if deadline.glider:
