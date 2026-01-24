@@ -1994,7 +1994,7 @@ def update_maintenance_deadline(request, deadline_id):
         return JsonResponse(
             {
                 "success": False,
-                "message": "Invalid deadline: no aircraft associated.",
+                "error": "Invalid deadline: no aircraft associated.",
             },
             status=400,
         )
