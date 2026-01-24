@@ -744,6 +744,11 @@ class MemberSpecificPermissionTests(TestCase):
         # Verify page is still public
         self.assertTrue(self.public_page.is_public)
 
+        # Verify page remains publicly viewable (anonymous users can still view)
+        from django.contrib.auth.models import AnonymousUser
+
+        self.assertTrue(self.public_page.can_user_access(AnonymousUser()))
+
         # Verify member has permission
         self.assertTrue(self.public_page.has_member_permission(self.aircraft_manager))
 

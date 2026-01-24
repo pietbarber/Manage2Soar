@@ -102,11 +102,13 @@ class PageMemberPermission(models.Model):
     Allows assigning specific members EDIT permissions for specific CMS pages or folders.
 
     This model enables fine-grained EDIT access control, allowing individual members
-    to be granted editing rights in Django admin, separate from VIEW permissions.
+    to be granted editing rights, separate from VIEW permissions.
 
-    IMPORTANT: This grants EDIT permissions only (via Django admin).
-    - For PUBLIC pages: Grants edit rights while page remains publicly viewable
-    - For PRIVATE pages: Grants both edit rights AND view access
+    IMPORTANT: This grants EDIT permissions with different scope depending on context:
+    - Django Admin: Can edit both PUBLIC and PRIVATE pages
+    - Site Editor (cms/views.py): Only PUBLIC pages (webmaster-only), PRIVATE pages work
+    - For PUBLIC pages: Edit via Django admin, page remains publicly viewable
+    - For PRIVATE pages: Edit via Django admin AND site editor, also grants VIEW access
 
     Use Cases:
     - Assign content editor for public documentation (page stays public)
