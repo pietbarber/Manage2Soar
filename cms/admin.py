@@ -137,13 +137,13 @@ class PageAdmin(admin.ModelAdmin):
         Shows members who can edit this page beyond the standard officers
         (directors, secretaries, webmasters).
 
+        Works for both public and private pages - editors are shown regardless
+        of page visibility.
+
         Note: This method relies on prefetch_related('member_permissions__member')
         in get_queryset() to prevent N+1 queries. If the prefetch is modified or
         removed, performance will degrade.
         """
-        if obj.is_public:
-            return "-"
-
         # Use prefetched data to avoid N+1 queries
         members = list(obj.member_permissions.all())
         if not members:

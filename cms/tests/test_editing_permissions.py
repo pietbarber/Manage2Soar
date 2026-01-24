@@ -746,6 +746,9 @@ class MemberSpecificPermissionTests(TestCase):
         # Verify member has permission
         self.assertTrue(self.public_page.has_member_permission(self.aircraft_manager))
 
+        # Verify member can actually EDIT the page (Issue #549 requirement)
+        self.assertTrue(self.public_page.can_user_edit(self.aircraft_manager))
+
     def test_member_permission_unique_constraint(self):
         """Cannot add same member twice to same page."""
         from django.db import IntegrityError
