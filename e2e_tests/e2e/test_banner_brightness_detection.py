@@ -37,18 +37,18 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
     @classmethod
     def setUpClass(cls):
         """Create test image files for brightness detection tests."""
-        super().setUpClass()
-
-        # Create temp directory for test images
-        cls.temp_dir = tempfile.mkdtemp(prefix="banner_test_")
-
-        # Override MEDIA_ROOT to prevent polluting repo's media/ directory
+        # Override MEDIA_ROOT BEFORE starting live server
         from django.conf import settings
-        from django.test import override_settings
 
         cls._original_media_root = settings.MEDIA_ROOT
         cls.test_media_root = tempfile.mkdtemp(prefix="test_media_")
         settings.MEDIA_ROOT = cls.test_media_root
+
+        # Now start the live server with overridden MEDIA_ROOT
+        super().setUpClass()
+
+        # Create temp directory for test images
+        cls.temp_dir = tempfile.mkdtemp(prefix="banner_test_")
 
         # Create a bright white image (brightness ≈ 255)
         cls.bright_image_path = os.path.join(cls.temp_dir, "bright_banner.png")
@@ -199,38 +199,32 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
             banner.count() == 0
         ), "#page-banner should not exist when page has no banner_image"
 
-    def test_fallback_on_canvas_security_error(self):
+    def test_same_origin_image_brightness_detection(self):
         """
-        Verify fallback behavior when canvas operations fail.
+        Verify brightness detection works correctly for same-origin images.
 
-        In some browser security contexts (CORS), canvas.getImageData()
-        throws a security error. The JavaScript should fall back to light-text.
+        NOTE: This test does NOT actually trigger a canvas security error
+        because the image is served from the same origin. Testing actual
+        CORS/canvas security errors would require a cross-origin image URL
+        without proper CORS headers, which is difficult to reliably test
+        in an E2E environment.
         """
-        # Create page with banner
-        page = self._create_page_with_banner("test-fallback", self.bright_image_path)
-
-        # Navigate and check console for security errors
-        console_messages = []
-
-        def handle_console(msg):
-            console_messages.append(msg.text)
-
-        self.page.on("console", handle_console)
+        # Create page with bright banner (same-origin, should succeed)
+        page = self._create_page_with_banner("test-same-origin", self.bright_image_path)
 
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
         self.page.wait_for_load_state("networkidle")
         self.page.wait_for_timeout(2000)
 
-        # Check banner has the fallback light-text class
-        # (JavaScript applies light-text on canvas/CORS errors)
+        # Verify brightness detection completed successfully
         banner = self.page.locator("#page-banner")
         assert banner.count() > 0, "#page-banner should exist"
 
         classes = banner.get_attribute("class") or ""
-        # On error, JavaScript should apply light-text fallback
+        # Same-origin bright image should get dark-text
         assert (
-            "light-text" in classes or "dark-text" in classes
-        ), f"Banner should have contrast class (fallback on error), got: {classes}"
+            "dark-text" in classes
+        ), f"Bright same-origin banner should have 'dark-text', got: {classes}"
 
 
 class TestBannerBrightnessEdgeCases(DjangoPlaywrightTestCase):

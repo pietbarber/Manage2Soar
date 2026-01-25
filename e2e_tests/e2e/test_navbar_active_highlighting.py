@@ -217,23 +217,28 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
         classes = members_dropdown.first.get_attribute("class") or ""
         assert "active" in classes, "Members dropdown should have active class"
 
-        # Use JavaScript to verify the pseudo-element styling is applied
-        # This checks that the CSS for .nav-link.active::after exists
+        # Use JavaScript to verify the active border-bottom styling is applied
+        # This checks that the CSS for .navbar-nav .nav-link.active has a visible bottom border
         has_styling = self.page.evaluate(
             """
                 () => {
                     const link = document.querySelector('#membersDropdown');
                     if (!link) return false;
 
-                    const afterStyle = window.getComputedStyle(link, '::after');
-                    // The active indicator should have some height/content
-                    return afterStyle.height !== 'auto' && afterStyle.height !== '0px';
+                    const style = window.getComputedStyle(link);
+                    const borderWidth = style.borderBottomWidth;
+                    const borderStyle = style.borderBottomStyle;
+
+                    // The active indicator should have a non-zero, visible bottom border
+                    return borderWidth !== '0px' && borderStyle !== 'none';
                 }
             """
         )
 
         # Assert the styling is actually applied
-        assert has_styling, "Active link should have CSS pseudo-element styling applied"
+        assert (
+            has_styling
+        ), "Active link should have visible border-bottom styling applied"
 
 
 class TestNavbarActiveHighlightingMobile(DjangoPlaywrightTestCase):
