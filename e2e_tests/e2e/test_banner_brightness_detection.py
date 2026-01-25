@@ -169,8 +169,10 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
         self.page.wait_for_load_state("networkidle")
 
-        # Give JavaScript time to process
-        self.page.wait_for_timeout(2000)
+        # Wait deterministically for brightness detection to apply a contrast class
+        self.page.wait_for_selector(
+            "#page-banner.dark-text, #page-banner.light-text", timeout=5000
+        )
 
         # Check that brightness detection added a class
         banner = self.page.locator("#page-banner")
@@ -218,7 +220,21 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
 
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
         self.page.wait_for_load_state("networkidle")
-        self.page.wait_for_timeout(2000)
+
+        # Wait deterministically for brightness detection to apply a text class
+        self.page.wait_for_function(
+            """
+            () => {
+                const banner = document.querySelector('#page-banner');
+                if (!banner) return false;
+                const classList = banner.classList;
+                return (
+                    classList.contains('dark-text') ||
+                    classList.contains('light-text')
+                );
+            }
+            """
+        )
 
         # Verify brightness detection completed successfully
         banner = self.page.locator("#page-banner")
