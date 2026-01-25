@@ -291,3 +291,19 @@ gke_create_superuser: false
 # django_superuser_username: "admin"
 # django_superuser_email: "admin@example.com"  # Optional, defaults to admin@{{ gke_base_domain }}
 # vault_django_superuser_password: Must be defined in vault.yml (NEVER in plain text)
+# ============================================================
+# PRE-DEPLOYMENT VALIDATION (Issue #529)
+# ============================================================
+# These controls enable/disable pre-deployment configuration checks.
+# All validations are enabled by default for safety.
+
+# Enable/disable all email configuration validation
+# When true, validates that email_dev_mode is properly set for the environment
+gke_validate_email_config: true
+
+# Enable/disable security validations (DEBUG mode, ALLOWED_HOSTS)
+gke_validate_security: true
+
+# Environment type (production, staging, development)
+# Validation rules are stricter for production
+gke_environment: "production"

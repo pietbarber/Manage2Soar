@@ -1,0 +1,209 @@
+---
+# GKE Deploy Role - Pre-Deployment Configuration Validation
+#
+# CRITICAL: This task runs before any deployment actions to catch configuration
+# errors that could have severe production impact.
+#
+# Issue #529: These validations prevent catastrophic misconfigurations like
+# deploying email_dev_mode: true to production, which would redirect ALL
+# club emails to dev addresses (breaking duty roster, applications, etc.)
+
+# ============================================================
+# EMAIL_DEV_MODE VALIDATION (CRITICAL)
+# ============================================================
+# Production tenants MUST have email_dev_mode: false
+# This prevents accidental email redirection to dev addresses
+
+- name: Validate EMAIL_DEV_MODE for production tenants
+  ansible.builtin.assert:
+    that:
+      - item.email_dev_mode is not defined or item.email_dev_mode == false or (gke_environment | default('production')) != 'production'
+    fail_msg: |
+      ════════════════════════════════════════════════════════════════════════
+      🚨 CRITICAL CONFIGURATION ERROR 🚨
+      ════════════════════════════════════════════════════════════════════════
+
+      Tenant '{{ item.prefix }}' ({{ item.name | default('unnamed') }}) has
+      email_dev_mode: {{ item.email_dev_mode | default('UNDEFINED') }}
+
+      This is DANGEROUS for production deployments!
+
+      When email_dev_mode is true (or not explicitly set to false), ALL emails will be redirected
+      to development addresses instead of real recipients. This breaks:
+        - Duty roster notifications
+        - Membership applications
+        - Member communications
+        - Instructor scheduling
+        - All automated email workflows
+
+      TO FIX:
+        1. Edit inventory/gcp_app.yml or group_vars/gcp_app/vars.yml
+        2. Set email_dev_mode: false for production tenants
+        3. Set email_dev_mode_redirect_to: "" for production tenants
+
+      Or if this is intentionally a non-production environment, set:
+        gke_environment: staging  (or development)
+
+      ════════════════════════════════════════════════════════════════════════
+    success_msg: "✅ Tenant '{{ item.prefix }}' email configuration validated"
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    label: "{{ item.prefix }}"
+  delegate_to: localhost
+  run_once: true
+  when:
+    - gke_multi_tenant | bool
+    - gke_validate_email_config | default(true) | bool
+  tags: [validate, email-config, critical]
+
+# Validate single-tenant email configuration
+- name: Validate EMAIL_DEV_MODE for single-tenant deployment
+  ansible.builtin.assert:
+    that:
+      - gke_email_dev_mode is defined
+      - gke_email_dev_mode == false or (gke_environment | default('production')) != 'production'
+    fail_msg: |
+      ════════════════════════════════════════════════════════════════════════
+      🚨 CRITICAL CONFIGURATION ERROR 🚨
+      ════════════════════════════════════════════════════════════════════════
+
+      Deployment has gke_email_dev_mode: {{ gke_email_dev_mode | default('UNDEFINED') }}
+
+      This is DANGEROUS for production deployments!
+
+      See the multi-tenant error message above for full details on why this
+      is dangerous and how to fix it.
+
+      ════════════════════════════════════════════════════════════════════════
+    success_msg: "✅ Email configuration validated for single-tenant deployment"
+  delegate_to: localhost
+  run_once: true
+  when:
+    - not (gke_multi_tenant | bool)
+    - gke_validate_email_config | default(true) | bool
+  tags: [validate, email-config, critical]
+
+# ============================================================
+# DJANGO DEBUG VALIDATION
+# ============================================================
+
+- name: Validate DJANGO_DEBUG is disabled for production
+  ansible.builtin.assert:
+    that:
+      - gke_django_debug is defined
+      - gke_django_debug == false or (gke_environment | default('production')) != 'production'
+    fail_msg: |
+      ════════════════════════════════════════════════════════════════════════
+      🚨 SECURITY ERROR 🚨
+      ════════════════════════════════════════════════════════════════════════
+
+      gke_django_debug is {{ gke_django_debug | default('UNDEFINED') }}
+
+      Django DEBUG mode MUST be disabled in production!
+
+      DEBUG mode exposes:
+        - Detailed error messages with code snippets
+        - Database query details
+        - Environment variables
+        - Full stack traces
+
+      TO FIX:
+        Set gke_django_debug: false in your inventory or group_vars
+
+      ════════════════════════════════════════════════════════════════════════
+    success_msg: "✅ Django DEBUG mode is disabled"
+  delegate_to: localhost
+  run_once: true
+  when: gke_validate_security | default(true) | bool
+  tags: [validate, security]
+
+# ============================================================
+# ALLOWED HOSTS VALIDATION
+# ============================================================
+
+- name: Validate ALLOWED_HOSTS is configured
+  ansible.builtin.assert:
+    that:
+      - gke_django_allowed_hosts is defined
+      - gke_django_allowed_hosts != "CONFIGURE_ALLOWED_HOSTS"
+      - gke_django_allowed_hosts != "*"
+      - gke_django_allowed_hosts | length > 0
+    fail_msg: |
+      ════════════════════════════════════════════════════════════════════════
+      🚨 SECURITY ERROR 🚨
+      ════════════════════════════════════════════════════════════════════════
+
+      gke_django_allowed_hosts is: {{ gke_django_allowed_hosts | default('UNDEFINED') }}
+
+      ALLOWED_HOSTS must be explicitly configured with your actual domain(s)
+      for NON-INGRESS deployments.
+
+      Using "*" or the placeholder value is a security risk that allows
+      host header attacks.
+
+      TO FIX (non-ingress deployments):
+        Set gke_django_allowed_hosts to your actual domain(s), e.g.:
+        gke_django_allowed_hosts: "example.com,www.example.com"
+
+      NOTE: When gke_enable_ingress is true, ALLOWED_HOSTS is normally derived
+      from tenant domain configuration in k8s-secrets.yml.j2, and this
+      validation is skipped. In that case, ensure your tenant domains are
+      correctly configured instead.
+
+      ════════════════════════════════════════════════════════════════════════
+    success_msg: "✅ ALLOWED_HOSTS is properly configured"
+  delegate_to: localhost
+  run_once: true
+  when:
+    - gke_validate_security | default(true) | bool
+    - not (gke_enable_ingress | default(false) | bool)
+  tags: [validate, security]
+
+# ============================================================
+# VALIDATION SUMMARY
+# ============================================================
+
+- name: Display validation summary
+  ansible.builtin.debug:
+    msg: |
+      {% set email_check_enabled = gke_validate_email_config | default(true) | bool %}
+      {% set security_check_enabled = gke_validate_security | default(true) | bool %}
+      ════════════════════════════════════════════════════════════════════════
+      ✅ PRE-DEPLOYMENT VALIDATION PASSED
+      ════════════════════════════════════════════════════════════════════════
+
+      {% if email_check_enabled and security_check_enabled %}
+      All critical configuration checks passed:
+      {% else %}
+      Critical configuration checks status:
+      {% endif %}
+
+      {% if email_check_enabled %}
+        ✓ Email configuration (email_dev_mode)
+      {% else %}
+        - Email configuration (email_dev_mode) SKIPPED (gke_validate_email_config=false)
+      {% endif %}
+      {% if security_check_enabled %}
+        ✓ Django DEBUG mode
+        ✓ ALLOWED_HOSTS security
+      {% else %}
+        - Django DEBUG mode check SKIPPED (gke_validate_security=false)
+        - ALLOWED_HOSTS security check SKIPPED (gke_validate_security=false)
+      {% endif %}
+
+      {% if gke_multi_tenant %}
+      {% if email_check_enabled %}
+      Validated {{ gke_tenants | length }} tenant(s):
+      {% for tenant in gke_tenants %}
+        ✓ {{ tenant.prefix }}: email_dev_mode={{ tenant.email_dev_mode | default(gke_email_dev_mode | default(false)) }}
+      {% endfor %}
+      {% else %}
+      Tenant email_dev_mode values NOT validated (gke_validate_email_config=false)
+      {% endif %}
+      {% endif %}
+
+      Proceeding with deployment...
+      ════════════════════════════════════════════════════════════════════════
+  delegate_to: localhost
+  run_once: true
+  tags: [validate]

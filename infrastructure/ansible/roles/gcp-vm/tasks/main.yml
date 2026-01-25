@@ -282,6 +282,49 @@
   become: false
   when: gcp_create_firewall_rules and gcp_smtp_allowed_sources is defined and gcp_smtp_allowed_sources | length > 0
 
+# Issue #529: HTTP firewall rule for Let's Encrypt HTTP-01 challenge validation
+# This rule allows ACME servers to reach port 80 for certificate renewal
+- name: "⚠️  WARNING: HTTP firewall rule will open port 80 to the internet"
+  ansible.builtin.debug:
+    msg: |
+      ════════════════════════════════════════════════════════════════════════
+      ⚠️  SECURITY WARNING: Opening port 80 to 0.0.0.0/0 (entire internet)
+      ════════════════════════════════════════════════════════════════════════
+
+      This firewall rule is required for Let's Encrypt HTTP-01 challenges.
+
+      SECURITY CONSIDERATIONS:
+        - Port 80 will be accessible from anywhere on the internet
+        - Ensure your web server is properly configured (e.g., certbot standalone)
+        - Consider DNS-01 challenge as a more secure alternative
+        - This is an "optional enhancement" - current setup uses self-signed certs
+
+      ════════════════════════════════════════════════════════════════════════
+  when:
+    - gcp_create_firewall_rules
+    - gcp_enable_http_firewall | default(false)
+
+- name: Create HTTP firewall rule (Let's Encrypt)
+  google.cloud.gcp_compute_firewall:
+    name: "{{ gcp_firewall_name_prefix }}-allow-http"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+    service_account_file: "{{ gcp_service_account_file | default(omit) }}"
+    network:
+      selfLink: "global/networks/{{ gcp_network }}"
+    allowed:
+      - ip_protocol: tcp
+        ports:
+          - "80"
+    source_ranges:
+      - "0.0.0.0/0"  # Let's Encrypt needs public access for HTTP-01 challenge
+    target_tags: "{{ gcp_network_tags }}"
+    description: "Allow HTTP for Let's Encrypt ACME HTTP-01 challenge validation"
+    state: present
+  delegate_to: localhost
+  become: false
+  when: gcp_create_firewall_rules and gcp_enable_http_firewall | default(false)
+
 # ============================================================
 # WAIT FOR VM TO BE READY
 # ============================================================

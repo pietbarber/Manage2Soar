@@ -86,6 +86,14 @@ gcp_firewall_name_prefix: "m2s-mail"
 # Whether to create firewall rules
 gcp_create_firewall_rules: true
 
+# HTTP firewall rule for Let's Encrypt (optional)
+# Enable this only if you plan to use Let's Encrypt HTTP-01 challenges for TLS certificates.
+# WARNING: This opens port 80 to the entire internet (0.0.0.0/0).
+# - Ensure your web server is properly configured (e.g., certbot standalone mode)
+# - Consider DNS-01 challenge as a more secure alternative
+# - Current setup uses self-signed certificates, so this is typically not needed
+gcp_enable_http_firewall: false
+
 # PostgreSQL source ranges (not needed for mail server, but required by gcp-vm role)
 gcp_postgresql_allowed_sources: []
 

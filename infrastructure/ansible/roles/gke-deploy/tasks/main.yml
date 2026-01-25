@@ -4,6 +4,21 @@
 # Deploys Django application to Google Kubernetes Engine
 
 # ============================================================
+# PRE-DEPLOYMENT VALIDATION (Issue #529)
+# ============================================================
+# CRITICAL: Run configuration validation BEFORE any other tasks.
+# This catches dangerous misconfigurations like email_dev_mode: true
+# in production before any deployment actions occur.
+#
+# NOTE: Validation runs on ALL runs by default (including tagged runs)
+# because it is tagged with "always". To bypass validation, you must
+# explicitly use --skip-tags validate (strongly discouraged in production).
+
+- name: Include pre-deployment validation
+  ansible.builtin.include_tasks: validate-config.yml
+  tags: [always, validate]
+
+# ============================================================
 # PREREQUISITES
 # ============================================================
 
