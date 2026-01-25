@@ -39,8 +39,14 @@
     background-repeat: no-repeat;
     /* Creates parallax effect on desktop
      * Note: background-attachment: fixed can cause performance issues on some browsers,
-     * particularly mobile Safari and Firefox. Monitor scrolling performance if issues arise.
-     * This is disabled on mobile devices (see responsive section below).
+     * particularly mobile Safari, Firefox, and Chrome on certain devices. Known issues include:
+     * - Janky scrolling performance during rapid scrolling
+     * - High CPU usage and battery drain on mobile
+     * - Browser repaint on every scroll event
+     *
+     * Consider JS-based parallax (transform: translateY) for better cross-browser performance.
+     * For now, this is acceptable but monitor real-world performance. Parallax is disabled
+     * on mobile devices (see responsive section) and for prefers-reduced-motion users.
      */
     background-attachment: fixed;
     z-index: 1;
