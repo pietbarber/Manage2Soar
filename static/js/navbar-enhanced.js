@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const navbar = document.getElementById('main-navbar');
     if (!navbar) return;
 
-    // Add shadow when scrolled
+    // Add shadow when scrolled - throttled with requestAnimationFrame
+    let navbarShadowTicking = false;
+
     function updateNavbarShadow() {
         if (window.scrollY > 10) {
             navbar.classList.add('scrolled');
@@ -20,7 +22,18 @@ document.addEventListener('DOMContentLoaded', function () {
             navbar.classList.remove('scrolled');
         }
     }
-    window.addEventListener('scroll', updateNavbarShadow);
+
+    function onScroll() {
+        if (!navbarShadowTicking) {
+            navbarShadowTicking = true;
+            window.requestAnimationFrame(function () {
+                updateNavbarShadow();
+                navbarShadowTicking = false;
+            });
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
     updateNavbarShadow(); // Initial check
 
     // Active page highlighting based on current URL
@@ -30,8 +43,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!href || href === '#') return;
 
         // Exact match for root, or path segment match for others
+        // Ensures '/member' doesn't match when on '/members/123'
         const isActive = (href === '/' && currentPath === '/') ||
-            (href !== '/' && (currentPath === href || currentPath.startsWith(href + '/')));
+            (href !== '/' && (currentPath === href || (currentPath.startsWith(href + '/') && href.endsWith('/'))));
 
         if (isActive) {
             link.classList.add('active');

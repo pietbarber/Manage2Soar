@@ -38,19 +38,33 @@ function detectBannerBrightness(imageUrl, bannerId) {
 
     img.onload = function () {
         try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
             // Sample center region of image (avoid edges which may be darker/lighter)
             const sampleWidth = Math.min(100, img.width);
             const sampleHeight = Math.min(100, img.height);
             const sampleX = (img.width - sampleWidth) / 2;
             const sampleY = (img.height - sampleHeight) / 2;
 
-            const imageData = ctx.getImageData(sampleX, sampleY, sampleWidth, sampleHeight);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Only create a canvas as large as the sampled region (performance optimization)
+            canvas.width = sampleWidth;
+            canvas.height = sampleHeight;
+
+            // Draw only the sampled region into the smaller canvas
+            ctx.drawImage(
+                img,
+                sampleX,
+                sampleY,
+                sampleWidth,
+                sampleHeight,
+                0,
+                0,
+                sampleWidth,
+                sampleHeight
+            );
+
+            const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
             const data = imageData.data;
 
             // Calculate average brightness

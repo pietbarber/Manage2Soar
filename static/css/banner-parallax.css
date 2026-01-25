@@ -43,6 +43,13 @@
     z-index: 1;
 }
 
+/* Respect user's motion preferences - disable parallax for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .page-banner-image {
+        background-attachment: scroll;
+    }
+}
+
 /* Gradient overlay for text readability */
 .page-banner-overlay {
     position: absolute;

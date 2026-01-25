@@ -10,6 +10,8 @@
 <div class="page-banner" id="page-banner">
   <div class="page-banner-image"
        id="banner-image"
+       role="img"
+       aria-label="Banner image for {{ page.title }}"
        style="background-image: url('{{ page.banner_image.url }}');"
        data-image-url="{{ page.banner_image.url }}">
   </div>
@@ -18,7 +20,6 @@
     <h1 class="page-banner-title">{{ page.title }}</h1>
   </div>
 </div>
-<script src="{% static 'js/banner-brightness-detection.js' %}"></script>
 <script>
   // Initialize banner brightness detection
   document.addEventListener('DOMContentLoaded', function() {

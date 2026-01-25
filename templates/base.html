@@ -228,7 +228,7 @@
         <!-- Right side: Welcome + Logout -->
         {% if user.is_authenticated %}
         {% is_kiosk_session as kiosk_mode %}
-        <div class="d-flex align-items-center me-3">
+        <div class="d-flex align-items-center me-3 user-section">
           <a href="{% url 'members:member_view' member_id=user.pk %}" class="profile-bubble" title="View My Profile">
             <img src="{{ user.profile_image_url_small }}" class="nav-avatar" alt="Profile Photo">
           </a>
@@ -288,6 +288,7 @@
   <!-- PWA Service Worker Registration -->
   <script src="{% static 'js/service-worker-register.js' %}"></script>
   <script src="{% static 'js/navbar-enhanced.js' %}"></script>
+  <script src="{% static 'js/banner-brightness-detection.js' %}"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', (event) => {
       const token = document.cookie
