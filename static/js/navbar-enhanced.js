@@ -61,17 +61,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Auto-close off-canvas when a navigation link is clicked (mobile)
     const offcanvasEl = document.getElementById('navbarOffcanvas');
-    if (offcanvasEl) {
+    if (offcanvasEl && typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
         offcanvasEl.querySelectorAll('.nav-link:not(.dropdown-toggle), .dropdown-item').forEach(function (link) {
-            link.addEventListener('click', function () {
+            link.addEventListener('click', function (event) {
+                // Respect default-prevented events (e.g., custom handlers)
+                if (event.defaultPrevented) {
+                    return;
+                }
+
+                // Only auto-close on primary (left) button clicks
+                if (event.button !== 0) {
+                    return;
+                }
+
+                // Do not interfere with modified clicks (open in new tab/window)
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                }
+
+                // Do not auto-close for explicit new-tab targets
+                const targetAttr = link.getAttribute('target');
+                if (targetAttr && targetAttr.toLowerCase() === '_blank') {
+                    return;
+                }
+
                 // Check if mobile viewport at click time
                 if (window.innerWidth < 992) {
                     const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
                     if (offcanvas) {
-                        // Small delay to allow navigation to start
-                        setTimeout(function () {
-                            offcanvas.hide();
-                        }, 150);
+                        // Let the browser handle navigation; just hide immediately
+                        offcanvas.hide();
                     }
                 }
             });

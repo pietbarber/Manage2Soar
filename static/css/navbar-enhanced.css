@@ -8,11 +8,10 @@
  * - Larger touch targets for mobile
  * - Active page highlighting
  * - Print-friendly (hidden when printing)
+ * - Backdrop overlay when mobile menu is open
  *
  * IMPORTANT: After modifying this file, run `python manage.py collectstatic`
  * CSS changes are NOT visible until collected!
- */
- * - Backdrop overlay when mobile menu is open
  */
 
 /* ==========================================================================
@@ -34,12 +33,6 @@
 
 .page-title-row h1 {
     margin: 0;
-}
-
-@media (min-width: 992px) {
-    .navbar-spacer {
-        height: 56px;
-    }
 }
 
 /* Ensure fixed navbar has proper z-index */
