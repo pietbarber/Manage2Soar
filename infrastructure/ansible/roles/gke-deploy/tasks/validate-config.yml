@@ -192,10 +192,14 @@
       {% endif %}
 
       {% if gke_multi_tenant %}
+      {% if email_check_enabled %}
       Validated {{ gke_tenants | length }} tenant(s):
       {% for tenant in gke_tenants %}
         ✓ {{ tenant.prefix }}: email_dev_mode={{ tenant.email_dev_mode | default(gke_email_dev_mode) }}
       {% endfor %}
+      {% else %}
+      Tenant email_dev_mode values NOT validated (gke_validate_email_config=false)
+      {% endif %}
       {% endif %}
 
       Proceeding with deployment...
