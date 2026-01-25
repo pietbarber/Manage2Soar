@@ -19,8 +19,10 @@
    ========================================================================== */
 
 /* Issue #567: Spacer to prevent content from hiding behind fixed navbar
-   Bootstrap 5 fixed-top navbar default height is ~56px.
-   Increased to 60px to ensure no content clipping. */
+   Height is dynamically set by JavaScript (navbar-enhanced.js) to match
+   the actual navbar height, ensuring correct offset even if navbar height
+   changes due to text wrapping, zoom, or font size changes.
+   Default fallback: 60px (~56px navbar + buffer). */
 .navbar-spacer {
     height: 60px;
 }

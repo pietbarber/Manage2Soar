@@ -12,6 +12,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const navbar = document.getElementById('main-navbar');
     if (!navbar) return;
 
+    // Issue #567: Dynamically set navbar-spacer height to match actual navbar height
+    // This ensures content offset stays correct even if navbar height changes
+    // (e.g., text wrapping, zoom level, font size changes)
+    function updateNavbarSpacerHeight() {
+        const spacer = document.querySelector('.navbar-spacer');
+        if (spacer) {
+            const navbarHeight = navbar.offsetHeight;
+            spacer.style.height = navbarHeight + 'px';
+        }
+    }
+
+    // Set initial spacer height
+    updateNavbarSpacerHeight();
+
+    // Update on window resize (handles zoom, viewport changes)
+    let resizeTicking = false;
+    window.addEventListener('resize', function () {
+        if (!resizeTicking) {
+            resizeTicking = true;
+            window.requestAnimationFrame(function () {
+                updateNavbarSpacerHeight();
+                resizeTicking = false;
+            });
+        }
+    }, { passive: true });
+
     // Add shadow when scrolled - throttled with requestAnimationFrame
     let navbarShadowTicking = false;
 
