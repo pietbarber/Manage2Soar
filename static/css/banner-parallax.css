@@ -34,8 +34,12 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    /* Creates parallax effect on desktop
+     * Note: background-attachment: fixed can cause performance issues on some browsers,
+     * particularly mobile Safari and Firefox. Monitor scrolling performance if issues arise.
+     * This is disabled on mobile devices (see responsive section below).
+     */
     background-attachment: fixed;
-    /* Creates parallax effect on desktop */
     z-index: 1;
 }
 

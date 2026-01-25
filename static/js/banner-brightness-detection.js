@@ -1,0 +1,88 @@
+/**
+ * Banner Brightness Detection for Auto-Contrast Text
+ * Issue #547: Site Style Enhancements
+ *
+ * Analyzes banner image brightness to determine whether light or dark text
+ * should be used for optimal contrast.
+ */
+
+/**
+ * Brightness threshold for determining text color (0-255 scale)
+ * Values above this threshold are considered "bright" and get dark text
+ * Values below get light text
+ */
+const BRIGHTNESS_THRESHOLD = 140;
+
+/**
+ * Analyzes image brightness and applies appropriate text color class
+ * @param {string} imageUrl - URL of the banner image
+ * @param {string} bannerId - ID of the banner element
+ */
+function detectBannerBrightness(imageUrl, bannerId) {
+  const banner = document.getElementById(bannerId);
+  if (!banner) return;
+
+  const img = new Image();
+
+  // Only set crossOrigin for truly cross-origin URLs to avoid CORS issues
+  try {
+    const pageOrigin = window.location.origin;
+    const imgUrl = new URL(imageUrl, pageOrigin);
+    if (imgUrl.origin !== pageOrigin) {
+      img.crossOrigin = 'Anonymous';
+    }
+  } catch (e) {
+    // If URL parsing fails, skip setting crossOrigin
+    console.warn('Banner brightness detection: Unable to parse image URL', e);
+  }
+
+  img.onload = function() {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // Sample center region of image (avoid edges which may be darker/lighter)
+      const sampleWidth = Math.min(100, img.width);
+      const sampleHeight = Math.min(100, img.height);
+      const sampleX = (img.width - sampleWidth) / 2;
+      const sampleY = (img.height - sampleHeight) / 2;
+
+      const imageData = ctx.getImageData(sampleX, sampleY, sampleWidth, sampleHeight);
+      const data = imageData.data;
+
+      // Calculate average brightness
+      let totalBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // Weighted brightness calculation (human eye perceives green as brighter)
+        const brightness = (0.299 * r + 0.587 * g + 0.114 * b);
+        totalBrightness += brightness;
+      }
+      const avgBrightness = totalBrightness / (data.length / 4);
+
+      // Apply appropriate text color class based on brightness threshold
+      if (avgBrightness > BRIGHTNESS_THRESHOLD) {
+        banner.classList.add('dark-text');
+        banner.classList.remove('light-text');
+      } else {
+        banner.classList.add('light-text');
+        banner.classList.remove('dark-text');
+      }
+    } catch (error) {
+      console.warn('Banner brightness detection failed, using default light text:', error);
+      banner.classList.add('light-text');
+    }
+  };
+
+  img.onerror = function() {
+    console.warn('Banner image failed to load, using default light text');
+    banner.classList.add('light-text');
+  };
+
+  img.src = imageUrl;
+}

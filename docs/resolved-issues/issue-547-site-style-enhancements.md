@@ -133,6 +133,13 @@ static/css/
 - File size: optimize images to < 500KB for performance
 - Format: JPEG for photos, PNG for graphics
 
+### Post-Deployment Steps
+**CRITICAL**: After deploying CSS or JavaScript changes, always run:
+```bash
+python manage.py collectstatic --noinput
+```
+CSS and JS changes will NOT be visible until static files are collected. This applies to both development and production deployments.
+
 ## Testing
 
 ### E2E Test

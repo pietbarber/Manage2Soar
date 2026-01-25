@@ -21,6 +21,17 @@
     /* Default Bootstrap navbar height */
 }
 
+/* Page title row for CMS pages */
+.page-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.page-title-row h1 {
+    margin: 0;
+}
+
 @media (min-width: 992px) {
     .navbar-spacer {
         height: 56px;

@@ -8,9 +8,9 @@
 {% block content %}
   {% include 'cms/includes/banner.html' with page=page %}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;">
+  <div class="page-title-row">
     {% if not page.banner_image %}
-      <h1 style="margin:0">{{ page.title }}</h1>
+      <h1>{{ page.title }}</h1>
     {% else %}
       <div></div> {# Spacer when title is in banner #}
     {% endif %}
