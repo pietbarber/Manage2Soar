@@ -93,12 +93,12 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
 
         # The parent Members dropdown should have the active class
         members_dropdown = self.page.locator("#membersDropdown")
+        assert members_dropdown.count() > 0, "Members dropdown should exist"
 
-        if members_dropdown.count() > 0:
-            classes = members_dropdown.first.get_attribute("class") or ""
-            assert (
-                "active" in classes
-            ), f"Members dropdown should be active on /members/badges/, got: {classes}"
+        classes = members_dropdown.first.get_attribute("class") or ""
+        assert (
+            "active" in classes
+        ), f"Members dropdown should be active on /members/badges/, got: {classes}"
 
     def test_no_false_positive_substring_matching(self):
         """
@@ -195,13 +195,13 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
 
         # On homepage, the Members dropdown should NOT be active
         members_dropdown = self.page.locator("#membersDropdown")
+        assert members_dropdown.count() > 0, "Members dropdown should exist"
 
-        if members_dropdown.count() > 0:
-            classes = members_dropdown.first.get_attribute("class") or ""
-            # Members dropdown should NOT be active when on homepage
-            assert (
-                "active" not in classes
-            ), f"Members dropdown should NOT be active on homepage, got: {classes}"
+        classes = members_dropdown.first.get_attribute("class") or ""
+        # Members dropdown should NOT be active when on homepage
+        assert (
+            "active" not in classes
+        ), f"Members dropdown should NOT be active on homepage, got: {classes}"
 
     def test_active_link_styling_visible(self):
         """Verify active links have visible styling (dusty rose indicator)."""

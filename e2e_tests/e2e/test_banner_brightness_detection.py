@@ -147,21 +147,12 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
 
         # Wait for the brightness detection to complete
-        try:
-            self.page.wait_for_selector("#page-banner.light-text", timeout=5000)
-            banner = self.page.locator("#page-banner")
-            classes = banner.get_attribute("class") or ""
-            assert (
-                "light-text" in classes
-            ), f"Dark banner should have 'light-text', got: {classes}"
-        except Exception:
-            banner = self.page.locator("#page-banner")
-            if banner.count() > 0:
-                classes = banner.get_attribute("class") or ""
-                # Verify at least one contrast class is applied
-                assert (
-                    "dark-text" in classes or "light-text" in classes
-                ), f"Banner should have text contrast class, got: {classes}"
+        self.page.wait_for_selector("#page-banner.light-text", timeout=5000)
+        banner = self.page.locator("#page-banner")
+        classes = banner.get_attribute("class") or ""
+        assert (
+            "light-text" in classes
+        ), f"Dark banner should have 'light-text', got: {classes}"
 
     def test_brightness_detection_completes(self):
         """Verify brightness detection runs and applies a text class."""
@@ -179,13 +170,13 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
 
         # Check that brightness detection added a class
         banner = self.page.locator("#page-banner")
+        assert banner.count() > 0, "#page-banner should exist"
 
-        if banner.count() > 0:
-            classes = banner.get_attribute("class") or ""
-            has_contrast_class = "dark-text" in classes or "light-text" in classes
-            assert (
-                has_contrast_class
-            ), f"Banner should have 'dark-text' or 'light-text' class after detection, got: {classes}"
+        classes = banner.get_attribute("class") or ""
+        has_contrast_class = "dark-text" in classes or "light-text" in classes
+        assert (
+            has_contrast_class
+        ), f"Banner should have 'dark-text' or 'light-text' class after detection, got: {classes}"
 
     def test_page_without_banner_has_no_brightness_detection(self):
         """Verify pages without banners don't trigger brightness detection."""
