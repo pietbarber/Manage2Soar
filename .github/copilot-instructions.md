@@ -49,6 +49,26 @@
   3. **Expect new terminals**: Background processes, long-running commands, and time gaps between commands often spawn new terminals
 - **WORKFLOW**: When you see "command not found" errors, immediately run `source .venv/bin/activate` and retry the command.
 
+## Git Workflow - NEVER COMMIT TO MAIN ⚠️
+- **CRITICAL RULE**: NEVER commit directly to the `main` branch. ALL changes must go through feature branches and pull requests.
+- **Before ANY commit**, verify you are on a feature branch:
+  ```bash
+  git branch --show-current  # Must NOT be "main"
+  ```
+- **If starting new work**:
+  1. Ensure you're on main: `git checkout main && git pull`
+  2. Create a feature branch: `git checkout -b feature/issue-XXX-description`
+  3. Make changes and commit to the feature branch
+  4. Push: `git push -u origin feature/issue-XXX-description`
+  5. Create PR via GitHub
+- **If you accidentally committed to main**:
+  1. Note the commit hash: `git log --oneline -1`
+  2. Reset main: `git reset --hard HEAD~1` (or to specific commit)
+  3. Force push: `git push --force origin main`
+  4. Create branch and cherry-pick: `git checkout -b feature/issue-XXX && git cherry-pick <hash>`
+- **Branch naming**: `feature/issue-XXX-short-description` (e.g., `feature/issue-558-e2e-tests`)
+- **WHY**: Direct commits bypass code review, CI checks, and Copilot review. PRs ensure quality.
+
 ## Django Development Server Management
 - **CRITICAL PORT REQUIREMENT**: Development server MUST run on port 8001 due to HSTS cache issues on port 8000. NEVER use port 8001 in production.
 - **DEVELOPMENT SERVER COMMAND**: Always use `python manage.py runserver 127.0.0.1:8001` for local development
