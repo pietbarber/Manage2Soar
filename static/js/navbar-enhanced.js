@@ -44,8 +44,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Exact match for root, or path segment match for others
         // Ensures '/member' doesn't match when on '/members/123'
+        // Handle both trailing-slash and non-trailing-slash URLs
         const isActive = (href === '/' && currentPath === '/') ||
-            (href !== '/' && (currentPath === href || (currentPath.startsWith(href + '/') && href.endsWith('/'))));
+            (href !== '/' && (currentPath === href || currentPath.startsWith(href.endsWith('/') ? href : href + '/')));
 
         if (isActive) {
             link.classList.add('active');

@@ -24,7 +24,7 @@
   // Initialize banner brightness detection
   document.addEventListener('DOMContentLoaded', function() {
     const bannerImage = document.getElementById('banner-image');
-    if (bannerImage) {
+    if (bannerImage && typeof detectBannerBrightness === 'function') {
       const imageUrl = bannerImage.dataset.imageUrl;
       if (imageUrl) {
         detectBannerBrightness(imageUrl, 'page-banner');
