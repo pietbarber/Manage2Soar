@@ -61,37 +61,10 @@
         height: 1.5em !important;
     }
 
-    /* Better positioning and spacing for collapsed menu */
-    .navbar-collapse {
-        margin-top: 1rem;
-    }
+    /* Note: Mobile navbar styles moved to navbar-enhanced.css (Issue #547) */
+    /* Old navbar-collapse and nav-link mobile styles removed as dead code */
 
-    /* Make navigation links much larger for mobile */
-    .navbar-nav .nav-link {
-        padding: 1rem 1.5rem !important;
-        font-size: 1.3rem !important;
-        font-weight: 500 !important;
-        min-height: 48px !important;
-        display: flex !important;
-        align-items: center !important;
-    }
-
-    /* Dropdown menu items also larger */
-    .navbar-nav .dropdown-menu {
-        margin-left: var(--bs-spacer-3, 1rem);
-        margin-right: var(--bs-spacer-3, 1rem);
-        font-size: 1.2rem !important;
-    }
-
-    .navbar-nav .dropdown-item {
-        padding: 0.75rem 1.5rem !important;
-        font-size: 1.2rem !important;
-        min-height: 48px !important;
-        display: flex !important;
-        align-items: center !important;
-    }
-
-    /* Make navbar brand larger too */
+    /* Make navbar brand larger for mobile */
     .navbar-brand {
         font-size: 1.4rem !important;
         font-weight: 600 !important;

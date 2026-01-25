@@ -7,6 +7,9 @@
  * - Automatic text contrast based on image brightness
  * - Responsive sizing for mobile devices
  * - Gradient overlay for text readability
+ *
+ * IMPORTANT: After modifying this file, run `python manage.py collectstatic`
+ * CSS changes are NOT visible until collected!
  */
 
 /* ==========================================================================

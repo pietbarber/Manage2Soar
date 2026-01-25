@@ -42,11 +42,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const href = link.getAttribute('href');
         if (!href || href === '#') return;
 
-        // Exact match for root, or path segment match for others
+        // Exact match, or path segment match for non-root links
         // Ensures '/member' doesn't match when on '/members/123'
-        // Handle both trailing-slash and non-trailing-slash URLs
-        const isActive = (href === '/' && currentPath === '/') ||
-            (href !== '/' && (currentPath === href || currentPath.startsWith(href.endsWith('/') ? href : href + '/')));
+        const isActive =
+            currentPath === href ||
+            (href !== '/' && currentPath.startsWith(href + '/'));
 
         if (isActive) {
             link.classList.add('active');

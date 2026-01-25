@@ -39,6 +39,11 @@ function detectBannerBrightness(imageUrl, bannerId) {
     img.onload = function () {
         try {
             // Sample center region of image (avoid edges which may be darker/lighter)
+            // Note: This samples a 100x100 center region for performance. For images with
+            // non-uniform brightness, consider future enhancements:
+            // - Sample the specific region where text overlay appears
+            // - Sample multiple regions and use weighted averages
+            // - Add manual override option in CMS admin for edge cases
             const sampleWidth = Math.min(100, img.width);
             const sampleHeight = Math.min(100, img.height);
             const sampleX = (img.width - sampleWidth) / 2;

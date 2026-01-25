@@ -8,6 +8,10 @@
  * - Larger touch targets for mobile
  * - Active page highlighting
  * - Print-friendly (hidden when printing)
+ *
+ * IMPORTANT: After modifying this file, run `python manage.py collectstatic`
+ * CSS changes are NOT visible until collected!
+ */
  * - Backdrop overlay when mobile menu is open
  */
 

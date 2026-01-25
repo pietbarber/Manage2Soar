@@ -96,6 +96,7 @@
             {% endif %}
             {{ siteconfig.club_name|default:'Menu' }}
           </span>
+          {# tabindex="-1" is Bootstrap default for offcanvas. Focus management (to offcanvas when opened, ESC to close, focus return to toggle) is handled by Bootstrap. Manual keyboard testing recommended after CSS changes. #}
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body">
