@@ -86,7 +86,13 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
         ), f"Duty Roster dropdown toggle should have 'active' class, got: {classes}"
 
     def test_nested_path_highlights_parent_dropdown(self):
-        """Verify nested paths like /members/badges/ highlight the parent Members dropdown."""
+        """
+        Verify nested paths like /members/badges/ highlight the parent Members dropdown.
+
+        This test exercises the "path segment match" branch in navbar-enhanced.js:
+        currentPath.startsWith(href + '/') where href='/members/' and
+        currentPath='/members/badges/', so /members/ should be highlighted.
+        """
         # Navigate to a known nested path under members
         self.page.goto(f"{self.live_server_url}/members/badges/")
         self.page.wait_for_load_state("networkidle")

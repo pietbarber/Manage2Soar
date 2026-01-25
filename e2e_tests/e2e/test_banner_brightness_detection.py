@@ -6,8 +6,12 @@ Issue #558: Add E2E tests for navbar active highlighting and banner brightness d
 These tests verify that the JavaScript in banner-brightness-detection.js correctly:
 - Detects bright banner images and applies 'dark-text' class
 - Detects dark banner images and applies 'light-text' class
-- Falls back to light text when image fails to load
 - Handles same-origin images correctly
+- Validates the brightness threshold constant (140)
+- Confirms the detectBannerBrightness function exists
+
+NOTE: Testing actual CORS/canvas security errors or image load failures is
+difficult to reliably test in an E2E environment without mocking.
 """
 
 import os
@@ -37,12 +41,12 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
     @classmethod
     def setUpClass(cls):
         """Create test image files for brightness detection tests."""
-        # Override MEDIA_ROOT BEFORE starting live server
-        from django.conf import settings
+        # Use override_settings for proper test isolation
+        from django.test import override_settings
 
-        cls._original_media_root = settings.MEDIA_ROOT
         cls.test_media_root = tempfile.mkdtemp(prefix="test_media_")
-        settings.MEDIA_ROOT = cls.test_media_root
+        cls._media_override = override_settings(MEDIA_ROOT=cls.test_media_root)
+        cls._media_override.enable()
 
         # Now start the live server with overridden MEDIA_ROOT
         super().setUpClass()
@@ -67,17 +71,17 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         """Clean up test image files and test media directory."""
         import shutil
 
-        from django.conf import settings
-
         # Clean up test images
         if hasattr(cls, "temp_dir") and os.path.exists(cls.temp_dir):
             shutil.rmtree(cls.temp_dir)
 
-        # Clean up test media directory and restore original MEDIA_ROOT
+        # Clean up test media directory
         if hasattr(cls, "test_media_root") and os.path.exists(cls.test_media_root):
             shutil.rmtree(cls.test_media_root)
-        if hasattr(cls, "_original_media_root"):
-            settings.MEDIA_ROOT = cls._original_media_root
+
+        # Disable override_settings to restore original MEDIA_ROOT
+        if hasattr(cls, "_media_override"):
+            cls._media_override.disable()
 
         super().tearDownClass()
 
