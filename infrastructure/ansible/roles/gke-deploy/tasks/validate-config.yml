@@ -17,8 +17,7 @@
 - name: Validate EMAIL_DEV_MODE for production tenants
   ansible.builtin.assert:
     that:
-      - item.email_dev_mode is defined
-      - item.email_dev_mode == false or (gke_environment | default('production')) != 'production'
+      - item.email_dev_mode is not defined or item.email_dev_mode == false or (gke_environment | default('production')) != 'production'
     fail_msg: |
       ════════════════════════════════════════════════════════════════════════
       🚨 CRITICAL CONFIGURATION ERROR 🚨
@@ -29,7 +28,7 @@
 
       This is DANGEROUS for production deployments!
 
-      When email_dev_mode is true or undefined, ALL emails will be redirected
+      When email_dev_mode is true (or not explicitly set to false), ALL emails will be redirected
       to development addresses instead of real recipients. This breaks:
         - Duty roster notifications
         - Membership applications
@@ -159,19 +158,34 @@
 - name: Display validation summary
   ansible.builtin.debug:
     msg: |
+      {% set email_check_enabled = gke_validate_email_config | default(true) | bool %}
+      {% set security_check_enabled = gke_validate_security | default(true) | bool %}
       ════════════════════════════════════════════════════════════════════════
       ✅ PRE-DEPLOYMENT VALIDATION PASSED
       ════════════════════════════════════════════════════════════════════════
 
+      {% if email_check_enabled and security_check_enabled %}
       All critical configuration checks passed:
+      {% else %}
+      Critical configuration checks status:
+      {% endif %}
+
+      {% if email_check_enabled %}
         ✓ Email configuration (email_dev_mode)
+      {% else %}
+        - Email configuration (email_dev_mode) SKIPPED (gke_validate_email_config=false)
+      {% endif %}
         ✓ Django DEBUG mode
+      {% if security_check_enabled %}
         ✓ ALLOWED_HOSTS security
+      {% else %}
+        - ALLOWED_HOSTS security check SKIPPED (gke_validate_security=false)
+      {% endif %}
 
       {% if gke_multi_tenant %}
       Validated {{ gke_tenants | length }} tenant(s):
       {% for tenant in gke_tenants %}
-        ✓ {{ tenant.prefix }}: email_dev_mode={{ tenant.email_dev_mode }}
+        ✓ {{ tenant.prefix }}: email_dev_mode={{ tenant.email_dev_mode | default(gke_email_dev_mode) }}
       {% endfor %}
       {% endif %}
 

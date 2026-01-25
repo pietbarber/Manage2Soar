@@ -92,6 +92,11 @@ gcp_ssh_public_keys: []
 # Enable HTTP (port 80) firewall rule for Let's Encrypt HTTP-01 challenge
 # Set to true on mail servers that use Let's Encrypt for TLS certificates
 # Issue #529: This enables ACME HTTP-01 validation for certificate renewal
+#
+# WARNING: Enabling this opens port 80 to the entire internet (0.0.0.0/0)
+# Only enable if you have properly configured certbot or web server to handle
+# HTTP-01 ACME challenges. Consider DNS-01 challenge as a more secure alternative.
+# See: https://letsencrypt.org/docs/challenge-types/
 gcp_enable_http_firewall: false
 
 # Ansible SSH connection settings (optional)

@@ -170,7 +170,7 @@ gcloud compute firewall-rules create m2s-mail-allow-http \
 **IaC Backfill (Issue #529, 2026-01-25)**:
 - ✅ Added `gcp_enable_http_firewall` variable to `roles/gcp-vm/defaults/main.yml`
 - ✅ Added HTTP firewall rule task to `roles/gcp-vm/tasks/main.yml`
-- ✅ Enabled HTTP firewall for mail server in `group_vars/gcp_mail/vars.yml`
+- ✅ Variable can be enabled in `group_vars/gcp_mail/vars.yml` when Let's Encrypt is needed
 
 The HTTP firewall rule is now controlled by `gcp_enable_http_firewall: true` (default: false).
 Mail servers with Let's Encrypt should enable this, other servers can leave it disabled.
