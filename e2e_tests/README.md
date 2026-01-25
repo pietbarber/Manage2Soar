@@ -33,7 +33,13 @@ The `DjangoPlaywrightTestCase` base class sets the `DJANGO_ALLOW_ASYNC_UNSAFE` e
 
 - `conftest.py`: Playwright fixtures and `DjangoPlaywrightTestCase` base class
 - `test_basic_setup.py`: Basic Playwright integration tests (homepage, login, Bootstrap JS)
+- `test_navbar_active_highlighting.py`: Navbar active page highlighting tests (Issue #558)
+- `test_banner_brightness_detection.py`: Banner auto-contrast text detection tests (Issue #558)
 - `test_tinymce.py`: TinyMCE editor tests (initialization, YouTube embedding, media dialog)
+- `test_duty_percentage_validation.py`: Duty roster percentage validation tests
+- `test_kiosk_authentication.py`: Kiosk authentication mode tests
+- `test_logsheet_altitude_buttons.py`: Logsheet altitude button interaction tests
+- `test_maintenance_deadline_update.py`: Maintenance deadline update tests
 
 ### Writing E2E Tests
 
@@ -73,3 +79,5 @@ pytest e2e_tests/e2e/ --cov=. --cov-report=term-missing -v
 
 - Issue #389: Playwright-pytest integration
 - Issue #422: TinyMCE YouTube embedding bug (confirmed via xfail test)
+- Issue #547: Site Style Enhancements (navbar, banners)
+- Issue #558: E2E tests for navbar active highlighting and banner brightness detection
