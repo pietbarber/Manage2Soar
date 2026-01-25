@@ -89,6 +89,49 @@
         max-width: 320px;
     }
 
+    /* Enhanced backdrop overlay - darker grey when menu is open */
+    .offcanvas-backdrop {
+        background-color: #000;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .offcanvas-backdrop.show {
+        opacity: 0.6;
+    }
+
+    /* Smooth slide-in animation for sidebar */
+    .navbar-offcanvas {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    /* Off-canvas header styling */
+    .navbar-offcanvas .offcanvas-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        background-color: #1a1d20;
+    }
+
+    .navbar-offcanvas .offcanvas-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-offcanvas .offcanvas-title img {
+        filter: brightness(1.1);
+    }
+
+    .navbar-offcanvas .btn-close-white {
+        opacity: 0.8;
+        transition: opacity 0.15s ease;
+    }
+
+    .navbar-offcanvas .btn-close-white:hover {
+        opacity: 1;
+    }
+
     .navbar-offcanvas .offcanvas-body {
         padding: 0;
         display: flex;
