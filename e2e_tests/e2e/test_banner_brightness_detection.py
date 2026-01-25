@@ -250,14 +250,6 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
 class TestBannerBrightnessEdgeCases(DjangoPlaywrightTestCase):
     """Edge case tests for banner brightness detection."""
 
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-
     def setUp(self):
         super().setUp()
         self.create_test_member(username="edge_case_admin", is_superuser=True)

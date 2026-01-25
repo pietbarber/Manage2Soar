@@ -51,6 +51,7 @@
 
 ## Git Workflow - NEVER COMMIT TO MAIN ⚠️
 - **CRITICAL RULE**: NEVER commit directly to the `main` branch. ALL changes must go through feature branches and pull requests.
+- **ONLY EXCEPTION**: If you accidentally committed to main, a revert commit to main is acceptable to undo the damage, then move work to a feature branch.
 - **Before ANY commit**, verify you are on a feature branch:
   ```bash
   git branch --show-current  # Must NOT be "main"
