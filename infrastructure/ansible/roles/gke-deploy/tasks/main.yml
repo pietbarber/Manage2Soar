@@ -4,6 +4,17 @@
 # Deploys Django application to Google Kubernetes Engine
 
 # ============================================================
+# PRE-DEPLOYMENT VALIDATION (Issue #529)
+# ============================================================
+# CRITICAL: Run configuration validation BEFORE any other tasks.
+# This catches dangerous misconfigurations like email_dev_mode: true
+# in production before any deployment actions occur.
+
+- name: Include pre-deployment validation
+  ansible.builtin.include_tasks: validate-config.yml
+  tags: [validate, always]
+
+# ============================================================
 # PREREQUISITES
 # ============================================================
 

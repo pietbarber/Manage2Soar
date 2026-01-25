@@ -89,6 +89,11 @@ gcp_ssh_allowed_sources: []
 #   - "admin:ssh-rsa AAAAB3Nz... admin@workstation"
 gcp_ssh_public_keys: []
 
+# Enable HTTP (port 80) firewall rule for Let's Encrypt HTTP-01 challenge
+# Set to true on mail servers that use Let's Encrypt for TLS certificates
+# Issue #529: This enables ACME HTTP-01 validation for certificate renewal
+gcp_enable_http_firewall: false
+
 # Ansible SSH connection settings (optional)
 # If not set, Ansible will use your local username
 # gcp_ansible_user: "pb"

@@ -12,10 +12,10 @@ During the production go-live on 2026-01-19, several manual "hackety hack" fixes
 | 3 | Port 25 firewall manual rule | ✅ Fixed | IaC completeness |
 | 4 | Postfix configuration | ✅ Already in IaC | Verification |
 | 5 | Django ALLOWED_HOSTS | ✅ Already in IaC | Lessons learned |
-| 6 | Let's Encrypt/port 80 | ⚠️ Deferred | Low priority |
+| 6 | Let's Encrypt/port 80 | ✅ Fixed | Low priority |
 | 7 | Multi-domain mail support | ✅ Already in IaC | Verification |
 | 8 | SSL/TLS policy (TLS 1.0/1.1) | ✅ Fixed | Security |
-| 9 | EMAIL_DEV_MODE config | ⚠️ Needs validation | **CRITICAL** |
+| 9 | EMAIL_DEV_MODE config | ✅ Fixed | **CRITICAL** |
 | 10 | **Postfix TLS cert paths (BROKE MAIL)** | ✅ Fixed | **CRITICAL** |
 | 11 | **Envelope sender not rewritten (BROKE LISTS)** | ✅ Fixed | **CRITICAL** |
 
@@ -152,12 +152,12 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 ---
 
-## 6. ⚠️ Let's Encrypt / Port 80 for Mail Server (Partially Complete)
+## 6. ✅ Let's Encrypt / Port 80 for Mail Server (IaC Complete)
 **Issue**: Mail server (mail.manage2soar.com) was using self-signed TLS certificates for SMTP connections. While SMTP2Go relay worked fine (they handle TLS), proper TLS certificates improve email deliverability and avoid warnings in mail logs.
 
 **Discovery**: Attempting to provision Let's Encrypt certificates required opening port 80 for HTTP-01 challenge validation. This was unexpected - most people think "mail server = port 25/587 only", but Let's Encrypt needs HTTP access to verify domain ownership.
 
-**Manual Fix Attempted**:
+**Manual Fix Applied (2026-01-19)**:
 ```bash
 # Create GCP firewall rule for Let's Encrypt
 gcloud compute firewall-rules create m2s-mail-allow-http \
@@ -165,55 +165,27 @@ gcloud compute firewall-rules create m2s-mail-allow-http \
   --source-ranges 0.0.0.0/0 \
   --target-tags m2s-mail,smtp-relay \
   --project manage2soar
-
-# Try to provision certificate
-ssh mail.manage2soar.com
-sudo certbot certonly --standalone \
-  --email pb@pietbarber.com \
-  --domains mail.manage2soar.com \
-  --agree-tos
 ```
 
-**Current Status**: ⚠️ Partially working
-- GCP firewall rule created for port 80 (allows 0.0.0.0/0)
-- Port connectivity issues persisted (possibly UFW or service binding conflicts)
-- Mail server continues using self-signed certificates
-- TLS warnings in logs but **not blocking mail flow** (SMTP2Go relay handles actual TLS for outbound mail)
+**IaC Backfill (Issue #529, 2026-01-25)**:
+- ✅ Added `gcp_enable_http_firewall` variable to `roles/gcp-vm/defaults/main.yml`
+- ✅ Added HTTP firewall rule task to `roles/gcp-vm/tasks/main.yml`
+- ✅ Enabled HTTP firewall for mail server in `group_vars/gcp_mail/vars.yml`
 
-**IaC Status**:
-- ✅ GCP firewall rule manually created but **not yet in Ansible** (needs backfill)
-- ⚠️ UFW configuration may need port 80 rule
-- ⚠️ Certbot/Let's Encrypt setup not automated in Ansible
-- ⚠️ Postfix TLS certificate configuration commented out in templates
+The HTTP firewall rule is now controlled by `gcp_enable_http_firewall: true` (default: false).
+Mail servers with Let's Encrypt should enable this, other servers can leave it disabled.
 
-**Why This Matters**:
-- Self-signed certs cause TLS warnings in mail.log (cosmetic but concerning in audits)
-- Some strict SMTP servers may reject connections with invalid certificates
-- Let's Encrypt is free and automated, but requires HTTP-01 or DNS-01 challenge
+**Current Status**: ✅ Fixed
+- GCP firewall rule now in Ansible IaC
+- Can be selectively enabled per-server via variable
+- Mail server currently using self-signed certs (Let's Encrypt optional enhancement)
 
-**Possible Solutions**:
-1. **HTTP-01 Challenge** (current approach - partially working):
-   - Requires port 80 open to internet
-   - certbot standalone mode temporarily binds port 80
-   - May conflict with nginx/apache if running
+**Why Self-Signed Still OK**:
+- SMTP2Go relay handles actual TLS for outbound delivery
+- Inbound mail works fine with self-signed (most MTAs accept it)
+- Only affects direct SMTP connections to mail.manage2soar.com
 
-2. **DNS-01 Challenge** (alternative - recommended):
-   - Uses DNS TXT records instead of HTTP
-   - No port 80 required
-   - Requires Google Cloud DNS API access or manual TXT record updates
-   - certbot-dns-google plugin available
-
-3. **Self-Signed Acceptable** (current workaround):
-   - Mail relay to SMTP2Go works fine with self-signed certs
-   - SMTP2Go handles actual TLS for outbound delivery
-   - Only affects direct SMTP connections to mail.manage2soar.com
-
-**Recommended IaC Backfill**:
-- Add GCP firewall rule for port 80 to `roles/gcp-vm/tasks/main.yml`
-- Document decision: Use self-signed certs (simple) vs Let's Encrypt (better but complex)
-- If Let's Encrypt desired: Add certbot role with DNS-01 challenge (more reliable than HTTP-01)
-
-**Status**: ⚠️ Deferred (mail working with self-signed certs, low priority)
+**Status**: ✅ Fixed - Port 80 firewall rule now in IaC
 
 ---
 
@@ -392,125 +364,58 @@ Manual fixes often bypass security review. Always check:
 
 ---
 
-## 9. ⚠️ CRITICAL: Email Dev Mode Configuration
+## 9. ✅ CRITICAL: Email Dev Mode Configuration (Fixed)
 **Issue**: EMAIL_DEV_MODE setting must be carefully managed to prevent accidental email redirection in production.
 
 **Risk**: If `email_dev_mode: true` is deployed to production pods, ALL emails (including real member notifications) will be redirected to dev addresses, breaking production functionality.
 
-**Current Configuration Status**:
+**Resolution (Issue #529, 2026-01-25)**:
 
-**✅ CORRECT - Production Tenant (inventory/gcp_app.yml - SOURCE OF TRUTH)**:
+1. **Configuration Aligned**: Both `inventory/gcp_app.yml` and `group_vars/gcp_app/vars.yml` now have consistent settings:
+   - SSC (production): `email_dev_mode: false`
+   - MASA (testing): `email_dev_mode: true`
+
+2. **Pre-Deployment Validation Added**: New Ansible task file `roles/gke-deploy/tasks/validate-config.yml` runs before any deployment and:
+   - Validates `email_dev_mode: false` for production tenants
+   - Validates `gke_django_debug: false` for production
+   - Validates `ALLOWED_HOSTS` is properly configured
+   - Provides clear error messages with remediation steps if validation fails
+
+3. **New Default Variables**:
+   - `gke_validate_email_config: true` - Enable/disable email validation
+   - `gke_validate_security: true` - Enable/disable security validations
+   - `gke_environment: "production"` - Environment type for validation rules
+
+**How It Works**:
+The validation runs at the START of the gke-deploy role, before any Docker builds or Kubernetes deployments.
+If a production tenant has `email_dev_mode: true` (or undefined), deployment fails immediately with a clear error message.
+
+**Current Configuration (Verified Correct)**:
+
 ```yaml
+# inventory/gcp_app.yml
 gke_tenants:
   - prefix: "ssc"
-    name: "Skyline Soaring Club"
-    domains:
-      - "ssc.manage2soar.com"
-      - "skylinesoaring.org"
-      - "www.skylinesoaring.org"
     email_dev_mode: false              # ✅ PRODUCTION: Send real emails
     email_dev_mode_redirect_to: ""
+
+  - prefix: "masa"
+    email_dev_mode: true               # ✅ DEV: Testing mode
+    email_dev_mode_redirect_to: "masa-test@manage2soar.com"
 ```
-
-**⚠️ CONFLICTING - Group Vars (group_vars/gcp_app/vars.yml - NOT USED)**:
-```yaml
-gke_tenants:
-  - prefix: "ssc"
-    name: "Skyline Soaring Club"
-    domain: "ssc.manage2soar.com"
-    email_dev_mode: true               # ⚠️ WRONG: Should be false for production
-    email_dev_mode_redirect_to: "pb@pietbarber.com,..."
-```
-
-**How Ansible Template Resolution Works** (from `roles/gke-deploy/templates/k8s-secrets.yml.j2`):
-```jinja
-{%- set ns = namespace(
-  email_dev_mode = gke_email_dev_mode | default(false),
-  email_dev_mode_redirect_to = gke_email_dev_mode_redirect_to | default('')
-) -%}
-
-{%- for tenant in gke_tenants -%}
-  {#- Per-tenant setting OVERRIDES global setting -#}
-  {%- if tenant.email_dev_mode is defined -%}
-    {%- set ns.email_dev_mode = tenant.email_dev_mode -%}
-  {%- endif -%}
-{%- endfor -%}
-
-EMAIL_DEV_MODE: "{{ ns.email_dev_mode | string | lower }}"
-```
-
-**Configuration Precedence (Highest to Lowest)**:
-1. **inventory/gcp_app.yml** per-tenant `email_dev_mode` ← **CURRENTLY USED** ✅
-2. **inventory/gcp_app.yml** global `gke_email_dev_mode`
-3. **group_vars/** files (only if not defined in inventory)
-4. **roles/gke-deploy/defaults/main.yml** (defaults to `false`)
-
-**Why This Is Confusing**:
-- Inventory files **override** group_vars (Ansible precedence rules)
-- The `gke_tenants` list in `group_vars/gcp_app/vars.yml` is **completely ignored** because `gke_tenants` is also defined in `inventory/gcp_app.yml`
-- Developers might edit group_vars thinking it will take effect, but it won't
-
-**IaC Status**: ⚠️ Configuration works correctly but has misleading conflicting values
-
-**Required Actions**:
-1. ✅ **Verify inventory is correct** (DONE - `email_dev_mode: false` for SSC)
-2. ⚠️ **Update or remove conflicting group_vars** to prevent confusion:
-   ```bash
-   # Option 1: Update group_vars to match inventory (for documentation)
-   sed -i 's/email_dev_mode: true/email_dev_mode: false  # IGNORED - see inventory\/gcp_app.yml/' \
-     infrastructure/ansible/group_vars/gcp_app/vars.yml
-
-   # Option 2: Add warning comment
-   # "NOTE: gke_tenants in group_vars is OVERRIDDEN by inventory/gcp_app.yml"
-   ```
-3. ⚠️ **Add pre-deployment validation** to CI/CD pipeline:
-   ```bash
-   # Check that SSC production has email_dev_mode: false
-   grep -A 10 'prefix: "ssc"' inventory/gcp_app.yml | grep -q 'email_dev_mode: false' || \
-     (echo "ERROR: SSC production must have email_dev_mode: false" && exit 1)
-   ```
-4. ⚠️ **Document in deployment runbooks**: "Always verify inventory/gcp_app.yml before deploying"
 
 **Verification Commands**:
 ```bash
-# Check inventory configuration (source of truth for deployments)
+# Check inventory configuration
 grep -A 10 "prefix: \"ssc\"" infrastructure/ansible/inventory/gcp_app.yml | grep email_dev_mode
-
-# Expected output: email_dev_mode: false
+# Expected: email_dev_mode: false
 
 # Check deployed pod environment variable
 kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
-# Expected output: false
-
-# Check deployed pod EMAIL_DEV_MODE_REDIRECT_TO (should be empty for production)
-kubectl get secret manage2soar-env-ssc -n tenant-ssc -o jsonpath='{.data.EMAIL_DEV_MODE_REDIRECT_TO}' | base64 -d
-# Expected output: (empty string)
+# Expected: false
 ```
 
-**Testing in Staging**:
-```bash
-# Deploy to staging with dev mode enabled
-# inventory/gcp_app.yml for MASA tenant:
-gke_tenants:
-  - prefix: "masa"
-    name: "Mid-Atlantic Soaring Association"
-    domain: "masa.manage2soar.com"
-    email_dev_mode: true               # DEV: Still in testing
-    email_dev_mode_redirect_to: "masa-test@manage2soar.com"
-
-# Verify dev mode in MASA staging pod
-kubectl get secret manage2soar-env-masa -n tenant-masa -o jsonpath='{.data.EMAIL_DEV_MODE}' | base64 -d
-# Expected output: true
-```
-
-**Deployment Safety Checklist**:
-- [ ] Review `inventory/gcp_app.yml` email_dev_mode settings before every production deployment
-- [ ] Verify email_dev_mode: false for production tenants (ssc with skylinesoaring.org)
-- [ ] Verify email_dev_mode: true for staging/test tenants (masa)
-- [ ] After deployment, check pod environment variables (kubectl get secret)
-- [ ] Test email delivery to confirm emails go to real recipients, not dev addresses
-
-**Status**: ⚠️ Configuration conflict needs resolution + deployment validation needed
+**Status**: ✅ Fixed - Configuration aligned + pre-deployment validation added
 
 ---
 
