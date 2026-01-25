@@ -6,7 +6,7 @@ from django.utils.text import slugify
 from tinymce.models import HTMLField
 
 from utils.upload_document_obfuscated import upload_document_obfuscated
-from utils.upload_entropy import upload_homepage_gallery
+from utils.upload_entropy import upload_cms_banner, upload_homepage_gallery
 
 # Thread-local storage for recursion guards
 _thread_locals = threading.local()
@@ -242,6 +242,12 @@ class Page(models.Model):
     )
     content = HTMLField(blank=True)
     is_public = models.BooleanField(default=True)
+    banner_image = models.ImageField(
+        upload_to=upload_cms_banner,
+        blank=True,
+        null=True,
+        help_text="Banner image displayed at top of page with parallax effect. Recommended size: 1920x600px.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

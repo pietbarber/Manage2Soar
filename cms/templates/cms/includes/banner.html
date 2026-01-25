@@ -1,0 +1,80 @@
+{% load static %}
+{% comment %}
+  Banner Image Partial
+  Usage: include 'cms/includes/banner.html' with page=page
+
+  Displays a full-width parallax banner with the page title overlaid.
+  Automatically adjusts text color for contrast using JavaScript.
+{% endcomment %}
+{% if page.banner_image %}
+<div class="page-banner" id="page-banner">
+  <div class="page-banner-image"
+       id="banner-image"
+       style="background-image: url('{{ page.banner_image.url }}');"
+       data-image-url="{{ page.banner_image.url }}">
+  </div>
+  <div class="page-banner-overlay"></div>
+  <div class="page-banner-content">
+    <h1 class="page-banner-title">{{ page.title }}</h1>
+  </div>
+</div>
+<script>
+  // Auto-contrast: Analyze banner image and set appropriate text color
+  (function() {
+    const banner = document.getElementById('page-banner');
+    const bannerImage = document.getElementById('banner-image');
+    if (!banner || !bannerImage) return;
+
+    const imageUrl = bannerImage.dataset.imageUrl;
+    if (!imageUrl) return;
+
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = function() {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Sample a smaller version for performance
+        const sampleSize = 50;
+        canvas.width = sampleSize;
+        canvas.height = sampleSize;
+
+        ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
+        const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+        const data = imageData.data;
+
+        // Calculate average brightness
+        let totalBrightness = 0;
+        const pixelCount = data.length / 4;
+
+        for (let i = 0; i < data.length; i += 4) {
+          // Using relative luminance formula
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const brightness = (0.299 * r + 0.587 * g + 0.114 * b);
+          totalBrightness += brightness;
+        }
+
+        const avgBrightness = totalBrightness / pixelCount;
+
+        // If image is bright (> 128 on 0-255 scale), use dark text
+        if (avgBrightness > 140) {
+          banner.classList.add('dark-text');
+        } else {
+          banner.classList.add('light-text');
+        }
+      } catch (e) {
+        // CORS or other error - default to light text (safe for most images)
+        console.log('Banner contrast detection failed, defaulting to light text');
+        banner.classList.add('light-text');
+      }
+    };
+    img.onerror = function() {
+      banner.classList.add('light-text');
+    };
+    img.src = imageUrl;
+  })();
+</script>
+{% endif %}
