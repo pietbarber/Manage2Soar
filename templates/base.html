@@ -81,14 +81,24 @@
         {{ siteconfig.club_name|default:'Manage2Soar' }}
       </a>
 
-      <!-- Hamburger toggle button -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
-        aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <!-- Hamburger toggle button - triggers off-canvas on mobile -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas"
+        aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <!-- Collapsible links -->
-      <div class="collapse navbar-collapse" id="navbarCollapse">
+      <!-- Off-canvas sidebar for mobile, regular navbar for desktop -->
+      <div class="offcanvas offcanvas-start navbar-offcanvas" tabindex="-1" id="navbarOffcanvas" aria-labelledby="navbarOffcanvasLabel">
+        <div class="offcanvas-header bg-dark">
+          <span class="offcanvas-title text-white" id="navbarOffcanvasLabel">
+            {% if siteconfig and siteconfig.club_logo %}
+              <img src="{{ siteconfig.club_logo.url }}" alt="{{ siteconfig.club_name }} Logo" height="24" class="me-2">
+            {% endif %}
+            {{ siteconfig.club_name|default:'Menu' }}
+          </span>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="membersDropdown" role="button" data-bs-toggle="dropdown"
@@ -242,8 +252,9 @@
         <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">Login</a>
         {% endif %}
 
-      </div>
-    </div>
+        </div><!-- /.offcanvas-body -->
+      </div><!-- /.offcanvas -->
+    </div><!-- /.container-fluid -->
   </nav>
 
   <!-- Spacer to prevent content from hiding behind fixed navbar -->
@@ -319,6 +330,20 @@
           link.classList.add('active');
         }
       });
+
+      // Auto-close off-canvas when a navigation link is clicked (mobile)
+      const offcanvasEl = document.getElementById('navbarOffcanvas');
+      if (offcanvasEl && window.innerWidth < 992) {
+        const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+        offcanvasEl.querySelectorAll('.nav-link:not(.dropdown-toggle), .dropdown-item').forEach(function(link) {
+          link.addEventListener('click', function() {
+            // Small delay to allow navigation to start
+            setTimeout(function() {
+              offcanvas.hide();
+            }, 150);
+          });
+        });
+      }
     });
   </script>
 
