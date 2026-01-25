@@ -175,10 +175,11 @@
       {% else %}
         - Email configuration (email_dev_mode) SKIPPED (gke_validate_email_config=false)
       {% endif %}
-        ✓ Django DEBUG mode
       {% if security_check_enabled %}
+        ✓ Django DEBUG mode
         ✓ ALLOWED_HOSTS security
       {% else %}
+        - Django DEBUG mode check SKIPPED (gke_validate_security=false)
         - ALLOWED_HOSTS security check SKIPPED (gke_validate_security=false)
       {% endif %}
 
