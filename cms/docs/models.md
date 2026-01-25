@@ -13,6 +13,7 @@ erDiagram
         int parent_id FK
         text content
         boolean is_public
+        image banner_image
         datetime created_at
         datetime updated_at
     }
@@ -95,6 +96,7 @@ erDiagram
 - **Role-based access control**: Three access levels - public, member-only, and role-restricted
 - Auto-generates slugs from titles
 - Contains rich HTML content via TinyMCE
+- **Banner images** (Issue #547): Optional hero banner with parallax scrolling effect and auto-contrast text color
 - Access control methods: `can_user_access()`, `has_role_restrictions()`, `get_required_roles()`
 - Validation prevents public pages from having role restrictions
 

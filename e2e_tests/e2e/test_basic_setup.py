@@ -42,7 +42,7 @@ class TestPlaywrightSetup(DjangoPlaywrightTestCase):
         assert bootstrap_defined, "Bootstrap JavaScript should be loaded"
 
     def test_navbar_toggle_works_on_mobile(self):
-        """Test that Bootstrap navbar toggle works on mobile viewport."""
+        """Test that Bootstrap navbar toggle works on mobile viewport (off-canvas sidebar)."""
         # Set mobile viewport
         self.page.set_viewport_size({"width": 375, "height": 667})
 
@@ -56,26 +56,41 @@ class TestPlaywrightSetup(DjangoPlaywrightTestCase):
             toggler.count() > 0
         ), "Navbar toggler should exist on mobile viewport - if missing, navbar structure has changed"
 
-        # On mobile, the navbar should be collapsed
-        navbar_collapse = self.page.locator(".navbar-collapse")
+        # Look for off-canvas sidebar (Bootstrap 5 off-canvas pattern)
+        offcanvas = self.page.locator(".navbar-offcanvas")
+        assert (
+            offcanvas.count() > 0
+        ), "Off-canvas sidebar should exist for mobile navigation"
 
-        # Check initial state - should be collapsed
-        initial_visible = navbar_collapse.is_visible()
+        # On mobile, the off-canvas should be hidden initially
+        initial_visible = offcanvas.is_visible()
+        assert (
+            not initial_visible
+        ), "Off-canvas sidebar should be hidden initially on mobile"
 
         # Click the toggler
         toggler.click()
 
-        # Wait for the navbar collapse to become visible (if it was hidden)
-        if not initial_visible:
-            navbar_collapse.wait_for(state="visible")
+        # Wait for the off-canvas to become visible
+        offcanvas.wait_for(state="visible", timeout=3000)
 
-        # After clicking, visibility should change
-        # (Either it becomes visible if collapsed, or stays visible)
-        after_click_visible = navbar_collapse.is_visible()
+        # After clicking, off-canvas should be visible
+        after_click_visible = offcanvas.is_visible()
+        assert (
+            after_click_visible
+        ), "Off-canvas sidebar should open after clicking toggler"
 
-        # If initially hidden, should now be visible
-        if not initial_visible:
-            assert after_click_visible, "Navbar should expand after clicking toggler"
+        # Check that the close button exists and works
+        close_btn = self.page.locator(".offcanvas-header .btn-close")
+        assert (
+            close_btn.is_visible()
+        ), "Close button should be visible in off-canvas header"
+
+        # Click close button to hide the sidebar
+        close_btn.click()
+
+        # Wait for off-canvas to hide
+        offcanvas.wait_for(state="hidden", timeout=3000)
 
     def test_authenticated_user_can_access_members(self):
         """Test that authenticated users can access member pages."""

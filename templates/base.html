@@ -48,6 +48,7 @@
   <link href="{% static 'css/cms-responsive.css' %}" rel="stylesheet">
   <link href="{% static 'css/cms.css' %}" rel="stylesheet">
   <link href="{% static 'css/mobile-fixes.css' %}" rel="stylesheet">
+  <link href="{% static 'css/navbar-enhanced.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
 
@@ -62,13 +63,13 @@
 </head>
   <style>
     @media print {
-      .no-print-nav { display: none !important; }
+      .no-print-nav, .navbar-spacer { display: none !important; }
     }
   </style>
 
 <body>
 
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top no-print-nav" id="main-navbar">
     <div class="container-fluid">
       {% get_siteconfig as siteconfig %}
   <a class="navbar-brand" href="{% url 'home' %}">
@@ -80,14 +81,25 @@
         {{ siteconfig.club_name|default:'Manage2Soar' }}
       </a>
 
-      <!-- Hamburger toggle button -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
-        aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <!-- Hamburger toggle button - triggers off-canvas on mobile -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas"
+        aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <!-- Collapsible links -->
-      <div class="collapse navbar-collapse" id="navbarCollapse">
+      <!-- Off-canvas sidebar for mobile, regular navbar for desktop -->
+      <div class="offcanvas offcanvas-start navbar-offcanvas" tabindex="-1" id="navbarOffcanvas" aria-labelledby="navbarOffcanvasLabel">
+        <div class="offcanvas-header bg-dark">
+          <span class="offcanvas-title text-white" id="navbarOffcanvasLabel">
+            {% if siteconfig and siteconfig.club_logo %}
+              <img src="{{ siteconfig.club_logo.url }}" alt="{{ siteconfig.club_name }} Logo" height="24" class="me-2">
+            {% endif %}
+            {{ siteconfig.club_name|default:'Menu' }}
+          </span>
+          {# tabindex="-1" is Bootstrap default for offcanvas. Focus management (to offcanvas when opened, ESC to close, focus return to toggle) is handled by Bootstrap. Manual keyboard testing recommended after CSS changes. #}
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="membersDropdown" role="button" data-bs-toggle="dropdown"
@@ -217,7 +229,7 @@
         <!-- Right side: Welcome + Logout -->
         {% if user.is_authenticated %}
         {% is_kiosk_session as kiosk_mode %}
-        <div class="d-flex align-items-center me-3">
+        <div class="d-flex align-items-center me-3 user-section">
           <a href="{% url 'members:member_view' member_id=user.pk %}" class="profile-bubble" title="View My Profile">
             <img src="{{ user.profile_image_url_small }}" class="nav-avatar" alt="Profile Photo">
           </a>
@@ -241,10 +253,13 @@
         <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">Login</a>
         {% endif %}
 
-      </div>
-    </div>
+        </div><!-- /.offcanvas-body -->
+      </div><!-- /.offcanvas -->
+    </div><!-- /.container-fluid -->
   </nav>
 
+  <!-- Spacer to prevent content from hiding behind fixed navbar -->
+  <div class="navbar-spacer"></div>
 
   <div class="container">
     {% if user.is_authenticated %}
@@ -273,6 +288,8 @@
   <script src="{% static 'js/tablesort-init.js' %}"></script>
   <!-- PWA Service Worker Registration -->
   <script src="{% static 'js/service-worker-register.js' %}"></script>
+  <script src="{% static 'js/navbar-enhanced.js' %}"></script>
+  <script src="{% static 'js/banner-brightness-detection.js' %}"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', (event) => {
       const token = document.cookie

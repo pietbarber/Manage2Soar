@@ -1,0 +1,160 @@
+/*
+ * Banner Parallax Styles
+ * Issue #547: Site Style Enhancements
+ *
+ * Features:
+ * - Full-width banner images with parallax scrolling effect
+ * - Automatic text contrast based on image brightness
+ * - Responsive sizing for mobile devices
+ * - Gradient overlay for text readability
+ *
+ * IMPORTANT: After modifying this file, run `python manage.py collectstatic`
+ * CSS changes are NOT visible until collected!
+ */
+
+/* ==========================================================================
+   BANNER CONTAINER
+   ========================================================================== */
+
+.page-banner {
+    position: relative;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    height: 300px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-banner-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 120%;
+    /* Extra height for parallax movement */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* Creates parallax effect on desktop
+     * Note: background-attachment: fixed can cause performance issues on some browsers,
+     * particularly mobile Safari, Firefox, and Chrome on certain devices. Known issues include:
+     * - Janky scrolling performance during rapid scrolling
+     * - High CPU usage and battery drain on mobile
+     * - Browser repaint on every scroll event
+     *
+     * Consider JS-based parallax (transform: translateY) for better cross-browser performance.
+     * For now, this is acceptable but monitor real-world performance. Parallax is disabled
+     * on mobile devices (see responsive section) and for prefers-reduced-motion users.
+     */
+    background-attachment: fixed;
+    z-index: 1;
+}
+
+/* Respect user's motion preferences - disable parallax for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .page-banner-image {
+        background-attachment: scroll;
+    }
+}
+
+/* Gradient overlay for text readability */
+.page-banner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom,
+            rgba(0, 0, 0, 0.3) 0%,
+            rgba(0, 0, 0, 0.5) 50%,
+            rgba(0, 0, 0, 0.3) 100%);
+    z-index: 2;
+}
+
+/* Banner content (title) */
+.page-banner-content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    padding: 1rem 2rem;
+    max-width: 90%;
+}
+
+.page-banner-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    color: #fff;
+    /* Default to white, will be overridden by auto-contrast */
+}
+
+/* Auto-contrast classes set by JavaScript */
+.page-banner.light-text .page-banner-title {
+    color: #fff;
+}
+
+.page-banner.dark-text .page-banner-title {
+    color: #212529;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.page-banner.dark-text .page-banner-overlay {
+    background: linear-gradient(to bottom,
+            rgba(255, 255, 255, 0.2) 0%,
+            rgba(255, 255, 255, 0.4) 50%,
+            rgba(255, 255, 255, 0.2) 100%);
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 991.98px) {
+    .page-banner {
+        height: 200px;
+    }
+
+    .page-banner-image {
+        /* Disable fixed attachment on mobile (causes issues on iOS) */
+        background-attachment: scroll;
+    }
+
+    .page-banner-title {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .page-banner {
+        height: 150px;
+    }
+
+    .page-banner-title {
+        font-size: 1.5rem;
+    }
+
+    .page-banner-content {
+        padding: 0.5rem 1rem;
+    }
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+    .page-banner {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   ANIMATION
+   ========================================================================== */
+
+.page-banner-image {
+    transition: transform 0.1s ease-out;
+}

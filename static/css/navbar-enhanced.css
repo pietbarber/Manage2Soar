@@ -1,0 +1,317 @@
+/*
+ * Enhanced Navbar Styles
+ * Issue #547: Site Style Enhancements
+ *
+ * Features:
+ * - Sticky (fixed) navbar that stays at top when scrolling
+ * - Off-canvas sidebar navigation for mobile
+ * - Larger touch targets for mobile
+ * - Active page highlighting
+ * - Print-friendly (hidden when printing)
+ * - Backdrop overlay when mobile menu is open
+ *
+ * IMPORTANT: After modifying this file, run `python manage.py collectstatic`
+ * CSS changes are NOT visible until collected!
+ */
+
+/* ==========================================================================
+   STICKY NAVBAR & SPACING
+   ========================================================================== */
+
+/* Spacer to prevent content from hiding behind fixed navbar */
+.navbar-spacer {
+    height: 56px;
+    /* Default Bootstrap navbar height */
+}
+
+/* Page title row for CMS pages */
+.page-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.page-title-row h1 {
+    margin: 0;
+}
+
+/* Ensure fixed navbar has proper z-index */
+#main-navbar {
+    z-index: 1030;
+    transition: box-shadow 0.3s ease;
+}
+
+/* Add subtle shadow when scrolled */
+#main-navbar.scrolled {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   OFF-CANVAS SIDEBAR (MOBILE)
+   ========================================================================== */
+
+/* Off-canvas specific styles */
+.navbar-offcanvas {
+    max-width: 300px;
+    background-color: #212529;
+    /* Match navbar bg-dark */
+}
+
+/* Override default off-canvas behavior - act as collapse on desktop */
+@media (min-width: 992px) {
+    .navbar-offcanvas {
+        position: static !important;
+        visibility: visible !important;
+        transform: none !important;
+        width: auto !important;
+        max-width: none !important;
+        flex-grow: 1;
+        display: flex !important;
+        flex-basis: auto;
+        background-color: transparent !important;
+        border: none !important;
+    }
+
+    .navbar-offcanvas .offcanvas-header {
+        display: none !important;
+    }
+
+    .navbar-offcanvas .offcanvas-body {
+        display: flex !important;
+        flex-grow: 0;
+        padding: 0;
+        overflow-y: visible;
+        width: 100%;
+    }
+
+    /* Hide backdrop on desktop */
+    .offcanvas-backdrop {
+        display: none !important;
+    }
+}
+
+/* Mobile off-canvas styling */
+@media (max-width: 991.98px) {
+    .navbar-offcanvas {
+        width: 85%;
+        max-width: 320px;
+    }
+
+    /* Enhanced backdrop overlay - darker grey when menu is open */
+    .offcanvas-backdrop {
+        background-color: #000;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .offcanvas-backdrop.show {
+        opacity: 0.6;
+    }
+
+    /* Smooth slide-in animation for sidebar */
+    .navbar-offcanvas {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    /* Off-canvas header styling */
+    .navbar-offcanvas .offcanvas-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        background-color: #1a1d20;
+    }
+
+    .navbar-offcanvas .offcanvas-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-offcanvas .offcanvas-title img {
+        filter: brightness(1.1);
+    }
+
+    .navbar-offcanvas .btn-close-white {
+        opacity: 0.8;
+        transition: opacity 0.15s ease;
+    }
+
+    .navbar-offcanvas .btn-close-white:hover {
+        opacity: 1;
+    }
+
+    .navbar-offcanvas .offcanvas-body {
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Navigation list takes up available space */
+    .navbar-offcanvas .navbar-nav {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    /* Larger touch-friendly navigation links */
+    .navbar-offcanvas .nav-link {
+        padding: 1rem 1.25rem !important;
+        font-size: 1.2rem !important;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.85) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-offcanvas .nav-link:hover,
+    .navbar-offcanvas .nav-link:focus {
+        color: #fff !important;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Dropdown styling for mobile */
+    .navbar-offcanvas .dropdown-menu {
+        position: static !important;
+        float: none;
+        background-color: rgba(0, 0, 0, 0.2);
+        border: none;
+        border-radius: 0;
+        margin: 0 !important;
+        padding: 0;
+    }
+
+    .navbar-offcanvas .dropdown-item {
+        padding: 0.875rem 1.25rem 0.875rem 2.5rem !important;
+        font-size: 1.1rem !important;
+        color: rgba(255, 255, 255, 0.75) !important;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .navbar-offcanvas .dropdown-item:hover,
+    .navbar-offcanvas .dropdown-item:focus {
+        color: #fff !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Dropdown divider */
+    .navbar-offcanvas .dropdown-divider {
+        border-color: rgba(255, 255, 255, 0.15);
+        margin: 0;
+    }
+
+    /* User section at bottom of mobile menu */
+    .navbar-offcanvas .user-section {
+        margin-top: auto;
+        padding: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
+
+    .navbar-offcanvas .user-section .navbar-text {
+        font-size: 1rem;
+    }
+
+    /* Login/Logout button full width on mobile */
+    .navbar-offcanvas form.d-flex,
+    .navbar-offcanvas .btn-outline-light {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .navbar-offcanvas .btn-outline-light {
+        display: block;
+        text-align: center;
+    }
+}
+
+/* ==========================================================================
+   ACTIVE PAGE HIGHLIGHTING
+   ========================================================================== */
+
+/* Active/current page indicator */
+.nav-link.active,
+.dropdown-item.active {
+    color: #c9849e !important;
+    /* Soft dusty rose */
+    font-weight: 600;
+}
+
+.navbar-offcanvas .nav-link.active::before {
+    content: "";
+    width: 4px;
+    height: 100%;
+    background-color: #c9849e;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.navbar-offcanvas .nav-link.active {
+    position: relative;
+}
+
+/* Desktop active indicator */
+@media (min-width: 992px) {
+    .navbar-nav .nav-link.active {
+        border-bottom: 3px solid #c9849e;
+        padding-bottom: calc(0.5rem - 3px) !important;
+    }
+
+    .navbar-nav .nav-link.active::before {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   HAMBURGER BUTTON ENHANCEMENTS
+   ========================================================================== */
+
+.navbar-toggler {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 0.5rem 0.75rem;
+}
+
+.navbar-toggler:focus {
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+}
+
+.navbar-toggler-icon {
+    width: 1.5em;
+    height: 1.5em;
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+
+    #main-navbar,
+    .navbar-spacer,
+    .offcanvas-backdrop {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
+   DROPDOWN ANIMATION
+   ========================================================================== */
+
+/* Smooth dropdown animation on mobile */
+@media (max-width: 991.98px) {
+    .navbar-offcanvas .dropdown-menu {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+
+    .navbar-offcanvas .dropdown-menu.show {
+        max-height: 500px;
+    }
+}

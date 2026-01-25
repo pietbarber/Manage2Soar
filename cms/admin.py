@@ -98,6 +98,17 @@ class PageAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("title", "slug", "parent", "content")}),
         (
+            "Banner Image",
+            {
+                "fields": ("banner_image",),
+                "description": (
+                    "Upload a banner image to display at the top of the page with a parallax effect. "
+                    "Recommended size: 1920x600 pixels (landscape orientation)."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Access Control",
             {
                 "fields": ("is_public",),

@@ -102,3 +102,10 @@ def upload_site_logo(instance, filename):
     name, ext = os.path.splitext(filename)
     token = secrets.token_urlsafe(6)
     return f"site_logo/{name}-{token}{ext}"
+
+
+def upload_cms_banner(instance, filename):
+    """Upload path for CMS page banner images with parallax effect."""
+    name, ext = os.path.splitext(filename)
+    token = secrets.token_urlsafe(6)
+    return f"cms/banners/{name}-{token}{ext}"

@@ -1,0 +1,34 @@
+{% load static %}
+{% comment %}
+  Banner Image Partial
+  Usage: include 'cms/includes/banner.html' with page=page
+
+  Displays a full-width parallax banner with the page title overlaid.
+  Automatically adjusts text color for contrast using JavaScript.
+{% endcomment %}
+{% if page.banner_image %}
+<div class="page-banner" id="page-banner">
+  <div class="page-banner-image"
+       id="banner-image"
+       aria-hidden="true"
+       style="background-image: url('{{ page.banner_image.url }}');"
+       data-image-url="{{ page.banner_image.url }}">
+  </div>
+  <div class="page-banner-overlay"></div>
+  <div class="page-banner-content">
+    <h1 class="page-banner-title">{{ page.title }}</h1>
+  </div>
+</div>
+<script>
+  // Initialize banner brightness detection
+  document.addEventListener('DOMContentLoaded', function() {
+    const bannerImage = document.getElementById('banner-image');
+    if (bannerImage && typeof detectBannerBrightness === 'function') {
+      const imageUrl = bannerImage.dataset.imageUrl;
+      if (imageUrl) {
+        detectBannerBrightness(imageUrl, 'page-banner');
+      }
+    }
+  });
+</script>
+{% endif %}
