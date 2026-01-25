@@ -4,6 +4,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Issue #567: Offset content for fixed-top navbar
+   Bootstrap's fixed-top navbar overlays page content by default.
+   Add padding-top equal to navbar height to prevent content clipping.
+   Standard Bootstrap 5 navbar height is 56px; we add a bit more for safety. */
+body {
+  padding-top: 60px;
+}
+
 .footer {
   width: 100%;
   max-width: 100vw;
