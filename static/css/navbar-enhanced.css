@@ -18,10 +18,11 @@
    STICKY NAVBAR & SPACING
    ========================================================================== */
 
-/* Spacer to prevent content from hiding behind fixed navbar */
+/* Issue #567: Spacer to prevent content from hiding behind fixed navbar
+   Bootstrap 5 fixed-top navbar default height is ~56px.
+   Increased to 60px to ensure no content clipping. */
 .navbar-spacer {
-    height: 56px;
-    /* Default Bootstrap navbar height */
+    height: 60px;
 }
 
 /* Page title row for CMS pages */
