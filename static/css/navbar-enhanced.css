@@ -18,10 +18,13 @@
    STICKY NAVBAR & SPACING
    ========================================================================== */
 
-/* Spacer to prevent content from hiding behind fixed navbar */
+/* Issue #567: Spacer to prevent content from hiding behind fixed navbar
+   Height is dynamically set by JavaScript (navbar-enhanced.js) to match
+   the actual navbar height, ensuring correct offset even if navbar height
+   changes due to text wrapping, zoom, or font size changes.
+   Default fallback: 60px (~56px navbar + buffer). */
 .navbar-spacer {
-    height: 56px;
-    /* Default Bootstrap navbar height */
+    height: 60px;
 }
 
 /* Page title row for CMS pages */
