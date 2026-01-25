@@ -43,19 +43,12 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
             members_link = self.page.locator('a.dropdown-item:has-text("Member List")')
 
         # Check if link exists and has active class
-        if members_link.count() > 0:
-            classes = members_link.first.get_attribute("class") or ""
-            assert (
-                "active" in classes
-            ), f"Members dropdown-item should have 'active' class, got: {classes}"
-        else:
-            # Check if parent dropdown toggle is active (which is the expected behavior)
-            members_dropdown = self.page.locator("#membersDropdown")
-            if members_dropdown.count() > 0:
-                classes = members_dropdown.first.get_attribute("class") or ""
-                assert (
-                    "active" in classes
-                ), f"Members dropdown toggle should have 'active' class when child is active, got: {classes}"
+        assert members_link.count() > 0, "Members link should exist in dropdown"
+
+        classes = members_link.first.get_attribute("class") or ""
+        assert (
+            "active" in classes
+        ), f"Members dropdown-item should have 'active' class, got: {classes}"
 
     def test_logsheet_page_highlights_logsheet_link(self):
         """Verify /logsheet/ page highlights the Log Sheets dropdown or its items."""
@@ -67,12 +60,13 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
         # Check if the logsheet dropdown toggle has active class
         logsheet_dropdown = self.page.locator("#logsheetDropdown")
 
-        if logsheet_dropdown.count() > 0:
-            classes = logsheet_dropdown.first.get_attribute("class") or ""
-            # Parent dropdown should be active when on a child page
-            assert (
-                "active" in classes
-            ), f"Log Sheets dropdown toggle should have 'active' class, got: {classes}"
+        assert logsheet_dropdown.count() > 0, "Log Sheets dropdown should exist"
+
+        classes = logsheet_dropdown.first.get_attribute("class") or ""
+        # Parent dropdown should be active when on a child page
+        assert (
+            "active" in classes
+        ), f"Log Sheets dropdown toggle should have 'active' class, got: {classes}"
 
     def test_duty_roster_page_highlights_duty_roster_link(self):
         """Verify /duty_roster/ page highlights the Duty Roster dropdown."""
@@ -84,11 +78,12 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
         # Check if the duty roster dropdown toggle has active class
         duty_dropdown = self.page.locator("#dutyrosterDropdown")
 
-        if duty_dropdown.count() > 0:
-            classes = duty_dropdown.first.get_attribute("class") or ""
-            assert (
-                "active" in classes
-            ), f"Duty Roster dropdown toggle should have 'active' class, got: {classes}"
+        assert duty_dropdown.count() > 0, "Duty Roster dropdown should exist"
+
+        classes = duty_dropdown.first.get_attribute("class") or ""
+        assert (
+            "active" in classes
+        ), f"Duty Roster dropdown toggle should have 'active' class, got: {classes}"
 
     def test_nested_path_highlights_parent_dropdown(self):
         """Verify nested paths like /members/badges/ highlight the parent Members dropdown."""
@@ -216,15 +211,16 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
         # Check the Members dropdown toggle for active class
         members_dropdown = self.page.locator("#membersDropdown")
 
-        if members_dropdown.count() > 0:
-            # Check that the active class is present
-            classes = members_dropdown.first.get_attribute("class") or ""
-            assert "active" in classes, "Members dropdown should have active class"
+        assert members_dropdown.count() > 0, "Members dropdown should exist"
 
-            # Use JavaScript to verify the pseudo-element styling is applied
-            # This checks that the CSS for .nav-link.active::after exists
-            has_styling = self.page.evaluate(
-                """
+        # Check that the active class is present
+        classes = members_dropdown.first.get_attribute("class") or ""
+        assert "active" in classes, "Members dropdown should have active class"
+
+        # Use JavaScript to verify the pseudo-element styling is applied
+        # This checks that the CSS for .nav-link.active::after exists
+        has_styling = self.page.evaluate(
+            """
                 () => {
                     const link = document.querySelector('#membersDropdown');
                     if (!link) return false;
@@ -234,10 +230,10 @@ class TestNavbarActiveHighlighting(DjangoPlaywrightTestCase):
                     return afterStyle.height !== 'auto' && afterStyle.height !== '0px';
                 }
             """
-            )
+        )
 
-            # Note: This check may not work in all headless browsers
-            # The important thing is the class is applied; CSS rendering is a separate concern
+        # Assert the styling is actually applied
+        assert has_styling, "Active link should have CSS pseudo-element styling applied"
 
 
 class TestNavbarActiveHighlightingMobile(DjangoPlaywrightTestCase):
@@ -259,18 +255,21 @@ class TestNavbarActiveHighlightingMobile(DjangoPlaywrightTestCase):
 
         # Open the off-canvas menu
         toggler = self.page.locator(".navbar-toggler")
-        if toggler.count() > 0:
-            toggler.click()
+        assert toggler.count() > 0, "Navbar toggler should exist"
 
-            # Wait for off-canvas to open
-            offcanvas = self.page.locator(".navbar-offcanvas")
-            offcanvas.wait_for(state="visible", timeout=3000)
+        toggler.click()
 
-            # Check for active class on the Members dropdown toggle in the off-canvas
-            members_dropdown = self.page.locator(".navbar-offcanvas #membersDropdown")
+        # Wait for off-canvas to open
+        offcanvas = self.page.locator(".navbar-offcanvas")
+        offcanvas.wait_for(state="visible", timeout=3000)
 
-            if members_dropdown.count() > 0:
-                classes = members_dropdown.first.get_attribute("class") or ""
-                assert (
-                    "active" in classes
-                ), f"Members dropdown in off-canvas should have 'active' class, got: {classes}"
+        # Check for active class on the Members dropdown toggle in the off-canvas
+        members_dropdown = self.page.locator(".navbar-offcanvas #membersDropdown")
+        assert (
+            members_dropdown.count() > 0
+        ), "Members dropdown should exist in off-canvas"
+
+        classes = members_dropdown.first.get_attribute("class") or ""
+        assert (
+            "active" in classes
+        ), f"Members dropdown in off-canvas should have 'active' class, got: {classes}"

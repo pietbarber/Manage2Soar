@@ -10,7 +10,6 @@ These tests verify that the JavaScript in banner-brightness-detection.js correct
 - Handles same-origin images correctly
 """
 
-import io
 import os
 import tempfile
 
@@ -43,6 +42,14 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         # Create temp directory for test images
         cls.temp_dir = tempfile.mkdtemp(prefix="banner_test_")
 
+        # Override MEDIA_ROOT to prevent polluting repo's media/ directory
+        from django.conf import settings
+        from django.test import override_settings
+
+        cls._original_media_root = settings.MEDIA_ROOT
+        cls.test_media_root = tempfile.mkdtemp(prefix="test_media_")
+        settings.MEDIA_ROOT = cls.test_media_root
+
         # Create a bright white image (brightness ≈ 255)
         cls.bright_image_path = os.path.join(cls.temp_dir, "bright_banner.png")
         cls._create_test_image(cls.bright_image_path, color=(255, 255, 255))
@@ -57,11 +64,21 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """Clean up test image files."""
+        """Clean up test image files and test media directory."""
         import shutil
 
+        from django.conf import settings
+
+        # Clean up test images
         if hasattr(cls, "temp_dir") and os.path.exists(cls.temp_dir):
             shutil.rmtree(cls.temp_dir)
+
+        # Clean up test media directory and restore original MEDIA_ROOT
+        if hasattr(cls, "test_media_root") and os.path.exists(cls.test_media_root):
+            shutil.rmtree(cls.test_media_root)
+        if hasattr(cls, "_original_media_root"):
+            settings.MEDIA_ROOT = cls._original_media_root
+
         super().tearDownClass()
 
     @staticmethod
@@ -114,23 +131,12 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
 
         # Wait for the brightness detection to complete
         # The JavaScript adds 'dark-text' or 'light-text' class
-        try:
-            self.page.wait_for_selector("#page-banner.dark-text", timeout=5000)
-            banner = self.page.locator("#page-banner")
-            classes = banner.get_attribute("class") or ""
-            assert (
-                "dark-text" in classes
-            ), f"Bright banner should have 'dark-text', got: {classes}"
-        except Exception:
-            # If dark-text isn't applied, check what class is present
-            banner = self.page.locator("#page-banner")
-            if banner.count() > 0:
-                classes = banner.get_attribute("class") or ""
-                # Could fail due to canvas security in headless mode
-                # In that case, light-text fallback is acceptable
-                assert (
-                    "dark-text" in classes or "light-text" in classes
-                ), f"Banner should have text contrast class, got: {classes}"
+        self.page.wait_for_selector("#page-banner.dark-text", timeout=5000)
+        banner = self.page.locator("#page-banner")
+        classes = banner.get_attribute("class") or ""
+        assert (
+            "dark-text" in classes
+        ), f"Bright banner should have 'dark-text', got: {classes}"
 
     def test_light_text_applied_to_dark_banner(self):
         """Verify dark banners get 'light-text' class for contrast."""
@@ -198,12 +204,9 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         # There should be no #page-banner element
         banner = self.page.locator("#page-banner")
         # Page without banner_image won't render the banner div
-        # or if it does, it shouldn't have brightness classes
-        if banner.count() > 0:
-            classes = banner.get_attribute("class") or ""
-            # May or may not have classes, but shouldn't error
-            # Just verify the page loads without JavaScript errors
-            pass
+        assert (
+            banner.count() == 0
+        ), "#page-banner should not exist when page has no banner_image"
 
     def test_fallback_on_canvas_security_error(self):
         """
@@ -227,29 +230,16 @@ class TestBannerBrightnessDetection(DjangoPlaywrightTestCase):
         self.page.wait_for_load_state("networkidle")
         self.page.wait_for_timeout(2000)
 
-        # Check banner has a contrast class (either works means fallback succeeded)
+        # Check banner has the fallback light-text class
+        # (JavaScript applies light-text on canvas/CORS errors)
         banner = self.page.locator("#page-banner")
+        assert banner.count() > 0, "#page-banner should exist"
 
-        if banner.count() > 0:
-            classes = banner.get_attribute("class") or ""
-            # Either class is acceptable - the important thing is it doesn't crash
-            has_any_class = "dark-text" in classes or "light-text" in classes
-
-            if not has_any_class:
-                # Check if there were security-related warnings in console
-                security_warnings = [
-                    m
-                    for m in console_messages
-                    if "security" in m.lower() or "cors" in m.lower()
-                ]
-                if security_warnings:
-                    # Security errors are expected in some contexts - that's OK
-                    pass
-                else:
-                    # No security errors but also no class - might be a real issue
-                    assert (
-                        has_any_class
-                    ), f"Banner should have contrast class, got: {classes}"
+        classes = banner.get_attribute("class") or ""
+        # On error, JavaScript should apply light-text fallback
+        assert (
+            "light-text" in classes or "dark-text" in classes
+        ), f"Banner should have contrast class (fallback on error), got: {classes}"
 
 
 class TestBannerBrightnessEdgeCases(DjangoPlaywrightTestCase):
@@ -258,20 +248,9 @@ class TestBannerBrightnessEdgeCases(DjangoPlaywrightTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.temp_dir = tempfile.mkdtemp(prefix="banner_edge_test_")
-
-        # Create test images
-        cls.bright_image_path = os.path.join(cls.temp_dir, "bright.png")
-        TestBannerBrightnessDetection._create_test_image(
-            cls.bright_image_path, color=(255, 255, 255)
-        )
 
     @classmethod
     def tearDownClass(cls):
-        import shutil
-
-        if hasattr(cls, "temp_dir") and os.path.exists(cls.temp_dir):
-            shutil.rmtree(cls.temp_dir)
         super().tearDownClass()
 
     def setUp(self):

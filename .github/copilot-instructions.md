@@ -62,10 +62,13 @@
   4. Push: `git push -u origin feature/issue-XXX-description`
   5. Create PR via GitHub
 - **If you accidentally committed to main**:
-  1. Note the commit hash: `git log --oneline -1`
-  2. Reset main: `git reset --hard HEAD~1` (or to specific commit)
-  3. Force push: `git push --force origin main`
-  4. Create branch and cherry-pick: `git checkout -b feature/issue-XXX && git cherry-pick <hash>`
+  1. Create a revert commit: `git revert HEAD` (creates a new commit that undoes the change)
+  2. Push the revert: `git push origin main`
+  3. Create feature branch: `git checkout -b feature/issue-XXX-description`
+  4. Cherry-pick the original work: `git cherry-pick <hash-of-original-commit>`
+  5. Push feature branch: `git push -u origin feature/issue-XXX-description`
+  6. Create PR via GitHub
+  7. **NEVER use `git push --force`** - it rewrites history and can cause data loss in collaborative environments
 - **Branch naming**: `feature/issue-XXX-short-description` (e.g., `feature/issue-558-e2e-tests`)
 - **WHY**: Direct commits bypass code review, CI checks, and Copilot review. PRs ensure quality.
 
