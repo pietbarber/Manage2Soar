@@ -388,7 +388,7 @@ Manual fixes often bypass security review. Always check:
 
 **How It Works**:
 The validation runs at the START of the gke-deploy role, before any Docker builds or Kubernetes deployments.
-If a production tenant has `email_dev_mode: true` (or undefined), deployment fails immediately with a clear error message.
+If a production tenant has `email_dev_mode: true`, deployment fails immediately with a clear error message. If `email_dev_mode` is undefined, it is accepted and falls back to `gke_email_dev_mode` (default: `false`).
 
 **Current Configuration (Verified Correct)**:
 

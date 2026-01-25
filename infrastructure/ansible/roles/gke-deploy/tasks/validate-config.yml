@@ -135,20 +135,28 @@
 
       gke_django_allowed_hosts is: {{ gke_django_allowed_hosts | default('UNDEFINED') }}
 
-      ALLOWED_HOSTS must be explicitly configured with your actual domain(s).
+      ALLOWED_HOSTS must be explicitly configured with your actual domain(s)
+      for NON-INGRESS deployments.
 
       Using "*" or the placeholder value is a security risk that allows
       host header attacks.
 
-      TO FIX:
+      TO FIX (non-ingress deployments):
         Set gke_django_allowed_hosts to your actual domain(s), e.g.:
         gke_django_allowed_hosts: "example.com,www.example.com"
+
+      NOTE: When gke_enable_ingress is true, ALLOWED_HOSTS is normally derived
+      from tenant domain configuration in k8s-secrets.yml.j2, and this
+      validation is skipped. In that case, ensure your tenant domains are
+      correctly configured instead.
 
       ════════════════════════════════════════════════════════════════════════
     success_msg: "✅ ALLOWED_HOSTS is properly configured"
   delegate_to: localhost
   run_once: true
-  when: gke_validate_security | default(true) | bool
+  when:
+    - gke_validate_security | default(true) | bool
+    - not (gke_enable_ingress | default(false) | bool)
   tags: [validate, security]
 
 # ============================================================

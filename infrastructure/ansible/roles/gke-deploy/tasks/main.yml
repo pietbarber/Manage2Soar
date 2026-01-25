@@ -9,10 +9,14 @@
 # CRITICAL: Run configuration validation BEFORE any other tasks.
 # This catches dangerous misconfigurations like email_dev_mode: true
 # in production before any deployment actions occur.
+#
+# NOTE: Validation runs by default when no --tags filter is used.
+# To include validation during tagged runs, add --tags validate
+# (e.g., --tags "deploy,validate").
 
 - name: Include pre-deployment validation
   ansible.builtin.include_tasks: validate-config.yml
-  tags: [validate, always]
+  tags: [validate]
 
 # ============================================================
 # PREREQUISITES
