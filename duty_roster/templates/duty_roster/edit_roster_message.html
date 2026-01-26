@@ -4,16 +4,14 @@
 
 {% block title %}Edit Roster Announcement{% endblock %}
 
-{% block extra_head %}
-{{ form.media }}
-{# Issue #397: TinyMCE YouTube fix must load after form.media #}
-<script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
-{% endblock %}
-
 {% block content %}
 <div class="container py-4">
   <div class="row justify-content-center">
     <div class="col-lg-10">
+      {{ form.media }}
+      {# Issue #397: TinyMCE YouTube fix must load after form.media #}
+      <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
+
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
           <h4 class="mb-0">
