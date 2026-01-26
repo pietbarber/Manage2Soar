@@ -110,7 +110,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer", membership_status="Full Member")
         self.login(username="viewer")
 
         # Navigate to calendar
