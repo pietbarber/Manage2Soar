@@ -1790,7 +1790,9 @@ def _notify_surge_instructor_needed(assignment, student_count):
 
 
 @active_member_required
-@user_passes_test(is_rostermeister)
+@user_passes_test(
+    lambda u: getattr(u, "rostermeister", False) or u.is_staff or u.is_superuser
+)
 @never_cache
 def edit_roster_message(request):
     """

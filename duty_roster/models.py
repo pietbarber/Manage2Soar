@@ -59,12 +59,8 @@ class DutyRosterMessage(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        """Ensure only one instance exists (singleton pattern)."""
+        """Validate singleton constraint before saving."""
         self.full_clean()  # Call clean() for validation
-        if not self.pk:
-            # If creating a new instance, delete any existing ones
-            # This provides a fallback if clean() is bypassed
-            DutyRosterMessage.objects.all().delete()
         super().save(*args, **kwargs)
 
     @classmethod
