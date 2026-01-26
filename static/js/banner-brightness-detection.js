@@ -105,3 +105,52 @@ function detectBannerBrightness(imageUrl, bannerId) {
 
     img.src = imageUrl;
 }
+
+/**
+ * Initialize parallax scrolling effect for banner images
+ * Issue #570: Uses transform instead of background-attachment: fixed
+ * to avoid image cropping issues while maintaining parallax effect.
+ *
+ * @param {string} bannerId - ID of the banner element
+ */
+function initBannerParallax(bannerId) {
+    const banner = document.getElementById(bannerId);
+    if (!banner) return;
+
+    const bannerImage = banner.querySelector('.page-banner-image');
+    if (!bannerImage) return;
+
+    // Check for reduced motion preference
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return; // Skip parallax for users who prefer reduced motion
+    }
+
+    // Parallax speed factor (0.3 = image moves at 30% of scroll speed)
+    const parallaxSpeed = 0.3;
+
+    function updateParallax() {
+        const scrollY = window.scrollY;
+        const bannerRect = banner.getBoundingClientRect();
+
+        // Only apply parallax when banner is visible
+        if (bannerRect.bottom > 0 && bannerRect.top < window.innerHeight) {
+            const offset = scrollY * parallaxSpeed;
+            bannerImage.style.transform = `translateY(${offset}px)`;
+        }
+    }
+
+    // Use requestAnimationFrame for smooth scrolling
+    let ticking = false;
+    window.addEventListener('scroll', function() {
+        if (!ticking) {
+            window.requestAnimationFrame(function() {
+                updateParallax();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }, { passive: true });
+
+    // Initial position
+    updateParallax();
+}

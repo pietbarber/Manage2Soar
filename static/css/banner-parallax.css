@@ -35,21 +35,20 @@
     height: 120%;
     /* Extra height for parallax movement */
     background-size: cover;
-    background-position: center;
+    background-position: center center;
     background-repeat: no-repeat;
-    /* Creates parallax effect on desktop
-     * Note: background-attachment: fixed can cause performance issues on some browsers,
-     * particularly mobile Safari, Firefox, and Chrome on certain devices. Known issues include:
-     * - Janky scrolling performance during rapid scrolling
-     * - High CPU usage and battery drain on mobile
-     * - Browser repaint on every scroll event
+    /* Use scroll instead of fixed to prevent cropping issues.
+     * background-attachment: fixed positions the image relative to the viewport,
+     * which causes background-size: cover to scale based on viewport dimensions
+     * rather than the banner element, resulting in only showing the top-left corner.
      *
-     * Consider JS-based parallax (transform: translateY) for better cross-browser performance.
-     * For now, this is acceptable but monitor real-world performance. Parallax is disabled
-     * on mobile devices (see responsive section) and for prefers-reduced-motion users.
+     * For parallax effect, we use JavaScript-based transform instead (see banner-parallax.js).
+     * This provides better cross-browser compatibility and correct image scaling.
      */
-    background-attachment: fixed;
+    background-attachment: scroll;
     z-index: 1;
+    /* Enable smooth parallax via JavaScript transform */
+    will-change: transform;
 }
 
 /* Respect user's motion preferences - disable parallax for users who prefer reduced motion */
@@ -117,11 +116,6 @@
         height: 200px;
     }
 
-    .page-banner-image {
-        /* Disable fixed attachment on mobile (causes issues on iOS) */
-        background-attachment: scroll;
-    }
-
     .page-banner-title {
         font-size: 1.75rem;
     }
@@ -149,12 +143,4 @@
     .page-banner {
         display: none;
     }
-}
-
-/* ==========================================================================
-   ANIMATION
-   ========================================================================== */
-
-.page-banner-image {
-    transition: transform 0.1s ease-out;
 }

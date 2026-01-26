@@ -20,13 +20,17 @@
   </div>
 </div>
 <script>
-  // Initialize banner brightness detection
+  // Initialize banner brightness detection and parallax effect
   document.addEventListener('DOMContentLoaded', function() {
     const bannerImage = document.getElementById('banner-image');
-    if (bannerImage && typeof detectBannerBrightness === 'function') {
+    if (bannerImage) {
       const imageUrl = bannerImage.dataset.imageUrl;
-      if (imageUrl) {
+      if (imageUrl && typeof detectBannerBrightness === 'function') {
         detectBannerBrightness(imageUrl, 'page-banner');
+      }
+      // Initialize JS-based parallax (Issue #570)
+      if (typeof initBannerParallax === 'function') {
+        initBannerParallax('page-banner');
       }
     }
   });
