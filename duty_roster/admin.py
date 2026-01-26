@@ -7,6 +7,7 @@ from .models import (
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRosterMessage,
     DutySwapOffer,
     DutySwapRequest,
     GliderReservation,
@@ -14,6 +15,46 @@ from .models import (
     MemberBlackout,
     OpsIntent,
 )
+
+
+@admin.register(DutyRosterMessage)
+class DutyRosterMessageAdmin(AdminHelperMixin, admin.ModelAdmin):
+    """Admin for DutyRosterMessage singleton (Issue #551)."""
+
+    list_display = ("get_preview", "is_active", "updated_at", "updated_by")
+    readonly_fields = ("updated_at", "updated_by")
+    admin_helper_message = (
+        "<b>Duty Roster Message:</b> Rich HTML announcement displayed at the top of the duty calendar. "
+        "This is a singleton - only one message can exist. Edit via the form below or use the "
+        "<a href='/duty_roster/message/edit/'>dedicated editor</a> for a better TinyMCE experience."
+    )
+
+    @admin.display(description="Message Preview")
+    def get_preview(self, obj):
+        """Show a preview of the message content."""
+        from django.utils.html import strip_tags
+
+        if obj and obj.content:
+            text = strip_tags(obj.content)
+            return text[:100] + "..." if len(text) > 100 else text
+        return "(empty)"
+
+    def has_add_permission(self, request):
+        """Prevent creating multiple instances (singleton pattern)."""
+        from .models import DutyRosterMessage
+
+        # Only allow add if no instance exists
+        return not DutyRosterMessage.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion to reset the message."""
+        return True
+
+    class Media:
+        """Include TinyMCE for the content field."""
+
+        js = ()
+        css = {}
 
 
 @admin.register(MemberBlackout)
