@@ -2,6 +2,7 @@ import calendar
 
 from django import forms
 from django.db.models import Exists, OuterRef, Q
+from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue
 from members.models import Member
@@ -718,9 +719,9 @@ class DutyRosterMessageForm(forms.ModelForm):
         model = DutyRosterMessage
         fields = ["content", "is_active"]
         widgets = {
-            "content": forms.Textarea(
+            "content": TinyMCE(
                 attrs={
-                    "class": "form-control tinymce",
+                    "class": "form-control",
                     "rows": 10,
                 }
             ),
