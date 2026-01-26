@@ -30,12 +30,22 @@ ALLOWED_TAGS = [
     "blockquote",
     "span",
     "div",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "caption",
 ]
 
 ALLOWED_ATTRIBUTES = {
-    "a": ["href", "title", "target"],
+    "a": ["href", "title", "target", "rel"],
     "span": ["style"],
     "div": ["style"],
+    "th": ["scope", "colspan", "rowspan"],
+    "td": ["colspan", "rowspan"],
 }
 
 # CSS Sanitizer for inline styles

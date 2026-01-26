@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.urls import reverse
 
 from utils.admin_helpers import AdminHelperMixin
 
@@ -23,11 +24,16 @@ class DutyRosterMessageAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     list_display = ("get_preview", "is_active", "updated_at", "updated_by")
     readonly_fields = ("updated_at", "updated_by")
-    admin_helper_message = (
-        "<b>Duty Roster Message:</b> Rich HTML announcement displayed at the top of the duty calendar. "
-        "This is a singleton - only one message can exist. Edit via the form below or use the "
-        "<a href='/duty_roster/message/edit/'>dedicated editor</a> for a better TinyMCE experience."
-    )
+
+    @property
+    def admin_helper_message(self):
+        """Generate admin message with dynamic URL."""
+        edit_url = reverse("duty_roster:edit_roster_message")
+        return (
+            "<b>Duty Roster Message:</b> Rich HTML announcement displayed at the top of the duty calendar. "
+            "This is a singleton - only one message can exist. Edit via the form below or use the "
+            f"<a href='{edit_url}'>dedicated editor</a> for a better TinyMCE experience."
+        )
 
     @admin.display(description="Message Preview")
     def get_preview(self, obj):
