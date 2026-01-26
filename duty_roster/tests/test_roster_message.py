@@ -65,21 +65,6 @@ def regular_member(db, membership_statuses, siteconfig):
 
 
 @pytest.fixture
-def staff_user(db, membership_statuses, siteconfig):
-    """Create a staff user."""
-    user = Member.objects.create_user(
-        username="staff",
-        email="staff@test.org",
-        password="testpass123",
-        first_name="Staff",
-        last_name="User",
-        membership_status="Full Member",
-        is_staff=True,
-    )
-    return user
-
-
-@pytest.fixture
 def roster_message(db):
     """Create a DutyRosterMessage instance."""
     # Clear any existing messages first (singleton pattern)
