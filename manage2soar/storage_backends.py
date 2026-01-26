@@ -26,4 +26,8 @@ class StaticRootGCS(GoogleCloudStorage):
     querystring_auth = False  # Generate unsigned URLs instead of signed URLs
     file_overwrite = True
     # Skip ManifestFilesMixin to avoid post-processing issues on GCP
-    object_parameters = {"cache_control": "public, max-age=31536000, immutable"}
+    # Issue #567: Add CORS headers to fix CORB blocking of CSS/JS files
+    object_parameters = {
+        "cache_control": "public, max-age=31536000, immutable",
+        "content_disposition": "inline",  # Serve files inline, not as downloads
+    }
