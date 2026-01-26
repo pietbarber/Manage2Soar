@@ -235,6 +235,39 @@ class TestEditRosterMessageView:
         assert response.status_code == 200
         assert b"Edit Roster Announcement" in response.content
 
+    def test_staff_user_can_access(self, client, membership_statuses, siteconfig):
+        """Test that staff users can access the view."""
+        staff_user = Member.objects.create_user(
+            username="staff",
+            email="staff@test.org",
+            password="testpass123",
+            first_name="Staff",
+            last_name="User",
+            membership_status="Full Member",
+            is_staff=True,
+        )
+        client.force_login(staff_user)
+        url = reverse("duty_roster:edit_roster_message")
+        response = client.get(url)
+        assert response.status_code == 200
+        assert b"Edit Roster Announcement" in response.content
+
+    def test_superuser_can_access(self, client, membership_statuses, siteconfig):
+        """Test that superusers can access the view."""
+        superuser = Member.objects.create_superuser(
+            username="superuser",
+            email="superuser@test.org",
+            password="testpass123",
+            first_name="Super",
+            last_name="User",
+            membership_status="Full Member",
+        )
+        client.force_login(superuser)
+        url = reverse("duty_roster:edit_roster_message")
+        response = client.get(url)
+        assert response.status_code == 200
+        assert b"Edit Roster Announcement" in response.content
+
     def test_view_displays_form(self, client, rostermeister):
         """Test that the view displays the form."""
         client.force_login(rostermeister)
