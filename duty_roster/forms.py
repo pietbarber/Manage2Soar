@@ -10,6 +10,7 @@ from siteconfig.models import SiteConfiguration
 from .models import (
     DutyAssignment,
     DutyPreference,
+    DutyRosterMessage,
     DutySwapOffer,
     DutySwapRequest,
     GliderReservation,
@@ -714,8 +715,6 @@ class DutyRosterMessageForm(forms.ModelForm):
     """Form for editing the Rostermeister's announcement message (Issue #551)."""
 
     class Meta:
-        from .models import DutyRosterMessage
-
         model = DutyRosterMessage
         fields = ["content", "is_active"]
         widgets = {

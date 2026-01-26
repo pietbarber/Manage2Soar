@@ -107,16 +107,21 @@ class TestDutyRosterMessageModel:
 
     def test_singleton_pattern(self, db):
         """Test that only one DutyRosterMessage can exist (singleton)."""
-        DutyRosterMessage.objects.all().delete()
-        msg1 = DutyRosterMessage.objects.create(content="<p>First</p>")
-        msg2 = DutyRosterMessage.objects.create(content="<p>Second</p>")
+        from django.core.exceptions import ValidationError
 
-        # After creating second, only one should exist
+        DutyRosterMessage.objects.all().delete()
+        DutyRosterMessage.objects.create(content="<p>First</p>")
+
+        # Trying to create a second instance should raise ValidationError
+        with pytest.raises(ValidationError, match="Only one Duty Roster Message"):
+            DutyRosterMessage.objects.create(content="<p>Second</p>")
+
+        # Should still only have one instance
         assert DutyRosterMessage.objects.count() == 1
-        # The second one should be the one that exists
+        # The first one should still exist
         message = DutyRosterMessage.objects.first()
         assert message is not None
-        assert message.content == "<p>Second</p>"
+        assert message.content == "<p>First</p>"
 
     def test_get_message_returns_active_message(self, roster_message):
         """Test get_message() returns the active message."""

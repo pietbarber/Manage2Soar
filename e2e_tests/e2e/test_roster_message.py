@@ -35,7 +35,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
 
     def test_rostermeister_can_access_edit_page(self):
         """Test that a rostermeister can access the edit message page."""
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )
@@ -51,7 +51,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
 
     def test_regular_member_cannot_access_edit_page(self):
         """Test that a regular member is redirected when trying to access edit page."""
-        member = self.create_test_member(
+        self.create_test_member(
             username="regular",
             rostermeister=False,
         )
@@ -66,7 +66,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
 
     def test_save_message_and_view_on_calendar(self):
         """Test saving a message and seeing it on the calendar."""
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )
@@ -107,7 +107,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        member = self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer")
         self.login(username="viewer")
 
         # Navigate to calendar
@@ -125,7 +125,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=False,
         )
 
-        member = self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer")
         self.login(username="viewer")
 
         # Navigate to calendar
@@ -142,7 +142,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )
@@ -165,7 +165,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        member = self.create_test_member(
+        self.create_test_member(
             username="regular",
             rostermeister=False,
         )
@@ -181,7 +181,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
 
     def test_rostermeister_sees_add_button_when_no_message(self):
         """Test that rostermeisters see 'Add Announcement' when no message exists."""
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )
@@ -201,7 +201,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        member = self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer")
         self.login(username="viewer")
 
         # Navigate to calendar
@@ -227,7 +227,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )
@@ -248,7 +248,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
 
     def test_back_to_calendar_button(self):
         """Test that 'Back to Calendar' button works."""
-        rostermeister = self.create_test_member(
+        self.create_test_member(
             username="rostermeister",
             rostermeister=True,
         )

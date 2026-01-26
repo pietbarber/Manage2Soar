@@ -1,3 +1,5 @@
+import re
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -44,16 +46,24 @@ class DutyRosterMessage(models.Model):
     def __str__(self):
         if self.content:
             # Strip HTML and truncate for display
-            import re
-
             text = re.sub(r"<[^>]+>", "", self.content)
             return f"Rostermeister Message: {text[:50]}..."
         return "Rostermeister Message (empty)"
 
+    def clean(self):
+        """Enforce singleton constraint at validation level to prevent race conditions."""
+        if not self.pk and DutyRosterMessage.objects.exists():
+            raise ValidationError(
+                "Only one Duty Roster Message instance is allowed. "
+                "Please edit the existing message instead of creating a new one."
+            )
+
     def save(self, *args, **kwargs):
         """Ensure only one instance exists (singleton pattern)."""
+        self.full_clean()  # Call clean() for validation
         if not self.pk:
             # If creating a new instance, delete any existing ones
+            # This provides a fallback if clean() is bypassed
             DutyRosterMessage.objects.all().delete()
         super().save(*args, **kwargs)
 
