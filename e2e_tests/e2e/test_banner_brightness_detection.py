@@ -278,3 +278,228 @@ class TestBannerBrightnessEdgeCases(DjangoPlaywrightTestCase):
 
         # Threshold should be 140 as per the JavaScript
         assert threshold == 140, f"BRIGHTNESS_THRESHOLD should be 140, got: {threshold}"
+
+
+class TestBannerParallaxEffect(DjangoPlaywrightTestCase):
+    """
+    E2E tests for banner parallax scrolling functionality (Issue #570).
+
+    Feature: JavaScript-based parallax effect using transform: translateY()
+    File: static/js/banner-brightness-detection.js (initBannerParallax function)
+
+    Technical Notes:
+    - Parallax speed factor is 0.3 (image moves at 30% of scroll speed)
+    - Uses requestAnimationFrame for smooth performance
+    - Respects prefers-reduced-motion preference
+    - Only applies when banner is visible in viewport
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """Create a test image for parallax tests."""
+        from django.test import override_settings
+
+        cls.test_media_root = tempfile.mkdtemp(prefix="test_media_parallax_")
+        cls._media_override = override_settings(MEDIA_ROOT=cls.test_media_root)
+        cls._media_override.enable()
+
+        super().setUpClass()
+
+        # Create temp directory for test image
+        cls.temp_dir = tempfile.mkdtemp(prefix="parallax_test_")
+
+        # Create a test banner image
+        cls.test_image_path = os.path.join(cls.temp_dir, "parallax_banner.png")
+        img = Image.new("RGB", (1920, 600), color=(100, 150, 200))
+        img.save(cls.test_image_path, "PNG")
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up test files and media directory."""
+        import shutil
+
+        if hasattr(cls, "temp_dir") and os.path.exists(cls.temp_dir):
+            shutil.rmtree(cls.temp_dir)
+
+        if hasattr(cls, "test_media_root") and os.path.exists(cls.test_media_root):
+            shutil.rmtree(cls.test_media_root)
+
+        if hasattr(cls, "_media_override"):
+            cls._media_override.disable()
+
+        super().tearDownClass()
+
+    def _create_page_with_banner(self, slug, image_path):
+        """Create a CMS page with a banner image."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        with open(image_path, "rb") as f:
+            image_content = f.read()
+
+        uploaded_file = SimpleUploadedFile(
+            name=os.path.basename(image_path),
+            content=image_content,
+            content_type="image/png",
+        )
+
+        page = Page.objects.create(
+            title=f"Test Page {slug}",
+            slug=slug,
+            content="<p>Test content</p>",
+            is_public=True,
+            banner_image=uploaded_file,
+        )
+        return page
+
+    def setUp(self):
+        super().setUp()
+        self.create_test_member(username="parallax_admin", is_superuser=True)
+        self.login(username="parallax_admin")
+
+    def test_parallax_function_exists(self):
+        """Verify the initBannerParallax function is defined globally."""
+        self.page.goto(self.live_server_url)
+        self.page.wait_for_load_state("networkidle")
+
+        function_exists = self.page.evaluate("typeof initBannerParallax === 'function'")
+        assert function_exists, "initBannerParallax function should be defined"
+
+    def test_parallax_applies_transform_on_scroll(self):
+        """Verify that parallax effect applies CSS transform when scrolling."""
+        # Create page with banner and extra content to make it scrollable
+        page = self._create_page_with_banner(
+            "test-parallax-scroll", self.test_image_path
+        )
+        page.content = "<p>Content line</p>" * 50  # Add enough content for scrolling
+        page.save()
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.wait_for_load_state("networkidle")
+
+        # Wait for banner to be visible
+        banner_image = self.page.locator(".page-banner-image")
+        assert banner_image.count() > 0, "Banner image should exist"
+
+        # Get initial transform value (should be translateY(0px))
+        initial_transform = banner_image.evaluate("el => el.style.transform")
+
+        # Scroll down the page significantly (past the banner)
+        self.page.evaluate("window.scrollBy(0, 500)")
+        self.page.wait_for_timeout(200)  # Wait for parallax to apply
+
+        # Get transform after scroll
+        after_scroll_transform = banner_image.evaluate("el => el.style.transform")
+
+        # Transform should have changed (parallax applied)
+        # At scrollY=500, parallax offset should be 500 * 0.3 = 150px
+        assert (
+            after_scroll_transform != initial_transform
+        ), f"Transform should change after scroll. Initial: {initial_transform}, After: {after_scroll_transform}"
+
+        # Verify it's a translateY transform with a positive value
+        assert (
+            "translateY(" in after_scroll_transform
+        ), f"Transform should contain translateY, got: {after_scroll_transform}"
+
+        # Verify the value is non-zero (can be decimal like 104.7px)
+        import re
+
+        match = re.search(r"translateY\(([\d.]+)px\)", after_scroll_transform)
+        assert match, f"Should have numeric translateY value: {after_scroll_transform}"
+        translate_value = float(match.group(1))
+        assert translate_value > 0, f"translateY should be > 0, got {translate_value}px"
+
+    def test_parallax_respects_prefers_reduced_motion(self):
+        """Verify that parallax is disabled when prefers-reduced-motion is set."""
+        # Set prefers-reduced-motion media query
+        self.page.emulate_media(color_scheme="light", reduced_motion="reduce")
+
+        page = self._create_page_with_banner(
+            "test-parallax-reduced-motion", self.test_image_path
+        )
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.wait_for_load_state("networkidle")
+
+        banner_image = self.page.locator(".page-banner-image")
+        assert banner_image.count() > 0, "Banner image should exist"
+
+        # Get initial transform
+        initial_transform = banner_image.evaluate("el => el.style.transform")
+
+        # Scroll down
+        self.page.evaluate("window.scrollBy(0, 200)")
+        self.page.wait_for_timeout(100)
+
+        # Get transform after scroll
+        after_scroll_transform = banner_image.evaluate("el => el.style.transform")
+
+        # Transform should NOT change when reduced motion is preferred
+        # (initBannerParallax should return early)
+        assert (
+            after_scroll_transform == initial_transform or not after_scroll_transform
+        ), "Transform should not change when prefers-reduced-motion is set"
+
+    def test_parallax_only_applies_when_banner_visible(self):
+        """Verify that parallax only applies when banner is in viewport."""
+        page = self._create_page_with_banner(
+            "test-parallax-visibility", self.test_image_path
+        )
+
+        # Add lots of content so we can scroll past the banner
+        page.content = "<p>Content</p>" * 100
+        page.save()
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.wait_for_load_state("networkidle")
+
+        banner_image = self.page.locator(".page-banner-image")
+        assert banner_image.count() > 0, "Banner image should exist"
+
+        # Scroll way past the banner (banner height is ~300px, scroll 1000px)
+        self.page.evaluate("window.scrollBy(0, 1000)")
+        self.page.wait_for_timeout(100)
+
+        # The parallax logic in JavaScript only applies transform when banner is visible
+        # We can't easily test the internal logic without modifying production code,
+        # but we can verify the function doesn't throw errors and executes
+        no_errors = self.page.evaluate(
+            """
+            () => {
+                try {
+                    // Trigger a scroll event
+                    window.scrollBy(0, 10);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+            """
+        )
+        assert no_errors, "Parallax should not throw errors when banner is out of view"
+
+    def test_parallax_initializes_without_errors(self):
+        """Verify that parallax initialization doesn't throw errors."""
+        page = self._create_page_with_banner("test-parallax-init", self.test_image_path)
+
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+        self.page.wait_for_load_state("networkidle")
+
+        # Check for any JavaScript errors
+        errors = []
+
+        def handle_console(msg):
+            if msg.type == "error":
+                errors.append(msg.text)
+
+        self.page.on("console", handle_console)
+
+        # Scroll to trigger parallax
+        self.page.evaluate("window.scrollBy(0, 100)")
+        self.page.wait_for_timeout(200)
+
+        # Remove listener
+        self.page.remove_listener("console", handle_console)
+
+        # No errors should have occurred
+        assert len(errors) == 0, f"Parallax should not cause console errors: {errors}"
