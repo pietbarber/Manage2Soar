@@ -198,4 +198,10 @@ urlpatterns = [
         views_swap.withdraw_offer,
         name="withdraw_swap_offer",
     ),
+    # Rostermeister Message (Issue #551)
+    path(
+        "message/edit/",
+        views.edit_roster_message,
+        name="edit_roster_message",
+    ),
 ]

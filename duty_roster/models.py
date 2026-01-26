@@ -1,9 +1,167 @@
+import re
+
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from tinymce.models import HTMLField
 
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+
+# Allowed HTML tags and attributes for roster messages
+ALLOWED_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "u",
+    "ul",
+    "ol",
+    "li",
+    "a",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "blockquote",
+    "span",
+    "div",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "caption",
+]
+
+ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target", "rel"],
+    "span": ["style"],
+    "div": ["style"],
+    "th": ["scope", "colspan", "rowspan"],
+    "td": ["colspan", "rowspan"],
+}
+
+# CSS Sanitizer for inline styles
+CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=["color", "background-color", "font-weight", "text-align"]
+)
+
+
+class DutyRosterMessage(models.Model):
+    """
+    Singleton model for the Rostermeister's message displayed at the top of the duty calendar.
+
+    This replaces the plain-text `duty_roster_announcement` field in SiteConfiguration,
+    providing rich HTML content editable through TinyMCE.
+
+    Only one instance of this model should exist at a time.
+    """
+
+    content = HTMLField(
+        blank=True,
+        default="",
+        help_text="Rich HTML message displayed at the top of the duty calendar. "
+        "Leave blank to hide the announcement.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="When unchecked, the message will not be displayed even if content exists.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="duty_roster_message_updates",
+        help_text="Last person to update this message.",
+    )
+
+    class Meta:
+        verbose_name = "Duty Roster Message"
+        verbose_name_plural = "Duty Roster Message"  # Singular since it's a singleton
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(id__lte=1),
+                name="singleton_only_one_instance",
+                violation_error_message="Only one Duty Roster Message instance is allowed.",
+            )
+        ]
+
+    def __str__(self):
+        if self.content:
+            # Strip HTML and truncate for display
+            text = re.sub(r"<[^>]+>", "", self.content)
+            return f"Rostermeister Message: {text[:50]}..."
+        return "Rostermeister Message (empty)"
+
+    def clean(self):
+        """Enforce singleton constraint at validation level to prevent race conditions."""
+        if not self.pk and DutyRosterMessage.objects.exists():
+            raise ValidationError(
+                "Only one Duty Roster Message instance is allowed. "
+                "Please edit the existing message instead of creating a new one."
+            )
+
+    def save(self, *args, **kwargs):
+        """
+        Validate singleton constraint and sanitize HTML content before saving.
+
+        Strips dangerous HTML tags (script, iframe, etc.) while preserving safe
+        formatting tags to prevent XSS attacks.
+        """
+        # Sanitize HTML content to prevent XSS
+        if self.content:
+            self.content = bleach.clean(
+                self.content,
+                tags=ALLOWED_TAGS,
+                attributes=ALLOWED_ATTRIBUTES,
+                css_sanitizer=CSS_SANITIZER,
+                strip=True,  # Strip disallowed tags instead of escaping
+            )
+
+        self.full_clean()  # Call clean() for validation
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_message(cls):
+        """
+        Get the current active message, or None if no message exists or is inactive.
+
+        Returns:
+            DutyRosterMessage instance or None
+        """
+        message = cls.objects.first()
+        if message and message.is_active and message.content.strip():
+            return message
+        return None
+
+    @classmethod
+    def get_or_create_message(cls):
+        """
+        Get existing message or create an empty one.
+
+        Uses select_for_update() to prevent race conditions in distributed
+        environments (production runs on 2-pod Kubernetes cluster).
+
+        Returns:
+            DutyRosterMessage instance (created if necessary)
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Use select_for_update() with row-level lock to prevent concurrent creation
+            message = cls.objects.select_for_update().first()
+            if not message:
+                message = cls.objects.create()
+            return message
 
 
 class MemberBlackout(models.Model):

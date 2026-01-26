@@ -152,12 +152,15 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Duty Roster Announcements",
+            "⚠️ Duty Roster Announcements (DEPRECATED)",
             {
                 "fields": ("duty_roster_announcement",),
                 "description": (
-                    "Optional announcement that will be displayed at the top of the duty roster calendar. "
-                    "Use this for Rostermeister updates, schedule changes, or important notices for members."
+                    "<strong>⚠️ DEPRECATED:</strong> This field is deprecated as of Issue #551. "
+                    "Use the new rich HTML editor in the Duty Roster app instead. "
+                    "Rostermeisters can access it via the 'Edit Announcement' button on the duty calendar. "
+                    "This field will be removed in a future release. "
+                    "NOTE: The URL path should be kept in sync with duty_roster/urls.py."
                 ),
                 "classes": ("collapse",),
             },

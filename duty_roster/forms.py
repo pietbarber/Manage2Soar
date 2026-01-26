@@ -2,6 +2,7 @@ import calendar
 
 from django import forms
 from django.db.models import Exists, OuterRef, Q
+from tinymce.widgets import TinyMCE
 
 from logsheet.models import Glider, MaintenanceIssue
 from members.models import Member
@@ -10,6 +11,7 @@ from siteconfig.models import SiteConfiguration
 from .models import (
     DutyAssignment,
     DutyPreference,
+    DutyRosterMessage,
     DutySwapOffer,
     DutySwapRequest,
     GliderReservation,
@@ -708,3 +710,33 @@ class GliderReservationCancelForm(forms.Form):
         ),
         label="Reason for cancellation",
     )
+
+
+class DutyRosterMessageForm(forms.ModelForm):
+    """Form for editing the Rostermeister's announcement message (Issue #551)."""
+
+    class Meta:
+        model = DutyRosterMessage
+        fields = ["content", "is_active"]
+        widgets = {
+            "content": TinyMCE(
+                attrs={
+                    "class": "form-control",
+                    "rows": 10,
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                }
+            ),
+        }
+        labels = {
+            "content": "Announcement Message",
+            "is_active": "Display this message on the duty calendar",
+        }
+        help_texts = {
+            "content": "Use the editor to format your message. This will be displayed "
+            "at the top of the duty calendar for all members to see.",
+            "is_active": "Uncheck to hide the message without deleting the content.",
+        }
