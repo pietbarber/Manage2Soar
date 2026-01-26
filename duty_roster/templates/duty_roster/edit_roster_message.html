@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+{% load siteconfig_tags %}
+
+{% block title %}Edit Roster Announcement{% endblock %}
+
+{% block extra_head %}
+{{ form.media }}
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-megaphone-fill me-2"></i>
+            Edit Roster Announcement
+          </h4>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-4">
+            This message will be displayed at the top of the duty calendar for all members to see.
+            Use it for schedule announcements, important notices, or seasonal updates.
+          </p>
+
+          <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-4">
+              <label for="{{ form.content.id_for_label }}" class="form-label fw-bold">
+                {{ form.content.label }}
+              </label>
+              {{ form.content }}
+              {% if form.content.help_text %}
+                <div class="form-text">{{ form.content.help_text }}</div>
+              {% endif %}
+              {% if form.content.errors %}
+                <div class="invalid-feedback d-block">
+                  {{ form.content.errors }}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                {{ form.is_active }}
+                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                  {{ form.is_active.label }}
+                </label>
+              </div>
+              {% if form.is_active.help_text %}
+                <div class="form-text">{{ form.is_active.help_text }}</div>
+              {% endif %}
+            </div>
+
+            {% if message.updated_at and message.updated_by %}
+            <div class="alert alert-light border mb-4">
+              <small class="text-muted">
+                <i class="bi bi-clock-history me-1"></i>
+                Last updated {{ message.updated_at|date:"F j, Y, g:i a" }}
+                by {{ message.updated_by.full_display_name }}
+              </small>
+            </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-between align-items-center">
+              <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Calendar
+              </a>
+              <div>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-lg me-1"></i> Save Message
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Preview Section -->
+      {% if message.content %}
+      <div class="card shadow-sm mt-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="bi bi-eye me-2"></i>
+            Current Message Preview
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info mb-0">
+            <div class="d-flex align-items-start">
+              <i class="bi bi-megaphone-fill me-2 fs-5 text-info" aria-hidden="true"></i>
+              <div class="cms-content">
+                <strong class="d-block mb-1">Roster Manager Announcement:</strong>
+                {{ message.content|safe }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

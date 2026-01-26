@@ -241,11 +241,13 @@ class SiteConfiguration(models.Model):
         default=False, help_text="We schedule Assistant Duty Officers ahead of time"
     )
 
-    # Duty Roster Announcement (Issue #333)
+    # Duty Roster Announcement (Issue #333) - DEPRECATED as of Issue #551
+    # Use DutyRosterMessage model in duty_roster app instead for rich HTML support
     duty_roster_announcement = models.TextField(
         blank=True,
         default="",
-        help_text="Optional announcement from the Roster Manager displayed on the duty calendar. Visible to all members.",
+        help_text="DEPRECATED: Use the new Duty Roster Message editor at /duty_roster/message/edit/ instead. "
+        "This field will be removed in a future release.",
     )
 
     # Terminology (customizable titles for all roles)

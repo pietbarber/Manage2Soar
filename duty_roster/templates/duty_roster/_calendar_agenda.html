@@ -1,6 +1,35 @@
 {% load duty_extras %}
 {% load static %}
 {% load siteconfig_tags %}
+{% get_roster_message as roster_message %}
+
+{# Issue #551: Rich HTML message from DutyRosterMessage model #}
+{% if roster_message %}
+<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <i class="bi bi-megaphone-fill me-2 fs-5 text-info" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+      <div class="d-flex justify-content-between align-items-start">
+        <strong class="d-block mb-1">Roster Manager Announcement:</strong>
+        {% if user.rostermeister or user.is_staff or user.is_superuser %}
+        <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-primary ms-2" title="Edit announcement">
+          <i class="bi bi-pencil"></i>
+        </a>
+        {% endif %}
+      </div>
+      <div class="cms-content">{{ roster_message.content|safe }}</div>
+    </div>
+  </div>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% elif user.rostermeister or user.is_staff or user.is_superuser %}
+{# Show "Add Message" button for rostermeisters when no message exists #}
+<div class="mb-4 text-end">
+  <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-secondary" title="Add roster announcement">
+    <i class="bi bi-megaphone me-1"></i> Add Announcement
+  </a>
+</div>
+{% endif %}
 
 {% if user.rostermeister %}
   <div class="d-flex justify-content-center mb-4">

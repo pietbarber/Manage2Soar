@@ -83,28 +83,40 @@ class TestDutyRosterAnnouncement:
 
 @pytest.mark.django_db
 class TestDutyRosterCalendarWithAnnouncement:
-    """Tests for duty roster calendar view with announcements."""
+    """Tests for duty roster calendar view with announcements.
+
+    Note: As of Issue #551, the calendar uses DutyRosterMessage model
+    instead of the deprecated siteconfig.duty_roster_announcement field.
+    """
 
     def test_calendar_loads_without_announcement(
         self, client, active_member, siteconfig
     ):
         """Test that calendar loads when there's no announcement."""
+        # Ensure no DutyRosterMessage exists
+        from duty_roster.models import DutyRosterMessage
+
+        DutyRosterMessage.objects.all().delete()
+
         client.force_login(active_member)
         url = reverse("duty_roster:duty_calendar")
         response = client.get(url)
         assert response.status_code == 200
         # Should NOT contain announcement alert when empty
-        assert b"bi-megaphone" not in response.content
+        assert b"Roster Manager Announcement" not in response.content
 
     def test_calendar_displays_announcement(
         self, client, membership_statuses, siteconfig
     ):
-        """Test that calendar displays announcement when set."""
-        # Set announcement on existing siteconfig
-        siteconfig.duty_roster_announcement = (
-            "Important: Schedule change for next weekend!"
+        """Test that calendar displays announcement when set (Issue #551)."""
+        from duty_roster.models import DutyRosterMessage
+
+        # Create announcement using new DutyRosterMessage model
+        DutyRosterMessage.objects.all().delete()
+        DutyRosterMessage.objects.create(
+            content="<p>Important: Schedule change for next weekend!</p>",
+            is_active=True,
         )
-        siteconfig.save()
 
         # Create active member
         user = Member.objects.create_user(
@@ -128,10 +140,14 @@ class TestDutyRosterCalendarWithAnnouncement:
     def test_announcement_has_roster_manager_label(
         self, client, membership_statuses, siteconfig
     ):
-        """Test that announcement shows 'Roster Manager Announcement' label."""
-        # Set announcement on existing siteconfig
-        siteconfig.duty_roster_announcement = "Test announcement"
-        siteconfig.save()
+        """Test that announcement shows 'Roster Manager Announcement' label (Issue #551)."""
+        from duty_roster.models import DutyRosterMessage
+
+        DutyRosterMessage.objects.all().delete()
+        DutyRosterMessage.objects.create(
+            content="<p>Test announcement</p>",
+            is_active=True,
+        )
 
         user = Member.objects.create_user(
             username="testmember3",
@@ -148,13 +164,18 @@ class TestDutyRosterCalendarWithAnnouncement:
         assert response.status_code == 200
         assert b"Roster Manager Announcement" in response.content
 
-    def test_multiline_announcement_renders_with_line_breaks(
+    def test_rich_html_announcement_renders_correctly(
         self, client, membership_statuses, siteconfig
     ):
-        """Test that multiline announcements render with <br> tags."""
-        # Set multiline announcement
-        siteconfig.duty_roster_announcement = "Line 1\nLine 2\nLine 3"
-        siteconfig.save()
+        """Test that rich HTML announcements render correctly (Issue #551)."""
+        from duty_roster.models import DutyRosterMessage
+
+        DutyRosterMessage.objects.all().delete()
+        # Set HTML content with formatting
+        DutyRosterMessage.objects.create(
+            content="<p><strong>Line 1</strong></p><p>Line 2</p><p>Line 3</p>",
+            is_active=True,
+        )
 
         user = Member.objects.create_user(
             username="testmember_multiline",
@@ -170,29 +191,29 @@ class TestDutyRosterCalendarWithAnnouncement:
         response = client.get(url)
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        # Should contain line breaks converted by linebreaksbr filter
-        assert "<br" in content or "<br>" in content
-        # Should contain all three lines
-        assert "Line 1" in content
+        # Should contain the HTML rendered
+        assert "<strong>Line 1</strong>" in content
         assert "Line 2" in content
         assert "Line 3" in content
 
-    def test_announcement_escapes_html_to_prevent_xss(
+    def test_announcement_inactive_not_displayed(
         self, client, membership_statuses, siteconfig
     ):
-        """Test that HTML/JavaScript in announcements is properly escaped."""
-        # Set announcement with malicious HTML/JavaScript
-        siteconfig.duty_roster_announcement = (
-            "<script>alert('XSS')</script><img src=x onerror=alert(1)>"
+        """Test that inactive announcements are not displayed (Issue #551)."""
+        from duty_roster.models import DutyRosterMessage
+
+        DutyRosterMessage.objects.all().delete()
+        DutyRosterMessage.objects.create(
+            content="<p>This should be hidden</p>",
+            is_active=False,
         )
-        siteconfig.save()
 
         user = Member.objects.create_user(
-            username="testmember_xss",
-            email="xss@test.org",
+            username="testmember_inactive",
+            email="inactive@test.org",
             password="testpass123",
             first_name="Test",
-            last_name="XSS",
+            last_name="Inactive",
             membership_status="Full Member",
         )
 
@@ -201,13 +222,8 @@ class TestDutyRosterCalendarWithAnnouncement:
         response = client.get(url)
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        # Should contain escaped HTML entities for angle brackets
-        assert "&lt;script&gt;" in content
-        assert "&lt;img" in content
-        # Should NOT contain the dangerous payload in an executable form
-        # The key test: ensure the malicious string is escaped in the announcement span
-        assert 'announcement-text">&lt;script&gt;alert' in content
-        assert not ("<script>alert" in content and "'XSS')</script>" in content)
+        # Should NOT contain the hidden message
+        assert "This should be hidden" not in content
 
 
 @pytest.mark.django_db

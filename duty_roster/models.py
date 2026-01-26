@@ -1,9 +1,90 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from tinymce.models import HTMLField
 
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+
+
+class DutyRosterMessage(models.Model):
+    """
+    Singleton model for the Rostermeister's message displayed at the top of the duty calendar.
+
+    This replaces the plain-text `duty_roster_announcement` field in SiteConfiguration,
+    providing rich HTML content editable through TinyMCE.
+
+    Only one instance of this model should exist at a time.
+    """
+
+    content = HTMLField(
+        blank=True,
+        default="",
+        help_text="Rich HTML message displayed at the top of the duty calendar. "
+        "Leave blank to hide the announcement.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="When unchecked, the message will not be displayed even if content exists.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="duty_roster_message_updates",
+        help_text="Last person to update this message.",
+    )
+
+    class Meta:
+        verbose_name = "Duty Roster Message"
+        verbose_name_plural = "Duty Roster Message"  # Singular since it's a singleton
+
+    def __str__(self):
+        if self.content:
+            # Strip HTML and truncate for display
+            import re
+
+            text = re.sub(r"<[^>]+>", "", self.content)
+            return f"Rostermeister Message: {text[:50]}..."
+        return "Rostermeister Message (empty)"
+
+    def save(self, *args, **kwargs):
+        """Ensure only one instance exists (singleton pattern)."""
+        if not self.pk:
+            # If creating a new instance, delete any existing ones
+            DutyRosterMessage.objects.all().delete()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_message(cls):
+        """
+        Get the current active message, or None if no message exists or is inactive.
+
+        Returns:
+            DutyRosterMessage instance or None
+        """
+        try:
+            message = cls.objects.first()
+            if message and message.is_active and message.content.strip():
+                return message
+            return None
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_or_create_message(cls):
+        """
+        Get existing message or create an empty one.
+
+        Returns:
+            DutyRosterMessage instance (created if necessary)
+        """
+        message = cls.objects.first()
+        if not message:
+            message = cls.objects.create()
+        return message
 
 
 class MemberBlackout(models.Model):

@@ -41,12 +41,13 @@ from siteconfig.utils import get_role_title
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 
-from .forms import DutyAssignmentForm, DutyPreferenceForm
+from .forms import DutyAssignmentForm, DutyPreferenceForm, DutyRosterMessageForm
 from .models import (
     DutyAssignment,
     DutyAvoidance,
     DutyPairing,
     DutyPreference,
+    DutyRosterMessage,
     MemberBlackout,
     OpsIntent,
 )
@@ -1786,3 +1787,44 @@ def _notify_surge_instructor_needed(assignment, student_count):
         )
     except Exception:
         logger.exception("Failed to send surge instructor notification")
+
+
+def rostermeister_required(user):
+    """Check if user is a rostermeister, staff, or superuser."""
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.is_staff or getattr(user, "rostermeister", False)
+
+
+@user_passes_test(rostermeister_required, login_url="/accounts/login/")
+@never_cache
+def edit_roster_message(request):
+    """
+    View for Rostermeisters to edit the duty roster announcement message (Issue #551).
+
+    This replaces the plain-text announcement in SiteConfiguration with a
+    rich HTML message editable through TinyMCE.
+    """
+    message = DutyRosterMessage.get_or_create_message()
+
+    if request.method == "POST":
+        form = DutyRosterMessageForm(request.POST, instance=message)
+        if form.is_valid():
+            roster_message = form.save(commit=False)
+            roster_message.updated_by = request.user
+            roster_message.save()
+            messages.success(
+                request, "Roster announcement message updated successfully."
+            )
+            return redirect("duty_roster:duty_calendar")
+    else:
+        form = DutyRosterMessageForm(instance=message)
+
+    return render(
+        request,
+        "duty_roster/edit_roster_message.html",
+        {
+            "form": form,
+            "message": message,
+        },
+    )
