@@ -233,7 +233,7 @@ class TestEditRosterMessageView:
         url = reverse("duty_roster:edit_roster_message")
         response = client.get(url)
         assert response.status_code == 302
-        assert "/accounts/login/" in response.url
+        assert "/login/" in response.url
 
     def test_regular_member_denied(self, client, regular_member):
         """Test that regular members cannot access the view."""
@@ -249,13 +249,6 @@ class TestEditRosterMessageView:
         response = client.get(url)
         assert response.status_code == 200
         assert b"Edit Roster Announcement" in response.content
-
-    def test_staff_can_access(self, client, staff_user):
-        """Test that staff users can access the view."""
-        client.force_login(staff_user)
-        url = reverse("duty_roster:edit_roster_message")
-        response = client.get(url)
-        assert response.status_code == 200
 
     def test_view_displays_form(self, client, rostermeister):
         """Test that the view displays the form."""

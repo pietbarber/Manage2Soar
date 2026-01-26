@@ -1789,14 +1789,8 @@ def _notify_surge_instructor_needed(assignment, student_count):
         logger.exception("Failed to send surge instructor notification")
 
 
-def rostermeister_required(user):
-    """Check if user is a rostermeister, staff, or superuser."""
-    if not user.is_authenticated:
-        return False
-    return user.is_superuser or user.is_staff or getattr(user, "rostermeister", False)
-
-
-@user_passes_test(rostermeister_required, login_url="/accounts/login/")
+@active_member_required
+@user_passes_test(is_rostermeister)
 @never_cache
 def edit_roster_message(request):
     """

@@ -88,13 +88,20 @@ class DutyRosterMessage(models.Model):
         """
         Get existing message or create an empty one.
 
+        Uses select_for_update() to prevent race conditions in distributed
+        environments (production runs on 2-pod Kubernetes cluster).
+
         Returns:
             DutyRosterMessage instance (created if necessary)
         """
-        message = cls.objects.first()
-        if not message:
-            message = cls.objects.create()
-        return message
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Use select_for_update() with row-level lock to prevent concurrent creation
+            message = cls.objects.select_for_update().first()
+            if not message:
+                message = cls.objects.create()
+            return message
 
 
 class MemberBlackout(models.Model):
