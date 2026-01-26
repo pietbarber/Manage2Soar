@@ -41,20 +41,12 @@ class DutyRosterMessageAdmin(AdminHelperMixin, admin.ModelAdmin):
 
     def has_add_permission(self, request):
         """Prevent creating multiple instances (singleton pattern)."""
-        from .models import DutyRosterMessage
-
         # Only allow add if no instance exists
-        return not DutyRosterMessage.objects.exists()
+        return not self.model.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         """Allow deletion to reset the message."""
         return True
-
-    class Media:
-        """Include TinyMCE for the content field."""
-
-        js = ()
-        css = {}
 
 
 @admin.register(MemberBlackout)
