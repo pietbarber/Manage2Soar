@@ -42,8 +42,9 @@
      * which causes background-size: cover to scale based on viewport dimensions
      * rather than the banner element, resulting in only showing the top-left corner.
      *
-     * For parallax effect, we use JavaScript-based transform instead (see banner-parallax.js).
-     * This provides better cross-browser compatibility and correct image scaling.
+     * For parallax effect, we use a JavaScript-based transform instead (see banner-brightness-detection.js),
+     * which handles both brightness detection and parallax. This provides better cross-browser compatibility
+     * and correct image scaling.
      */
     background-attachment: scroll;
     z-index: 1;
