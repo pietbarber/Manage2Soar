@@ -173,6 +173,68 @@ class TestDutyRosterMessageModel:
         roster_message.refresh_from_db()
         assert roster_message.updated_by == rostermeister
 
+    def test_sanitizes_script_tags(self, db):
+        """Test that script tags are sanitized on save (XSS prevention)."""
+        DutyRosterMessage.objects.all().delete()
+        message = DutyRosterMessage.objects.create(
+            content="<p>Safe content</p><script>alert('XSS')</script>",
+            is_active=True,
+        )
+        message.refresh_from_db()
+        # Script tag should be stripped (content remains as plain text)
+        assert "<script>" not in message.content
+        assert "</script>" not in message.content
+        # Safe content should remain
+        assert "<p>Safe content</p>" in message.content
+
+    def test_sanitizes_event_handlers(self, db):
+        """Test that event handlers are sanitized (XSS prevention)."""
+        DutyRosterMessage.objects.all().delete()
+        message = DutyRosterMessage.objects.create(
+            content='<p onclick="alert(1)">Click me</p>',
+            is_active=True,
+        )
+        message.refresh_from_db()
+        # Event handler should be stripped
+        assert "onclick" not in message.content
+        assert "alert" not in message.content
+        # Safe content should remain
+        assert "<p>Click me</p>" in message.content
+
+    def test_sanitizes_iframe_tags(self, db):
+        """Test that iframe tags are sanitized (XSS prevention)."""
+        DutyRosterMessage.objects.all().delete()
+        message = DutyRosterMessage.objects.create(
+            content='<p>Safe</p><iframe src="evil.com"></iframe>',
+            is_active=True,
+        )
+        message.refresh_from_db()
+        # Iframe should be stripped
+        assert "<iframe" not in message.content
+        assert "evil.com" not in message.content
+        # Safe content should remain
+        assert "<p>Safe</p>" in message.content
+
+    def test_preserves_safe_html(self, db):
+        """Test that safe HTML formatting is preserved."""
+        DutyRosterMessage.objects.all().delete()
+        safe_html = (
+            "<p><strong>Bold</strong> and <em>italic</em> text</p>"
+            "<ul><li>Item 1</li><li>Item 2</li></ul>"
+            '<a href="https://example.com" title="Link">Link text</a>'
+        )
+        message = DutyRosterMessage.objects.create(
+            content=safe_html,
+            is_active=True,
+        )
+        message.refresh_from_db()
+        # All safe tags should be preserved
+        assert "<strong>Bold</strong>" in message.content
+        assert "<em>italic</em>" in message.content
+        assert "<ul>" in message.content
+        assert "<li>Item 1</li>" in message.content
+        assert '<a href="https://example.com"' in message.content
+
 
 @pytest.mark.django_db
 class TestDutyRosterMessageForm:

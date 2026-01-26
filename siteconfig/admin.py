@@ -158,9 +158,9 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "description": (
                     "<strong>⚠️ DEPRECATED:</strong> This field is deprecated as of Issue #551. "
                     "Use the new rich HTML editor in the Duty Roster app instead. "
-                    "Rostermeisters can access it via the 'Edit Announcement' button on the duty calendar, "
-                    "or directly at /duty_roster/message/edit/. "
-                    "This field will be removed in a future release."
+                    "Rostermeisters can access it via the 'Edit Announcement' button on the duty calendar. "
+                    "This field will be removed in a future release. "
+                    "NOTE: The URL path should be kept in sync with duty_roster/urls.py."
                 ),
                 "classes": ("collapse",),
             },

@@ -1,5 +1,7 @@
 import re
 
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -7,6 +9,39 @@ from tinymce.models import HTMLField
 
 from members.models import Member
 from siteconfig.models import SiteConfiguration
+
+# Allowed HTML tags and attributes for roster messages
+ALLOWED_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "u",
+    "ul",
+    "ol",
+    "li",
+    "a",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "blockquote",
+    "span",
+    "div",
+]
+
+ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target"],
+    "span": ["style"],
+    "div": ["style"],
+}
+
+# CSS Sanitizer for inline styles
+CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=["color", "background-color", "font-weight", "text-align"]
+)
 
 
 class DutyRosterMessage(models.Model):
@@ -59,7 +94,22 @@ class DutyRosterMessage(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        """Validate singleton constraint before saving."""
+        """
+        Validate singleton constraint and sanitize HTML content before saving.
+
+        Strips dangerous HTML tags (script, iframe, etc.) while preserving safe
+        formatting tags to prevent XSS attacks.
+        """
+        # Sanitize HTML content to prevent XSS
+        if self.content:
+            self.content = bleach.clean(
+                self.content,
+                tags=ALLOWED_TAGS,
+                attributes=ALLOWED_ATTRIBUTES,
+                css_sanitizer=CSS_SANITIZER,
+                strip=True,  # Strip disallowed tags instead of escaping
+            )
+
         self.full_clean()  # Call clean() for validation
         super().save(*args, **kwargs)
 
