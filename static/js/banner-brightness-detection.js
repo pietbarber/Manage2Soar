@@ -141,9 +141,9 @@ function initBannerParallax(bannerId) {
 
     // Use requestAnimationFrame for smooth scrolling
     let ticking = false;
-    window.addEventListener('scroll', function() {
+    window.addEventListener('scroll', function () {
         if (!ticking) {
-            window.requestAnimationFrame(function() {
+            window.requestAnimationFrame(function () {
                 updateParallax();
                 ticking = false;
             });
