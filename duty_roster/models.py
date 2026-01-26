@@ -71,13 +71,10 @@ class DutyRosterMessage(models.Model):
         Returns:
             DutyRosterMessage instance or None
         """
-        try:
-            message = cls.objects.first()
-            if message and message.is_active and message.content.strip():
-                return message
-            return None
-        except cls.DoesNotExist:
-            return None
+        message = cls.objects.first()
+        if message and message.is_active and message.content.strip():
+            return message
+        return None
 
     @classmethod
     def get_or_create_message(cls):

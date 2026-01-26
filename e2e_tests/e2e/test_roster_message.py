@@ -38,6 +38,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 
@@ -54,6 +55,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="regular",
             rostermeister=False,
+            membership_status="Full Member",
         )
         self.login(username="regular")
 
@@ -69,6 +71,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 
@@ -125,7 +128,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=False,
         )
 
-        self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer", membership_status="Full Member")
         self.login(username="viewer")
 
         # Navigate to calendar
@@ -145,6 +148,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 
@@ -168,6 +172,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="regular",
             rostermeister=False,
+            membership_status="Full Member",
         )
         self.login(username="regular")
 
@@ -184,6 +189,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 
@@ -201,7 +207,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
             is_active=True,
         )
 
-        self.create_test_member(username="viewer")
+        self.create_test_member(username="viewer", membership_status="Full Member")
         self.login(username="viewer")
 
         # Navigate to calendar
@@ -230,6 +236,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 
@@ -251,6 +258,7 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         self.create_test_member(
             username="rostermeister",
             rostermeister=True,
+            membership_status="Full Member",
         )
         self.login(username="rostermeister")
 

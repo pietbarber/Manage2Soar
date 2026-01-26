@@ -1813,6 +1813,8 @@ def edit_roster_message(request):
                 request, "Roster announcement message updated successfully."
             )
             return redirect("duty_roster:duty_calendar")
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         form = DutyRosterMessageForm(instance=message)
 
