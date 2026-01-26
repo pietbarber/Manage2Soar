@@ -87,6 +87,13 @@ class DutyRosterMessage(models.Model):
     class Meta:
         verbose_name = "Duty Roster Message"
         verbose_name_plural = "Duty Roster Message"  # Singular since it's a singleton
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(id__lte=1),
+                name="singleton_only_one_instance",
+                violation_error_message="Only one Duty Roster Message instance is allowed.",
+            )
+        ]
 
     def __str__(self):
         if self.content:
