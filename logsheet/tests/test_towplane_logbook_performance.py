@@ -880,3 +880,119 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
         self.assertEqual(day_data["day_hours"], 2.5)  # Has flight hours
         self.assertEqual(len(day_data["issues"]), 1)  # Has maintenance issue
         self.assertEqual(day_data["issues"][0]["description"], "Minor oil leak noticed")
+
+    def test_cum_hours_carried_forward_for_maintenance_only_days(self):
+        """
+        Test cum_hours (tach reading) carry-forward logic for maintenance-only days.
+
+        Scenario 1: Maintenance issue on Jan 10 (before first flight) should have cum_hours=None
+        Scenario 2: First flight on Jan 15 sets tach to 100.0
+        Scenario 3: Maintenance issue on Jan 20 (after flight) should carry forward cum_hours=100.0
+        Scenario 4: Second flight on Jan 25 sets tach to 105.5
+        Scenario 5: Maintenance issue on Jan 30 should carry forward cum_hours=105.5
+        """
+        # Pre-flight maintenance issue (Jan 10)
+        pre_flight_issue_date = date(2026, 1, 10)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Pre-flight inspection",
+            report_date=pre_flight_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=pre_flight_issue_date,
+        )
+
+        # First flight (Jan 15) - sets initial tach reading
+        first_flight_date = date(2026, 1, 15)
+        logsheet1 = Logsheet.objects.create(
+            log_date=first_flight_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet1,
+            towplane=self.towplane,
+            start_tach=95.0,
+            end_tach=100.0,
+            tach_time=5.0,
+        )
+
+        # Mid-period maintenance issue (Jan 20)
+        mid_period_issue_date = date(2026, 1, 20)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Oil check",
+            report_date=mid_period_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=mid_period_issue_date,
+        )
+
+        # Second flight (Jan 25)
+        second_flight_date = date(2026, 1, 25)
+        logsheet2 = Logsheet.objects.create(
+            log_date=second_flight_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet2,
+            towplane=self.towplane,
+            start_tach=100.0,
+            end_tach=105.5,
+            tach_time=5.5,
+        )
+
+        # Late maintenance issue (Jan 30)
+        late_issue_date = date(2026, 1, 30)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Final inspection",
+            report_date=late_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=late_issue_date,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have 5 rows total
+        self.assertEqual(len(daily), 5)
+
+        # Jan 10: Pre-flight maintenance (no prior flights) - cum_hours should be None
+        jan10_data = [d for d in daily if d["day"] == pre_flight_issue_date][0]
+        self.assertIsNone(jan10_data["cum_hours"])
+        self.assertEqual(jan10_data["day_hours"], 0.0)
+        self.assertEqual(len(jan10_data["issues"]), 1)  # resolved same day as reported
+
+        # Jan 15: First flight - cum_hours should be 100.0
+        jan15_data = [d for d in daily if d["day"] == first_flight_date][0]
+        self.assertEqual(jan15_data["cum_hours"], 100.0)
+        self.assertEqual(jan15_data["day_hours"], 5.0)
+
+        # Jan 20: Mid-period maintenance - should carry forward 100.0
+        jan20_data = [d for d in daily if d["day"] == mid_period_issue_date][0]
+        self.assertEqual(jan20_data["cum_hours"], 100.0)
+        self.assertEqual(jan20_data["day_hours"], 0.0)
+        self.assertEqual(len(jan20_data["issues"]), 1)  # resolved same day as reported
+
+        # Jan 25: Second flight - cum_hours should be 105.5
+        jan25_data = [d for d in daily if d["day"] == second_flight_date][0]
+        self.assertEqual(jan25_data["cum_hours"], 105.5)
+        self.assertEqual(jan25_data["day_hours"], 5.5)
+
+        # Jan 30: Late maintenance - should carry forward 105.5
+        jan30_data = [d for d in daily if d["day"] == late_issue_date][0]
+        self.assertEqual(jan30_data["cum_hours"], 105.5)
+        self.assertEqual(jan30_data["day_hours"], 0.0)
+        self.assertEqual(len(jan30_data["issues"]), 1)  # resolved same day as reported

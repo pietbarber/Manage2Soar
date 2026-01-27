@@ -2369,7 +2369,7 @@ def towplane_logbook(request, pk: int):
                 "day": day,
                 "logsheet_pk": c.logsheet.pk,
                 "day_hours": float(c.tach_time or 0),
-                "cum_hours": float(c.end_tach or 0),
+                "cum_hours": float(c.end_tach) if c.end_tach is not None else None,
                 "glider_tows": tow_count,
                 "towpilots": towpilot_names,
                 "issues": issues_by_day.get(day, []),
@@ -2377,7 +2377,9 @@ def towplane_logbook(request, pk: int):
             }
         else:
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
-            daily_data[day]["cum_hours"] = float(c.end_tach or 0)
+            daily_data[day]["cum_hours"] = (
+                float(c.end_tach) if c.end_tach is not None else None
+            )
             # glider_tows is already set from flights_by_day
 
     # Issue #537: Add rows for days with maintenance issues/deadlines but no flights
