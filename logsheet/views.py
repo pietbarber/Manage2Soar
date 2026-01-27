@@ -2230,15 +2230,65 @@ def glider_logbook(request, pk: int):
 
 
 def _issues_by_day_for_towplane(towplane):
-    qs = (
+    """
+    Get maintenance issues by day for a towplane.
+
+    Returns issues indexed by both report_date and resolved_date (if different),
+    so issues show up when created AND when resolved.
+    """
+    # Issues by report_date
+    qs_report = (
         MaintenanceIssue.objects.filter(towplane=towplane)
-        .annotate(day=TruncDate("report_date"))
-        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
-        .order_by("day", "id")
+        .values(
+            "report_date",
+            "id",
+            "description",
+            "resolved",
+            "grounded",
+            "resolved_date",
+        )
+        .order_by("report_date", "id")
+    )
+    # Issues by resolved_date (for issues resolved on non-flight days)
+    qs_resolved = (
+        MaintenanceIssue.objects.filter(towplane=towplane, resolved=True)
+        .exclude(resolved_date__isnull=True)
+        .values(
+            "resolved_date",
+            "id",
+            "description",
+            "resolved",
+            "grounded",
+            "resolved_date",
+            "report_date",
+        )
+        .order_by("resolved_date", "id")
     )
     bucket = {}
-    for it in qs:
-        bucket.setdefault(it["day"], []).append(it)
+    for it in qs_report:
+        it = dict(it)
+        it["event_type"] = "reported"
+        bucket.setdefault(it["report_date"], []).append(it)
+    for it in qs_resolved:
+        it = dict(it)
+        it["event_type"] = "resolved"
+        # Only add if resolved on a different day than reported (avoid double-listing)
+        if it["resolved_date"] != it["report_date"]:
+            bucket.setdefault(it["resolved_date"], []).append(it)
+    return bucket
+
+
+def _deadlines_by_day_for_towplane(towplane):
+    """Get maintenance deadlines by due_date for a towplane."""
+    qs = (
+        MaintenanceDeadline.objects.filter(towplane=towplane)
+        .values("due_date", "id", "description")
+        .order_by("due_date", "id")
+    )
+    bucket = {}
+    for dl in qs:
+        day = dl["due_date"]
+        bucket.setdefault(day, []).append(dl)
     return bucket
 
 
@@ -2292,6 +2342,7 @@ def towplane_logbook(request, pk: int):
 
     # OPTIMIZATION: Pre-fetch ALL issues once (instead of re-querying per day)
     issues_by_day = _issues_by_day_for_towplane(towplane)
+    deadlines_by_day = _deadlines_by_day_for_towplane(towplane)
 
     # Group closeouts by day
     # Note: When multiple closeouts exist for the same day (e.g., from different
@@ -2323,12 +2374,28 @@ def towplane_logbook(request, pk: int):
                 "glider_tows": tow_count,
                 "towpilots": towpilot_names,
                 "issues": issues_by_day.get(day, []),
-                "deadlines": [],
+                "deadlines": deadlines_by_day.get(day, []),
             }
         else:
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
             daily_data[day]["cum_hours"] = float(c.end_tach or 0)
             # glider_tows is already set from flights_by_day
+
+    # Issue #537: Add rows for days with maintenance issues/deadlines but no flights
+    # This ensures maintenance events are visible even when the towplane wasn't used
+    extra_days = set(issues_by_day.keys()) | set(deadlines_by_day.keys())
+    days_in_data = set(daily_data.keys())
+    for day in extra_days - days_in_data:
+        daily_data[day] = {
+            "day": day,
+            "logsheet_pk": None,
+            "day_hours": 0.0,
+            "cum_hours": 0.0,
+            "glider_tows": 0,
+            "towpilots": [],
+            "issues": issues_by_day.get(day, []),
+            "deadlines": deadlines_by_day.get(day, []),
+        }
 
     # Sort days and build final list
     daily = [daily_data[day] for day in sorted(daily_data.keys())]
