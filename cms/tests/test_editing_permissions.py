@@ -68,10 +68,17 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_edit_page(self.webmaster, self.member_page))
         self.assertTrue(can_edit_page(self.webmaster, self.board_page))
 
-    def test_can_edit_page_public_pages_webmaster_only(self):
-        """Only webmasters can edit public pages."""
+    def test_can_edit_page_public_pages_officer_access(self):
+        """
+        Officers (e.g., directors) and webmasters can edit public pages (Issue #549).
+        The is_public flag controls VIEW access, not EDIT access.
+        Member-with-PageMemberPermission scenario is covered in MemberSpecificPermissionTests.
+        """
+        # Regular member cannot edit public page (no edit permission)
         self.assertFalse(can_edit_page(self.member, self.public_page))
-        self.assertFalse(can_edit_page(self.director, self.public_page))
+        # Director CAN edit public page (has officer role)
+        self.assertTrue(can_edit_page(self.director, self.public_page))
+        # Webmaster can edit public page
         self.assertTrue(can_edit_page(self.webmaster, self.public_page))
 
     def test_can_edit_page_role_restricted_pages(self):
@@ -107,10 +114,17 @@ class EditingPermissionFunctionTests(TestCase):
         self.assertTrue(can_create_in_directory(self.webmaster, self.public_page))
         self.assertTrue(can_create_in_directory(self.webmaster, self.board_page))
 
-    def test_can_create_in_directory_public_parent_webmaster_only(self):
-        """Only webmasters can create pages under public parents."""
+    def test_can_create_in_directory_public_parent_officer_access(self):
+        """
+        Officers (e.g., directors) and webmasters can create pages under public parents (Issue #549).
+        The is_public flag controls VIEW access, not EDIT/create access.
+        Member-with-PageMemberPermission scenario is tested in test_member_can_create_under_public_parent_with_permission.
+        """
+        # Regular member cannot create under public page (no edit permission)
         self.assertFalse(can_create_in_directory(self.member, self.public_page))
-        self.assertFalse(can_create_in_directory(self.director, self.public_page))
+        # Director CAN create under public page (has officer role)
+        self.assertTrue(can_create_in_directory(self.director, self.public_page))
+        # Webmaster can create under public page
         self.assertTrue(can_create_in_directory(self.webmaster, self.public_page))
 
     def test_can_create_in_directory_role_restricted_parent(self):
@@ -754,9 +768,10 @@ class MemberSpecificPermissionTests(TestCase):
         # Page.can_user_edit() returns True for PageMemberPermission holders
         self.assertTrue(self.public_page.can_user_edit(self.aircraft_manager))
 
-        # Verify site editor still restricts public page editing to webmasters only
-        # Even though can_user_edit() is True, can_edit_page() should be False
-        self.assertFalse(can_edit_page(self.aircraft_manager, self.public_page))
+        # Verify site editor now ALLOWS public page editing for assigned members (Issue #549 fix)
+        # This was the bug - can_edit_page() used to block public pages, now it allows
+        # members with PageMemberPermission to edit public pages
+        self.assertTrue(can_edit_page(self.aircraft_manager, self.public_page))
 
     def test_member_permission_unique_constraint(self):
         """Cannot add same member twice to same page."""
@@ -850,3 +865,28 @@ class MemberSpecificPermissionTests(TestCase):
 
         # Now aircraft_manager can create under it
         self.assertTrue(can_create_in_directory(self.aircraft_manager, directory))
+
+    def test_member_can_create_under_public_parent_with_permission(self):
+        """
+        Members with PageMemberPermission on a public parent can create child pages under it (Issue #549).
+        This tests the scenario mentioned in cms/views.py:can_create_in_directory docstring.
+        """
+        # Create a public parent directory
+        public_parent = Page.objects.create(
+            title="Public Resources", slug="public-resources-test", is_public=True
+        )
+
+        # Regular member cannot create under public page (no edit permission)
+        self.assertFalse(can_create_in_directory(self.regular_member, public_parent))
+
+        # Grant PageMemberPermission to aircraft_manager on the public parent
+        PageMemberPermission.objects.create(
+            page=public_parent, member=self.aircraft_manager
+        )
+
+        # Now aircraft_manager can create child pages under the public parent
+        self.assertTrue(can_create_in_directory(self.aircraft_manager, public_parent))
+
+        # Verify the public parent remains publicly viewable
+        self.assertTrue(public_parent.is_public)
+        self.assertTrue(public_parent.can_user_access(AnonymousUser()))

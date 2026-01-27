@@ -104,20 +104,16 @@ class PageMemberPermission(models.Model):
     This model enables fine-grained EDIT access control, allowing individual members
     to be granted editing rights, separate from VIEW permissions.
 
-    IMPORTANT: This grants EDIT permissions with different scope depending on context:
-    - Django Admin: Members listed here (plus officers) can edit both PUBLIC and
-      PRIVATE pages.
-    - Site Editor (cms.views.can_edit_page): PUBLIC pages are editable here only by
-      webmasters and superusers; member-based permissions from this model are
-      evaluated by Page.can_user_edit(), but the public-page restriction itself is
-      enforced in cms.views.can_edit_page(), not in Page.can_user_edit().
-    - For PUBLIC pages: This permission affects who can EDIT via Django admin and
-      who passes Page.can_user_edit(); the site editor still restricts PUBLIC page
-      editing to webmasters and superusers via cms.views.can_edit_page(), and the
-      page remains publicly viewable.
-    - For PRIVATE pages: This permission grants EDIT access in both Django admin and
-      the site editor (after cms.views.can_edit_page() allows editing), and also
-      grants VIEW access.
+    IMPORTANT: This permission grants EDIT access to both PUBLIC and PRIVATE pages.
+    The is_public flag controls VIEW access (who can see the page), not EDIT access.
+
+    - For PUBLIC pages: This permission grants EDIT rights while the page remains
+      publicly viewable. Editors see the Edit button on public pages.
+    - For PRIVATE pages: This permission grants EDIT access plus implicit VIEW access
+      (editors can see pages they're assigned to edit, even if role-restricted).
+
+    Note: This behavior was clarified in Issue #549 to ensure that assigning a member
+    as an editor does not require making the page private.
 
     Use Cases:
     - Assign content editor for public documentation (page stays public)
@@ -157,10 +153,11 @@ class PageMemberPermission(models.Model):
         on_delete=models.CASCADE,
         related_name="cms_page_permissions",
         help_text=(
-            "Member granted EDIT access to this page. Applies in Django admin for "
-            "public and private pages, and in the CMS UI (including the site editor) "
-            "for private pages. For private pages, this also grants VIEW access "
-            "wherever Page.can_user_access() is used."
+            "Member granted EDIT access to this page. Applies in Django admin and "
+            "the CMS UI (site editor) for both public and private pages. "
+            "The Edit button will appear for this member on pages they're assigned to. "
+            "For private pages, this also grants VIEW access wherever "
+            "Page.can_user_access() is used."
         ),
     )
 

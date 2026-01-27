@@ -632,7 +632,20 @@ DocumentFormSet = inlineformset_factory(
 
 
 def can_edit_page(user, page):
-    """Check if user can edit a specific CMS page (includes member permissions)."""
+    """
+    Check if user can edit a specific CMS page.
+
+    Edit permissions are granted to:
+    1. Superusers and webmasters (can edit everything)
+    2. Members with explicit PageMemberPermission (for any page, public or private)
+    3. Officers (directors, secretaries) with the appropriate roles, for both public
+       and private pages (via Page.can_user_edit)
+
+    Note: is_public controls VIEW access, not EDIT access. Members and officers assigned
+    via PageMemberPermission or role-based rules can edit public pages while they remain
+    publicly viewable. This was fixed in Issue #549 to allow content editors for public
+    documentation.
+    """
     if user is None or not user.is_authenticated:
         return False
 
@@ -640,16 +653,17 @@ def can_edit_page(user, page):
     if user.is_superuser or getattr(user, "webmaster", False):
         return True
 
-    # Public pages: only webmaster can edit
-    if page.is_public:
-        return False
-
-    # Private pages: check EDIT permissions (includes member permissions)
+    # Check EDIT permissions (includes member permissions for both public and private pages)
     return page.can_user_edit(user)
 
 
 def can_create_in_directory(user, parent_page=None):
-    """Check if user can create pages in a directory (uses parent page EDIT permissions)."""
+    """
+    Check if user can create pages in a directory (uses parent page EDIT permissions).
+
+    Note: Members with EDIT permission on a public parent page can create child pages
+    under it. The is_public flag controls VIEW access, not EDIT/create access.
+    """
     if user is None or not user.is_authenticated:
         return False
 
@@ -661,12 +675,8 @@ def can_create_in_directory(user, parent_page=None):
     if not parent_page:
         return False
 
-    # Public parent pages: only webmaster can create under them
-    if parent_page.is_public:
-        return False
-
-    # Private parent pages: user needs EDIT permission on parent to create children
-    # This uses the new can_user_edit() which checks member permissions
+    # User needs EDIT permission on parent to create children
+    # This checks member permissions for both public and private pages
     return parent_page.can_user_edit(user)
 
 
