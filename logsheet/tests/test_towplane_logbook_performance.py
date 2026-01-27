@@ -803,13 +803,13 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
         Scenario: Annual inspection due Jan 31, no flights scheduled.
         The deadline should still appear in the logbook.
         """
-        from logsheet.models import MaintenanceDeadline
+        from logsheet.models import DeadlineType, MaintenanceDeadline
 
         due_date = date(2026, 1, 31)
 
         MaintenanceDeadline.objects.create(
             towplane=self.towplane,
-            description="Annual inspection",
+            description=DeadlineType.ANNUAL,
             due_date=due_date,
         )
 
@@ -830,7 +830,7 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
         self.assertEqual(day_data["day"], due_date)
         self.assertEqual(day_data["glider_tows"], 0)  # No flights
         self.assertEqual(len(day_data["deadlines"]), 1)
-        self.assertEqual(day_data["deadlines"][0]["description"], "Annual inspection")
+        self.assertEqual(day_data["deadlines"][0]["description"], DeadlineType.ANNUAL)
 
     def test_maintenance_on_flight_day_combines_correctly(self):
         """

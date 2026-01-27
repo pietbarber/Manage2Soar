@@ -2259,7 +2259,6 @@ def _issues_by_day_for_towplane(towplane):
             "description",
             "resolved",
             "grounded",
-            "resolved_date",
             "report_date",
         )
         .order_by("resolved_date", "id")
@@ -2383,14 +2382,33 @@ def towplane_logbook(request, pk: int):
 
     # Issue #537: Add rows for days with maintenance issues/deadlines but no flights
     # This ensures maintenance events are visible even when the towplane wasn't used
+    # For maintenance-only days, carry forward the last known tach reading up to that date.
+    # If there is no prior closeout (no known tach yet), leave cum_hours as None so the
+    # template can render a blank instead of an incorrect 0.0.
     extra_days = set(issues_by_day.keys()) | set(deadlines_by_day.keys())
     days_in_data = set(daily_data.keys())
-    for day in extra_days - days_in_data:
+    closeout_timeline = [(c.logsheet.log_date, c.end_tach) for c in closeouts]
+    remaining_days = sorted(extra_days - days_in_data)
+    last_tach = None
+    timeline_index = 0
+    num_closeouts = len(closeout_timeline)
+
+    for day in remaining_days:
+        # Advance through closeouts up to and including this day, updating last_tach
+        while (
+            timeline_index < num_closeouts
+            and closeout_timeline[timeline_index][0] <= day
+        ):
+            _, end_tach = closeout_timeline[timeline_index]
+            if end_tach is not None:
+                last_tach = float(end_tach)
+            timeline_index += 1
+
         daily_data[day] = {
             "day": day,
             "logsheet_pk": None,
             "day_hours": 0.0,
-            "cum_hours": 0.0,
+            "cum_hours": last_tach,
             "glider_tows": 0,
             "towpilots": [],
             "issues": issues_by_day.get(day, []),
