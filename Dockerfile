@@ -1,6 +1,6 @@
 # Dockerfile for Django + Gunicorn
-#FROM python:3.13-slim-alpine
-FROM python:3.14-slim-bookworm
+# Use Python 3.13 instead of 3.14 for better package compatibility
+FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY requirements.txt ./
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends ca-certificates build-essential libpq-dev libffi-dev curl gnupg \
+    && apt-get install -y --no-install-recommends ca-certificates build-essential python3-dev libpq-dev libffi-dev curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
