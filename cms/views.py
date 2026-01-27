@@ -638,11 +638,13 @@ def can_edit_page(user, page):
     Edit permissions are granted to:
     1. Superusers and webmasters (can edit everything)
     2. Members with explicit PageMemberPermission (for any page, public or private)
-    3. Officers (directors, secretaries) for private pages
+    3. Officers (directors, secretaries) with the appropriate roles, for both public
+       and private pages (via Page.can_user_edit)
 
-    Note: is_public controls VIEW access, not EDIT access. Members assigned via
-    PageMemberPermission can edit public pages while they remain publicly viewable.
-    This was fixed in Issue #549 to allow content editors for public documentation.
+    Note: is_public controls VIEW access, not EDIT access. Members and officers assigned
+    via PageMemberPermission or role-based rules can edit public pages while they remain
+    publicly viewable. This was fixed in Issue #549 to allow content editors for public
+    documentation.
     """
     if user is None or not user.is_authenticated:
         return False
