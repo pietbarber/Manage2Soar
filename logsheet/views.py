@@ -2339,7 +2339,7 @@ def towplane_logbook(request, pk: int):
         ):
             id_to_name[m.id] = m.get_full_name() or m.username
 
-    # OPTIMIZATION: Pre-fetch ALL issues once (instead of re-querying per day)
+    # OPTIMIZATION: Pre-fetch ALL issues and deadlines once (instead of re-querying per day)
     issues_by_day = _issues_by_day_for_towplane(towplane)
     deadlines_by_day = _deadlines_by_day_for_towplane(towplane)
 
@@ -2384,15 +2384,17 @@ def towplane_logbook(request, pk: int):
                 daily_data[day]["cum_hours"] = float(c.end_tach)
             # glider_tows is already set from flights_by_day
 
-    # Issue #537: Add rows for days with maintenance issues/deadlines but no flights
+    # Issue #537: Add rows for days with maintenance issues/deadlines but no closeouts
     # This ensures maintenance events are visible even when the towplane wasn't used
     # For maintenance-only days, carry forward the last known tach reading up to that date.
     # If there is no prior closeout (no known tach yet), leave cum_hours as None so the
     # template can render a blank instead of an incorrect 0.0.
     extra_days = set(issues_by_day.keys()) | set(deadlines_by_day.keys())
     days_in_data = set(daily_data.keys())
+    # Exclude days that have flights but no closeout (incomplete logsheets) from synthetic rows
+    days_with_flights = set(flights_by_day.keys())
+    remaining_days = sorted(extra_days - days_in_data - days_with_flights)
     closeout_timeline = [(c.logsheet.log_date, c.end_tach) for c in closeouts]
-    remaining_days = sorted(extra_days - days_in_data)
     last_tach = None
     timeline_index = 0
     num_closeouts = len(closeout_timeline)
