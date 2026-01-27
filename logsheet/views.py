@@ -2377,9 +2377,11 @@ def towplane_logbook(request, pk: int):
             }
         else:
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
-            daily_data[day]["cum_hours"] = (
-                float(c.end_tach) if c.end_tach is not None else None
-            )
+            # Only update cumulative hours when this closeout has a non-null end_tach.
+            # This prevents later closeouts without an end_tach from overwriting a
+            # previously recorded tach reading for the same day.
+            if c.end_tach is not None:
+                daily_data[day]["cum_hours"] = float(c.end_tach)
             # glider_tows is already set from flights_by_day
 
     # Issue #537: Add rows for days with maintenance issues/deadlines but no flights

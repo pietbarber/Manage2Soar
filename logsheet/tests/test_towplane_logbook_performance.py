@@ -259,6 +259,7 @@ class TowplaneLogbookPerformanceTestCase(TestCase):
         # Issue #537 adds maintenance-only days, so we need to find a day with actual flights
         flight_day = next((d for d in daily if d["glider_tows"] > 0), None)
         self.assertIsNotNone(flight_day, "Should have at least one day with flights")
+        assert flight_day is not None  # Type narrowing for Pylance
         self.assertGreater(flight_day["glider_tows"], 0)
         self.assertGreater(len(flight_day["towpilots"]), 0)
 
@@ -835,10 +836,28 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
     def test_maintenance_on_flight_day_combines_correctly(self):
         """
         When maintenance and flights happen on the same day, they should combine.
+        Tests that glider_tows, towpilots, and maintenance issues all appear together.
         """
         flight_date = date(2026, 1, 15)
 
-        # Create flight activity
+        # Create a test glider for the flights
+        glider = Glider.objects.create(
+            make="Schweizer",
+            model="2-33",
+            n_number="N12345",
+            is_active=True,
+        )
+
+        # Create a towpilot member
+        towpilot = Member.objects.create_user(
+            username="towpilot",
+            password="testpass123",
+            first_name="Tow",
+            last_name="Pilot",
+            membership_status="Full Member",
+        )
+
+        # Create flight activity with actual flights
         logsheet = Logsheet.objects.create(
             log_date=flight_date,
             airfield=self.airfield,
@@ -851,6 +870,20 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
             start_tach=100.0,
             end_tach=102.5,
             tach_time=2.5,
+        )
+
+        # Create actual Flight records (2 flights)
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            towplane=self.towplane,
+            tow_pilot=towpilot,
+        )
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            towplane=self.towplane,
+            tow_pilot=towpilot,
         )
 
         # Create maintenance issue on same day
@@ -878,6 +911,9 @@ class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
         day_data = daily[0]
         self.assertEqual(day_data["day"], flight_date)
         self.assertEqual(day_data["day_hours"], 2.5)  # Has flight hours
+        self.assertEqual(day_data["glider_tows"], 2)  # Has 2 flights
+        self.assertEqual(len(day_data["towpilots"]), 1)  # Has towpilot
+        self.assertIn("Tow Pilot", day_data["towpilots"][0])  # Verify towpilot name
         self.assertEqual(len(day_data["issues"]), 1)  # Has maintenance issue
         self.assertEqual(day_data["issues"][0]["description"], "Minor oil leak noticed")
 
