@@ -153,10 +153,11 @@ class PageMemberPermission(models.Model):
         on_delete=models.CASCADE,
         related_name="cms_page_permissions",
         help_text=(
-            "Member granted EDIT access to this page. Applies in Django admin for "
-            "public and private pages, and in the CMS UI (including the site editor) "
-            "for private pages. For private pages, this also grants VIEW access "
-            "wherever Page.can_user_access() is used."
+            "Member granted EDIT access to this page. Applies in Django admin and "
+            "the CMS UI (site editor) for both public and private pages. "
+            "The Edit button will appear for this member on pages they're assigned to. "
+            "For private pages, this also grants VIEW access wherever "
+            "Page.can_user_access() is used."
         ),
     )
 
