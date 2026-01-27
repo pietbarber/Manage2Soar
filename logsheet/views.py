@@ -2230,15 +2230,64 @@ def glider_logbook(request, pk: int):
 
 
 def _issues_by_day_for_towplane(towplane):
-    qs = (
+    """
+    Get maintenance issues by day for a towplane.
+
+    Returns issues indexed by both report_date and resolved_date (if different),
+    so issues show up when created AND when resolved.
+    """
+    # Issues by report_date
+    qs_report = (
         MaintenanceIssue.objects.filter(towplane=towplane)
-        .annotate(day=TruncDate("report_date"))
-        .values("day", "id", "description", "resolved", "grounded", "resolved_date")
-        .order_by("day", "id")
+        .values(
+            "report_date",
+            "id",
+            "description",
+            "resolved",
+            "grounded",
+            "resolved_date",
+        )
+        .order_by("report_date", "id")
+    )
+    # Issues by resolved_date (for issues resolved on non-flight days)
+    qs_resolved = (
+        MaintenanceIssue.objects.filter(towplane=towplane, resolved=True)
+        .exclude(resolved_date__isnull=True)
+        .values(
+            "resolved_date",
+            "id",
+            "description",
+            "resolved",
+            "grounded",
+            "report_date",
+        )
+        .order_by("resolved_date", "id")
     )
     bucket = {}
-    for it in qs:
-        bucket.setdefault(it["day"], []).append(it)
+    for it in qs_report:
+        it = dict(it)
+        it["event_type"] = "reported"
+        bucket.setdefault(it["report_date"], []).append(it)
+    for it in qs_resolved:
+        it = dict(it)
+        it["event_type"] = "resolved"
+        # Only add if resolved on a different day than reported (avoid double-listing)
+        if it["resolved_date"] != it["report_date"]:
+            bucket.setdefault(it["resolved_date"], []).append(it)
+    return bucket
+
+
+def _deadlines_by_day_for_towplane(towplane):
+    """Get maintenance deadlines by due_date for a towplane."""
+    qs = (
+        MaintenanceDeadline.objects.filter(towplane=towplane)
+        .values("due_date", "id", "description")
+        .order_by("due_date", "id")
+    )
+    bucket = {}
+    for dl in qs:
+        day = dl["due_date"]
+        bucket.setdefault(day, []).append(dl)
     return bucket
 
 
@@ -2290,8 +2339,9 @@ def towplane_logbook(request, pk: int):
         ):
             id_to_name[m.id] = m.get_full_name() or m.username
 
-    # OPTIMIZATION: Pre-fetch ALL issues once (instead of re-querying per day)
+    # OPTIMIZATION: Pre-fetch ALL issues and deadlines once (instead of re-querying per day)
     issues_by_day = _issues_by_day_for_towplane(towplane)
+    deadlines_by_day = _deadlines_by_day_for_towplane(towplane)
 
     # Group closeouts by day
     # Note: When multiple closeouts exist for the same day (e.g., from different
@@ -2319,16 +2369,57 @@ def towplane_logbook(request, pk: int):
                 "day": day,
                 "logsheet_pk": c.logsheet.pk,
                 "day_hours": float(c.tach_time or 0),
-                "cum_hours": float(c.end_tach or 0),
+                "cum_hours": float(c.end_tach) if c.end_tach is not None else None,
                 "glider_tows": tow_count,
                 "towpilots": towpilot_names,
                 "issues": issues_by_day.get(day, []),
-                "deadlines": [],
+                "deadlines": deadlines_by_day.get(day, []),
             }
         else:
             daily_data[day]["day_hours"] += float(c.tach_time or 0)
-            daily_data[day]["cum_hours"] = float(c.end_tach or 0)
+            # Only update cumulative hours when this closeout has a non-null end_tach.
+            # This prevents later closeouts without an end_tach from overwriting a
+            # previously recorded tach reading for the same day.
+            if c.end_tach is not None:
+                daily_data[day]["cum_hours"] = float(c.end_tach)
             # glider_tows is already set from flights_by_day
+
+    # Issue #537: Add rows for days with maintenance issues/deadlines but no closeouts
+    # This ensures maintenance events are visible even when the towplane wasn't used
+    # For maintenance-only days, carry forward the last known tach reading up to that date.
+    # If there is no prior closeout (no known tach yet), leave cum_hours as None so the
+    # template can render a blank instead of an incorrect 0.0.
+    extra_days = set(issues_by_day.keys()) | set(deadlines_by_day.keys())
+    days_in_data = set(daily_data.keys())
+    # Exclude days that have flights but no closeout (incomplete logsheets) from synthetic rows
+    days_with_flights = set(flights_by_day.keys())
+    remaining_days = sorted(extra_days - days_in_data - days_with_flights)
+    closeout_timeline = [(c.logsheet.log_date, c.end_tach) for c in closeouts]
+    last_tach = None
+    timeline_index = 0
+    num_closeouts = len(closeout_timeline)
+
+    for day in remaining_days:
+        # Advance through closeouts up to and including this day, updating last_tach
+        while (
+            timeline_index < num_closeouts
+            and closeout_timeline[timeline_index][0] <= day
+        ):
+            _, end_tach = closeout_timeline[timeline_index]
+            if end_tach is not None:
+                last_tach = float(end_tach)
+            timeline_index += 1
+
+        daily_data[day] = {
+            "day": day,
+            "logsheet_pk": None,
+            "day_hours": 0.0,
+            "cum_hours": last_tach,
+            "glider_tows": 0,
+            "towpilots": [],
+            "issues": issues_by_day.get(day, []),
+            "deadlines": deadlines_by_day.get(day, []),
+        }
 
     # Sort days and build final list
     daily = [daily_data[day] for day in sorted(daily_data.keys())]

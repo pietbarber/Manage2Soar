@@ -208,8 +208,15 @@ class TowplaneLogbookPerformanceTestCase(TestCase):
         self.assertEqual(response.context["object"], self.towplane)
 
         # Check we have the expected number of days
+        # Note: Issue #537 fix adds rows for days with maintenance events but no flights
+        # The test creates maintenance issues every 10th day (10 total), resolved the next day
+        # So we have 100 flight days + 10 resolved-issue-only days = 110 total days
         daily = response.context["daily"]
-        self.assertEqual(len(daily), 100, "Should have 100 days of data")
+        self.assertEqual(
+            len(daily),
+            110,
+            "Should have 110 days (100 flight days + 10 maintenance-only days)",
+        )
 
     @override_settings(DEBUG=True)
     def test_towplane_logbook_data_integrity(self):
@@ -240,17 +247,21 @@ class TowplaneLogbookPerformanceTestCase(TestCase):
             self.assertIn("towpilots", day_data)
             self.assertIn("issues", day_data)
 
-            # Tow count should be positive
-            self.assertGreater(day_data["glider_tows"], 0)
-
-            # Tow pilots should be a list of names
+            # Tow pilots should be a list
             self.assertIsInstance(day_data["towpilots"], list)
-            self.assertGreater(len(day_data["towpilots"]), 0)
 
             # All names should be strings, not member IDs
             for name in day_data["towpilots"]:
                 self.assertIsInstance(name, str)
                 self.assertNotRegex(name, r"^\d+$", "Tow pilot should be name, not ID")
+
+        # Find a day with flights (not a maintenance-only day) for more detailed checks
+        # Issue #537 adds maintenance-only days, so we need to find a day with actual flights
+        flight_day = next((d for d in daily if d["glider_tows"] > 0), None)
+        self.assertIsNotNone(flight_day, "Should have at least one day with flights")
+        assert flight_day is not None  # Type narrowing for Pylance
+        self.assertGreater(flight_day["glider_tows"], 0)
+        self.assertGreater(len(flight_day["towpilots"]), 0)
 
     @override_settings(DEBUG=True)
     def test_query_analysis(self):
@@ -680,3 +691,344 @@ class TowplaneLogbookMinimalTestCase(TestCase):
         day_data = response.context["daily"][0]
         self.assertEqual(day_data["day"], date.today())
         self.assertEqual(day_data["day_hours"], 1.5)
+
+
+class TowplaneMaintenanceOnlyDaysTestCase(TestCase):
+    """
+    Test Issue #537: Maintenance events should appear even on days with no flights.
+
+    This ensures that towplane logbook shows rows for days that have:
+    - Maintenance issues reported (even if towplane wasn't used that day)
+    - Maintenance issues resolved (on a different day than reported)
+    - Maintenance deadlines due
+    """
+
+    def setUp(self):
+        self.member = Member.objects.create_user(
+            username="test_mx_member",
+            password="testpass123",
+            first_name="Test",
+            last_name="Member",
+            membership_status="Full Member",
+        )
+        self.airfield = Airfield.objects.create(name="Test Field", identifier="TEST")
+        self.towplane = Towplane.objects.create(
+            name="Test Husky",
+            n_number="N123HK",
+            is_active=True,
+        )
+
+    def test_maintenance_issue_appears_on_no_flight_day(self):
+        """
+        Issue #537: A maintenance issue on a day with no flights should create a row.
+
+        Scenario: Propeller falls off on Jan 20, towplane grounded, no flights.
+        The maintenance issue should still appear in the logbook for that date.
+        """
+        issue_date = date(2026, 1, 20)
+
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Propeller fell off",
+            report_date=issue_date,
+            grounded=True,
+            resolved=False,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have exactly one row for the maintenance issue date
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], issue_date)
+        self.assertEqual(day_data["glider_tows"], 0)  # No flights
+        self.assertEqual(day_data["day_hours"], 0.0)
+        self.assertEqual(len(day_data["issues"]), 1)
+        self.assertEqual(day_data["issues"][0]["description"], "Propeller fell off")
+        self.assertTrue(day_data["issues"][0]["grounded"])
+
+    def test_resolved_issue_appears_on_resolution_day(self):
+        """
+        Resolved issues should appear on both report date AND resolution date.
+
+        Scenario: Issue reported Jan 20, resolved Jan 21. Both days should show in logbook.
+        """
+        report_date = date(2026, 1, 20)
+        resolve_date = date(2026, 1, 21)
+
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Oil leak",
+            report_date=report_date,
+            grounded=True,
+            resolved=True,
+            resolved_date=resolve_date,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have two rows: one for report date, one for resolution date
+        self.assertEqual(len(daily), 2)
+
+        # First row should be report date
+        self.assertEqual(daily[0]["day"], report_date)
+        self.assertEqual(len(daily[0]["issues"]), 1)
+        self.assertEqual(daily[0]["issues"][0]["event_type"], "reported")
+
+        # Second row should be resolution date
+        self.assertEqual(daily[1]["day"], resolve_date)
+        self.assertEqual(len(daily[1]["issues"]), 1)
+        self.assertEqual(daily[1]["issues"][0]["event_type"], "resolved")
+
+    def test_deadline_appears_on_due_date(self):
+        """
+        Maintenance deadlines should appear on their due date.
+
+        Scenario: Annual inspection due Jan 31, no flights scheduled.
+        The deadline should still appear in the logbook.
+        """
+        from logsheet.models import DeadlineType, MaintenanceDeadline
+
+        due_date = date(2026, 1, 31)
+
+        MaintenanceDeadline.objects.create(
+            towplane=self.towplane,
+            description=DeadlineType.ANNUAL,
+            due_date=due_date,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have one row for the deadline date
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], due_date)
+        self.assertEqual(day_data["glider_tows"], 0)  # No flights
+        self.assertEqual(len(day_data["deadlines"]), 1)
+        self.assertEqual(day_data["deadlines"][0]["description"], DeadlineType.ANNUAL)
+
+    def test_maintenance_on_flight_day_combines_correctly(self):
+        """
+        When maintenance and flights happen on the same day, they should combine.
+        Tests that glider_tows, towpilots, and maintenance issues all appear together.
+        """
+        flight_date = date(2026, 1, 15)
+
+        # Create a test glider for the flights
+        glider = Glider.objects.create(
+            make="Schweizer",
+            model="2-33",
+            n_number="N12345",
+            is_active=True,
+        )
+
+        # Create a towpilot member
+        towpilot = Member.objects.create_user(
+            username="towpilot",
+            password="testpass123",
+            first_name="Tow",
+            last_name="Pilot",
+            membership_status="Full Member",
+        )
+
+        # Create flight activity with actual flights
+        logsheet = Logsheet.objects.create(
+            log_date=flight_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet,
+            towplane=self.towplane,
+            start_tach=100.0,
+            end_tach=102.5,
+            tach_time=2.5,
+        )
+
+        # Create actual Flight records (2 flights)
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            towplane=self.towplane,
+            tow_pilot=towpilot,
+        )
+        Flight.objects.create(
+            logsheet=logsheet,
+            glider=glider,
+            towplane=self.towplane,
+            tow_pilot=towpilot,
+        )
+
+        # Create maintenance issue on same day
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Minor oil leak noticed",
+            report_date=flight_date,
+            grounded=False,
+            resolved=False,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have exactly one row with both flight and maintenance data
+        self.assertEqual(len(daily), 1)
+
+        day_data = daily[0]
+        self.assertEqual(day_data["day"], flight_date)
+        self.assertEqual(day_data["day_hours"], 2.5)  # Has flight hours
+        self.assertEqual(day_data["glider_tows"], 2)  # Has 2 flights
+        self.assertEqual(len(day_data["towpilots"]), 1)  # Has towpilot
+        self.assertIn("Tow Pilot", day_data["towpilots"][0])  # Verify towpilot name
+        self.assertEqual(len(day_data["issues"]), 1)  # Has maintenance issue
+        self.assertEqual(day_data["issues"][0]["description"], "Minor oil leak noticed")
+
+    def test_cum_hours_carried_forward_for_maintenance_only_days(self):
+        """
+        Test cum_hours (tach reading) carry-forward logic for maintenance-only days.
+
+        Scenario 1: Maintenance issue on Jan 10 (before first flight) should have cum_hours=None
+        Scenario 2: First flight on Jan 15 sets tach to 100.0
+        Scenario 3: Maintenance issue on Jan 20 (after flight) should carry forward cum_hours=100.0
+        Scenario 4: Second flight on Jan 25 sets tach to 105.5
+        Scenario 5: Maintenance issue on Jan 30 should carry forward cum_hours=105.5
+        """
+        # Pre-flight maintenance issue (Jan 10)
+        pre_flight_issue_date = date(2026, 1, 10)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Pre-flight inspection",
+            report_date=pre_flight_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=pre_flight_issue_date,
+        )
+
+        # First flight (Jan 15) - sets initial tach reading
+        first_flight_date = date(2026, 1, 15)
+        logsheet1 = Logsheet.objects.create(
+            log_date=first_flight_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet1,
+            towplane=self.towplane,
+            start_tach=95.0,
+            end_tach=100.0,
+            tach_time=5.0,
+        )
+
+        # Mid-period maintenance issue (Jan 20)
+        mid_period_issue_date = date(2026, 1, 20)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Oil check",
+            report_date=mid_period_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=mid_period_issue_date,
+        )
+
+        # Second flight (Jan 25)
+        second_flight_date = date(2026, 1, 25)
+        logsheet2 = Logsheet.objects.create(
+            log_date=second_flight_date,
+            airfield=self.airfield,
+            duty_officer=self.member,
+            created_by=self.member,
+        )
+        TowplaneCloseout.objects.create(
+            logsheet=logsheet2,
+            towplane=self.towplane,
+            start_tach=100.0,
+            end_tach=105.5,
+            tach_time=5.5,
+        )
+
+        # Late maintenance issue (Jan 30)
+        late_issue_date = date(2026, 1, 30)
+        MaintenanceIssue.objects.create(
+            towplane=self.towplane,
+            description="Final inspection",
+            report_date=late_issue_date,
+            grounded=False,
+            resolved=True,
+            resolved_date=late_issue_date,
+        )
+
+        client = Client()
+        client.force_login(self.member)
+
+        response = client.get(
+            reverse("logsheet:towplane_logbook", args=[self.towplane.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        daily = response.context["daily"]
+
+        # Should have 5 rows total
+        self.assertEqual(len(daily), 5)
+
+        # Jan 10: Pre-flight maintenance (no prior flights) - cum_hours should be None
+        jan10_data = [d for d in daily if d["day"] == pre_flight_issue_date][0]
+        self.assertIsNone(jan10_data["cum_hours"])
+        self.assertEqual(jan10_data["day_hours"], 0.0)
+        self.assertEqual(len(jan10_data["issues"]), 1)  # resolved same day as reported
+
+        # Jan 15: First flight - cum_hours should be 100.0
+        jan15_data = [d for d in daily if d["day"] == first_flight_date][0]
+        self.assertEqual(jan15_data["cum_hours"], 100.0)
+        self.assertEqual(jan15_data["day_hours"], 5.0)
+
+        # Jan 20: Mid-period maintenance - should carry forward 100.0
+        jan20_data = [d for d in daily if d["day"] == mid_period_issue_date][0]
+        self.assertEqual(jan20_data["cum_hours"], 100.0)
+        self.assertEqual(jan20_data["day_hours"], 0.0)
+        self.assertEqual(len(jan20_data["issues"]), 1)  # resolved same day as reported
+
+        # Jan 25: Second flight - cum_hours should be 105.5
+        jan25_data = [d for d in daily if d["day"] == second_flight_date][0]
+        self.assertEqual(jan25_data["cum_hours"], 105.5)
+        self.assertEqual(jan25_data["day_hours"], 5.5)
+
+        # Jan 30: Late maintenance - should carry forward 105.5
+        jan30_data = [d for d in daily if d["day"] == late_issue_date][0]
+        self.assertEqual(jan30_data["cum_hours"], 105.5)
+        self.assertEqual(jan30_data["day_hours"], 0.0)
+        self.assertEqual(len(jan30_data["issues"]), 1)  # resolved same day as reported
