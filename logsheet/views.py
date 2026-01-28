@@ -1739,7 +1739,7 @@ def maintenance_log(request):
         request,
         "logsheet/maintenance_log.html",
         {
-            "issues": issues,
+            "issues": issues_list,
             "gliders": gliders,
             "towplanes": towplanes,
             "selected_type": aircraft_type,

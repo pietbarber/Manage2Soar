@@ -76,7 +76,7 @@ class TestMaintenanceLogView:
         )
         # Create a towplane issue
         towplane = Towplane.objects.create(
-            n_number="N123TP", club_owned=True, is_active=True
+            name="Test Towplane", n_number="N123TP", club_owned=True, is_active=True
         )
         MaintenanceIssue.objects.create(
             description="Towplane engine issue",
@@ -104,9 +104,9 @@ class TestMaintenanceLogView:
         )
         # Create a towplane issue
         towplane = Towplane.objects.create(
-            n_number="N123TP", club_owned=True, is_active=True
+            name="Test Towplane", n_number="N123TP", club_owned=True, is_active=True
         )
-        towplane_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Towplane engine issue",
             towplane=towplane,
             resolved=False,

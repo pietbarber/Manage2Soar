@@ -18,14 +18,18 @@ class TestMaintenanceLogE2E(DjangoPlaywrightTestCase):
     def test_aircraft_filter_javascript_functionality(self):
         """Test that JavaScript filter dropdown works correctly."""
         # Create test user and data
-        admin = self.create_test_member(username="admin", is_superuser=True)
+        self.create_test_member(username="admin", is_superuser=True)
 
         # Create test aircraft
         glider = Glider.objects.create(
             n_number="N123AB", make="Schleicher", model="ASK21", is_active=True
         )
         towplane = Towplane.objects.create(
-            n_number="N456TP", make="Piper", model="Super Cub", is_active=True
+            name="Test Towplane",
+            n_number="N456TP",
+            make="Piper",
+            model="Super Cub",
+            is_active=True,
         )
 
         # Create maintenance issues for both aircraft
