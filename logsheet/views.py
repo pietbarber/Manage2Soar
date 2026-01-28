@@ -1712,7 +1712,9 @@ def maintenance_issues(request):
     gliders = Glider.objects.filter(club_owned=True, is_active=True).order_by(
         "n_number"
     )
-    towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
+    towplanes = Towplane.objects.filter(club_owned=True, is_active=True).order_by(
+        "n_number"
+    )
 
     return render(
         request,

@@ -421,7 +421,7 @@
 
 <!-- Add Maintenance Issue Modal (reusable include) -->
 {% url 'logsheet:add_maintenance_issue' logsheet.id as closeout_form_action_url %}
-{% include "logsheet/includes/add_maintenance_issue_modal.html" with form_action_url=closeout_form_action_url gliders=gliders towplanes=towplanes %}
+{% include "logsheet/includes/add_maintenance_issue_modal.html" with form_action_url=closeout_form_action_url gliders=gliders towplanes=towplanes id_prefix="closeout_" %}
 
   </div> <!-- Close closeout-form-container -->
 </div> <!-- Close container -->

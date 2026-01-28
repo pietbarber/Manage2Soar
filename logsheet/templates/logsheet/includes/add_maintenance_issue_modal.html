@@ -8,9 +8,10 @@ Can be included in any page that provides:
 Optional variables:
   - modal_id: custom ID for the modal (default: "addIssueModal")
   - modal_label_id: custom ID for the modal label (default: "addIssueModalLabel")
+  - id_prefix: prefix for all form field IDs to avoid conflicts (default: "")
 {% endcomment %}
 
-{% with modal_id=modal_id|default:"addIssueModal" modal_label_id=modal_label_id|default:"addIssueModalLabel" %}
+{% with modal_id=modal_id|default:"addIssueModal" modal_label_id=modal_label_id|default:"addIssueModalLabel" id_prefix=id_prefix|default:"" %}
 <div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_label_id }}" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg">
     <div class="modal-content maintenance-modal">
@@ -36,10 +37,10 @@ Optional variables:
                   <i class="bi bi-airplane me-1"></i>Select Aircraft
                 </h6>
                 <div class="mb-4">
-                  <label for="glider" class="form-label">
+                  <label for="{{ id_prefix }}glider" class="form-label">
                     <i class="bi bi-airplane me-1"></i>Glider
                   </label>
-                  <select name="glider" id="glider" class="form-select form-select-lg">
+                  <select name="glider" id="{{ id_prefix }}glider" class="form-select form-select-lg">
                     <option value="">Select a glider...</option>
                     {% for g in gliders %}
                       <option value="{{ g.id }}">{{ g }}</option>
@@ -47,10 +48,10 @@ Optional variables:
                   </select>
                 </div>
                 <div class="mb-4">
-                  <label for="towplane" class="form-label">
+                  <label for="{{ id_prefix }}towplane" class="form-label">
                     <i class="bi bi-airplane-engines me-1"></i>Towplane
                   </label>
-                  <select name="towplane" id="towplane" class="form-select form-select-lg">
+                  <select name="towplane" id="{{ id_prefix }}towplane" class="form-select form-select-lg">
                     <option value="">Select a towplane...</option>
                     {% for t in towplanes %}
                       <option value="{{ t.id }}">{{ t }}</option>
@@ -58,8 +59,8 @@ Optional variables:
                   </select>
                 </div>
                 <div class="form-check form-switch mb-3">
-                  <input class="form-check-input form-check-input-lg" type="checkbox" name="grounded" id="grounded" role="switch">
-                  <label class="form-check-label fw-bold text-danger" for="grounded">
+                  <input class="form-check-input form-check-input-lg" type="checkbox" name="grounded" id="{{ id_prefix }}grounded" role="switch">
+                  <label class="form-check-label fw-bold text-danger" for="{{ id_prefix }}grounded">
                     <i class="bi bi-exclamation-triangle me-1"></i>Ground Aircraft
                   </label>
                   <div class="form-text">Check this if the aircraft should not be used until the issue is resolved</div>
@@ -72,10 +73,10 @@ Optional variables:
                   <i class="bi bi-chat-text me-1"></i>Issue Details
                 </h6>
                 <div class="mb-3">
-                  <label for="description" class="form-label">
+                  <label for="{{ id_prefix }}description" class="form-label">
                     <i class="bi bi-journal-text me-1"></i>Issue Description
                   </label>
-                  <textarea name="description" id="description" rows="8" class="form-control"
+                  <textarea name="description" id="{{ id_prefix }}description" rows="8" class="form-control"
                     placeholder="Please describe the maintenance issue in detail. Include:&#10;• What was observed&#10;• When it occurred&#10;• Any relevant circumstances&#10;• Potential safety concerns"></textarea>
                   <div class="form-text">Be as specific as possible to help maintenance crews address the issue quickly</div>
                 </div>
