@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from tinymce.models import HTMLField
 
@@ -60,10 +62,48 @@ class TrainingPhase(models.Model):
 ####################################################
 
 
+def generate_sort_key(code: str) -> str:
+    """
+    Generate a sort key from a lesson code for natural/version-number sorting.
+
+    Handles nested number formats like "1.10" by zero-padding each segment.
+    Examples:
+        "1.1"  -> "00001.00001"
+        "1.10" -> "00001.00010"
+        "2.0"  -> "00002.00000"
+        "2a"   -> "00002a"
+        "10"   -> "00010"
+
+    This ensures "1.2" sorts before "1.10" (version order, not lexicographic).
+    """
+    parts = code.split(".")
+    padded_parts = []
+    for part in parts:
+        # Extract leading digits and trailing non-digits (e.g., "2a" -> "2", "a")
+        match = re.match(r"^(\d+)(.*)$", part)
+        if match:
+            num_part = match.group(1).zfill(5)  # Zero-pad to 5 digits
+            suffix = match.group(2)
+            padded_parts.append(num_part + suffix)
+        else:
+            # No leading digits, just use as-is
+            padded_parts.append(part)
+    return ".".join(padded_parts)
+
+
 class TrainingLesson(models.Model):
     code = models.CharField(max_length=5, unique=True)  # e.g., "2l"
     title = models.CharField(max_length=100)  # e.g., "Normal Landing"
     description = HTMLField(blank=True)  # full lesson content from .shtml
+
+    # Sort key for natural/version-number ordering (auto-generated from code)
+    sort_key = models.CharField(
+        max_length=50,
+        blank=True,
+        editable=False,
+        db_index=True,
+        help_text="Auto-generated sort key for natural ordering (e.g., 1.2 before 1.10)",
+    )
 
     # FAA compliance tracking (from legacy fields)
     far_requirement = models.CharField(
@@ -84,7 +124,12 @@ class TrainingLesson(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["code"]
+        ordering = ["sort_key"]
+
+    def save(self, *args, **kwargs):
+        # Auto-generate sort_key from code before saving
+        self.sort_key = generate_sort_key(self.code)
+        super().save(*args, **kwargs)
 
     def is_required_for_solo(self):
         return bool(self.far_requirement)
