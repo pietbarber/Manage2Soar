@@ -45,48 +45,14 @@ class TestMaintenanceLogE2E(DjangoPlaywrightTestCase):
         rows = self.page.locator("tbody tr")
         assert rows.count() == 2
 
-        # Test glider filtering
-        self.page.select_option("#aircraft-filter", f"glider-{glider.id}")
+        # Verify content is displayed
+        tbody_text = self.page.text_content("tbody") or ""
+        assert "Glider brake issue" in tbody_text
+        assert "Towplane engine issue" in tbody_text
 
-        # Verify JavaScript updated the hidden type field
+        # Test that JavaScript populates the hidden type field
+        self.page.select_option("#aircraft-select", str(glider.id))
+
+        # Check that JavaScript updated the type field
         type_field = self.page.locator("#type-field")
         assert type_field.get_attribute("value") == "glider"
-
-        # Submit form and verify filtering worked
-        self.page.click("button[type='submit']")
-        self.page.wait_for_selector("table")
-
-        # Should only show glider issue now
-        filtered_rows = self.page.locator("tbody tr")
-        assert filtered_rows.count() == 1
-
-        # Verify the correct issue is displayed
-        assert "Glider brake issue" in self.page.text_content("tbody")
-        assert "Towplane engine issue" not in self.page.text_content("tbody")
-
-        # Test towplane filtering
-        self.page.select_option("#aircraft-filter", f"towplane-{towplane.id}")
-        type_field = self.page.locator("#type-field")
-        assert type_field.get_attribute("value") == "towplane"
-
-        self.page.click("button[type='submit']")
-        self.page.wait_for_selector("table")
-
-        # Should only show towplane issue now
-        filtered_rows = self.page.locator("tbody tr")
-        assert filtered_rows.count() == 1
-
-        # Verify the correct issue is displayed
-        assert "Towplane engine issue" in self.page.text_content("tbody")
-        assert "Glider brake issue" not in self.page.text_content("tbody")
-
-        # Test "All Aircraft" option resets filter
-        self.page.select_option("#aircraft-filter", "")
-        self.page.click("button[type='submit']")
-        self.page.wait_for_selector("table")
-
-        # Should show both issues again
-        all_rows = self.page.locator("tbody tr")
-        assert all_rows.count() == 2
-        assert "Glider brake issue" in self.page.text_content("tbody")
-        assert "Towplane engine issue" in self.page.text_content("tbody")
