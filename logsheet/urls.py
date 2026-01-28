@@ -49,6 +49,11 @@ urlpatterns = [
     path("maintenance/", views.maintenance_issues, name="maintenance_issues"),
     path("maintenance/log/", views.maintenance_log, name="maintenance_log"),
     path(
+        "maintenance/add-issue/",
+        views.add_maintenance_issue_standalone,
+        name="add_maintenance_issue_standalone",
+    ),
+    path(
         "maintenance/resolve-modal/<int:issue_id>/",
         views.maintenance_resolve_modal,
         name="maintenance_resolve_modal",

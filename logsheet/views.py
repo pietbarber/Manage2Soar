@@ -1605,6 +1605,47 @@ def add_maintenance_issue(request, logsheet_id):
 
 
 #################################################
+# add_maintenance_issue_standalone
+#
+# Purpose:
+# Allows active members to submit a new maintenance issue from the maintenance
+# issues page (not tied to a specific logsheet).
+#
+# Behavior:
+# - Accepts POST data from the MaintenanceIssueForm.
+# - Validates the form and ensures a glider or towplane is selected.
+# - Assigns the reporting member (no logsheet association).
+# - Saves the issue and displays success or error messages.
+# - Redirects back to the maintenance issues page.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP POST request containing maintenance issue data.
+#
+# Returns:
+# - HttpResponseRedirect: Redirects to the maintenance issues page after submission.
+#################################################
+
+
+@require_POST
+@active_member_required
+def add_maintenance_issue_standalone(request):
+    form = MaintenanceIssueForm(request.POST)
+
+    if form.is_valid():
+        issue = form.save(commit=False)
+        issue.reported_by = request.user
+        # No logsheet association for standalone submissions
+        issue.save()
+        messages.success(request, "Maintenance issue submitted successfully.")
+    else:
+        messages.error(
+            request, "Failed to submit maintenance issue. Please check the form."
+        )
+
+    return redirect("logsheet:maintenance_issues")
+
+
+#################################################
 # equipment_list
 #
 # Purpose:
@@ -1667,11 +1708,17 @@ def maintenance_issues(request):
     open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related(
         "glider", "towplane"
     )
+    # Get active aircraft for the "Add Issue" modal
+    gliders = Glider.objects.filter(is_active=True).order_by("n_number")
+    towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
+
     return render(
         request,
         "logsheet/maintenance_list.html",
         {
             "open_issues": open_issues,
+            "gliders": gliders,
+            "towplanes": towplanes,
         },
     )
 
