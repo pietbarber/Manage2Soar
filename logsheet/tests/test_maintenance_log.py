@@ -8,7 +8,7 @@ The maintenance_log view shows a complete history of all maintenance issues
 import pytest
 from django.urls import reverse
 
-from logsheet.models import Glider, MaintenanceIssue, Towplane
+from logsheet.models import MaintenanceIssue, Towplane
 
 
 @pytest.mark.django_db
@@ -45,13 +45,13 @@ class TestMaintenanceLogView:
     ):
         """View should show both open and resolved maintenance issues."""
         # Create an open issue
-        open_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Open brake issue",
             glider=glider_for_meister,
             resolved=False,
         )
         # Create a resolved issue
-        resolved_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Resolved canopy issue",
             glider=glider_for_meister,
             resolved=True,
@@ -69,7 +69,7 @@ class TestMaintenanceLogView:
     def test_filter_by_glider(self, client, active_member, glider_for_meister):
         """View should filter by glider when aircraft_type=glider."""
         # Create a glider issue
-        glider_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Glider wheel issue",
             glider=glider_for_meister,
             resolved=False,
@@ -78,7 +78,7 @@ class TestMaintenanceLogView:
         towplane = Towplane.objects.create(
             n_number="N123TP", club_owned=True, is_active=True
         )
-        towplane_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Towplane engine issue",
             towplane=towplane,
             resolved=False,
@@ -169,7 +169,7 @@ class TestMaintenanceLogView:
         older_issue.report_date = date.today() - timedelta(days=7)
         older_issue.save()
 
-        newer_issue = MaintenanceIssue.objects.create(
+        MaintenanceIssue.objects.create(
             description="Newer issue",
             glider=glider_for_meister,
             resolved=False,
@@ -204,3 +204,69 @@ class TestMaintenanceLogView:
 
         assert response.status_code == 200
         assert b"maintenance/log" in response.content
+
+    def test_invalid_aircraft_id_handling(
+        self, client, active_member, glider_for_meister
+    ):
+        """View should handle invalid aircraft_id gracefully."""
+        # Create a test issue
+        MaintenanceIssue.objects.create(
+            description="Test issue",
+            glider=glider_for_meister,
+            resolved=False,
+        )
+
+        client.force_login(active_member)
+
+        # Test with non-numeric aircraft_id
+        response = client.get(
+            reverse("logsheet:maintenance_log"),
+            {"type": "glider", "aircraft_id": "invalid"},
+        )
+        assert response.status_code == 200
+        # Should show all issues since filter was ignored
+        issues = list(response.context["issues"])
+        assert len(issues) == 1
+
+        # Test with empty aircraft_id
+        response = client.get(
+            reverse("logsheet:maintenance_log"),
+            {"type": "glider", "aircraft_id": ""},
+        )
+        assert response.status_code == 200
+        # Should show all issues since no filter applied
+        issues = list(response.context["issues"])
+        assert len(issues) == 1
+
+    def test_invalid_aircraft_id_handling(
+        self, client, active_member, glider_for_meister
+    ):
+        """View should handle invalid aircraft_id gracefully."""
+        # Create a test issue
+        MaintenanceIssue.objects.create(
+            description="Test issue",
+            glider=glider_for_meister,
+            resolved=False,
+        )
+
+        client.force_login(active_member)
+
+        # Test with non-numeric aircraft_id
+        response = client.get(
+            reverse("logsheet:maintenance_log"),
+            {"type": "glider", "aircraft_id": "invalid"},
+        )
+        assert response.status_code == 200
+        # Should show all issues since filter was ignored
+        issues = list(response.context["issues"])
+        assert len(issues) == 1
+
+        # Test with empty aircraft_id
+        response = client.get(
+            reverse("logsheet:maintenance_log"),
+            {"type": "glider", "aircraft_id": ""},
+        )
+        assert response.status_code == 200
+        # Should show all issues since no filter applied
+        issues = list(response.context["issues"])
+        assert len(issues) == 1

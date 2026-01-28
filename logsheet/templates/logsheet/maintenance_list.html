@@ -2,6 +2,10 @@
 {% load static %}
 {% load logsheet_tags %}
 
+{% block extra_css %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/equipment_logbook.css' %}">
+{% endblock %}
+
 
 {% block content %}
 <div class="container mt-4">

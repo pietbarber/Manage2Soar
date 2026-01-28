@@ -1685,7 +1685,7 @@ def maintenance_issues(request):
 #
 # Behavior:
 # - Fetches all maintenance issues ordered by report_date (newest first).
-# - Groups issues by aircraft for easy navigation.
+# - Displays issues in a flat chronological list for all aircraft.
 # - Shows both open and resolved issues with their full history.
 # - Optionally filters by aircraft if specified in query params.
 #
@@ -1710,19 +1710,30 @@ def maintenance_log(request):
 
     # Apply filters if specified
     if aircraft_type == "glider" and aircraft_id:
-        issues = issues.filter(glider_id=aircraft_id)
+        try:
+            aircraft_id = int(aircraft_id)
+            issues = issues.filter(glider_id=aircraft_id)
+        except (ValueError, TypeError):
+            aircraft_id = None  # Invalid ID, ignore filter
     elif aircraft_type == "towplane" and aircraft_id:
-        issues = issues.filter(towplane_id=aircraft_id)
+        try:
+            aircraft_id = int(aircraft_id)
+            issues = issues.filter(towplane_id=aircraft_id)
+        except (ValueError, TypeError):
+            aircraft_id = None  # Invalid ID, ignore filter
 
     # Get all aircraft for filter dropdowns
     gliders = Glider.objects.filter(is_active=True).order_by("n_number")
     towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
 
-    # Calculate statistics
-    total_issues = issues.count()
-    open_issues_count = issues.filter(resolved=False).count()
-    resolved_issues_count = issues.filter(resolved=True).count()
-    grounded_count = issues.filter(resolved=False, grounded=True).count()
+    # Calculate statistics efficiently by evaluating the queryset once
+    issues_list = list(issues)
+    total_issues = len(issues_list)
+    open_issues_count = sum(1 for issue in issues_list if not issue.resolved)
+    resolved_issues_count = sum(1 for issue in issues_list if issue.resolved)
+    grounded_count = sum(
+        1 for issue in issues_list if not issue.resolved and issue.grounded
+    )
 
     return render(
         request,
@@ -1732,7 +1743,7 @@ def maintenance_log(request):
             "gliders": gliders,
             "towplanes": towplanes,
             "selected_type": aircraft_type,
-            "selected_aircraft_id": int(aircraft_id) if aircraft_id else None,
+            "selected_aircraft_id": aircraft_id,
             "total_issues": total_issues,
             "open_issues_count": open_issues_count,
             "resolved_issues_count": resolved_issues_count,
