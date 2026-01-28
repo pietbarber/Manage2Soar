@@ -41,5 +41,7 @@ RUN if [ -f package.json ]; then npm run vendor:tablesort || true; fi
 # (see roles/gke-deploy/tasks/deploy.yml)
 
 # Gunicorn entrypoint
-# Increased timeout to 60s to handle slow SMTP server connections (mail server has 10s connection delay)
-CMD ["gunicorn", "manage2soar.wsgi:application", "--bind", "0.0.0.0:8000", "--workers=3", "--timeout=60"]
+# Increased timeout to 120s to handle:
+# - Slow SMTP server connections (mail server has 10s connection delay)
+# - Heavy CMS pages with large embedded content (newsletter archives)
+CMD ["gunicorn", "manage2soar.wsgi:application", "--bind", "0.0.0.0:8000", "--workers=3", "--timeout=120"]
