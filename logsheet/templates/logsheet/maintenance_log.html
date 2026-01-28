@@ -51,7 +51,9 @@
   <!-- Filter Form -->
   <div class="card mb-4">
     <div class="card-body">
-      <form method="get" action="{% url 'logsheet:maintenance_log' %}" class="row g-3 align-items-end">\n        <div class="col-md-4">\n          <label for="aircraft-select" class="form-label">Filter by Aircraft</label>
+      <form method="get" action="{% url 'logsheet:maintenance_log' %}" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label for="aircraft-select" class="form-label">Filter by Aircraft</label>
           <select id="aircraft-select" name="aircraft_id" class="form-select">
             <option value="">All Aircraft</option>
             <optgroup label="Gliders">
