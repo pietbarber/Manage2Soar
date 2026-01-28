@@ -57,6 +57,40 @@ class TestMaintenanceLogE2E(DjangoPlaywrightTestCase):
         # Test that JavaScript populates the hidden type field
         self.page.select_option("#aircraft-select", str(glider.id))
 
+        # Wait for JavaScript event to complete
+        self.page.wait_for_timeout(100)
+
         # Check that JavaScript updated the type field
         type_field = self.page.locator("#type-field")
         assert type_field.get_attribute("value") == "glider"
+
+        # Submit the form and verify filtered results
+        self.page.click("button.btn-outline-primary")
+        self.page.wait_for_load_state("networkidle")
+
+        # Verify we're still on the maintenance log page
+        assert "/logsheet/maintenance/log/" in self.page.url
+
+        # Verify page reloaded with filtered results
+        rows = self.page.locator("tbody tr")
+        assert rows.count() == 1  # Only glider issue should be shown
+
+        # Verify only glider issue is displayed
+        tbody_text = self.page.text_content("tbody") or ""
+        assert "Glider brake issue" in tbody_text
+        assert "Towplane engine issue" not in tbody_text
+
+        # Verify dropdown maintains the selected value after form submission
+        selected_value = self.page.locator("#aircraft-select").input_value()
+        assert selected_value == str(glider.id)
+
+        # Test Clear button functionality
+        self.page.click("a.btn-outline-secondary")
+        self.page.wait_for_load_state("networkidle")
+
+        # Verify all issues are shown again after clearing
+        rows = self.page.locator("tbody tr")
+        assert rows.count() == 2
+        tbody_text = self.page.text_content("tbody") or ""
+        assert "Glider brake issue" in tbody_text
+        assert "Towplane engine issue" in tbody_text

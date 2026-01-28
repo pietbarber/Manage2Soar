@@ -1701,53 +1701,53 @@ def maintenance_issues(request):
 def maintenance_log(request):
     # Get filter parameters
     aircraft_type = request.GET.get("type")  # 'glider' or 'towplane'
-    aircraft_id = request.GET.get("aircraft_id")
+    aircraft_id_str = request.GET.get("aircraft_id")
 
     # Base queryset with all issues
     issues = MaintenanceIssue.objects.select_related(
         "glider", "towplane", "reported_by", "resolved_by"
     ).order_by("-report_date", "-id")
 
-    # Apply filters if specified
-    if aircraft_type == "glider" and aircraft_id:
+    # Convert and apply filters if specified
+    aircraft_id_int = None
+    if aircraft_type == "glider" and aircraft_id_str:
         try:
-            aircraft_id = int(aircraft_id)
-            issues = issues.filter(glider_id=aircraft_id)
+            aircraft_id_int = int(aircraft_id_str)
+            issues = issues.filter(glider_id=aircraft_id_int)
         except (ValueError, TypeError):
-            aircraft_id = None  # Invalid ID, ignore filter
-    elif aircraft_type == "towplane" and aircraft_id:
+            aircraft_id_int = None  # Invalid ID, ignore filter
+    elif aircraft_type == "towplane" and aircraft_id_str:
         try:
-            aircraft_id = int(aircraft_id)
-            issues = issues.filter(towplane_id=aircraft_id)
+            aircraft_id_int = int(aircraft_id_str)
+            issues = issues.filter(towplane_id=aircraft_id_int)
         except (ValueError, TypeError):
-            aircraft_id = None  # Invalid ID, ignore filter
+            aircraft_id_int = None  # Invalid ID, ignore filter
 
     # Get all aircraft for filter dropdowns
     gliders = Glider.objects.filter(is_active=True).order_by("n_number")
     towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
 
-    # Calculate statistics efficiently by evaluating the queryset once
-    issues_list = list(issues)
-    total_issues = len(issues_list)
-    open_issues_count = sum(1 for issue in issues_list if not issue.resolved)
-    resolved_issues_count = sum(1 for issue in issues_list if issue.resolved)
-    grounded_count = sum(
-        1 for issue in issues_list if not issue.resolved and issue.grounded
+    # Calculate statistics using ORM aggregation to avoid loading all issues into memory
+    stats = issues.aggregate(
+        total=Count("id"),
+        open_count=Count("id", filter=Q(resolved=False)),
+        resolved_count=Count("id", filter=Q(resolved=True)),
+        grounded=Count("id", filter=Q(resolved=False, grounded=True)),
     )
 
     return render(
         request,
         "logsheet/maintenance_log.html",
         {
-            "issues": issues_list,
+            "issues": issues,
             "gliders": gliders,
             "towplanes": towplanes,
             "selected_type": aircraft_type,
-            "selected_aircraft_id": aircraft_id,
-            "total_issues": total_issues,
-            "open_issues_count": open_issues_count,
-            "resolved_issues_count": resolved_issues_count,
-            "grounded_count": grounded_count,
+            "selected_aircraft_id": aircraft_id_int,
+            "total_issues": stats["total"],
+            "open_issues_count": stats["open_count"],
+            "resolved_issues_count": stats["resolved_count"],
+            "grounded_count": stats["grounded"],
         },
     )
 

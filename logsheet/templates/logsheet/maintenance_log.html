@@ -51,11 +51,8 @@
   <!-- Filter Form -->
   <div class="card mb-4">
     <div class="card-body">
-      <form method="get" class="row g-3 align-items-end">
-        <div class="col-md-4">
-          <label for="aircraft-select" class="form-label">Filter by Aircraft</label>
-          <select id="aircraft-select" name="aircraft_id" class="form-select"
-                  onchange="updateTypeField(this)">
+      <form method="get" action="{% url 'logsheet:maintenance_log' %}" class="row g-3 align-items-end">\n        <div class="col-md-4">\n          <label for="aircraft-select" class="form-label">Filter by Aircraft</label>
+          <select id="aircraft-select" name="aircraft_id" class="form-select">
             <option value="">All Aircraft</option>
             <optgroup label="Gliders">
               {% for glider in gliders %}
@@ -78,7 +75,7 @@
         </div>
         <div class="col-md-2">
           <button type="submit" class="btn btn-outline-primary">Filter</button>
-          {% if selected_aircraft_id %}
+          {% if selected_aircraft_id and selected_type %}
           <a href="{% url 'logsheet:maintenance_log' %}" class="btn btn-outline-secondary">Clear</a>
           {% endif %}
         </div>
@@ -173,10 +170,17 @@
 </div>
 
 <script>
-function updateTypeField(select) {
-  const option = select.options[select.selectedIndex];
-  const type = option.getAttribute('data-type') || '';
-  document.getElementById('type-field').value = type;
-}
+// Update hidden type field when aircraft is selected
+// Uses proper event listener for better keyboard accessibility
+document.addEventListener('DOMContentLoaded', function() {
+  const select = document.getElementById('aircraft-select');
+  const typeField = document.getElementById('type-field');
+
+  select.addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    const type = option.getAttribute('data-type') || '';
+    typeField.value = type;
+  });
+});
 </script>
 {% endblock %}
