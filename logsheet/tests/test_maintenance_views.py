@@ -413,3 +413,102 @@ def test_maintenance_deadlines_view(client, active_member):
     response = client.get(reverse("logsheet:maintenance_deadlines"))
     assert response.status_code == 200
     assert "deadlines" in response.context
+
+
+# =============================================================================
+# Tests for standalone add maintenance issue (Issue #553)
+# =============================================================================
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_standalone_success(client, active_member, glider):
+    """Test standalone maintenance issue submission without logsheet"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue_standalone"),
+        {
+            "description": "Canopy latch needs adjustment",
+            "glider": glider.pk,
+        },
+    )
+    # Should redirect to maintenance issues page
+    assert response.status_code == 302
+    assert response.url == reverse("logsheet:maintenance_issues")
+
+    # Verify issue was created
+    issue = MaintenanceIssue.objects.get(description="Canopy latch needs adjustment")
+    assert issue.glider == glider
+    assert issue.reported_by == active_member
+    assert issue.logsheet is None  # No logsheet association
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_standalone_with_towplane(
+    client, active_member, towplane
+):
+    """Test standalone maintenance issue for towplane"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue_standalone"),
+        {
+            "description": "Engine running rough",
+            "towplane": towplane.pk,
+            "grounded": "on",
+        },
+    )
+    assert response.status_code == 302
+
+    issue = MaintenanceIssue.objects.get(description="Engine running rough")
+    assert issue.towplane == towplane
+    assert issue.grounded is True
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_standalone_validation_error(client, active_member):
+    """Test standalone submission with missing aircraft shows error"""
+    client.force_login(active_member)
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue_standalone"),
+        {"description": "Issue without aircraft"},
+    )
+    # Should redirect back with error message
+    assert response.status_code == 302
+    assert response.url == reverse("logsheet:maintenance_issues")
+    # Issue should NOT be created
+    assert not MaintenanceIssue.objects.filter(
+        description="Issue without aircraft"
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_standalone_requires_post(client, active_member):
+    """Test standalone endpoint only accepts POST"""
+    client.force_login(active_member)
+    response = client.get(reverse("logsheet:add_maintenance_issue_standalone"))
+    assert response.status_code == 405  # Method not allowed
+
+
+@pytest.mark.django_db
+def test_add_maintenance_issue_standalone_requires_login(client, glider):
+    """Test standalone endpoint requires authentication"""
+    response = client.post(
+        reverse("logsheet:add_maintenance_issue_standalone"),
+        {
+            "description": "Test issue",
+            "glider": glider.pk,
+        },
+    )
+    # Should redirect to login
+    assert response.status_code == 302
+    assert "/login/" in response.url or "/accounts/login/" in response.url
+
+
+@pytest.mark.django_db
+def test_maintenance_issues_view_includes_aircraft_for_modal(client, active_member):
+    """Test maintenance issues view passes gliders and towplanes for Add Issue modal"""
+    client.force_login(active_member)
+    response = client.get(reverse("logsheet:maintenance_issues"))
+    assert response.status_code == 200
+    # Issue #553: View should include aircraft for the Add Issue modal
+    assert "gliders" in response.context
+    assert "towplanes" in response.context
