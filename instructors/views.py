@@ -134,7 +134,7 @@ def public_syllabus_overview(request):
 
 def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
-    # Get all lessons in code order
+    # Get all lessons ordered by sort_key (natural sort order)
     lessons = list(TrainingLesson.objects.order_by("sort_key"))
     idx = next((i for i, l in enumerate(lessons) if l.code == code), None)
     prev_lesson = lessons[idx - 1] if idx is not None and idx > 0 else None

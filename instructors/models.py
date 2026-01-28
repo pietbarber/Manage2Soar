@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from tinymce.models import HTMLField
 
@@ -74,8 +76,6 @@ def generate_sort_key(code: str) -> str:
 
     This ensures "1.2" sorts before "1.10" (version order, not lexicographic).
     """
-    import re
-
     parts = code.split(".")
     padded_parts = []
     for part in parts:

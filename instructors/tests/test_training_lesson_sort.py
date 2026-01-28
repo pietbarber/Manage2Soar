@@ -1,6 +1,5 @@
 """Tests for TrainingLesson sort_key functionality (Issue #574)."""
 
-import pytest
 from django.test import TestCase
 
 from instructors.models import TrainingLesson, generate_sort_key
