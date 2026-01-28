@@ -1708,8 +1708,10 @@ def maintenance_issues(request):
     open_issues = MaintenanceIssue.objects.filter(resolved=False).select_related(
         "glider", "towplane"
     )
-    # Get active aircraft for the "Add Issue" modal
-    gliders = Glider.objects.filter(is_active=True).order_by("n_number")
+    # Get active club-owned aircraft for the "Add Issue" modal
+    gliders = Glider.objects.filter(club_owned=True, is_active=True).order_by(
+        "n_number"
+    )
     towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
 
     return render(
