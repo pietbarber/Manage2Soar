@@ -1,6 +1,6 @@
 # Dockerfile for Django + Gunicorn
-# Use Python 3.13 instead of 3.14 for better package compatibility
-FROM python:3.13-slim-bookworm
+# Use Python 3.13.11 with latest security patches
+FROM python:3.13.11-slim-bookworm
 
 WORKDIR /app
 
