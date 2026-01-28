@@ -135,7 +135,7 @@ def public_syllabus_overview(request):
 def public_syllabus_detail(request, code):
     lesson = get_object_or_404(TrainingLesson, code=code)
     # Get all lessons in code order
-    lessons = list(TrainingLesson.objects.order_by("code"))
+    lessons = list(TrainingLesson.objects.order_by("sort_key"))
     idx = next((i for i, l in enumerate(lessons) if l.code == code), None)
     prev_lesson = lessons[idx - 1] if idx is not None and idx > 0 else None
     next_lesson = (
@@ -176,7 +176,7 @@ def instructors_home(request):
 
 @instructor_required
 def syllabus_overview(request):
-    lessons = TrainingLesson.objects.all().order_by("code")
+    lessons = TrainingLesson.objects.all().order_by("sort_key")
     return render(request, "instructors/syllabus_overview.html", {"lessons": lessons})
 
 
@@ -257,7 +257,7 @@ def fill_instruction_report(request, student_id, report_date):
     if report_date > now().date():
         return HttpResponseBadRequest("Report date cannot be in the future.")
 
-    lessons = TrainingLesson.objects.all().order_by("code")
+    lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     if request.method == "POST":
         # Track if this is an update to an existing report
@@ -557,7 +557,7 @@ def member_training_grid(request, member_id):
 
     # Extract sorted report dates
     report_dates = [r.report_date for r in reports]
-    lessons = TrainingLesson.objects.all().order_by("code")
+    lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     # Build lookup for scores by (lesson_id, date)
     scores_lookup = {
@@ -716,7 +716,7 @@ def log_ground_instruction(request):
     # compatibility with multiple templates/links in the codebase.
     student_id = request.GET.get("student") or request.GET.get("student_id")
     student = get_object_or_404(Member, pk=student_id) if student_id else None
-    lessons = TrainingLesson.objects.all().order_by("code")
+    lessons = TrainingLesson.objects.all().order_by("sort_key")
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -1486,7 +1486,7 @@ def public_syllabus_full(request):
     header = SyllabusDocument.objects.filter(slug="header").first()
     materials = SyllabusDocument.objects.filter(slug="materials").first()
     # all lessons in order
-    lessons = TrainingLesson.objects.order_by("code").all()
+    lessons = TrainingLesson.objects.order_by("sort_key").all()
 
     return render(
         request,
@@ -1946,7 +1946,7 @@ def member_logbook(request):
 def _build_signoff_records(student, threshold_scores, requirement_check):
     records = []
 
-    for lesson in TrainingLesson.objects.order_by("phase", "code"):
+    for lesson in TrainingLesson.objects.order_by("phase", "sort_key"):
         # 1) Skip lessons not required
         if not requirement_check(lesson):
             continue

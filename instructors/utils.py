@@ -233,7 +233,7 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
 
     # Get lesson scores for this report
     lesson_scores = report.lesson_scores.select_related("lesson").order_by(
-        "lesson__code"
+        "lesson__sort_key"
     )
 
     # Build email context
