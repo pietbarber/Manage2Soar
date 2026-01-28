@@ -1677,6 +1677,71 @@ def maintenance_issues(request):
 
 
 #################################################
+# maintenance_log
+#
+# Purpose:
+# Displays a running log of all maintenance issues (both open and resolved)
+# for all aircraft. This provides a historical view of all maintenance activity.
+#
+# Behavior:
+# - Fetches all maintenance issues ordered by report_date (newest first).
+# - Groups issues by aircraft for easy navigation.
+# - Shows both open and resolved issues with their full history.
+# - Optionally filters by aircraft if specified in query params.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request.
+#
+# Returns:
+# - HttpResponse: Renders the maintenance log page.
+#################################################
+
+
+@active_member_required
+def maintenance_log(request):
+    # Get filter parameters
+    aircraft_type = request.GET.get("type")  # 'glider' or 'towplane'
+    aircraft_id = request.GET.get("aircraft_id")
+
+    # Base queryset with all issues
+    issues = MaintenanceIssue.objects.select_related(
+        "glider", "towplane", "reported_by", "resolved_by"
+    ).order_by("-report_date", "-id")
+
+    # Apply filters if specified
+    if aircraft_type == "glider" and aircraft_id:
+        issues = issues.filter(glider_id=aircraft_id)
+    elif aircraft_type == "towplane" and aircraft_id:
+        issues = issues.filter(towplane_id=aircraft_id)
+
+    # Get all aircraft for filter dropdowns
+    gliders = Glider.objects.filter(is_active=True).order_by("n_number")
+    towplanes = Towplane.objects.filter(is_active=True).order_by("n_number")
+
+    # Calculate statistics
+    total_issues = issues.count()
+    open_issues_count = issues.filter(resolved=False).count()
+    resolved_issues_count = issues.filter(resolved=True).count()
+    grounded_count = issues.filter(resolved=False, grounded=True).count()
+
+    return render(
+        request,
+        "logsheet/maintenance_log.html",
+        {
+            "issues": issues,
+            "gliders": gliders,
+            "towplanes": towplanes,
+            "selected_type": aircraft_type,
+            "selected_aircraft_id": int(aircraft_id) if aircraft_id else None,
+            "total_issues": total_issues,
+            "open_issues_count": open_issues_count,
+            "resolved_issues_count": resolved_issues_count,
+            "grounded_count": grounded_count,
+        },
+    )
+
+
+#################################################
 # mark_issue_resolved
 #
 # Purpose:

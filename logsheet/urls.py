@@ -47,6 +47,7 @@ urlpatterns = [
     ),
     path("equipment/", views.equipment_list, name="equipment_list"),
     path("maintenance/", views.maintenance_issues, name="maintenance_issues"),
+    path("maintenance/log/", views.maintenance_log, name="maintenance_log"),
     path(
         "maintenance/resolve-modal/<int:issue_id>/",
         views.maintenance_resolve_modal,
