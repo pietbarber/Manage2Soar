@@ -122,26 +122,29 @@ Daily 2:00 AM UTC:
 
 ### Multi-Layer Encryption Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Database Server (m2s-database)                                  │
-│                                                                 │
-│ 1. pg_dump → m2s.pgdump (unencrypted, ephemeral)              │
-│ 2. openssl enc → m2s.pgdump.enc (AES-256-CBC encrypted)       │
-│ 3. shred → m2s.pgdump (secure deletion)                        │
-│ 4. gsutil cp → Upload to GCS                                   │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Google Cloud Storage (gs://m2s-database-backups)                │
-│                                                                 │
-│ 5. GCS applies CMEK encryption (Cloud KMS) - Layer 2           │
-│ 6. Lifecycle policy moves to Coldline after 30 days            │
-│ 7. Lifecycle policy deletes after 365 days                     │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph server["Database Server (m2s-database)"]
+        A[1. pg_dump creates m2s.pgdump<br/>unencrypted, ephemeral]
+        B[2. openssl enc encrypts<br/>m2s.pgdump.enc AES-256-CBC]
+        C[3. shred securely deletes<br/>m2s.pgdump]
+        D[4. gsutil cp uploads<br/>to GCS]
+        A --> B --> C --> D
+    end
 
-Result: Double-encrypted backups (client-side AES + server-side CMEK)
+    subgraph gcs["Google Cloud Storage (gs://m2s-database-backups)"]
+        E[5. GCS applies CMEK encryption<br/>Cloud KMS - Layer 2]
+        F[6. Lifecycle: Move to Coldline<br/>after 30 days]
+        G[7. Lifecycle: Delete<br/>after 365 days]
+        E --> F --> G
+    end
+
+    D -.-> E
+
+    style server fill:#e1f5ff
+    style gcs fill:#fff4e1
+
+    note["Result: Double-encrypted backups<br/>client-side AES + server-side CMEK"]
 ```
 
 ### Backup File Naming
