@@ -11,7 +11,7 @@ This directory contains operational runbooks for system administrators managing 
 | [Deployment & Updates](deployment-updates.md) | Deploy new versions, rollbacks, zero-downtime updates | Weekly deployments, hotfixes |
 | [Troubleshooting Guide](troubleshooting.md) | Common issues and solutions | Production incidents |
 | [Ansible Playbook Guide](ansible-playbook-guide.md) | Complete reference for all Ansible playbooks | Reference |
-| Database Operations *(coming soon)* | PostgreSQL backups, migrations, troubleshooting | Database changes, recovery |
+| [Database Operations](database-operations.md) | PostgreSQL backups, restoration, troubleshooting | Database changes, disaster recovery |
 | Security Operations *(coming soon)* | Secret rotation, vulnerability patching | Security incidents, monthly maintenance |
 | Disaster Recovery *(coming soon)* | System restore, data recovery | Critical outages |
 
