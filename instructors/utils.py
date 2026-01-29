@@ -92,18 +92,22 @@ def get_flight_summary_for_member(member):
         for row in qs:
             data.setdefault(row["n_number"], {}).update(row)
 
+    # Prepare defaults template (used for missing keys - must be separate from totals)
+    defaults: dict = {}
+    for field in ("solo", "with", "given", "total"):
+        defaults[f"{field}_count"] = 0
+        defaults[f"{field}_time"] = timedelta(0)
+        defaults[f"{field}_last"] = None
+
     # Prepare totals accumulator
     flights_summary: list[dict] = []
     totals: dict = {"n_number": "Totals"}
-    for field in ("solo", "with", "given", "total"):
-        totals[f"{field}_count"] = 0
-        totals[f"{field}_time"] = timedelta(0)
-        totals[f"{field}_last"] = None
+    totals.update(defaults.copy())
 
     for n in sorted(data):
         row = data[n]
-        # Ensure missing keys get default values
-        for k, v in totals.items():
+        # Ensure missing keys get default values (use defaults, not totals!)
+        for k, v in defaults.items():
             row.setdefault(k, v)
         flights_summary.append(row)
         # Accumulate into totals
