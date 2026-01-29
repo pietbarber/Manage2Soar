@@ -231,7 +231,7 @@ cd /tmp/backup-test
 sudo openssl enc -d -aes-256-cbc -pbkdf2 \
   -in /var/backups/postgresql/daily/m2s_latest.pgdump.enc \
   -out /tmp/backup-test/test_restore.pgdump \
-  -pass file:/root/.backup_passphrase
+  -pass file:/var/lib/postgresql/.backup_passphrase
 
 # Verify decrypted file is valid PostgreSQL backup
 sudo file /tmp/backup-test/test_restore.pgdump
@@ -333,7 +333,7 @@ BACKUP_TIMESTAMP="2026-01-28_020000"
 sudo openssl enc -d -aes-256-cbc -pbkdf2 \
   -in /var/backups/postgresql/daily/m2s_${BACKUP_TIMESTAMP}.pgdump.enc \
   -out /tmp/m2s_restore.pgdump \
-  -pass file:/root/.backup_passphrase
+  -pass file:/var/lib/postgresql/.backup_passphrase
 
 # Step 6: Verify decrypted backup
 sudo file /tmp/m2s_restore.pgdump
@@ -499,8 +499,8 @@ ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT COUNT(*) FROM m
 ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT COUNT(*) FROM logsheet_flight;'"
 ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT MAX(created_at) FROM logsheet_logsheet;'"
 
-# Step 7: Verify Django database connectivity
-ssh pb@TEST_SERVER "cd /path/to/manage2soar && python manage.py dbshell --database m2s_test -c 'SELECT 1;'"
+# Step 7: Verify database connectivity
+ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT 1;'"
 
 # Step 8: Document results
 # - Restoration time: [X minutes]
@@ -531,7 +531,7 @@ TEST_FILE="/tmp/backup_verify_test.pgdump"
 openssl enc -d -aes-256-cbc -pbkdf2 \
   -in "${BACKUP_FILE}" \
   -out "${TEST_FILE}" \
-  -pass file:/root/.backup_passphrase
+  -pass file:/var/lib/postgresql/.backup_passphrase
 
 # Verify
 if pg_restore -l "${TEST_FILE}" > /dev/null 2>&1; then
@@ -574,17 +574,17 @@ ssh pb@m2s-database "sudo -u postgres /usr/local/bin/m2s-pg-backup.sh"
 
 ```bash
 # Check passphrase file exists
-ssh pb@m2s-database "sudo ls -lh /root/.backup_passphrase"
-# Expected: -r-------- 1 root root 65 [date] /root/.backup_passphrase
+ssh pb@m2s-database "sudo ls -lh /var/lib/postgresql/.backup_passphrase"
+# Expected: -r-------- 1 postgres postgres 65 [date] /var/lib/postgresql/.backup_passphrase
 
 # If missing, redeploy via Ansible:
 cd infrastructure/ansible
-ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml --tags backup
+ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml --tags postgresql
 
-# Test encryption manually
-ssh pb@m2s-database "echo 'test' | sudo openssl enc -aes-256-cbc -salt -pbkdf2 \
-  -pass file:/root/.backup_passphrase | sudo openssl enc -d -aes-256-cbc -pbkdf2 \
-  -pass file:/root/.backup_passphrase"
+# Test encryption manually (as postgres, using the backup passphrase file)
+ssh pb@m2s-database "echo 'test' | sudo -u postgres openssl enc -aes-256-cbc -salt -pbkdf2 \
+  -pass file:/var/lib/postgresql/.backup_passphrase | sudo -u postgres openssl enc -d -aes-256-cbc -pbkdf2 \
+  -pass file:/var/lib/postgresql/.backup_passphrase"
 # Expected: "test"
 ```
 
@@ -627,7 +627,7 @@ file backup.pgdump.enc
 openssl enc -d -aes-256-cbc -pbkdf2 -v \
   -in backup.pgdump.enc \
   -out test_restore.pgdump \
-  -pass file:/root/.backup_passphrase
+  -pass file:/var/lib/postgresql/.backup_passphrase
 
 # Common causes:
 # 1. Wrong passphrase - check Ansible Vault
