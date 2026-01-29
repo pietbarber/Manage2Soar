@@ -15,7 +15,15 @@ from tinymce.widgets import TinyMCE
 
 from utils.admin_helpers import AdminHelperMixin
 
-from .models import Badge, Biography, KioskAccessLog, KioskToken, Member, MemberBadge
+from .models import (
+    Badge,
+    Biography,
+    KioskAccessLog,
+    KioskToken,
+    Member,
+    MemberBadge,
+    SafetyReport,
+)
 from .models_applications import MembershipApplication
 from .utils.image_processing import generate_profile_thumbnails
 
@@ -912,3 +920,85 @@ class KioskAccessLogAdmin(admin.ModelAdmin):
         if obj.device_fingerprint:
             return obj.device_fingerprint[:12] + "..."
         return "-"
+
+
+@admin.register(SafetyReport)
+class SafetyReportAdmin(VersionAdmin, AdminHelperMixin, admin.ModelAdmin):
+    """Admin interface for managing safety reports."""
+
+    list_display = (
+        "id",
+        "get_reporter_display",
+        "status",
+        "observation_date",
+        "location",
+        "created_at",
+        "reviewed_by",
+    )
+    list_filter = ("status", "is_anonymous", "created_at", "observation_date")
+    search_fields = (
+        "observation",
+        "location",
+        "reporter__first_name",
+        "reporter__last_name",
+        "reporter__username",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+
+    fieldsets = (
+        (
+            "Report Details",
+            {
+                "fields": (
+                    "reporter",
+                    "is_anonymous",
+                    "observation",
+                    "observation_date",
+                    "location",
+                )
+            },
+        ),
+        (
+            "Status & Review",
+            {
+                "fields": (
+                    "status",
+                    "reviewed_by",
+                    "reviewed_at",
+                )
+            },
+        ),
+        (
+            "Officer Notes",
+            {
+                "fields": (
+                    "officer_notes",
+                    "actions_taken",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    formfield_overrides = {
+        models.TextField: {"widget": TinyMCE()},
+    }
+
+    admin_helper_message = (
+        "Safety Reports: Member-submitted safety observations. "
+        "Anonymous reports have the reporter field hidden. "
+        "Use officer_notes for internal review comments."
+    )
+
+    @admin.display(description="Reporter")
+    def get_reporter_display(self, obj):
+        return obj.get_reporter_display()

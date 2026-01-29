@@ -41,6 +41,7 @@ erDiagram
         boolean webmaster
         boolean member_manager
         boolean rostermeister
+        boolean safety_officer
         string legacy_username
         datetime date_joined
         int last_updated_by_id FK
@@ -132,6 +133,24 @@ erDiagram
     Member ||--o{ Member : last_updated_by
     Member ||--o| MembershipApplication : created_from_application
     Member ||--o{ MembershipApplication : reviewed_applications
+    Member ||--o{ SafetyReport : submitted_reports
+    Member ||--o{ SafetyReport : reviewed_by
+
+    SafetyReport {
+        int id PK
+        int reporter_id FK "nullable for anonymous"
+        boolean is_anonymous
+        text observation
+        date observation_date
+        string location
+        string status "new/reviewed/in_progress/resolved/closed"
+        int reviewed_by_id FK
+        datetime reviewed_at
+        text officer_notes
+        text actions_taken
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ## Models
@@ -166,6 +185,14 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 ### `MemberBadge`
 - Through model linking `Member` and `Badge`.
 - Tracks which badges a member has earned and when.
+
+### `SafetyReport`
+- Stores safety observations, suggestions, and near-miss reports from members.
+- Supports fully anonymous submissions: when `is_anonymous=True`, the `reporter` field is intentionally left null to honor anonymity.
+- Reports go through a status workflow: new → reviewed → in_progress → resolved → closed.
+- Safety officers (members with `safety_officer=True`) can review reports, add notes, and track actions taken.
+- Linked to `Member` via optional `reporter` FK (null for anonymous) and `reviewed_by` FK.
+- Uses TinyMCE HTMLField for rich text observations and officer notes.
 
 ## Also See
 - [README.md](README.md)

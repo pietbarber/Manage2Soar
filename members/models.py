@@ -207,6 +207,10 @@ class Member(AbstractUser):
     director = models.BooleanField(default=False)
     member_manager = models.BooleanField(default=False)
     rostermeister = models.BooleanField(default=False)
+    safety_officer = models.BooleanField(
+        default=False,
+        help_text="Safety Officer/Coach - receives safety reports from members",
+    )
 
     joined_club = models.DateField(blank=True, null=True)
     emergency_contact = models.TextField(blank=True, null=True)
@@ -641,6 +645,124 @@ class KioskAccessLog(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.status}"
+
+
+#########################
+# SafetyReport Model
+#
+# Stores safety-related observations reported by members.
+# Supports anonymous reporting to encourage honest safety feedback.
+# Safety officers can review and manage reports.
+#
+# Related: Issue #554 - Add Safety Report form accessible to any member
+
+
+class SafetyReport(models.Model):
+    """Safety observation report submitted by club members.
+
+    Members can report safety-related observations anonymously or with
+    their identity attached. Reports are visible to safety officers
+    for review and to facilitate club safety meetings.
+    """
+
+    STATUS_CHOICES = [
+        ("new", "New"),
+        ("reviewed", "Reviewed"),
+        ("in_progress", "In Progress"),
+        ("resolved", "Resolved"),
+        ("closed", "Closed"),
+    ]
+
+    # Who submitted the report (null if anonymous)
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="safety_reports_submitted",
+        help_text="Member who submitted the report (null if anonymous)",
+    )
+
+    # Flag to indicate if report was submitted anonymously
+    is_anonymous = models.BooleanField(
+        default=False,
+        help_text="If true, reporter identity is hidden from all viewers",
+    )
+
+    # The report content - rich text for detailed descriptions
+    observation = HTMLField(
+        help_text="What did you observe? Describe the safety concern in detail.",
+    )
+
+    # Optional: Date when the observation occurred
+    observation_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date when the observation occurred (optional)",
+    )
+
+    # Optional: Location where observation occurred
+    location = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Location where the observation occurred (optional)",
+    )
+
+    # Tracking fields
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="new",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Safety officer who reviewed the report
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="safety_reports_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    # Safety officer notes (not visible to reporter)
+    officer_notes = HTMLField(
+        blank=True,
+        null=True,
+        help_text="Internal notes for safety officers (not visible to reporter)",
+    )
+
+    # Optional follow-up actions taken
+    actions_taken = HTMLField(
+        blank=True,
+        null=True,
+        help_text="Description of actions taken to address the concern",
+    )
+
+    class Meta:
+        verbose_name = "Safety Report"
+        verbose_name_plural = "Safety Reports"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        if self.is_anonymous:
+            reporter_name = "Anonymous"
+        elif self.reporter:
+            reporter_name = self.reporter.get_full_name() or self.reporter.username
+        else:
+            reporter_name = "Unknown"
+        return f"Safety Report #{self.pk} by {reporter_name} ({self.created_at.strftime('%Y-%m-%d')})"
+
+    def get_reporter_display(self):
+        """Return display name for reporter, respecting anonymity."""
+        if self.is_anonymous:
+            return "Anonymous"
+        if self.reporter:
+            return self.reporter.get_full_name() or self.reporter.username
+        return "Unknown"
 
 
 # Import MembershipApplication model from separate file to keep models.py manageable

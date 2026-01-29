@@ -1,0 +1,32 @@
+🛡️ NEW SAFETY REPORT SUBMITTED
+
+{{ club_name }}
+
+REPORT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reporter:          {{ reporter_display }}
+Submission Date:   {{ report.created_at|date:"F j, Y g:i a" }}
+{% if report.observation_date %}Observation Date:  {{ report.observation_date|date:"F j, Y" }}{% endif %}
+{% if report.location %}Location:          {{ report.location }}{% endif %}
+Status:            {{ report.get_status_display }}
+
+OBSERVATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{ report.observation|striptags }}
+
+ACTION REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Please review this safety report and take appropriate action.
+
+Log into the admin interface to:
+- Review the full report details
+- Update the status
+- Add officer notes and actions taken
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This message was sent automatically by the {{ club_name }} safety reporting system.
+{% if site_url %}{{ site_url }}{% endif %}

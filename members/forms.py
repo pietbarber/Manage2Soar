@@ -1,7 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from tinymce.widgets import TinyMCE
 
-from .models import Biography, Member
+from .models import Biography, Member, SafetyReport
 from .utils.image_processing import generate_profile_thumbnails
 
 #########################
@@ -109,3 +110,59 @@ class SetPasswordForm(forms.Form):
         if p1 and p2 and p1 != p2:
             raise ValidationError("Passwords do not match.")
         return cleaned_data
+
+
+#########################
+# SafetyReportForm Class
+
+# Form for submitting safety observations.
+# Members can optionally submit anonymously.
+
+# Related: Issue #554 - Add Safety Report form accessible to any member
+
+
+class SafetyReportForm(forms.ModelForm):
+    """Form for members to submit safety observations."""
+
+    class Meta:
+        model = SafetyReport
+        fields = ["observation", "observation_date", "location", "is_anonymous"]
+        widgets = {
+            "observation": TinyMCE(
+                attrs={
+                    "cols": 80,
+                    "rows": 10,
+                    "placeholder": "Describe what you observed...",
+                },
+            ),
+            "observation_date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control",
+                },
+            ),
+            "location": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "e.g., Runway, Launch area, Tie-down area",
+                },
+            ),
+            "is_anonymous": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                },
+            ),
+        }
+        labels = {
+            "observation": "What did you observe?",
+            "observation_date": "When did this occur? (optional)",
+            "location": "Where did this occur? (optional)",
+            "is_anonymous": "Submit anonymously",
+        }
+        help_texts = {
+            "observation": "Describe the safety concern in as much detail as possible.",
+            "is_anonymous": (
+                "If checked, your identity will not be recorded with this report. "
+                "Be honest - anonymous reports are taken seriously."
+            ),
+        }
