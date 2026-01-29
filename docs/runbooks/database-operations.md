@@ -340,7 +340,7 @@ sudo file /tmp/m2s_restore.pgdump
 # Expected: "PostgreSQL custom database dump"
 
 # Step 7: Create backup of current database (if needed)
-sudo -u postgres pg_dump -Fc m2s > /tmp/m2s_pre_restore_backup.pgdump
+sudo -u postgres pg_dump -Fc -f /tmp/m2s_pre_restore_backup.pgdump m2s
 
 # Step 8: Terminate active connections
 sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='m2s' AND pid != pg_backend_pid();"
