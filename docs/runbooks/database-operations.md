@@ -6,9 +6,9 @@ This runbook covers PostgreSQL database operations including backups, restoratio
 
 | Operation | Command | When to Use |
 |-----------|---------|-------------|
-| Check backup status | `ssh m2s-database "sudo tail -50 /var/log/m2s-pg-backup.log"` | Daily monitoring |
-| Manual backup | `ssh m2s-database "sudo -u postgres /usr/local/bin/m2s-pg-backup.sh"` | Before major changes |
-| List local backups | `ssh m2s-database "sudo ls -lh /var/backups/postgresql/daily/"` | Verify recent backups |
+| Check backup status | `ssh pb@m2s-database "sudo tail -50 /var/log/m2s-pg-backup.log"` | Daily monitoring |
+| Manual backup | `ssh pb@m2s-database "sudo -u postgres /usr/local/bin/m2s-pg-backup.sh"` | Before major changes |
+| List local backups | `ssh pb@m2s-database "sudo ls -lh /var/backups/postgresql/daily/"` | Verify recent backups |
 | List GCS backups | `gsutil ls -lh gs://m2s-database-backups/postgresql/` | Disaster recovery prep |
 | Full restore | See [Restoration Procedures](#restoration-procedures) | Disaster recovery |
 
@@ -474,7 +474,8 @@ shred -u /tmp/m2s_restore.pgdump
 # - Same schema as production (or create fresh database)
 
 # Step 1: Download latest production backup from GCS
-gsutil cp "gs://m2s-database-backups/postgresql/m2s_latest.pgdump.enc" /tmp/
+LATEST_BACKUP="$(gsutil ls gs://m2s-database-backups/postgresql/m2s_*.pgdump.enc | sort | tail -n 1)"
+gsutil cp "${LATEST_BACKUP}" /tmp/m2s_latest.pgdump.enc
 
 # Step 2: Retrieve decryption passphrase (Scenario 2, Step 3)
 # ...
@@ -498,8 +499,8 @@ ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT COUNT(*) FROM m
 ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT COUNT(*) FROM logsheet_flight;'"
 ssh pb@TEST_SERVER "sudo -u postgres psql -d m2s_test -c 'SELECT MAX(created_at) FROM logsheet_logsheet;'"
 
-# Step 7: Run Django integrity checks
-ssh pb@TEST_SERVER "cd /path/to/manage2soar && python manage.py check --database m2s_test"
+# Step 7: Verify Django database connectivity
+ssh pb@TEST_SERVER "cd /path/to/manage2soar && python manage.py dbshell --database m2s_test -c 'SELECT 1;'"
 
 # Step 8: Document results
 # - Restoration time: [X minutes]
@@ -743,7 +744,7 @@ gcloud logging metrics create m2s-backup-failures \
 
 ```bash
 # Add to end of /usr/local/bin/m2s-pg-backup.sh
-if grep -q "ERROR" /var/log/m2s-pg-backup.log | tail -50; then
+if tail -50 /var/log/m2s-pg-backup.log | grep -q "ERROR"; then
   echo "Backup failed! Check /var/log/m2s-pg-backup.log" | \
     mail -s "M2S Backup FAILED" ops@yourdomain.com
 fi
@@ -753,9 +754,9 @@ fi
 
 ### Internal Documentation
 
-- [Backup Encryption Architecture](../infrastructure/ansible/roles/postgresql/docs/backup-encryption.md)
-- [GCS Backup Role](../infrastructure/ansible/roles/gcs-backup/README.md)
-- [Single-Host Architecture](../infrastructure/docs/single-host-architecture.md)
+- [Backup Encryption Architecture](../../infrastructure/ansible/roles/postgresql/docs/backup-encryption.md)
+- [GCS Backup Role](../../infrastructure/ansible/roles/gcs-backup/README.md)
+- [Single-Host Architecture](../../infrastructure/docs/single-host-architecture.md)
 - [Ansible Playbook Guide](ansible-playbook-guide.md)
 
 ### External Resources
