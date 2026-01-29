@@ -3,9 +3,11 @@ Tests for safety reports functionality (Issue #554).
 """
 
 from datetime import date
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -241,3 +243,165 @@ class TestSafetyOfficerField(TestCase):
         officer = safety_officers.first()
         assert officer is not None
         assert officer.username == "officer"
+
+
+@pytest.mark.django_db
+class TestSafetyReportNotifications:
+    """Tests for safety report email and in-app notifications."""
+
+    def test_email_sent_to_safety_officers(self, client, active_member, safety_officer):
+        """Test that email notifications are sent to all safety officers."""
+        # Create a second safety officer
+        safety_officer2 = Member.objects.create_user(
+            username="safetyofficer2",
+            email="safety2@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            safety_officer=True,
+        )
+
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Test safety observation.</p>",
+            "is_anonymous": False,
+        }
+
+        # Submit the report
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # Verify email was sent
+        assert len(mail.outbox) == 1
+        email = mail.outbox[0]
+
+        # Check email content (subject should mention both officers in dev mode or production)
+        assert "New Safety Report Submitted" in email.subject
+        # Check body contains reporter name (non-anonymous)
+        assert "Test Member" in email.body
+
+    def test_email_respects_anonymity(self, client, active_member, safety_officer):
+        """Test that anonymous reports show 'Anonymous' in email."""
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Anonymous observation.</p>",
+            "is_anonymous": True,
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # Verify email content shows Anonymous
+        assert len(mail.outbox) == 1
+        email = mail.outbox[0]
+        assert "Anonymous" in email.body
+        # Should NOT contain the actual reporter's name
+        assert "Test Member" not in email.body
+
+    def test_no_email_when_no_safety_officers(self, client, active_member):
+        """Test that no email is sent when no safety officers are configured."""
+        # No safety officers exist
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Test observation.</p>",
+            "is_anonymous": False,
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # No email should be sent
+        assert len(mail.outbox) == 0
+
+    def test_email_only_to_officers_with_email(self, client, active_member):
+        """Test that emails are only sent to safety officers who have email addresses."""
+        # Safety officer with email
+        officer1 = Member.objects.create_user(
+            username="officer1",
+            email="officer1@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            safety_officer=True,
+        )
+
+        # Safety officer without email
+        officer2 = Member.objects.create_user(
+            username="officer2",
+            email="",  # No email
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            safety_officer=True,
+        )
+
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Test observation.</p>",
+            "is_anonymous": False,
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # Email should be sent (to officer1, but may be redirected in dev mode)
+        assert len(mail.outbox) == 1
+
+    @patch("members.views.Notification")
+    def test_in_app_notifications_created(
+        self, mock_notification, client, active_member, safety_officer
+    ):
+        """Test that in-app notifications are created for safety officers."""
+        # Create a second safety officer
+        safety_officer2 = Member.objects.create_user(
+            username="safetyofficer2",
+            email="safety2@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            safety_officer=True,
+        )
+
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Test observation.</p>",
+            "is_anonymous": False,
+        }
+
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # Verify Notification.objects.create was called twice (once per safety officer)
+        assert mock_notification.objects.create.call_count == 2
+
+        # Verify notification content includes reporter display
+        calls = mock_notification.objects.create.call_args_list
+        for call in calls:
+            kwargs = call[1]
+            assert "New safety report submitted" in kwargs["message"]
+            assert "Test Member" in kwargs["message"]
+            assert kwargs["url"] is not None  # Should have admin URL
+
+    @patch("members.views.Notification", None)
+    def test_no_error_when_notifications_unavailable(
+        self, client, active_member, safety_officer
+    ):
+        """Test that the view doesn't crash when Notification model is unavailable."""
+        client.login(username="testmember", password="testpass123")
+        url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Test observation.</p>",
+            "is_anonymous": False,
+        }
+
+        # Should not raise an exception even though Notification is None
+        response = client.post(url, form_data)
+        assert response.status_code == 302
+
+        # Email should still be sent
+        assert len(mail.outbox) == 1

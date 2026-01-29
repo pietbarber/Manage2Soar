@@ -989,10 +989,6 @@ class SafetyReportAdmin(VersionAdmin, AdminHelperMixin, admin.ModelAdmin):
         ),
     )
 
-    formfield_overrides = {
-        models.TextField: {"widget": TinyMCE()},
-    }
-
     admin_helper_message = (
         "Safety Reports: Member-submitted safety observations. "
         "Anonymous reports have the reporter field hidden. "

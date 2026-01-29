@@ -34,7 +34,7 @@ from .forms import (
     SafetyReportForm,
     SetPasswordForm,
 )
-from .models import Badge, Biography, Member, MemberBadge, SafetyReport
+from .models import Badge, Biography, Member, MemberBadge
 from .utils.avatar_generator import generate_identicon
 from .utils.vcard_tools import generate_vcard_qr
 
@@ -845,7 +845,7 @@ def safety_report_submit(request):
             report.save()
 
             # Send email notification to safety officers
-            _notify_safety_officers_of_new_report(request, report)
+            _notify_safety_officers_of_new_report(report)
 
             messages.success(
                 request,
@@ -862,7 +862,7 @@ def safety_report_submit(request):
     )
 
 
-def _notify_safety_officers_of_new_report(request, report):
+def _notify_safety_officers_of_new_report(report):
     """
     Send email and in-app notifications to all safety officers about a new report.
     """
