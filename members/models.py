@@ -419,6 +419,7 @@ class Member(AbstractUser):
 # - code: short identifier (e.g., "A")
 # - description: text explanation of the badge
 # - category: optional grouping for organizational purposes
+# - parent_badge: optional FK to the parent badge (for legs referencing full badge)
 
 # Used in a many-to-many relationship with members through MemberBadge.
 
@@ -428,12 +429,26 @@ class Badge(models.Model):
     image = models.ImageField(upload_to=upload_badge_image, blank=True, null=True)
     description = HTMLField(blank=True)
     order = models.PositiveIntegerField(default=0)
+    parent_badge = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="legs",
+        help_text="Parent badge (e.g., FAI Silver for Silver Duration leg). "
+        "When a member has earned the parent, legs are hidden on the badge board.",
+    )
 
     class Meta:
         ordering = ["order"]
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_leg(self):
+        """Return True if this badge is a leg (has a parent badge)."""
+        return self.parent_badge is not None
 
 
 #########################

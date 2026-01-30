@@ -470,7 +470,10 @@ def tinymce_image_upload(request):
 # Only accessible to logged-in users.
 
 # Variables:
-# - members: queryset of all members, prefetching badge relationships
+# - active_members: queryset of active members used to filter member-badge awards
+# - badges: queryset of all badges, with parent_badge selected and memberbadge_set
+#           prefetched into badge.filtered_memberbadges (filtered to active_members)
+# - Issue #560: Legs are suppressed for members who have earned the parent badge
 
 
 @active_member_required
@@ -478,15 +481,39 @@ def badge_board(request):
     active_statuses = get_active_membership_statuses()
     active_members = Member.objects.filter(membership_status__in=active_statuses)
 
-    badges = Badge.objects.prefetch_related(
-        Prefetch(
-            "memberbadge_set",
-            queryset=MemberBadge.objects.filter(member__in=active_members)
-            .select_related("member")
-            .order_by("member__last_name", "member__first_name"),
-            to_attr="filtered_memberbadges",
+    # Get all badges with their member awards
+    badges = (
+        Badge.objects.select_related("parent_badge")
+        .prefetch_related(
+            Prefetch(
+                "memberbadge_set",
+                queryset=MemberBadge.objects.filter(member__in=active_members)
+                .select_related("member")
+                .order_by("member__last_name", "member__first_name"),
+                to_attr="filtered_memberbadges",
+            )
         )
-    ).order_by("order")
+        .order_by("order")
+    )
+
+    # Build a mapping of parent_badge_id -> set of member_ids who have earned it
+    parent_badge_members = {}
+    for badge in badges:
+        if badge.parent_badge_id is None:
+            # This badge could be a parent - collect members who have it
+            member_ids = {mb.member_id for mb in badge.filtered_memberbadges}
+            parent_badge_members[badge.id] = member_ids
+
+    # For leg badges, filter out members who already have the parent badge
+    for badge in badges:
+        if badge.parent_badge_id and badge.parent_badge_id in parent_badge_members:
+            # Filter out members who have earned the parent badge
+            parent_member_ids = parent_badge_members[badge.parent_badge_id]
+            badge.filtered_memberbadges = [
+                mb
+                for mb in badge.filtered_memberbadges
+                if mb.member_id not in parent_member_ids
+            ]
 
     return render(request, "members/badges.html", {"badges": badges})
 
