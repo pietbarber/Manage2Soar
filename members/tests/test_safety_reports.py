@@ -252,7 +252,7 @@ class TestSafetyReportNotifications:
     def test_email_sent_to_safety_officers(self, client, active_member, safety_officer):
         """Test that email notifications are sent to all safety officers."""
         # Create a second safety officer
-        safety_officer2 = Member.objects.create_user(
+        Member.objects.create_user(
             username="safetyofficer2",
             email="safety2@example.com",
             password="testpass123",
@@ -319,7 +319,7 @@ class TestSafetyReportNotifications:
     def test_email_only_to_officers_with_email(self, client, active_member):
         """Test that emails are only sent to safety officers who have email addresses."""
         # Safety officer with email
-        officer1 = Member.objects.create_user(
+        Member.objects.create_user(
             username="officer1",
             email="officer1@example.com",
             password="testpass123",
@@ -329,7 +329,7 @@ class TestSafetyReportNotifications:
         )
 
         # Safety officer without email
-        officer2 = Member.objects.create_user(
+        Member.objects.create_user(
             username="officer2",
             email="",  # No email
             password="testpass123",
@@ -357,7 +357,7 @@ class TestSafetyReportNotifications:
     ):
         """Test that in-app notifications are created for safety officers."""
         # Create a second safety officer
-        safety_officer2 = Member.objects.create_user(
+        Member.objects.create_user(
             username="safetyofficer2",
             email="safety2@example.com",
             password="testpass123",

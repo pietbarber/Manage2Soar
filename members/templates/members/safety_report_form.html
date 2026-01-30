@@ -76,6 +76,8 @@
                 <div class="card-body">
                     <form method="post" novalidate>
                         {% csrf_token %}
+                        {{ form.media }}
+                        <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 
                         <!-- Observation -->
                         <div class="mb-4">
