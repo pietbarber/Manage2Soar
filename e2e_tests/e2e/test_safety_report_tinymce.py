@@ -97,6 +97,7 @@ class TestSafetyReportTinyMCE(DjangoPlaywrightTestCase):
 
         # Verify the content was entered
         content = editor_body.text_content()
+        assert content is not None, "Editor content should not be None"
         assert test_content in content, f"Content should be in editor. Got: '{content}'"
 
     def test_form_submission_with_tinymce_content(self):
