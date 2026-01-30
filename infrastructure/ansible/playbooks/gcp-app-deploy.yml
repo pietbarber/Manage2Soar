@@ -258,7 +258,7 @@
 
         - name: Authenticate with GCR
           ansible.builtin.shell:
-            cmd: gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+            cmd: PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
           when: gke_push_image | default(true) | bool
           changed_when: false
           no_log: true
