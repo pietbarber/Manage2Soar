@@ -241,8 +241,14 @@
 # ============================================================
 # SUPERUSER CREATION
 # ============================================================
+# NOTE: Superuser creation is handled at the playbook level for
+# multi-tenant deployments. The role's superuser.yml task is retained
+# for single-tenant deployments but should not be called from
+# multi-tenant playbooks.
 
 - name: Include superuser tasks
   ansible.builtin.include_tasks: superuser.yml
-  when: gke_create_superuser | default(false) | bool
+  when:
+    - gke_create_superuser | default(false) | bool
+    - not gke_multi_tenant | default(false) | bool
   tags: [superuser]

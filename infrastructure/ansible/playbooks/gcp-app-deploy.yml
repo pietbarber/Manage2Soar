@@ -215,6 +215,7 @@
       ansible.builtin.set_fact:
         gke_deploy_tenants: >-
           {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_tenants }}
+      tags: [always]
 
     - name: Validate vault secrets for selected tenants
       ansible.builtin.assert:
@@ -312,6 +313,55 @@
         label: "{{ tenant.prefix }}"
 
   post_tasks:
+    # Create superuser for each tenant (if enabled)
+    - name: Create superuser for each tenant
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - -n
+          - "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+          - "deployment/django-app-{{ tenant.prefix }}"
+          - --
+          - env
+          - "DJANGO_SUPERUSER_USERNAME={{ django_superuser_username | default('admin') }}"
+          - "DJANGO_SUPERUSER_EMAIL={{ django_superuser_email | default('admin@' + gke_base_domain) }}"
+          - "DJANGO_SUPERUSER_PASSWORD={{ vault_django_superuser_password }}"
+          - python
+          - manage.py
+          - createsuperuser
+          - --noinput
+      delegate_to: localhost
+      register: superuser_result
+      changed_when: "'Superuser created successfully' in superuser_result.stdout or 'Superuser created successfully' in superuser_result.stderr"
+      failed_when: >
+        superuser_result.rc != 0 and
+        'already exists' not in (superuser_result.stdout | default('') + superuser_result.stderr | default('')) and
+        'already taken' not in (superuser_result.stdout | default('') + superuser_result.stderr | default('')) and
+        'unapplied migration' not in (superuser_result.stdout | default('') + superuser_result.stderr | default(''))
+      no_log: true
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      when: gke_create_superuser | default(false) | bool
+      tags: [superuser]
+
+    - name: Display superuser creation results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Superuser Creation Results
+          ========================================
+          {% for result in superuser_result.results | default([]) %}
+          {{ result.tenant.prefix }}: {% if 'Superuser created successfully' in (result.stdout | default('') + result.stderr | default('')) %}✓ Created{% elif 'already exists' in (result.stdout | default('') + result.stderr | default('')) or 'already taken' in (result.stdout | default('') + result.stderr | default('')) %}ℹ Already exists{% else %}⚠ Unknown status{% endif %}
+          {% endfor %}
+          ========================================
+      when:
+        - gke_create_superuser | default(false) | bool
+        - superuser_result is defined
+      tags: [superuser]
+
     - name: Display multi-tenant deployment summary
       ansible.builtin.debug:
         msg: |
