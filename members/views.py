@@ -28,7 +28,12 @@ from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
 
 from .decorators import active_member_required
-from .forms import BiographyForm, MemberProfilePhotoForm, SetPasswordForm
+from .forms import (
+    BiographyForm,
+    MemberProfilePhotoForm,
+    SafetyReportForm,
+    SetPasswordForm,
+)
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.avatar_generator import generate_identicon
 from .utils.vcard_tools import generate_vcard_qr
@@ -811,3 +816,129 @@ def visiting_pilot_qr_display(request):
         "members/visiting_pilot_qr_display.html",
         {"config": config, "qr_url": qr_url, "signup_url": signup_url},
     )
+
+
+#########################
+# Safety Report Views
+#########################
+
+
+@active_member_required
+def safety_report_submit(request):
+    """
+    Allow any active member to submit a safety report/suggestion.
+
+    If the report is anonymous, we do NOT record the reporter's identity -
+    truly honoring the anonymity request per Issue #554 guidance.
+    """
+    config = SiteConfiguration.objects.first()
+
+    if request.method == "POST":
+        form = SafetyReportForm(request.POST)
+        if form.is_valid():
+            report = form.save(commit=False)
+
+            # Only record reporter if NOT anonymous
+            if not report.is_anonymous:
+                report.reporter = request.user
+
+            report.save()
+
+            # Send email notification to safety officers
+            _notify_safety_officers_of_new_report(report)
+
+            messages.success(
+                request,
+                "Thank you for your safety report. Our safety team will review it.",
+            )
+            return redirect("home")
+    else:
+        form = SafetyReportForm()
+
+    return render(
+        request,
+        "members/safety_report_form.html",
+        {"form": form, "config": config},
+    )
+
+
+def _notify_safety_officers_of_new_report(report):
+    """
+    Send email and in-app notifications to all safety officers about a new report.
+    """
+    from django.template.loader import render_to_string
+
+    from utils.email import send_mail
+
+    try:
+        # Get all safety officers
+        safety_officers = Member.objects.filter(safety_officer=True, is_active=True)
+
+        if not safety_officers.exists():
+            logger.warning(
+                "No safety officers configured to receive safety report notifications"
+            )
+            return
+
+        config = SiteConfiguration.objects.first()
+
+        # Build context for email
+        context = {
+            "report": report,
+            "club_name": config.club_name if config else "Club",
+            "site_url": getattr(settings, "SITE_URL", None),
+            "reporter_display": report.get_reporter_display(),
+        }
+
+        # Render templates
+        subject = (
+            f"[{config.club_name if config else 'Club'}] New Safety Report Submitted"
+        )
+        html_message = render_to_string(
+            "members/emails/safety_report_notification.html", context
+        )
+        text_message = render_to_string(
+            "members/emails/safety_report_notification.txt", context
+        )
+
+        # Get recipient emails
+        recipient_emails = [
+            officer.email for officer in safety_officers if officer.email
+        ]
+
+        if recipient_emails:
+            send_mail(
+                subject=subject,
+                message=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=recipient_emails,
+                html_message=html_message,
+                fail_silently=False,
+            )
+
+        # Create in-app notifications
+        if Notification is not None:
+            notification_message = (
+                f"New safety report submitted: {report.get_reporter_display()}"
+            )
+            try:
+                detail_url = reverse(
+                    "admin:members_safetyreport_change", args=[report.pk]
+                )
+            except Exception:
+                detail_url = None
+
+            for officer in safety_officers:
+                try:
+                    Notification.objects.create(
+                        user=officer,
+                        message=notification_message,
+                        url=detail_url,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to create notification for safety officer {officer}: {e}"
+                    )
+
+    except Exception as e:
+        logger.error(f"Failed to send safety report notifications: {e}")

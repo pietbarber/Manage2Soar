@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Safety Report</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table { border-collapse: collapse; }
+        td { padding: 0; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <!-- Main container -->
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #2c5282; padding: 24px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                                🛡️ New Safety Report
+                            </h1>
+                            <p style="margin: 8px 0 0 0; color: #bee3f8; font-size: 14px;">
+                                {{ club_name }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Notice bar -->
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fefcbf; border-bottom: 2px solid #d69e2e;">
+                                <tr>
+                                    <td style="padding: 12px 24px; text-align: center;">
+                                        <p style="margin: 0; color: #744210; font-size: 14px; font-weight: 600;">
+                                            ⚠️ Action Required - Please Review
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Report Details -->
+                    <tr>
+                        <td style="padding: 24px;">
+                            <h2 style="margin: 0 0 16px 0; color: #2d3748; font-size: 18px; font-weight: 600;">
+                                Report Details
+                            </h2>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px; width: 140px;">Reporter:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px; font-weight: 600;">{{ reporter_display }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Submitted:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px;">{{ report.created_at|date:"F j, Y g:i a" }}</td>
+                                            </tr>
+                                            {% if report.observation_date %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Observation Date:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px;">{{ report.observation_date|date:"F j, Y" }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if report.location %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Location:</td>
+                                                <td style="padding: 4px 0; color: #2d3748; font-size: 14px;">{{ report.location }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            <tr>
+                                                <td style="padding: 4px 0; color: #718096; font-size: 14px;">Status:</td>
+                                                <td style="padding: 4px 0;">
+                                                    <span style="display: inline-block; padding: 2px 8px; background-color: #bee3f8; color: #2c5282; font-size: 12px; font-weight: 600; border-radius: 4px;">
+                                                        {{ report.get_status_display }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Observation Content -->
+                    <tr>
+                        <td style="padding: 0 24px 24px 24px;">
+                            <h2 style="margin: 0 0 16px 0; color: #2d3748; font-size: 18px; font-weight: 600;">
+                                Observation
+                            </h2>
+                            <div style="background-color: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; padding: 16px; color: #2d3748; font-size: 14px; line-height: 1.6;">
+                                {{ report.observation|safe }}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Action Required -->
+                    <tr>
+                        <td style="padding: 0 24px 24px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ebf8ff; border-radius: 6px; border: 1px solid #90cdf4;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #2c5282; font-size: 14px; font-weight: 600;">
+                                            Action Required
+                                        </h3>
+                                        <p style="margin: 0 0 12px 0; color: #2d3748; font-size: 14px; line-height: 1.5;">
+                                            Please review this safety report and take appropriate action. Log into the admin interface to update the status and add any notes.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #edf2f7; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; color: #718096; font-size: 12px; line-height: 1.5;">
+                                This message was sent automatically by the {{ club_name }} safety reporting system.
+                                {% if site_url %}<br><a href="{{ site_url }}" style="color: #4299e1; text-decoration: none;">{{ site_url }}</a>{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

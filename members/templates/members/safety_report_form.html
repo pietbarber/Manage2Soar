@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Safety Suggestion Box - {{ config.club_name|default:"Skyline Soaring Club" }}{% endblock %}
+
+{% block head_extra %}
+<link href="{% static 'css/baseline.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <!-- Header Card -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h1 class="h4 mb-0">
+                        <i class="bi bi-shield-exclamation me-2"></i>Safety Suggestion Box
+                    </h1>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        Your input helps keep our club safe! Use this form to report safety observations,
+                        suggestions, near-misses, or concerns. All reports are reviewed by our safety team.
+                    </p>
+                    <div class="alert alert-info border-0 mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Anonymous submissions:</strong> If you check the anonymous option below,
+                        your identity will not be recorded with this report. We truly honor your anonymity.
+                    </div>
+                </div>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Form Errors Display -->
+            {% if form.errors or form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    <h6 class="alert-heading mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Please correct the following errors:
+                    </h6>
+                    {% if form.non_field_errors %}
+                        <div class="mb-3">
+                            {% for error in form.non_field_errors %}
+                                <div class="mb-1"><i class="bi bi-x-circle me-2"></i>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if form.errors %}
+                        <ul class="mb-0 ps-3">
+                            {% for field_name, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li class="mb-1">
+                                        <strong>{% for field in form %}{% if field.name == field_name %}{{ field.label }}{% endif %}{% endfor %}:</strong>
+                                        {{ error|striptags }}
+                                    </li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <!-- Main Form Card -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {{ form.media }}
+                        <script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
+
+                        <!-- Observation -->
+                        <div class="mb-4">
+                            <label for="{{ form.observation.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-chat-left-text me-1"></i>
+                                {{ form.observation.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.observation }}
+                            {% if form.observation.help_text %}
+                                <div class="form-text">{{ form.observation.help_text }}</div>
+                            {% endif %}
+                            {% if form.observation.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.observation.errors|join:", " }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Date and Location Row -->
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label for="{{ form.observation_date.id_for_label }}" class="form-label fw-bold">
+                                    <i class="bi bi-calendar-event me-1"></i>
+                                    {{ form.observation_date.label }}
+                                </label>
+                                {{ form.observation_date|add_class:"form-control" }}
+                                {% if form.observation_date.help_text %}
+                                    <div class="form-text">{{ form.observation_date.help_text }}</div>
+                                {% endif %}
+                                {% if form.observation_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.observation_date.errors|join:", " }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.location.id_for_label }}" class="form-label fw-bold">
+                                    <i class="bi bi-geo-alt me-1"></i>
+                                    {{ form.location.label }}
+                                </label>
+                                {{ form.location|add_class:"form-control" }}
+                                {% if form.location.help_text %}
+                                    <div class="form-text">{{ form.location.help_text }}</div>
+                                {% endif %}
+                                {% if form.location.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.location.errors|join:", " }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Anonymous Checkbox -->
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.is_anonymous|add_class:"form-check-input" }}
+                                <label class="form-check-label" for="{{ form.is_anonymous.id_for_label }}">
+                                    <i class="bi bi-incognito me-1"></i>
+                                    {{ form.is_anonymous.label }}
+                                </label>
+                            </div>
+                            {% if form.is_anonymous.help_text %}
+                                <div class="form-text ms-4">{{ form.is_anonymous.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-modern">
+                                <i class="bi bi-send me-1"></i>Submit Report
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

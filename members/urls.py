@@ -85,6 +85,12 @@ urlpatterns = [
         views_applications.membership_application_status,
         name="membership_application_status",
     ),
+    # Safety Reports
+    path(
+        "safety-report/submit/",
+        views.safety_report_submit,
+        name="safety_report_submit",
+    ),
 ]
 
 

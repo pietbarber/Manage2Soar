@@ -33,6 +33,7 @@ class MailingListCriterion(models.TextChoices):
     WEBMASTER = "webmaster", "Webmaster"
     MEMBER_MANAGER = "member_manager", "Member Manager"
     ROSTERMEISTER = "rostermeister", "Rostermeister"
+    SAFETY_OFFICER = "safety_officer", "Safety Officer"
 
     # Special computed criteria
     PRIVATE_GLIDER_OWNER = "private_glider_owner", "Private Glider Owner"
@@ -151,6 +152,7 @@ class MailingList(models.Model):
             MailingListCriterion.WEBMASTER: "webmaster",
             MailingListCriterion.MEMBER_MANAGER: "member_manager",
             MailingListCriterion.ROSTERMEISTER: "rostermeister",
+            MailingListCriterion.SAFETY_OFFICER: "safety_officer",
         }
 
         if criterion in boolean_fields:
