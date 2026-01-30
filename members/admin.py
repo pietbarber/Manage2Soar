@@ -133,7 +133,15 @@ class BadgeAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.TextField: {"widget": TinyMCE(attrs={"cols": 80, "rows": 10})},
     }
+    list_display = ["name", "order", "parent_badge", "leg_count"]
+    list_filter = ["parent_badge"]
     search_fields = ["name", "description"]
+    autocomplete_fields = ["parent_badge"]
+
+    @admin.display(description="Legs")
+    def leg_count(self, obj):
+        """Display the number of legs for this badge."""
+        return obj.legs.count()
 
 
 #########################

@@ -117,6 +117,7 @@ erDiagram
         image image
         text description
         int order
+        int parent_badge_id FK "nullable - for legs"
     }
 
     MemberBadge {
@@ -127,6 +128,7 @@ erDiagram
         text notes
     }
 
+    Badge ||--o{ Badge : parent_badge
     Member ||--o| Biography : has_biography
     Member ||--o{ MemberBadge : earned_badges
     Badge ||--o{ MemberBadge : awarded_to_members
@@ -181,6 +183,10 @@ See also: [Redaction of Personal Contact Information](redaction.md)
 ### `Badge`
 - Represents a badge that can be earned by a member.
 - Includes badge name, description, and image.
+- **Leg Support (Issue #560)**: Optional `parent_badge` FK allows badges to be designated as "legs" of a parent badge.
+  - Example: "Silver Duration" is a leg of "FAI Silver Badge"
+  - On the badge board, legs are suppressed for members who have already earned the parent badge.
+  - This prevents showing redundant leg achievements when the full badge has been earned.
 
 ### `MemberBadge`
 - Through model linking `Member` and `Badge`.
