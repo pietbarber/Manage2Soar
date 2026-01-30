@@ -273,6 +273,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
             "webmaster",
             "secretary",
             "treasurer",
+            "safety_officer",
             "address",
             "city",
             "state_code",
@@ -363,6 +364,7 @@ class MemberAdmin(AdminHelperMixin, ImportExportModelAdmin, VersionAdmin, UserAd
                     "webmaster",
                     "secretary",
                     "treasurer",
+                    "safety_officer",
                 )
             },
         ),
