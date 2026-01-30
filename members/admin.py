@@ -138,10 +138,14 @@ class BadgeAdmin(admin.ModelAdmin):
     search_fields = ["name", "description"]
     autocomplete_fields = ["parent_badge"]
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.annotate(_leg_count=models.Count("legs"))
+
     @admin.display(description="Legs")
     def leg_count(self, obj):
         """Display the number of legs for this badge."""
-        return obj.legs.count()
+        return getattr(obj, "_leg_count", obj.legs.count())
 
 
 #########################

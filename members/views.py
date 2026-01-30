@@ -470,7 +470,9 @@ def tinymce_image_upload(request):
 # Only accessible to logged-in users.
 
 # Variables:
-# - members: queryset of all members, prefetching badge relationships
+# - active_members: queryset of active members used to filter member-badge awards
+# - badges: queryset of all badges, with parent_badge selected and memberbadge_set
+#           prefetched into badge.filtered_memberbadges (filtered to active_members)
 # - Issue #560: Legs are suppressed for members who have earned the parent badge
 
 
