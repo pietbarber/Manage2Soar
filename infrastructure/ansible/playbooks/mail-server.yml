@@ -21,6 +21,12 @@
   hosts: mail_servers
   become: true
 
+  # Note: Variables are loaded from group_vars/ via Ansible's automatic discovery.
+  # The playbooks/group_vars symlink ensures playbook-level group_vars have lower
+  # precedence than host-specific group_vars (e.g., gcp_mail/), allowing proper
+  # variable overrides for dkim_selector, trusted_relay_ips, etc.
+  # Explicit vars_files loading was removed to fix variable precedence issues.
+
   vars:
     # Paths
     postfix_config_dir: /etc/postfix

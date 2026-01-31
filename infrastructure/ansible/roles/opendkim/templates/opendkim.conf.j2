@@ -38,9 +38,11 @@ SignatureAlgorithm      rsa-sha256
 OversignHeaders         From
 
 # What to do on errors
-# Note: On-BadSignature set to 'accept' to avoid rejecting legitimate mail
-# during DKIM troubleshooting or when external senders have misconfigured DKIM.
-# Consider changing to 'reject' after thorough testing. (Issue #532)
+# Note: On-BadSignature is set to 'accept' to match current production policy
+# and to avoid rejecting legitimate mail during DKIM troubleshooting or when
+# external senders have misconfigured DKIM. Switching this to 'reject' would
+# be a deliberate, stricter policy change and should only be done after
+# thorough testing and stakeholder approval. (See Issue #532)
 On-BadSignature         accept
 On-DNSError             tempfail
 On-InternalError        tempfail
