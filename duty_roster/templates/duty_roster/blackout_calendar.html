@@ -410,6 +410,18 @@
                         <i class="fas fa-thumbs-up me-2 text-success"></i>
                         Prefer to work with:
                       </label>
+                      {% if pair_with %}
+                      <div class="mb-2">
+                        <small class="text-muted">Currently selected:</small>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          {% for m in pair_with %}
+                          <span class="badge bg-success-subtle text-success border border-success">
+                            <i class="fas fa-user me-1"></i>{{ m.full_display_name }}
+                          </span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      {% endif %}
                       <select name="pair_with" id="pairWith" class="form-select multi-select-responsive" multiple>
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">
@@ -432,6 +444,18 @@
                         <i class="fas fa-user-times me-2 text-warning"></i>
                         Please avoid scheduling me with:
                       </label>
+                      {% if avoid_with %}
+                      <div class="mb-2">
+                        <small class="text-muted">Currently selected:</small>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          {% for m in avoid_with %}
+                          <span class="badge bg-warning-subtle text-warning border border-warning">
+                            <i class="fas fa-user me-1"></i>{{ m.full_display_name }}
+                          </span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      {% endif %}
                       <select name="avoid_with" id="avoidWith" class="form-select multi-select-responsive" multiple>
                         {% for group_name, members in member_optgroups %}
                           <optgroup label="{{ group_name }}">

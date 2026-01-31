@@ -1377,3 +1377,113 @@ class DutyPreferenceFormTests(TestCase):
         self.assertEqual(pref.duty_officer_percent, 0)
         self.assertEqual(pref.ado_percent, 0)
         self.assertEqual(pref.towpilot_percent, 100)
+
+
+class PairingPreferencesDisplayTests(TestCase):
+    """Tests for pairing preferences display on blackout page (Issue #561)."""
+
+    def setUp(self):
+        """Set up test data."""
+        # Create main member
+        self.member = Member.objects.create(
+            username="testmember",
+            email="testmember@test.com",
+            first_name="Test",
+            last_name="Member",
+            membership_status="Full Member",
+        )
+        self.member.set_password("testpass123")
+        self.member.save()
+
+        # Create other members for pairing
+        self.pair_member1 = Member.objects.create(
+            username="pair1",
+            email="pair1@test.com",
+            first_name="Alice",
+            last_name="Partner",
+            membership_status="Full Member",
+        )
+        self.pair_member2 = Member.objects.create(
+            username="pair2",
+            email="pair2@test.com",
+            first_name="Bob",
+            last_name="Buddy",
+            membership_status="Full Member",
+        )
+        self.avoid_member = Member.objects.create(
+            username="avoid1",
+            email="avoid1@test.com",
+            first_name="Charlie",
+            last_name="Conflict",
+            membership_status="Full Member",
+        )
+
+    def test_pairing_preferences_display_without_preferences(self):
+        """Page loads without errors when no pairing preferences are set."""
+        self.client.login(username="testmember", password="testpass123")
+        url = reverse("duty_roster:blackout_manage")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Should not show "Currently selected" when no preferences set
+        self.assertNotContains(response, "Currently selected:")
+
+    def test_pairing_preferences_display_with_pair_with(self):
+        """Page shows saved 'prefer to work with' members as badges."""
+        from duty_roster.models import DutyPairing
+
+        # Set up pairing preferences
+        DutyPairing.objects.create(member=self.member, pair_with=self.pair_member1)
+        DutyPairing.objects.create(member=self.member, pair_with=self.pair_member2)
+
+        self.client.login(username="testmember", password="testpass123")
+        url = reverse("duty_roster:blackout_manage")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Should show "Currently selected" text
+        self.assertContains(response, "Currently selected:")
+        # Should show both paired members' names
+        self.assertContains(response, "Alice Partner")
+        self.assertContains(response, "Bob Buddy")
+        # Should have success styling (green badges)
+        self.assertContains(response, "bg-success-subtle")
+
+    def test_pairing_preferences_display_with_avoid_with(self):
+        """Page shows saved 'avoid scheduling with' members as badges."""
+        from duty_roster.models import DutyAvoidance
+
+        # Set up avoidance preferences
+        DutyAvoidance.objects.create(member=self.member, avoid_with=self.avoid_member)
+
+        self.client.login(username="testmember", password="testpass123")
+        url = reverse("duty_roster:blackout_manage")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Should show "Currently selected" text
+        self.assertContains(response, "Currently selected:")
+        # Should show avoided member's name
+        self.assertContains(response, "Charlie Conflict")
+        # Should have warning styling (orange/yellow badges)
+        self.assertContains(response, "bg-warning-subtle")
+
+    def test_pairing_preferences_display_with_both(self):
+        """Page shows both pair_with and avoid_with preferences."""
+        from duty_roster.models import DutyAvoidance, DutyPairing
+
+        # Set up both types of preferences
+        DutyPairing.objects.create(member=self.member, pair_with=self.pair_member1)
+        DutyAvoidance.objects.create(member=self.member, avoid_with=self.avoid_member)
+
+        self.client.login(username="testmember", password="testpass123")
+        url = reverse("duty_roster:blackout_manage")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Should show both members
+        self.assertContains(response, "Alice Partner")
+        self.assertContains(response, "Charlie Conflict")
+        # Should have both badge styles
+        self.assertContains(response, "bg-success-subtle")
+        self.assertContains(response, "bg-warning-subtle")
