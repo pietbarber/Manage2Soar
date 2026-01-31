@@ -22,10 +22,12 @@
   become: true
 
   # Note: Variables are loaded from group_vars/ via Ansible's automatic discovery.
-  # The playbooks/group_vars symlink ensures playbook-level group_vars have lower
-  # precedence than host-specific group_vars (e.g., gcp_mail/), allowing proper
-  # variable overrides for dkim_selector, trusted_relay_ips, etc.
-  # Explicit vars_files loading was removed to fix variable precedence issues.
+  # The playbooks/group_vars symlink exists so this playbook can see shared
+  # group_vars files in a consistent location; it affects discovery/path, not
+  # Ansible's variable precedence.
+  # Explicit vars_files loading (play-level vars) was removed so that inventory
+  # group_vars/host_vars (e.g., gcp_mail/) can correctly override values like
+  # dkim_selector, trusted_relay_ips, etc.
 
   vars:
     # Paths
