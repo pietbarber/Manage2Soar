@@ -5,6 +5,7 @@
 
 {% block extra_head %}
 {{ form.media }}
+<script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -94,6 +95,32 @@
                         <strong>First Reviewed By:</strong> {{ report.reviewed_by.get_full_name|default:report.reviewed_by.username }}<br>
                         <strong>Reviewed At:</strong> {{ report.reviewed_at|date:"F d, Y g:i A" }}
                     </p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.officer_notes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-journal-text"></i> Officer Notes
+                </div>
+                <div class="card-body">
+                    <div class="cms-content border rounded p-3 bg-light">
+                        {{ report.officer_notes|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.actions_taken %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-check2-circle"></i> Actions Taken
+                </div>
+                <div class="card-body">
+                    <div class="cms-content border rounded p-3 bg-light">
+                        {{ report.actions_taken|safe }}
+                    </div>
                 </div>
             </div>
             {% endif %}

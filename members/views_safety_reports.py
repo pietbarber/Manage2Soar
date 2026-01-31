@@ -8,6 +8,7 @@ Related: Issue #585 - Create Safety Officer Interface for Viewing Safety Reports
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -22,7 +23,7 @@ def safety_report_list(request):
 
     Provides filtering, sorting, and pagination.
     """
-    reports = SafetyReport.objects.all()
+    reports = SafetyReport.objects.select_related("reporter", "reviewed_by")
 
     # Filtering
     status_filter = request.GET.get("status", "")
@@ -41,7 +42,18 @@ def safety_report_list(request):
         "-observation_date",
     ]
     if sort_by in valid_sorts:
-        reports = reports.order_by(sort_by)
+        # Handle nullable observation_date with secondary sort
+        if "observation_date" in sort_by:
+            if sort_by == "-observation_date":
+                reports = reports.order_by(
+                    F("observation_date").desc(nulls_last=True), "-created_at"
+                )
+            else:
+                reports = reports.order_by(
+                    F("observation_date").asc(nulls_last=True), "-created_at"
+                )
+        else:
+            reports = reports.order_by(sort_by)
     else:
         sort_by = default_sort
         reports = reports.order_by(default_sort)
@@ -51,13 +63,13 @@ def safety_report_list(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    # Statistics for dashboard
-    stats = {
-        "total": SafetyReport.objects.count(),
-        "new": SafetyReport.objects.filter(status="new").count(),
-        "in_progress": SafetyReport.objects.filter(status="in_progress").count(),
-        "resolved": SafetyReport.objects.filter(status="resolved").count(),
-    }
+    # Statistics for dashboard (single query optimization)
+    stats = SafetyReport.objects.aggregate(
+        total=Count("id"),
+        new=Count("id", filter=Q(status="new")),
+        in_progress=Count("id", filter=Q(status="in_progress")),
+        resolved=Count("id", filter=Q(status="resolved")),
+    )
 
     context = {
         "page_obj": page_obj,
