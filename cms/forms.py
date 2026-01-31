@@ -1,7 +1,11 @@
+import logging
+
 from django import forms
 from tinymce.widgets import TinyMCE
 
 from .models import SiteFeedback, VisitorContact
+
+logger = logging.getLogger(__name__)
 
 
 class SiteFeedbackForm(forms.ModelForm):
@@ -32,7 +36,24 @@ class VisitorContactForm(forms.ModelForm):
     """
     Contact form for visitors (non-members) to reach out to the club.
     Replaces exposing welcome@skylinesoaring.org to spam.
+
+    Includes honeypot field for spam prevention (Issue #590).
     """
+
+    # Honeypot field - bots will fill this, humans won't see it
+    # Named 'website' as bots commonly look for this field
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Your website",
+                "autocomplete": "off",
+                "tabindex": "-1",  # Skip in tab order
+            }
+        ),
+        label="Website",
+    )
 
     class Meta:
         model = VisitorContact
@@ -137,3 +158,27 @@ class VisitorContactForm(forms.ModelForm):
                 )
 
         return message
+
+    def clean_website(self):
+        """
+        Honeypot validation - if this field is filled, it's a bot.
+        We don't raise a ValidationError because we want to silently reject.
+        Instead, we set a flag that the view can check.
+        """
+        website = self.cleaned_data.get("website", "")
+        if website:
+            # Log the honeypot trigger for monitoring
+            logger.warning(
+                f"Honeypot triggered on contact form. "
+                f"Email: {self.data.get('email', 'unknown')}, "
+                f"Website field contained: {website[:100]}"
+            )
+            # Set flag for view to check
+            self._honeypot_triggered = True
+        else:
+            self._honeypot_triggered = False
+        return website
+
+    def is_honeypot_triggered(self):
+        """Check if the honeypot was triggered."""
+        return getattr(self, "_honeypot_triggered", False)

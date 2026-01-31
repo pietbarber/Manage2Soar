@@ -28,6 +28,13 @@
                     <form method="post">
                         {% csrf_token %}
 
+                        {# Honeypot field for spam prevention - hidden from humans via CSS #}
+                        {# Do not use display:none as bots detect that. Use positioning instead. #}
+                        <div aria-hidden="true" style="position: absolute; left: -9999px; top: -9999px;">
+                            <label for="id_website">Website (leave blank)</label>
+                            {{ form.website }}
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 {{ form.name.label_tag }}

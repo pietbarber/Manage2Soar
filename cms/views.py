@@ -395,10 +395,18 @@ def contact(request):
     """
     Public contact form for visitors to reach the club.
     No authentication required - this replaces exposing welcome@skylinesoaring.org
+
+    Includes honeypot spam prevention (Issue #590) - if honeypot field is filled,
+    we silently redirect to success page without saving, so bot thinks it worked.
     """
     if request.method == "POST":
         form = VisitorContactForm(request.POST)
         if form.is_valid():
+            # Check honeypot - if triggered, silently redirect without saving
+            if form.is_honeypot_triggered():
+                # Don't save, don't notify, but redirect to success so bot thinks it worked
+                return redirect("contact_success")
+
             contact_submission = form.save(commit=False)
 
             # Capture IP address for spam prevention
