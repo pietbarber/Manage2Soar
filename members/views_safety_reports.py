@@ -30,10 +30,21 @@ def safety_report_list(request):
         reports = reports.filter(status=status_filter)
 
     # Sorting
-    sort_by = request.GET.get("sort", "-created_at")
-    valid_sorts = ["created_at", "-created_at", "status", "-status", "observation_date"]
+    default_sort = "-created_at"
+    sort_by = request.GET.get("sort")
+    valid_sorts = [
+        "created_at",
+        "-created_at",
+        "status",
+        "-status",
+        "observation_date",
+        "-observation_date",
+    ]
     if sort_by in valid_sorts:
         reports = reports.order_by(sort_by)
+    else:
+        sort_by = default_sort
+        reports = reports.order_by(default_sort)
 
     # Pagination
     paginator = Paginator(reports, 20)  # 20 reports per page

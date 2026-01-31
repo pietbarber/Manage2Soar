@@ -3,8 +3,9 @@
 Tests for Issue #585 - Safety Officer Interface for viewing safety reports.
 """
 
+from unittest.mock import patch
+
 import pytest
-from django.test import Client
 from django.urls import reverse
 
 from members.models import Member, SafetyReport
@@ -105,6 +106,26 @@ class TestSafetyOfficerRequired:
         url = reverse("members:safety_report_list")
         response = client.get(url)
         assert response.status_code == 200
+
+    def test_inactive_safety_officer_gets_403(self, client, db):
+        """Safety officer with inactive membership status should get 403 Forbidden."""
+        # Create safety officer with Full Member status
+        inactive_officer = Member.objects.create_user(
+            username="inactive_officer",
+            password="testpass123",
+            membership_status="Full Member",
+            is_active=True,
+            safety_officer=True,
+        )
+
+        # Login
+        client.force_login(inactive_officer)
+
+        # Mock is_active_member to return False (simulating inactive membership)
+        with patch("members.decorators.is_active_member", return_value=False):
+            url = reverse("members:safety_report_list")
+            response = client.get(url)
+            assert response.status_code == 403
 
 
 class TestSafetyReportListView:

@@ -71,6 +71,8 @@
                     <select name="sort" id="sort" class="form-select">
                         <option value="-created_at" {% if sort_by == '-created_at' %}selected{% endif %}>Newest First</option>
                         <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Oldest First</option>
+                        <option value="-observation_date" {% if sort_by == '-observation_date' %}selected{% endif %}>Observation Date (Newest First)</option>
+                        <option value="observation_date" {% if sort_by == 'observation_date' %}selected{% endif %}>Observation Date (Oldest First)</option>
                         <option value="-status" {% if sort_by == '-status' %}selected{% endif %}>Status (Z-A)</option>
                         <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status (A-Z)</option>
                     </select>
