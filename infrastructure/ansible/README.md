@@ -567,8 +567,53 @@ sudo certbot --nginx -d your-domain.com
 1. **Firewall**: Enable UFW and only allow ports 22, 80, 443
 2. **SSH**: Disable password auth, use key-based only
 3. **fail2ban**: Installed and configured automatically
-4. **Updates**: Keep the server updated with `apt upgrade`
+4. **Automatic Security Updates**: See section below
 5. **Backups**: PostgreSQL backups are automatic; also backup `/var/www/m2s/media`
+
+### Automatic Security Updates
+
+Both the mail server and database server are configured with `unattended-upgrades` to automatically install security patches daily. This is a critical security feature that keeps servers protected without manual intervention.
+
+**What Gets Updated:**
+- Ubuntu security patches only (noble-security origin)
+- Ubuntu ESM security updates (noble-apps-security, noble-infra-security)
+- Regular package updates are NOT installed automatically (must be done manually)
+
+**Update Schedule:**
+- Daily checks run via systemd timers around 6:00-6:45 AM UTC
+- Updates install automatically if security patches are available
+- Services restart if required (e.g., OpenSSL library updates)
+
+**Verify unattended-upgrades is Running:**
+
+```bash
+# Check service status
+sudo systemctl status unattended-upgrades.service
+
+# View update schedule
+systemctl list-timers apt-daily*
+
+# Check recent update activity
+sudo tail -n 30 /var/log/unattended-upgrades/unattended-upgrades.log
+```
+
+**Expected Output:**
+- Service should show "active (running)" since server boot
+- Timers should show daily schedule (NEXT/LEFT columns)
+- Logs should show recent upgrade activity with package names
+
+**Configuration:**
+- Config file: `/etc/apt/apt.conf.d/50unattended-upgrades`
+- Default Ubuntu 24.04 settings are used
+- Automatic reboots: Currently disabled (manual reboots required for kernel updates)
+
+**Troubleshooting:**
+If updates aren't running:
+1. Check systemd timers: `systemctl list-timers apt-daily*`
+2. View recent logs: `sudo journalctl -u unattended-upgrades.service`
+3. Manually trigger update: `sudo unattended-upgrade --debug --dry-run`
+
+**Note:** For non-security package updates (e.g., Apache version bumps, new Python releases), you must manually run `apt update && apt upgrade` after reviewing available updates.
 
 ---
 

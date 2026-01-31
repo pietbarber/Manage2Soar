@@ -21,8 +21,13 @@
   hosts: mail_servers
   become: true
 
-  vars_files:
-    - ../group_vars/all.yml
+  # Note: Variables are loaded from group_vars/ via Ansible's automatic discovery.
+  # The playbooks/group_vars symlink exists so this playbook can see shared
+  # group_vars files in a consistent location; it affects discovery/path, not
+  # Ansible's variable precedence.
+  # Explicit vars_files loading (play-level vars) was removed so that inventory
+  # group_vars/host_vars (e.g., gcp_mail/) can correctly override values like
+  # dkim_selector, trusted_relay_ips, etc.
 
   vars:
     # Paths

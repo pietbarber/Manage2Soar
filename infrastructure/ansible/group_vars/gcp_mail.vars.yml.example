@@ -109,6 +109,22 @@ mail_domain: "manage2soar.com"
 mail_hostname: "mail.{{ mail_domain }}"
 
 # ============================================================
+# SPAM REJECTION MESSAGES
+# ============================================================
+# URLs and contact info shown in spam rejection messages
+
+# URL where users can update their email address in their member profile
+# This is shown when their email is rejected from mailing lists
+# Example: "https://yourclub.manage2soar.com/members/profile/"
+rejection_help_url: "https://yourclub.manage2soar.com/members/profile/"
+
+# Contact form URL shown in rejection messages for user support
+# Use a web form instead of email to avoid rejection loops (since the contact
+# email address might also require whitelisting and would be rejected too)
+# Example: "https://yoursoaringclub.org/contact/"
+rejection_contact_url: "https://{{ mail_domain }}/contact/"
+
+# ============================================================
 # SMTP RELAY (SMTP2Go)
 # ============================================================
 # GCP blocks outbound port 25, so we relay through SMTP2Go.
