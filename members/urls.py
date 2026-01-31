@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from . import views, views_applications, views_kiosk
+from . import views, views_applications, views_kiosk, views_safety_reports
 from .views import tinymce_image_upload
 
 app_name = "members"
@@ -90,6 +90,17 @@ urlpatterns = [
         "safety-report/submit/",
         views.safety_report_submit,
         name="safety_report_submit",
+    ),
+    # Safety Officer Interface (Issue #585)
+    path(
+        "safety-reports/",
+        views_safety_reports.safety_report_list,
+        name="safety_report_list",
+    ),
+    path(
+        "safety-reports/<int:report_id>/",
+        views_safety_reports.safety_report_detail,
+        name="safety_report_detail",
     ),
 ]
 
