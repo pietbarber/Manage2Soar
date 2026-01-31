@@ -166,3 +166,45 @@ class SafetyReportForm(forms.ModelForm):
                 "Be honest - anonymous reports are taken seriously."
             ),
         }
+
+
+# SafetyReportOfficerForm Class
+
+# Form for safety officers to update report status, notes, and actions taken.
+# Related: Issue #585 - Safety Officer Interface
+
+
+class SafetyReportOfficerForm(forms.ModelForm):
+    """Form for safety officers to update safety reports."""
+
+    class Meta:
+        model = SafetyReport
+        fields = ["status", "officer_notes", "actions_taken"]
+        widgets = {
+            "status": forms.Select(
+                attrs={
+                    "class": "form-select",
+                },
+            ),
+            "officer_notes": TinyMCE(
+                attrs={
+                    "cols": 80,
+                    "rows": 6,
+                },
+            ),
+            "actions_taken": TinyMCE(
+                attrs={
+                    "cols": 80,
+                    "rows": 6,
+                },
+            ),
+        }
+        labels = {
+            "status": "Report Status",
+            "officer_notes": "Internal Notes (not visible to reporter)",
+            "actions_taken": "Actions Taken",
+        }
+        help_texts = {
+            "officer_notes": "These notes are only visible to safety officers.",
+            "actions_taken": "Describe what actions were taken to address this concern.",
+        }

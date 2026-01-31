@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Safety Report #{{ report.pk }} - Safety Officer View{% endblock %}
+
+{% block extra_head %}
+{{ form.media }}
+<script src="{% static 'js/tinymce-youtube-fix.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'members:safety_report_list' %}">Safety Reports</a></li>
+                    <li class="breadcrumb-item active">Report #{{ report.pk }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-shield-exclamation text-warning"></i>
+                Safety Report #{{ report.pk }}
+                {% if report.status == 'new' %}
+                <span class="badge bg-danger">New</span>
+                {% elif report.status == 'reviewed' %}
+                <span class="badge bg-info">Reviewed</span>
+                {% elif report.status == 'in_progress' %}
+                <span class="badge bg-warning text-dark">In Progress</span>
+                {% elif report.status == 'resolved' %}
+                <span class="badge bg-success">Resolved</span>
+                {% elif report.status == 'closed' %}
+                <span class="badge bg-secondary">Closed</span>
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Report Details -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-file-text"></i> Report Details
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Submitted:</strong><br>
+                            {{ report.created_at|date:"F d, Y g:i A" }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Reporter:</strong><br>
+                            {% if report.is_anonymous %}
+                            <span class="badge bg-secondary">Anonymous</span>
+                            {% elif report.reporter %}
+                            {{ report.reporter.get_full_name|default:report.reporter.username }}
+                            <br><small class="text-muted">{{ report.reporter.email }}</small>
+                            {% else %}
+                            <span class="text-muted">Unknown</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Observation Date:</strong><br>
+                            {{ report.observation_date|date:"F d, Y"|default:"Not specified" }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Location:</strong><br>
+                            {{ report.location|default:"Not specified" }}
+                        </div>
+                    </div>
+                    <hr>
+                    <h5>Observation</h5>
+                    <div class="cms-content border rounded p-3 bg-light">
+                        {{ report.observation|safe }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review History -->
+            {% if report.reviewed_by %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-clock-history"></i> Review History
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>First Reviewed By:</strong> {{ report.reviewed_by.get_full_name|default:report.reviewed_by.username }}<br>
+                        <strong>Reviewed At:</strong> {{ report.reviewed_at|date:"F d, Y g:i A" }}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.officer_notes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-journal-text"></i> Officer Notes
+                </div>
+                <div class="card-body">
+                    <div class="cms-content border rounded p-3 bg-light">
+                        {{ report.officer_notes|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if report.actions_taken %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-check2-circle"></i> Actions Taken
+                </div>
+                <div class="card-body">
+                    <div class="cms-content border rounded p-3 bg-light">
+                        {{ report.actions_taken|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Officer Actions Sidebar -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-gear"></i> Safety Officer Actions
+                </div>
+                <div class="card-body">
+                    {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Please correct the following errors:</strong>
+                        <ul class="mb-0 mt-2">
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="id_status" class="form-label fw-bold">{{ form.status.label }}</label>
+                            {{ form.status }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_officer_notes" class="form-label fw-bold">{{ form.officer_notes.label }}</label>
+                            <p class="text-muted small">{{ form.officer_notes.help_text }}</p>
+                            {{ form.officer_notes }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_actions_taken" class="form-label fw-bold">{{ form.actions_taken.label }}</label>
+                            <p class="text-muted small">{{ form.actions_taken.help_text }}</p>
+                            {{ form.actions_taken }}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'members:safety_report_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to List
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Info Card -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Report Info
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Report ID:</strong> #{{ report.pk }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Created:</strong> {{ report.created_at|date:"M d, Y" }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Last Updated:</strong> {{ report.updated_at|date:"M d, Y g:i A" }}
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Anonymous:</strong>
+                        {% if report.is_anonymous %}
+                        <span class="badge bg-secondary">Yes</span>
+                        {% else %}
+                        <span class="badge bg-primary">No</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
