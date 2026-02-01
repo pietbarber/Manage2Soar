@@ -866,6 +866,8 @@ def calendar_tow_signup(request, year, month, day):
     # Notify after transaction completes to avoid holding row lock during email sends
     # Only notify if assignment was actually changed
     if assignment_changed:
+        # Refresh from DB to get current state (in case concurrent signups updated other roles)
+        assignment.refresh_from_db()
         notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -929,6 +931,8 @@ def calendar_instructor_signup(request, year, month, day):
     # Notify after transaction completes to avoid holding row lock during email sends
     # Only notify if assignment was actually changed
     if assignment_changed:
+        # Refresh from DB to get current state (in case concurrent signups updated other roles)
+        assignment.refresh_from_db()
         notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -1092,12 +1096,6 @@ def calendar_ado_rescind(request, year, month, day):
         assignment.assistant_duty_officer = None
         assignment.save()
 
-    notify_ops_status(assignment)
-
-    # Return HTMX response to refresh calendar body with specific month context
-    return calendar_refresh_response(year, month)
-    assignment.assistant_duty_officer = None
-    assignment.save()
     notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
