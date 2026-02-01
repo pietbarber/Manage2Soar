@@ -8,7 +8,6 @@ Ensures that:
 
 from datetime import date, timedelta
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -293,7 +292,7 @@ class TestAdHocRescindFunctionality(TestCase):
     def test_cannot_rescind_if_not_signed_up(self):
         """Test that a member cannot rescind if they're not signed up."""
         # Create another tow pilot
-        other_member = User.objects.create_user(
+        User.objects.create_user(
             username="othertow",
             email="other@example.com",
             password="testpass123",
@@ -478,3 +477,112 @@ class TestRescindRequiresAuthentication(TestCase):
         )
         response = self.client.post(url)
         self.assertEqual(response.status_code, 302)
+
+
+class TestRescindOnConfirmedAdHoc(TestCase):
+    """Test rescinding signups on confirmed ad-hoc days."""
+
+    def setUp(self):
+        self.client = Client()
+        self.tomorrow = date.today() + timedelta(days=1)
+
+        # Create a dual-qualified member
+        self.dual_member = User.objects.create_user(
+            username="dualmember",
+            email="dual@example.com",
+            password="testpass123",
+            first_name="Dual",
+            last_name="Member",
+            membership_status="Full Member",
+            towpilot=True,
+            instructor=True,
+            duty_officer=True,
+        )
+
+        # Create another tow pilot and duty officer
+        self.tow_member = User.objects.create_user(
+            username="towmember",
+            email="tow@example.com",
+            password="testpass123",
+            first_name="Tow",
+            last_name="Member",
+            membership_status="Full Member",
+            towpilot=True,
+        )
+
+        self.do_member = User.objects.create_user(
+            username="domember",
+            email="do@example.com",
+            password="testpass123",
+            first_name="Duty",
+            last_name="Officer",
+            membership_status="Full Member",
+            duty_officer=True,
+        )
+
+        # Create required airfield
+        self.airfield = Airfield.objects.create(identifier="KFRR", name="Test Airfield")
+
+        # Create a confirmed ad-hoc day with tow pilot and duty officer
+        self.adhoc_assignment = DutyAssignment.objects.create(
+            date=self.tomorrow,
+            is_scheduled=False,
+            is_confirmed=True,  # This is a confirmed ad-hoc day
+            tow_pilot=self.dual_member,
+            duty_officer=self.do_member,
+        )
+
+    def test_can_rescind_tow_pilot_on_confirmed_adhoc(self):
+        """Test that rescinding tow pilot works on a confirmed ad-hoc day."""
+        self.client.login(username="dualmember", password="testpass123")
+
+        url = reverse(
+            "duty_roster:calendar_tow_rescind",
+            args=[self.tomorrow.year, self.tomorrow.month, self.tomorrow.day],
+        )
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.adhoc_assignment.refresh_from_db()
+        self.assertIsNone(self.adhoc_assignment.tow_pilot)
+        # Confirmation should be recalculated - no tow pilot means not confirmed
+        self.assertFalse(self.adhoc_assignment.is_confirmed)
+
+    def test_can_rescind_duty_officer_on_confirmed_adhoc(self):
+        """Test that rescinding duty officer works on a confirmed ad-hoc day."""
+        self.client.login(username="domember", password="testpass123")
+
+        url = reverse(
+            "duty_roster:calendar_dutyofficer_rescind",
+            args=[self.tomorrow.year, self.tomorrow.month, self.tomorrow.day],
+        )
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.adhoc_assignment.refresh_from_db()
+        self.assertIsNone(self.adhoc_assignment.duty_officer)
+        # Confirmation should be recalculated - no duty officer means not confirmed
+        self.assertFalse(self.adhoc_assignment.is_confirmed)
+
+    def test_rescind_then_another_member_can_signup(self):
+        """Test that after rescinding, another member can sign up for that role."""
+        # Dual member rescind tow pilot
+        self.client.login(username="dualmember", password="testpass123")
+        rescind_url = reverse(
+            "duty_roster:calendar_tow_rescind",
+            args=[self.tomorrow.year, self.tomorrow.month, self.tomorrow.day],
+        )
+        response = self.client.post(rescind_url)
+        self.assertEqual(response.status_code, 200)
+
+        # Now another member can sign up as tow pilot
+        self.client.login(username="towmember", password="testpass123")
+        signup_url = reverse(
+            "duty_roster:calendar_tow_signup",
+            args=[self.tomorrow.year, self.tomorrow.month, self.tomorrow.day],
+        )
+        response = self.client.post(signup_url)
+        self.assertEqual(response.status_code, 200)
+
+        self.adhoc_assignment.refresh_from_db()
+        self.assertEqual(self.adhoc_assignment.tow_pilot, self.tow_member)

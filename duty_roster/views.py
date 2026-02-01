@@ -828,29 +828,33 @@ def calendar_ad_hoc_confirm(request, year, month, day):
 @require_POST
 @active_member_required
 def calendar_tow_signup(request, year, month, day):
+    from django.db import transaction
+
     day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    member = request.user
 
     # Validate that user is allowed
-    member = request.user
     if not member.towpilot:
         return HttpResponseForbidden("You are not a tow pilot.")
 
-    # For ad-hoc days, prevent dual signup as both towpilot and instructor
-    if not assignment.is_scheduled:
-        if assignment.instructor == member:
-            title = get_role_title("instructor") or "Instructor"
-            return HttpResponseForbidden(
-                f"You are already signed up as {title} for this day. "
-                "Please rescind that signup first if you want to tow instead."
-            )
+    # Use transaction with row lock for ad-hoc days to prevent race conditions
+    with transaction.atomic():
+        assignment = DutyAssignment.objects.select_for_update().get(date=day_obj)
 
-    # Assign as tow pilot if none already assigned
-    if not assignment.tow_pilot:
-        assignment.tow_pilot = member
+        # For ad-hoc days, prevent dual signup as both towpilot and instructor
+        if not assignment.is_scheduled:
+            if assignment.instructor == member:
+                title = get_role_title("instructor") or "Instructor"
+                return HttpResponseForbidden(
+                    f"You are already signed up as {title} for this day. "
+                    "Please rescind that signup first if you want to tow instead."
+                )
 
-        assignment.save()
-        notify_ops_status(assignment)
+        # Assign as tow pilot if none already assigned
+        if not assignment.tow_pilot:
+            assignment.tow_pilot = member
+            assignment.save()
+            notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -880,26 +884,31 @@ def calendar_dutyofficer_signup(request, year, month, day):
 @require_POST
 @active_member_required
 def calendar_instructor_signup(request, year, month, day):
-    day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    from django.db import transaction
 
+    day_obj = date(int(year), int(month), int(day))
     member = request.user
+
     if not member.instructor:
         return HttpResponseForbidden("You are not an instructor.")
 
-    # For ad-hoc days, prevent dual signup as both towpilot and instructor
-    if not assignment.is_scheduled:
-        if assignment.tow_pilot == member:
-            title = get_role_title("towpilot") or "Tow Pilot"
-            return HttpResponseForbidden(
-                f"You are already signed up as {title} for this day. "
-                "Please rescind that signup first if you want to instruct instead."
-            )
+    # Use transaction with row lock for ad-hoc days to prevent race conditions
+    with transaction.atomic():
+        assignment = DutyAssignment.objects.select_for_update().get(date=day_obj)
 
-    if not assignment.instructor:
-        assignment.instructor = member
-        assignment.save()
-        notify_ops_status(assignment)
+        # For ad-hoc days, prevent dual signup as both towpilot and instructor
+        if not assignment.is_scheduled:
+            if assignment.tow_pilot == member:
+                title = get_role_title("towpilot") or "Tow Pilot"
+                return HttpResponseForbidden(
+                    f"You are already signed up as {title} for this day. "
+                    "Please rescind that signup first if you want to instruct instead."
+                )
+
+        if not assignment.instructor:
+            assignment.instructor = member
+            assignment.save()
+            notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -942,8 +951,10 @@ def calendar_tow_rescind(request, year, month, day):
     if assignment.tow_pilot != member:
         return HttpResponseForbidden("You are not the tow pilot for this day.")
 
-    # Remove the signup
+    # Remove the signup and recalculate confirmation state
+    # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
     assignment.tow_pilot = None
+    assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
     assignment.save()
     notify_ops_status(assignment)
 
@@ -994,8 +1005,10 @@ def calendar_dutyofficer_rescind(request, year, month, day):
     if assignment.duty_officer != member:
         return HttpResponseForbidden("You are not the duty officer for this day.")
 
-    # Remove the signup
+    # Remove the signup and recalculate confirmation state
+    # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
     assignment.duty_officer = None
+    assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
     assignment.save()
     notify_ops_status(assignment)
 
