@@ -840,7 +840,8 @@ def calendar_tow_signup(request, year, month, day):
     if not member.towpilot:
         return HttpResponseForbidden("You are not a tow pilot.")
 
-    # Use transaction with row lock for ad-hoc days to prevent race conditions
+    # Use transaction with row lock to prevent race conditions
+    assignment_changed = False
     with transaction.atomic():
         assignment = get_object_or_404(
             DutyAssignment.objects.select_for_update(),
@@ -860,9 +861,12 @@ def calendar_tow_signup(request, year, month, day):
         if not assignment.tow_pilot:
             assignment.tow_pilot = member
             assignment.save()
+            assignment_changed = True
 
     # Notify after transaction completes to avoid holding row lock during email sends
-    notify_ops_status(assignment)
+    # Only notify if assignment was actually changed
+    if assignment_changed:
+        notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -900,7 +904,8 @@ def calendar_instructor_signup(request, year, month, day):
     if not member.instructor:
         return HttpResponseForbidden("You are not an instructor.")
 
-    # Use transaction with row lock for ad-hoc days to prevent race conditions
+    # Use transaction with row lock to prevent race conditions
+    assignment_changed = False
     with transaction.atomic():
         assignment = get_object_or_404(
             DutyAssignment.objects.select_for_update(),
@@ -919,9 +924,12 @@ def calendar_instructor_signup(request, year, month, day):
         if not assignment.instructor:
             assignment.instructor = member
             assignment.save()
+            assignment_changed = True
 
     # Notify after transaction completes to avoid holding row lock during email sends
-    notify_ops_status(assignment)
+    # Only notify if assignment was actually changed
+    if assignment_changed:
+        notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -951,24 +959,32 @@ def calendar_ado_signup(request, year, month, day):
 @active_member_required
 def calendar_tow_rescind(request, year, month, day):
     """Allow a member to rescind their tow pilot signup for an ad-hoc day."""
-    day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    from django.db import transaction
 
+    day_obj = date(int(year), int(month), int(day))
     member = request.user
 
-    # Only allow rescinding on ad-hoc days (not scheduled)
-    if assignment.is_scheduled:
-        return HttpResponseForbidden("Cannot rescind from scheduled operations.")
+    # Use transaction with row lock to prevent race conditions
+    with transaction.atomic():
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
-    # Only allow rescinding if you're the one signed up
-    if assignment.tow_pilot != member:
-        return HttpResponseForbidden("You are not the tow pilot for this day.")
+        # Only allow rescinding on ad-hoc days (not scheduled)
+        if assignment.is_scheduled:
+            return HttpResponseForbidden("Cannot rescind from scheduled operations.")
 
-    # Remove the signup and recalculate confirmation state
-    # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
-    assignment.tow_pilot = None
-    assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
-    assignment.save()
+        # Only allow rescinding if you're the one signed up
+        if assignment.tow_pilot != member:
+            return HttpResponseForbidden("You are not the tow pilot for this day.")
+
+        # Remove the signup and recalculate confirmation state
+        # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
+        assignment.tow_pilot = None
+        assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
+        assignment.save()
+
     notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -979,22 +995,30 @@ def calendar_tow_rescind(request, year, month, day):
 @active_member_required
 def calendar_instructor_rescind(request, year, month, day):
     """Allow a member to rescind their instructor signup for an ad-hoc day."""
-    day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    from django.db import transaction
 
+    day_obj = date(int(year), int(month), int(day))
     member = request.user
 
-    # Only allow rescinding on ad-hoc days (not scheduled)
-    if assignment.is_scheduled:
-        return HttpResponseForbidden("Cannot rescind from scheduled operations.")
+    # Use transaction with row lock to prevent race conditions
+    with transaction.atomic():
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
-    # Only allow rescinding if you're the one signed up
-    if assignment.instructor != member:
-        return HttpResponseForbidden("You are not the instructor for this day.")
+        # Only allow rescinding on ad-hoc days (not scheduled)
+        if assignment.is_scheduled:
+            return HttpResponseForbidden("Cannot rescind from scheduled operations.")
 
-    # Remove the signup
-    assignment.instructor = None
-    assignment.save()
+        # Only allow rescinding if you're the one signed up
+        if assignment.instructor != member:
+            return HttpResponseForbidden("You are not the instructor for this day.")
+
+        # Remove the signup
+        assignment.instructor = None
+        assignment.save()
+
     notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -1005,24 +1029,32 @@ def calendar_instructor_rescind(request, year, month, day):
 @active_member_required
 def calendar_dutyofficer_rescind(request, year, month, day):
     """Allow a member to rescind their duty officer signup for an ad-hoc day."""
-    day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    from django.db import transaction
 
+    day_obj = date(int(year), int(month), int(day))
     member = request.user
 
-    # Only allow rescinding on ad-hoc days (not scheduled)
-    if assignment.is_scheduled:
-        return HttpResponseForbidden("Cannot rescind from scheduled operations.")
+    # Use transaction with row lock to prevent race conditions
+    with transaction.atomic():
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
-    # Only allow rescinding if you're the one signed up
-    if assignment.duty_officer != member:
-        return HttpResponseForbidden("You are not the duty officer for this day.")
+        # Only allow rescinding on ad-hoc days (not scheduled)
+        if assignment.is_scheduled:
+            return HttpResponseForbidden("Cannot rescind from scheduled operations.")
 
-    # Remove the signup and recalculate confirmation state
-    # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
-    assignment.duty_officer = None
-    assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
-    assignment.save()
+        # Only allow rescinding if you're the one signed up
+        if assignment.duty_officer != member:
+            return HttpResponseForbidden("You are not the duty officer for this day.")
+
+        # Remove the signup and recalculate confirmation state
+        # Ad-hoc ops are only confirmed when both tow pilot and duty officer are assigned
+        assignment.duty_officer = None
+        assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
+        assignment.save()
+
     notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -1033,21 +1065,37 @@ def calendar_dutyofficer_rescind(request, year, month, day):
 @active_member_required
 def calendar_ado_rescind(request, year, month, day):
     """Allow a member to rescind their ADO signup for an ad-hoc day."""
-    day_obj = date(int(year), int(month), int(day))
-    assignment = get_object_or_404(DutyAssignment, date=day_obj)
+    from django.db import transaction
 
+    day_obj = date(int(year), int(month), int(day))
     member = request.user
 
-    # Only allow rescinding on ad-hoc days (not scheduled)
-    if assignment.is_scheduled:
-        return HttpResponseForbidden("Cannot rescind from scheduled operations.")
+    # Use transaction with row lock to prevent race conditions
+    with transaction.atomic():
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
-    # Only allow rescinding if you're the one signed up
-    if assignment.assistant_duty_officer != member:
-        title = get_role_title("assistant_duty_officer") or "Assistant Duty Officer"
-        return HttpResponseForbidden(f"You are not the {title.lower()} for this day.")
+        # Only allow rescinding on ad-hoc days (not scheduled)
+        if assignment.is_scheduled:
+            return HttpResponseForbidden("Cannot rescind from scheduled operations.")
 
-    # Remove the signup
+        # Only allow rescinding if you're the one signed up
+        if assignment.assistant_duty_officer != member:
+            title = get_role_title("assistant_duty_officer") or "Assistant Duty Officer"
+            return HttpResponseForbidden(
+                f"You are not the {title.lower()} for this day."
+            )
+
+        # Remove the signup
+        assignment.assistant_duty_officer = None
+        assignment.save()
+
+    notify_ops_status(assignment)
+
+    # Return HTMX response to refresh calendar body with specific month context
+    return calendar_refresh_response(year, month)
     assignment.assistant_duty_officer = None
     assignment.save()
     notify_ops_status(assignment)
