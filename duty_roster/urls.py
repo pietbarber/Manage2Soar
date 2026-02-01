@@ -58,6 +58,27 @@ urlpatterns = [
         views.calendar_ado_signup,
         name="calendar_ado_signup",
     ),
+    # Rescind signup URLs for ad-hoc days (Issue #589)
+    path(
+        "calendar/tow-rescind/<int:year>/<int:month>/<int:day>/",
+        views.calendar_tow_rescind,
+        name="calendar_tow_rescind",
+    ),
+    path(
+        "calendar/instructor-rescind/<int:year>/<int:month>/<int:day>/",
+        views.calendar_instructor_rescind,
+        name="calendar_instructor_rescind",
+    ),
+    path(
+        "calendar/dutyofficer-rescind/<int:year>/<int:month>/<int:day>/",
+        views.calendar_dutyofficer_rescind,
+        name="calendar_dutyofficer_rescind",
+    ),
+    path(
+        "calendar/ado-rescind/<int:year>/<int:month>/<int:day>/",
+        views.calendar_ado_rescind,
+        name="calendar_ado_rescind",
+    ),
     path(
         "calendar/ad-hoc/<int:year>/<int:month>/<int:day>/",
         views.calendar_ad_hoc_start,
