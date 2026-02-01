@@ -1231,7 +1231,7 @@ def manage_logsheet_finances(request, pk):
                 )
 
             messages.success(request, "Payment methods updated.")
-            return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
+            return redirect("logsheet:manage", pk=logsheet.pk)
 
     # Sort pilot_summary by pilot last name
     pilot_summary_sorted = sorted(
