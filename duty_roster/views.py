@@ -808,7 +808,8 @@ def calendar_ad_hoc_confirm(request, year, month, day):
             "You must be signed in to propose and edit operations", status=403
         )
 
-    default_airfield = Airfield.objects.get(identifier="KFRR")
+    # Get default airfield - use first available or None
+    default_airfield = Airfield.objects.filter(is_active=True).first()
 
     assignment, created = DutyAssignment.objects.get_or_create(
         date=day_obj,
