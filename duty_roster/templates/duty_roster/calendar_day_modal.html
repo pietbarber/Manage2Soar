@@ -330,7 +330,12 @@
     </div>
 
     {# Volunteer Signup Buttons (for ad-hoc days) #}
-    {% if assignment and not assignment.is_scheduled %}
+    {% comment %}
+    For ad-hoc days, show volunteer section when:
+    1. Day is not confirmed (allow signups), OR
+    2. User has a role on this day (allow rescind)
+    {% endcomment %}
+    {% if assignment and not assignment.is_scheduled and (not assignment.is_confirmed or assignment.tow_pilot == user or assignment.instructor == user or assignment.duty_officer == user or assignment.assistant_duty_officer == user) %}
     <hr class="my-3">
     <h6 class="fw-semibold text-secondary mb-2">
       <i class="bi bi-hand-thumbs-up me-2" aria-hidden="true"></i>Volunteer for Duty:

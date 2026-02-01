@@ -808,8 +808,11 @@ def calendar_ad_hoc_confirm(request, year, month, day):
             "You must be signed in to propose and edit operations", status=403
         )
 
-    # Get default airfield - use first available or None
-    default_airfield = Airfield.objects.filter(is_active=True).first()
+    # Get default airfield - prefer KFRR if active, otherwise use first active
+    default_airfield = (
+        Airfield.objects.filter(identifier="KFRR", is_active=True).first()
+        or Airfield.objects.filter(is_active=True).first()
+    )
 
     assignment, created = DutyAssignment.objects.get_or_create(
         date=day_obj,
@@ -839,7 +842,10 @@ def calendar_tow_signup(request, year, month, day):
 
     # Use transaction with row lock for ad-hoc days to prevent race conditions
     with transaction.atomic():
-        assignment = DutyAssignment.objects.select_for_update().get(date=day_obj)
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
         # For ad-hoc days, prevent dual signup as both towpilot and instructor
         if not assignment.is_scheduled:
@@ -854,7 +860,9 @@ def calendar_tow_signup(request, year, month, day):
         if not assignment.tow_pilot:
             assignment.tow_pilot = member
             assignment.save()
-            notify_ops_status(assignment)
+
+    # Notify after transaction completes to avoid holding row lock during email sends
+    notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -894,7 +902,10 @@ def calendar_instructor_signup(request, year, month, day):
 
     # Use transaction with row lock for ad-hoc days to prevent race conditions
     with transaction.atomic():
-        assignment = DutyAssignment.objects.select_for_update().get(date=day_obj)
+        assignment = get_object_or_404(
+            DutyAssignment.objects.select_for_update(),
+            date=day_obj,
+        )
 
         # For ad-hoc days, prevent dual signup as both towpilot and instructor
         if not assignment.is_scheduled:
@@ -908,7 +919,9 @@ def calendar_instructor_signup(request, year, month, day):
         if not assignment.instructor:
             assignment.instructor = member
             assignment.save()
-            notify_ops_status(assignment)
+
+    # Notify after transaction completes to avoid holding row lock during email sends
+    notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
