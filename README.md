@@ -3,6 +3,92 @@
 
 Manage2Soar is a modern Django 5.2 web application for comprehensive soaring club management. It supports members, gliders, badges, operations, analytics, instruction, notifications, and site configuration—all in one integrated platform.
 
+## Quick Start for Local Development
+
+### Prerequisites
+- Python 3.12+
+- PostgreSQL 12+ (running locally or accessible via network)
+- Git
+
+### Setup Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/pietbarber/Manage2Soar.git
+   cd Manage2Soar
+   ```
+
+2. **Create and activate virtual environment:**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Set up PostgreSQL database:**
+   ```bash
+   # Create database and user (adjust as needed for your PostgreSQL setup)
+   sudo -u postgres psql
+   ```
+   ```sql
+   CREATE DATABASE manage2soar;
+   CREATE USER m2s WITH PASSWORD 'your-password-here';
+   ALTER ROLE m2s SET client_encoding TO 'utf8';
+   ALTER ROLE m2s SET default_transaction_isolation TO 'read committed';
+   ALTER ROLE m2s SET timezone TO 'UTC';
+   GRANT ALL PRIVILEGES ON DATABASE manage2soar TO m2s;
+   \q
+   ```
+
+5. **Configure environment variables:**
+   ```bash
+   # Copy the example .env file
+   cp .env.example .env
+
+   # Edit .env and set your values (minimum required):
+   # - DJANGO_SECRET_KEY (generate a new one)
+   # - DB_PASSWORD (match the PostgreSQL password you created)
+   ```
+
+6. **Run migrations:**
+   ```bash
+   python manage.py migrate
+   ```
+
+7. **Create a superuser:**
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+8. **Run the development server:**
+   ```bash
+   # IMPORTANT: Use port 8001 to avoid HSTS caching issues on port 8000
+   python manage.py runserver 127.0.0.1:8001
+   ```
+
+9. **Access the application:**
+   - Open http://127.0.0.1:8001 in your browser
+   - Log in with your superuser credentials
+   - Visit http://127.0.0.1:8001/admin to configure site settings
+
+### Troubleshooting
+
+**"no password supplied" database error:**
+- Make sure you created the `.env` file from `.env.example`
+- Verify `DB_PASSWORD` in `.env` matches your PostgreSQL user password
+- Check that PostgreSQL is running: `sudo systemctl status postgresql`
+
+**"command not found" errors:**
+- Always activate the virtual environment first: `source .venv/bin/activate`
+
+**Port 8000 vs 8001:**
+- Always use port 8001 for local development
+- Port 8000 has HSTS caching that can interfere with HTTP development
+
 ## Major Apps
 - `members`: Membership management, profiles, roles, and permissions
 - `logsheet`: Flight logging, glider operations, and analytics data source
