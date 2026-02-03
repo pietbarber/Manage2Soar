@@ -523,6 +523,9 @@ class TestBannerParallaxEffect(DjangoPlaywrightTestCase):
         # Navigate to the page
         self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
 
+        # Wait for page to fully load including stylesheets
+        self.page.wait_for_load_state("networkidle")
+
         # Wait for banner to be visible
         self.page.wait_for_selector(".page-banner-image", timeout=5000)
 

@@ -41,8 +41,9 @@
      *
      * Behavior:
      * - background-size: contain = image fits within the 120% element without being cropped BY CSS
-     * - The parent's overflow: hidden means only the center 100% of the 120% element is visible
-     * - This provides 10% vertical space above/below for parallax movement via translateY()
+     * - With top: 0, the parent initially shows the top 100% of the 120% element
+     * - The extra ~20% height sits primarily below the visible area, providing room for parallax
+     *   movement via translateY() without revealing empty space at the bottom
      * - For wide panoramic images (6:1 ratio), this results in significantly less cropping than 'cover'
      *
      * Why not height: 100%?
