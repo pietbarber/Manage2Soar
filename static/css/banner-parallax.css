@@ -34,7 +34,12 @@
     width: 100%;
     height: 120%;
     /* Extra height for parallax movement */
-    background-size: cover;
+    /* Issue #570: Changed from 'cover' to 'contain' to show full banner image without cropping
+     * cover = fills container but crops image to fit aspect ratio (zooms in)
+     * contain = shows full image, may leave empty space but no cropping
+     * This ensures user's carefully composed banner images are fully visible.
+     */
+    background-size: contain;
     background-position: center center;
     background-repeat: no-repeat;
     /* Use scroll instead of fixed to prevent cropping issues.
