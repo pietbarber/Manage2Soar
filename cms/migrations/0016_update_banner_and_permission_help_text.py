@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
             name="banner_image",
             field=models.ImageField(
                 blank=True,
-                help_text="Banner image displayed at top of the page with a parallax effect. The image is scaled to fill the banner area and may be cropped at the edges depending on screen size and aspect ratio. Recommended source size is at least 1920x300px (desktop) or any wide panoramic image around a 6:1–5:1 aspect ratio. Approximate banner height: 300px desktop, 200px tablet, 150px mobile.",
+                help_text="Banner image displayed at top of the page with a parallax effect. The image is scaled to fit entirely within the banner area without cropping; depending on screen size and aspect ratio, empty space (letterboxing) may appear above/below or to the sides. Recommended source size is at least 1920x300px (desktop) or any wide panoramic image around a 6:1–5:1 aspect ratio. Approximate maximum banner height: 300px desktop, 200px tablet, 150px mobile (taller/narrower images will appear shorter).",
                 null=True,
                 upload_to=utils.upload_entropy.upload_cms_banner,
             ),

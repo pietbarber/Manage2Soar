@@ -33,11 +33,21 @@
     left: 0;
     width: 100%;
     height: 120%;
-    /* Extra height for parallax movement */
-    /* Issue #570: Changed from 'cover' to 'contain' to show full banner image without cropping
-     * cover = fills container but crops image to fit aspect ratio (zooms in)
-     * contain = shows full image, may leave empty space but no cropping
-     * This ensures user's carefully composed banner images are fully visible.
+    /* Extra height for parallax movement - allows vertical translation without revealing edges */
+    /* Issue #570: Changed from 'cover' to 'contain' to reduce banner image cropping
+     *
+     * IMPORTANT: With height: 120% and overflow: hidden on parent, some vertical cropping
+     * can still occur during parallax movement, but this is intentional for the parallax effect.
+     *
+     * Behavior:
+     * - background-size: contain = image fits within the 120% element without being cropped BY CSS
+     * - The parent's overflow: hidden means only the center 100% of the 120% element is visible
+     * - This provides 10% vertical space above/below for parallax movement via translateY()
+     * - For wide panoramic images (6:1 ratio), this results in significantly less cropping than 'cover'
+     *
+     * Why not height: 100%?
+     * - Would eliminate parallax movement capability (no room to translate)
+     * - Current setup is a compromise: minimal cropping while preserving parallax effect
      */
     background-size: contain;
     background-position: center center;

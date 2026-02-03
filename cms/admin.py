@@ -103,10 +103,12 @@ class PageAdmin(admin.ModelAdmin):
                 "fields": ("banner_image",),
                 "description": (
                     "Upload a banner image to display at the top of the page with a parallax effect. "
-                    "The image is scaled to fit the banner area while preserving aspect ratio and may show "
-                    "letterboxing or slight clipping depending on the image aspect ratio and parallax. "
-                    "Recommended dimensions: 1920x300px (desktop), or any wide panoramic image with 6:1 or 5:1 "
-                    "aspect ratio. Banner height: 300px desktop, 200px tablet, 150px mobile."
+                    "The image is scaled to fit within the banner area while preserving its aspect ratio. "
+                    "This prevents cropping of the image itself, but may result in letterboxing (empty space "
+                    "above/below or left/right) when the image aspect ratio does not match the banner. The "
+                    "parallax banner uses a fixed height (300px desktop, 200px tablet, 150px mobile), so only "
+                    "a portion of very tall or complex images may be visible at once as you scroll. Recommended "
+                    "dimensions: 1920x300px (desktop), or any wide panoramic image with a 6:1 or 5:1 aspect ratio."
                 ),
                 "classes": ("collapse",),
             },
