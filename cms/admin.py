@@ -103,9 +103,10 @@ class PageAdmin(admin.ModelAdmin):
                 "fields": ("banner_image",),
                 "description": (
                     "Upload a banner image to display at the top of the page with a parallax effect. "
-                    "The full image will be shown without cropping - recommended dimensions: "
-                    "1920x300px (desktop), or any wide panoramic image with 6:1 or 5:1 aspect ratio. "
-                    "Banner height: 300px desktop, 200px tablet, 150px mobile."
+                    "The image is scaled to fit the banner area while preserving aspect ratio and may show "
+                    "letterboxing or slight clipping depending on the image aspect ratio and parallax. "
+                    "Recommended dimensions: 1920x300px (desktop), or any wide panoramic image with 6:1 or 5:1 "
+                    "aspect ratio. Banner height: 300px desktop, 200px tablet, 150px mobile."
                 ),
                 "classes": ("collapse",),
             },

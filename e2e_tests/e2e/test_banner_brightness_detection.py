@@ -503,3 +503,36 @@ class TestBannerParallaxEffect(DjangoPlaywrightTestCase):
 
         # No errors should have occurred
         assert len(errors) == 0, f"Parallax should not cause console errors: {errors}"
+
+    def test_banner_background_size_is_contain(self):
+        """
+        Verify banner image uses background-size: contain to prevent cropping.
+
+        Issue #570: Banner images were being inappropriately zoomed/cropped when
+        using background-size: cover. This test ensures the CSS remains set to
+        'contain' to show full banner images.
+
+        Regression prevention: This test will fail if background-size is changed
+        back to 'cover' or any other value that would cause cropping.
+        """
+        # Create page with any banner image
+        page = self._create_page_with_banner(
+            "test-banner-contain", self.test_image_path
+        )
+
+        # Navigate to the page
+        self.page.goto(f"{self.live_server_url}/cms/{page.slug}/")
+
+        # Wait for banner to be visible
+        self.page.wait_for_selector(".page-banner-image", timeout=5000)
+
+        # Get computed background-size style
+        banner_image = self.page.locator(".page-banner-image")
+        background_size = banner_image.evaluate(
+            "element => window.getComputedStyle(element).backgroundSize"
+        )
+
+        # Verify it's 'contain' not 'cover'
+        assert (
+            background_size == "contain"
+        ), f"Banner background-size should be 'contain' to prevent cropping, got: {background_size}"

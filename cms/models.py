@@ -243,10 +243,11 @@ class Page(models.Model):
         upload_to=upload_cms_banner,
         blank=True,
         null=True,
-        help_text="Banner image displayed at top of page with parallax effect. "
-        "The full image will be shown without cropping - recommended dimensions: "
-        "1920x300px (desktop), or any wide panoramic image with 6:1 or 5:1 aspect ratio. "
-        "Banner height: 300px desktop, 200px tablet, 150px mobile.",
+        help_text="Banner image displayed at top of the page with a parallax effect. "
+        "The image is scaled to fill the banner area and may be cropped at the edges "
+        "depending on screen size and aspect ratio. Recommended source size is at least "
+        "1920x300px (desktop) or any wide panoramic image around a 6:1–5:1 aspect ratio. "
+        "Approximate banner height: 300px desktop, 200px tablet, 150px mobile.",
     )
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
