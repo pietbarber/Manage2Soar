@@ -143,8 +143,8 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that announcement shows 'Roster Manager Announcement' label (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        # Use get_or_create to respect singleton pattern
-        message, _ = DutyRosterMessage.objects.get_or_create(id=1)
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
         message.content = "<p>Test announcement</p>"
         message.is_active = True
         message.save()
@@ -170,8 +170,8 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that rich HTML announcements render correctly (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        # Use get_or_create to respect singleton pattern
-        message, _ = DutyRosterMessage.objects.get_or_create(id=1)
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
         # Set HTML content with formatting
         message.content = "<p><strong>Line 1</strong></p><p>Line 2</p><p>Line 3</p>"
         message.is_active = True
@@ -202,8 +202,8 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that inactive announcements are not displayed (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        # Use get_or_create to respect singleton pattern
-        message, _ = DutyRosterMessage.objects.get_or_create(id=1)
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
         message.content = "<p>This should be hidden</p>"
         message.is_active = False
         message.save()

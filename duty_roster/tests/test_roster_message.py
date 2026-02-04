@@ -67,8 +67,8 @@ def regular_member(db, membership_statuses, siteconfig):
 @pytest.fixture
 def roster_message(db):
     """Create a DutyRosterMessage instance."""
-    # Use update_or_create for singleton pattern
-    message, created = DutyRosterMessage.objects.update_or_create(
+    # Use get_or_create for singleton pattern (consistent with model's classmethod)
+    message, created = DutyRosterMessage.objects.get_or_create(
         id=1,
         defaults={
             "content": "<p>Test announcement with <strong>HTML</strong> content.</p>",
