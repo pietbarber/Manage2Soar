@@ -614,7 +614,7 @@ class KioskActiveMemberDecoratorTests(TestCase):
         "interaction with force_login() causes redirect to login page despite user being "
         "authenticated. Requires investigation of @active_member_required decorator behavior "
         "when user.is_authenticated=True but membership_status is inactive. "
-        "See GitHub issue for details."
+        "See GitHub Issue # 603 for details."
     )
     def test_non_kiosk_inactive_member_denied(self):
         """Non-kiosk users with inactive membership_status should be denied."""
@@ -656,7 +656,7 @@ class KioskActiveMemberDecoratorTests(TestCase):
         "to bypass membership_status check even when session flag is not set. Requires "
         "investigation of middleware cookie validation logic and decorator interaction. "
         "May indicate middleware is setting is_kiosk_authenticated based on cookies alone, "
-        "or decorator is not checking session flag correctly. See GitHub issue for details."
+        "or decorator is not checking session flag correctly. See GitHub Issue # 603 for details."
     )
     def test_stale_kiosk_cookies_with_oauth_login_denied(self):
         """
@@ -704,7 +704,7 @@ class KioskActiveMemberDecoratorTests(TestCase):
         "handling differs between test client and real requests. After logout, accessing page "
         "with kiosk cookies should trigger middleware to re-authenticate user and set session "
         "flag, but user remains unauthenticated. Requires investigation of middleware execution "
-        "in Django test client vs production. See GitHub issue for details."
+        "in Django test client vs production. See GitHub Issue # 603 for details."
     )
     def test_kiosk_middleware_sets_session_flag(self):
         """Middleware should set is_kiosk_authenticated session flag on auto-reauth."""
