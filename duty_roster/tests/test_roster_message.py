@@ -85,10 +85,10 @@ class TestDutyRosterMessageModel:
     def test_create_message(self, db):
         """Test creating a DutyRosterMessage instance."""
         DutyRosterMessage.objects.all().delete()
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={"content": "<p>Hello World</p>", "is_active": True},
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Hello World</p>"
+        message.is_active = True
+        message.save()
         assert message.pk is not None
         assert message.content == "<p>Hello World</p>"
         assert message.is_active is True
@@ -98,9 +98,9 @@ class TestDutyRosterMessageModel:
         from django.core.exceptions import ValidationError
 
         DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.update_or_create(
-            id=1, defaults={"content": "<p>First</p>"}
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>First</p>"
+        message.save()
 
         # Trying to create a second instance should raise ValidationError from model.clean()
         # The model's save() calls full_clean() which calls clean(), raising ValidationError
@@ -125,26 +125,28 @@ class TestDutyRosterMessageModel:
     def test_get_message_returns_none_when_inactive(self, db):
         """Test get_message() returns None when message is inactive."""
         DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={"content": "<p>Inactive message</p>", "is_active": False},
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Inactive message</p>"
+        message.is_active = False
+        message.save()
         assert DutyRosterMessage.get_message() is None
 
     def test_get_message_returns_none_when_empty(self, db):
         """Test get_message() returns None when content is empty."""
         DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.update_or_create(
-            id=1, defaults={"content": "", "is_active": True}
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = ""
+        message.is_active = True
+        message.save()
         assert DutyRosterMessage.get_message() is None
 
     def test_get_message_returns_none_when_whitespace_only(self, db):
         """Test get_message() returns None when content is whitespace only."""
         DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.update_or_create(
-            id=1, defaults={"content": "   \n\t  ", "is_active": True}
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "   \n\t  "
+        message.is_active = True
+        message.save()
         assert DutyRosterMessage.get_message() is None
 
     def test_get_or_create_message_creates_if_not_exists(self, db):
@@ -169,9 +171,9 @@ class TestDutyRosterMessageModel:
     def test_str_representation_empty(self, db):
         """Test string representation when content is empty."""
         DutyRosterMessage.objects.all().delete()
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1, defaults={"content": ""}
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = ""
+        message.save()
         assert "empty" in str(message).lower()
 
     def test_updated_by_tracking(self, roster_message, rostermeister):
@@ -184,13 +186,10 @@ class TestDutyRosterMessageModel:
     def test_sanitizes_script_tags(self, db):
         """Test that script tags are sanitized on save (XSS prevention)."""
         DutyRosterMessage.objects.all().delete()
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={
-                "content": "<p>Safe content</p><script>alert('XSS')</script>",
-                "is_active": True,
-            },
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Safe content</p><script>alert('XSS')</script>"
+        message.is_active = True
+        message.save()
         message.refresh_from_db()
         # Script tag should be stripped (content remains as plain text)
         assert "<script>" not in message.content
@@ -201,13 +200,10 @@ class TestDutyRosterMessageModel:
     def test_sanitizes_event_handlers(self, db):
         """Test that event handlers are sanitized (XSS prevention)."""
         DutyRosterMessage.objects.all().delete()
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={
-                "content": '<p onclick="alert(1)">Click me</p>',
-                "is_active": True,
-            },
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = '<p onclick="alert(1)">Click me</p>'
+        message.is_active = True
+        message.save()
         message.refresh_from_db()
         # Event handler should be stripped
         assert "onclick" not in message.content
@@ -218,13 +214,10 @@ class TestDutyRosterMessageModel:
     def test_sanitizes_iframe_tags(self, db):
         """Test that iframe tags are sanitized (XSS prevention)."""
         DutyRosterMessage.objects.all().delete()
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={
-                "content": '<p>Safe</p><iframe src="evil.com"></iframe>',
-                "is_active": True,
-            },
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = '<p>Safe</p><iframe src="evil.com"></iframe>'
+        message.is_active = True
+        message.save()
         message.refresh_from_db()
         # Iframe should be stripped
         assert "<iframe" not in message.content
@@ -240,9 +233,10 @@ class TestDutyRosterMessageModel:
             "<ul><li>Item 1</li><li>Item 2</li></ul>"
             '<a href="https://example.com" title="Link">Link text</a>'
         )
-        message, created = DutyRosterMessage.objects.update_or_create(
-            id=1, defaults={"content": safe_html, "is_active": True}
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = safe_html
+        message.is_active = True
+        message.save()
         message.refresh_from_db()
         # All safe tags should be preserved
         assert "<strong>Bold</strong>" in message.content
@@ -424,10 +418,10 @@ class TestCalendarDisplaysRosterMessage:
     def test_calendar_no_message_when_inactive(self, client, regular_member, db):
         """Test that the calendar doesn't display inactive messages."""
         DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.update_or_create(
-            id=1,
-            defaults={"content": "<p>Hidden message</p>", "is_active": False},
-        )
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Hidden message</p>"
+        message.is_active = False
+        message.save()
 
         client.force_login(regular_member)
         url = reverse("duty_roster:duty_calendar")
