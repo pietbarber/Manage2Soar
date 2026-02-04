@@ -95,8 +95,8 @@ vault_smtp_password: "your-smtp2go-api-key-43-chars"
 # Used by Postfix to relay mail through [mail.smtp2go.com]:587
 
 # External SMTP relay credentials (used by m2s-mail server)
-vault_smtp_relay_username: "manage2soar"
-vault_smtp_relay_password: "your-smtp2go-relay-password"
+vault_smtp_relay_username: "YOUR_SMTP2GO_USERNAME"
+vault_smtp_relay_password: "REPLACE_WITH_SMTP2GO_PASSWORD_FROM_DASHBOARD"
 
 # ============================================================
 # GOOGLE OAUTH CREDENTIALS (OPTIONAL)
