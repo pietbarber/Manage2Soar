@@ -554,7 +554,11 @@ class KioskActiveMemberDecoratorTests(TestCase):
         )
 
         # Bind device with fingerprint
-        fingerprint_hash = "test_fingerprint_hash_" + "a" * 40
+        # Note: The bind view hashes the fingerprint, so we need to hash it here too
+        import hashlib
+
+        raw_fingerprint = "test_fingerprint_hash_" + "a" * 40
+        fingerprint_hash = hashlib.sha256(raw_fingerprint.encode()).hexdigest()
         self.kiosk_token.bind_device(fingerprint_hash)
 
         # Create normal user with inactive membership_status
@@ -585,7 +589,7 @@ class KioskActiveMemberDecoratorTests(TestCase):
         )
         response = self.client.post(
             bind_url,
-            data=json.dumps({"fingerprint": "test_fingerprint_" + "a" * 40}),
+            data=json.dumps({"fingerprint": "test_fingerprint_hash_" + "a" * 40}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -606,8 +610,9 @@ class KioskActiveMemberDecoratorTests(TestCase):
 
     def test_non_kiosk_inactive_member_denied(self):
         """Non-kiosk users with inactive membership_status should be denied."""
-        # Log in as inactive user via normal Django authentication
-        self.client.login(username="inactive", password="testpass123")
+        # Note: Inactive users have is_active=False which normally prevents login
+        # Use force_login to bypass authentication and test the decorator directly
+        self.client.force_login(self.inactive_user)
 
         # Verify NO kiosk session flag
         session = self.client.session
@@ -615,7 +620,9 @@ class KioskActiveMemberDecoratorTests(TestCase):
 
         # Access a view with @active_member_required
         member_list_url = reverse("members:member_list")
-        response = self.client.get(member_list_url)
+        response = self.client.get(member_list_url, follow=False)
+
+        # Should get 403, not redirect
         self.assertEqual(
             response.status_code, 403, "Inactive user should be denied access"
         )
@@ -656,8 +663,9 @@ class KioskActiveMemberDecoratorTests(TestCase):
         assert fingerprint is not None  # Type narrowing for Pylance
         self.client.cookies["kiosk_fingerprint"] = fingerprint
 
-        # Log in as inactive user via Django authentication (simulating OAuth2)
-        self.client.login(username="inactive", password="testpass123")
+        # Force login as inactive user (simulating OAuth2 login)
+        # Note: Normal login fails because is_active=False for inactive membership_status
+        self.client.force_login(self.inactive_user)
 
         # Verify session has NO kiosk flag (middleware didn't authenticate via kiosk)
         session = self.client.session
@@ -683,7 +691,7 @@ class KioskActiveMemberDecoratorTests(TestCase):
         )
         response = self.client.post(
             bind_url,
-            data=json.dumps({"fingerprint": "test_fingerprint_" + "a" * 40}),
+            data=json.dumps({"fingerprint": "test_fingerprint_hash_" + "a" * 40}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
