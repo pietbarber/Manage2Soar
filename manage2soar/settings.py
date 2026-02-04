@@ -495,6 +495,13 @@ if not DEBUG:
         "yes",
     )
 
+    # SameSite cookie settings to prevent CSRF attacks
+    # Lax = cookies sent with same-site requests and top-level navigation (recommended)
+    # Strict = cookies only sent with same-site requests (more restrictive)
+    # None = cookies sent with all requests (requires Secure flag)
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
+
     # Secure kiosk cookies - only sent over HTTPS (Issue #364)
     KIOSK_COOKIE_SECURE = os.getenv("KIOSK_COOKIE_SECURE", "True").lower() in (
         "true",
@@ -507,6 +514,8 @@ else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", "Lax")
     # KIOSK_COOKIE_SECURE should be True in production to prevent session hijacking
     # WARNING: Deploying with DEBUG=True in production will set this to False,
     # creating a security vulnerability. Middleware logs warnings if cookies are
