@@ -128,3 +128,40 @@ alert_email: "ops@manage2soar.com"
 
 # Threshold for queue size warning
 queue_alert_threshold: 100
+
+# ============================================================
+# ADMIN SSH ACCESS
+# ============================================================
+# SSH public keys and IPs for co-webmasters with server access
+#
+# ⚠️  CRITICAL: This is the SINGLE SOURCE OF TRUTH for admin IPs
+# ⚠️  All firewall rules reference this list - update here ONLY!
+#
+# To add a new co-webmaster:
+# 1. Add their entry to admin_ssh_keys below
+# 2. Run the appropriate playbook to update firewall rules:
+#    Recommended (full playbook run, especially for new admins):
+#      - Database: ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml
+#      - Mail: ansible-playbook -i inventory/gcp_mail.yml playbooks/gcp-mail-server.yml
+#      - Provisioner: ansible-playbook -i inventory/gcp_provisioner.yml playbooks/gcp-provisioner.yml
+#    Advanced (GCP firewall-only update, if you know no other changes are needed):
+#      - ansible-playbook -i inventory/gcp_provisioner.yml playbooks/gcp-provisioner.yml --tags gcp-provision
+#
+# See docs/runbooks/ansible-playbook-guide.md for detailed instructions
+
+admin_ssh_keys:
+  - user: "your_username"
+    name: "Your Full Name"
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... your_username@laptop"  # Get with: cat ~/.ssh/id_ed25519.pub
+    ip: "203.0.113.10/32"  # Your public IP (get with: curl -4 ifconfig.me)
+
+  # Add more co-webmasters as needed:
+  # - user: "admin2"
+  #   name: "Second Admin Name"
+  #   key: "ssh-rsa AAAAB3NzaC1yc2E... admin2@workstation"
+  #   ip: "198.51.100.20/32"
+
+# Derived list of IPs for firewall rules (DO NOT EDIT - auto-generated from admin_ssh_keys)
+# Use this variable in host-specific vars files like:
+#   gcp_ssh_allowed_sources: "{{ admin_ssh_ips }}"
+admin_ssh_ips: "{{ admin_ssh_keys | map(attribute='ip') | list }}"

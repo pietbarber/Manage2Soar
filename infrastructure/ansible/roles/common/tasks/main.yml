@@ -31,6 +31,43 @@
       - mailutils
     state: present
 
+- name: Validate SSH key format
+  ansible.builtin.assert:
+    that:
+      - item.key is defined
+      - item.key | length > 0
+      - item.key is match('^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521) ')
+    fail_msg: "Invalid SSH key format for user {{ item.user }}: {{ (item.key | default('key not defined'))[:50] }}..."
+    quiet: yes
+  loop: "{{ admin_ssh_keys }}"
+  when: admin_ssh_keys is defined
+
+- name: Create admin user accounts for SSH access
+  ansible.builtin.user:
+    name: "{{ item.user }}"
+    shell: /bin/bash
+    create_home: yes
+    state: present
+  loop: "{{ admin_ssh_keys }}"
+  when: admin_ssh_keys is defined
+
+- name: Add SSH keys to admin user authorized_keys
+  ansible.posix.authorized_key:
+    user: "{{ item.user }}"
+    key: "{{ item.key }}"
+    state: present
+    exclusive: no
+  loop: "{{ admin_ssh_keys }}"
+  when: admin_ssh_keys is defined
+
+- name: Add admin users to sudo group
+  ansible.builtin.user:
+    name: "{{ item.user }}"
+    groups: sudo
+    append: yes
+  loop: "{{ admin_ssh_keys }}"
+  when: admin_ssh_keys is defined
+
 - name: Configure UFW defaults
   community.general.ufw:
     direction: "{{ item.direction }}"
@@ -39,11 +76,21 @@
     - { direction: incoming, policy: deny }
     - { direction: outgoing, policy: allow }
 
-- name: Allow SSH
+- name: Allow SSH from specific IPs (if configured)
   community.general.ufw:
     rule: allow
     port: "22"
     proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ admin_ssh_ips }}"
+  when: admin_ssh_ips is defined and admin_ssh_ips | length > 0
+
+- name: Allow SSH from anywhere (if no IPs configured)
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+  when: admin_ssh_ips is not defined or admin_ssh_ips | length == 0
 
 - name: Allow SMTP
   community.general.ufw:
