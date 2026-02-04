@@ -39,6 +39,277 @@ ansible-playbook -i inventory/gcp_app.yml \
 ansible-playbook -i inventory/gcp_database.yml \
   --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-database.yml --tags postgresql
+
+# Update firewall rules (after adding co-webmaster)
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --tags firewall
+```
+
+---
+
+## 🔐 Managing Admin SSH Access
+
+**⚠️ CRITICAL**: All admin SSH keys and IP addresses are centralized in `group_vars/all.yml`. This is the **SINGLE SOURCE OF TRUTH** for firewall rules across all infrastructure.
+
+### Adding a New Co-Webmaster
+
+**Step 1: Update centralized admin list**
+
+Edit `group_vars/all.yml`:
+
+```yaml
+admin_ssh_keys:
+  - user: "pb"
+    name: "Piet Barber"
+    key: "ssh-ed25519 AAAAC3... pb@host"
+    ip: "138.88.187.144/32"
+
+  # Add new entry:
+  - user: "newadmin"
+    name: "New Admin Name"
+    key: "ssh-ed25519 AAAAC3... newadmin@host"  # Get with: cat ~/.ssh/id_ed25519.pub
+    ip: "203.0.113.10/32"  # Their public IP + /32 CIDR
+```
+
+**Step 2: Update firewall rules on ALL servers**
+
+```bash
+cd infrastructure/ansible
+
+# OPTION A: Full playbook run (updates GCP + OS firewalls + user accounts)
+# Recommended for adding new admins (creates users, deploys SSH keys, configures both firewall layers)
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml
+
+ansible-playbook -i inventory/gcp_mail.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-mail-server.yml
+
+# OPTION B: GCP firewall only (cloud-level firewall rules)
+# Use when updating admin IPs but user accounts already exist
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --tags gcp-provision
+
+ansible-playbook -i inventory/gcp_mail.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-mail-server.yml --tags gcp-provision
+```
+
+**⚠️ Important**: The `--tags firewall` filter does NOT work for GCP firewall updates because GCP firewall tasks are tagged as `gcp-provision`. Always use Option A (full playbook) or Option B (`--tags gcp-provision`) for firewall changes.
+
+**Two-layer firewall architecture:**
+- **GCP Cloud Firewall** (outer perimeter): Controls traffic reaching the VM from the internet. Updated via `--tags gcp-provision` or full playbook run.
+- **UFW OS Firewall** (host-level): Controls traffic reaching services on the VM. Updated via full playbook run only (no tag filter works correctly).
+
+For complete admin access setup, the full playbook run (Option A) is recommended because it:
+1. Updates GCP cloud firewall rules
+2. Creates OS user accounts for new admins
+3. Deploys SSH keys to authorized_keys
+4. Updates UFW OS firewall rules
+5. Updates service-level access controls (e.g., PostgreSQL pg_hba.conf)
+
+**Step 3: Verify firewall rule changes**
+
+```bash
+# Capture firewall state BEFORE changes
+gcloud compute firewall-rules list --format="yaml" --sort-by=name > /tmp/firewall-rules-before.yaml
+
+# Run playbooks (see Step 2 above)
+
+# Capture firewall state AFTER changes
+gcloud compute firewall-rules list --format="yaml" --sort-by=name > /tmp/firewall-rules-after.yaml
+
+# Compare to verify expected changes
+diff -u /tmp/firewall-rules-before.yaml /tmp/firewall-rules-after.yaml
+```
+
+**Step 4: Test SSH access**
+
+```bash
+# Test SSH connection
+gcloud compute ssh m2s-database --zone=us-east1-b -- "echo 'SSH working!'"
+gcloud compute ssh m2s-mail --zone=us-east1-b -- "echo 'SSH working!'"
+
+# Verify OS-level firewall rules on each server
+ssh pb@34.74.153.95 "sudo ufw status numbered"  # Database
+ssh pb@35.237.42.68 "sudo ufw status numbered"  # Mail
+
+# Verify firewall rules were updated
+gcloud compute firewall-rules describe m2s-database-allow-ssh
+gcloud compute firewall-rules describe m2s-mail-allow-ssh
+```
+
+### Updating Existing Admin IP
+
+When a co-webmaster's IP address changes:
+
+**Step 1: Update IP in `group_vars/all.yml`**
+
+```yaml
+admin_ssh_keys:
+  - user: "brian"
+    name: "Brian [Last Name]"
+    key: "ssh-ed25519 AAAAC3... brian@host"
+    ip: "203.0.113.99/32"  # <-- Updated IP
+```
+
+**Step 2: Run firewall update** (same commands as above)
+
+### Removing Admin Access
+
+**Step 1: Comment out or remove entry in `group_vars/all.yml`**
+
+```yaml
+admin_ssh_keys:
+  - user: "pb"
+    # ...
+  # REMOVED: brian no longer needs access
+  # - user: "brian"
+  #   name: "Brian [Last Name]"
+  #   key: "..."
+  #   ip: "..."
+```
+
+**Step 2: Run firewall update** (same commands as above)
+
+### Troubleshooting
+
+**"Permission denied (publickey)" when SSHing**
+
+Check:
+1. Is the SSH key in `group_vars/all.yml`?
+2. Did you run the firewall update playbook?
+3. Is the IP address correct? (Check with `curl ifconfig.me`)
+4. Are you using the correct SSH key? (`ssh-add -l`)
+
+**Firewall rule shows old IPs**
+
+```bash
+# Verify all.yml is correct
+cat group_vars/all.yml | grep -A 20 "admin_ssh_keys:"
+
+# Re-run firewall update
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --tags firewall --check  # Dry run first
+
+# Then apply
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --tags firewall
+```
+
+**"Module format_ssh_key not found"**
+
+This is a custom Jinja2 filter. If it's missing, the simplified approach is to manually format keys:
+
+```yaml
+# In gcp_mail/vars.yml
+gcp_ssh_public_keys:
+  - "{{ admin_ssh_keys[0].user }}:{{ admin_ssh_keys[0].key }}"
+  - "{{ admin_ssh_keys[1].user }}:{{ admin_ssh_keys[1].key }}"
+  # etc...
+```
+
+---
+
+## 🔑 PostgreSQL Password Management
+
+**CRITICAL**: PostgreSQL passwords must stay synchronized between Ansible vault and Kubernetes secrets. Mismatches cause production outages.
+
+### Password Synchronization Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Source of Truth: Kubernetes Secrets (Production)      │
+│  - manage2soar-env-ssc (tenant-ssc namespace)          │
+│  - manage2soar-env-masa (tenant-masa namespace)        │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+                   Must match exactly
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│  Ansible Vault: group_vars/localhost/vault.yml         │
+│  - vault_postgresql_password_ssc                        │
+│  - vault_postgresql_password_masa                       │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+                   Used by playbook
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│  PostgreSQL Database Server                             │
+│  - User: m2s_ssc with password                          │
+│  - User: m2s_masa with password                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Safeguard: Password Update Protection
+
+By default, the `gcp-database.yml` playbook will **NOT** update passwords for existing PostgreSQL users. This prevents accidental production outages.
+
+```yaml
+# roles/postgresql/defaults/main.yml
+postgresql_update_existing_passwords: false  # Default: safe mode
+```
+
+When you run the database playbook, existing users will show:
+```
+⚠️  User m2s_ssc already exists - password NOT updated
+To update passwords, set postgresql_update_existing_passwords: true
+WARNING: This will break Django apps until K8s secrets are updated!
+```
+
+### Syncing Vault to Match Production (Recommended)
+
+If Ansible vault passwords drift out of sync with production:
+
+```bash
+cd infrastructure/ansible
+
+# Extract production passwords from K8s
+kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/ssc_pass.txt
+kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/masa_pass.txt
+
+# Decrypt vault
+ansible-vault decrypt group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
+
+# Update passwords (use a text editor or sed)
+# vault_postgresql_password_ssc: "<paste from /tmp/ssc_pass.txt>"
+# vault_postgresql_password_masa: "<paste from /tmp/masa_pass.txt>"
+
+# Re-encrypt vault
+ansible-vault encrypt group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
+
+# Clean up temp files
+rm -f /tmp/ssc_pass.txt /tmp/masa_pass.txt
+
+# Verify sync (optional - passwords will match but playbook won't update them)
+ansible-playbook -i inventory/gcp_database.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  playbooks/gcp-database.yml --check
+```
+
+### Emergency Recovery: Password Mismatch
+
+If Django apps can't connect to database due to password mismatch:
+
+```bash
+# Reset PostgreSQL to match K8s (fastest fix)
+kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/ssc_pass.txt
+ssh pb@34.74.153.95 "sudo -u postgres psql -c \"ALTER USER m2s_ssc WITH PASSWORD '\$(cat /tmp/ssc_pass.txt)';\""
+
+kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/masa_pass.txt
+ssh pb@34.74.153.95 "sudo -u postgres psql -c \"ALTER USER m2s_masa WITH PASSWORD '\$(cat /tmp/masa_pass.txt)';\""
+
+rm -f /tmp/*_pass.txt
+
+# Verify website works
+curl -I https://skylinesoaring.org/
+
+# Then sync Ansible vault (see "Syncing Vault to Match Production" above)
 ```
 
 ---

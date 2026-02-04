@@ -54,22 +54,19 @@ gcp_network: "default"
 # Whether to allow SSH access (recommend: true for initial setup)
 gcp_allow_ssh: true
 
-# SSH source ranges - RESTRICT IN PRODUCTION!
-# For production, use your office IP or VPN CIDR
-# CRITICAL: Replace this placeholder with your actual public IP/VPN CIDR before deployment!
-gcp_ssh_allowed_sources:
-  - "YOUR_IP_HERE/32"  # EXAMPLE ONLY - REPLACE with your public IP/VPN CIDR before deployment
+# SSH source ranges - CENTRALLY MANAGED
+# Admin IPs are defined in all.yml as the SINGLE SOURCE OF TRUTH
+# See docs/runbooks/ansible-playbook-guide.md for instructions on adding co-webmasters
+gcp_ssh_allowed_sources: "{{ admin_ssh_ips }}"
 
-# SSH public keys to add to VM metadata
-# CRITICAL: You MUST add at least one valid SSH public key here or Ansible won't be able to connect!
-# Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
+# SSH public keys - CENTRALLY MANAGED
+# Admin SSH keys are defined in all.yml - this references that centralized list
+# CRITICAL: You MUST define admin_ssh_keys in all.yml before deploying!
 # Format: "username:ssh-type key-data username@hostname"
-gcp_ssh_public_keys: []
-# Example (uncomment and REPLACE with your actual key):
-# gcp_ssh_public_keys:
-#   - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAYourRealKeyDataHere pb@laptop"
-#   # Add multiple keys if needed:
-#   # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
+gcp_ssh_public_keys:
+  - "{{ admin_ssh_keys[0].user }}:{{ admin_ssh_keys[0].key }}"
+  # Add more co-webmaster keys by referencing admin_ssh_keys[1], [2], etc.
+  # or add additional non-admin keys manually here
 
 # Ansible SSH connection settings (optional - defaults to your local username)
 # gcp_ansible_user: "pb"  # Must match the username in gcp_ssh_public_keys

@@ -55,29 +55,27 @@ gcp_network: "default"
 # Whether to allow SSH access (recommend: true for initial setup)
 gcp_allow_ssh: true
 
-# SSH source ranges - RESTRICT IN PRODUCTION!
-# For production, use your office IP or VPN CIDR
-gcp_ssh_allowed_sources: []
-#   - "203.0.113.10/32"  # EXAMPLE: replace with your public IP CIDR
-#   - "YOUR_OFFICE_IP/32"
-#   - "YOUR_VPN_CIDR"
+# SSH source ranges - CENTRALLY MANAGED
+# Admin IPs are defined in all.yml as the SINGLE SOURCE OF TRUTH
+# See docs/runbooks/ansible-playbook-guide.md for instructions on adding co-webmasters
+gcp_ssh_allowed_sources: "{{ admin_ssh_ips }}"
 
-# SSH public keys to add to VM metadata
-# CRITICAL: Add your SSH public key here or Ansible won't be able to connect!
-# Get your key: cat ~/.ssh/id_ed25519.pub (or id_rsa.pub)
+# SSH public keys - CENTRALLY MANAGED
+# Admin SSH keys are defined in all.yml - this references that centralized list
 # Format: "username:ssh-type key-data username@hostname"
 gcp_ssh_public_keys:
-  - "pb:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDataHere pb@laptop"
-  # Add multiple keys if needed:
-  # - "admin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... admin@workstation"
+  - "{{ admin_ssh_keys[0].user }}:{{ admin_ssh_keys[0].key }}"
+  # Add more co-webmaster keys by referencing admin_ssh_keys[1], [2], etc.
+  # or add additional non-admin keys manually here
 
 # Ansible SSH connection settings (optional - defaults to your local username)
 # gcp_ansible_user: "pb"  # Must match the username in gcp_ssh_public_keys
 # gcp_ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
 
-# PostgreSQL source ranges - your K8s cluster or app servers
-gcp_postgresql_allowed_sources:
-  - "10.0.0.0/8"      # Internal GCP network
+# PostgreSQL source ranges - includes admin IPs + internal network + app servers
+# Admin IPs are centrally managed in all.yml - see admin_ssh_ips variable
+gcp_postgresql_allowed_sources: "{{ admin_ssh_ips + ['10.0.0.0/8'] }}"
+  # Add additional non-admin IPs as needed:
   # - "35.192.0.0/12"  # GKE cluster IP range
   # - "YOUR_APP_SERVER_IP/32"
 
@@ -92,8 +90,9 @@ postgresql_version: "17"
 postgresql_listen_addresses: "0.0.0.0"
 
 # Remote access CIDRs (must match gcp_postgresql_allowed_sources)
-postgresql_remote_access_cidrs:
-  - "10.0.0.0/8"
+# Admin IPs are centrally managed in all.yml
+postgresql_remote_access_cidrs: "{{ admin_ssh_ips + ['10.0.0.0/8'] }}"
+  # Add additional non-admin IPs as needed (must match gcp_postgresql_allowed_sources)
 
 # ============================================================
 # SSL/TLS CONFIGURATION
