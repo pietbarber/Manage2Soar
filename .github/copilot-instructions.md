@@ -1,7 +1,7 @@
 # Copilot Instructions for Manage2Soar
 
 ## Project Overview
-- **Manage2Soar** is a Django 5.2 web application for soaring club management: members, gliders, badges, operations, analytics, and instruction.
+- **Manage2Soar** is a Django 5.2.11 web application for soaring club management: members, gliders, badges, operations, analytics, and instruction.
 - Major apps: `members`, `logsheet`, `duty_roster`, `instructors`, `analytics`, `cms`, `knowledgetest`, `notifications`, `siteconfig`, `utils`.
 - **Production deployment:** Kubernetes cluster with 2-pod deployment, PostgreSQL database, distributed CronJob system.
 
