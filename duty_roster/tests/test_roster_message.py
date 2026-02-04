@@ -103,9 +103,11 @@ class TestDutyRosterMessageModel:
         )
 
         # Trying to create a second instance should raise ValidationError from model.clean()
+        # The model's save() calls full_clean() which calls clean(), raising ValidationError
+        # before the database CheckConstraint is evaluated
         with pytest.raises(ValidationError, match="Only one Duty Roster Message"):
             msg = DutyRosterMessage(id=2, content="<p>Second</p>")
-            msg.save()  # Calls full_clean() which raises ValidationError
+            msg.save()
 
         # Should still only have one instance
         assert DutyRosterMessage.objects.count() == 1

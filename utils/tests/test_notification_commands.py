@@ -332,16 +332,19 @@ class TestDutyDelinquentsCommand(TestCase):
         assert self.non_flying_member not in delinquent_members
 
     def test_excludes_members_with_duty(self):
-        """Test that members who did duty are not flagged."""
-        # Create duty assignment for flying member within lookback period
-        # Command uses lookback_months=12, so duty must be within last year
+        """Test that members who performed actual duty are not flagged."""
+        # Create ACTUAL performed duty (Logsheet) for flying member within lookback period
+        # Command checks Logsheet duty_officer, not DutyAssignment (scheduled duty)
         duty_date = timezone.now().date() - timedelta(days=60)  # 2 months ago
-        # Create a duty assignment with the flying member as duty officer
         airfield = Airfield.objects.create(identifier="DUTY", name="Duty Field")
-        DutyAssignment.objects.create(
-            date=duty_date,
+
+        # Create a finalized logsheet with flying member as duty officer (actual performed duty)
+        Logsheet.objects.create(
+            log_date=duty_date,
             duty_officer=self.flying_member,
-            location=airfield,
+            airfield=airfield,
+            finalized=True,
+            created_by=self.flying_member,
         )
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -350,11 +353,9 @@ class TestDutyDelinquentsCommand(TestCase):
                     lookback_months=12, min_flights=1, dry_run=False, verbosity=1
                 )
 
-        # Member with recent duty should still be flagged if they fly but don't do enough duty
-        # The test expectation was wrong - the command tracks duty participation rate,
-        # not just "did any duty". One duty assignment for someone with 5 flights may not be enough.
-        # Update assertion to match actual behavior: report IS sent because duty ratio is insufficient
-        mock_send.assert_called_once()
+        # Flying member should NOT be delinquent since they performed actual duty
+        # No delinquent members found, so no report should be sent
+        mock_send.assert_not_called()
 
     def test_configurable_parameters(self):
         """Test that command parameters work correctly."""
