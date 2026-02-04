@@ -18,8 +18,7 @@ While Django defaults to `SameSite='Lax'` since version 3.1, Safari on iOS has k
     "requestMethod": "POST",
     "requestUrl": "https://www.skylinesoaring.org/login/",
     "status": 403,
-    "userAgent": "Mozilla/5.0 (iPad; CPU OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7.3 Mobile/15E148 Safari/604.1",
-    "remoteIp": "205.220.129.47"
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7.3 Mobile/15E148 Safari/604.1"
   },
   "timestamp": "2026-02-03T19:37:28.622413Z"
 }
