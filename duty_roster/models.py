@@ -160,7 +160,10 @@ class DutyRosterMessage(models.Model):
             # Use select_for_update() with row-level lock to prevent concurrent creation
             message = cls.objects.select_for_update().first()
             if not message:
-                message = cls.objects.create()
+                # Must specify id=1 for singleton constraint (id__lte=1)
+                message, created = cls.objects.update_or_create(
+                    id=1, defaults={"content": "", "is_active": True}
+                )
             return message
 
 
