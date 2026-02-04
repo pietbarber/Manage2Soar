@@ -157,10 +157,15 @@ class DutyRosterMessage(models.Model):
         from django.db import transaction
 
         with transaction.atomic():
-            # Use select_for_update() with row-level lock to prevent concurrent creation
-            message = cls.objects.select_for_update().first()
+            # Use select_for_update() with row-level lock on id=1 to prevent race condition
+            # Lock id=1 specifically before checking existence and creating
+            message = cls.objects.select_for_update().filter(id=1).first()
             if not message:
-                message = cls.objects.create()
+                # Use get_or_create within locked context to handle concurrent creation
+                # Must specify id=1 for singleton constraint (id__lte=1)
+                message, created = cls.objects.get_or_create(
+                    id=1, defaults={"content": "", "is_active": True}
+                )
             return message
 
 

@@ -332,15 +332,19 @@ class TestDutyDelinquentsCommand(TestCase):
         assert self.non_flying_member not in delinquent_members
 
     def test_excludes_members_with_duty(self):
-        """Test that members who did duty are not flagged."""
-        # Create duty assignment for flying member
-        duty_date = timezone.now().date() - timedelta(days=60)
-        # Create a duty assignment with the flying member as duty officer
+        """Test that members who performed actual duty are not flagged."""
+        # Create ACTUAL performed duty (Logsheet) for flying member within lookback period
+        # Command checks Logsheet duty_officer, not DutyAssignment (scheduled duty)
+        duty_date = timezone.now().date() - timedelta(days=60)  # 2 months ago
         airfield = Airfield.objects.create(identifier="DUTY", name="Duty Field")
-        DutyAssignment.objects.create(
-            date=duty_date,
+
+        # Create a finalized logsheet with flying member as duty officer (actual performed duty)
+        Logsheet.objects.create(
+            log_date=duty_date,
             duty_officer=self.flying_member,
-            location=airfield,
+            airfield=airfield,
+            finalized=True,
+            created_by=self.flying_member,
         )
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -349,7 +353,7 @@ class TestDutyDelinquentsCommand(TestCase):
                     lookback_months=12, min_flights=1, dry_run=False, verbosity=1
                 )
 
-        # Flying member should not be delinquent since they did duty
+        # Flying member should NOT be delinquent since they performed actual duty
         # No delinquent members found, so no report should be sent
         mock_send.assert_not_called()
 

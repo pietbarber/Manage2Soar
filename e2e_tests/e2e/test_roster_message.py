@@ -78,14 +78,16 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         # Navigate to edit page
         self.page.goto(f"{self.live_server_url}/duty_roster/message/edit/")
 
-        # The TinyMCE editor may take a moment to initialize
+        # Wait for TinyMCE to fully initialize
+        self.page.wait_for_function(
+            "typeof tinymce !== 'undefined' && tinymce.activeEditor !== null"
+        )
         self.page.wait_for_timeout(500)
 
-        # Find and fill the textarea (TinyMCE may use different methods)
-        # For simplicity, we'll try the raw textarea first
-        textarea = self.page.locator("textarea#id_content, textarea[name='content']")
-        if textarea.is_visible():
-            textarea.fill("<p>Test announcement from E2E test!</p>")
+        # Set content using TinyMCE JavaScript API (more reliable than filling textarea)
+        self.page.evaluate(
+            "tinymce.activeEditor.setContent('<p>Test announcement from E2E test!</p>')"
+        )
 
         # Ensure is_active is checked
         is_active_checkbox = self.page.locator("#id_is_active, input[name='is_active']")
@@ -98,16 +100,19 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         # Should redirect to calendar
         self.page.wait_for_url(f"{self.live_server_url}/duty_roster/calendar/**")
 
-        # Verify the message appears on the calendar
-        assert self.page.is_visible("text=Roster Manager Announcement")
+        # Verify the message appears on the calendar (note colon in template)
+        assert self.page.is_visible("text=Roster Manager Announcement:")
         assert self.page.is_visible("text=Test announcement from E2E test")
 
     def test_message_displays_on_calendar_view(self):
         """Test that an existing message displays on the calendar view."""
         # Create a message in the database
-        DutyRosterMessage.objects.create(
-            content="<p><strong>Important:</strong> Schedule change next week!</p>",
-            is_active=True,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p><strong>Important:</strong> Schedule change next week!</p>",
+                "is_active": True,
+            },
         )
 
         self.create_test_member(username="viewer", membership_status="Full Member")
@@ -116,16 +121,19 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         # Navigate to calendar
         self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
 
-        # Should see the announcement
-        assert self.page.is_visible("text=Roster Manager Announcement")
+        # Should see the announcement (note colon in template)
+        assert self.page.is_visible("text=Roster Manager Announcement:")
         assert self.page.is_visible("text=Schedule change next week")
 
     def test_inactive_message_not_displayed(self):
         """Test that inactive messages are not displayed."""
         # Create an inactive message
-        DutyRosterMessage.objects.create(
-            content="<p>This should be hidden</p>",
-            is_active=False,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p>This should be hidden</p>",
+                "is_active": False,
+            },
         )
 
         self.create_test_member(username="viewer", membership_status="Full Member")
@@ -140,9 +148,12 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
     def test_rostermeister_sees_edit_button(self):
         """Test that rostermeisters see the edit button on the calendar."""
         # Create a message
-        DutyRosterMessage.objects.create(
-            content="<p>Announcement content</p>",
-            is_active=True,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p>Announcement content</p>",
+                "is_active": True,
+            },
         )
 
         self.create_test_member(
@@ -164,9 +175,12 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
     def test_regular_member_no_edit_button(self):
         """Test that regular members don't see the edit button."""
         # Create a message
-        DutyRosterMessage.objects.create(
-            content="<p>Announcement content</p>",
-            is_active=True,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p>Announcement content</p>",
+                "is_active": True,
+            },
         )
 
         self.create_test_member(
@@ -179,8 +193,8 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         # Navigate to calendar
         self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
 
-        # Should see the announcement but not the edit button
-        assert self.page.is_visible("text=Roster Manager Announcement")
+        # Should see the announcement but not the edit button (note colon in template)
+        assert self.page.is_visible("text=Roster Manager Announcement:")
         edit_button = self.page.locator("a[title='Edit announcement']")
         assert edit_button.count() == 0
 
@@ -202,9 +216,12 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
     def test_message_dismissible(self):
         """Test that the message alert can be dismissed."""
         # Create a message
-        DutyRosterMessage.objects.create(
-            content="<p>Dismissible announcement</p>",
-            is_active=True,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p>Dismissible announcement</p>",
+                "is_active": True,
+            },
         )
 
         self.create_test_member(username="viewer", membership_status="Full Member")
@@ -228,9 +245,12 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
     def test_edit_button_navigates_to_edit_page(self):
         """Test that clicking the edit button navigates to the edit page."""
         # Create a message
-        DutyRosterMessage.objects.create(
-            content="<p>Click to edit</p>",
-            is_active=True,
+        DutyRosterMessage.objects.update_or_create(
+            id=1,
+            defaults={
+                "content": "<p>Click to edit</p>",
+                "is_active": True,
+            },
         )
 
         self.create_test_member(

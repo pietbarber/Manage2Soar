@@ -143,11 +143,11 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that announcement shows 'Roster Manager Announcement' label (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.create(
-            content="<p>Test announcement</p>",
-            is_active=True,
-        )
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Test announcement</p>"
+        message.is_active = True
+        message.save()
 
         user = Member.objects.create_user(
             username="testmember3",
@@ -170,12 +170,12 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that rich HTML announcements render correctly (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        DutyRosterMessage.objects.all().delete()
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
         # Set HTML content with formatting
-        DutyRosterMessage.objects.create(
-            content="<p><strong>Line 1</strong></p><p>Line 2</p><p>Line 3</p>",
-            is_active=True,
-        )
+        message.content = "<p><strong>Line 1</strong></p><p>Line 2</p><p>Line 3</p>"
+        message.is_active = True
+        message.save()
 
         user = Member.objects.create_user(
             username="testmember_multiline",
@@ -202,11 +202,11 @@ class TestDutyRosterCalendarWithAnnouncement:
         """Test that inactive announcements are not displayed (Issue #551)."""
         from duty_roster.models import DutyRosterMessage
 
-        DutyRosterMessage.objects.all().delete()
-        DutyRosterMessage.objects.create(
-            content="<p>This should be hidden</p>",
-            is_active=False,
-        )
+        # Use the model's singleton helper to respect the singleton pattern
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>This should be hidden</p>"
+        message.is_active = False
+        message.save()
 
         user = Member.objects.create_user(
             username="testmember_inactive",
