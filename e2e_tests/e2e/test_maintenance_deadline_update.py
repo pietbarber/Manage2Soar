@@ -89,17 +89,18 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
         # Click Save Changes
         self.page.locator("#save-deadline-btn").click()
 
-        # Wait for success toast
-        toast = self.page.locator("#successToast")
-        assert toast.wait_for(state="visible", timeout=5000)
-        toast_text = toast.text_content() or ""
-        assert "successfully" in toast_text.lower()
+        # Wait for modal to close (indicates successful submission)
+        modal = self.page.locator("#updateDeadlineModal.show")
+        modal.wait_for(state="hidden", timeout=5000)
 
-        # Wait for page reload
-        self.page.wait_for_load_state("networkidle")
+        # Wait for page reload (JavaScript does setTimeout reload after success)
+        self.page.wait_for_load_state("networkidle", timeout=10000)
 
         # Verify new date appears in table (after reload)
-        assert "2027-01-31" in self.page.content()
+        page_content = self.page.content()
+        assert (
+            "2027-01-31" in page_content
+        ), "Updated date not found in page after submission"
 
     def test_form_submission_via_enter_key(self):
         """Test that pressing Enter in date field submits form (keyboard accessibility)."""
@@ -117,11 +118,18 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
         date_input.fill("2027-02-28")
         date_input.press("Enter")
 
-        # Wait for success toast
-        toast = self.page.locator("#successToast")
-        assert toast.wait_for(state="visible", timeout=5000)
-        toast_text = toast.text_content() or ""
-        assert "successfully" in toast_text.lower()
+        # Wait for modal to close (indicates successful submission)
+        modal = self.page.locator("#updateDeadlineModal.show")
+        modal.wait_for(state="hidden", timeout=5000)
+
+        # Wait for page reload (JavaScript does setTimeout reload after success)
+        self.page.wait_for_load_state("networkidle", timeout=10000)
+
+        # Verify updated date appears after reload
+        page_content = self.page.content()
+        assert (
+            "2027-02-28" in page_content
+        ), "Updated date not found in page after submission"
 
     def test_error_handling_for_invalid_submission(self):
         """Test that error messages display correctly for invalid submissions."""
