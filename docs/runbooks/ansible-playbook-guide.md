@@ -152,8 +152,8 @@ gcloud compute ssh m2s-database --zone=us-east1-b -- "echo 'SSH working!'"
 gcloud compute ssh m2s-mail --zone=us-east1-b -- "echo 'SSH working!'"
 
 # Verify OS-level firewall rules on each server
-ssh pb@34.74.153.95 "sudo ufw status numbered"  # Database
-ssh pb@35.237.42.68 "sudo ufw status numbered"  # Mail
+gcloud compute ssh m2s-database --zone=us-east1-b -- "sudo ufw status numbered"  # Database
+gcloud compute ssh m2s-mail --zone=us-east1-b -- "sudo ufw status numbered"  # Mail
 
 # Verify firewall rules were updated
 gcloud compute firewall-rules describe m2s-database-allow-ssh
@@ -209,15 +209,15 @@ Check:
 # Verify all.yml is correct
 cat group_vars/all.yml | grep -A 20 "admin_ssh_keys:"
 
-# Re-run firewall update
+# Re-run firewall update (GCP layer)
 ansible-playbook -i inventory/gcp_database.yml \
   --vault-password-file ~/.ansible_vault_pass \
-  playbooks/gcp-database.yml --tags firewall --check  # Dry run first
+  playbooks/gcp-database.yml --tags gcp-provision --check  # Dry run first
 
 # Then apply
 ansible-playbook -i inventory/gcp_database.yml \
   --vault-password-file ~/.ansible_vault_pass \
-  playbooks/gcp-database.yml --tags firewall
+  playbooks/gcp-database.yml --tags gcp-provision
 ```
 
 **"Module format_ssh_key not found"**
@@ -287,22 +287,22 @@ If Ansible vault passwords drift out of sync with production:
 ```bash
 cd infrastructure/ansible
 
-# Extract production passwords from K8s
-kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/ssc_pass.txt
-kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/masa_pass.txt
+# Extract production passwords from K8s into environment variables (in-memory, avoid /tmp files)
+export SSC_DB_PASSWORD="$(kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)"
+export MASA_DB_PASSWORD="$(kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)"
 
 # Decrypt vault
 ansible-vault decrypt group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
 
-# Update passwords (use a text editor or sed)
-# vault_postgresql_password_ssc: "<paste from /tmp/ssc_pass.txt>"
-# vault_postgresql_password_masa: "<paste from /tmp/masa_pass.txt>"
+# Update passwords using environment variables
+sed -i "s/vault_postgresql_password_ssc: .*/vault_postgresql_password_ssc: \"${SSC_DB_PASSWORD}\"/" group_vars/localhost/vault.yml
+sed -i "s/vault_postgresql_password_masa: .*/vault_postgresql_password_masa: \"${MASA_DB_PASSWORD}\"/" group_vars/localhost/vault.yml
 
 # Re-encrypt vault
 ansible-vault encrypt group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
 
-# Clean up temp files
-rm -f /tmp/ssc_pass.txt /tmp/masa_pass.txt
+# Clean up in-memory secrets (consider also clearing shell history)
+unset SSC_DB_PASSWORD MASA_DB_PASSWORD
 
 # Verify sync (optional - passwords will match but playbook won't update them)
 ansible-playbook -i inventory/gcp_database.yml \
@@ -312,22 +312,33 @@ ansible-playbook -i inventory/gcp_database.yml \
 
 ### Emergency Recovery: Password Mismatch
 
-If Django apps can't connect to database due to password mismatch:
+⚠️ **WARNING**: This procedure uses manual SSH/SQL commands and violates the IaC-first principle. Use only as a last resort when the production site is down and immediate recovery is required. After using this emergency procedure, you MUST update Ansible vault to match production (see "Syncing Vault to Match Production" above) to restore IaC consistency.
+
+**IaC-First Approach (Recommended)**: Update Ansible vault with K8s password values, then run playbook with `postgresql_update_existing_passwords=true` flag. This ensures infrastructure code matches reality.
+
+If Django apps can't connect to database due to password mismatch and immediate recovery is needed:
 
 ```bash
-# Reset PostgreSQL to match K8s (fastest fix)
-kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/ssc_pass.txt
-ssh pb@34.74.153.95 "sudo -u postgres psql -c \"ALTER USER m2s_ssc WITH PASSWORD '\$(cat /tmp/ssc_pass.txt)';\""
+# Fetch passwords from K8s secrets into local shell variables (not files)
+SSC_DB_PASSWORD="$(kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)"
+MASA_DB_PASSWORD="$(kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)"
 
-kubectl get secret -n tenant-masa manage2soar-env-masa -o jsonpath='{.data.DB_PASSWORD}' | base64 -d > /tmp/masa_pass.txt
-ssh pb@34.74.153.95 "sudo -u postgres psql -c \"ALTER USER m2s_masa WITH PASSWORD '\$(cat /tmp/masa_pass.txt)';\""
+# Escape single quotes for safe use inside SQL string literals
+SSC_DB_PASSWORD_ESCAPED="${SSC_DB_PASSWORD//\'/\'\'\'}"
+MASA_DB_PASSWORD_ESCAPED="${MASA_DB_PASSWORD//\'/\'\'\'}"
 
-rm -f /tmp/*_pass.txt
+# Apply passwords on the database host via psql (no use of /tmp)
+gcloud compute ssh m2s-database --zone=us-east1-b -- "sudo -u postgres psql -c \"ALTER USER m2s_ssc WITH PASSWORD '${SSC_DB_PASSWORD_ESCAPED}';\""
+gcloud compute ssh m2s-database --zone=us-east1-b -- "sudo -u postgres psql -c \"ALTER USER m2s_masa WITH PASSWORD '${MASA_DB_PASSWORD_ESCAPED}';\""
+
+# Clean up in-memory variables
+unset SSC_DB_PASSWORD MASA_DB_PASSWORD SSC_DB_PASSWORD_ESCAPED MASA_DB_PASSWORD_ESCAPED
 
 # Verify website works
 curl -I https://skylinesoaring.org/
 
-# Then sync Ansible vault (see "Syncing Vault to Match Production" above)
+# CRITICAL: Sync Ansible vault to match production (restore IaC consistency)
+# See "Syncing Vault to Match Production" section above
 ```
 
 ---

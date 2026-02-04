@@ -74,10 +74,9 @@ gcp_ssh_public_keys:
 
 # PostgreSQL source ranges - includes admin IPs + internal network + app servers
 # Admin IPs are centrally managed in all.yml - see admin_ssh_ips variable
+# To add non-admin IPs, extend the list like:
+#   gcp_postgresql_allowed_sources: "{{ admin_ssh_ips + ['10.0.0.0/8', '35.192.0.0/12', 'YOUR_APP_SERVER_IP/32'] }}"
 gcp_postgresql_allowed_sources: "{{ admin_ssh_ips + ['10.0.0.0/8'] }}"
-  # Add additional non-admin IPs as needed:
-  # - "35.192.0.0/12"  # GKE cluster IP range
-  # - "YOUR_APP_SERVER_IP/32"
 
 # ============================================================
 # POSTGRESQL CONFIGURATION
@@ -91,8 +90,8 @@ postgresql_listen_addresses: "0.0.0.0"
 
 # Remote access CIDRs (must match gcp_postgresql_allowed_sources)
 # Admin IPs are centrally managed in all.yml
+# To add non-admin IPs, extend the list to match gcp_postgresql_allowed_sources
 postgresql_remote_access_cidrs: "{{ admin_ssh_ips + ['10.0.0.0/8'] }}"
-  # Add additional non-admin IPs as needed (must match gcp_postgresql_allowed_sources)
 
 # ============================================================
 # SSL/TLS CONFIGURATION

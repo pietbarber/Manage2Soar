@@ -140,9 +140,12 @@ queue_alert_threshold: 100
 # To add a new co-webmaster:
 # 1. Add their entry to admin_ssh_keys below
 # 2. Run the appropriate playbook to update firewall rules:
-#    - Database: ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml --tags firewall
-#    - Mail: ansible-playbook -i inventory/gcp_mail.yml playbooks/mail-server.yml --tags firewall
-#    - Provisioner: ansible-playbook -i inventory/gcp_provisioner.yml playbooks/gcp-provisioner.yml --tags firewall
+#    Recommended (full playbook run, especially for new admins):
+#      - Database: ansible-playbook -i inventory/gcp_database.yml playbooks/gcp-database.yml
+#      - Mail: ansible-playbook -i inventory/gcp_mail.yml playbooks/gcp-mail-server.yml
+#      - Provisioner: ansible-playbook -i inventory/gcp_provisioner.yml playbooks/gcp-provisioner.yml
+#    Advanced (GCP firewall-only update, if you know no other changes are needed):
+#      - ansible-playbook -i inventory/gcp_provisioner.yml playbooks/gcp-provisioner.yml --tags gcp-provision
 #
 # See docs/runbooks/ansible-playbook-guide.md for detailed instructions
 

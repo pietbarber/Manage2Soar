@@ -31,6 +31,17 @@
       - mailutils
     state: present
 
+- name: Validate SSH key format
+  ansible.builtin.assert:
+    that:
+      - item.key is defined
+      - item.key | length > 0
+      - item.key is match('^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521) ')
+    fail_msg: "Invalid SSH key format for user {{ item.user }}: {{ item.key[:50] }}..."
+    quiet: yes
+  loop: "{{ admin_ssh_keys }}"
+  when: admin_ssh_keys is defined
+
 - name: Create admin user accounts for SSH access
   ansible.builtin.user:
     name: "{{ item.user }}"
@@ -39,22 +50,39 @@
     state: present
   loop: "{{ admin_ssh_keys }}"
   when: admin_ssh_keys is defined
+  register: admin_user_creation
+  failed_when:
+    - admin_user_creation.failed
+    - "'already exists' not in admin_user_creation.msg | default('')"
 
 - name: Add SSH keys to admin user authorized_keys
   ansible.posix.authorized_key:
     user: "{{ item.user }}"
     key: "{{ item.key }}"
     state: present
+    exclusive: no
   loop: "{{ admin_ssh_keys }}"
   when: admin_ssh_keys is defined
 
-- name: Add admin users to sudo group
-  ansible.builtin.user:
-    name: "{{ item.user }}"
-    groups: sudo
-    append: yes
+- name: Check if admin users are already in sudo group
+  ansible.builtin.command:
+    cmd: "groups {{ item.user }}"
   loop: "{{ admin_ssh_keys }}"
   when: admin_ssh_keys is defined
+  register: user_groups
+  changed_when: false
+  failed_when: false
+
+- name: Add admin users to sudo group
+  ansible.builtin.user:
+    name: "{{ item.item.user }}"
+    groups: sudo
+    append: yes
+  loop: "{{ user_groups.results }}"
+  when:
+    - admin_ssh_keys is defined
+    - item.stdout is defined
+    - "'sudo' not in item.stdout"
 
 - name: Configure UFW defaults
   community.general.ufw:
