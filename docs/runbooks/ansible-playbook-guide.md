@@ -6,6 +6,24 @@ Complete reference for all Ansible playbooks used in Manage2Soar infrastructure 
 
 This guide documents all Ansible playbooks in `infrastructure/ansible/playbooks/`, their purpose, usage patterns, and common scenarios. Always refer to this guide before manual operations - IaC-first approach.
 
+## 🔐 Vault Architecture: One Vault To Rule Them All
+
+**IMPORTANT**: All production secrets are stored in a **single master vault file**:
+
+```
+infrastructure/ansible/group_vars/localhost/vault.yml  ← MASTER VAULT
+```
+
+Other vault locations are **symlinks** to this master file:
+- `group_vars/gcp_app/vault.yml` → symlink to `localhost/vault.yml`
+- `group_vars/gcp_provisioner/vault.yml` → symlink to `localhost/vault.yml`
+
+**Specialized vaults** (different structure/password):
+- `group_vars/gcp_mail/vault.yml` - SMTP2Go API credentials (different structure)
+- `group_vars/single_host/vault.yml` - Dev/test environment (different password)
+
+**WHY**: Single source of truth prevents drift, simplifies secret management, enforces IaC-first philosophy. All production secrets are synchronized with K8s secrets.
+
 ## 🗂️ Playbook Index
 
 | Playbook | Purpose | Frequency | Tags |
