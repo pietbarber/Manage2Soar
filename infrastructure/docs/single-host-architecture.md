@@ -19,7 +19,7 @@ flowchart TB
         subgraph WebStack["Web Stack"]
             NGINX["NGINX<br/>─────────<br/>• TLS termination (Let's Encrypt)<br/>• Static file serving<br/>• Reverse proxy to Gunicorn<br/>• Rate limiting"]
             Gunicorn["Gunicorn<br/>─────────<br/>• WSGI server<br/>• Process management<br/>• Worker processes"]
-            Django["Django 5.2<br/>─────────<br/>• Manage2Soar Application<br/>• All apps: members, logsheet,<br/>  duty_roster, analytics, etc."]
+            Django["Django 5.2.11<br/>─────────<br/>• Manage2Soar Application<br/>• All apps: members, logsheet,<br/>  duty_roster, analytics, etc."]
         end
 
         subgraph DataLayer["Data Layer"]

@@ -1,7 +1,7 @@
 
 # Manage2Soar – Soaring Club Management Platform
 
-Manage2Soar is a modern Django 5.2 web application for comprehensive soaring club management. It supports members, gliders, badges, operations, analytics, instruction, notifications, and site configuration—all in one integrated platform.
+Manage2Soar is a modern Django 5.2.11 web application for comprehensive soaring club management. It supports members, gliders, badges, operations, analytics, instruction, notifications, and site configuration—all in one integrated platform.
 
 ## Quick Start for Local Development
 
@@ -129,7 +129,7 @@ Manage2Soar is a modern Django 5.2 web application for comprehensive soaring clu
 
 ### Backend
 - **Python 3.12**
-- **Django 5.2**
+- **Django 5.2.11**
 - **PostgreSQL** (with `psycopg2-binary`)
 
 ### Frontend
