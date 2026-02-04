@@ -524,16 +524,16 @@ class KioskActiveMemberDecoratorTests(TestCase):
     def setUpTestData(cls):
         """Create test users and membership statuses."""
         # Create active membership status
-        MembershipStatus.objects.create(
-            name="Full Member", is_active=True, display_order=1
+        MembershipStatus.objects.get_or_create(
+            name="Full Member", defaults={"is_active": True, "sort_order": 1}
         )
         # Create inactive membership status
-        MembershipStatus.objects.create(
-            name="Inactive", is_active=False, display_order=99
+        MembershipStatus.objects.get_or_create(
+            name="Inactive", defaults={"is_active": False, "sort_order": 99}
         )
         # Create role account status
-        MembershipStatus.objects.create(
-            name="Role Account", is_active=False, display_order=100
+        MembershipStatus.objects.get_or_create(
+            name="Role Account", defaults={"is_active": False, "sort_order": 100}
         )
 
     def setUp(self):
