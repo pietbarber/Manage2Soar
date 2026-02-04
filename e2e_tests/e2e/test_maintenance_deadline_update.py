@@ -40,7 +40,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
         """Test that clicking Update button opens Bootstrap modal."""
         # Use superuser instead of webmaster to test button interaction
         # (webmaster group membership not visible to live server - separate issue)
-        webmaster = self.create_test_member(
+        self.create_test_member(
             username="webmaster",
             is_superuser=True,  # Changed: use superuser for now
             membership_status="Full Member",
@@ -73,7 +73,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
 
     def test_form_submission_via_button_updates_deadline(self):
         """Test that clicking Save Changes button submits form and updates deadline."""
-        webmaster = self.create_test_member(username="webmaster", is_superuser=True)
+        self.create_test_member(username="webmaster", is_superuser=True)
         self.login(username="webmaster")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")
@@ -104,7 +104,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
 
     def test_form_submission_via_enter_key(self):
         """Test that pressing Enter in date field submits form (keyboard accessibility)."""
-        webmaster = self.create_test_member(username="webmaster", is_superuser=True)
+        self.create_test_member(username="webmaster", is_superuser=True)
         self.login(username="webmaster")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")
@@ -133,7 +133,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
 
     def test_error_handling_for_invalid_submission(self):
         """Test that error messages display correctly for invalid submissions."""
-        webmaster = self.create_test_member(username="webmaster", is_superuser=True)
+        self.create_test_member(username="webmaster", is_superuser=True)
         self.login(username="webmaster")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")
@@ -199,7 +199,7 @@ class TestMaintenanceDeadlineUpdateE2E(DjangoPlaywrightTestCase):
 
     def test_modal_closes_on_cancel(self):
         """Test that clicking Cancel button closes the modal."""
-        webmaster = self.create_test_member(username="webmaster", is_superuser=True)
+        self.create_test_member(username="webmaster", is_superuser=True)
         self.login(username="webmaster")
 
         self.page.goto(f"{self.live_server_url}/logsheet/maintenance-deadlines/")

@@ -113,7 +113,6 @@ class TestDutyRosterMessageModel:
         message = DutyRosterMessage.objects.first()
         assert message is not None
         assert message.content == "<p>First</p>"
-        assert message.content == "<p>First</p>"
 
     def test_get_message_returns_active_message(self, roster_message):
         """Test get_message() returns the active message."""
