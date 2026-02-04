@@ -361,32 +361,35 @@ def test_visiting_pilot_form_warns_about_same_name_no_ssa(visiting_pilot_config)
 
 @pytest.mark.django_db
 def test_visiting_pilot_signup_logic_for_authenticated_users(visiting_pilot_config):
-    """Test the view logic for authenticated users using RequestFactory."""
+    """Test the view logic for authenticated users using Client (has session middleware)."""
+    from django.test import Client
 
-    # Create a test user
+    # Create a test user with valid membership_status so is_active=True
     user = Member.objects.create_user(
         username="testmember@example.com",
         email="testmember@example.com",
         first_name="Test",
         last_name="Member",
+        membership_status="Full Member",  # Valid status so is_active=True
     )
 
-    # Use RequestFactory to create request with authenticated user
-    factory = RequestFactory()
+    # Use Client instead of RequestFactory to get session support
+    client = Client()
+    client.force_login(user)
+
     # Generate daily token for testing
     token = visiting_pilot_config.get_or_create_daily_token()
-    request = factory.get(reverse("members:visiting_pilot_signup", args=[token]))
-    request.user = user  # Manually set authenticated user
 
-    # Test the view directly
-    response = visiting_pilot_signup(request, token)
+    # Test the view via URL
+    response = client.get(reverse("members:visiting_pilot_signup", args=[token]))
 
     # Should show the member redirect page (status 200)
     assert response.status_code == 200
 
-    # Should contain member-specific content
-    assert b"Already a Club Member" in response.content
-    assert b"already logged in as a club member" in response.content
+    # Check that visiting_pilot_member_redirect.html template was used
+    assert "members/visiting_pilot_member_redirect.html" in [
+        t.name for t in response.templates
+    ]
 
 
 @pytest.mark.django_db
