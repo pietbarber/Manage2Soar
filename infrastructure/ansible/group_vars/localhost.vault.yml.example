@@ -1,0 +1,117 @@
+# M2S Master Vault - Single Source of Truth
+#
+# ⚠️  NOTE: Canonical example is ../group_vars/localhost.vault.yml.example (parent directory)
+#
+# This is a copy for convenience. If they differ, the parent directory version is authoritative.
+#
+# See: ../group_vars/localhost.vault.yml.example for full documentation and setup instructions
+#
+# ⚠️  CRITICAL: This is the MASTER vault file - all other vaults are symlinks to this!
+#
+# VAULT ARCHITECTURE: One Vault To Rule Them All
+#
+#   Master vault (YOU ARE HERE):
+#     group_vars/localhost/vault.yml  ← MASTER (single source of truth)
+#
+#   Symlinked vaults (point to master):
+#     group_vars/gcp_app/vault.yml → ../localhost/vault.yml
+#     group_vars/gcp_provisioner/vault.yml → ../localhost/vault.yml
+#
+#   Specialized vaults (different structure):
+#     group_vars/gcp_mail/vault.yml (SMTP2Go API credentials - different structure)
+#     group_vars/single_host/vault.yml (dev/test - different vault password, deprecated)
+#
+# SETUP INSTRUCTIONS:
+#
+# 1. Create vault password file (if not already done):
+#    echo "your-secure-vault-password" > ~/.ansible_vault_pass
+#    chmod 600 ~/.ansible_vault_pass
+#
+# 2. Create the master vault from this template:
+#    mkdir -p group_vars/localhost
+#    cp group_vars/localhost.vault.yml.example group_vars/localhost/vault.yml
+#    # Edit vault.yml and fill in real secrets
+#    ansible-vault encrypt group_vars/localhost/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# 3. Create symlinks from other locations:
+#    mkdir -p group_vars/gcp_app
+#    mkdir -p group_vars/gcp_provisioner
+#    cd group_vars/gcp_app
+#    ln -sf ../localhost/vault.yml vault.yml
+#    cd ../gcp_provisioner
+#    ln -sf ../localhost/vault.yml vault.yml
+#
+# TO EDIT LATER:
+#    ansible-vault edit group_vars/localhost/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# TO VIEW:
+#    ansible-vault view group_vars/localhost/vault.yml \
+#      --vault-password-file ~/.ansible_vault_pass
+#
+# GENERATE SECRETS:
+#   PostgreSQL password: openssl rand -base64 32
+#   Django secret key: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+#   Mail API key: (get from K8s: kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.M2S_MAIL_API_KEY}' | base64 -d)
+#   SMTP relay: (get from SMTP2Go dashboard)
+#   OAuth: (get from Google Cloud Console)
+
+---
+# ============================================================
+# DJANGO SECRETS
+# ============================================================
+
+# Django secret key (required, 50+ characters)
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+vault_django_secret_key: "your-50-character-django-secret-key-here"
+
+# ============================================================
+# POSTGRESQL PASSWORDS
+# ============================================================
+# Generate with: openssl rand -base64 32
+
+# Single-tenant mode password (deprecated)
+vault_postgresql_password: "your-single-tenant-db-password"
+
+# Multi-tenant passwords (one per club)
+vault_postgresql_password_ssc: "ssc-database-password-32-chars"
+vault_postgresql_password_masa: "masa-database-password-32-chars"
+# vault_postgresql_password_nfss: "nfss-database-password-32-chars"
+
+# ============================================================
+# MAIL CREDENTIALS
+# ============================================================
+
+# Django's direct SMTP API key (used by Django to send mail via SMTP2Go API)
+# Get from K8s production: kubectl get secret -n tenant-ssc manage2soar-env-ssc -o jsonpath='{.data.M2S_MAIL_API_KEY}' | base64 -d
+vault_smtp_password: "your-smtp2go-api-key-43-chars"
+
+# ============================================================
+# SMTP RELAY CREDENTIALS (for Postfix mail server)
+# ============================================================
+# NOTE: These are DIFFERENT from Django's SMTP API key above
+# Get from SMTP2Go dashboard → Settings → Users
+# Used by Postfix to relay mail through [mail.smtp2go.com]:587
+
+# External SMTP relay credentials (used by m2s-mail server)
+vault_smtp_relay_username: "manage2soar"
+vault_smtp_relay_password: "your-smtp2go-relay-password"
+
+# ============================================================
+# GOOGLE OAUTH CREDENTIALS (OPTIONAL)
+# ============================================================
+# Get from: https://console.cloud.google.com/apis/credentials
+# Leave commented out to disable Google OAuth login
+
+# vault_google_oauth_client_id: "your-client-id.apps.googleusercontent.com"
+# vault_google_oauth_client_secret: "your-google-oauth-secret"
+
+# ============================================================
+# GCP SERVICE ACCOUNT CREDENTIALS (OPTIONAL)
+# ============================================================
+# Only needed for GCP API access (Cloud Storage, etc.)
+
+# vault_gcp_project_id: "your-gcp-project-id"
+# vault_gcp_service_account_email: "your-service-account@project.iam.gserviceaccount.com"
+# vault_gcp_service_account_key: "your-service-account-json-key-content"

@@ -1,25 +1,39 @@
-# GCP Database Server Secrets - Vault Template
+# GCP Database Server Secrets
 #
-# This file should be encrypted with ansible-vault.
+# ⚠️  NOTE: Canonical example is ../group_vars/gcp_database.vault.yml.example (parent directory)
 #
-# SETUP INSTRUCTIONS:
+# VAULT ARCHITECTURE: One Vault To Rule Them All
 #
-# 1. Create vault password file (if not already done):
-#    echo "your-secure-vault-password" > ~/.ansible_vault_pass
-#    chmod 600 ~/.ansible_vault_pass
+#   Master vault (single source of truth):
+#     ../group_vars/localhost/vault.yml
 #
-# 2. Create the directory structure:
-#    mkdir -p group_vars/gcp_provisioner
+#   Database passwords are in the master vault:
+#     vault_postgresql_password_ssc
+#     vault_postgresql_password_masa
 #
-# 3. Copy and encrypt this file:
-#    cp group_vars/gcp_database.vault.yml.example group_vars/gcp_provisioner/vault.yml
-#    ansible-vault encrypt group_vars/gcp_provisioner/vault.yml \
-#      --vault-password-file ~/.ansible_vault_pass
+# To edit database passwords:
+#   ansible-vault edit ../group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
 #
-# OR use the automated script:
-#    infrastructure/scripts/initialize-vault-secrets.sh group_vars/gcp_provisioner/vault.yml
+# See: ../group_vars/localhost.vault.yml.example for full documentation
 #
-# NOTE: Use group_vars/gcp_provisioner/ to match the playbook's vars_files paths.
+# ⚠️  IMPORTANT: Database secrets are in the MASTER vault, not here!
+#
+# VAULT ARCHITECTURE: One Vault To Rule Them All
+#
+#   Master vault (single source of truth):
+#     group_vars/localhost/vault.yml
+#
+#   Contains all database passwords:
+#     vault_postgresql_password_ssc
+#     vault_postgresql_password_masa
+#
+# Database playbooks automatically read from localhost/vault.yml.
+# You do NOT need a separate vault file here.
+#
+# To edit database passwords:
+#   ansible-vault edit group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
+#
+# See docs/runbooks/ansible-playbook-guide.md for password management workflows.
 
 ---
 # ALTERNATIVE: Use the automated secret generator:

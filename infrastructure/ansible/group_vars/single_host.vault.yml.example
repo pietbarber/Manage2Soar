@@ -1,21 +1,28 @@
-# Single-Host Deployment Secrets - vault.yml Example
+# Single-Host Deployment Secrets
 #
-# This file should be encrypted with ansible-vault.
+# ⚠️  NOTE: Canonical example is ../group_vars/single_host.vault.yml.example (parent directory)
 #
-# SETUP INSTRUCTIONS:
-# 1. Create vault password file:
-#      echo "your-secure-vault-password" > ~/.ansible_vault_pass
-#      chmod 600 ~/.ansible_vault_pass
+# ⚠️  DEPRECATED: Single-host deployment mode is no longer actively maintained.
 #
-# 2. Create the encrypted vault file:
+# RECOMMENDED: Use GCP multi-tenant deployment with the master vault:
+#   ../group_vars/localhost/vault.yml
+#
+# See: ../group_vars/localhost.vault.yml.example for full documentation
+#
+# ⚠️  DEPRECATED: This deployment mode is no longer actively maintained.
+#
+# RECOMMENDED: Use GCP multi-tenant deployment with the master vault:
+#   group_vars/localhost/vault.yml (master - single source of truth)
+#
+# If you still need single-host deployment:
+# 1. This vault file uses a DIFFERENT password than the master vault
+# 2. Create separate vault password file:
+#      echo "your-single-host-vault-password" > ~/.ansible_vault_pass_single_host
+#      chmod 600 ~/.ansible_vault_pass_single_host
+#
+# 3. Create the encrypted vault file:
 #      ansible-vault create group_vars/single_host/vault.yml \
-#        --vault-password-file ~/.ansible_vault_pass
-#
-# 3. Paste the contents below and customize:
-#
-# 4. To edit later:
-#      ansible-vault edit group_vars/single_host/vault.yml \
-#        --vault-password-file ~/.ansible_vault_pass
+#        --vault-password-file ~/.ansible_vault_pass_single_host
 #
 # GENERATE SECRETS:
 #   PostgreSQL password: openssl rand -base64 32
