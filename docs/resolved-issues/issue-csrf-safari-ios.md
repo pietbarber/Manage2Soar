@@ -74,10 +74,31 @@ gke_csrf_cookie_samesite: "Lax"     # or "Strict" or "None"
   - Least secure option
 
 ## Deployment
+
+### GKE Multi-Tenant Deployment
 Changes take effect on next deployment:
 ```bash
 cd infrastructure/ansible
 ansible-playbook playbooks/gke-deploy.yml -e "gke_club_prefix=ssc"
+```
+
+No inventory changes needed (uses sensible defaults).
+
+### Single-Host Deployment
+For single-host deployments, the same fix is automatically applied via the `m2s-app` role:
+```bash
+cd infrastructure/ansible
+ansible-playbook -i inventory/single_host.yml \
+  --vault-password-file ~/.ansible_vault_pass \
+  -e "@group_vars/single_host/vault.yml" \
+  -e "@group_vars/single_host/vars.yml" \
+  playbooks/single-host.yml
+```
+
+To override defaults, add to `group_vars/single_host/vars.yml`:
+```yaml
+m2s_session_cookie_samesite: "Lax"  # or "Strict", "None"
+m2s_csrf_cookie_samesite: "Lax"     # or "Strict", "None"
 ```
 
 ## Testing Recommendations
