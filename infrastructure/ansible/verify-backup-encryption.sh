@@ -179,7 +179,7 @@ scp "${TEMP_DIR}/${BACKUP_FILENAME}" "${SSH_USER}@${DB_SERVER}:/tmp/"
 DECRYPTED_FILENAME="${BACKUP_FILENAME%.enc}"
 # Pass filenames as environment variables to prevent shell injection
 # shellcheck disable=SC2087
-DECRYPT_RESULT=$(ssh "${SSH_USER}@${DB_SERVER}" "BACKUP_FILE=${BACKUP_FILENAME}" "DECRYPTED_FILE=${DECRYPTED_FILENAME}" "PASSPHRASE=${PASSPHRASE_FILE}" bash <<'EOF'
+DECRYPT_RESULT=$(ssh "${SSH_USER}@${DB_SERVER}" env BACKUP_FILE="${BACKUP_FILENAME}" DECRYPTED_FILE="${DECRYPTED_FILENAME}" PASSPHRASE="${PASSPHRASE_FILE}" bash <<'EOF'
     sudo -u postgres openssl enc -d -aes-256-cbc -pbkdf2 \
       -in "/tmp/${BACKUP_FILE}" \
       -out "/tmp/${DECRYPTED_FILE}" \
@@ -237,7 +237,7 @@ echo ""
 echo "Cleaning up temporary files..."
 # Pass filenames as environment variables to prevent shell injection
 # shellcheck disable=SC2087
-ssh "${SSH_USER}@${DB_SERVER}" "BACKUP_FILE=${BACKUP_FILENAME}" "DECRYPTED_FILE=${DECRYPTED_FILENAME}" bash <<'EOF'
+ssh "${SSH_USER}@${DB_SERVER}" env BACKUP_FILE="${BACKUP_FILENAME}" DECRYPTED_FILE="${DECRYPTED_FILENAME}" bash <<'EOF'
     sudo rm -f "/tmp/${BACKUP_FILE}" "/tmp/${DECRYPTED_FILE}" 2>/dev/null || true
 EOF
 # Use shred for sensitive local files (contain database backup data)
