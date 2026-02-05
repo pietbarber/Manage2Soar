@@ -20,6 +20,7 @@ This runbook covers PostgreSQL database operations including backups, restoratio
 - [Verification Procedures](#verification-procedures)
 - [Manual Backup Execution](#manual-backup-execution)
 - [Restoration Procedures](#restoration-procedures)
+- [Disaster Recovery (Total Loss)](#disaster-recovery-total-loss)
 - [Testing Backup Integrity](#testing-backup-integrity)
 - [Troubleshooting](#troubleshooting)
 - [Monitoring & Alerts](#monitoring--alerts)
@@ -547,6 +548,372 @@ else
   exit 1
 fi
 ```
+
+## Disaster Recovery (Total Loss)
+
+### 🔥 Scenario: Database Server Completely Destroyed
+
+**Critical Requirements** - You MUST have access to:
+1. ✅ Ansible Vault password (`~/.ansible_vault_pass`)
+2. ✅ Ansible `group_vars/gcp_database/vault.yml` file
+3. ✅ GCS bucket access: `gs://m2s-database-backups-manage2soar`
+
+**If you don't have these**, backups cannot be decrypted. This is why we:
+- Store Ansible Vault password in a secure password manager (1Password, LastPass)
+- Maintain off-site backups of Ansible vault files
+- Share DR credentials with co-webmasters
+
+### Quick Reference Card
+
+**🚨 Database Destroyed - Recovery in 4 Steps:**
+
+> **Note**: Steps 1-3 run on your local machine. Step 4 must run from a machine with PostgreSQL client tools and network access to the new database (for example, the new database server itself or another trusted client host) after you've copied the decrypted backup there.
+> See detailed procedure below for complete workflow.
+
+```bash
+# 1. Get passphrase from Ansible Vault (local machine)
+cd infrastructure/ansible
+ansible-vault view --vault-password-file ~/.ansible_vault_pass \
+  group_vars/gcp_database/vault.yml | grep vault_postgresql_backup_passphrase
+
+# 2. Download encrypted backup from GCS
+gsutil ls -lh gs://m2s-database-backups-manage2soar/postgresql/
+gsutil cp gs://m2s-database-backups-manage2soar/postgresql/m2s_all_TIMESTAMP.sql.enc /tmp/
+
+# 3. Decrypt backup
+echo "PASSPHRASE_FROM_STEP_1" > /tmp/.backup_passphrase && chmod 400 /tmp/.backup_passphrase
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -in /tmp/m2s_all_TIMESTAMP.sql.enc \
+  -out /tmp/m2s_restore.sql \
+  -pass file:/tmp/.backup_passphrase
+
+# 4. Restore to new database
+psql -f /tmp/m2s_restore.sql  # For SQL text backups (pg_dumpall)
+# OR
+pg_restore -d m2s /tmp/m2s_restore.pgdump  # For custom format backups (pg_dump -Fc)
+```
+
+### Detailed Recovery Procedure
+
+#### Step 1: Provision New Database Server
+
+**Option A: Use IaC (Recommended)**
+
+```bash
+cd infrastructure/ansible
+
+# Provision new GCP database VM
+ansible-playbook -i inventory/gcp_database.yml \
+  playbooks/gcp-database.yml \
+  --vault-password-file ~/.ansible_vault_pass
+
+# This will:
+# - Create new GCP Compute Engine VM
+# - Install PostgreSQL 17
+# - Configure firewall rules
+# - Deploy backup passphrase to /var/lib/postgresql/.backup_passphrase
+```
+
+**Option B: Manual Provisioning (⚠️ NOT RECOMMENDED)**
+
+> **Warning**: Manual provisioning bypasses IaC and is not repeatable.
+> Use this only as a last resort when IaC is unavailable. Document all manual steps for later IaC migration.
+
+```bash
+# Create GCP VM
+gcloud compute instances create m2s-database-new \
+  --project=manage2soar \
+  --zone=us-east1-b \
+  --machine-type=e2-medium \
+  --boot-disk-size=50GB \
+  --boot-disk-type=pd-standard \
+  --image-family=ubuntu-2404-lts-amd64 \
+  --image-project=ubuntu-os-cloud
+
+# Install PostgreSQL 17
+ssh ${USER}@NEW_DB_SERVER "
+  sudo apt update && \
+  sudo apt install -y postgresql-17 postgresql-contrib-17
+"
+```
+
+> **⚠️ IaC First Philosophy**: If the Ansible playbook fails, debug the specific failure (authentication, quotas, network) rather than bypassing IaC. The manual commands above are shown only as diagnostic/verification tools, not as a provisioning alternative. Changes made manually won't persist if deployments are rerun from Ansible.
+
+#### Step 2: Retrieve Decryption Passphrase
+
+**Critical File**: `infrastructure/ansible/group_vars/gcp_database/vault.yml`
+
+**If you have Ansible vault files locally:**
+
+```bash
+cd infrastructure/ansible
+
+# View the passphrase
+ansible-vault view --vault-password-file ~/.ansible_vault_pass \
+  group_vars/gcp_database/vault.yml | grep vault_postgresql_backup_passphrase
+
+# Expected output:
+# vault_postgresql_backup_passphrase: "very-long-random-string-64-chars-or-more"
+```
+
+**If you only have the backup tarball:**
+
+```bash
+# Extract backup tarball (created manually with tar command)
+tar -xzf /path/to/manage2soar-ansible-secrets-YYYYMMDD.tar.gz
+
+# View passphrase from extracted vault file
+ansible-vault view --vault-password-file ~/.ansible_vault_pass \
+  infrastructure/ansible/group_vars/gcp_database/vault.yml | \
+  grep vault_postgresql_backup_passphrase
+```
+
+**If you don't have EITHER:**
+- Check your secure password manager (1Password, LastPass)
+- Contact co-webmasters who have the backup tarball
+- Check offline backup storage (USB drives, encrypted cloud storage)
+
+⚠️ **WITHOUT THE PASSPHRASE, BACKUPS CANNOT BE DECRYPTED!**
+
+#### Step 3: Download Encrypted Backup from GCS
+
+```bash
+# List available backups (sorted by date, newest first)
+gsutil ls -lh gs://m2s-database-backups-manage2soar/postgresql/ | \
+  grep "\.enc$" | sort -r | head -20
+
+# Identify the backup you want to restore
+# Format: m2s_all_YYYY-MM-DD_HHMMSS.sql.enc (multi-tenant)
+#     OR: m2s_YYYY-MM-DD_HHMMSS.pgdump.enc (single-tenant)
+
+# Download the selected backup
+BACKUP_FILE="m2s_all_2026-02-04_020001.sql.enc"  # Replace with actual filename
+gsutil cp "gs://m2s-database-backups-manage2soar/postgresql/${BACKUP_FILE}" /tmp/
+
+# Verify download
+ls -lh /tmp/${BACKUP_FILE}
+file /tmp/${BACKUP_FILE}
+# Expected: "openssl enc'd data with salted password" or "data"
+```
+
+#### Step 4: Decrypt Backup
+
+```bash
+# Create temporary passphrase file
+# Replace YOUR_PASSPHRASE_FROM_VAULT with actual value from Step 2
+echo "YOUR_PASSPHRASE_FROM_VAULT" > /tmp/.backup_passphrase
+chmod 400 /tmp/.backup_passphrase
+
+# Decrypt the backup
+BACKUP_FILE="m2s_all_2026-02-04_020001.sql.enc"  # Use actual filename
+DECRYPTED_FILE="/tmp/m2s_restore.sql"  # Or .pgdump for custom format
+
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -in "/tmp/${BACKUP_FILE}" \
+  -out "${DECRYPTED_FILE}" \
+  -pass file:/tmp/.backup_passphrase
+
+# Verify decryption succeeded
+file "${DECRYPTED_FILE}"
+# Expected: "ASCII text" (for SQL) or "PostgreSQL custom database dump" (for custom format)
+
+# Check decrypted file size (should be larger than encrypted)
+ls -lh "${DECRYPTED_FILE}"
+```
+
+**Common Decryption Errors:**
+
+| Error Message | Cause | Solution |
+|--------------|-------|----------|
+| `bad decrypt` | Wrong passphrase | Verify passphrase from vault, check for typos |
+| `digital envelope routines::unsupported` | OpenSSL version mismatch | Use same OpenSSL version as backup server |
+| File is empty | Corrupted backup | Try an older backup from GCS |
+
+#### Step 5: Restore Database
+
+**For SQL Text Backups** (pg_dumpall format - multi-tenant):
+
+```bash
+# Copy decrypted backup to new database server
+scp /tmp/m2s_restore.sql ${USER}@NEW_DB_SERVER:/tmp/
+
+# Restore all databases and global objects
+ssh ${USER}@NEW_DB_SERVER "
+  sudo -u postgres psql -f /tmp/m2s_restore.sql
+"
+
+# Verify restoration
+ssh ${USER}@NEW_DB_SERVER "
+  sudo -u postgres psql -d m2s_all -c 'SELECT COUNT(*) FROM members_member;'
+  sudo -u postgres psql -d m2s_all -c 'SELECT COUNT(*) FROM logsheet_flight;'
+"
+```
+
+**For Custom Format Backups** (pg_dump -Fc format - single-tenant):
+
+```bash
+# Copy decrypted backup to new database server
+scp /tmp/m2s_restore.pgdump ${USER}@NEW_DB_SERVER:/tmp/
+
+# Ensure m2s role exists and create database
+# PREFERRED: Use Ansible postgresql-setup role (IaC approach) to create role/database automatically
+# Manual fallback if starting from bare PostgreSQL (retrieve password from Ansible vault):
+ssh ${USER}@NEW_DB_SERVER "
+  # Create m2s role if it doesn't exist
+  sudo -u postgres psql -tc \"SELECT 1 FROM pg_roles WHERE rolname = 'm2s';\" | grep -q 1 || \\
+    sudo -u postgres psql -c \"CREATE ROLE m2s LOGIN PASSWORD '<vault_m2s_db_password>';\"
+  # Create database owned by m2s
+  sudo -u postgres psql -c 'CREATE DATABASE m2s OWNER m2s;'
+"
+
+# Restore database
+ssh ${USER}@NEW_DB_SERVER "
+  sudo -u postgres pg_restore -d m2s /tmp/m2s_restore.pgdump
+"
+
+# Verify restoration
+ssh ${USER}@NEW_DB_SERVER "
+  sudo -u postgres psql -d m2s -c 'SELECT COUNT(*) FROM members_member;'
+  sudo -u postgres psql -d m2s -c 'SELECT COUNT(*) FROM logsheet_flight;'
+"
+```
+
+#### Step 6: Update Application Configuration
+
+**Update Django application to point to new database server:**
+
+**Preferred IaC Approach:**
+
+```bash
+cd infrastructure/ansible
+
+# Update inventory with new database server IP
+vim inventory/gcp_database.yml
+# Change ansible_host: NEW_DB_SERVER_IP
+
+# Update application secrets with new database host
+ansible-vault edit --vault-password-file ~/.ansible_vault_pass \
+  group_vars/gcp_app/vault.yml
+
+# Update: vault_database_host: "NEW_DB_SERVER_IP"
+
+# Redeploy application
+ansible-playbook -i inventory/gcp_app.yml \
+  playbooks/gcp-app-deploy.yml \
+  --vault-password-file ~/.ansible_vault_pass
+```
+
+**Emergency Break-Glass Only (if app must be restored before IaC can be fixed):**
+
+> **⚠️ CRITICAL WARNING**: This bypasses IaC. Use ONLY in absolute emergencies when the application must be restored immediately. Changes won't persist if deployment is rerun from Ansible. **CREATE A FOLLOW-UP TASK** to properly implement this fix via Ansible after using this workaround to prevent configuration drift.
+
+```bash
+# Update database host in secret
+kubectl edit secret manage2soar-env-ssc -n tenant-ssc
+
+# Update DATABASE_HOST value (base64 encoded)
+echo -n "NEW_DB_SERVER_IP" | base64
+
+# Restart pods to pick up new configuration
+kubectl rollout restart deployment/django-app-ssc -n tenant-ssc
+```
+
+#### Step 7: Verify Application Connectivity
+
+```bash
+# Test database connectivity from application pod
+kubectl exec -it deployment/django-app-ssc -n tenant-ssc -- \
+  python manage.py dbshell
+
+# Should connect successfully and show psql prompt
+
+# Test application health
+curl -I https://skylinesoaring.manage2soar.com
+
+# Check Django admin
+curl -I https://skylinesoaring.manage2soar.com/admin/
+
+# Verify member login works
+# (Manual test via browser)
+```
+
+#### Step 8: Secure Cleanup
+
+```bash
+# CRITICAL: Delete decrypted backup files (contain sensitive data).
+# NOTE: `shred` is a *best-effort* secure delete and its effectiveness is filesystem-dependent.
+# It may not reliably overwrite data on journaling (e.g., ext3/ext4 with data=journal),
+# copy-on-write (e.g., btrfs, ZFS), or snapshot-backed/cloud storage volumes.
+# COMPENSATING CONTROLS (IaC RECOMMENDED):
+#   - Ensure database disks and /tmp are on encrypted storage (e.g., LUKS) in server provisioning.
+#   - Prefer mounting /tmp as tmpfs on highly sensitive systems.
+# Within that context, use shred as an additional defense-in-depth measure:
+shred -u /tmp/m2s_restore.sql /tmp/.backup_passphrase
+ssh ${USER}@NEW_DB_SERVER "sudo shred -u /tmp/m2s_restore.sql"
+
+# Delete encrypted backup (can re-download from GCS if needed)
+rm /tmp/m2s_all_*.enc
+```
+
+### Post-Recovery Checklist
+
+- [ ] Database server provisioned and PostgreSQL 17 running
+- [ ] Backup decrypted successfully from GCS
+- [ ] Database restored and data verified (member/flight counts)
+- [ ] Application configuration updated (database host)
+- [ ] Application pods restarted and connecting to new database
+- [ ] User login tested and working
+- [ ] New backup cron job configured on new server
+- [ ] GCS credentials re-deployed (for future backups)
+- [ ] Decrypted files securely deleted
+- [ ] DNS/firewall rules updated (if needed)
+- [ ] Monitoring alerts configured for new server
+- [ ] Document recovery time and any issues encountered
+
+### Recovery Time Estimate
+
+| Phase | Estimated Time |
+|-------|---------------|
+| Provision new database server | 15-30 minutes (IaC) |
+| Download backup from GCS | 2-5 minutes (depending on size) |
+| Decrypt backup | 1-2 minutes |
+| Restore database | 10-30 minutes (depending on size) |
+| Update application configuration | 5-10 minutes |
+| Verify and test | 10-20 minutes |
+| **Total** | **45-90 minutes** |
+
+### Prevention and Preparedness
+
+**Quarterly Backup Drills:**
+
+```bash
+# Run verification script (auto-detects database server from inventory)
+cd infrastructure/ansible
+./verify-backup-encryption.sh
+# Or specify database server explicitly:
+# ./verify-backup-encryption.sh m2s-database
+```
+
+**Store Off-Site:**
+1. Ansible Vault password in password manager
+2. Backup tarball: `/tmp/manage2soar-ansible-secrets-YYYYMMDD.tar.gz`
+3. GCS service account key: `manage2soar-django-key.json`
+
+**Share with Co-Webmasters:**
+- Ansible Vault password (via secure channel)
+- Backup tarball (encrypted, via Google Drive or similar)
+- DR runbook access (this document)
+
+**Document Passphrase Rotation:**
+- If passphrase is rotated, document OLD passphrase
+- Old passphrase needed to decrypt backups created before rotation
+- Keep old passphrases until all old backups expire (365 days)
+
+### Related Documentation
+
+- [Backup Encryption Architecture](../../infrastructure/ansible/roles/postgresql/docs/backup-encryption.md)
+- [Ansible GCP Database Playbook](../../infrastructure/ansible/playbooks/gcp-database.yml)
+- [GKE Deployment Guide](../../infrastructure/ansible/docs/gke-post-deployment.md)
 
 ## Troubleshooting
 
