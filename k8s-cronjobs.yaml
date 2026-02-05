@@ -32,14 +32,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -84,14 +84,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -138,14 +138,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -190,14 +190,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -242,14 +242,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -294,14 +294,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
@@ -346,14 +346,14 @@ spec:
               workingDir: /app
               env:
                 - name: GOOGLE_APPLICATION_CREDENTIALS
-                  value: /app/skyline-soaring-storage.json
+                  value: /app/gcp-credentials.json
               envFrom:
                 - secretRef:
                     name: manage2soar-env
               volumeMounts:
                 - name: gcp-sa-key
-                  mountPath: /app/skyline-soaring-storage.json
-                  subPath: skyline-soaring-storage.json
+                  mountPath: /app/gcp-credentials.json
+                  subPath: gcp-credentials.json
                   readOnly: true
               resources:
                 requests:
