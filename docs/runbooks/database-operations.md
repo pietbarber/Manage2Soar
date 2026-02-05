@@ -631,7 +631,7 @@ gcloud compute instances create m2s-database-new \
   --image-project=ubuntu-os-cloud
 
 # Install PostgreSQL 17
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo apt update && \
   sudo apt install -y postgresql-17 postgresql-contrib-17
 "
@@ -789,7 +789,7 @@ ansible-vault edit --vault-password-file ~/.ansible_vault_pass \
 
 # Redeploy application
 ansible-playbook -i inventory/gcp_app.yml \
-  playbooks/gke-deploy.yml \
+  playbooks/gcp-app-deploy.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
@@ -833,7 +833,7 @@ curl -I https://skylinesoaring.manage2soar.com/admin/
 ```bash
 # CRITICAL: Delete decrypted backup files (contain sensitive data)
 shred -u /tmp/m2s_restore.sql /tmp/.backup_passphrase
-ssh pb@NEW_DB_SERVER "sudo shred -u /tmp/m2s_restore.sql"
+ssh ${USER}@NEW_DB_SERVER "sudo shred -u /tmp/m2s_restore.sql"
 
 # Delete encrypted backup (can re-download from GCS if needed)
 rm /tmp/m2s_all_*.enc

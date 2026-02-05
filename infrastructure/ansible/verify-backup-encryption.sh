@@ -176,12 +176,13 @@ scp "${TEMP_DIR}/${BACKUP_FILENAME}" "${SSH_USER}@${DB_SERVER}:/tmp/"
 
 # Attempt decryption on database server
 DECRYPTED_FILENAME="${BACKUP_FILENAME%.enc}"
+# Pass filenames as environment variables to prevent shell injection
 # shellcheck disable=SC2087
-DECRYPT_RESULT=$(ssh "${SSH_USER}@${DB_SERVER}" bash <<EOF
+DECRYPT_RESULT=$(ssh "${SSH_USER}@${DB_SERVER}" "BACKUP_FILE=${BACKUP_FILENAME}" "DECRYPTED_FILE=${DECRYPTED_FILENAME}" "PASSPHRASE=${PASSPHRASE_FILE}" bash <<'EOF'
     sudo -u postgres openssl enc -d -aes-256-cbc -pbkdf2 \
-      -in "/tmp/${BACKUP_FILENAME}" \
-      -out "/tmp/${DECRYPTED_FILENAME}" \
-      -pass file:"${PASSPHRASE_FILE}" 2>&1 || echo 'DECRYPT_FAILED'
+      -in "/tmp/${BACKUP_FILE}" \
+      -out "/tmp/${DECRYPTED_FILE}" \
+      -pass file:"${PASSPHRASE}" 2>&1 || echo 'DECRYPT_FAILED'
 EOF
 )
 
@@ -201,28 +202,28 @@ if [[ "${DECRYPT_RESULT}" == *"DECRYPT_FAILED"* ]] || [[ "${DECRYPT_RESULT}" == 
     echo "  3. If passphrase was recently rotated, you'll need the OLD passphrase"
     echo "     to decrypt backups created before the rotation"
 
-    # Cleanup
-    ssh "${SSH_USER}@${DB_SERVER}" "rm /tmp/${BACKUP_FILENAME}"
+    # Cleanup - quote filename to prevent shell injection
+    ssh "${SSH_USER}@${DB_SERVER}" "rm \"/tmp/${BACKUP_FILENAME}\""
     rm -rf "${TEMP_DIR}"
     exit 1
 fi
 
 # Verify decrypted file is a valid PostgreSQL backup
-DECRYPTED_FILE_TYPE=$(ssh "${SSH_USER}@${DB_SERVER}" "file -b /tmp/${DECRYPTED_FILENAME}")
+DECRYPTED_FILE_TYPE=$(ssh "${SSH_USER}@${DB_SERVER}" "file -b \"/tmp/${DECRYPTED_FILENAME}\"")
 
 if [[ "${DECRYPTED_FILE_TYPE}" =~ "PostgreSQL" ]]; then
     echo -e "${GREEN}✓ Decryption SUCCESSFUL${NC}"
     echo "  Decrypted file type: ${DECRYPTED_FILE_TYPE}"
 
     # Get file size
-    DECRYPTED_SIZE=$(ssh "${SSH_USER}@${DB_SERVER}" "du -h /tmp/${DECRYPTED_FILENAME} | cut -f1")
+    DECRYPTED_SIZE=$(ssh "${SSH_USER}@${DB_SERVER}" "du -h \"/tmp/${DECRYPTED_FILENAME}\" | cut -f1")
     echo "  Decrypted backup size: ${DECRYPTED_SIZE}"
 elif [[ "${DECRYPTED_FILE_TYPE}" =~ "ASCII text" ]] && [[ "${BACKUP_FILENAME}" =~ "sql.enc" ]]; then
     # For pg_dumpall SQL text backups
     echo -e "${GREEN}✓ Decryption SUCCESSFUL (SQL text backup)${NC}"
     echo "  Decrypted file type: ${DECRYPTED_FILE_TYPE}"
 
-    DECRYPTED_SIZE=$(ssh "${SSH_USER}@${DB_SERVER}" "du -h /tmp/${DECRYPTED_FILENAME} | cut -f1")
+    DECRYPTED_SIZE=$(ssh "${SSH_USER}@${DB_SERVER}" "du -h \"/tmp/${DECRYPTED_FILENAME}\" | cut -f1")
     echo "  Decrypted backup size: ${DECRYPTED_SIZE}"
 else
     echo -e "${YELLOW}⚠ WARNING: Decryption succeeded but file type is unexpected${NC}"
@@ -233,9 +234,10 @@ fi
 # Cleanup
 echo ""
 echo "Cleaning up temporary files..."
+# Pass filenames as environment variables to prevent shell injection
 # shellcheck disable=SC2087
-ssh "${SSH_USER}@${DB_SERVER}" bash <<EOF
-    sudo rm -f "/tmp/${BACKUP_FILENAME}" "/tmp/${DECRYPTED_FILENAME}" 2>/dev/null || true
+ssh "${SSH_USER}@${DB_SERVER}" "BACKUP_FILE=${BACKUP_FILENAME}" "DECRYPTED_FILE=${DECRYPTED_FILENAME}" bash <<'EOF'
+    sudo rm -f "/tmp/${BACKUP_FILE}" "/tmp/${DECRYPTED_FILE}" 2>/dev/null || true
 EOF
 # Use shred for sensitive local files (contain database backup data)
 if [[ -d "${TEMP_DIR}" ]]; then
