@@ -567,8 +567,11 @@ fi
 
 **🚨 Database Destroyed - Recovery in 4 Steps:**
 
+> **Note**: Steps 1-3 run on your local machine. Step 4 runs on the new database server after copying files.
+> See detailed procedure below for complete workflow.
+
 ```bash
-# 1. Get passphrase from Ansible Vault
+# 1. Get passphrase from Ansible Vault (local machine)
 cd infrastructure/ansible
 ansible-vault view --vault-password-file ~/.ansible_vault_pass \
   group_vars/gcp_database/vault.yml | grep vault_postgresql_backup_passphrase
@@ -611,7 +614,10 @@ ansible-playbook -i inventory/gcp_database.yml \
 # - Deploy backup passphrase to /var/lib/postgresql/.backup_passphrase
 ```
 
-**Option B: Manual Provisioning**
+**Option B: Manual Provisioning (⚠️ NOT RECOMMENDED)**
+
+> **Warning**: Manual provisioning bypasses IaC and is not repeatable.
+> Use this only as a last resort when IaC is unavailable. Document all manual steps for later IaC migration.
 
 ```bash
 # Create GCP VM
@@ -651,7 +657,7 @@ ansible-vault view --vault-password-file ~/.ansible_vault_pass \
 **If you only have the backup tarball:**
 
 ```bash
-# Extract tarball (created via: infrastructure/ansible/verify-backup-encryption.sh)
+# Extract backup tarball (created manually with tar command)
 tar -xzf /path/to/manage2soar-ansible-secrets-YYYYMMDD.tar.gz
 
 # View passphrase from extracted vault file
@@ -727,15 +733,15 @@ ls -lh "${DECRYPTED_FILE}"
 
 ```bash
 # Copy decrypted backup to new database server
-scp /tmp/m2s_restore.sql pb@NEW_DB_SERVER:/tmp/
+scp /tmp/m2s_restore.sql ${USER}@NEW_DB_SERVER:/tmp/
 
 # Restore all databases and global objects
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo -u postgres psql -f /tmp/m2s_restore.sql
 "
 
 # Verify restoration
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo -u postgres psql -d m2s_all -c 'SELECT COUNT(*) FROM members_member;'
   sudo -u postgres psql -d m2s_all -c 'SELECT COUNT(*) FROM logsheet_flight;'
 "
@@ -745,20 +751,20 @@ ssh pb@NEW_DB_SERVER "
 
 ```bash
 # Copy decrypted backup to new database server
-scp /tmp/m2s_restore.pgdump pb@NEW_DB_SERVER:/tmp/
+scp /tmp/m2s_restore.pgdump ${USER}@NEW_DB_SERVER:/tmp/
 
 # Create database
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo -u postgres psql -c 'CREATE DATABASE m2s OWNER m2s;'
 "
 
 # Restore database
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo -u postgres pg_restore -d m2s /tmp/m2s_restore.pgdump
 "
 
 # Verify restoration
-ssh pb@NEW_DB_SERVER "
+ssh ${USER}@NEW_DB_SERVER "
   sudo -u postgres psql -d m2s -c 'SELECT COUNT(*) FROM members_member;'
   sudo -u postgres psql -d m2s -c 'SELECT COUNT(*) FROM logsheet_flight;'
 "
@@ -787,7 +793,10 @@ ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
-**Or update Kubernetes ConfigMap directly:**
+**Or update Kubernetes ConfigMap directly (⚠️ TEMPORARY ONLY):**
+
+> **Warning**: This bypasses IaC and changes won't persist if the deployment is rerun from Ansible.
+> Use this only as an emergency fix, then follow up with proper IaC updates.
 
 ```bash
 # Update database host in secret
@@ -862,9 +871,11 @@ rm /tmp/m2s_all_*.enc
 **Quarterly Backup Drills:**
 
 ```bash
-# Run verification script
+# Run verification script (auto-detects database server from inventory)
 cd infrastructure/ansible
-./verify-backup-encryption.sh db1.manage2soar.com
+./verify-backup-encryption.sh
+# Or specify database server explicitly:
+# ./verify-backup-encryption.sh m2s-database
 ```
 
 **Store Off-Site:**
