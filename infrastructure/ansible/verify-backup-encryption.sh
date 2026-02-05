@@ -35,8 +35,8 @@ if [[ -z "${1:-}" ]] && [[ -f "inventory/gcp_database.yml" ]]; then
         in_hosts && /^[^[:space:]]/ { in_hosts=0; in_group=0 }
         in_hosts && /ansible_host:/ { host=$2 }
         in_hosts && /ansible_user:/ { user=$2; print user " " host; exit }
-        # If we find ansible_host but never see ansible_user, print with empty user
-        in_hosts && /^[^[:space:]]/ && host { print " " host; exit }
+        # If we find ansible_host but never see ansible_user, print with empty user in END
+        END { if (host && !user) print " " host }
     ' inventory/gcp_database.yml)
 
     DB_SERVER=$(echo "${DB_INFO}" | awk '{print $2}')
@@ -108,8 +108,9 @@ fi
 echo ""
 
 # Step 2: Test encryption/decryption with a small test string
-# NOTE: This uses a small in-memory test string for verification only.
-#       For production backup workflows, prefer file-based input to OpenSSL.
+# NOTE: This uses a small in-memory test string for verification only (piped through SSH/OpenSSL).
+#       For production backup workflows, prefer file-based input to OpenSSL for both security
+#       (avoids sensitive data in process listings/shell pipelines) and reliability reasons.
 echo "[2/5] Testing encryption/decryption with test data..."
 TEST_STRING="manage2soar-backup-test-$(date +%s)"
 ENCRYPTED=$(printf '%s\n' "${TEST_STRING}" | ssh "${SSH_USER}@${DB_SERVER}" "sudo -u postgres openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:${PASSPHRASE_FILE} -base64")

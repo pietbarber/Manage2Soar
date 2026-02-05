@@ -567,7 +567,7 @@ fi
 
 **🚨 Database Destroyed - Recovery in 4 Steps:**
 
-> **Note**: Steps 1-3 run on your local machine. Step 4 runs on the new database server after copying files.
+> **Note**: Steps 1-3 run on your local machine. Step 4 must run from a machine with PostgreSQL client tools and network access to the new database (for example, the new database server itself or another trusted client host) after you've copied the decrypted backup there.
 > See detailed procedure below for complete workflow.
 
 ```bash
@@ -636,6 +636,8 @@ ssh ${USER}@NEW_DB_SERVER "
   sudo apt install -y postgresql-17 postgresql-contrib-17
 "
 ```
+
+> **⚠️ IaC First Philosophy**: If the Ansible playbook fails, debug the specific failure (authentication, quotas, network) rather than bypassing IaC. The manual commands above are shown only as diagnostic/verification tools, not as a provisioning alternative. Changes made manually won't persist if deployments are rerun from Ansible.
 
 #### Step 2: Retrieve Decryption Passphrase
 
@@ -753,8 +755,14 @@ ssh ${USER}@NEW_DB_SERVER "
 # Copy decrypted backup to new database server
 scp /tmp/m2s_restore.pgdump ${USER}@NEW_DB_SERVER:/tmp/
 
-# Create database
+# Ensure m2s role exists and create database
+# PREFERRED: Use Ansible postgresql-setup role (IaC approach) to create role/database automatically
+# Manual fallback if starting from bare PostgreSQL (retrieve password from Ansible vault):
 ssh ${USER}@NEW_DB_SERVER "
+  # Create m2s role if it doesn't exist
+  sudo -u postgres psql -tc \"SELECT 1 FROM pg_roles WHERE rolname = 'm2s';\" | grep -q 1 || \\
+    sudo -u postgres psql -c \"CREATE ROLE m2s LOGIN PASSWORD '<vault_m2s_db_password>';\"
+  # Create database owned by m2s
   sudo -u postgres psql -c 'CREATE DATABASE m2s OWNER m2s;'
 "
 
@@ -773,6 +781,8 @@ ssh ${USER}@NEW_DB_SERVER "
 #### Step 6: Update Application Configuration
 
 **Update Django application to point to new database server:**
+
+**Preferred IaC Approach:**
 
 ```bash
 cd infrastructure/ansible
@@ -793,10 +803,9 @@ ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass
 ```
 
-**Or update Kubernetes ConfigMap directly (⚠️ TEMPORARY ONLY):**
+**Emergency Break-Glass Only (if app must be restored before IaC can be fixed):**
 
-> **Warning**: This bypasses IaC and changes won't persist if the deployment is rerun from Ansible.
-> Use this only as an emergency fix, then follow up with proper IaC updates.
+> **⚠️ CRITICAL WARNING**: This bypasses IaC. Use ONLY in absolute emergencies when the application must be restored immediately. Changes won't persist if deployment is rerun from Ansible. **CREATE A FOLLOW-UP TASK** to properly implement this fix via Ansible after using this workaround to prevent configuration drift.
 
 ```bash
 # Update database host in secret
@@ -831,7 +840,14 @@ curl -I https://skylinesoaring.manage2soar.com/admin/
 #### Step 8: Secure Cleanup
 
 ```bash
-# CRITICAL: Delete decrypted backup files (contain sensitive data)
+# CRITICAL: Delete decrypted backup files (contain sensitive data).
+# NOTE: `shred` is a *best-effort* secure delete and its effectiveness is filesystem-dependent.
+# It may not reliably overwrite data on journaling (e.g., ext3/ext4 with data=journal),
+# copy-on-write (e.g., btrfs, ZFS), or snapshot-backed/cloud storage volumes.
+# COMPENSATING CONTROLS (IaC RECOMMENDED):
+#   - Ensure database disks and /tmp are on encrypted storage (e.g., LUKS) in server provisioning.
+#   - Prefer mounting /tmp as tmpfs on highly sensitive systems.
+# Within that context, use shred as an additional defense-in-depth measure:
 shred -u /tmp/m2s_restore.sql /tmp/.backup_passphrase
 ssh ${USER}@NEW_DB_SERVER "sudo shred -u /tmp/m2s_restore.sql"
 
