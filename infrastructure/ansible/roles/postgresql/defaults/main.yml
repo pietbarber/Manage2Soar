@@ -20,6 +20,13 @@ postgresql_user: "m2s"
 # Enable multi-tenant mode (one database per tenant)
 postgresql_multi_tenant: false
 
+# Update passwords for existing users (default: false to prevent production outages)
+# Set to true ONLY when intentionally rotating passwords
+# WARNING: Changing this to true will update PostgreSQL user passwords.
+# You MUST then manually update K8s secrets AND restart Django pods,
+# or the applications will lose database connectivity.
+postgresql_update_existing_passwords: false
+
 # List of tenants (used when postgresql_multi_tenant is true)
 # Each tenant gets their own database: m2s_{prefix}
 postgresql_tenants: []

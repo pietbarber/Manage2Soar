@@ -1,15 +1,24 @@
 # GCP App Deployment Vault Secrets
 #
-# COPY THIS FILE AND FILL IN YOUR SECRETS:
-#   mkdir -p group_vars/gcp_app
-#   cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
-#   ansible-vault encrypt group_vars/gcp_app/vault.yml
+# ⚠️  IMPORTANT: This vault is now a SYMLINK to the master vault!
 #
-# This file should be encrypted with ansible-vault:
-#   ansible-vault encrypt group_vars/gcp_app/vault.yml
-#   ansible-vault edit group_vars/gcp_app/vault.yml
+# VAULT ARCHITECTURE: One Vault To Rule Them All
 #
-# All variables in this file should be prefixed with 'vault_' for clarity.
+#   Master vault (single source of truth):
+#     group_vars/localhost/vault.yml
+#
+#   This file (gcp_app/vault.yml) should be a SYMLINK:
+#     cd group_vars/gcp_app
+#     ln -sf ../localhost/vault.yml vault.yml
+#
+# WHY: Single source of truth prevents drift, simplifies secret management.
+#
+# To edit secrets, edit the MASTER vault:
+#   ansible-vault edit group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass
+#
+# DO NOT create a separate vault file here - use the symlink!
+#
+# See: group_vars/localhost.vault.yml.example for full documentation
 
 ---
 # ============================================================

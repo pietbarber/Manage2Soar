@@ -1,7 +1,20 @@
 # PostgreSQL Multi-Tenant Database/User Creation Tasks
 # Called in a loop for each tenant
 ---
+- name: "Check if database user exists for tenant: {{ tenant.prefix }}"
+  community.postgresql.postgresql_query:
+    query: "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname = %s) as user_exists"
+    positional_args:
+      - "m2s_{{ tenant.prefix }}"
+  become: true
+  become_user: postgres
+  register: user_exists_check
+  changed_when: false
+
 - name: "Create database user for tenant: {{ tenant.prefix }}"
+  # NOTE: When postgresql_update_existing_passwords is true, this task always reports 'changed'
+  # even if the password is already correct, because the module re-applies role attributes
+  # (NOSUPERUSER, NOCREATEDB). This is safe but means 'changed' doesn't confirm password change.
   community.postgresql.postgresql_user:
     name: "m2s_{{ tenant.prefix }}"
     password: "{{ tenant.password }}"
@@ -10,6 +23,17 @@
   become: true
   become_user: postgres
   no_log: true
+  when: not user_exists_check.query_result[0].user_exists or postgresql_update_existing_passwords | default(false)
+
+- name: "Warn about skipping password update for tenant: {{ tenant.prefix }}"
+  ansible.builtin.debug:
+    msg: |
+      ⚠️  User m2s_{{ tenant.prefix }} already exists - password NOT updated
+      To update passwords, set postgresql_update_existing_passwords: true
+      WARNING: This will break Django apps until K8s secrets are updated!
+  when:
+    - user_exists_check.query_result[0].user_exists
+    - not (postgresql_update_existing_passwords | default(false))
 
 - name: "Create database for tenant: {{ tenant.prefix }}"
   community.postgresql.postgresql_db:
