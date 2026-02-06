@@ -289,8 +289,11 @@ class Page(models.Model):
         Ensures that pages with role restrictions cannot be made public,
         maintaining security by preventing accidental exposure of restricted content.
 
+        Also enforces MAX_CMS_DEPTH nesting limit (Issue #596).
+
         Raises:
-            ValidationError: If attempting to make a page with role restrictions public
+            ValidationError: If attempting to make a page with role restrictions public,
+                           or if nesting depth exceeds MAX_CMS_DEPTH
 
         Note:
             Only validates existing pages (with pk) since Many-to-Many relationships
@@ -298,12 +301,27 @@ class Page(models.Model):
         """
         from django.core.exceptions import ValidationError
 
+        # Import MAX_CMS_DEPTH from urls.py (Issue #596)
+        from cms.urls import MAX_CMS_DEPTH
+
         # Only check if this is an update (has pk) since M2M relations don't exist on create
         if self.pk and self.is_public and self.role_permissions.exists():
             raise ValidationError(
                 "Public pages cannot have role restrictions. "
                 "Set 'is_public' to False to enable role-based access control."
             )
+
+        # Enforce maximum nesting depth (Issue #596)
+        depth = 1  # Current page counts as depth 1
+        current = self.parent
+        while current:
+            depth += 1
+            if depth > MAX_CMS_DEPTH:
+                raise ValidationError(
+                    f"Cannot create page: maximum nesting depth of {MAX_CMS_DEPTH} levels would be exceeded. "
+                    f"This page would be at level {depth}."
+                )
+            current = current.parent
 
     def save(self, *args, **kwargs):
         """

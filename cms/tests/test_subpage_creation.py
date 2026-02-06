@@ -5,13 +5,11 @@ Tests the "Create Subpage" button, parent pre-population, permission copying,
 disabled parent field, and URL depth support up to 10 levels.
 """
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from cms.models import Page, PageMemberPermission, PageRolePermission
-from cms.views import can_create_in_directory
 
 User = get_user_model()
 
@@ -412,7 +410,7 @@ class URLDepthTests(TestCase):
 
     def test_breadcrumbs_for_deep_nesting(self):
         """Breadcrumbs should be built correctly for deeply nested pages."""
-        pages = self._create_nested_pages(5)
+        self._create_nested_pages(5)
         self.client.force_login(self.webmaster)
         path = "/cms/" + "/".join(f"level-{i + 1}" for i in range(5)) + "/"
         response = self.client.get(path)

@@ -790,7 +790,10 @@ def create_cms_page(request):
     parent_page = None
     is_subpage = False
     if parent_id:
-        parent_page = get_object_or_404(Page, id=parent_id)
+        parent_page = get_object_or_404(
+            Page.objects.prefetch_related("role_permissions", "member_permissions"),
+            id=parent_id,
+        )
         is_subpage = True
 
     # Check creation permissions
