@@ -254,32 +254,6 @@ def notify_membership_managers_of_new_application(application):
 
                 subject = f"New Membership Application: {safe_name[:50]}"
 
-                message_lines = [
-                    f"A new membership application has been submitted through the club website.",
-                    "",
-                    "Applicant Details:",
-                    f"- Name: {safe_name}",
-                    f"- Email: {safe_email}",
-                    f"- Phone: {safe_phone}",
-                    f"- Location: {safe_city}",
-                    f"- Application ID: {application.application_id}",
-                    f"- Submission Time: {application.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}",
-                    "",
-                    "Application Status: Pending Review",
-                    "",
-                    "To review this application:",
-                    "1. Log into the member management interface",
-                    "2. Navigate to Membership Applications",
-                    "3. Review the applicant's information and background",
-                    "4. Approve, reject, or request additional information",
-                    "",
-                    "Management Links:",
-                    f"- Review Application: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/{application.application_id}/",
-                    f"- All Applications: {settings.SITE_URL if hasattr(settings, 'SITE_URL') else 'https://localhost:8000'}/members/applications/",
-                    "",
-                    "This message was sent automatically by the club website membership system.",
-                ]
-
                 # Prepare context for email templates
                 context = {
                     "application": application,
