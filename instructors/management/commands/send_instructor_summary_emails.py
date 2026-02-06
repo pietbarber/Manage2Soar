@@ -23,6 +23,7 @@ from instructors.models import StudentProgressSnapshot
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.management.commands.base_cronjob import BaseCronJobCommand
+from utils.url_helpers import get_canonical_url
 
 
 class Command(BaseCronJobCommand):
@@ -98,7 +99,7 @@ class Command(BaseCronJobCommand):
 
         # Get site configuration
         config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+        site_url = get_canonical_url()
 
         emails_sent = 0
         errors = 0
@@ -250,8 +251,10 @@ class Command(BaseCronJobCommand):
             "club_name": config.club_name if config else "Soaring Club",
             "club_logo_url": logo_url,
             "site_url": site_url,
-            "review_url": f"{site_url}{reverse('duty_roster:instructor_requests')}",
-            "calendar_url": f"{site_url}{reverse('duty_roster:duty_calendar')}",
+            "review_url": build_absolute_url(
+                reverse("duty_roster:instructor_requests")
+            ),
+            "calendar_url": build_absolute_url(reverse("duty_roster:duty_calendar")),
         }
 
         html_message = render_to_string(

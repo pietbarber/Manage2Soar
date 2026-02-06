@@ -82,6 +82,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "club_name",
                     "domain_name",
+                    "canonical_url",
                     "club_abbreviation",
                     "club_logo",
                     "club_nickname",

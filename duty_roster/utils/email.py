@@ -10,6 +10,7 @@ from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 
 def get_email_config():
@@ -19,10 +20,8 @@ def get_email_config():
         dict: Configuration containing config, site_url, roster_url, from_email, and club_name
     """
     config = SiteConfiguration.objects.first()
-    site_url = getattr(settings, "SITE_URL", "").rstrip("/")
-    roster_url = (
-        f"{site_url}/duty_roster/calendar/" if site_url else "/duty_roster/calendar/"
-    )
+    site_url = get_canonical_url()
+    roster_url = build_absolute_url("/duty_roster/calendar/")
 
     # Build from_email
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
