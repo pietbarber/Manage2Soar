@@ -183,16 +183,6 @@ class SiteConfiguration(models.Model):
     domain_name = models.CharField(
         max_length=200, help_text="Primary domain name (e.g. example.org)"
     )
-    canonical_url = models.URLField(
-        max_length=255,
-        blank=True,
-        help_text=(
-            "Canonical URL for all outbound email links (e.g., https://www.skylinesoaring.org). "
-            "This ensures consistent URLs in emails regardless of which domain users access. "
-            "Do NOT include trailing slash. Leave blank to use SITE_URL environment variable."
-        ),
-        verbose_name="Canonical Email URL",
-    )
     club_abbreviation = models.CharField(
         max_length=20, help_text="Short abbreviation (e.g. SSS)"
     )

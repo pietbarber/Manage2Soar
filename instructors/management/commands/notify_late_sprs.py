@@ -13,7 +13,6 @@ from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
-from utils.url_helpers import build_absolute_url, get_canonical_url
 
 
 class Command(BaseCronJobCommand):
@@ -183,8 +182,10 @@ class Command(BaseCronJobCommand):
 
         # Prepare template context
         config = SiteConfiguration.objects.first()
-        site_url = get_canonical_url()
-        instruction_reports_url = build_absolute_url("/instructors/")
+        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
+        instruction_reports_url = (
+            f"{site_url}/instructors/" if site_url else "/instructors/"
+        )
 
         # Format SPR data for templates
         formatted_escalation_groups = {}

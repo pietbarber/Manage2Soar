@@ -128,7 +128,7 @@ urlpatterns = [
     path("cms/", include("cms.urls")),
     path(
         "password-reset/",
-        members_views.CustomPasswordResetView.as_view(
+        auth_views.PasswordResetView.as_view(
             html_email_template_name="registration/password_reset_email.html",
             subject_template_name="registration/password_reset_subject.txt",
         ),

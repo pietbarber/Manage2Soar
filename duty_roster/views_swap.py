@@ -24,7 +24,6 @@ from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import get_dev_mode_info, send_mail
 from utils.email_helpers import get_absolute_club_logo_url
-from utils.url_helpers import get_canonical_url
 
 from .forms import DutySwapOfferForm, DutySwapRequestForm
 from .models import DutyAssignment, DutySwapOffer, DutySwapRequest, MemberBlackout
@@ -609,7 +608,7 @@ def update_duty_assignments(swap_request, offer):
 def get_email_context_base():
     """Get base context for email templates."""
     config = SiteConfiguration.objects.first()
-    base_url = get_canonical_url()
+    base_url = getattr(settings, "SITE_URL", "http://localhost:8001")
     if not config:
         return {
             "club_name": "Soaring Club",

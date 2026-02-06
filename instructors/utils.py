@@ -14,7 +14,6 @@ from logsheet.models import Flight
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
-from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .models import (
     GroundInstruction,
@@ -227,12 +226,11 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
     # Get site configuration
     config = SiteConfiguration.objects.first()
     club_name = config.club_name if config else "Manage2Soar"
+    domain_name = config.domain_name if config else "manage2soar.com"
 
-    # Build URLs using canonical URL helpers
-    site_url = get_canonical_url()
-    logbook_url = build_absolute_url(
-        f"/instructors/instruction-record/{report.student.id}/"
-    )
+    # Build URLs
+    site_url = f"https://{domain_name}"
+    logbook_url = f"{site_url}/instructors/instruction-record/{report.student.id}/"
 
     # Get club logo URL if available (uses helper for proper absolute URL)
     club_logo_url = get_absolute_club_logo_url(config)

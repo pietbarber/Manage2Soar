@@ -6,7 +6,6 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -27,7 +26,6 @@ from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
-from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .decorators import active_member_required
 from .forms import (
@@ -232,7 +230,7 @@ def toggle_redaction(request, member_id):
                     action = "hidden" if member.redact_contact else "made visible"
                     message = f"{actor_name} has {action} personal contact information for member {subject_name}."
 
-                url = build_absolute_url(
+                url = request.build_absolute_uri(
                     reverse("members:member_view", kwargs={"member_id": member.id})
                 )
 
@@ -777,7 +775,7 @@ def visiting_pilot_qr_code(request):
         token = config.get_or_create_daily_token()
 
         # Build the full URL for the signup page with token
-        signup_url = build_absolute_url(
+        signup_url = request.build_absolute_uri(
             reverse("members:visiting_pilot_signup", args=[token])
         )
 
@@ -836,7 +834,7 @@ def visiting_pilot_qr_display(request):
     token = config.get_or_create_daily_token()
 
     qr_url = reverse("members:visiting_pilot_qr_code")
-    signup_url = build_absolute_url(
+    signup_url = request.build_absolute_uri(
         reverse("members:visiting_pilot_signup", args=[token])
     )
 
@@ -915,7 +913,7 @@ def _notify_safety_officers_of_new_report(report):
         context = {
             "report": report,
             "club_name": config.club_name if config else "Club",
-            "site_url": get_canonical_url(),
+            "site_url": getattr(settings, "SITE_URL", None),
             "reporter_display": report.get_reporter_display(),
         }
 
@@ -971,35 +969,3 @@ def _notify_safety_officers_of_new_report(report):
 
     except Exception as e:
         logger.error(f"Failed to send safety report notifications: {e}")
-
-
-#########################
-# Custom Password Reset View
-#########################
-
-
-class CustomPasswordResetView(auth_views.PasswordResetView):
-    """
-    Custom password reset view that injects canonical URL into email context.
-
-    This ensures password reset emails use the canonical URL from SiteConfiguration
-    database field instead of relying on request.get_host() which can vary.
-
-    Issue #612: Fixes password manager domain mismatch between login and email URLs.
-    """
-
-    def get_email_context(self, *args, **kwargs):
-        """Override to inject canonical URL."""
-        context = super().get_email_context(*args, **kwargs)
-
-        # Replace protocol://domain with canonical URL
-        canonical_url = get_canonical_url()
-        if canonical_url:
-            # Parse canonical URL to extract protocol and domain
-            from urllib.parse import urlparse
-
-            parsed = urlparse(canonical_url)
-            context["protocol"] = parsed.scheme
-            context["domain"] = parsed.netloc
-
-        return context

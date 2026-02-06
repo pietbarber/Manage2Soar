@@ -8,8 +8,6 @@ from django.urls import reverse
 
 from notifications.models import Notification
 from utils.email import send_mail
-from utils.email_helpers import get_absolute_club_logo_url
-from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .models import Flight, MaintenanceIssue
 
@@ -42,6 +40,16 @@ def _get_club_config():
     return SiteConfiguration.objects.first()
 
 
+def _get_absolute_club_logo_url(config):
+    """Get absolute URL for club logo."""
+    if not config or not config.club_logo:
+        return None
+    site_url = getattr(settings, "SITE_URL", "")
+    if site_url and config.club_logo:
+        return f"{site_url.rstrip('/')}{config.club_logo.url}"
+    return None
+
+
 def _send_maintenance_issue_email(issue, meisters):
     """Send email notification to meisters about a new maintenance issue.
 
@@ -55,7 +63,13 @@ def _send_maintenance_issue_email(issue, meisters):
     aircraft = issue.glider or issue.towplane
     aircraft_type = "Glider" if issue.glider else "Towplane"
 
-    maintenance_url = build_absolute_url(reverse("logsheet:maintenance_issues"))
+    try:
+        maintenance_url = reverse("logsheet:maintenance_issues")
+        site_url = getattr(settings, "SITE_URL", "")
+        if site_url:
+            maintenance_url = f"{site_url.rstrip('/')}{maintenance_url}"
+    except Exception:
+        maintenance_url = None
 
     context = {
         "aircraft": str(aircraft),
@@ -69,8 +83,8 @@ def _send_maintenance_issue_email(issue, meisters):
             issue.logsheet.log_date.strftime("%B %d, %Y") if issue.logsheet else "N/A"
         ),
         "club_name": config.club_name if config else "Soaring Club",
-        "club_logo_url": get_absolute_club_logo_url(config),
-        "site_url": get_canonical_url(),
+        "club_logo_url": _get_absolute_club_logo_url(config),
+        "site_url": getattr(settings, "SITE_URL", None),
         "maintenance_url": maintenance_url,
     }
 
