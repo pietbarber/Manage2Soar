@@ -32,7 +32,7 @@ def test_public_page_and_document_accessible_anonymous(client, settings, tmp_pat
         logging.info(f"GoogleCloudStorage not available in test environment: {e}")
 
     # Visiting the page should be allowed without login
-    url = reverse("cms:cms_page", kwargs={"slug1": page.slug})
+    url = reverse("cms:cms_page", kwargs={"path": page.slug})
     resp = client.get(url)
     assert resp.status_code == 200
 
@@ -68,7 +68,7 @@ def test_restricted_page_and_document_redirects_anonymous(client, settings, tmp_
         logging.info(f"GoogleCloudStorage not available in test environment: {e}")
 
     # Visiting the page should redirect to login for anonymous user
-    url = reverse("cms:cms_page", kwargs={"slug1": page.slug})
+    url = reverse("cms:cms_page", kwargs={"path": page.slug})
     resp = client.get(url)
     # Expect redirect to login (302) or login page rendered
     assert resp.status_code in (302, 303)

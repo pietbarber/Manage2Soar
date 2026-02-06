@@ -5,6 +5,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
 from django.http import HttpResponseForbidden
@@ -22,7 +23,7 @@ from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
 
-from .models import Document, Page
+from .models import Document, Page, PageMemberPermission, PageRolePermission
 
 # Module-level logger to avoid repeated getLogger calls
 logger = logging.getLogger(__name__)
@@ -112,35 +113,46 @@ def get_accessible_top_level_pages(user, request=None):
 
 
 def cms_page(request, **kwargs):
-    # Accepts named kwargs: slug1, slug2, slug3 from urls.py
+    # Accepts 'path' kwarg: slash-separated slugs (e.g. "parent/child/grandchild")
+    # Supports up to MAX_CMS_DEPTH levels of nesting (Issue #596)
     debug_logger = logging.getLogger("cms.debug")
-    slugs = []
-    for i in range(1, 4):
-        slug = kwargs.get(f"slug{i}")
-        if slug:
-            slugs.append(slug)
+    path_str = kwargs.get("path", "")
+    slugs = [s for s in path_str.split("/") if s]
     debug_logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
         debug_logger.debug("cms_page: No slugs, redirecting to cms:resources")
         return redirect("cms:resources")
     parent = None
     page = None
+    parent_chain = []  # Track parent chain during traversal to avoid N+1 queries
     for slug in slugs:
         debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
-        # Prefetch role_permissions to avoid N+1 queries later
+        # Prefetch role_permissions to avoid N+1 queries
         page = get_object_or_404(
-            Page.objects.prefetch_related("role_permissions"), slug=slug, parent=parent
+            Page.objects.prefetch_related("role_permissions"),
+            slug=slug,
+            parent=parent,
         )
+        parent_chain.append(page)  # Build chain for later access control check
         parent = page
     debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
     # Access control: check if user can access this page based on role restrictions
     assert page is not None
-    if not page.can_user_access(request.user, request):
-        # Use Django's helper to redirect to login (handles encoding)
-        return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
+
+    # Check parent chain for access restrictions (security improvement)
+    # If any ancestor page is private/restricted, user must have access to ALL ancestors
+    # This prevents "public pages hidden under private parents" from being accessible
+    # via direct links/bookmarks while appearing invisible in navigation
+    # Using parent_chain built during traversal to avoid N+1 queries (up to 10 levels)
+    for ancestor in parent_chain:
+        if not ancestor.can_user_access(request.user, request):
+            # User blocked by this page or an ancestor - deny access
+            return redirect_to_login(
+                request.get_full_path(), login_url=settings.LOGIN_URL
+            )
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1
@@ -202,6 +214,9 @@ def cms_page(request, **kwargs):
     # role_permissions are already prefetched from the page traversal loop
     page_required_roles = get_role_display_names(page) if not page.is_public else []
 
+    # Check if user can create subpages under this page (Issue #596)
+    can_create_subpage = can_create_in_directory(request.user, page)
+
     return render(
         request,
         "cms/page.html",
@@ -213,6 +228,7 @@ def cms_page(request, **kwargs):
             "page_has_role_restrictions": page.has_role_restrictions(),
             "page_required_roles": page_required_roles,
             "can_edit_page": can_edit_page(request.user, page),
+            "can_create_subpage": can_create_subpage,
         },
     )
 
@@ -777,12 +793,22 @@ def edit_homepage_content(request, content_id):
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def create_cms_page(request):
-    """Create a new CMS page with full TinyMCE functionality."""
+    """Create a new CMS page with full TinyMCE functionality.
+
+    Supports creating subpages (Issue #596): when ?parent=<id> is provided,
+    the parent field is pre-set and disabled, is_public is inherited from the
+    parent, and role/member permissions are copied from the parent after creation.
+    """
     # Get parent page if specified
     parent_id = request.GET.get("parent")
     parent_page = None
+    is_subpage = False
     if parent_id:
-        parent_page = get_object_or_404(Page, id=parent_id)
+        parent_page = get_object_or_404(
+            Page.objects.prefetch_related("role_permissions", "member_permissions"),
+            id=parent_id,
+        )
+        is_subpage = True
 
     # Check creation permissions
     if not can_create_in_directory(request.user, parent_page):
@@ -794,31 +820,91 @@ def create_cms_page(request):
         form = CmsPageForm(request.POST)
         formset = DocumentFormSet(request.POST, request.FILES)
 
+        # When creating a subpage, ensure the parent field cannot be manipulated
+        # via POST data. Disable the field so cleaned_data does not override the
+        # server-controlled parent set below (security - Issue #596).
+        if is_subpage:
+            form.fields["parent"].disabled = True
+            form.instance.parent = parent_page
+
         if form.is_valid() and formset.is_valid():
-            page = form.save()
+            # Manually trigger model validation (clean()) before save to enforce
+            # MAX_CMS_DEPTH limit (Issue #596). Django forms don't automatically
+            # call model.clean() unless form.save() calls instance.full_clean().
+            page = form.save(commit=False)
 
-            # Save documents with uploaded_by field
-            formset.instance = page
-            documents = formset.save(commit=False)
-            for document in documents:
-                document.page = page
-                if not document.uploaded_by:
-                    document.uploaded_by = request.user
-                document.save()
+            # Re-apply parent for subpages (in case form.save() created a new instance)
+            if is_subpage:
+                page.parent = parent_page
 
-            # Finalize formset changes (e.g., deletions, post-save hooks)
-            formset.save()
+            try:
+                page.full_clean()
+                page.save()
+            except ValidationError as e:
+                # Surface the validation error via the messages framework so it is visible
+                messages.error(request, str(e))
+                # Don't proceed to save - fall through to re-render the form
+            else:
+                form.save_m2m()  # Save many-to-many relationships
 
-            messages.success(request, f'Page "{page.title}" created successfully!')
-            return redirect(page.get_absolute_url())
+                # Copy permissions from parent page (Issue #596)
+                if is_subpage and parent_page:
+                    # Only copy role permissions if child page is private
+                    # (PageRolePermission.clean() prevents role perms on public pages)
+                    if not page.is_public:
+                        for role_perm in parent_page.role_permissions.all():
+                            PageRolePermission.objects.get_or_create(
+                                page=page, role_name=role_perm.role_name
+                            )
+                    # Copy member permissions (EDIT access) - applies to both public and private
+                    for member_perm in parent_page.member_permissions.all():
+                        PageMemberPermission.objects.get_or_create(
+                            page=page, member=member_perm.member
+                        )
+
+                # Save documents with uploaded_by field
+                formset.instance = page
+                documents = formset.save(commit=False)
+                for document in documents:
+                    document.page = page
+                    if not document.uploaded_by:
+                        document.uploaded_by = request.user
+                    document.save()
+
+                # Finalize formset changes (e.g., deletions, post-save hooks)
+                formset.save()
+
+                messages.success(request, f'Page "{page.title}" created successfully!')
+                return redirect(page.get_absolute_url())
     else:
-        form = CmsPageForm()
+        initial = {}
+        if is_subpage and parent_page:
+            initial["parent"] = parent_page.id
+            initial["is_public"] = parent_page.is_public
+        form = CmsPageForm(initial=initial)
+
+        # Disable the parent field when creating a subpage (Issue #596)
+        if is_subpage:
+            form.fields["parent"].disabled = True
+
         formset = DocumentFormSet(queryset=Document.objects.none())
+
+    # Build page title to include parent context for subpages
+    if is_subpage and parent_page:
+        page_title = f'Create Subpage under "{parent_page.title}"'
+    else:
+        page_title = "Create New CMS Page"
 
     return render(
         request,
         "cms/create_page.html",
-        {"form": form, "formset": formset, "page_title": "Create New CMS Page"},
+        {
+            "form": form,
+            "formset": formset,
+            "page_title": page_title,
+            "parent_page": parent_page,
+            "is_subpage": is_subpage,
+        },
     )
 
 

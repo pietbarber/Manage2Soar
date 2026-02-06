@@ -24,6 +24,12 @@ erDiagram
         string role_name
     }
 
+    PageMemberPermission {
+        int id PK
+        int page_id FK
+        int member_id FK
+    }
+
     Document {
         int id PK
         int page_id FK
@@ -82,8 +88,10 @@ erDiagram
     Page ||--o{ Page : parent_child
     Page ||--o{ Document : contains_documents
     Page ||--o{ PageRolePermission : role_restrictions
+    Page ||--o{ PageMemberPermission : edit_permissions
     HomePageContent ||--o{ HomePageImage : has_images
     Member ||--o{ Document : uploaded_by
+    Member ||--o{ PageMemberPermission : edit_access
     Member ||--o{ SiteFeedback : submitted_by
     Member ||--o{ SiteFeedback : responded_by
     Member ||--o{ VisitorContact : handled_by
@@ -93,12 +101,14 @@ erDiagram
 
 ### `Page`
 - Hierarchical CMS pages with parent-child relationships
+- **Subpage depth**: Supports up to 10 levels of nesting (increased from 3 levels in the legacy URL routing; Issue #596)
 - **Role-based access control**: Three access levels - public, member-only, and role-restricted
 - Auto-generates slugs from titles
 - Contains rich HTML content via TinyMCE
 - **Banner images** (Issue #547): Optional hero banner with parallax scrolling effect and auto-contrast text color
 - Access control methods: `can_user_access()`, `has_role_restrictions()`, `get_required_roles()`
 - Validation prevents public pages from having role restrictions
+- **Subpage creation** (Issue #596): "Create Subpage" button on page detail view pre-sets parent, inherits `is_public` and copies role/member permissions from parent
 
 ### `PageRolePermission` (Issue #239)
 - Many-to-Many relationship for role-based page access control
@@ -106,6 +116,15 @@ erDiagram
 - Unique constraint prevents duplicate role assignments per page
 - OR logic: users need ANY of the assigned roles to access the page
 - Only applies to private pages (`is_public=False`)
+- **Subpage inheritance** (Issue #596): Role permissions are automatically copied from parent page when creating subpages
+
+### `PageMemberPermission` (Issue #273)
+- Per-member EDIT access control for CMS pages
+- Works independently of VIEW permissions (`is_public` flag)
+- Grants EDIT rights to specific members for both public and private pages
+- For private pages, EDIT permission also grants VIEW access
+- Unique constraint prevents duplicate member assignments per page
+- **Subpage inheritance** (Issue #596): Member permissions are automatically copied from parent page when creating subpages
 
 ### `Document`
 - File attachments linked to CMS pages
@@ -188,6 +207,7 @@ erDiagram
 ### Available Editing Views
 - **Edit Page**: `/cms/edit/page/<id>/` - Edit existing CMS pages with content and file uploads
 - **Create Page**: `/cms/create/page/` - Create new CMS pages with parent directory context
+- **Create Subpage**: `/cms/create/page/?parent=<id>` - Create subpage with parent pre-set, permissions inherited (Issue #596)
 - **Edit Homepage**: `/cms/edit/homepage/<id>/` - Edit homepage content (webmaster-only)
 
 ### Permission Logic

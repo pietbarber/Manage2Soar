@@ -21,21 +21,12 @@ urlpatterns = [
     # Visitor contact URLs (Issue #70)
     path("contact/", views.contact, name="contact"),
     path("contact/success/", views.contact_success, name="contact_success"),
-    # /cms/<slug>/ or /cms/<parent>/<slug>/ (supports up to 3 levels for now)
-    # Exclude common reserved paths (admin, debug, api, etc.) from CMS routing
+    # CMS page routing - supports up to MAX_CMS_DEPTH levels of nesting (Issue #596)
+    # Single catch-all pattern handles any depth from 1 to 10 slug segments.
+    # Excludes reserved paths (edit, create, admin, etc.) from CMS routing.
     re_path(
-        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt|feedback|contact)/)(?P<slug1>[-\w]+)/$",
+        r"^(?!(?:admin|debug|api|static|media|favicon\.ico|robots\.txt|feedback|contact|edit|create)/)(?P<path>[-\w]+(?:/[-\w]+)*)/$",
         views.cms_page,
         name="cms_page",
-    ),
-    re_path(
-        r"^(?P<slug1>[-\w]+)/(?P<slug2>[-\w]+)/$",
-        views.cms_page,
-        name="cms_page_nested",
-    ),
-    re_path(
-        r"^(?P<slug1>[-\w]+)/(?P<slug2>[-\w]+)/(?P<slug3>[-\w]+)/$",
-        views.cms_page,
-        name="cms_page_nested2",
     ),
 ]

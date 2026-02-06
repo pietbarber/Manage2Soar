@@ -21,7 +21,7 @@ def test_page_breadcrumbs_and_doc_count(client, django_user_model, monkeypatch):
     child.documents.create(title="Child doc 2", file="files/child2.pdf")
 
     # Request the parent page (use the cms app url name)
-    url = reverse("cms:cms_page", args=(parent.slug,))
+    url = reverse("cms:cms_page", kwargs={"path": parent.slug})
     resp = client.get(url)
     assert resp.status_code == 200
 
