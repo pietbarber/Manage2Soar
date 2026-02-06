@@ -311,6 +311,18 @@ class Page(models.Model):
             )
 
         # Enforce maximum nesting depth (Issue #596)
+        self._validate_depth()
+
+    def _validate_depth(self):
+        """Validate that page depth doesn't exceed MAX_CMS_DEPTH.
+
+        Raises:
+            ValidationError: If nesting depth exceeds MAX_CMS_DEPTH
+        """
+        from django.core.exceptions import ValidationError
+
+        from cms.constants import MAX_CMS_DEPTH
+
         depth = 1  # Current page counts as depth 1
         current = self.parent
         while current:
@@ -332,24 +344,11 @@ class Page(models.Model):
         Args:
             *args, **kwargs: Standard Django save() parameters
         """
-        from django.core.exceptions import ValidationError
-
-        from cms.constants import MAX_CMS_DEPTH
-
         if not self.slug:
             self.slug = slugify(self.title)
 
         # Enforce maximum nesting depth for all saves (Issue #596)
-        depth = 1  # Current page counts as depth 1
-        current = self.parent
-        while current:
-            depth += 1
-            if depth > MAX_CMS_DEPTH:
-                raise ValidationError(
-                    f"Cannot create page: maximum nesting depth of {MAX_CMS_DEPTH} levels would be exceeded. "
-                    f"This page would be at level {depth}."
-                )
-            current = current.parent
+        self._validate_depth()
 
         # Only run clean() if this is an update (pk exists) to prevent unnecessary queries
         if self.pk:

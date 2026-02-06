@@ -128,9 +128,11 @@ def cms_page(request, **kwargs):
         debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
-        # Prefetch role_permissions to avoid N+1 queries later
+        # Prefetch role_permissions and parent to avoid N+1 queries
         page = get_object_or_404(
-            Page.objects.prefetch_related("role_permissions"), slug=slug, parent=parent
+            Page.objects.prefetch_related("role_permissions").select_related("parent"),
+            slug=slug,
+            parent=parent,
         )
         parent = page
     debug_logger.debug(f"cms_page: Found page {page}")

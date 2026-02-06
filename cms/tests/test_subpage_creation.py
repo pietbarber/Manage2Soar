@@ -469,7 +469,7 @@ class URLDepthTests(TestCase):
 
         # Should show validation error about depth limit via messages
         messages_list = list(response.context["messages"])
-        self.assertTrue(len(messages_list) > 0)
+        self.assertGreater(len(messages_list), 0)
         error_message = str(messages_list[0])
         self.assertIn("maximum nesting depth", error_message)
 
