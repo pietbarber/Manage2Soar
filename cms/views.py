@@ -5,6 +5,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Max
 from django.forms import inlineformset_factory
 from django.http import HttpResponseForbidden
@@ -825,7 +826,7 @@ def create_cms_page(request):
 
             try:
                 page.full_clean()
-            except Exception as e:
+            except ValidationError as e:
                 # Add the validation error to the form and re-render
                 form.add_error(None, str(e))
                 # Don't proceed to save - fall through to re-render the form

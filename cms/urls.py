@@ -1,11 +1,9 @@
 from django.urls import path, re_path
 
 from . import views
+from .constants import MAX_CMS_DEPTH
 
 app_name = "cms"
-
-# Maximum supported subpage nesting depth (Issue #596)
-MAX_CMS_DEPTH = 10
 
 urlpatterns = [
     # CMS Resources index page at /cms/

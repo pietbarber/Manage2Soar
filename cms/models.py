@@ -301,8 +301,7 @@ class Page(models.Model):
         """
         from django.core.exceptions import ValidationError
 
-        # Import MAX_CMS_DEPTH from urls.py (Issue #596)
-        from cms.urls import MAX_CMS_DEPTH
+        from cms.constants import MAX_CMS_DEPTH
 
         # Only check if this is an update (has pk) since M2M relations don't exist on create
         if self.pk and self.is_public and self.role_permissions.exists():
