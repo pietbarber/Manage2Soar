@@ -441,6 +441,40 @@ class URLDepthTests(TestCase):
         response = self.client.get("/cms/level-1/level-3/")
         self.assertEqual(response.status_code, 404)
 
+    def test_max_depth_validation_enforced(self):
+        """Creating a page beyond MAX_CMS_DEPTH should fail with ValidationError."""
+        # Create 10 levels (the maximum)
+        self._create_nested_pages(10)
+        # Attempt to create an 11th level via the view (not .create() which bypasses validation)
+        self.client.force_login(self.webmaster)
+        parent_page = Page.objects.get(slug="level-10")
+        url = reverse("cms:create_page") + f"?parent={parent_page.id}"
+        form_data = {
+            "title": "Level 11 - Should Fail",
+            "slug": "level-11",
+            "parent": parent_page.id,
+            "content": "",
+            "is_public": True,
+            "documents-TOTAL_FORMS": "0",
+            "documents-INITIAL_FORMS": "0",
+            "documents-MIN_NUM_FORMS": "0",
+            "documents-MAX_NUM_FORMS": "1000",
+        }
+        response = self.client.post(url, data=form_data)
+        # Should fail (200 with form errors, not 302 redirect)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify the page was NOT created
+        self.assertFalse(Page.objects.filter(slug="level-11").exists())
+
+        # Should show validation error about depth limit
+        self.assertIn("form", response.context)
+        form = response.context["form"]
+        self.assertFalse(form.is_valid())
+        # Verify the error mentions depth limit
+        errors = str(form.errors)
+        self.assertIn("maximum nesting depth", errors.lower())
+
 
 class SubpageCreationByEditorTests(TestCase):
     """Test that members with PageMemberPermission can create subpages."""

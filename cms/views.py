@@ -806,41 +806,60 @@ def create_cms_page(request):
         form = CmsPageForm(request.POST)
         formset = DocumentFormSet(request.POST, request.FILES)
 
-        # When creating a subpage, the parent field is disabled in the form
-        # so it won't be in POST data. We must set it on the instance before save.
+        # When creating a subpage, ensure the parent field cannot be manipulated
+        # via POST data. Disable the field so cleaned_data does not override the
+        # server-controlled parent set below (security - Issue #596).
         if is_subpage:
+            form.fields["parent"].disabled = True
             form.instance.parent = parent_page
 
         if form.is_valid() and formset.is_valid():
-            page = form.save()
+            # Manually trigger model validation (clean()) before save to enforce
+            # MAX_CMS_DEPTH limit (Issue #596). Django forms don't automatically
+            # call model.clean() unless form.save() calls instance.full_clean().
+            page = form.save(commit=False)
 
-            # Copy permissions from parent page (Issue #596)
-            if is_subpage and parent_page:
-                # Copy role permissions (VIEW access)
-                for role_perm in parent_page.role_permissions.all():
-                    PageRolePermission.objects.get_or_create(
-                        page=page, role_name=role_perm.role_name
-                    )
-                # Copy member permissions (EDIT access)
-                for member_perm in parent_page.member_permissions.all():
-                    PageMemberPermission.objects.get_or_create(
-                        page=page, member=member_perm.member
-                    )
+            # Re-apply parent for subpages (in case form.save() created a new instance)
+            if is_subpage:
+                page.parent = parent_page
 
-            # Save documents with uploaded_by field
-            formset.instance = page
-            documents = formset.save(commit=False)
-            for document in documents:
-                document.page = page
-                if not document.uploaded_by:
-                    document.uploaded_by = request.user
-                document.save()
+            try:
+                page.full_clean()
+            except Exception as e:
+                # Add the validation error to the form and re-render
+                form.add_error(None, str(e))
+                # Don't proceed to save - fall through to re-render the form
+            else:
+                page.save()
+                form.save_m2m()  # Save many-to-many relationships
 
-            # Finalize formset changes (e.g., deletions, post-save hooks)
-            formset.save()
+                # Copy permissions from parent page (Issue #596)
+                if is_subpage and parent_page:
+                    # Copy role permissions (VIEW access)
+                    for role_perm in parent_page.role_permissions.all():
+                        PageRolePermission.objects.get_or_create(
+                            page=page, role_name=role_perm.role_name
+                        )
+                    # Copy member permissions (EDIT access)
+                    for member_perm in parent_page.member_permissions.all():
+                        PageMemberPermission.objects.get_or_create(
+                            page=page, member=member_perm.member
+                        )
 
-            messages.success(request, f'Page "{page.title}" created successfully!')
-            return redirect(page.get_absolute_url())
+                # Save documents with uploaded_by field
+                formset.instance = page
+                documents = formset.save(commit=False)
+                for document in documents:
+                    document.page = page
+                    if not document.uploaded_by:
+                        document.uploaded_by = request.user
+                    document.save()
+
+                # Finalize formset changes (e.g., deletions, post-save hooks)
+                formset.save()
+
+                messages.success(request, f'Page "{page.title}" created successfully!')
+                return redirect(page.get_absolute_url())
     else:
         initial = {}
         if is_subpage and parent_page:
