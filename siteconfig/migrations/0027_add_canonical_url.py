@@ -20,6 +20,7 @@ class Migration(migrations.Migration):
                 max_length=255,
                 verbose_name="Canonical Email URL",
             ),
+            preserve_default=False,
         ),
         migrations.AlterField(
             model_name="siteconfiguration",

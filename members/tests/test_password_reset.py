@@ -30,7 +30,7 @@ def test_password_reset_with_unknown_email_does_not_send(client):
 
 
 @pytest.mark.django_db
-def test_password_reset_uses_canonical_url(client, settings):
+def test_password_reset_uses_canonical_url(client):
     """Test that password reset emails use canonical URL from SiteConfiguration.
 
     Issue #612: Ensures password reset emails use canonical domain (skylinesoaring.org)

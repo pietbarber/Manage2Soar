@@ -548,17 +548,19 @@ def notify_membership_managers_of_withdrawal(application):
                 subject = f"Membership Application Withdrawn: {safe_name[:50]}"
 
                 # Prepare context for email templates
+                site_url = get_canonical_url()
                 context = {
                     "application": application,
                     "submitted_at": application.submitted_at.strftime(
                         "%B %d, %Y at %I:%M %p"
                     ),
                     "view_application_url": build_absolute_url(
-                        f"/members/applications/{application.application_id}/"
+                        f"/members/applications/{application.application_id}/",
+                        canonical=site_url,
                     ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
-                    "site_url": get_canonical_url(),
+                    "site_url": site_url,
                 }
 
                 # Render HTML and plain text templates

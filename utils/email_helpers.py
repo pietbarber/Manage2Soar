@@ -28,6 +28,7 @@ def get_absolute_club_logo_url(config):
     if logo_url.startswith(("http://", "https://")):
         return logo_url
 
-    # Convert relative URL to absolute using canonical URL
-    site_url = get_canonical_url()
+    # Convert relative URL to absolute using canonical URL from config
+    # Use config.canonical_url if available, otherwise fall back to get_canonical_url()
+    site_url = config.canonical_url if config.canonical_url else get_canonical_url()
     return f"{site_url.rstrip('/')}{logo_url}"
