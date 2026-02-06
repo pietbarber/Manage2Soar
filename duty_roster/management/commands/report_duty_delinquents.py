@@ -260,7 +260,6 @@ class Command(BaseCronJobCommand):
 
         # Prepare template context
         config = SiteConfiguration.objects.first()
-        site_url = get_canonical_url()
 
         # Build URLs
         detail_report_url = build_absolute_url("/duty_roster/duty-delinquents/detail/")

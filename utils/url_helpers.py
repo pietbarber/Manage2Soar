@@ -29,12 +29,14 @@ def get_canonical_url():
         'https://www.skylinesoaring.org'
     """
     try:
+        from django.db.utils import OperationalError, ProgrammingError
+
         from siteconfig.models import SiteConfiguration
 
         config = SiteConfiguration.objects.first()
         if config and config.canonical_url:
             return config.canonical_url.rstrip("/")
-    except Exception:
+    except (OperationalError, ProgrammingError):
         # Database not ready (migrations, tests, initial setup)
         pass
 
@@ -47,13 +49,15 @@ def get_canonical_url():
     return "http://localhost:8001"
 
 
-def build_absolute_url(path):
+def build_absolute_url(path, canonical=None):
     """
     Build absolute URL for email links using canonical URL.
 
     Args:
         path: URL path (e.g., '/members/applications/123/' or 'members/applications/123/')
               Can include leading slash or not - will be normalized.
+        canonical: Optional precomputed canonical URL to avoid repeated DB queries.
+                   If not provided, will call get_canonical_url().
 
     Returns:
         str: Full absolute URL
@@ -64,7 +68,13 @@ def build_absolute_url(path):
 
         >>> build_absolute_url('duty_roster/calendar/')
         'https://www.skylinesoaring.org/duty_roster/calendar/'
+
+        >>> # Performance: reuse canonical URL for multiple calls
+        >>> base = get_canonical_url()
+        >>> url1 = build_absolute_url('/path1/', canonical=base)
+        >>> url2 = build_absolute_url('/path2/', canonical=base)
     """
-    canonical = get_canonical_url()
+    if canonical is None:
+        canonical = get_canonical_url()
     path = path.lstrip("/")
     return f"{canonical}/{path}"

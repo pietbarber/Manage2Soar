@@ -62,12 +62,10 @@ def generate_duty_ics(
     if notes:
         description_parts.append(f"Notes: {notes}")
 
-    # Add site URL to description if available
-    site_url = get_canonical_url()
-    if site_url:
-        description_parts.append(
-            f"\nView duty roster: {build_absolute_url('/duty_roster/calendar/')}"
-        )
+    # Add duty roster link
+    description_parts.append(
+        f"\nView duty roster: {build_absolute_url('/duty_roster/calendar/')}"
+    )
 
     event.add("description", "\n".join(description_parts))
 

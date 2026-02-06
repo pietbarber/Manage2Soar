@@ -227,6 +227,7 @@ def send_instruction_report_email(report, is_update=False, new_qualifications=No
     # Get site configuration
     config = SiteConfiguration.objects.first()
     club_name = config.club_name if config else "Manage2Soar"
+    domain_name = config.domain_name if config else "manage2soar.com"
 
     # Build URLs using canonical URL helpers
     site_url = get_canonical_url()
