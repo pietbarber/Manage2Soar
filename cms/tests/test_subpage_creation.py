@@ -460,20 +460,18 @@ class URLDepthTests(TestCase):
             "documents-MIN_NUM_FORMS": "0",
             "documents-MAX_NUM_FORMS": "1000",
         }
-        response = self.client.post(url, data=form_data)
-        # Should fail (200 with form errors, not 302 redirect)
+        response = self.client.post(url, data=form_data, follow=True)
+        # Should fail (200 with error message, not successful redirect)
         self.assertEqual(response.status_code, 200)
 
         # Verify the page was NOT created
         self.assertFalse(Page.objects.filter(slug="level-11").exists())
 
-        # Should show validation error about depth limit
-        self.assertIn("form", response.context)
-        form = response.context["form"]
-        self.assertFalse(form.is_valid())
-        # Verify the error mentions depth limit
-        errors = str(form.errors)
-        self.assertIn("maximum nesting depth", errors.lower())
+        # Should show validation error about depth limit via messages
+        messages_list = list(response.context["messages"])
+        self.assertTrue(len(messages_list) > 0)
+        error_message = str(messages_list[0])
+        self.assertIn("maximum nesting depth", error_message)
 
 
 class SubpageCreationByEditorTests(TestCase):

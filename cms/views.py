@@ -826,12 +826,12 @@ def create_cms_page(request):
 
             try:
                 page.full_clean()
+                page.save()
             except ValidationError as e:
-                # Add the validation error to the form and re-render
-                form.add_error(None, str(e))
+                # Surface the validation error via the messages framework so it is visible
+                messages.error(request, str(e))
                 # Don't proceed to save - fall through to re-render the form
             else:
-                page.save()
                 form.save_m2m()  # Save many-to-many relationships
 
                 # Copy permissions from parent page (Issue #596)

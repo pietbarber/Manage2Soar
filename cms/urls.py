@@ -1,7 +1,6 @@
 from django.urls import path, re_path
 
 from . import views
-from .constants import MAX_CMS_DEPTH
 
 app_name = "cms"
 
