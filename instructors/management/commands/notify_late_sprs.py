@@ -13,7 +13,7 @@ from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
-from utils.url_helpers import build_absolute_url, get_canonical_url
+from utils.url_helpers import build_absolute_url
 
 
 class Command(BaseCronJobCommand):

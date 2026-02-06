@@ -13,7 +13,7 @@ from django.utils import timezone
 from icalendar import Calendar, Event
 
 from siteconfig.models import SiteConfiguration
-from utils.url_helpers import build_absolute_url, get_canonical_url
+from utils.url_helpers import build_absolute_url
 
 
 def generate_duty_ics(

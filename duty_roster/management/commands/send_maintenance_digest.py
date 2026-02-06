@@ -64,7 +64,7 @@ class Command(BaseCommand):
         # Prepare template context using helper function
         email_config = get_email_config()
         site_url = email_config["site_url"]
-        maintenance_url = build_absolute_url("/maintenance/")
+        maintenance_url = build_absolute_url("/maintenance/", canonical=site_url)
 
         # NOTE: Grounded issues are intentionally listed before operational issues
         # to prioritize critical maintenance items in the email digest. This changes

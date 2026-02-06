@@ -182,7 +182,7 @@ def send_student_signup_notification(slot):
 
     context = _get_email_context(slot, config, site_url)
     context["review_url"] = build_absolute_url(
-        reverse("duty_roster:instructor_requests")
+        reverse("duty_roster:instructor_requests"), canonical=site_url
     )
 
     from_email = _get_from_email(config)

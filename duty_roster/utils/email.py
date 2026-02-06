@@ -21,7 +21,7 @@ def get_email_config():
     """
     config = SiteConfiguration.objects.first()
     site_url = get_canonical_url()
-    roster_url = build_absolute_url("/duty_roster/calendar/")
+    roster_url = build_absolute_url("/duty_roster/calendar/", canonical=site_url)
 
     # Build from_email
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""

@@ -55,7 +55,10 @@ def _send_maintenance_issue_email(issue, meisters):
     aircraft = issue.glider or issue.towplane
     aircraft_type = "Glider" if issue.glider else "Towplane"
 
-    maintenance_url = build_absolute_url(reverse("logsheet:maintenance_issues"))
+    site_url = get_canonical_url()
+    maintenance_url = build_absolute_url(
+        reverse("logsheet:maintenance_issues"), canonical=site_url
+    )
 
     context = {
         "aircraft": str(aircraft),
@@ -70,7 +73,7 @@ def _send_maintenance_issue_email(issue, meisters):
         ),
         "club_name": config.club_name if config else "Soaring Club",
         "club_logo_url": get_absolute_club_logo_url(config),
-        "site_url": get_canonical_url(),
+        "site_url": site_url,
         "maintenance_url": maintenance_url,
     }
 

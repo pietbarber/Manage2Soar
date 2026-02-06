@@ -96,7 +96,8 @@ def _notify_member_managers_of_visiting_pilot(member):
 
                 subject = f"New Visiting Pilot Registration: {safe_name[:50]}"
 
-                # Prepare context for email templates
+                # Prepare context for email templates - compute canonical once to avoid redundant DB queries
+                site_url = get_canonical_url()
                 context = {
                     "member": member,
                     "auto_approved": auto_approved,
@@ -107,14 +108,15 @@ def _notify_member_managers_of_visiting_pilot(member):
                         "%Y-%m-%d %H:%M:%S"
                     ),
                     "manage_member_url": build_absolute_url(
-                        f"/admin/members/member/{member.pk}/change/"
+                        f"/admin/members/member/{member.pk}/change/", canonical=site_url
                     ),
                     "all_visiting_pilots_url": build_absolute_url(
-                        f"/admin/members/member/?membership_status__exact={config.visiting_pilot_status}"
+                        f"/admin/members/member/?membership_status__exact={config.visiting_pilot_status}",
+                        canonical=site_url,
                     ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
-                    "site_url": get_canonical_url(),
+                    "site_url": site_url,
                 }
 
                 # Render HTML and plain text templates

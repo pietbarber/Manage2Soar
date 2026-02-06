@@ -15,6 +15,7 @@ class Migration(migrations.Migration):
             name="canonical_url",
             field=models.URLField(
                 blank=True,
+                default="",
                 help_text="Canonical URL for all outbound email links (e.g., https://www.skylinesoaring.org). This ensures consistent URLs in emails regardless of which domain users access. Do NOT include trailing slash. Leave blank to use SITE_URL environment variable.",
                 max_length=255,
                 verbose_name="Canonical Email URL",

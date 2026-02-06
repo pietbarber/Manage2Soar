@@ -530,9 +530,11 @@ def _notify_member_managers_of_contact(contact_submission):
         # Prepare context for email templates
         config = SiteConfiguration.objects.first()
 
-        # Build admin URL for this contact submission
+        # Build URLs using canonical base to avoid redundant DB queries
+        site_url = get_canonical_url()
         admin_url = build_absolute_url(
-            f"/admin/cms/visitorcontact/{contact_submission.pk}/change/"
+            f"/admin/cms/visitorcontact/{contact_submission.pk}/change/",
+            canonical=site_url,
         )
 
         context = {
@@ -543,7 +545,7 @@ def _notify_member_managers_of_contact(contact_submission):
             "admin_url": admin_url,
             "club_name": config.club_name if config else "Club",
             "club_logo_url": get_absolute_club_logo_url(config),
-            "site_url": get_canonical_url(),
+            "site_url": site_url,
         }
 
         # Render HTML and plain text templates

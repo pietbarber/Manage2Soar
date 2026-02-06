@@ -27,3 +27,50 @@ def test_password_reset_with_unknown_email_does_not_send(client):
     response = client.post(reverse("password_reset"), {"email": "ghost@example.com"})
     assert response.status_code == 302
     assert len(mail.outbox) == 0  # Silent fail, don't reveal user existence
+
+
+@pytest.mark.django_db
+def test_password_reset_uses_canonical_url(client, settings):
+    """Test that password reset emails use canonical URL from SiteConfiguration.
+
+    Issue #612: Ensures password reset emails use canonical domain (skylinesoaring.org)
+    instead of alternate domains (manage2soar.com), preventing password manager
+    domain mismatch issues.
+    """
+    from siteconfig.models import SiteConfiguration
+
+    # Create or update SiteConfiguration with canonical URL
+    config = SiteConfiguration.objects.first()
+    if not config:
+        config = SiteConfiguration.objects.create(
+            club_name="Test Soaring Club",
+            club_abbreviation="TSC",
+            domain_name="test.example.com",
+        )
+    config.canonical_url = "https://www.skylinesoaring.org"
+    config.save()
+
+    # Create test user
+    Member.objects.create_user(
+        username="testuser",
+        email="testuser@example.com",
+        password="oldpassword",
+        membership_status="Full Member",
+    )
+
+    # Request password reset
+    response = client.post(reverse("password_reset"), {"email": "testuser@example.com"})
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+
+    # Verify that canonical URL is used in the email body
+    email_body = mail.outbox[0].body
+    assert (
+        "www.skylinesoaring.org" in email_body
+    ), "Password reset email should use canonical URL from SiteConfiguration"
+
+    # Verify HTML part also uses canonical URL (if present)
+    if hasattr(mail.outbox[0], "alternatives") and mail.outbox[0].alternatives:
+        html_body = mail.outbox[0].alternatives[0][0]
+        assert "www.skylinesoaring.org" in html_body

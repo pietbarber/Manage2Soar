@@ -252,9 +252,11 @@ class Command(BaseCronJobCommand):
             "club_logo_url": logo_url,
             "site_url": site_url,
             "review_url": build_absolute_url(
-                reverse("duty_roster:instructor_requests")
+                reverse("duty_roster:instructor_requests"), canonical=site_url
             ),
-            "calendar_url": build_absolute_url(reverse("duty_roster:duty_calendar")),
+            "calendar_url": build_absolute_url(
+                reverse("duty_roster:duty_calendar"), canonical=site_url
+            ),
         }
 
         html_message = render_to_string(

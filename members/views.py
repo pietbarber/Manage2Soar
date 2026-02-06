@@ -988,18 +988,19 @@ class CustomPasswordResetView(auth_views.PasswordResetView):
     Issue #612: Fixes password manager domain mismatch between login and email URLs.
     """
 
-    def get_email_context(self, *args, **kwargs):
-        """Override to inject canonical URL."""
-        context = super().get_email_context(*args, **kwargs)
-
-        # Replace protocol://domain with canonical URL
+    def form_valid(self, form):
+        """Override to inject canonical URL before sending email."""
+        # Get canonical URL and parse it
         canonical_url = get_canonical_url()
         if canonical_url:
-            # Parse canonical URL to extract protocol and domain
             from urllib.parse import urlparse
 
             parsed = urlparse(canonical_url)
-            context["protocol"] = parsed.scheme
-            context["domain"] = parsed.netloc
+            # Set extra_email_context with canonical domain/protocol
+            # These will override Django's default protocol/domain in the email template
+            if not self.extra_email_context:
+                self.extra_email_context = {}
+            self.extra_email_context["protocol"] = parsed.scheme
+            self.extra_email_context["domain"] = parsed.netloc
 
-        return context
+        return super().form_valid(form)
