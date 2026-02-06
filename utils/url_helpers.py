@@ -76,5 +76,7 @@ def build_absolute_url(path, canonical=None):
     """
     if canonical is None:
         canonical = get_canonical_url()
+    # Normalize canonical URL by removing trailing slash to avoid double slashes
+    canonical = canonical.rstrip("/")
     path = path.lstrip("/")
     return f"{canonical}/{path}"

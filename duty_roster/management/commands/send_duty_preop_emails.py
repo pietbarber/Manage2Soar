@@ -256,7 +256,9 @@ class Command(BaseCommand):
             "club_nickname": config.club_nickname if config else "",
             "club_logo_url": self._get_logo_url(config, site_url),
             "site_url": site_url,
-            "duty_roster_url": build_absolute_url("/duty_roster/calendar/"),
+            "duty_roster_url": build_absolute_url(
+                "/duty_roster/calendar/", canonical=site_url
+            ),
             # Duty crew
             "instructor": assignment.instructor,
             "surge_instructor": assignment.surge_instructor,

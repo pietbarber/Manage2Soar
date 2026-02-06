@@ -259,9 +259,11 @@ def send_request_response_email(slot):
     )
     context["instructor_note"] = slot.instructor_note or ""
     context["my_requests_url"] = build_absolute_url(
-        reverse("duty_roster:my_instruction_requests")
+        reverse("duty_roster:my_instruction_requests"), canonical=site_url
     )
-    context["calendar_url"] = build_absolute_url(reverse("duty_roster:duty_calendar"))
+    context["calendar_url"] = build_absolute_url(
+        reverse("duty_roster:duty_calendar"), canonical=site_url
+    )
 
     from_email = _get_from_email(config)
 
