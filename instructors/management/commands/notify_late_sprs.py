@@ -183,7 +183,10 @@ class Command(BaseCronJobCommand):
 
         # Prepare template context
         config = SiteConfiguration.objects.first()
-        instruction_reports_url = build_absolute_url("/instructors/")
+        canonical_base = get_canonical_url()
+        instruction_reports_url = build_absolute_url(
+            "/instructors/", canonical=canonical_base
+        )
 
         # Format SPR data for templates
         formatted_escalation_groups = {}
