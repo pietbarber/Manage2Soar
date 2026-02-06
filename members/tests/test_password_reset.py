@@ -64,13 +64,15 @@ def test_password_reset_uses_canonical_url(client, settings):
     assert response.status_code == 302
     assert len(mail.outbox) == 1
 
-    # Verify that canonical URL is used in the email body
+    # Verify that canonical URL is used in the password reset link
+    # Check for the complete URL pattern (protocol + domain + path) to avoid
+    # "incomplete URL substring sanitization" security warning (CodeQL)
     email_body = mail.outbox[0].body
     assert (
-        "www.skylinesoaring.org" in email_body
+        "https://www.skylinesoaring.org/reset/" in email_body
     ), "Password reset email should use canonical URL from SiteConfiguration"
 
     # Verify HTML part also uses canonical URL (if present)
     if hasattr(mail.outbox[0], "alternatives") and mail.outbox[0].alternatives:
         html_body = mail.outbox[0].alternatives[0][0]
-        assert "www.skylinesoaring.org" in html_body
+        assert "https://www.skylinesoaring.org/reset/" in html_body
