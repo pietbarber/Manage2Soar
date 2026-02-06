@@ -63,6 +63,16 @@
 vault_django_secret_key: "REPLACE-ME-WITH-DJANGO-SECRET-KEY-FROM-GENERATOR"
 
 # ============================================================
+# DJANGO SUPERUSER PASSWORDS (Multi-Tenant)
+# ============================================================
+# Generate with: openssl rand -base64 32
+# Required when gke_create_superuser is true (one per tenant)
+
+vault_django_superuser_password_ssc: "REPLACE-WITH-SSC-SUPERUSER-PASSWORD"
+vault_django_superuser_password_masa: "REPLACE-WITH-MASA-SUPERUSER-PASSWORD"
+# vault_django_superuser_password_nfss: "nfss-superuser-password-32-chars"
+
+# ============================================================
 # POSTGRESQL PASSWORDS
 # ============================================================
 # Generate with: openssl rand -base64 32
