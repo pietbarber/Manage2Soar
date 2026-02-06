@@ -19,6 +19,8 @@ from django.urls import reverse
 from notifications.models import Notification
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
+from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +116,8 @@ def _get_email_context(slot, config, site_url):
         if last_instructor_flight:
             last_instructor_flight_date = last_instructor_flight.logsheet.log_date
 
-    # Get logo URL
-    logo_url = None
-    if config and config.club_logo:
-        logo_url = config.club_logo.url
-        if not logo_url.startswith(("http://", "https://")):
-            logo_url = f"{site_url.rstrip('/')}{logo_url}"
+    # Get logo URL using helper
+    logo_url = get_absolute_club_logo_url(config)
 
     return {
         "student": slot.student,
@@ -162,7 +160,7 @@ def send_student_signup_notification(slot):
     from .models import InstructionSlot
 
     config = SiteConfiguration.objects.first()
-    site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+    site_url = get_canonical_url()
 
     # Determine which instructor(s) to notify
     # Primary instructor on the assignment, and surge instructor if present (and different)
@@ -183,7 +181,9 @@ def send_student_signup_notification(slot):
         return
 
     context = _get_email_context(slot, config, site_url)
-    context["review_url"] = f"{site_url}{reverse('duty_roster:instructor_requests')}"
+    context["review_url"] = build_absolute_url(
+        reverse("duty_roster:instructor_requests")
+    )
 
     from_email = _get_from_email(config)
 
@@ -250,7 +250,7 @@ def send_request_response_email(slot):
         return
 
     config = SiteConfiguration.objects.first()
-    site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+    site_url = get_canonical_url()
 
     context = _get_email_context(slot, config, site_url)
     context["is_accepted"] = slot.instructor_response == "accepted"
@@ -258,10 +258,10 @@ def send_request_response_email(slot):
         "Accepted" if slot.instructor_response == "accepted" else "Not Available"
     )
     context["instructor_note"] = slot.instructor_note or ""
-    context["my_requests_url"] = (
-        f"{site_url}{reverse('duty_roster:my_instruction_requests')}"
+    context["my_requests_url"] = build_absolute_url(
+        reverse("duty_roster:my_instruction_requests")
     )
-    context["calendar_url"] = f"{site_url}{reverse('duty_roster:duty_calendar')}"
+    context["calendar_url"] = build_absolute_url(reverse("duty_roster:duty_calendar"))
 
     from_email = _get_from_email(config)
 

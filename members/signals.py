@@ -15,6 +15,7 @@ from django.utils import timezone
 from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .models import Member
 
@@ -105,11 +106,15 @@ def _notify_member_managers_of_visiting_pilot(member):
                     "registration_time": member.date_joined.strftime(
                         "%Y-%m-%d %H:%M:%S"
                     ),
-                    "manage_member_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/admin/members/member/{member.pk}/change/",
-                    "all_visiting_pilots_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/admin/members/member/?membership_status__exact={config.visiting_pilot_status}",
+                    "manage_member_url": build_absolute_url(
+                        f"/admin/members/member/{member.pk}/change/"
+                    ),
+                    "all_visiting_pilots_url": build_absolute_url(
+                        f"/admin/members/member/?membership_status__exact={config.visiting_pilot_status}"
+                    ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
-                    "site_url": getattr(settings, "SITE_URL", None),
+                    "site_url": get_canonical_url(),
                 }
 
                 # Render HTML and plain text templates
@@ -279,11 +284,15 @@ def notify_membership_managers_of_new_application(application):
                     "submitted_at": application.submitted_at.strftime(
                         "%Y-%m-%d %H:%M:%S"
                     ),
-                    "review_application_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/{application.application_id}/",
-                    "all_applications_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/",
+                    "review_application_url": build_absolute_url(
+                        f"/members/applications/{application.application_id}/"
+                    ),
+                    "all_applications_url": build_absolute_url(
+                        "/members/applications/"
+                    ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
-                    "site_url": getattr(settings, "SITE_URL", None),
+                    "site_url": get_canonical_url(),
                 }
 
                 # Render HTML and plain text templates
@@ -542,10 +551,12 @@ def notify_membership_managers_of_withdrawal(application):
                     "submitted_at": application.submitted_at.strftime(
                         "%B %d, %Y at %I:%M %p"
                     ),
-                    "view_application_url": f"{getattr(settings, 'SITE_URL', 'https://localhost:8000')}/members/applications/{application.application_id}/",
+                    "view_application_url": build_absolute_url(
+                        f"/members/applications/{application.application_id}/"
+                    ),
                     "club_name": config.club_name if config else "Club",
                     "club_logo_url": get_absolute_club_logo_url(config),
-                    "site_url": getattr(settings, "SITE_URL", None),
+                    "site_url": get_canonical_url(),
                 }
 
                 # Render HTML and plain text templates

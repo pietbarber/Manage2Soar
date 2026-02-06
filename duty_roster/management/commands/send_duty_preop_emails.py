@@ -33,6 +33,7 @@ from logsheet.models import MaintenanceDeadline, MaintenanceIssue
 from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import get_dev_mode_info
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 
 class Command(BaseCommand):
@@ -97,7 +98,7 @@ class Command(BaseCommand):
 
         # Get site configuration
         config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+        site_url = get_canonical_url()
 
         # Build context for templates
         context = self._build_context(assignment, target_date, config, site_url)
@@ -255,7 +256,7 @@ class Command(BaseCommand):
             "club_nickname": config.club_nickname if config else "",
             "club_logo_url": self._get_logo_url(config, site_url),
             "site_url": site_url,
-            "duty_roster_url": f"{site_url}/duty_roster/calendar/",
+            "duty_roster_url": build_absolute_url("/duty_roster/calendar/"),
             # Duty crew
             "instructor": assignment.instructor,
             "surge_instructor": assignment.surge_instructor,
