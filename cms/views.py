@@ -846,12 +846,14 @@ def create_cms_page(request):
 
                 # Copy permissions from parent page (Issue #596)
                 if is_subpage and parent_page:
-                    # Copy role permissions (VIEW access)
-                    for role_perm in parent_page.role_permissions.all():
-                        PageRolePermission.objects.get_or_create(
-                            page=page, role_name=role_perm.role_name
-                        )
-                    # Copy member permissions (EDIT access)
+                    # Only copy role permissions if child page is private
+                    # (PageRolePermission.clean() prevents role perms on public pages)
+                    if not page.is_public:
+                        for role_perm in parent_page.role_permissions.all():
+                            PageRolePermission.objects.get_or_create(
+                                page=page, role_name=role_perm.role_name
+                            )
+                    # Copy member permissions (EDIT access) - applies to both public and private
                     for member_perm in parent_page.member_permissions.all():
                         PageMemberPermission.objects.get_or_create(
                             page=page, member=member_perm.member
