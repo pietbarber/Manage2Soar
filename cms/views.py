@@ -124,16 +124,18 @@ def cms_page(request, **kwargs):
         return redirect("cms:resources")
     parent = None
     page = None
+    parent_chain = []  # Track parent chain during traversal to avoid N+1 queries
     for slug in slugs:
         debug_logger.debug(
             f"cms_page: Looking for Page with slug='{slug}' and parent={parent}"
         )
-        # Prefetch role_permissions and parent to avoid N+1 queries
+        # Prefetch role_permissions to avoid N+1 queries
         page = get_object_or_404(
-            Page.objects.prefetch_related("role_permissions").select_related("parent"),
+            Page.objects.prefetch_related("role_permissions"),
             slug=slug,
             parent=parent,
         )
+        parent_chain.append(page)  # Build chain for later access control check
         parent = page
     debug_logger.debug(f"cms_page: Found page {page}")
     # page is now the deepest resolved page
@@ -144,14 +146,13 @@ def cms_page(request, **kwargs):
     # If any ancestor page is private/restricted, user must have access to ALL ancestors
     # This prevents "public pages hidden under private parents" from being accessible
     # via direct links/bookmarks while appearing invisible in navigation
-    current = page
-    while current:
-        if not current.can_user_access(request.user, request):
+    # Using parent_chain built during traversal to avoid N+1 queries (up to 10 levels)
+    for ancestor in parent_chain:
+        if not ancestor.can_user_access(request.user, request):
             # User blocked by this page or an ancestor - deny access
             return redirect_to_login(
                 request.get_full_path(), login_url=settings.LOGIN_URL
             )
-        current = current.parent
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1

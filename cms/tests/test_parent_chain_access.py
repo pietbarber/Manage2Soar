@@ -91,3 +91,36 @@ class ParentChainAccessControlTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Public content")
+
+    def test_public_child_under_private_parent_blocked(self):
+        """Public child under private parent is blocked by parent restriction.
+
+        This documents important security behavior: even if a child page is public,
+        it inherits access restrictions from its parent chain. A public page under
+        a director-only parent is inaccessible to regular members.
+        """
+        # Create a public child page under the private parent
+        public_child = Page.objects.create(
+            title="Public Child Under Private Parent",
+            slug="public-child",
+            content="This is public but parent is restricted",
+            parent=self.private_parent,
+            is_public=True,
+        )
+
+        # Anonymous user blocked by private parent
+        url = public_child.get_absolute_url()
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+        # Regular member blocked by private parent (parent is directors-only)
+        self.client.force_login(self.member)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+
+        # Director can access (has parent permission)
+        self.client.force_login(self.director)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is public but parent is restricted")

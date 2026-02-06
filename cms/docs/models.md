@@ -101,7 +101,7 @@ erDiagram
 
 ### `Page`
 - Hierarchical CMS pages with parent-child relationships
-- **Subpage depth**: Supports up to 10 levels of nesting (Issue #596)
+- **Subpage depth**: Supports up to 10 levels of nesting (increased from 3 levels in the legacy URL routing; Issue #596)
 - **Role-based access control**: Three access levels - public, member-only, and role-restricted
 - Auto-generates slugs from titles
 - Contains rich HTML content via TinyMCE
