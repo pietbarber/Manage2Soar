@@ -34,8 +34,8 @@
             <p class="text-muted mb-0">Create a new CMS page with rich content editor</p>
         </div>
         <div>
-            <a href="{% url 'cms:resources' %}" class="btn btn-outline-secondary btn-modern">
-                <i class="bi bi-arrow-left me-2"></i>Back to Resources
+            <a href="{% if parent_page %}{{ parent_page.get_absolute_url }}{% else %}{% url 'cms:resources' %}{% endif %}" class="btn btn-outline-secondary btn-modern">
+                <i class="bi bi-arrow-left me-2"></i>{% if parent_page %}Back to {{ parent_page.title }}{% else %}Back to Resources{% endif %}
             </a>
         </div>
     </div>
@@ -92,6 +92,11 @@
                                 <i class="bi bi-folder text-primary me-2"></i>{{ form.parent.label }}
                             </label>
                             {{ form.parent|add_class:"form-select" }}
+                            {% if is_subpage %}
+                                <div class="form-text text-info">
+                                    <i class="bi bi-info-circle me-1"></i>Parent page is pre-set for this subpage and cannot be changed.
+                                </div>
+                            {% endif %}
                             {% if form.parent.help_text %}
                                 <div class="form-text">{{ form.parent.help_text }}</div>
                             {% endif %}
@@ -187,7 +192,7 @@
                     <button type="submit" class="btn btn-success btn-modern btn-lg">
                         <i class="bi bi-plus-circle me-2"></i>Create Page
                     </button>
-                    <a href="{% url 'cms:resources' %}" class="btn btn-outline-secondary btn-modern">
+                    <a href="{% if parent_page %}{{ parent_page.get_absolute_url }}{% else %}{% url 'cms:resources' %}{% endif %}" class="btn btn-outline-secondary btn-modern">
                         <i class="bi bi-x-circle me-2"></i>Cancel
                     </a>
                 </div>

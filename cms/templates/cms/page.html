@@ -14,10 +14,15 @@
     {% else %}
       <div></div> {# Spacer when title is in banner #}
     {% endif %}
-    {% if can_edit_page %}
+    {% if can_edit_page or can_create_subpage %}
       <div>
-        <a class="btn btn-sm btn-primary me-2" href="{% url 'cms:edit_page' page.id %}">✏️ Edit Page</a>
-        <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:cms_page_change' page.pk %}">⚙️ Admin</a>
+        {% if can_create_subpage %}
+          <a class="btn btn-sm btn-success me-2" href="{% url 'cms:create_page' %}?parent={{ page.id }}">➕ Create Subpage</a>
+        {% endif %}
+        {% if can_edit_page %}
+          <a class="btn btn-sm btn-primary me-2" href="{% url 'cms:edit_page' page.id %}">✏️ Edit Page</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:cms_page_change' page.pk %}">⚙️ Admin</a>
+        {% endif %}
       </div>
     {% endif %}
   </div>

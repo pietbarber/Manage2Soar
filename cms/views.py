@@ -22,7 +22,7 @@ from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
 
-from .models import Document, Page
+from .models import Document, Page, PageMemberPermission, PageRolePermission
 
 # Module-level logger to avoid repeated getLogger calls
 logger = logging.getLogger(__name__)
@@ -112,13 +112,11 @@ def get_accessible_top_level_pages(user, request=None):
 
 
 def cms_page(request, **kwargs):
-    # Accepts named kwargs: slug1, slug2, slug3 from urls.py
+    # Accepts 'path' kwarg: slash-separated slugs (e.g. "parent/child/grandchild")
+    # Supports up to MAX_CMS_DEPTH levels of nesting (Issue #596)
     debug_logger = logging.getLogger("cms.debug")
-    slugs = []
-    for i in range(1, 4):
-        slug = kwargs.get(f"slug{i}")
-        if slug:
-            slugs.append(slug)
+    path_str = kwargs.get("path", "")
+    slugs = [s for s in path_str.split("/") if s]
     debug_logger.debug(f"cms_page: slugs={slugs}")
     if not slugs:
         debug_logger.debug("cms_page: No slugs, redirecting to cms:resources")
@@ -202,6 +200,9 @@ def cms_page(request, **kwargs):
     # role_permissions are already prefetched from the page traversal loop
     page_required_roles = get_role_display_names(page) if not page.is_public else []
 
+    # Check if user can create subpages under this page (Issue #596)
+    can_create_subpage = can_create_in_directory(request.user, page)
+
     return render(
         request,
         "cms/page.html",
@@ -213,6 +214,7 @@ def cms_page(request, **kwargs):
             "page_has_role_restrictions": page.has_role_restrictions(),
             "page_required_roles": page_required_roles,
             "can_edit_page": can_edit_page(request.user, page),
+            "can_create_subpage": can_create_subpage,
         },
     )
 
@@ -777,12 +779,19 @@ def edit_homepage_content(request, content_id):
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def create_cms_page(request):
-    """Create a new CMS page with full TinyMCE functionality."""
+    """Create a new CMS page with full TinyMCE functionality.
+
+    Supports creating subpages (Issue #596): when ?parent=<id> is provided,
+    the parent field is pre-set and disabled, is_public is inherited from the
+    parent, and role/member permissions are copied from the parent after creation.
+    """
     # Get parent page if specified
     parent_id = request.GET.get("parent")
     parent_page = None
+    is_subpage = False
     if parent_id:
         parent_page = get_object_or_404(Page, id=parent_id)
+        is_subpage = True
 
     # Check creation permissions
     if not can_create_in_directory(request.user, parent_page):
@@ -794,8 +803,26 @@ def create_cms_page(request):
         form = CmsPageForm(request.POST)
         formset = DocumentFormSet(request.POST, request.FILES)
 
+        # When creating a subpage, the parent field is disabled in the form
+        # so it won't be in POST data. We must set it on the instance before save.
+        if is_subpage:
+            form.instance.parent = parent_page
+
         if form.is_valid() and formset.is_valid():
             page = form.save()
+
+            # Copy permissions from parent page (Issue #596)
+            if is_subpage and parent_page:
+                # Copy role permissions (VIEW access)
+                for role_perm in parent_page.role_permissions.all():
+                    PageRolePermission.objects.get_or_create(
+                        page=page, role_name=role_perm.role_name
+                    )
+                # Copy member permissions (EDIT access)
+                for member_perm in parent_page.member_permissions.all():
+                    PageMemberPermission.objects.get_or_create(
+                        page=page, member=member_perm.member
+                    )
 
             # Save documents with uploaded_by field
             formset.instance = page
@@ -812,13 +839,34 @@ def create_cms_page(request):
             messages.success(request, f'Page "{page.title}" created successfully!')
             return redirect(page.get_absolute_url())
     else:
-        form = CmsPageForm()
+        initial = {}
+        if is_subpage and parent_page:
+            initial["parent"] = parent_page.id
+            initial["is_public"] = parent_page.is_public
+        form = CmsPageForm(initial=initial)
+
+        # Disable the parent field when creating a subpage (Issue #596)
+        if is_subpage:
+            form.fields["parent"].disabled = True
+
         formset = DocumentFormSet(queryset=Document.objects.none())
+
+    # Build page title to include parent context for subpages
+    if is_subpage and parent_page:
+        page_title = f'Create Subpage under "{parent_page.title}"'
+    else:
+        page_title = "Create New CMS Page"
 
     return render(
         request,
         "cms/create_page.html",
-        {"form": form, "formset": formset, "page_title": "Create New CMS Page"},
+        {
+            "form": form,
+            "formset": formset,
+            "page_title": page_title,
+            "parent_page": parent_page,
+            "is_subpage": is_subpage,
+        },
     )
 
 

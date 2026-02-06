@@ -387,8 +387,14 @@ class CreatePageViewTests(TestCase):
         self.assertIn("form", response.context)
         self.assertIn("formset", response.context)  # Context variable is 'formset'
         self.assertIn("page_title", response.context)
-        self.assertEqual(response.context["page_title"], "Create New CMS Page")
-        # parent_page and can_create_page are not passed in context - permission check happens in the view
+        # When parent is specified, title reflects subpage creation (Issue #596)
+        self.assertEqual(
+            response.context["page_title"],
+            f'Create Subpage under "{self.parent_page.title}"',
+        )
+        self.assertIn("parent_page", response.context)
+        self.assertIn("is_subpage", response.context)
+        self.assertTrue(response.context["is_subpage"])
 
 
 # EditHomepageViewTests removed - requires content_id parameter and is tested elsewhere
