@@ -566,6 +566,22 @@ class SiteConfiguration(models.Model):
                         )
                         break
 
+        # Validate canonical_url is origin-only (no path/query/fragment)
+        if self.canonical_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(self.canonical_url)
+            if parsed.path and parsed.path != "/":
+                errors["canonical_url"] = (
+                    "Canonical URL must be an origin only (e.g., https://www.example.org). "
+                    "Do not include a path, query string, or fragment."
+                )
+            elif parsed.query or parsed.fragment:
+                errors["canonical_url"] = (
+                    "Canonical URL must be an origin only (e.g., https://www.example.org). "
+                    "Do not include a query string or fragment."
+                )
+
         if errors:
             raise ValidationError(errors)
 

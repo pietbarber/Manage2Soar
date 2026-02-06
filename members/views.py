@@ -777,8 +777,11 @@ def visiting_pilot_qr_code(request):
         token = config.get_or_create_daily_token()
 
         # Build the full URL for the signup page with token
+        # Reuse config.canonical_url to avoid redundant DB query
+        canonical_base = config.canonical_url if config.canonical_url else None
         signup_url = build_absolute_url(
-            reverse("members:visiting_pilot_signup", args=[token])
+            reverse("members:visiting_pilot_signup", args=[token]),
+            canonical=canonical_base,
         )
 
         # Generate QR code
@@ -836,8 +839,11 @@ def visiting_pilot_qr_display(request):
     token = config.get_or_create_daily_token()
 
     qr_url = reverse("members:visiting_pilot_qr_code")
+    # Reuse config.canonical_url to avoid redundant DB query
+    canonical_base = config.canonical_url if config.canonical_url else None
     signup_url = build_absolute_url(
-        reverse("members:visiting_pilot_signup", args=[token])
+        reverse("members:visiting_pilot_signup", args=[token]),
+        canonical=canonical_base,
     )
 
     return render(
