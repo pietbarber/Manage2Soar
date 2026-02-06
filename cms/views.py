@@ -527,9 +527,6 @@ def _notify_member_managers_of_contact(contact_submission):
             contact_submission.message
         )  # Keep original formatting for message content
 
-        # Prepare context for email templates
-        config = SiteConfiguration.objects.first()
-
         # Build URLs using canonical base to avoid redundant DB queries
         site_url = get_canonical_url()
         admin_url = build_absolute_url(
@@ -543,8 +540,8 @@ def _notify_member_managers_of_contact(contact_submission):
                 "%Y-%m-%d %H:%M:%S"
             ),
             "admin_url": admin_url,
-            "club_name": config.club_name if config else "Club",
-            "club_logo_url": get_absolute_club_logo_url(config),
+            "club_name": site_config.club_name if site_config else "Club",
+            "club_logo_url": get_absolute_club_logo_url(site_config),
             "site_url": site_url,
         }
 

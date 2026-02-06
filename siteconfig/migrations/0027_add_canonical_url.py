@@ -22,13 +22,4 @@ class Migration(migrations.Migration):
             ),
             preserve_default=False,
         ),
-        migrations.AlterField(
-            model_name="siteconfiguration",
-            name="duty_roster_announcement",
-            field=models.TextField(
-                blank=True,
-                default="",
-                help_text="DEPRECATED: Use the new Duty Roster Message editor at /duty_roster/message/edit/ instead. This field will be removed in a future release.",
-            ),
-        ),
     ]
