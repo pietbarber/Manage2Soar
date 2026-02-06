@@ -137,9 +137,19 @@ def cms_page(request, **kwargs):
     # page is now the deepest resolved page
     # Access control: check if user can access this page based on role restrictions
     assert page is not None
-    if not page.can_user_access(request.user, request):
-        # Use Django's helper to redirect to login (handles encoding)
-        return redirect_to_login(request.get_full_path(), login_url=settings.LOGIN_URL)
+
+    # Check parent chain for access restrictions (security improvement)
+    # If any ancestor page is private/restricted, user must have access to ALL ancestors
+    # This prevents "public pages hidden under private parents" from being accessible
+    # via direct links/bookmarks while appearing invisible in navigation
+    current = page
+    while current:
+        if not current.can_user_access(request.user, request):
+            # User blocked by this page or an ancestor - deny access
+            return redirect_to_login(
+                request.get_full_path(), login_url=settings.LOGIN_URL
+            )
+        current = current.parent
     # Build subpage metadata (doc counts and last-updated timestamps) to
     # avoid doing this in the template and to prevent N+1 queries.
     # Annotate children with document counts and latest upload to avoid N+1
