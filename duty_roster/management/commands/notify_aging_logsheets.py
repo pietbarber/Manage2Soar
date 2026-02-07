@@ -1,16 +1,15 @@
 from datetime import timedelta
 
-from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.utils.email import get_email_config
 from logsheet.models import Logsheet
 from notifications.models import Notification
-from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
+from utils.url_helpers import build_absolute_url
 
 
 class Command(BaseCronJobCommand):
@@ -118,11 +117,7 @@ class Command(BaseCronJobCommand):
         context = {
             "member": member,
             "logsheet_list": logsheet_list,
-            "logsheet_url": (
-                f"{email_config['site_url']}/logsheet/"
-                if email_config["site_url"]
-                else "/logsheet/"
-            ),
+            "logsheet_url": build_absolute_url("/logsheet/"),
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
             "site_url": email_config["site_url"],

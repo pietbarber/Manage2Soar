@@ -183,6 +183,16 @@ class SiteConfiguration(models.Model):
     domain_name = models.CharField(
         max_length=200, help_text="Primary domain name (e.g. example.org)"
     )
+    canonical_url = models.URLField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Canonical URL for all outbound email links (e.g., https://www.skylinesoaring.org). "
+            "This ensures consistent URLs in emails regardless of which domain users access. "
+            "Do NOT include trailing slash. Leave blank to use SITE_URL environment variable."
+        ),
+        verbose_name="Canonical Email URL",
+    )
     club_abbreviation = models.CharField(
         max_length=20, help_text="Short abbreviation (e.g. SSS)"
     )
@@ -555,6 +565,22 @@ class SiteConfiguration(models.Model):
                             f"Altitude values must be integers. Invalid value: {alt_str}"
                         )
                         break
+
+        # Validate canonical_url is origin-only (no path/query/fragment)
+        if self.canonical_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(self.canonical_url)
+            if parsed.path and parsed.path != "/":
+                errors["canonical_url"] = (
+                    "Canonical URL must be an origin only (e.g., https://www.example.org). "
+                    "Do not include a path, query string, or fragment."
+                )
+            elif parsed.query or parsed.fragment:
+                errors["canonical_url"] = (
+                    "Canonical URL must be an origin only (e.g., https://www.example.org). "
+                    "Do not include a query string or fragment."
+                )
 
         if errors:
             raise ValidationError(errors)

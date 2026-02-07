@@ -13,6 +13,7 @@ from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 
 class Command(BaseCronJobCommand):
@@ -259,16 +260,14 @@ class Command(BaseCronJobCommand):
 
         # Prepare template context
         config = SiteConfiguration.objects.first()
-        site_url = getattr(settings, "SITE_URL", "").rstrip("/")
 
-        # Build URLs
-        detail_report_url = (
-            f"{site_url}/duty_roster/duty-delinquents/detail/"
-            if site_url
-            else "/duty_roster/duty-delinquents/detail/"
+        # Build URLs using canonical base to avoid redundant DB queries
+        site_url = get_canonical_url()
+        detail_report_url = build_absolute_url(
+            "/duty_roster/duty-delinquents/detail/", canonical=site_url
         )
-        member_directory_url = f"{site_url}/members/" if site_url else "/members/"
-        duty_roster_url = f"{site_url}/duty_roster/" if site_url else "/duty_roster/"
+        member_directory_url = build_absolute_url("/members/", canonical=site_url)
+        duty_roster_url = build_absolute_url("/duty_roster/", canonical=site_url)
 
         # Sort by flight count (most active first)
         duty_delinquents.sort(key=lambda x: x["flight_count"], reverse=True)

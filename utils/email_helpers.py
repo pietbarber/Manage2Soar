@@ -2,7 +2,7 @@
 Utility functions for email generation.
 """
 
-from django.conf import settings
+from .url_helpers import get_canonical_url
 
 
 def get_absolute_club_logo_url(config):
@@ -28,6 +28,7 @@ def get_absolute_club_logo_url(config):
     if logo_url.startswith(("http://", "https://")):
         return logo_url
 
-    # Convert relative URL to absolute
-    site_url = getattr(settings, "SITE_URL", "https://localhost:8000")
+    # Convert relative URL to absolute using canonical URL from config
+    # Use config.canonical_url if available, otherwise fall back to get_canonical_url()
+    site_url = config.canonical_url if config.canonical_url else get_canonical_url()
     return f"{site_url.rstrip('/')}{logo_url}"

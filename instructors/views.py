@@ -63,6 +63,7 @@ from logsheet.models import Flight
 from members.decorators import active_member_required
 from members.models import Member
 from members.utils.membership import get_active_membership_statuses
+from utils.url_helpers import build_absolute_url
 
 try:
     from notifications.models import Notification
@@ -1461,7 +1462,7 @@ def member_instruction_record(request, member_id):
 
 
 def public_syllabus_qr(request, code):
-    url = request.build_absolute_uri(reverse("public_syllabus_detail", args=[code]))
+    url = build_absolute_url(reverse("public_syllabus_detail", args=[code]))
     img = qrcode.make(url)
     buf = BytesIO()
     img.save(buf, "PNG")

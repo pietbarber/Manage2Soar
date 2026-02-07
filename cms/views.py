@@ -22,6 +22,7 @@ from cms.models import HomePageContent
 from members.decorators import active_member_required
 from members.utils import is_active_member
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url, get_canonical_url
 
 from .models import Document, Page, PageMemberPermission, PageRolePermission
 
@@ -519,33 +520,23 @@ def _notify_member_managers_of_contact(contact_submission):
             .replace("\r", "")
             .replace("\n", " ")
         )
-        safe_user_subject = contact_submission.subject.replace("\r", "").replace(
-            "\n", " "
+
+        # Build URLs using canonical base to avoid redundant DB queries
+        site_url = get_canonical_url()
+        admin_url = build_absolute_url(
+            f"/admin/cms/visitorcontact/{contact_submission.pk}/change/",
+            canonical=site_url,
         )
-        safe_message = (
-            contact_submission.message
-        )  # Keep original formatting for message content
-
-        # Prepare context for email templates
-        config = SiteConfiguration.objects.first()
-
-        # Determine base URL for admin interface link
-        if hasattr(settings, "SITE_URL"):
-            base_url = settings.SITE_URL
-        elif site_config and site_config.domain_name:
-            base_url = f"https://{site_config.domain_name}"
-        else:
-            base_url = "https://localhost:8000"
 
         context = {
             "contact": contact_submission,
             "submitted_at": contact_submission.submitted_at.strftime(
                 "%Y-%m-%d %H:%M:%S"
             ),
-            "admin_url": f"{base_url}/admin/cms/visitorcontact/{contact_submission.pk}/change/",
-            "club_name": config.club_name if config else "Club",
-            "club_logo_url": get_absolute_club_logo_url(config),
-            "site_url": getattr(settings, "SITE_URL", None),
+            "admin_url": admin_url,
+            "club_name": site_config.club_name if site_config else "Club",
+            "club_logo_url": get_absolute_club_logo_url(site_config),
+            "site_url": site_url,
         }
 
         # Render HTML and plain text templates

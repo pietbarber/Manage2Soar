@@ -13,6 +13,7 @@ from django.utils import timezone
 from icalendar import Calendar, Event
 
 from siteconfig.models import SiteConfiguration
+from utils.url_helpers import build_absolute_url
 
 
 def generate_duty_ics(
@@ -61,12 +62,10 @@ def generate_duty_ics(
     if notes:
         description_parts.append(f"Notes: {notes}")
 
-    # Add site URL to description if available
-    site_url = getattr(settings, "SITE_URL", "")
-    if site_url:
-        description_parts.append(
-            f"\nView duty roster: {site_url}/duty_roster/calendar/"
-        )
+    # Add duty roster link
+    description_parts.append(
+        f"\nView duty roster: {build_absolute_url('/duty_roster/calendar/')}"
+    )
 
     event.add("description", "\n".join(description_parts))
 

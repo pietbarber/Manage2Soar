@@ -6,6 +6,7 @@ from duty_roster.utils.email import get_email_config
 from logsheet.models import AircraftMeister, MaintenanceIssue
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url
 
 
 class Command(BaseCommand):
@@ -63,7 +64,7 @@ class Command(BaseCommand):
         # Prepare template context using helper function
         email_config = get_email_config()
         site_url = email_config["site_url"]
-        maintenance_url = f"{site_url}/maintenance/" if site_url else "/maintenance/"
+        maintenance_url = build_absolute_url("/maintenance/", canonical=site_url)
 
         # NOTE: Grounded issues are intentionally listed before operational issues
         # to prioritize critical maintenance items in the email digest. This changes
