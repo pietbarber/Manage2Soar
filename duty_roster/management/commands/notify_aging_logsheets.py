@@ -1,13 +1,11 @@
 from datetime import timedelta
 
-from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from duty_roster.utils.email import get_email_config
 from logsheet.models import Logsheet
 from notifications.models import Notification
-from siteconfig.models import SiteConfiguration
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
 from utils.management.commands.base_cronjob import BaseCronJobCommand

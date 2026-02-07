@@ -520,12 +520,6 @@ def _notify_member_managers_of_contact(contact_submission):
             .replace("\r", "")
             .replace("\n", " ")
         )
-        safe_user_subject = contact_submission.subject.replace("\r", "").replace(
-            "\n", " "
-        )
-        safe_message = (
-            contact_submission.message
-        )  # Keep original formatting for message content
 
         # Build URLs using canonical base to avoid redundant DB queries
         site_url = get_canonical_url()

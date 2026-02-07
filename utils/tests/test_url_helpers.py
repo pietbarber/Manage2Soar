@@ -179,13 +179,6 @@ class TestBuildAbsoluteURL:
         assert result == "https://www.skylinesoaring.org/members/"
         assert "//" not in result.replace("https://", "")
 
-    def test_prevents_double_slashes_with_both_trailing(self):
-        """Should prevent // when both canonical and path have slashes."""
-        result = build_absolute_url(
-            "/members/", canonical="https://www.skylinesoaring.org/"
-        )
-        assert result == "https://www.skylinesoaring.org/members/"
-
     def test_uses_canonical_parameter_when_provided(self):
         """Should use provided canonical parameter instead of querying DB."""
         config = SiteConfiguration.objects.first()
