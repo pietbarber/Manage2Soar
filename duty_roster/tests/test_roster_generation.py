@@ -25,24 +25,34 @@ class TestRosterGenerationDefaults:
 
     def test_member_without_preference_is_eligible(self):
         """Members with no DutyPreference should be eligible with default constraints."""
-        # Create member with role flag but no preference
-        member = Member.objects.create(
+        # Create only one member with role flag but no preference (deterministic test)
+        Member.objects.create(
             username="nopref",
             email="nopref@test.com",
             first_name="No",
             last_name="Pref",
             instructor=True,
             is_active=True,
+            membership_status="Full Member",
+            joined_club=date.today() - timedelta(days=365),
         )
 
-        # Generate roster for current month
+        # Generate roster for current month with only instructor role
         roster = generate_roster(roles=["instructor"])
 
-        # Member should be considered eligible during generation
-        # (verify by checking some slots are filled or diagnostics don't exclude them)
+        # Verify roster was generated and member appears in assignments
         assert roster is not None
         assert len(roster) > 0
-        assert "diagnostics" in roster[0]
+
+        # Count how many instructor slots are filled
+        filled_slots = sum(
+            1 for day in roster if day.get("slots", {}).get("instructor")
+        )
+        # With only one eligible instructor and no preference restrictions,
+        # at least some slots should be filled (not zero)
+        assert (
+            filled_slots > 0
+        ), "Member without DutyPreference should be assigned to instructor slots"
 
     def test_member_without_preference_respects_blackouts(self):
         """Members without preference should still respect blackouts."""

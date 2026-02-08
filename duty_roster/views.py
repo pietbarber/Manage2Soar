@@ -1242,8 +1242,18 @@ def get_eligible_members_for_slot(request):
 
         # Get currently assigned members for this day
         # Collect all member IDs from the slots, then bulk-fetch to avoid N+1 queries.
+        # Exclude the member currently assigned to the slot being edited (if provided),
+        # so they are not incorrectly flagged as "already assigned" elsewhere today.
+        current_member_id = request.GET.get("current_member_id")
+        try:
+            current_member_id = int(current_member_id) if current_member_id else None
+        except (TypeError, ValueError):
+            current_member_id = None
+
         assigned_member_ids = {
-            member_id for _, member_id in day_entry["slots"].items() if member_id
+            member_id
+            for _, member_id in day_entry["slots"].items()
+            if member_id and member_id != current_member_id
         }
 
         assigned_today_queryset = Member.objects.filter(pk__in=assigned_member_ids)
@@ -1511,9 +1521,11 @@ def update_roster_slot(request):
 
             entry["slots"][role] = member_id
 
-            # Clear any stale diagnostics for this role when the slot is manually edited.
+            # Clear any stale diagnostics for this role only when the slot is now filled.
+            # If the slot is cleared (member_id is empty/None), retain diagnostics so the
+            # UI can still explain why the slot is empty.
             diagnostics = entry.get("diagnostics")
-            if isinstance(diagnostics, dict) and role in diagnostics:
+            if isinstance(diagnostics, dict) and role in diagnostics and member_id:
                 diagnostics.pop(role, None)
 
             updated = True
