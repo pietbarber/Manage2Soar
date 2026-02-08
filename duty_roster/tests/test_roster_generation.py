@@ -111,19 +111,27 @@ class TestRoleScarcity:
         members = Member.objects.filter(is_active=True)
         prefs = {}
         blackouts = set()
-        avoidances = set()
 
-        roles = ["instructor", "towpilot"]
         today = date.today()
         operational_dates = [today + timedelta(days=i) for i in range(7)]
 
+        # Calculate scarcity for towpilot role
         scarcity = calculate_role_scarcity(
-            roles, members, prefs, blackouts, avoidances, operational_dates
+            members, prefs, blackouts, operational_dates, "towpilot"
         )
 
-        # Towpilot should be more scarce (lower availability) than instructor
-        assert len(scarcity) == 2
-        assert all("scarcity_score" in s for s in scarcity)
+        # Towpilot should show scarcity data
+        assert "scarcity_score" in scarcity
+        assert "total_members" in scarcity
+        assert scarcity["total_members"] == 1  # Only one towpilot
+
+        # Calculate scarcity for instructor role
+        scarcity_instructor = calculate_role_scarcity(
+            members, prefs, blackouts, operational_dates, "instructor"
+        )
+
+        # Instructor should have more members available
+        assert scarcity_instructor["total_members"] == 2  # Two instructors
 
 
 @pytest.mark.django_db
