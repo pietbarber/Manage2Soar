@@ -132,6 +132,16 @@ urlpatterns = [
     ),
     path("propose-roster/", views.propose_roster, name="propose_roster"),
     path(
+        "propose-roster/get-eligible-members/",
+        views.get_eligible_members_for_slot,
+        name="get_eligible_members_for_slot",
+    ),
+    path(
+        "propose-roster/update-slot/",
+        views.update_roster_slot,
+        name="update_roster_slot",
+    ),
+    path(
         "duty-delinquents/detail/",
         views.duty_delinquents_detail,
         name="duty_delinquents_detail",

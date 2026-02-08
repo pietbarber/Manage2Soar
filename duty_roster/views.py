@@ -55,6 +55,9 @@ from .roster_generator import generate_roster, is_within_operational_season
 
 logger = logging.getLogger("duty_roster.views")
 
+# Allowed roles for roster slot editing/assignment endpoints
+ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+
 
 def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
@@ -1178,6 +1181,388 @@ def is_rostermeister(user):
 
 @active_member_required
 @user_passes_test(is_rostermeister)
+@require_POST
+def get_eligible_members_for_slot(request):
+    """
+    AJAX endpoint to get eligible members for a specific roster slot.
+    Returns JSON with eligible members and their availability info.
+    """
+    try:
+        from datetime import date as dt_date
+
+        date_str = request.POST.get("date")
+        role = request.POST.get("role")
+
+        if not date_str or not role:
+            return JsonResponse({"error": "Missing date or role"}, status=400)
+
+        # Validate role is one of the allowed role names (security)
+        if role not in ALLOWED_ROLES:
+            return JsonResponse({"error": "Invalid role"}, status=400)
+
+        try:
+            day = dt_date.fromisoformat(date_str)
+        except ValueError:
+            return JsonResponse({"error": "Invalid date format"}, status=400)
+
+        # Get current roster from session
+        draft = request.session.get("proposed_roster", [])
+        day_entry = next((e for e in draft if e["date"] == date_str), None)
+
+        if not day_entry:
+            return JsonResponse({"error": "Date not found in roster"}, status=404)
+
+        # Ensure the requested role is actually enabled for this day in the draft roster
+        slots = day_entry.get("slots", {})
+        if role not in slots:
+            return JsonResponse(
+                {"error": "Role not enabled for this date in the current roster"},
+                status=400,
+            )
+    except Exception as e:
+        logger.exception("Error in get_eligible_members_for_slot (initial checks)")
+        return JsonResponse({"error": "Internal error processing request"}, status=500)
+
+    try:
+        # Get all members and prefs for eligibility checking
+        members = list(Member.objects.filter(is_active=True))
+        prefs = {
+            p.member_id: p
+            for p in DutyPreference.objects.select_related("member").all()
+        }
+        blackouts = {
+            (b.member_id, b.date)
+            for b in MemberBlackout.objects.filter(
+                date__year=day.year, date__month=day.month
+            )
+        }
+        avoidances = {
+            (a.member_id, a.avoid_with_id) for a in DutyAvoidance.objects.all()
+        }
+
+        # Get currently assigned members for this day
+        # Collect all member IDs from the slots, then bulk-fetch to avoid N+1 queries.
+        # Exclude the member currently assigned to the slot being edited (if provided),
+        # so they are not incorrectly flagged as "already assigned" elsewhere today.
+        current_member_id = request.POST.get("current_member_id")
+        try:
+            current_member_id = int(current_member_id) if current_member_id else None
+        except (TypeError, ValueError):
+            current_member_id = None
+
+        assigned_member_ids = {
+            member_id
+            for _, member_id in day_entry["slots"].items()
+            if member_id and member_id != current_member_id
+        }
+
+        assigned_today_queryset = Member.objects.filter(pk__in=assigned_member_ids)
+        found_ids = set(assigned_today_queryset.values_list("id", flat=True))
+        missing_ids = assigned_member_ids - found_ids
+        for missing_id in missing_ids:
+            # Draft may reference a member that has since been deleted; skip but log
+            logger.warning(
+                "Duty roster draft refers to missing Member id=%s; skipping.",
+                missing_id,
+            )
+
+        assigned_today = set(assigned_today_queryset)
+
+        # Calculate assignments for the month
+        assignments = defaultdict(int)
+        for entry in draft:
+            for r, member_id in entry["slots"].items():
+                if member_id:
+                    assignments[member_id] += 1
+
+        # Find eligible members
+        DEFAULT_MAX_ASSIGNMENTS = 8
+        eligible_members = []
+        for m in members:
+            # Check if member has the role flag
+            if not getattr(m, role, False):
+                continue
+
+            p = prefs.get(m.id)
+
+            # If no preference, treat as eligible with defaults
+            if not p:
+                # Still check basic constraints
+                if (m.id, day) in blackouts:
+                    continue
+
+                avoids = False
+                for o in assigned_today:
+                    if m != o and (
+                        (m.id, o.id) in avoidances or (o.id, m.id) in avoidances
+                    ):
+                        avoids = True
+                        break
+
+                already_assigned = m in assigned_today
+                at_max = assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS
+
+                eligible_members.append(
+                    {
+                        "id": m.id,
+                        "name": m.full_display_name,
+                        "warnings": {
+                            "avoids_someone": avoids,
+                            "already_assigned": already_assigned,
+                            "at_max": at_max,
+                        },
+                        "assignments_this_month": assignments[m.id],
+                        "max_assignments": DEFAULT_MAX_ASSIGNMENTS,
+                    }
+                )
+                continue
+
+            # Member has preferences - check them
+            if p.dont_schedule or p.scheduling_suspended:
+                continue
+
+            if (m.id, day) in blackouts:
+                continue
+
+            # Check avoidances (but less strict - show as "warning")
+            avoids = False
+            for o in assigned_today:
+                if m != o and (
+                    (m.id, o.id) in avoidances or (o.id, m.id) in avoidances
+                ):
+                    avoids = True
+                    break
+
+            # Check if already assigned (also show as warning)
+            already_assigned = m in assigned_today
+
+            # Check percentage
+            percent_fields = [
+                ("instructor", "instructor_percent"),
+                ("duty_officer", "duty_officer_percent"),
+                ("assistant_duty_officer", "ado_percent"),
+                ("towpilot", "towpilot_percent"),
+            ]
+            eligible_role_fields = [
+                field for r, field in percent_fields if getattr(m, r, False)
+            ]
+
+            if len(eligible_role_fields) == 1:
+                field = eligible_role_fields[0]
+                pct = getattr(p, field, 0)
+                if pct == 0:
+                    pct = 100
+            else:
+                all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
+                if role == "assistant_duty_officer":
+                    pct = p.ado_percent if not all_zero else 100
+                else:
+                    pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+
+            if pct == 0:
+                continue
+
+            # Check max assignments
+            at_max = assignments[m.id] >= getattr(p, "max_assignments_per_month", 0)
+
+            eligible_members.append(
+                {
+                    "id": m.id,
+                    "name": m.full_display_name,
+                    "warnings": {
+                        "avoids_someone": avoids,
+                        "already_assigned": already_assigned,
+                        "at_max": at_max,
+                    },
+                    "assignments_this_month": assignments[m.id],
+                    "max_assignments": getattr(p, "max_assignments_per_month", 0),
+                }
+            )
+
+        # Sort by assignments (fewest first) and name
+        eligible_members.sort(key=lambda x: (x["assignments_this_month"], x["name"]))
+
+        return JsonResponse(
+            {
+                "eligible_members": eligible_members,
+                "current_assignment": day_entry["slots"].get(role),
+                "date": date_str,
+                "role": role,
+            }
+        )
+    except Exception as e:
+        logger.exception("Error in get_eligible_members_for_slot (main logic)")
+        return JsonResponse(
+            {"error": "Internal error loading eligible members"}, status=500
+        )
+
+
+@active_member_required
+@user_passes_test(is_rostermeister)
+@require_POST
+def update_roster_slot(request):
+    """
+    AJAX endpoint to update a specific roster slot.
+    """
+    date_str = request.POST.get("date")
+    role = request.POST.get("role")
+    member_id = request.POST.get("member_id")  # Can be empty string to clear
+
+    if not date_str or not role:
+        return JsonResponse({"error": "Missing date or role"}, status=400)
+
+    # Validate role is one of the allowed role names (security)
+    if role not in ALLOWED_ROLES:
+        return JsonResponse({"error": "Invalid role"}, status=400)
+
+    # Validate member exists and is eligible if provided
+    member = None
+    member_name = "—"
+    if member_id and member_id != "":
+        try:
+            member_id = int(member_id)
+            member = Member.objects.get(pk=member_id)
+        except (ValueError, Member.DoesNotExist):
+            return JsonResponse({"error": "Invalid member"}, status=400)
+
+        # Enforce that the selected member is actually eligible for this role.
+        # For the allowed roles, the Member capability flag matches the role name
+        # (e.g., member.instructor, member.duty_officer, member.towpilot).
+        if not getattr(member, role, False):
+            return JsonResponse(
+                {"error": "Member not eligible for this role"},
+                status=400,
+            )
+
+        # Check active membership status
+        if not member.is_active:
+            return JsonResponse(
+                {"error": "Member is not active"},
+                status=400,
+            )
+
+        # Parse the date for constraint checks
+        try:
+            day = dt_date.fromisoformat(date_str)
+        except ValueError:
+            return JsonResponse({"error": "Invalid date format"}, status=400)
+
+        # Check for preference-based constraints
+        try:
+            pref = DutyPreference.objects.get(member=member)
+            if pref.dont_schedule:
+                return JsonResponse(
+                    {"error": "Member has opted out of scheduling"},
+                    status=400,
+                )
+            if pref.scheduling_suspended:
+                return JsonResponse(
+                    {"error": "Member scheduling is suspended"},
+                    status=400,
+                )
+
+            # Check role percentage (0% means don't schedule for this role)
+            percent_fields = [
+                ("instructor", "instructor_percent"),
+                ("duty_officer", "duty_officer_percent"),
+                ("assistant_duty_officer", "ado_percent"),
+                ("towpilot", "towpilot_percent"),
+            ]
+            eligible_role_fields = [
+                field for r, field in percent_fields if getattr(member, r, False)
+            ]
+
+            if len(eligible_role_fields) == 1:
+                field = eligible_role_fields[0]
+                pct = getattr(pref, field, 0)
+                if pct == 0:
+                    pct = 100  # Single role, treat 0 as 100
+            else:
+                all_zero = all(getattr(pref, f, 0) == 0 for f in eligible_role_fields)
+                if role == "assistant_duty_officer":
+                    pct = pref.ado_percent if not all_zero else 100
+                else:
+                    pct = getattr(pref, f"{role}_percent", 0) if not all_zero else 100
+
+            if pct == 0:
+                return JsonResponse(
+                    {"error": "Member has 0% preference for this role"},
+                    status=400,
+                )
+        except DutyPreference.DoesNotExist:
+            # No preference means eligible with defaults (no specific checks needed)
+            pass
+
+        # Check blackouts
+        blackout_exists = MemberBlackout.objects.filter(
+            member=member, date=day
+        ).exists()
+        if blackout_exists:
+            return JsonResponse(
+                {"error": "Member is blacked out on this date"},
+                status=400,
+            )
+
+        # Store member name now that we have the object
+        member_name = member.full_display_name
+    else:
+        member_id = None
+
+    # Get current roster from session
+    draft = request.session.get("proposed_roster", [])
+
+    # Find and update the day entry
+    updated = False
+    for entry in draft:
+        if entry["date"] == date_str:
+            # Ensure the role exists in this date's slots (prevents creating new keys)
+            if role not in entry.get("slots", {}):
+                return JsonResponse({"error": "Invalid role for this date"}, status=400)
+
+            entry["slots"][role] = member_id
+
+            # Clear any stale diagnostics for this role only when the slot is now filled.
+            # If the slot is cleared (member_id is empty/None), retain diagnostics so the
+            # UI can still explain why the slot is empty.
+            diagnostics = entry.get("diagnostics")
+            if isinstance(diagnostics, dict) and role in diagnostics and member_id:
+                diagnostics.pop(role, None)
+
+            updated = True
+            break
+
+    if not updated:
+        return JsonResponse({"error": "Date not found in roster"}, status=404)
+
+    # Save back to session
+    request.session["proposed_roster"] = draft
+    request.session.modified = True
+
+    # Get the updated entry to retrieve current diagnostic (if any)
+    current_diagnostic = None
+    for entry in draft:
+        if entry["date"] == date_str:
+            diagnostics = entry.get("diagnostics", {})
+            if isinstance(diagnostics, dict):
+                current_diagnostic = diagnostics.get(role)
+            break
+
+    # member_name was already set during validation (or defaults to "—")
+
+    return JsonResponse(
+        {
+            "success": True,
+            "member_id": member_id,
+            "member_name": member_name,
+            "date": date_str,
+            "role": role,
+            "diagnostic": current_diagnostic,  # Include current diagnostic state
+        }
+    )
+
+
+@active_member_required
+@user_passes_test(is_rostermeister)
 def propose_roster(request):
     year = request.POST.get("year") or request.GET.get("year")
     month = request.POST.get("month") or request.GET.get("month")
@@ -1276,7 +1661,7 @@ def propose_roster(request):
                 )
 
         elif action == "roll":
-            raw = generate_roster(year, month)
+            raw = generate_roster(year, month, roles=enabled_roles)
             if not raw:
                 cal = calendar.Calendar()
                 weekend = [
@@ -1295,6 +1680,7 @@ def propose_roster(request):
                 {
                     "date": e["date"].isoformat(),
                     "slots": {r: e["slots"].get(r) for r in enabled_roles},
+                    "diagnostics": e.get("diagnostics", {}),
                 }
                 for e in raw
             ]
@@ -1364,7 +1750,7 @@ def propose_roster(request):
             request.session.pop("proposed_roster", None)
             return redirect("duty_roster:duty_calendar")
     else:
-        raw = generate_roster(year, month)
+        raw = generate_roster(year, month, roles=enabled_roles)
         if not raw:
             cal = calendar.Calendar()
             weekend = [
@@ -1380,12 +1766,17 @@ def propose_roster(request):
             {
                 "date": e["date"].isoformat(),
                 "slots": {r: e["slots"].get(r) for r in enabled_roles},
+                "diagnostics": e.get("diagnostics", {}),
             }
             for e in raw
         ]
         request.session["proposed_roster"] = draft
     display = [
-        {"date": dt_date.fromisoformat(e["date"]), "slots": e["slots"]}
+        {
+            "date": dt_date.fromisoformat(e["date"]),
+            "slots": e["slots"],
+            "diagnostics": e.get("diagnostics", {}),
+        }
         for e in request.session.get("proposed_roster", [])
     ]
     return render(

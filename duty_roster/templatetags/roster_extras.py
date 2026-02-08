@@ -1,4 +1,7 @@
+import json
+
 from django import template
+from django.core.serializers.json import DjangoJSONEncoder
 
 from members.models import Member
 
@@ -17,3 +20,14 @@ def get_member_name(member_id):
 @register.filter
 def dict_get(d, key):
     return d.get(key)
+
+
+@register.filter
+def to_json(value):
+    """Convert a Python object to JSON string.
+
+    Uses Django's JSON encoder to handle dates, decimals, etc.
+    When embedding in HTML attributes, callers should use |escape filter
+    to prevent XSS (e.g., {{ value|to_json|escape }}).
+    """
+    return json.dumps(value, cls=DjangoJSONEncoder)

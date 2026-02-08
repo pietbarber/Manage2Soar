@@ -105,12 +105,343 @@ def is_within_operational_season(check_date: date) -> bool:
         return True
 
 
-def generate_roster(year=None, month=None):
+def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
+    """
+    Calculate scarcity score for a role based on actual availability.
+
+    Lower score = more constrained = higher priority to assign first.
+
+    Args:
+        members: List of active Member objects
+        prefs: Dict of member_id -> DutyPreference
+        blackouts: Set of (member_id, date) tuples
+        weekend_dates: List of date objects for the month
+        role: Role name (e.g., 'towpilot', 'instructor')
+
+    Returns:
+        Dict with:
+            - 'total_members': Total members with this role flag
+            - 'avg_available_per_day': Average members available per day
+            - 'scarcity_score': avg_available_per_day (lower = more critical)
+            - 'availability_by_day': List of counts for each day
+    """
+    if not weekend_dates:
+        return {
+            "total_members": 0,
+            "avg_available_per_day": 0,
+            "scarcity_score": float("inf"),
+            "availability_by_day": [],
+        }
+
+    # Count total members with this role
+    total_with_role = sum(1 for m in members if getattr(m, role, False))
+
+    # Count available members for each day
+    availability_by_day = []
+    for day in weekend_dates:
+        available_count = 0
+        for m in members:
+            # Check if member has the role flag
+            if not getattr(m, role, False):
+                continue
+
+            # Check DutyPreference constraints
+            p = prefs.get(m.id)
+            if p:
+                # Member has preferences - check them
+                if p.dont_schedule or p.scheduling_suspended:
+                    continue
+            # If no preference, treat as available (don't skip)
+
+            # Check if blacked out on this day
+            if (m.id, day) in blackouts:
+                continue
+
+            # Check role-specific percentage (skip if 0)
+            # Only check percentages if member has DutyPreference
+            if p:
+                percent_fields = {
+                    "instructor": "instructor_percent",
+                    "duty_officer": "duty_officer_percent",
+                    "assistant_duty_officer": "ado_percent",
+                    "towpilot": "towpilot_percent",
+                }
+
+                # Get all eligible role fields for this member
+                eligible_role_fields = [
+                    field for r, field in percent_fields.items() if getattr(m, r, False)
+                ]
+
+                # Determine if percentage is blocking
+                if len(eligible_role_fields) == 1:
+                    # Only eligible for one role - if percent is 0, treat as 100
+                    field = eligible_role_fields[0]
+                    pct = getattr(p, field, 0)
+                    if pct == 0:
+                        pct = 100
+                else:
+                    # Multiple roles - check if all are zero
+                    all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
+                    if role == "assistant_duty_officer":
+                        pct = p.ado_percent if not all_zero else 100
+                    else:
+                        pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+
+                if pct == 0:
+                    continue  # Skip if percentage explicitly set to 0
+
+            # Count member as available (either has good percentage or no preference)
+            available_count += 1
+
+        availability_by_day.append(available_count)
+
+    avg_available = (
+        sum(availability_by_day) / len(availability_by_day)
+        if availability_by_day
+        else 0
+    )
+
+    # Scarcity score: average available members per day
+    # Lower score = fewer available = more constrained = should assign first
+    scarcity_score = avg_available if len(weekend_dates) > 0 else float("inf")
+
+    logger.debug(
+        f"Role '{role}' scarcity: {total_with_role} total members, "
+        f"{avg_available:.1f} avg available/day, "
+        f"score={scarcity_score:.2f}"
+    )
+
+    return {
+        "total_members": total_with_role,
+        "avg_available_per_day": avg_available,
+        "scarcity_score": scarcity_score,
+        "availability_by_day": availability_by_day,
+    }
+
+
+def diagnose_empty_slot(
+    role,
+    day,
+    members,
+    prefs,
+    blackouts,
+    avoidances,
+    assignments,
+    assigned_today,
+    last_assigned=None,
+):
+    """
+    Diagnose why a role slot couldn't be filled on a specific day.
+
+    Args:
+        last_assigned: Optional dict of role -> member_id for previous day's assignments
+
+    Returns dict with:
+        - total_members_with_role: Total members who have the role flag
+        - reasons: Dict of reason -> list of member names
+        - summary: Human-readable summary string
+    """
+    DEFAULT_MAX_ASSIGNMENTS = 8
+
+    reasons = {
+        "no_preference": [],  # Note: These are now ELIGIBLE, just informational
+        "dont_schedule": [],
+        "scheduling_suspended": [],
+        "blacked_out": [],
+        "avoids_someone": [],
+        "already_assigned_today": [],
+        "percent_zero": [],
+        "max_assignments_reached": [],
+        "no_role_flag": [],
+        "assigned_yesterday": [],  # Anti-repeat constraint
+    }
+
+    total_with_role = 0
+
+    for m in members:
+        # Check if member has the role flag
+        has_role = getattr(m, role, False)
+        if not has_role:
+            continue
+
+        total_with_role += 1
+
+        # Check preference exists
+        p = prefs.get(m.id)
+        if not p:
+            # Note: Members without preferences are now treated as eligible!
+            # This is just for informational purposes in diagnostics
+            reasons["no_preference"].append(
+                f"{m.full_display_name} (treated as eligible with defaults)"
+            )
+            # Continue checking other constraints with defaults
+            if (m.id, day) in blackouts:
+                reasons["blacked_out"].append(m.full_display_name)
+                continue
+            avoids_someone = False
+            for o in assigned_today:
+                if (m.id, o.id) in avoidances or (o.id, m.id) in avoidances:
+                    reasons["avoids_someone"].append(
+                        f"{m.full_display_name} (avoids {o.full_display_name})"
+                    )
+                    avoids_someone = True
+                    break
+            if avoids_someone:
+                continue
+            if m in assigned_today:
+                reasons["already_assigned_today"].append(m.full_display_name)
+                continue
+            # Check anti-repeat constraint
+            if last_assigned and last_assigned.get(role) == m.id:
+                reasons["assigned_yesterday"].append(
+                    f"{m.full_display_name} (did this role yesterday)"
+                )
+                continue
+            if assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS:
+                reasons["max_assignments_reached"].append(
+                    f"{m.full_display_name} ({assignments[m.id]}/{DEFAULT_MAX_ASSIGNMENTS})"
+                )
+                continue
+            # If we get here, member with no preference is actually eligible!
+            continue
+
+        # Member has preferences - check them
+        # Check don't schedule flag
+        if p.dont_schedule:
+            reasons["dont_schedule"].append(m.full_display_name)
+            continue
+
+        # Check scheduling suspended
+        if p.scheduling_suspended:
+            reasons["scheduling_suspended"].append(m.full_display_name)
+            continue
+
+        # Check blackout
+        if (m.id, day) in blackouts:
+            reasons["blacked_out"].append(m.full_display_name)
+            continue
+
+        # Check avoidances
+        avoids_someone = False
+        for o in assigned_today:
+            if (m.id, o.id) in avoidances or (o.id, m.id) in avoidances:
+                reasons["avoids_someone"].append(
+                    f"{m.full_display_name} (avoids {o.full_display_name})"
+                )
+                avoids_someone = True
+                break
+        if avoids_someone:
+            continue
+
+        # Check already assigned today
+        if m in assigned_today:
+            reasons["already_assigned_today"].append(m.full_display_name)
+            continue
+
+        # Check anti-repeat constraint
+        if last_assigned and last_assigned.get(role) == m.id:
+            reasons["assigned_yesterday"].append(
+                f"{m.full_display_name} (did this role yesterday)"
+            )
+            continue
+
+        # Check percentage
+        percent_fields = [
+            ("instructor", "instructor_percent"),
+            ("duty_officer", "duty_officer_percent"),
+            ("assistant_duty_officer", "ado_percent"),
+            ("towpilot", "towpilot_percent"),
+        ]
+        eligible_role_fields = [
+            field for r, field in percent_fields if getattr(m, r, False)
+        ]
+
+        if len(eligible_role_fields) == 1:
+            field = eligible_role_fields[0]
+            pct = getattr(p, field, 0)
+            if pct == 0:
+                pct = 100  # Single role, treat 0 as 100
+        else:
+            all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
+            if role == "assistant_duty_officer":
+                pct = p.ado_percent if not all_zero else 100
+            else:
+                pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+
+        if pct == 0:
+            reasons["percent_zero"].append(m.full_display_name)
+            continue
+
+        # Check max assignments
+        if assignments[m.id] >= getattr(p, "max_assignments_per_month", 0):
+            max_val = getattr(p, "max_assignments_per_month", 0)
+            reasons["max_assignments_reached"].append(
+                f"{m.full_display_name} ({assignments[m.id]}/{max_val})"
+            )
+            continue
+
+    # Build human-readable summary
+    # Note: "no_preference" is not included in summary because members without
+    # preferences are treated as eligible (with default constraints). It's an
+    # informational category, not a blocking reason.
+    summary_parts = []
+    if reasons["blacked_out"]:
+        summary_parts.append(f"{len(reasons['blacked_out'])} blacked out")
+    if reasons["already_assigned_today"]:
+        summary_parts.append(
+            f"{len(reasons['already_assigned_today'])} already assigned"
+        )
+    if reasons["assigned_yesterday"]:
+        summary_parts.append(f"{len(reasons['assigned_yesterday'])} did role yesterday")
+    if reasons["max_assignments_reached"]:
+        summary_parts.append(
+            f"{len(reasons['max_assignments_reached'])} at max assignments"
+        )
+    if reasons["scheduling_suspended"]:
+        summary_parts.append(f"{len(reasons['scheduling_suspended'])} suspended")
+    if reasons["dont_schedule"]:
+        summary_parts.append(f"{len(reasons['dont_schedule'])} opted out")
+    if reasons["percent_zero"]:
+        summary_parts.append(f"{len(reasons['percent_zero'])} with 0% preference")
+    if reasons["avoids_someone"]:
+        summary_parts.append(f"{len(reasons['avoids_someone'])} avoiding co-workers")
+
+    if not summary_parts:
+        summary = f"No eligible members found for {role}"
+    else:
+        summary = f"No {role} available: " + ", ".join(summary_parts)
+
+    return {
+        "total_members_with_role": total_with_role,
+        "reasons": reasons,
+        "summary": summary,
+    }
+
+
+def generate_roster(year=None, month=None, roles=None):
+    """
+    Generate a duty roster for a given month.
+
+    Args:
+        year: Year to generate roster for (default: current year)
+        month: Month to generate roster for (default: current month)
+        roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
+
+    Returns:
+        List of dicts, each with:
+            - 'date': a datetime.date for the duty day
+            - 'slots': mapping of role name to assigned Member (or None if unfilled)
+            - 'diagnostics': per-date scheduling diagnostics/metadata
+    """
     from django.utils.timezone import now
 
     today = now().date()
     year = year or today.year
     month = month or today.month
+
+    # Use provided roles or fall back to DEFAULT_ROLES
+    roles_to_schedule = roles if roles is not None else DEFAULT_ROLES
+
     cal = calendar.Calendar()
     all_weekend_dates = [
         d
@@ -147,10 +478,45 @@ def generate_roster(year=None, month=None):
         return d or date(1900, 1, 1)
 
     def eligible(role, m, day, assigned):
+        # Default values for members without DutyPreference
+        DEFAULT_MAX_ASSIGNMENTS = 8
+
         p = prefs.get(m.id)
         if not p:
-            logger.debug(f"{m.full_display_name}: No DutyPreference found.")
-            return False
+            # Member has no preference set - treat as eligible with defaults
+            logger.debug(
+                f"{m.full_display_name}: No DutyPreference found, using defaults (schedulable, 100% available)."
+            )
+            # Still check basic constraints even without preference
+            if (m.id, day) in blackouts:
+                logger.debug(f"{m.full_display_name}: Blacked out on {day}.")
+                return False
+            for o in assigned:
+                if (m.id, o.id) in avoidances or (o.id, m.id) in avoidances:
+                    logger.debug(
+                        f"{m.full_display_name}: Avoids {o.full_display_name}."
+                    )
+                    return False
+            if m in assigned:
+                logger.debug(f"{m.full_display_name}: Already assigned today.")
+                return False
+            flag = getattr(m, role, False)
+            if not flag:
+                logger.debug(
+                    f"{m.full_display_name}: Not eligible for role {role} (flag is False)."
+                )
+                return False
+            if assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS:
+                logger.debug(
+                    f"{m.full_display_name}: Max assignments per month reached (using default {DEFAULT_MAX_ASSIGNMENTS})."
+                )
+                return False
+            logger.debug(
+                f"{m.full_display_name}: Eligible for {role} on {day} (no pref, treating as 100%)."
+            )
+            return True
+
+        # Member has preferences - check them
         if p.dont_schedule:
             logger.debug(f"{m.full_display_name}: 'Don't schedule' is set.")
             return False
@@ -225,7 +591,8 @@ def generate_roster(year=None, month=None):
                 field for r, field in percent_fields if getattr(m, r, False)
             ]
             if not p:
-                base = 0
+                # Member has no preference - treat as 100% available
+                base = 100
             elif len(eligible_role_fields) == 1:
                 field = eligible_role_fields[0]
                 base = getattr(p, field, 0)
@@ -257,12 +624,37 @@ def generate_roster(year=None, month=None):
         )
         return chosen
 
+    # Calculate role scarcity and prioritize most constrained roles first
+    role_scarcity = {}
+    for role in roles_to_schedule:
+        scarcity_data = calculate_role_scarcity(
+            members, prefs, blackouts, weekend_dates, role
+        )
+        role_scarcity[role] = scarcity_data
+
+    # Sort roles by scarcity score (lowest = most constrained = highest priority)
+    prioritized_roles = sorted(
+        roles_to_schedule, key=lambda r: role_scarcity[r]["scarcity_score"]
+    )
+
+    logger.debug(
+        f"Role assignment priority order (most constrained first): {prioritized_roles}"
+    )
+    for role in prioritized_roles:
+        data = role_scarcity[role]
+        logger.debug(
+            f"  {role}: {data['total_members']} members, "
+            f"{data['avg_available_per_day']:.1f} avg available/day, "
+            f"score={data['scarcity_score']:.2f}"
+        )
+
     schedule = []
-    last_assigned = {role: None for role in DEFAULT_ROLES}
+    last_assigned = {role: None for role in roles_to_schedule}
     for day in weekend_dates:
         assigned_today = set()
         slots = {}
-        for role in DEFAULT_ROLES:
+        diagnostics = {}
+        for role in prioritized_roles:
             cands = [
                 m
                 for m in members
@@ -275,8 +667,21 @@ def generate_roster(year=None, month=None):
                 assigned_today.add(sel)
                 assignments[sel.id] += 1
                 slots[role] = sel.id
+                diagnostics[role] = None  # No diagnostic needed for filled slots
             else:
                 slots[role] = None
-        schedule.append({"date": day, "slots": slots})
+                # Generate diagnostic for empty slot
+                diagnostics[role] = diagnose_empty_slot(
+                    role,
+                    day,
+                    members,
+                    prefs,
+                    blackouts,
+                    avoidances,
+                    assignments,
+                    assigned_today,
+                    last_assigned,
+                )
+        schedule.append({"date": day, "slots": slots, "diagnostics": diagnostics})
         last_assigned = slots.copy()
     return schedule
