@@ -1244,7 +1244,7 @@ def get_eligible_members_for_slot(request):
         # Collect all member IDs from the slots, then bulk-fetch to avoid N+1 queries.
         # Exclude the member currently assigned to the slot being edited (if provided),
         # so they are not incorrectly flagged as "already assigned" elsewhere today.
-        current_member_id = request.GET.get("current_member_id")
+        current_member_id = request.POST.get("current_member_id")
         try:
             current_member_id = int(current_member_id) if current_member_id else None
         except (TypeError, ValueError):
