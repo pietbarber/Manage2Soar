@@ -55,6 +55,9 @@ from .roster_generator import generate_roster, is_within_operational_season
 
 logger = logging.getLogger("duty_roster.views")
 
+# Allowed roles for roster slot editing/assignment endpoints
+ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+
 
 def calendar_refresh_response(year, month):
     """Helper function to create HTMX response that refreshes calendar with month context"""
@@ -1194,12 +1197,6 @@ def get_eligible_members_for_slot(request):
             return JsonResponse({"error": "Missing date or role"}, status=400)
 
         # Validate role is one of the allowed role names (security)
-        ALLOWED_ROLES = [
-            "instructor",
-            "duty_officer",
-            "assistant_duty_officer",
-            "towpilot",
-        ]
         if role not in ALLOWED_ROLES:
             return JsonResponse({"error": "Invalid role"}, status=400)
 
@@ -1405,7 +1402,6 @@ def update_roster_slot(request):
         return JsonResponse({"error": "Missing date or role"}, status=400)
 
     # Validate role is one of the allowed role names (security)
-    ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
     if role not in ALLOWED_ROLES:
         return JsonResponse({"error": "Invalid role"}, status=400)
 

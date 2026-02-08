@@ -220,10 +220,21 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
 
 
 def diagnose_empty_slot(
-    role, day, members, prefs, blackouts, avoidances, assignments, assigned_today
+    role,
+    day,
+    members,
+    prefs,
+    blackouts,
+    avoidances,
+    assignments,
+    assigned_today,
+    last_assigned=None,
 ):
     """
     Diagnose why a role slot couldn't be filled on a specific day.
+
+    Args:
+        last_assigned: Optional dict of role -> member_id for previous day's assignments
 
     Returns dict with:
         - total_members_with_role: Total members who have the role flag
@@ -242,6 +253,7 @@ def diagnose_empty_slot(
         "percent_zero": [],
         "max_assignments_reached": [],
         "no_role_flag": [],
+        "assigned_yesterday": [],  # Anti-repeat constraint
     }
 
     total_with_role = 0
@@ -278,6 +290,12 @@ def diagnose_empty_slot(
                 continue
             if m in assigned_today:
                 reasons["already_assigned_today"].append(m.full_display_name)
+                continue
+            # Check anti-repeat constraint
+            if last_assigned and last_assigned.get(role) == m.id:
+                reasons["assigned_yesterday"].append(
+                    f"{m.full_display_name} (did this role yesterday)"
+                )
                 continue
             if assignments[m.id] >= DEFAULT_MAX_ASSIGNMENTS:
                 reasons["max_assignments_reached"].append(
@@ -318,6 +336,13 @@ def diagnose_empty_slot(
         # Check already assigned today
         if m in assigned_today:
             reasons["already_assigned_today"].append(m.full_display_name)
+            continue
+
+        # Check anti-repeat constraint
+        if last_assigned and last_assigned.get(role) == m.id:
+            reasons["assigned_yesterday"].append(
+                f"{m.full_display_name} (did this role yesterday)"
+            )
             continue
 
         # Check percentage
@@ -366,6 +391,8 @@ def diagnose_empty_slot(
         summary_parts.append(
             f"{len(reasons['already_assigned_today'])} already assigned"
         )
+    if reasons["assigned_yesterday"]:
+        summary_parts.append(f"{len(reasons['assigned_yesterday'])} did role yesterday")
     if reasons["max_assignments_reached"]:
         summary_parts.append(
             f"{len(reasons['max_assignments_reached'])} at max assignments"
@@ -653,6 +680,7 @@ def generate_roster(year=None, month=None, roles=None):
                     avoidances,
                     assignments,
                     assigned_today,
+                    last_assigned,
                 )
         schedule.append({"date": day, "slots": slots, "diagnostics": diagnostics})
         last_assigned = slots.copy()

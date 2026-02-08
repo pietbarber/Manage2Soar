@@ -91,7 +91,7 @@
                 data-role="{{ role }}"
                 data-date="{{ entry.date|date:'Y-m-d' }}"
                 {% if not entry.slots|dict_get:role and entry.diagnostics|dict_get:role %}
-                data-diagnostic='{{ entry.diagnostics|dict_get:role|to_json }}'
+                data-diagnostic='{{ entry.diagnostics|dict_get:role|to_json|escape }}'
                 {% endif %}
                 data-current-member="{% if entry.slots|dict_get:role %}{{ entry.slots|dict_get:role }}{% endif %}"
                 style="cursor: pointer;"
@@ -484,7 +484,8 @@ function saveSlotAssignment() {
       // Keep diagnostic text in sync with the server response
       if (Object.prototype.hasOwnProperty.call(data, 'diagnostic')) {
         if (data.diagnostic) {
-          slotElement.dataset.diagnostic = data.diagnostic;
+          // dataset values must be strings, so stringify the object
+          slotElement.dataset.diagnostic = JSON.stringify(data.diagnostic);
         } else {
           delete slotElement.dataset.diagnostic;
         }
