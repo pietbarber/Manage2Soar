@@ -401,7 +401,10 @@ def generate_roster(year=None, month=None, roles=None):
         roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
 
     Returns:
-        List of dicts with 'date' and 'slots' keys
+        List of dicts, each with:
+            - 'date': a datetime.date for the duty day
+            - 'slots': mapping of role name to assigned Member (or None if unfilled)
+            - 'diagnostics': per-date scheduling diagnostics/metadata
     """
     from django.utils.timezone import now
 

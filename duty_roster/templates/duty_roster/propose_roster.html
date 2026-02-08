@@ -194,17 +194,17 @@ const ROLE_TITLES = JSON.parse(document.getElementById('role-titles-data').textC
 let currentEditSlot = null;
 let eligibleMembersData = null;
 
+// HTML escape function to prevent XSS
+function escapeHtml(unsafe) {
+  if (!unsafe) return '';
+  const div = document.createElement('div');
+  div.textContent = unsafe;
+  return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   // Add click handlers to all editable slots
   const editableSlots = document.querySelectorAll('.editable-slot');
-
-  // HTML escape function to prevent XSS
-  function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    const div = document.createElement('div');
-    div.textContent = unsafe;
-    return div.innerHTML;
-  }
 
   editableSlots.forEach(slot => {
     const handleSlotInteraction = function() {
@@ -446,12 +446,18 @@ function saveSlotAssignment() {
       const slotElement = currentEditSlot.element;
       const slotContent = slotElement.querySelector('.slot-content');
 
+      // Format date for aria-label (convert YYYY-MM-DD to readable format)
+      const dateObj = new Date(currentEditSlot.date + 'T00:00:00');
+      const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+      const roleName = ROLE_TITLES[currentEditSlot.role] || currentEditSlot.role;
+
       if (data.member_id) {
         slotContent.textContent = data.member_name;
         slotContent.className = 'slot-content';  // Reset classes, removing text-muted
         slotElement.classList.remove('empty-slot');
         slotElement.dataset.currentMember = data.member_id;
         slotElement.title = 'Click to edit assignment';
+        slotElement.setAttribute('aria-label', `Edit ${roleName} assignment for ${dateFormatted}`);
 
         // Update the edit icon
         const editIcon = slotElement.querySelector('small');
@@ -465,6 +471,7 @@ function saveSlotAssignment() {
         slotElement.classList.add('empty-slot');
         slotElement.dataset.currentMember = '';
         slotElement.title = 'Click to assign someone or view why empty';
+        slotElement.setAttribute('aria-label', `Assign ${roleName} for ${dateFormatted}`);
 
         // Update the add icon
         const addIcon = slotElement.querySelector('small');

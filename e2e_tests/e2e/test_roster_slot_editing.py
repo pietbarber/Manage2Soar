@@ -73,18 +73,19 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         # Login as rostermeister
         self.login(username="rostermeister")
 
-        # Navigate to propose-roster page with current month/year
-        current_date = datetime.now()
+        # Use a fixed month/year to avoid time-dependent test behavior
+        test_year = 2024
+        test_month = 6
         self.page.goto(
-            f"{self.live_server_url}/duty_roster/propose-roster/?year={current_date.year}&month={current_date.month}"
+            f"{self.live_server_url}/duty_roster/propose-roster/?year={test_year}&month={test_month}"
         )
 
         # Ensure correct month/year are selected
         year_select = self.page.locator('select[name="year"]')
         month_select = self.page.locator('select[name="month"]')
 
-        year_select.select_option(str(current_date.year))
-        month_select.select_option(str(current_date.month))
+        year_select.select_option(str(test_year))
+        month_select.select_option(str(test_month))
 
         # Click roll button to generate roster
         roll_button = self.page.locator('button[name="action"][value="roll"]')
