@@ -1405,8 +1405,9 @@ def update_roster_slot(request):
     if role not in ALLOWED_ROLES:
         return JsonResponse({"error": "Invalid role"}, status=400)
 
-    # Validate member exists if provided
+    # Validate member exists and is eligible if provided
     member = None
+    member_name = "—"
     if member_id and member_id != "":
         try:
             member_id = int(member_id)
@@ -1422,6 +1423,78 @@ def update_roster_slot(request):
                 {"error": "Member not eligible for this role"},
                 status=400,
             )
+
+        # Check active membership status
+        if not member.is_active:
+            return JsonResponse(
+                {"error": "Member is not active"},
+                status=400,
+            )
+
+        # Parse the date for constraint checks
+        try:
+            day = dt_date.fromisoformat(date_str)
+        except ValueError:
+            return JsonResponse({"error": "Invalid date format"}, status=400)
+
+        # Check for preference-based constraints
+        try:
+            pref = DutyPreference.objects.get(member=member)
+            if pref.dont_schedule:
+                return JsonResponse(
+                    {"error": "Member has opted out of scheduling"},
+                    status=400,
+                )
+            if pref.scheduling_suspended:
+                return JsonResponse(
+                    {"error": "Member scheduling is suspended"},
+                    status=400,
+                )
+
+            # Check role percentage (0% means don't schedule for this role)
+            percent_fields = [
+                ("instructor", "instructor_percent"),
+                ("duty_officer", "duty_officer_percent"),
+                ("assistant_duty_officer", "ado_percent"),
+                ("towpilot", "towpilot_percent"),
+            ]
+            eligible_role_fields = [
+                field for r, field in percent_fields if getattr(member, r, False)
+            ]
+
+            if len(eligible_role_fields) == 1:
+                field = eligible_role_fields[0]
+                pct = getattr(pref, field, 0)
+                if pct == 0:
+                    pct = 100  # Single role, treat 0 as 100
+            else:
+                all_zero = all(getattr(pref, f, 0) == 0 for f in eligible_role_fields)
+                if role == "assistant_duty_officer":
+                    pct = pref.ado_percent if not all_zero else 100
+                else:
+                    pct = getattr(pref, f"{role}_percent", 0) if not all_zero else 100
+
+            if pct == 0:
+                return JsonResponse(
+                    {"error": "Member has 0% preference for this role"},
+                    status=400,
+                )
+        except DutyPreference.DoesNotExist:
+            # No preference means eligible with defaults (no specific checks needed)
+            pass
+
+        # Check blackouts
+        blackout_exists = MemberBlackout.objects.filter(
+            member=member, date=day
+        ).exists()
+        if blackout_exists:
+            return JsonResponse(
+                {"error": "Member is blacked out on this date"},
+                status=400,
+            )
+
+        # Store member name now that we have the object
+        member_name = member.full_display_name
     else:
         member_id = None
 
@@ -1462,19 +1535,7 @@ def update_roster_slot(request):
                 current_diagnostic = diagnostics.get(role)
             break
 
-    member_name = "—"
-    if member_id:
-        try:
-            member_name = Member.objects.get(pk=member_id).full_display_name
-        except Member.DoesNotExist:
-            # Member could have been deleted between validation and name lookup
-            # Log and fall back to the default em dash placeholder
-            logger.warning(
-                "Member with id %s disappeared while updating roster slot for date %s and role %s",
-                member_id,
-                date_str,
-                role,
-            )
+    # member_name was already set during validation (or defaults to "—")
 
     return JsonResponse(
         {

@@ -5,8 +5,6 @@ Issue #616: Verify JavaScript correctly handles clicking roster slots,
 loading eligible members via AJAX, saving assignments, and displaying diagnostics.
 """
 
-from datetime import datetime
-
 from duty_roster.models import DutyPreference
 
 from .conftest import DjangoPlaywrightTestCase
