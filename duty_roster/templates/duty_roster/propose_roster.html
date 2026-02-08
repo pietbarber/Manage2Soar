@@ -310,7 +310,7 @@ function showEditSlotModal(role, date, currentMember) {
   const roleName = ROLE_TITLES[role] || role;
   const displayDate = formatDateForDisplay(date);
 
-  modalTitle.innerHTML = `✏️ Edit ${roleName} for ${displayDate}`;
+  modalTitle.textContent = `✏️ Edit ${roleName} for ${displayDate}`;
 
   // Show loading spinner
   modalBody.innerHTML = `
