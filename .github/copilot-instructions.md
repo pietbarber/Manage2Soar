@@ -32,76 +32,61 @@
   - `gke-post-deployment.md` - Post-deployment configuration and troubleshooting
   - Both guides emphasize IaC solutions over manual fixes
 
-## Terminal Environment Setup
-- **CRITICAL**: Every new terminal window requires virtual environment activation. The first command in any new terminal session MUST be:
+## Terminal & Virtual Environment
+- **CRITICAL**: Every new terminal window requires virtual environment activation:
   ```bash
   source .venv/bin/activate
   ```
-- **Issue**: New terminal windows do not automatically source the virtual environment, causing Python/pytest/Django commands to fail with "command not found" errors.
-- **Solution**: Always run `source .venv/bin/activate` as the first command when starting any terminal operation.
-- **Commands that require venv**: `pytest`, `python manage.py`, `pip`, `django-admin`, `black`, `isort`, `bandit`, `safety`, and any Python-related tooling.
-
-## Terminal Window Management
-- **UNPREDICTABLE**: VS Code's `run_in_terminal` tool unpredictably creates new terminal windows vs reusing existing ones. This cannot be controlled or predicted.
+- **UNPREDICTABLE BEHAVIOR**: VS Code's `run_in_terminal` tool unpredictably creates new terminal windows vs reusing existing ones.
 - **BEST PRACTICES**:
   1. **Always prefix Python commands**: Use `source .venv/bin/activate && your_command` when uncertain
-  2. **Check environment first**: Run `which python` to verify virtual environment before Python operations
-  3. **Expect new terminals**: Background processes, long-running commands, and time gaps between commands often spawn new terminals
-- **WORKFLOW**: When you see "command not found" errors, immediately run `source .venv/bin/activate` and retry the command.
+  2. **Check environment first**: Run `which python` to verify virtual environment
+  3. **When you see "command not found" errors**: Immediately run `source .venv/bin/activate` and retry
+- **Commands requiring venv**: `pytest`, `python manage.py`, `pip`, `django-admin`, `black`, `isort`, `bandit`, `safety`, and all Python tooling.
 
 ## Git Workflow - NEVER COMMIT TO MAIN ⚠️
-- **CRITICAL RULE**: NEVER commit directly to the `main` branch. ALL changes must go through feature branches and pull requests.
-- **ONLY EXCEPTION**: If you accidentally committed to main, a revert commit to main is acceptable to undo the damage, then move work to a feature branch.
-- **Before ANY commit**, verify you are on a feature branch:
-  ```bash
-  git branch --show-current  # Must NOT be "main"
-  ```
-- **If starting new work**:
-  1. Ensure you're on main: `git checkout main && git pull`
-  2. Create a feature branch: `git checkout -b feature/issue-XXX-description`
-  3. Make changes and commit to the feature branch
-  4. Push: `git push -u origin feature/issue-XXX-description`
-  5. Create PR via GitHub
+- **CRITICAL**: ALL changes must go through feature branches and pull requests. NEVER commit directly to `main`.
+- **Before committing**: Verify you're on a feature branch: `git branch --show-current` (must NOT be "main")
+- **Branch naming**: `feature/issue-XXX-short-description`
+- **Starting new work**:
+  1. `git checkout main && git pull`
+  2. `git checkout -b feature/issue-XXX-description`
+  3. Make changes, commit, push: `git push -u origin feature/issue-XXX-description`
+  4. Create PR via GitHub
 - **If you accidentally committed to main**:
-  1. Create a revert commit: `git revert HEAD` (creates a new commit that undoes the change)
-  2. Push the revert: `git push origin main`
-  3. Create feature branch: `git checkout -b feature/issue-XXX-description`
-  4. Cherry-pick the original work: `git cherry-pick <hash-of-original-commit>`
-  5. Push feature branch: `git push -u origin feature/issue-XXX-description`
-  6. Create PR via GitHub
-  7. **NEVER use `git push --force`** - it rewrites history and can cause data loss in collaborative environments
-- **Branch naming**: `feature/issue-XXX-short-description` (e.g., `feature/issue-558-e2e-tests`)
-- **WHY**: Direct commits bypass code review, CI checks, and Copilot review. PRs ensure quality.
+  1. Revert: `git revert HEAD && git push origin main`
+  2. Create feature branch: `git checkout -b feature/issue-XXX-description`
+  3. Cherry-pick: `git cherry-pick <hash-of-original-commit>`
+  4. Push and create PR
+- **NEVER use `git push --force`** - rewrites history, causes data loss
 
 ## Django Development Server Management
-- **CRITICAL PORT REQUIREMENT**: Development server MUST run on port 8001 due to HSTS cache issues on port 8000. NEVER use port 8001 in production.
-- **DEVELOPMENT SERVER COMMAND**: Always use `python manage.py runserver 127.0.0.1:8001` for local development
-- **CHECK FIRST**: Before starting `manage.py runserver`, always check if it's already running on port 8001:
-  ```bash
-  lsof -i :8001 || echo "Port 8001 is free"
-  ```
-- **HSTS ISSUE**: Port 8000 has persistent HSTS cache (365 days) that forces HTTPS, breaking local development. Port 8001 avoids this issue.
-- **AUTO-RESTART**: Django's development server automatically restarts when you modify `.py` files (views.py, models.py, forms.py, etc.). You do NOT need to manually restart it.
-- **AUTO-RESTART**: Django's development server automatically handles restarts when Python files change. This works regardless of your editor.
-- **WHEN TO RESTART**: Only manually restart the server for:
+- **CRITICAL PORT**: Development server MUST run on port 8001 (not 8000) due to HSTS cache issues: `python manage.py runserver 127.0.0.1:8001`
+- **CHECK FIRST**: Before starting, verify port 8001 is free: `lsof -i :8001 || echo "Port 8001 is free"`
+- **AUTO-RESTART**: Server automatically restarts when Python files change. Only manually restart for:
   - New dependencies/packages installed
   - Settings changes (manage2soar/settings.py)
   - Template/static file changes (sometimes)
-  - Migration changes that affect the database schema
-- **AVOID**: Don't use `pkill` or `lsof` commands to kill existing servers unless explicitly needed. VS Code will manage the auto-restart process.
+  - Migration changes affecting database schema
 
 ## Additional Context Resources
-- **Conversation Archives**: For complex issues requiring deep context, check `.github/conversations/` for saved debugging sessions and technical discussions. These contain valuable insights about system architecture, problem-solving approaches, data migration patterns, and testing strategies.
-- **IMPORTANT**: The `.github/conversations/` directory is gitignored - these files exist locally only and provide rich historical context for understanding technical decisions and debugging complex issues.
+- **Conversation Archives**: Check `.github/conversations/` for saved debugging sessions with insights about architecture, problem-solving approaches, data migration patterns, and testing strategies.
+- **IMPORTANT**: The `.github/conversations/` directory is gitignored - these files exist locally only.
 
-## GitHub Issue Lookup
-- **CRITICAL**: When user references an issue by number (e.g., "work on issue 70"), use this MCP pattern:
-  - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"` to get all open issues, then filter for the specific number
-  - **Method 2 (Fallback)**: `mcp_github_github_search_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `query="[issue_number]"` (simple number only, no GitHub syntax)
-- **DO NOT USE**:
-  - `mcp_github_github_get_issue` (tool doesn't exist)
-  - GitHub search syntax like `"number:70"` or `"is:issue 70"` (fails in search)
-- This eliminates the "three different attempts" pattern - use Method 1 first, then Method 2 if needed.
+## GitHub MCP Patterns
+
+### Issue Lookup
+- **When user references an issue by number** (e.g., "work on issue 70"):
+  - **Method 1 (Preferred)**: `mcp_github_github_list_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `state="OPEN"`, then filter
+  - **Method 2 (Fallback)**: `mcp_github_github_search_issues` with `owner="pietbarber"`, `repo="Manage2Soar"`, `query="[issue_number]"`
+- **DO NOT**: Use non-existent tools or GitHub search syntax like `"number:70"` or `"is:issue 70"`
+
+### Pull Request Review Comments
+- **When user mentions "N comments to address"** or references PR review comments:
+  - **Method 1 (Preferred)**: `mcp_github_github_pull_request_read` with `method="get_review_comments"`, `owner="pietbarber"`, `repo="Manage2Soar"`, `pullNumber=XXX`, `perPage=100`
+  - Parse the returned JSON directly to find unresolved, non-outdated comments: `select(.IsResolved == false and .IsOutdated == false)`
+- **DO NOT**: Parse workspace storage files, use `jq` on cached tool output, or manually traverse VS Code temporary directories
+- **Pattern**: Call MCP tool → Parse JSON response → Address comments → Commit with descriptive message
 
 ## Security Scanning & CodeQL Alerts
 - **CRITICAL**: When user mentions security vulnerabilities, CodeQL alerts, code scanning issues, or dependabot alerts, ALWAYS use the GitHub API to fetch alert details:
@@ -159,18 +144,13 @@
 - In tests, create users with a valid `membership_status` (e.g., `"Full Member"`) to pass this decorator.
 
 ## CSS & Static Files Management
-- **CRITICAL**: Always run `python manage.py collectstatic` after making changes to CSS files in `static/` directories. Changes to CSS files are NOT visible until collected.
-- **CSS Architecture**:
-  - Use external CSS files in `static/css/` instead of inline `<style>` tags in templates
-  - Check existing CSS in `static/css/baseline.css` for conflicting rules before creating new styles
-  - CSS specificity issues can cause "styling not working" problems - use browser dev tools to inspect actual applied styles
-  - When CSS "isn't working", check: 1) `collectstatic` was run, 2) CSS selectors match actual HTML elements, 3) specificity conflicts with existing CSS
-- **CSS Debugging Process**:
-  1. Make CSS changes in `static/css/` files
-  2. Run `python manage.py collectstatic --noinput`
-  3. Test in browser (hard refresh with Ctrl+F5 to clear cache)
-  4. Use browser dev tools to verify CSS is actually being applied
-  5. If still not working, check for CSS specificity conflicts with existing rules
+- **CRITICAL**: Always run `python manage.py collectstatic --noinput` after CSS/JS changes. Changes are NOT visible until collected.
+- **CSS Architecture**: Use external CSS files in `static/css/` (not inline `<style>` tags)
+- **CSS Debugging**: If styling appears broken:
+  1. Verify `collectstatic` was run
+  2. Hard refresh browser (Ctrl+F5)
+  3. Check CSS selectors match HTML elements
+  4. Use browser dev tools to inspect for specificity conflicts with `static/css/baseline.css`
 
 ## Troubleshooting
 - If you see `NoReverseMatch`, check that the URL name exists in your `urls.py`.
@@ -252,11 +232,6 @@
 ## Integration & Dependencies
 - **External:** Google OAuth2, Chart.js (frontend), Pillow, qrcode, vobject, django-reversion, django-htmx.
 - **Internal:** Cross-app model relations, signals, and shared templates.
-
-## Examples
-- To add a new analytics chart: update `analytics/queries.py` and corresponding template.
-- To add a new member field: update `members/models.py`, run migrations, update forms/admin.
-- To customize duty roster logic: see `duty_roster/roster_generator.py`.
 
 ---
 For more, see `README.md` and per-app `README.md`/`docs/` folders. When in doubt, follow Django best practices unless project docs specify otherwise.
