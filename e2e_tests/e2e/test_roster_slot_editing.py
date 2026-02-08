@@ -52,19 +52,19 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         DutyPreference.objects.create(
             member=self.member1,
             dont_schedule=False,
-            max_duty_days=8,
+            max_assignments_per_month=8,
             instructor_percent=50,
             duty_officer_percent=0,
-            assistant_duty_officer_percent=0,
+            ado_percent=0,
             towpilot_percent=50,
         )
         DutyPreference.objects.create(
             member=self.member2,
             dont_schedule=False,
-            max_duty_days=8,
+            max_assignments_per_month=8,
             instructor_percent=50,
             duty_officer_percent=0,
-            assistant_duty_officer_percent=0,
+            ado_percent=0,
             towpilot_percent=50,
         )
 
@@ -95,26 +95,27 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         """Test that clicking an empty slot shows diagnostic/assign choice modal."""
         self._create_test_roster()
 
-        # Find first empty slot (if any)
+        # Find first empty slot
         empty_slots = self.page.locator(".empty-slot.editable-slot")
-        if empty_slots.count() > 0:
-            empty_slot = empty_slots.first
-            empty_slot.click()
+        assert empty_slots.count() > 0, "Test requires at least one empty slot"
 
-            # Wait for modal to appear
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="visible", timeout=5000)
+        empty_slot = empty_slots.first
+        empty_slot.click()
 
-            # Verify choice buttons are present
-            assign_btn = self.page.locator("#assignSlotFromChoiceBtn")
-            diagnostic_btn = self.page.locator("#viewDiagnosticFromChoiceBtn")
+        # Wait for modal to appear
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="visible", timeout=5000)
 
-            assert assign_btn.is_visible(), "Assign button should be visible"
-            assert diagnostic_btn.is_visible(), "Diagnostic button should be visible"
+        # Verify choice buttons are present
+        assign_btn = self.page.locator("#assignSlotFromChoiceBtn")
+        diagnostic_btn = self.page.locator("#viewDiagnosticFromChoiceBtn")
 
-            # Close modal for cleanup
-            close_btn = self.page.locator("#editSlotModal .btn-close")
-            close_btn.click()
+        assert assign_btn.is_visible(), "Assign button should be visible"
+        assert diagnostic_btn.is_visible(), "Diagnostic button should be visible"
+
+        # Close modal for cleanup
+        close_btn = self.page.locator("#editSlotModal .btn-close")
+        close_btn.click()
 
     def test_clicking_filled_slot_shows_edit_modal(self):
         """Test that clicking a filled slot directly shows edit modal with members."""
@@ -122,27 +123,28 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         # Find a filled slot
         filled_slots = self.page.locator(".editable-slot:not(.empty-slot)")
-        if filled_slots.count() > 0:
-            filled_slot = filled_slots.first
-            filled_slot.click()
+        assert filled_slots.count() > 0, "Test requires at least one filled slot"
 
-            # Wait for modal to appear
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="visible", timeout=5000)
+        filled_slot = filled_slots.first
+        filled_slot.click()
 
-            # Wait for member select dropdown to appear (indicating AJAX completed)
-            member_select = self.page.locator("#memberSelect")
-            member_select.wait_for(state="visible", timeout=5000)
+        # Wait for modal to appear
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="visible", timeout=5000)
 
-            assert member_select.is_visible(), "Member select should be visible"
+        # Wait for member select dropdown to appear (indicating AJAX completed)
+        member_select = self.page.locator("#memberSelect")
+        member_select.wait_for(state="visible", timeout=5000)
 
-            # Verify dropdown has options
-            options = member_select.locator("option")
-            assert options.count() > 1, "Should have at least empty option + members"
+        assert member_select.is_visible(), "Member select should be visible"
 
-            # Close modal for cleanup
-            close_btn = self.page.locator("#editSlotModal .btn-close")
-            close_btn.click()
+        # Verify dropdown has options
+        options = member_select.locator("option")
+        assert options.count() > 1, "Should have at least empty option + members"
+
+        # Close modal for cleanup
+        close_btn = self.page.locator("#editSlotModal .btn-close")
+        close_btn.click()
 
     def test_assigning_member_to_slot_updates_table(self):
         """Test that assigning a member via modal updates the roster table."""
@@ -150,63 +152,63 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         # Find an empty slot to assign
         empty_slots = self.page.locator(".empty-slot.editable-slot")
-        if empty_slots.count() > 0:
-            empty_slot = empty_slots.first
+        assert empty_slots.count() > 0, "Test requires at least one empty slot"
 
-            # Store original cell content
-            original_content = empty_slot.text_content() or ""
+        empty_slot = empty_slots.first
 
-            # Click slot
-            empty_slot.click()
+        # Store original cell content
+        original_content = empty_slot.text_content() or ""
 
-            # Wait for modal
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="visible", timeout=5000)
+        # Click slot
+        empty_slot.click()
 
-            # If choice modal, click assign button
-            assign_btn = self.page.locator("#assignSlotFromChoiceBtn")
-            if assign_btn.is_visible():
-                assign_btn.click()
-                # Wait for edit modal to replace choice modal
-                self.page.wait_for_timeout(500)
+        # Wait for modal
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="visible", timeout=5000)
 
-            # Wait for member select
-            member_select = self.page.locator("#memberSelect")
-            member_select.wait_for(state="visible", timeout=5000)
+        # If choice modal, click assign button
+        assign_btn = self.page.locator("#assignSlotFromChoiceBtn")
+        if assign_btn.is_visible():
+            assign_btn.click()
+            # Wait for edit modal to replace choice modal
+            self.page.wait_for_timeout(500)
 
-            # Select a member (first non-empty option)
-            options = member_select.locator('option[value!=""]')
-            if options.count() > 0:
-                first_member_option = options.first
-                member_value = first_member_option.get_attribute("value")
-                member_name = first_member_option.text_content() or ""
+        # Wait for member select
+        member_select = self.page.locator("#memberSelect")
+        member_select.wait_for(state="visible", timeout=5000)
 
-                # Extract just the name part (before assignment count)
-                member_name_only = member_name.split("[")[0].strip()
+        # Select a member (first non-empty option)
+        options = member_select.locator('option[value!=""]')
+        assert options.count() > 0, "Test requires at least one eligible member"
 
-                member_select.select_option(member_value)
+        first_member_option = options.first
+        member_value = first_member_option.get_attribute("value")
+        member_name = first_member_option.text_content() or ""
 
-                # Click save button
-                save_btn = self.page.locator("#saveSlotBtn")
-                save_btn.click()
+        # Extract just the name part (before assignment count)
+        member_name_only = member_name.split("[")[0].strip()
 
-                # Wait for modal to close
-                modal.wait_for(state="hidden", timeout=5000)
+        member_select.select_option(member_value)
 
-                # Verify cell content updated
-                updated_content = empty_slot.text_content() or ""
-                assert (
-                    updated_content != original_content
-                ), "Cell content should have changed"
-                assert (
-                    member_name_only in updated_content
-                ), f"Cell should contain member name: {member_name_only}"
+        # Click save button
+        save_btn = self.page.locator("#saveSlotBtn")
+        save_btn.click()
 
-                # Verify cell no longer has empty-slot class
-                cell_classes = empty_slot.get_attribute("class") or ""
-                assert (
-                    "empty-slot" not in cell_classes
-                ), "Cell should no longer be marked as empty"
+        # Wait for modal to close
+        modal.wait_for(state="hidden", timeout=5000)
+
+        # Verify cell content updated
+        updated_content = empty_slot.text_content() or ""
+        assert updated_content != original_content, "Cell content should have changed"
+        assert (
+            member_name_only in updated_content
+        ), f"Cell should contain member name: {member_name_only}"
+
+        # Verify cell no longer has empty-slot class
+        cell_classes = empty_slot.get_attribute("class") or ""
+        assert (
+            "empty-slot" not in cell_classes
+        ), "Cell should no longer be marked as empty"
 
     def test_viewing_diagnostics_shows_reasons(self):
         """Test that viewing diagnostics shows detailed reasons for empty slot."""
@@ -216,35 +218,38 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         empty_slots_with_diagnostics = self.page.locator(
             ".empty-slot.editable-slot[data-diagnostic]"
         )
-        if empty_slots_with_diagnostics.count() > 0:
-            slot = empty_slots_with_diagnostics.first
-            slot.click()
+        assert (
+            empty_slots_with_diagnostics.count() > 0
+        ), "Test requires at least one empty slot with diagnostics"
 
-            # Wait for choice modal
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="visible", timeout=5000)
+        slot = empty_slots_with_diagnostics.first
+        slot.click()
 
-            # Click diagnostic button
-            diagnostic_btn = self.page.locator("#viewDiagnosticFromChoiceBtn")
-            diagnostic_btn.click()
+        # Wait for choice modal
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="visible", timeout=5000)
 
-            # Wait for diagnostic modal to appear
-            diagnostic_modal = self.page.locator("#diagnosticModal")
-            diagnostic_modal.wait_for(state="visible", timeout=5000)
+        # Click diagnostic button
+        diagnostic_btn = self.page.locator("#viewDiagnosticFromChoiceBtn")
+        diagnostic_btn.click()
 
-            # Verify diagnostic content is present
-            diagnostic_body = self.page.locator("#diagnosticModalBody")
-            diagnostic_text = diagnostic_body.text_content() or ""
+        # Wait for diagnostic modal to appear
+        diagnostic_modal = self.page.locator("#diagnosticModal")
+        diagnostic_modal.wait_for(state="visible", timeout=5000)
 
-            assert len(diagnostic_text) > 0, "Diagnostic modal should have content"
-            # Check for common diagnostic elements
-            assert (
-                "Summary:" in diagnostic_text or "Total members" in diagnostic_text
-            ), "Diagnostic should show summary or member count"
+        # Verify diagnostic content is present
+        diagnostic_body = self.page.locator("#diagnosticModalBody")
+        diagnostic_text = diagnostic_body.text_content() or ""
 
-            # Close modal
-            close_btn = self.page.locator("#diagnosticModal .btn-close")
-            close_btn.click()
+        assert len(diagnostic_text) > 0, "Diagnostic modal should have content"
+        # Check for common diagnostic elements
+        assert (
+            "Summary:" in diagnostic_text or "Total members" in diagnostic_text
+        ), "Diagnostic should show summary or member count"
+
+        # Close modal
+        close_btn = self.page.locator("#diagnosticModal .btn-close")
+        close_btn.click()
 
     def test_keyboard_navigation_enters_slot(self):
         """Test that keyboard Enter/Space key activates slot editing."""
@@ -252,32 +257,33 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         # Find first editable slot
         editable_slots = self.page.locator(".editable-slot")
-        if editable_slots.count() > 0:
-            slot = editable_slots.first
+        assert editable_slots.count() > 0, "Test requires at least one editable slot"
 
-            # Focus the slot
-            slot.focus()
+        slot = editable_slots.first
 
-            # Press Enter key
-            slot.press("Enter")
+        # Focus the slot
+        slot.focus()
 
-            # Wait for modal to appear
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="visible", timeout=5000)
+        # Press Enter key
+        slot.press("Enter")
 
-            assert modal.is_visible(), "Modal should open on Enter key press"
+        # Wait for modal to appear
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="visible", timeout=5000)
 
-            # Close modal
-            close_btn = self.page.locator("#editSlotModal .btn-close")
-            close_btn.click()
+        assert modal.is_visible(), "Modal should open on Enter key press"
 
-            # Test Space key as well
-            slot.focus()
-            slot.press("Space")
+        # Close modal
+        close_btn = self.page.locator("#editSlotModal .btn-close")
+        close_btn.click()
 
-            # Modal should reappear
-            modal.wait_for(state="visible", timeout=5000)
-            assert modal.is_visible(), "Modal should open on Space key press"
+        # Test Space key as well
+        slot.focus()
+        slot.press("Space")
+
+        # Modal should reappear
+        modal.wait_for(state="visible", timeout=5000)
+        assert modal.is_visible(), "Modal should open on Space key press"
 
     def test_clearing_slot_removes_assignment(self):
         """Test that selecting 'Leave Empty' clears an assignment."""
@@ -285,31 +291,32 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         # Find a filled slot
         filled_slots = self.page.locator(".editable-slot:not(.empty-slot)")
-        if filled_slots.count() > 0:
-            filled_slot = filled_slots.first
+        assert filled_slots.count() > 0, "Test requires at least one filled slot"
 
-            # Click to edit
-            filled_slot.click()
+        filled_slot = filled_slots.first
 
-            # Wait for modal with member select
-            member_select = self.page.locator("#memberSelect")
-            member_select.wait_for(state="visible", timeout=5000)
+        # Click to edit
+        filled_slot.click()
 
-            # Select empty option
-            member_select.select_option("")
+        # Wait for modal with member select
+        member_select = self.page.locator("#memberSelect")
+        member_select.wait_for(state="visible", timeout=5000)
 
-            # Save
-            save_btn = self.page.locator("#saveSlotBtn")
-            save_btn.click()
+        # Select empty option
+        member_select.select_option("")
 
-            # Wait for modal to close
-            modal = self.page.locator("#editSlotModal")
-            modal.wait_for(state="hidden", timeout=5000)
+        # Save
+        save_btn = self.page.locator("#saveSlotBtn")
+        save_btn.click()
 
-            # Verify cell is now empty
-            cell_classes = filled_slot.get_attribute("class") or ""
-            assert "empty-slot" in cell_classes, "Cell should be marked as empty"
+        # Wait for modal to close
+        modal = self.page.locator("#editSlotModal")
+        modal.wait_for(state="hidden", timeout=5000)
 
-            # Verify content is em dash
-            cell_text = filled_slot.locator(".slot-content").text_content() or ""
-            assert "—" in cell_text, "Cell should show empty placeholder"
+        # Verify cell is now empty
+        cell_classes = filled_slot.get_attribute("class") or ""
+        assert "empty-slot" in cell_classes, "Cell should be marked as empty"
+
+        # Verify content is em dash
+        cell_text = filled_slot.locator(".slot-content").text_content() or ""
+        assert "—" in cell_text, "Cell should show empty placeholder"
