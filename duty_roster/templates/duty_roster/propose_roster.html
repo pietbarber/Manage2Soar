@@ -474,6 +474,15 @@ function saveSlotAssignment() {
         }
       }
 
+      // Keep diagnostic text in sync with the server response
+      if (Object.prototype.hasOwnProperty.call(data, 'diagnostic')) {
+        if (data.diagnostic) {
+          slotElement.dataset.diagnostic = data.diagnostic;
+        } else {
+          delete slotElement.dataset.diagnostic;
+        }
+      }
+
       // Close modal
       const modal = bootstrap.Modal.getInstance(document.getElementById('editSlotModal'));
       modal.hide();

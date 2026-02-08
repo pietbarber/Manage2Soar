@@ -378,9 +378,6 @@ def diagnose_empty_slot(
         summary_parts.append(f"{len(reasons['percent_zero'])} with 0% preference")
     if reasons["avoids_someone"]:
         summary_parts.append(f"{len(reasons['avoids_someone'])} avoiding co-workers")
-    # Informational only - not a blocking reason
-    # if reasons["no_preference"]:
-    #     summary_parts.append(f"{len(reasons['no_preference'])} no preference set")
 
     if not summary_parts:
         summary = f"No eligible members found for {role}"

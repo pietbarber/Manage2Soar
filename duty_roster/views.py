@@ -1441,6 +1441,12 @@ def update_roster_slot(request):
                 return JsonResponse({"error": "Invalid role for this date"}, status=400)
 
             entry["slots"][role] = member_id
+
+            # Clear any stale diagnostics for this role when the slot is manually edited.
+            diagnostics = entry.get("diagnostics")
+            if isinstance(diagnostics, dict) and role in diagnostics:
+                diagnostics.pop(role, None)
+
             updated = True
             break
 
@@ -1450,6 +1456,15 @@ def update_roster_slot(request):
     # Save back to session
     request.session["proposed_roster"] = draft
     request.session.modified = True
+
+    # Get the updated entry to retrieve current diagnostic (if any)
+    current_diagnostic = None
+    for entry in draft:
+        if entry["date"] == date_str:
+            diagnostics = entry.get("diagnostics", {})
+            if isinstance(diagnostics, dict):
+                current_diagnostic = diagnostics.get(role)
+            break
 
     member_name = "—"
     if member_id:
@@ -1472,6 +1487,7 @@ def update_roster_slot(request):
             "member_name": member_name,
             "date": date_str,
             "role": role,
+            "diagnostic": current_diagnostic,  # Include current diagnostic state
         }
     )
 
