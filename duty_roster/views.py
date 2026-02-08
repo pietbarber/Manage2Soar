@@ -1193,6 +1193,16 @@ def get_eligible_members_for_slot(request):
         if not date_str or not role:
             return JsonResponse({"error": "Missing date or role"}, status=400)
 
+        # Validate role is one of the allowed role names (security)
+        ALLOWED_ROLES = [
+            "instructor",
+            "duty_officer",
+            "assistant_duty_officer",
+            "towpilot",
+        ]
+        if role not in ALLOWED_ROLES:
+            return JsonResponse({"error": "Invalid role"}, status=400)
+
         try:
             day = dt_date.fromisoformat(date_str)
         except ValueError:
@@ -1376,6 +1386,11 @@ def update_roster_slot(request):
 
     if not date_str or not role:
         return JsonResponse({"error": "Missing date or role"}, status=400)
+
+    # Validate role is one of the allowed role names (security)
+    ALLOWED_ROLES = ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
+    if role not in ALLOWED_ROLES:
+        return JsonResponse({"error": "Invalid role"}, status=400)
 
     # Validate member exists if provided
     if member_id and member_id != "":
