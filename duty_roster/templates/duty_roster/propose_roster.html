@@ -35,6 +35,18 @@
 </div>
 {% endif %}
 
+{% if removed_dates %}
+  <div class="alert alert-info">
+    <strong>📌 Removed dates (will stay removed on Roll Again):</strong>
+    <ul class="mb-1">
+      {% for rd in removed_dates %}
+        <li>{{ rd|date:"l, F j" }}</li>
+      {% endfor %}
+    </ul>
+    <small class="text-muted">Click "Restore All Dates" below to bring them back.</small>
+  </div>
+{% endif %}
+
 <h2>📝 Proposed Duty Roster — {{ month }}/{{ year }} (Draft)</h2>
 {% if no_scheduling %}
   <div class="alert alert-info">
@@ -117,6 +129,9 @@
   <div class="d-flex gap-2 mb-3">
     <button name="action" value="remove_dates" class="btn btn-warning">🗑️ Remove Selected Dates</button>
     <button name="action" value="roll" class="btn btn-secondary">🔄 Roll Again</button>
+    {% if removed_dates %}
+    <button name="action" value="restore_dates" class="btn btn-outline-secondary">↩️ Restore All Dates</button>
+    {% endif %}
   </div>
   {% endif %}
 

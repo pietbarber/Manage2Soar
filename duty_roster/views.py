@@ -1655,14 +1655,29 @@ def propose_roster(request):
                     if dt_date.fromisoformat(entry["date"]) not in dates_to_remove_set
                 ]
                 request.session["proposed_roster"] = draft
+
+                # Track removed dates so Roll Again remembers them
+                previously_removed = set(
+                    request.session.get("removed_roster_dates", [])
+                )
+                previously_removed.update(d.isoformat() for d in dates_to_remove_set)
+                request.session["removed_roster_dates"] = sorted(previously_removed)
+
                 messages.success(
                     request,
-                    f"Removed {len(dates_to_remove)} date(s) from the proposed roster.",
+                    f"Removed {len(dates_to_remove)} date(s) from the proposed roster. "
+                    f"These dates will stay removed on Roll Again.",
                 )
 
         elif action == "roll":
-            raw = generate_roster(year, month, roles=enabled_roles)
+            # Retrieve dates previously removed by the user so we skip them
+            removed_date_strs = request.session.get("removed_roster_dates", [])
+            exclude_dates = [dt_date.fromisoformat(ds) for ds in removed_date_strs]
+            raw = generate_roster(
+                year, month, roles=enabled_roles, exclude_dates=exclude_dates
+            )
             if not raw:
+                exclude_set = set(exclude_dates)
                 cal = calendar.Calendar()
                 weekend = [
                     d
@@ -1670,6 +1685,7 @@ def propose_roster(request):
                     if d.month == month
                     and d.weekday() in (5, 6)
                     and is_within_operational_season(d)
+                    and d not in exclude_set
                 ]
                 raw = [
                     {"date": d, "slots": {r: None for r in enabled_roles}}
@@ -1709,6 +1725,7 @@ def propose_roster(request):
                 created_assignments.append(assignment)
 
             request.session.pop("proposed_roster", None)
+            request.session.pop("removed_roster_dates", None)
 
             # Send ICS calendar invites to all assigned members
             if created_assignments:
@@ -1746,8 +1763,18 @@ def propose_roster(request):
 
             return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
+        elif action == "restore_dates":
+            # Clear removed dates so Roll Again includes all dates again
+            request.session.pop("removed_roster_dates", None)
+            messages.info(
+                request,
+                "All previously removed dates have been restored. "
+                "Click Roll Again to regenerate the full roster.",
+            )
+
         elif action == "cancel":
             request.session.pop("proposed_roster", None)
+            request.session.pop("removed_roster_dates", None)
             return redirect("duty_roster:duty_calendar")
     else:
         raw = generate_roster(year, month, roles=enabled_roles)
@@ -1779,6 +1806,10 @@ def propose_roster(request):
         }
         for e in request.session.get("proposed_roster", [])
     ]
+    # Build list of removed dates for display in the template
+    removed_date_strs = request.session.get("removed_roster_dates", [])
+    removed_dates = [dt_date.fromisoformat(ds) for ds in removed_date_strs]
+
     return render(
         request,
         "duty_roster/propose_roster.html",
@@ -1792,6 +1823,7 @@ def propose_roster(request):
             "operational_info": operational_info,
             "filtered_dates": filtered_dates,
             "siteconfig": siteconfig,
+            "removed_dates": removed_dates,
         },
     )
 
