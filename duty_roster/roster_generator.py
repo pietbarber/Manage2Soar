@@ -147,45 +147,51 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
 
             # Check DutyPreference constraints
             p = prefs.get(m.id)
-            if not p:
-                continue
-            if p.dont_schedule or p.scheduling_suspended:
-                continue
+            if p:
+                # Member has preferences - check them
+                if p.dont_schedule or p.scheduling_suspended:
+                    continue
+            # If no preference, treat as available (don't skip)
 
             # Check if blacked out on this day
             if (m.id, day) in blackouts:
                 continue
 
             # Check role-specific percentage (skip if 0)
-            percent_fields = {
-                "instructor": "instructor_percent",
-                "duty_officer": "duty_officer_percent",
-                "assistant_duty_officer": "ado_percent",
-                "towpilot": "towpilot_percent",
-            }
+            # Only check percentages if member has DutyPreference
+            if p:
+                percent_fields = {
+                    "instructor": "instructor_percent",
+                    "duty_officer": "duty_officer_percent",
+                    "assistant_duty_officer": "ado_percent",
+                    "towpilot": "towpilot_percent",
+                }
 
-            # Get all eligible role fields for this member
-            eligible_role_fields = [
-                field for r, field in percent_fields.items() if getattr(m, r, False)
-            ]
+                # Get all eligible role fields for this member
+                eligible_role_fields = [
+                    field for r, field in percent_fields.items() if getattr(m, r, False)
+                ]
 
-            # Determine if percentage is blocking
-            if len(eligible_role_fields) == 1:
-                # Only eligible for one role - if percent is 0, treat as 100
-                field = eligible_role_fields[0]
-                pct = getattr(p, field, 0)
-                if pct == 0:
-                    pct = 100
-            else:
-                # Multiple roles - check if all are zero
-                all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
-                if role == "assistant_duty_officer":
-                    pct = p.ado_percent if not all_zero else 100
+                # Determine if percentage is blocking
+                if len(eligible_role_fields) == 1:
+                    # Only eligible for one role - if percent is 0, treat as 100
+                    field = eligible_role_fields[0]
+                    pct = getattr(p, field, 0)
+                    if pct == 0:
+                        pct = 100
                 else:
-                    pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
+                    # Multiple roles - check if all are zero
+                    all_zero = all(getattr(p, f, 0) == 0 for f in eligible_role_fields)
+                    if role == "assistant_duty_officer":
+                        pct = p.ado_percent if not all_zero else 100
+                    else:
+                        pct = getattr(p, f"{role}_percent", 0) if not all_zero else 100
 
-            if pct > 0:
-                available_count += 1
+                if pct == 0:
+                    continue  # Skip if percentage explicitly set to 0
+
+            # Count member as available (either has good percentage or no preference)
+            available_count += 1
 
         availability_by_day.append(available_count)
 
@@ -196,13 +202,13 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
     )
     days_needed = len(weekend_dates)
 
-    # Scarcity score: how many available per slot needed
-    # Lower score = more constrained = should assign first
-    scarcity_score = avg_available / days_needed if days_needed > 0 else float("inf")
+    # Scarcity score: average available members per day
+    # Lower score = fewer available = more constrained = should assign first
+    scarcity_score = avg_available if len(weekend_dates) > 0 else float("inf")
 
-    logger.info(
+    logger.debug(
         f"Role '{role}' scarcity: {total_with_role} total members, "
-        f"{avg_available:.1f} avg available/day, {days_needed} days needed, "
+        f"{avg_available:.1f} avg available/day, "
         f"score={scarcity_score:.2f}"
     )
 
@@ -601,12 +607,12 @@ def generate_roster(year=None, month=None, roles=None):
         roles_to_schedule, key=lambda r: role_scarcity[r]["scarcity_score"]
     )
 
-    logger.info(
+    logger.debug(
         f"Role assignment priority order (most constrained first): {prioritized_roles}"
     )
     for role in prioritized_roles:
         data = role_scarcity[role]
-        logger.info(
+        logger.debug(
             f"  {role}: {data['total_members']} members, "
             f"{data['avg_available_per_day']:.1f} avg available/day, "
             f"score={data['scarcity_score']:.2f}"

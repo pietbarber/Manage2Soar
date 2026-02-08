@@ -188,6 +188,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // Add click handlers to all editable slots
   const editableSlots = document.querySelectorAll('.editable-slot');
 
+  // HTML escape function to prevent XSS
+  function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    const div = document.createElement('div');
+    div.textContent = unsafe;
+    return div.innerHTML;
+  }
+
   editableSlots.forEach(slot => {
     slot.addEventListener('click', function() {
       const role = this.dataset.role;
@@ -227,18 +235,23 @@ function showEditOrDiagnosticChoice(role, date, diagnosticJson) {
   // For empty slots with diagnostics, show a choice
   const modal = new bootstrap.Modal(document.getElementById('editSlotModal'));
   const modalBody = document.getElementById('editSlotModalBody');
+  const modalTitle = document.getElementById('editSlotModalLabel');
   const saveBtn = document.getElementById('saveSlotBtn');
 
   saveBtn.style.display = 'none'; // Hide save button for choice screen
+
+  const roleName = escapeHtml(ROLE_TITLES[role] || role);
+  const displayDate = formatDateForDisplay(date);
+  modalTitle.textContent = `Empty Slot: ${ROLE_TITLES[role] || role} for ${displayDate}`;
 
   modalBody.innerHTML = `
     <div class="text-center">
       <p>This slot is currently empty. Would you like to:</p>
       <div class="d-grid gap-2">
-        <button class="btn btn-primary btn-lg" onclick="showEditSlotModal('${role}', '${date}', '')">
+        <button id="assignSlotFromChoiceBtn" class="btn btn-primary btn-lg">
           ➕ Assign Someone to This Slot
         </button>
-        <button class="btn btn-secondary" onclick="showDiagnosticFromChoice('${role}', '${date}', \`${diagnosticJson}\`)">
+        <button id="viewDiagnosticFromChoiceBtn" class="btn btn-secondary">
           🔍 View Why This Slot Is Empty
         </button>
       </div>
@@ -246,18 +259,34 @@ function showEditOrDiagnosticChoice(role, date, diagnosticJson) {
   `;
 
   modal.show();
+
+  // Wire up event handlers after modal is shown
+  setTimeout(() => {
+    const assignBtn = document.getElementById('assignSlotFromChoiceBtn');
+    const viewDiagnosticBtn = document.getElementById('viewDiagnosticFromChoiceBtn');
+
+    if (assignBtn) {
+      assignBtn.addEventListener('click', function() {
+        modal.hide();
+        showEditSlotModal(role, date, '');
+      });
+    }
+
+    if (viewDiagnosticBtn) {
+      viewDiagnosticBtn.addEventListener('click', function() {
+        modal.hide();
+        try {
+          const diagnostic = JSON.parse(diagnosticJson);
+          showDiagnosticModal(role, date, diagnostic);
+        } catch (e) {
+          console.error('Error parsing diagnostic:', e);
+        }
+      });
+    }
+  }, 100);
 }
 
-function showDiagnosticFromChoice(role, date, diagnosticJson) {
-  const editModal = bootstrap.Modal.getInstance(document.getElementById('editSlotModal'));
-  editModal.hide();
-
-  try {
-    const diagnostic = JSON.parse(diagnosticJson);
-    showDiagnosticModal(role, date, diagnostic);
-  } catch (e) {
-    console.error('Error parsing diagnostic:', e);
-  }
+  modal.show();
 }
 
 function formatDateForDisplay(isoDateString) {
@@ -318,7 +347,7 @@ function showEditSlotModal(role, date, currentMember) {
   })
   .catch(error => {
     console.error('Error:', error);
-    modalBody.innerHTML = `<div class="alert alert-danger"><strong>Error loading eligible members:</strong><br>${error.message}</div>`;
+    modalBody.innerHTML = `<div class="alert alert-danger"><strong>Error loading eligible members:</strong><br>${escapeHtml(error.message)}</div>`;
   });
 }
 
@@ -331,7 +360,7 @@ function renderEditSlotForm(data, roleName) {
     const currentMember = data.eligible_members.find(m => m.id == data.current_assignment) ||
                           {id: data.current_assignment, name: 'Unknown'};
     html += `<div class="alert alert-info">
-      <strong>Currently assigned:</strong> ${currentMember.name}
+      <strong>Currently assigned:</strong> ${escapeHtml(currentMember.name)}
     </div>`;
   } else {
     html += `<div class="alert alert-warning">
@@ -340,7 +369,7 @@ function renderEditSlotForm(data, roleName) {
   }
 
   html += `<div class="mb-3">
-    <label for="memberSelect" class="form-label"><strong>Select Member for ${roleName}:</strong></label>
+    <label for="memberSelect" class="form-label"><strong>Select Member for ${escapeHtml(roleName)}:</strong></label>
     <select class="form-select form-select-lg" id="memberSelect">
       <option value="">— Leave Empty —</option>`;
 
@@ -357,7 +386,7 @@ function renderEditSlotForm(data, roleName) {
       const warningText = warnings.length > 0 ? ` (${warnings.join(', ')})` : '';
       const assignmentText = ` [${member.assignments_this_month}/${member.max_assignments}]`;
 
-      html += `<option value="${member.id}" ${selected}>${member.name}${assignmentText}${warningText}</option>`;
+      html += `<option value="${escapeHtml(member.id)}" ${selected}>${escapeHtml(member.name)}${escapeHtml(assignmentText)}${escapeHtml(warningText)}</option>`;
     });
     html += '</select>';
 
@@ -452,48 +481,51 @@ function showDiagnosticModal(role, date, diagnostic) {
   const roleName = ROLE_TITLES[role] || role;
   const displayDate = formatDateForDisplay(date);
 
-  // Update title
-  modalTitle.innerHTML = `🔍 Why no ${roleName} on ${displayDate}?`;
+  // Update title (use textContent to avoid XSS)
+  modalTitle.textContent = `Why no ${roleName} on ${displayDate}?`;
 
-  // Build detailed content
-  let content = `<div class="alert alert-info"><strong>Summary:</strong> ${diagnostic.summary}</div>`;
+  // Build detailed content with proper escaping
+  let content = `<div class="alert alert-info"><strong>Summary:</strong> ${escapeHtml(diagnostic.summary)}</div>`;
 
-  content += `<p><strong>Total members with ${roleName} role:</strong> ${diagnostic.total_members_with_role}</p>`;
+  content += `<p><strong>Total members with ${escapeHtml(roleName)} role:</strong> ${escapeHtml(diagnostic.total_members_with_role)}</p>`;
 
   content += '<h6>Detailed Breakdown:</h6><ul>';
 
   const reasons = diagnostic.reasons;
 
+  // Helper function to escape array of names
+  const escapeNames = (names) => names.map(n => escapeHtml(n)).join(', ');
+
   if (reasons.blacked_out && reasons.blacked_out.length > 0) {
-    content += `<li><strong>🚫 Blacked out (${reasons.blacked_out.length}):</strong> ${reasons.blacked_out.join(', ')}</li>`;
+    content += `<li><strong>🚫 Blacked out (${reasons.blacked_out.length}):</strong> ${escapeNames(reasons.blacked_out)}</li>`;
   }
 
   if (reasons.already_assigned_today && reasons.already_assigned_today.length > 0) {
-    content += `<li><strong>📅 Already assigned this day (${reasons.already_assigned_today.length}):</strong> ${reasons.already_assigned_today.join(', ')}</li>`;
+    content += `<li><strong>📅 Already assigned this day (${reasons.already_assigned_today.length}):</strong> ${escapeNames(reasons.already_assigned_today)}</li>`;
   }
 
   if (reasons.max_assignments_reached && reasons.max_assignments_reached.length > 0) {
-    content += `<li><strong>🎯 At max assignments for month (${reasons.max_assignments_reached.length}):</strong> ${reasons.max_assignments_reached.join(', ')}</li>`;
+    content += `<li><strong>🎯 At max assignments for month (${reasons.max_assignments_reached.length}):</strong> ${escapeNames(reasons.max_assignments_reached)}</li>`;
   }
 
   if (reasons.scheduling_suspended && reasons.scheduling_suspended.length > 0) {
-    content += `<li><strong>⏸️ Scheduling suspended (${reasons.scheduling_suspended.length}):</strong> ${reasons.scheduling_suspended.join(', ')}</li>`;
+    content += `<li><strong>⏸️ Scheduling suspended (${reasons.scheduling_suspended.length}):</strong> ${escapeNames(reasons.scheduling_suspended)}</li>`;
   }
 
   if (reasons.dont_schedule && reasons.dont_schedule.length > 0) {
-    content += `<li><strong>🙅 Opted out of duty scheduling (${reasons.dont_schedule.length}):</strong> ${reasons.dont_schedule.join(', ')}</li>`;
+    content += `<li><strong>🙅 Opted out of duty scheduling (${reasons.dont_schedule.length}):</strong> ${escapeNames(reasons.dont_schedule)}</li>`;
   }
 
   if (reasons.percent_zero && reasons.percent_zero.length > 0) {
-    content += `<li><strong>0️⃣ Role percentage set to 0% (${reasons.percent_zero.length}):</strong> ${reasons.percent_zero.join(', ')}</li>`;
+    content += `<li><strong>0️⃣ Role percentage set to 0% (${reasons.percent_zero.length}):</strong> ${escapeNames(reasons.percent_zero)}</li>`;
   }
 
   if (reasons.avoids_someone && reasons.avoids_someone.length > 0) {
-    content += `<li><strong>👥 Avoids someone already assigned (${reasons.avoids_someone.length}):</strong> ${reasons.avoids_someone.join(', ')}</li>`;
+    content += `<li><strong>👥 Avoids someone already assigned (${reasons.avoids_someone.length}):</strong> ${escapeNames(reasons.avoids_someone)}</li>`;
   }
 
   if (reasons.no_preference && reasons.no_preference.length > 0) {
-    content += `<li><strong>❓ No duty preference set (${reasons.no_preference.length}):</strong> ${reasons.no_preference.join(', ')}</li>`;
+    content += `<li><strong>❓ No duty preference set (${reasons.no_preference.length}):</strong> ${escapeNames(reasons.no_preference)}</li>`;
   }
 
   // Check if all reasons are empty

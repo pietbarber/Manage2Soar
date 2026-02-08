@@ -1216,7 +1216,7 @@ def get_eligible_members_for_slot(request):
             return JsonResponse({"error": "Date not found in roster"}, status=404)
     except Exception as e:
         logger.exception("Error in get_eligible_members_for_slot (initial checks)")
-        return JsonResponse({"error": f"Error: {str(e)}"}, status=500)
+        return JsonResponse({"error": "Internal error processing request"}, status=500)
 
     try:
         # Get all members and prefs for eligibility checking
@@ -1242,7 +1242,11 @@ def get_eligible_members_for_slot(request):
                 try:
                     assigned_today.add(Member.objects.get(pk=member_id))
                 except Member.DoesNotExist:
-                    pass
+                    # Draft may reference a member that has since been deleted; skip but log
+                    logger.warning(
+                        "Duty roster draft refers to missing Member id=%s; skipping.",
+                        member_id,
+                    )
 
         # Calculate assignments for the month
         assignments = defaultdict(int)
@@ -1368,7 +1372,9 @@ def get_eligible_members_for_slot(request):
         )
     except Exception as e:
         logger.exception("Error in get_eligible_members_for_slot (main logic)")
-        return JsonResponse({"error": f"Error: {str(e)}"}, status=500)
+        return JsonResponse(
+            {"error": "Internal error loading eligible members"}, status=500
+        )
 
 
 @active_member_required
@@ -1409,6 +1415,10 @@ def update_roster_slot(request):
     updated = False
     for entry in draft:
         if entry["date"] == date_str:
+            # Ensure the role exists in this date's slots (prevents creating new keys)
+            if role not in entry.get("slots", {}):
+                return JsonResponse({"error": "Invalid role for this date"}, status=400)
+
             entry["slots"][role] = member_id
             updated = True
             break
@@ -1425,7 +1435,14 @@ def update_roster_slot(request):
         try:
             member_name = Member.objects.get(pk=member_id).full_display_name
         except Member.DoesNotExist:
-            pass
+            # Member could have been deleted between validation and name lookup
+            # Log and fall back to the default em dash placeholder
+            logger.warning(
+                "Member with id %s disappeared while updating roster slot for date %s and role %s",
+                member_id,
+                date_str,
+                role,
+            )
 
     return JsonResponse(
         {
