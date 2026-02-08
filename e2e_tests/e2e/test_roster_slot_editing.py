@@ -5,10 +5,9 @@ Issue #616: Verify JavaScript correctly handles clicking roster slots,
 loading eligible members via AJAX, saving assignments, and displaying diagnostics.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from duty_roster.models import DutyPreference
-from members.models import Member
 
 from .conftest import DjangoPlaywrightTestCase
 
@@ -27,6 +26,7 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
             instructor=True,
             towpilot=True,
             is_superuser=False,
+            rostermeister=True,  # Set boolean flag for rostermeister permission
         )
         # Add to rostermeister group
         from django.contrib.auth.models import Group
@@ -73,23 +73,25 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         # Login as rostermeister
         self.login(username="rostermeister")
 
-        # Navigate to roster creation page
-        self.page.goto(f"{self.live_server_url}/duty_roster/create/")
-
-        # Select current month/year and generate roster
+        # Navigate to propose-roster page with current month/year
         current_date = datetime.now()
+        self.page.goto(
+            f"{self.live_server_url}/duty_roster/propose-roster/?year={current_date.year}&month={current_date.month}"
+        )
+
+        # Ensure correct month/year are selected
         year_select = self.page.locator('select[name="year"]')
         month_select = self.page.locator('select[name="month"]')
 
         year_select.select_option(str(current_date.year))
         month_select.select_option(str(current_date.month))
 
-        # Click generate button
-        generate_button = self.page.locator('button[name="action"][value="generate"]')
-        generate_button.click()
+        # Click roll button to generate roster
+        roll_button = self.page.locator('button[name="action"][value="roll"]')
+        roll_button.click()
 
-        # Wait for roster to be created and redirected to propose page
-        self.page.wait_for_url("**/duty_roster/propose/**", timeout=10000)
+        # Wait for roster to be created and page to be ready
+        self.page.wait_for_url("**/duty_roster/propose-roster/**", timeout=10000)
 
     def test_clicking_empty_slot_shows_choice_modal(self):
         """Test that clicking an empty slot shows diagnostic/assign choice modal."""

@@ -1419,9 +1419,9 @@ def update_roster_slot(request):
             return JsonResponse({"error": "Invalid member"}, status=400)
 
         # Enforce that the selected member is actually eligible for this role.
-        # ROLE_FIELD_MAP maps roster roles to the corresponding Member capability field.
-        role_field = ROLE_FIELD_MAP.get(role)
-        if role_field is not None and not getattr(member, role_field, False):
+        # For the allowed roles, the Member capability flag matches the role name
+        # (e.g., member.instructor, member.duty_officer, member.towpilot).
+        if not getattr(member, role, False):
             return JsonResponse(
                 {"error": "Member not eligible for this role"},
                 status=400,

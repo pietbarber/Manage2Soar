@@ -97,10 +97,12 @@
                 style="cursor: pointer;"
                 tabindex="0"
                 role="button"
-                aria-label="{% if entry.slots|dict_get:role %}Edit {{ role|title }} assignment for {{ entry.date|date:'F j' }}: {{ entry.slots|dict_get:role|get_member_name }}{% else %}Assign {{ role|title }} for {{ entry.date|date:'F j' }}{% endif %}"
+                aria-label="{% if entry.slots|dict_get:role %}Edit {{ role|title }} assignment for {{ entry.date|date:'F j' }}{% else %}Assign {{ role|title }} for {{ entry.date|date:'F j' }}{% endif %}"
                 title="{% if entry.slots|dict_get:role %}Click to edit assignment{% else %}Click to assign someone or view why empty{% endif %}">
               {% if entry.slots|dict_get:role %}
-                <span class="slot-content">{{ entry.slots|dict_get:role|get_member_name }}</span> <small class="text-muted">✏️</small>
+                {% with member_name=entry.slots|dict_get:role|get_member_name %}
+                  <span class="slot-content">{{ member_name }}</span> <small class="text-muted">✏️</small>
+                {% endwith %}
               {% else %}
                 <span class="text-muted slot-content">—</span> <small class="text-primary">➕</small>
               {% endif %}
@@ -446,6 +448,7 @@ function saveSlotAssignment() {
 
       if (data.member_id) {
         slotContent.textContent = data.member_name;
+        slotContent.className = 'slot-content';  // Reset classes, removing text-muted
         slotElement.classList.remove('empty-slot');
         slotElement.dataset.currentMember = data.member_id;
         slotElement.title = 'Click to edit assignment';
