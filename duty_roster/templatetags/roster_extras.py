@@ -1,3 +1,5 @@
+import json
+
 from django import template
 
 from members.models import Member
@@ -17,3 +19,9 @@ def get_member_name(member_id):
 @register.filter
 def dict_get(d, key):
     return d.get(key)
+
+
+@register.filter
+def to_json(value):
+    """Convert a Python object to JSON string for use in HTML data attributes."""
+    return json.dumps(value)
