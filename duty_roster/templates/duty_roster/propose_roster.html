@@ -164,21 +164,26 @@
   </div>
 </div>
 
+<!-- Role title data from siteconfig (JSON format to avoid Pylance errors) -->
+<script id="role-titles-data" type="application/json">
+{
+  {% if siteconfig %}
+    "instructor": "{{ siteconfig.instructor_title|default:'Instructor' }}",
+    "duty_officer": "{{ siteconfig.duty_officer_title|default:'Duty Officer' }}",
+    "assistant_duty_officer": "{{ siteconfig.assistant_duty_officer_title|default:'Assistant Duty Officer' }}",
+    "towpilot": "{{ siteconfig.towpilot_title|default:'Tow Pilot' }}"
+  {% else %}
+    "instructor": "Instructor",
+    "duty_officer": "Duty Officer",
+    "assistant_duty_officer": "Assistant Duty Officer",
+    "towpilot": "Tow Pilot"
+  {% endif %}
+}
+</script>
+
 <script>
 // Role title mappings from siteconfig
-const ROLE_TITLES = {
-  {% if siteconfig %}
-    'instructor': '{{ siteconfig.instructor_title|default:"Instructor" }}',
-    'duty_officer': '{{ siteconfig.duty_officer_title|default:"Duty Officer" }}',
-    'assistant_duty_officer': '{{ siteconfig.assistant_duty_officer_title|default:"Assistant Duty Officer" }}',
-    'towpilot': '{{ siteconfig.towpilot_title|default:"Tow Pilot" }}'
-  {% else %}
-    'instructor': 'Instructor',
-    'duty_officer': 'Duty Officer',
-    'assistant_duty_officer': 'Assistant Duty Officer',
-    'towpilot': 'Tow Pilot'
-  {% endif %}
-};
+const ROLE_TITLES = JSON.parse(document.getElementById('role-titles-data').textContent);
 
 // Global variables for tracking current slot being edited
 let currentEditSlot = null;
