@@ -95,6 +95,9 @@
                 {% endif %}
                 data-current-member="{% if entry.slots|dict_get:role %}{{ entry.slots|dict_get:role }}{% endif %}"
                 style="cursor: pointer;"
+                tabindex="0"
+                role="button"
+                aria-label="{% if entry.slots|dict_get:role %}Edit {{ role|title }} assignment for {{ entry.date|date:'F j' }}: {{ entry.slots|dict_get:role|get_member_name }}{% else %}Assign {{ role|title }} for {{ entry.date|date:'F j' }}{% endif %}"
                 title="{% if entry.slots|dict_get:role %}Click to edit assignment{% else %}Click to assign someone or view why empty{% endif %}">
               {% if entry.slots|dict_get:role %}
                 <span class="slot-content">{{ entry.slots|dict_get:role|get_member_name }}</span> <small class="text-muted">✏️</small>
@@ -168,10 +171,10 @@
 <script id="role-titles-data" type="application/json">
 {
   {% if siteconfig %}
-    "instructor": "{{ siteconfig.instructor_title|default:'Instructor' }}",
-    "duty_officer": "{{ siteconfig.duty_officer_title|default:'Duty Officer' }}",
-    "assistant_duty_officer": "{{ siteconfig.assistant_duty_officer_title|default:'Assistant Duty Officer' }}",
-    "towpilot": "{{ siteconfig.towpilot_title|default:'Tow Pilot' }}"
+    "instructor": "{{ siteconfig.instructor_title|default:'Instructor'|escapejs }}",
+    "duty_officer": "{{ siteconfig.duty_officer_title|default:'Duty Officer'|escapejs }}",
+    "assistant_duty_officer": "{{ siteconfig.assistant_duty_officer_title|default:'Assistant Duty Officer'|escapejs }}",
+    "towpilot": "{{ siteconfig.towpilot_title|default:'Tow Pilot'|escapejs }}"
   {% else %}
     "instructor": "Instructor",
     "duty_officer": "Duty Officer",
@@ -202,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   editableSlots.forEach(slot => {
-    slot.addEventListener('click', function() {
+    const handleSlotInteraction = function() {
       const role = this.dataset.role;
       const date = this.dataset.date;
       const currentMember = this.dataset.currentMember;
@@ -221,6 +224,17 @@ document.addEventListener('DOMContentLoaded', function() {
         showEditOrDiagnosticChoice(role, date, diagnostic);
       } else {
         showEditSlotModal(role, date, currentMember);
+      }
+    };
+
+    // Mouse/touch interaction
+    slot.addEventListener('click', handleSlotInteraction);
+
+    // Keyboard interaction (Enter or Space)
+    slot.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault(); // Prevent page scroll on Space
+        handleSlotInteraction.call(this);
       }
     });
   });

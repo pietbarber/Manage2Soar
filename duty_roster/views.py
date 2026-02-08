@@ -1214,6 +1214,14 @@ def get_eligible_members_for_slot(request):
 
         if not day_entry:
             return JsonResponse({"error": "Date not found in roster"}, status=404)
+
+        # Ensure the requested role is actually enabled for this day in the draft roster
+        slots = day_entry.get("slots", {})
+        if role not in slots:
+            return JsonResponse(
+                {"error": "Role not enabled for this date in the current roster"},
+                status=400,
+            )
     except Exception as e:
         logger.exception("Error in get_eligible_members_for_slot (initial checks)")
         return JsonResponse({"error": "Internal error processing request"}, status=500)
@@ -1236,17 +1244,22 @@ def get_eligible_members_for_slot(request):
         }
 
         # Get currently assigned members for this day
-        assigned_today = set()
-        for r, member_id in day_entry["slots"].items():
-            if member_id:
-                try:
-                    assigned_today.add(Member.objects.get(pk=member_id))
-                except Member.DoesNotExist:
-                    # Draft may reference a member that has since been deleted; skip but log
-                    logger.warning(
-                        "Duty roster draft refers to missing Member id=%s; skipping.",
-                        member_id,
-                    )
+        # Collect all member IDs from the slots, then bulk-fetch to avoid N+1 queries.
+        assigned_member_ids = {
+            member_id for _, member_id in day_entry["slots"].items() if member_id
+        }
+
+        assigned_today_queryset = Member.objects.filter(pk__in=assigned_member_ids)
+        found_ids = set(assigned_today_queryset.values_list("id", flat=True))
+        missing_ids = assigned_member_ids - found_ids
+        for missing_id in missing_ids:
+            # Draft may reference a member that has since been deleted; skip but log
+            logger.warning(
+                "Duty roster draft refers to missing Member id=%s; skipping.",
+                missing_id,
+            )
+
+        assigned_today = set(assigned_today_queryset)
 
         # Calculate assignments for the month
         assignments = defaultdict(int)
@@ -1384,8 +1397,6 @@ def update_roster_slot(request):
     """
     AJAX endpoint to update a specific roster slot.
     """
-    from datetime import date as dt_date
-
     date_str = request.POST.get("date")
     role = request.POST.get("role")
     member_id = request.POST.get("member_id")  # Can be empty string to clear
@@ -1399,12 +1410,22 @@ def update_roster_slot(request):
         return JsonResponse({"error": "Invalid role"}, status=400)
 
     # Validate member exists if provided
+    member = None
     if member_id and member_id != "":
         try:
             member_id = int(member_id)
-            Member.objects.get(pk=member_id)
+            member = Member.objects.get(pk=member_id)
         except (ValueError, Member.DoesNotExist):
             return JsonResponse({"error": "Invalid member"}, status=400)
+
+        # Enforce that the selected member is actually eligible for this role.
+        # ROLE_FIELD_MAP maps roster roles to the corresponding Member capability field.
+        role_field = ROLE_FIELD_MAP.get(role)
+        if role_field is not None and not getattr(member, role_field, False):
+            return JsonResponse(
+                {"error": "Member not eligible for this role"},
+                status=400,
+            )
     else:
         member_id = None
 

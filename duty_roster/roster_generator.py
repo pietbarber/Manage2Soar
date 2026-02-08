@@ -122,7 +122,7 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
         Dict with:
             - 'total_members': Total members with this role flag
             - 'avg_available_per_day': Average members available per day
-            - 'scarcity_score': avg_available / days_needed (lower = more critical)
+            - 'scarcity_score': avg_available_per_day (lower = more critical)
             - 'availability_by_day': List of counts for each day
     """
     if not weekend_dates:
@@ -200,7 +200,6 @@ def calculate_role_scarcity(members, prefs, blackouts, weekend_dates, role):
         if availability_by_day
         else 0
     )
-    days_needed = len(weekend_dates)
 
     # Scarcity score: average available members per day
     # Lower score = fewer available = more constrained = should assign first
@@ -357,6 +356,9 @@ def diagnose_empty_slot(
             continue
 
     # Build human-readable summary
+    # Note: "no_preference" is not included in summary because members without
+    # preferences are treated as eligible (with default constraints). It's an
+    # informational category, not a blocking reason.
     summary_parts = []
     if reasons["blacked_out"]:
         summary_parts.append(f"{len(reasons['blacked_out'])} blacked out")
@@ -376,8 +378,9 @@ def diagnose_empty_slot(
         summary_parts.append(f"{len(reasons['percent_zero'])} with 0% preference")
     if reasons["avoids_someone"]:
         summary_parts.append(f"{len(reasons['avoids_someone'])} avoiding co-workers")
-    if reasons["no_preference"]:
-        summary_parts.append(f"{len(reasons['no_preference'])} no preference set")
+    # Informational only - not a blocking reason
+    # if reasons["no_preference"]:
+    #     summary_parts.append(f"{len(reasons['no_preference'])} no preference set")
 
     if not summary_parts:
         summary = f"No eligible members found for {role}"
