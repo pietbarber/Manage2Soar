@@ -1561,6 +1561,41 @@ def update_roster_slot(request):
     )
 
 
+def _get_removed_dates_from_session(request, year, month, clean_invalid=False):
+    """
+    Parse removed dates from session for a given year/month.
+
+    Args:
+        request: Django HttpRequest with session data
+        year: Year to filter removed dates
+        month: Month to filter removed dates
+        clean_invalid: If True, update session to remove malformed dates
+
+    Returns:
+        List of datetime.date objects (malformed entries are skipped)
+    """
+    session_key = f"removed_roster_dates_{year}_{month:02d}"
+    removed_date_strs = request.session.get(session_key, [])
+    exclude_dates = []
+    cleaned_removed_date_strs = []
+
+    for ds in removed_date_strs:
+        try:
+            parsed_date = dt_date.fromisoformat(ds)
+        except (TypeError, ValueError):
+            # Skip any malformed or non-ISO-formatted values
+            continue
+        else:
+            exclude_dates.append(parsed_date)
+            cleaned_removed_date_strs.append(ds)
+
+    # If we dropped any bad entries and caller wants cleanup, update the session
+    if clean_invalid and len(cleaned_removed_date_strs) != len(removed_date_strs):
+        request.session[session_key] = cleaned_removed_date_strs
+
+    return exclude_dates
+
+
 @active_member_required
 @user_passes_test(is_rostermeister)
 def propose_roster(request):
@@ -1664,29 +1699,15 @@ def propose_roster(request):
 
                 messages.success(
                     request,
-                    f"Removed {len(dates_to_remove)} date(s) from the proposed roster. "
+                    f"Removed {len(dates_to_remove_set)} date(s) from the proposed roster. "
                     f"These dates will stay removed on Roll Again.",
                 )
 
         elif action == "roll":
             # Retrieve dates previously removed by the user so we skip them (scoped to year/month)
-            session_key = f"removed_roster_dates_{year}_{month:02d}"
-            removed_date_strs = request.session.get(session_key, [])
-            exclude_dates = []
-            cleaned_removed_date_strs = []
-            for ds in removed_date_strs:
-                try:
-                    parsed_date = dt_date.fromisoformat(ds)
-                except (TypeError, ValueError):
-                    # Skip any malformed or non-ISO-formatted values
-                    continue
-                else:
-                    exclude_dates.append(parsed_date)
-                    cleaned_removed_date_strs.append(ds)
-
-            # If we dropped any bad entries, update the session with only valid strings
-            if len(cleaned_removed_date_strs) != len(removed_date_strs):
-                request.session[session_key] = cleaned_removed_date_strs
+            exclude_dates = _get_removed_dates_from_session(
+                request, year, month, clean_invalid=True
+            )
 
             raw = generate_roster(
                 year, month, roles=enabled_roles, exclude_dates=exclude_dates
@@ -1798,14 +1819,7 @@ def propose_roster(request):
             return redirect("duty_roster:duty_calendar")
     else:
         # Retrieve any previously removed dates for this year/month
-        session_key = f"removed_roster_dates_{year}_{month:02d}"
-        removed_date_strs = request.session.get(session_key, [])
-        exclude_dates = []
-        for ds in removed_date_strs:
-            try:
-                exclude_dates.append(dt_date.fromisoformat(ds))
-            except (TypeError, ValueError):
-                continue
+        exclude_dates = _get_removed_dates_from_session(request, year, month)
 
         raw = generate_roster(
             year, month, roles=enabled_roles, exclude_dates=exclude_dates
@@ -1843,15 +1857,7 @@ def propose_roster(request):
         for e in request.session.get("proposed_roster", [])
     ]
     # Build list of removed dates for display in the template (scoped to year/month)
-    session_key = f"removed_roster_dates_{year}_{month:02d}"
-    removed_date_strs = request.session.get(session_key, [])
-    removed_dates = []
-    for ds in removed_date_strs:
-        try:
-            removed_dates.append(dt_date.fromisoformat(ds))
-        except (TypeError, ValueError):
-            # Skip malformed values to prevent 500 errors in template rendering
-            continue
+    removed_dates = _get_removed_dates_from_session(request, year, month)
 
     return render(
         request,
