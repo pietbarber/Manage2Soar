@@ -23,7 +23,8 @@ kubectl rollout restart deployment/django-app-masa -n tenant-masa
 
 ### Check Status
 ```bash
-kubectl get pods -n tenant-ssc -n tenant-masa
+kubectl get pods -n tenant-ssc
+kubectl get pods -n tenant-masa
 kubectl logs -n tenant-ssc -l app=django-app-ssc --tail=50
 ```
 
@@ -39,14 +40,23 @@ kubectl rollout undo deployment/django-app-masa -n tenant-masa
 
 ### From Browser Console → Cloud Shell:
 ```bash
-curl -s https://raw.githubusercontent.com/pietbarber/Manage2Soar/main/emergency-ssh-access.sh | bash
+# Download, review, then run:
+curl -s -o emergency-ssh-access.sh https://raw.githubusercontent.com/pietbarber/Manage2Soar/main/emergency-ssh-access.sh
+less emergency-ssh-access.sh   # review before executing
+bash emergency-ssh-access.sh
 ```
 
 ### Or Manually:
 ```bash
 MY_IP=$(curl -s ifconfig.me)
+
+# First, get the current source ranges:
+EXISTING=$(gcloud compute firewall-rules describe m2s-database-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)' | tr ';' ',')
+
+# Then update, appending your IP:
 gcloud compute firewall-rules update m2s-database-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32,${MY_IP}/32" \
+  --source-ranges="${EXISTING},${MY_IP}/32" \
   --project=manage2soar
 ```
 
@@ -79,8 +89,13 @@ sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;"
 
 ## 🏠 When Home: Remove Puerto Rico IP
 ```bash
+# Get current ranges, then remove the Puerto Rico IP manually:
+gcloud compute firewall-rules describe m2s-database-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)'
+
+# Update with the ranges MINUS your travel IP:
 gcloud compute firewall-rules update m2s-database-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32" \
+  --source-ranges="<PASTE_RANGES_WITHOUT_TRAVEL_IP>" \
   --project=manage2soar
 ```
 

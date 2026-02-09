@@ -74,7 +74,7 @@ for tenant in "${TENANTS[@]}"; do
 
     echo "  Updating ${deployment} in ${namespace}..."
     kubectl set image deployment/${deployment} \
-        django-app="${FULL_IMAGE}" \
+        django="${FULL_IMAGE}" \
         -n "${namespace}"
 
     echo "  Waiting for rollout..."

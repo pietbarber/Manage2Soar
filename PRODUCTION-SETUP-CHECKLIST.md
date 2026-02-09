@@ -23,7 +23,7 @@ Use this checklist to track your laptop setup progress for production deployment
 ## ✅ Phase 2: Authenticate & Configure - COMPLETE
 
 - [x] Authenticate with GCP  
-  - Account: pb@pietbarber.com
+  - Account: *(your GCP account)*
   - Project: manage2soar
   - Already configured via `gcloud init`
 
@@ -38,9 +38,9 @@ Use this checklist to track your laptop setup progress for production deployment
   ```
 
 - [x] Verify kubectl access
-  - Cluster: manage2soar-cluster (3 nodes, v1.33.5)
-  - Namespaces: tenant-ssc, tenant-masa (both running 2 pods)
-  - Current deployed version: `gcr.io/manage2soar/manage2soar:20260208-0126-00b1c36`
+  - Cluster: manage2soar-cluster (check with `gcloud container clusters list`)
+  - Namespaces: tenant-ssc, tenant-masa
+  - Current deployed version: check with `kubectl get deployment -n tenant-ssc -o jsonpath='{.items[0].spec.template.spec.containers[0].image}'`
 
 **Note:** Docker group requires `newgrp docker` in each new terminal, or log out/back in for permanent access.
 
@@ -74,7 +74,7 @@ newgrp docker
 ### Option B: Full Ansible Setup (For complete infrastructure management) - ✅ COMPLETE
 Required for: secrets management, database provisioning, cluster provisioning, multi-tenant config.
 
-- [x] Vault password file configured: `~/.ansible_vault_file` ✓
+- [x] Vault password file configured: `~/.ansible_vault_pass` ✓
 - [x] Extracted Ansible configuration from backup tarball ✓
 - [x] Generated SSH key: `~/.ssh/id_ed25519` ✓
 - [x] Added SSH key to GCP project metadata ✓
@@ -83,8 +83,8 @@ Required for: secrets management, database provisioning, cluster provisioning, m
 - [x] Verified Ansible vault access ✓
 
 **Configured Hosts:**
-- **m2s-database** (34.74.153.95): PostgreSQL 17.7 on Ubuntu 24.04 ✓
-- **m2s-mail** (35.237.42.68): Postfix mail server ✓
+- **m2s-database**: PostgreSQL server (get IP via `gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].accessConfigs[0].natIP)'`)
+- **m2s-mail**: Postfix mail server (get IP via `gcloud compute instances describe m2s-mail --zone=us-east1-b --format='get(networkInterfaces[0].accessConfigs[0].natIP)'`)
 
 **Test connectivity:**
 ```bash
@@ -101,12 +101,12 @@ ansible-playbook -i inventory/gcp_database.yml \
 
 # Mail server management  
 ansible-playbook -i inventory/gcp_mail.yml \
-  --vault-password-file ~/.ansible_vault_file \
+  --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-mail-server.yml
 
 # GKE app deployment (complete Django deployment with secrets)
 ansible-playbook -i inventory/gcp_app.yml \
-  --vault-password-file ~/.ansible_vault_file \
+  --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-app-deploy.yml
 ```
 

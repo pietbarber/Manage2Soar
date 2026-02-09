@@ -3,13 +3,19 @@
 #
 # This script adds your current public IP to the GCP firewall rules
 # for SSH access to m2s-database and m2s-mail servers.
+# It modifies firewall sourceRanges only — no SSH keys are touched.
+# Remember to remove your IP when you return home.
 #
 # Usage from ANYWHERE with gcloud installed:
 #   ./emergency-ssh-access.sh
 #
-# Or manually from ANY computer with browser:
+# Or from ANY computer with a browser:
 #   1. Go to: https://shell.cloud.google.com
-#   2. Run: curl -s https://raw.githubusercontent.com/pietbarber/Manage2Soar/main/emergency-ssh-access.sh | bash
+#   2. Download and review the script before running:
+#        TAG_OR_COMMIT="main"  # or pin to a specific tag/commit
+#        curl -s -o emergency-ssh-access.sh "https://raw.githubusercontent.com/pietbarber/Manage2Soar/${TAG_OR_COMMIT}/emergency-ssh-access.sh"
+#        less emergency-ssh-access.sh   # review before executing
+#        bash emergency-ssh-access.sh
 #
 # Or the safest manual method:
 #   1. Get your IP: curl ifconfig.me
@@ -91,7 +97,11 @@ if [ "$DB_NEEDS_UPDATE" = true ]; then
 
     # Get existing IPs and add new one
     EXISTING_IPS=$(echo "$DB_RULE_IPS" | tr ';' ',' | sed 's/,$//')
-    NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+    if [ -n "$EXISTING_IPS" ]; then
+        NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+    else
+        NEW_IPS="${CURRENT_IP}/32"
+    fi
 
     gcloud compute firewall-rules update m2s-database-allow-ssh \
         --project=$PROJECT_ID \
@@ -108,7 +118,11 @@ if [ "$MAIL_NEEDS_UPDATE" = true ]; then
 
     # Get existing IPs and add new one
     EXISTING_IPS=$(echo "$MAIL_RULE_IPS" | tr ';' ',' | sed 's/,$//')
-    NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+    if [ -n "$EXISTING_IPS" ]; then
+        NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+    else
+        NEW_IPS="${CURRENT_IP}/32"
+    fi
 
     gcloud compute firewall-rules update m2s-mail-allow-ssh \
         --project=$PROJECT_ID \
@@ -124,8 +138,8 @@ echo -e "${GREEN}Emergency Access Granted!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "You can now SSH to:"
-echo "  ssh pb@34.74.153.95  # m2s-database"
-echo "  ssh pb@35.237.42.68  # m2s-mail"
+echo "  gcloud compute ssh m2s-database --zone=us-east1-b --project=manage2soar"
+echo "  gcloud compute ssh m2s-mail --zone=us-east1-b --project=manage2soar"
 echo ""
 echo "Or use Ansible:"
 echo "  cd infrastructure/ansible"

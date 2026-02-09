@@ -27,13 +27,16 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Manage2Soar Admin Setup (Ubuntu)${NC}"
+echo -e "${GREEN}Manage2Soar Admin Setup (Ubuntu/Debian)${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
-# Check if running on Ubuntu
-if ! grep -q "Ubuntu" /etc/os-release; then
-    echo -e "${RED}ERROR: This script is designed for Ubuntu.${NC}"
+# Check if running on Ubuntu or Debian (or compatible derivatives)
+OS_ID=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_ID_LIKE=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"')
+
+if ! echo "$OS_ID $OS_ID_LIKE" | grep -Eq '\b(ubuntu|debian)\b'; then
+    echo -e "${RED}ERROR: This script is designed for Ubuntu/Debian-based systems.${NC}"
     echo "Your OS: $(grep PRETTY_NAME /etc/os-release | cut -d= -f2)"
     exit 1
 fi
@@ -187,7 +190,7 @@ if ! command -v k9s &> /dev/null; then
     echo "Installing k9s..."
     if curl -fsSL https://webinstall.dev/k9s 2>/dev/null | bash; then
         # Add to PATH
-        if ! grep -q '$HOME/.local/bin' ~/.bashrc; then
+        if ! grep -Fq '$HOME/.local/bin' ~/.bashrc; then
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
         fi
         echo -e "${GREEN}✓ k9s installed${NC}"

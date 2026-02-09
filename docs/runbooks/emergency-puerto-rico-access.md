@@ -40,7 +40,8 @@ gcloud container clusters get-credentials manage2soar-cluster \
   --zone=us-east1-b --project=manage2soar
 
 # Check cluster status
-kubectl get pods -n tenant-ssc -n tenant-masa
+kubectl get pods -n tenant-ssc
+kubectl get pods -n tenant-masa
 
 # View logs
 kubectl logs -n tenant-ssc -l app=django-app-ssc --tail=100
@@ -69,14 +70,24 @@ kubectl rollout restart deployment/django-app-masa -n tenant-masa
 # Get your IP
 curl ifconfig.me
 
-# Add to firewall via gcloud
+# Get current firewall source ranges
 NEW_IP="YOUR_IP_HERE"
+
+# 1) Read current ranges (always check live, don't copy from docs)
+EXISTING=$(gcloud compute firewall-rules describe m2s-database-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)' | tr ';' ',')
+
+# 2) Update, appending your IP
 gcloud compute firewall-rules update m2s-database-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32,${NEW_IP}/32" \
+  --source-ranges="${EXISTING},${NEW_IP}/32" \
   --project=manage2soar
 
+# Repeat for mail rule
+EXISTING=$(gcloud compute firewall-rules describe m2s-mail-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)' | tr ';' ',')
+
 gcloud compute firewall-rules update m2s-mail-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32,${NEW_IP}/32" \
+  --source-ranges="${EXISTING},${NEW_IP}/32" \
   --project=manage2soar
 ```
 
@@ -114,7 +125,8 @@ cd infrastructure/ansible
 **Quick Fix (Cloud Shell or local):**
 ```bash
 # Check pods
-kubectl get pods -n tenant-ssc -n tenant-masa
+kubectl get pods -n tenant-ssc
+kubectl get pods -n tenant-masa
 
 # View recent logs
 kubectl logs -n tenant-ssc -l app=django-app-ssc --tail=100
@@ -185,9 +197,9 @@ docker push "${FULL_IMAGE}"
 
 # Update deployments
 kubectl set image deployment/django-app-ssc \
-    django-app="${FULL_IMAGE}" -n tenant-ssc
+    django="${FULL_IMAGE}" -n tenant-ssc
 kubectl set image deployment/django-app-masa \
-    django-app="${FULL_IMAGE}" -n tenant-masa
+    django="${FULL_IMAGE}" -n tenant-masa
 
 # Watch rollout
 kubectl rollout status deployment/django-app-ssc -n tenant-ssc
@@ -281,8 +293,8 @@ kubectl top nodes
 # Pod resource usage
 kubectl top pods --all-namespaces
 
-# Database server disk space (via Cloud Console SSH)
-ssh pb@34.74.153.95 "df -h && free -h"
+# Database server disk space (via gcloud compute ssh)
+gcloud compute ssh m2s-database --zone=us-east1-b --project=manage2soar -- "df -h && free -h"
 ```
 
 ---
@@ -323,12 +335,21 @@ Don't forget to clean up your Puerto Rico IP:
 
 ```bash
 # Remove your Puerto Rico IP from firewall rules
+# First, get current ranges:
+gcloud compute firewall-rules describe m2s-database-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)'
+
+# Update with the ranges MINUS your travel IP:
 gcloud compute firewall-rules update m2s-database-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32" \
+  --source-ranges="<PASTE_RANGES_WITHOUT_TRAVEL_IP>" \
   --project=manage2soar
 
+# Repeat for mail rule:
+gcloud compute firewall-rules describe m2s-mail-allow-ssh \
+  --project=manage2soar --format='get(sourceRanges)'
+
 gcloud compute firewall-rules update m2s-mail-allow-ssh \
-  --source-ranges="138.88.187.144/32,71.171.120.3/32,100.36.44.55/32,108.18.156.42/32" \
+  --source-ranges="<PASTE_RANGES_WITHOUT_TRAVEL_IP>" \
   --project=manage2soar
 ```
 

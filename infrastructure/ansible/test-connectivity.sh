@@ -18,13 +18,13 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 
 # Check vault password file
-if [ ! -f ~/.ansible_vault_file ]; then
-    echo -e "${RED}ERROR: Vault password file not found at ~/.ansible_vault_file${NC}"
+if [ ! -f ~/.ansible_vault_pass ]; then
+    echo -e "${RED}ERROR: Vault password file not found at ~/.ansible_vault_pass${NC}"
     exit 1
 fi
 
 echo -e "${YELLOW}[1/5] Testing vault access...${NC}"
-if ansible-vault view group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_file > /dev/null 2>&1; then
+if ansible-vault view group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Vault password file works${NC}"
 else
     echo -e "${RED}✗ Vault password file failed${NC}"
@@ -62,7 +62,7 @@ echo ""
 echo -e "${YELLOW}[5/5] Testing fact gathering with vault...${NC}"
 if ansible gcp_database_servers -i inventory/gcp_database.yml \
     -m setup -a 'filter=ansible_hostname' \
-    --vault-password-file ~/.ansible_vault_file 2>&1 | grep -q "SUCCESS"; then
+    --vault-password-file ~/.ansible_vault_pass 2>&1 | grep -q "SUCCESS"; then
     echo -e "${GREEN}✓ Can gather facts with vault access${NC}"
 else
     echo -e "${RED}✗ Fact gathering failed${NC}"
