@@ -167,17 +167,15 @@ class TestProposeRosterSessionTracking:
         client.login(username="rostermeister", password="testpass123")
         url = reverse("duty_roster:propose_roster")
 
-        # First, do a GET to generate initial roster
+        # First, do a GET for any initial session setup
         resp = client.get(url, {"year": 2026, "month": 3})
         assert resp.status_code == 200
 
-        # Get a date from the session's proposed roster
+        # Seed the session with a deterministic proposed roster entry
         session = client.session
-        proposed = session.get("proposed_roster", [])
-        if not proposed:
-            pytest.skip("No proposed roster dates generated")
-
-        date_to_remove = proposed[0]["date"]
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        session.save()
+        date_to_remove = session["proposed_roster"][0]["date"]
 
         # POST to remove that date
         client.post(
@@ -261,10 +259,12 @@ class TestProposeRosterSessionTracking:
         # Verify we got a roster
         session = client.session
         proposed = session.get("proposed_roster", [])
-        if len(proposed) < 2:
-            pytest.skip("Not enough dates in proposed roster for this test")
+        assert len(proposed) >= 2, (
+            f"Expected at least 2 dates in proposed_roster for this test, "
+            f"got {len(proposed)}. This likely indicates an issue with roster "
+            "generation or operational-season configuration."
+        )
 
-        original_dates = {e["date"] for e in proposed}
         date_to_remove = proposed[0]["date"]
 
         # Remove one date

@@ -1797,8 +1797,21 @@ def propose_roster(request):
             request.session.pop(session_key, None)
             return redirect("duty_roster:duty_calendar")
     else:
-        raw = generate_roster(year, month, roles=enabled_roles)
+        # Retrieve any previously removed dates for this year/month
+        session_key = f"removed_roster_dates_{year}_{month:02d}"
+        removed_date_strs = request.session.get(session_key, [])
+        exclude_dates = []
+        for ds in removed_date_strs:
+            try:
+                exclude_dates.append(dt_date.fromisoformat(ds))
+            except (TypeError, ValueError):
+                continue
+
+        raw = generate_roster(
+            year, month, roles=enabled_roles, exclude_dates=exclude_dates
+        )
         if not raw:
+            exclude_set = set(exclude_dates)
             cal = calendar.Calendar()
             weekend = [
                 d
@@ -1806,6 +1819,7 @@ def propose_roster(request):
                 if d.month == month
                 and d.weekday() in (5, 6)
                 and is_within_operational_season(d)
+                and d not in exclude_set
             ]
             raw = [
                 {"date": d, "slots": {r: None for r in enabled_roles}} for d in weekend
