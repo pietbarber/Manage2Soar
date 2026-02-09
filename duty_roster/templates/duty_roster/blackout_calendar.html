@@ -26,24 +26,7 @@
     </div>
   </div>
 
-  <!-- Messages Section -->
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
-        {% if message.tags == "success" %}
-          <i class="fas fa-check-circle me-2"></i>
-        {% elif message.tags == "danger" or message.tags == "error" %}
-          <i class="fas fa-exclamation-circle me-2"></i>
-        {% elif message.tags == "warning" %}
-          <i class="fas fa-exclamation-triangle me-2"></i>
-        {% elif message.tags == "info" %}
-          <i class="fas fa-info-circle me-2"></i>
-        {% endif %}
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
+  {% include "duty_roster/_messages.html" %}
 
   <!-- Warning if all eligible role percents are zero -->
   {% with total_percent=preference.instructor_percent|add:preference.duty_officer_percent|add:preference.ado_percent|add:preference.towpilot_percent %}
