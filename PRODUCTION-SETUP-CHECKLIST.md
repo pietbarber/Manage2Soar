@@ -4,11 +4,11 @@ Use this checklist to track your laptop setup progress for production deployment
 
 ## ✅ Phase 1: Install Tools - COMPLETE
 
-- [x] Google Cloud CLI (`gcloud`) - v503.0.0
-- [x] kubectl - v1.32.0  
-- [x] Docker Engine - v27.4.1
-- [x] Ansible + collections - v2.18.1 with kubernetes.core, google.cloud, community.postgresql
-- [x] Optional: k9s (v0.50.18), helm (v3.14.0), jq (v1.7.1)
+- [x] Google Cloud CLI (`gcloud`)
+- [x] kubectl
+- [x] Docker Engine
+- [x] Ansible + required collections (kubernetes.core, google.cloud, community.postgresql)
+- [x] Optional: k9s, helm, jq
 - [x] Log out and log back in (for docker group membership)
 
 **Installation completed via:**
@@ -96,7 +96,7 @@ cd infrastructure/ansible
 ```bash
 # Database server management
 ansible-playbook -i inventory/gcp_database.yml \
-  --vault-password-file ~/.ansible_vault_file \
+  --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-database.yml
 
 # Mail server management  
@@ -120,8 +120,8 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 - [x] Test kubectl
   ```bash
-  kubectl cluster-info  # ✓ Connected to https://34.75.132.111
-  kubectl get pods --all-namespaces  # ✓ Both tenants running 2 pods each
+  kubectl cluster-info  # ✓ Shows cluster master endpoint for current context
+  kubectl get pods --all-namespaces  # ✓ Both tenants running pods
   ```
 
 - [x] Test Docker
@@ -133,7 +133,7 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 - [x] Test Ansible
   ```bash
-  ansible --version  # ✓ v2.16.3
+  ansible --version  # ✓ Check version is installed
   ansible-galaxy collection list | grep -E "kubernetes|google.cloud|community.postgresql"  # ✓ All present
   ```
 
@@ -153,10 +153,15 @@ newgrp docker
 ./quick-deploy.sh
 ```
 
-**Current Status:**
-- Production version: `20260208-0126-00b1c36` (PR #617)
-- Your HEAD: `2352820` (PR #619 - Roll Again removed dates)
-- Ready to deploy: YES ✓
+**Current Status (determine at runtime):**
+```bash
+# Check currently deployed image:
+kubectl -n tenant-ssc get deployment django-app-ssc \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
+
+# Check your local HEAD:
+git rev-parse --short HEAD
+```
 
 ### Full Ansible Deploy (Complete infrastructure management)
 

@@ -31,7 +31,6 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 PROJECT_ID="manage2soar"
-NETWORK="manage2soar-vpc"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Emergency SSH Access Setup${NC}"
@@ -40,10 +39,15 @@ echo ""
 
 # Get current public IP
 echo -e "${YELLOW}Getting your current public IP...${NC}"
-CURRENT_IP=$(curl -s ifconfig.me)
+CURRENT_IP=$(curl -s https://ifconfig.me)
 if [ -z "$CURRENT_IP" ]; then
     echo -e "${RED}ERROR: Could not determine public IP${NC}"
-    echo "Try manually: curl ifconfig.me"
+    echo "Try manually: curl https://ifconfig.me"
+    exit 1
+fi
+# Validate IP format (IPv4 or IPv6)
+if ! echo "$CURRENT_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$|^[0-9a-fA-F:]+$'; then
+    echo -e "${RED}ERROR: Invalid IP address received: ${CURRENT_IP}${NC}"
     exit 1
 fi
 echo -e "Your IP: ${GREEN}${CURRENT_IP}${NC}"

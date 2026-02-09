@@ -24,6 +24,10 @@ TENANTS=("ssc" "masa")
 # Generate timestamp and git hash
 TIMESTAMP=$(date +%Y%m%d-%H%M)
 GIT_HASH=$(git rev-parse --short HEAD)
+if [ -n "$(git status --porcelain)" ]; then
+    GIT_HASH="${GIT_HASH}-dirty"
+    echo -e "${YELLOW}WARNING: Working tree has uncommitted changes. Image tag will include '-dirty' suffix.${NC}"
+fi
 IMAGE_TAG="${TIMESTAMP}-${GIT_HASH}"
 FULL_IMAGE="${GCR_REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
 

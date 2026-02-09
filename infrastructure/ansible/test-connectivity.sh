@@ -24,10 +24,16 @@ if [ ! -f ~/.ansible_vault_pass ]; then
 fi
 
 echo -e "${YELLOW}[1/5] Testing vault access...${NC}"
-if ansible-vault view group_vars/localhost/vault.yml --vault-password-file ~/.ansible_vault_pass > /dev/null 2>&1; then
+VAULT_TEST_FILE="group_vars/localhost/vault.yml"
+if [ ! -f "$VAULT_TEST_FILE" ]; then
+    echo -e "${RED}✗ Vault test file not found: ${VAULT_TEST_FILE}${NC}"
+    echo -e "${YELLOW}  This file may not exist on a fresh checkout. Ensure infrastructure config files are set up.${NC}"
+    exit 1
+fi
+if ansible-vault view "$VAULT_TEST_FILE" --vault-password-file ~/.ansible_vault_pass > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Vault password file works${NC}"
 else
-    echo -e "${RED}✗ Vault password file failed${NC}"
+    echo -e "${RED}✗ Vault decryption failed (wrong password or corrupted vault file)${NC}"
     exit 1
 fi
 
@@ -78,15 +84,15 @@ echo "You can now run Ansible playbooks:"
 echo ""
 echo "  # Database deployment:"
 echo "  ansible-playbook -i inventory/gcp_database.yml \\"
-echo "    --vault-password-file ~/.ansible_vault_file \\"
+echo "    --vault-password-file ~/.ansible_vault_pass \\"
 echo "    playbooks/gcp-database.yml"
 echo ""
 echo "  # Mail server deployment:"
 echo "  ansible-playbook -i inventory/gcp_mail.yml \\"
-echo "    --vault-password-file ~/.ansible_vault_file \\"
+echo "    --vault-password-file ~/.ansible_vault_pass \\"
 echo "    playbooks/gcp-mail-server.yml"
 echo ""
 echo "  # GKE app deployment:"
 echo "  ansible-playbook -i inventory/gcp_app.yml \\"
-echo "    --vault-password-file ~/.ansible_vault_file \\"
+echo "    --vault-password-file ~/.ansible_vault_pass \\"
 echo "    playbooks/gcp-app-deploy.yml"
