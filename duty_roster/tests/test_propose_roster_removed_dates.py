@@ -10,13 +10,20 @@ from datetime import date
 import pytest
 from django.urls import reverse
 
-from duty_roster.roster_generator import generate_roster
+from duty_roster.roster_generator import clear_operational_season_cache, generate_roster
 from members.models import Member
 
 
 @pytest.mark.django_db
 class TestGenerateRosterExcludeDates:
     """Test that generate_roster respects the exclude_dates parameter."""
+
+    @pytest.fixture(autouse=True)
+    def setup_operational_season(self):
+        """Clear cache for reliable testing - missing SiteConfiguration defaults to year-round."""
+        clear_operational_season_cache()
+        yield
+        clear_operational_season_cache()
 
     def test_exclude_dates_removes_dates_from_output(self):
         """Dates in exclude_dates should not appear in generated roster."""
@@ -31,8 +38,8 @@ class TestGenerateRosterExcludeDates:
             joined_club=date.today(),
         )
 
-        # Generate full roster first
-        full_roster = generate_roster(roles=["instructor"])
+        # Generate full roster for a known month with predictable weekends
+        full_roster = generate_roster(year=2026, month=3, roles=["instructor"])
         assert full_roster and len(full_roster) > 0
 
         # Pick the first date to exclude
@@ -40,7 +47,7 @@ class TestGenerateRosterExcludeDates:
 
         # Regenerate with that date excluded
         filtered_roster = generate_roster(
-            roles=["instructor"], exclude_dates=[date_to_exclude]
+            year=2026, month=3, roles=["instructor"], exclude_dates=[date_to_exclude]
         )
 
         # The excluded date should not be in the filtered roster
@@ -63,12 +70,12 @@ class TestGenerateRosterExcludeDates:
             joined_club=date.today(),
         )
 
-        full_roster = generate_roster(roles=["instructor"])
+        full_roster = generate_roster(year=2026, month=3, roles=["instructor"])
         assert len(full_roster) >= 2
 
         dates_to_exclude = [full_roster[0]["date"], full_roster[1]["date"]]
         filtered_roster = generate_roster(
-            roles=["instructor"], exclude_dates=dates_to_exclude
+            year=2026, month=3, roles=["instructor"], exclude_dates=dates_to_exclude
         )
 
         filtered_dates = [entry["date"] for entry in filtered_roster]
@@ -90,8 +97,10 @@ class TestGenerateRosterExcludeDates:
             joined_club=date.today(),
         )
 
-        roster_default = generate_roster(roles=["instructor"])
-        roster_none = generate_roster(roles=["instructor"], exclude_dates=None)
+        roster_default = generate_roster(year=2026, month=3, roles=["instructor"])
+        roster_none = generate_roster(
+            year=2026, month=3, roles=["instructor"], exclude_dates=None
+        )
 
         assert len(roster_default) == len(roster_none)
 
@@ -108,8 +117,10 @@ class TestGenerateRosterExcludeDates:
             joined_club=date.today(),
         )
 
-        roster_default = generate_roster(roles=["instructor"])
-        roster_empty = generate_roster(roles=["instructor"], exclude_dates=[])
+        roster_default = generate_roster(year=2026, month=3, roles=["instructor"])
+        roster_empty = generate_roster(
+            year=2026, month=3, roles=["instructor"], exclude_dates=[]
+        )
 
         assert len(roster_default) == len(roster_empty)
 
@@ -157,8 +168,8 @@ class TestProposeRosterSessionTracking:
         url = reverse("duty_roster:propose_roster")
 
         # First, do a GET to generate initial roster
-        response = client.get(url, {"year": 2026, "month": 3})
-        assert response.status_code == 200
+        resp = client.get(url, {"year": 2026, "month": 3})
+        assert resp.status_code == 200
 
         # Get a date from the session's proposed roster
         session = client.session
@@ -169,7 +180,7 @@ class TestProposeRosterSessionTracking:
         date_to_remove = proposed[0]["date"]
 
         # POST to remove that date
-        response = client.post(
+        client.post(
             url,
             {
                 "year": 2026,
@@ -179,9 +190,10 @@ class TestProposeRosterSessionTracking:
             },
         )
 
-        # Check session has the removed date tracked
+        # Check session has the removed date tracked (scoped to 2026-03)
         session = client.session
-        removed = session.get("removed_roster_dates", [])
+        removed_key = "removed_roster_dates_2026_03"
+        removed = session.get(removed_key, [])
         assert date_to_remove in removed
 
     def test_cancel_clears_removed_dates(self, client, rostermeister):
@@ -195,18 +207,19 @@ class TestProposeRosterSessionTracking:
         # Set up session data
         session = client.session
         session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
-        session["removed_roster_dates"] = ["2026-03-01"]
+        removed_key = "removed_roster_dates_2026_03"
+        session[removed_key] = ["2026-03-01"]
         session.save()
 
         # Cancel
-        response = client.post(
+        client.post(
             url,
             {"year": 2026, "month": 3, "action": "cancel"},
         )
 
         session = client.session
         assert "proposed_roster" not in session
-        assert "removed_roster_dates" not in session
+        assert removed_key not in session
 
     def test_restore_dates_clears_removed_dates(self, client, rostermeister):
         """Restore All Dates should clear the removed dates list."""
@@ -221,14 +234,66 @@ class TestProposeRosterSessionTracking:
         session["proposed_roster"] = [
             {"date": "2026-03-07", "slots": {}, "diagnostics": {}}
         ]
-        session["removed_roster_dates"] = ["2026-03-01"]
+        removed_key = "removed_roster_dates_2026_03"
+        session[removed_key] = ["2026-03-01"]
         session.save()
 
         # Restore dates
-        response = client.post(
+        client.post(
             url,
             {"year": 2026, "month": 3, "action": "restore_dates"},
         )
 
         session = client.session
-        assert "removed_roster_dates" not in session
+        assert removed_key not in session
+
+    def test_roll_again_respects_removed_dates(
+        self, client, rostermeister, instructor_member
+    ):
+        """Integration test: removed dates stay removed when clicking Roll Again (Issue #618)."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        # Generate initial roster
+        resp = client.get(url, {"year": 2026, "month": 3})
+        assert resp.status_code == 200
+
+        # Verify we got a roster
+        session = client.session
+        proposed = session.get("proposed_roster", [])
+        if len(proposed) < 2:
+            pytest.skip("Not enough dates in proposed roster for this test")
+
+        original_dates = {e["date"] for e in proposed}
+        date_to_remove = proposed[0]["date"]
+
+        # Remove one date
+        client.post(
+            url,
+            {
+                "year": 2026,
+                "month": 3,
+                "action": "remove_dates",
+                "remove_date": [date_to_remove],
+            },
+        )
+
+        # Verify date was removed
+        session = client.session
+        proposed_after_remove = session.get("proposed_roster", [])
+        dates_after_remove = {e["date"] for e in proposed_after_remove}
+        assert date_to_remove not in dates_after_remove
+
+        # Now click "Roll Again"
+        client.post(
+            url,
+            {"year": 2026, "month": 3, "action": "roll"},
+        )
+
+        # Verify the removed date did NOT reappear
+        session = client.session
+        proposed_after_roll = session.get("proposed_roster", [])
+        dates_after_roll = {e["date"] for e in proposed_after_roll}
+        assert (
+            date_to_remove not in dates_after_roll
+        ), f"Date {date_to_remove} should still be excluded after Roll Again"

@@ -1656,12 +1656,11 @@ def propose_roster(request):
                 ]
                 request.session["proposed_roster"] = draft
 
-                # Track removed dates so Roll Again remembers them
-                previously_removed = set(
-                    request.session.get("removed_roster_dates", [])
-                )
+                # Track removed dates so Roll Again remembers them (scoped to year/month)
+                session_key = f"removed_roster_dates_{year}_{month:02d}"
+                previously_removed = set(request.session.get(session_key, []))
                 previously_removed.update(d.isoformat() for d in dates_to_remove_set)
-                request.session["removed_roster_dates"] = sorted(previously_removed)
+                request.session[session_key] = sorted(previously_removed)
 
                 messages.success(
                     request,
@@ -1670,9 +1669,25 @@ def propose_roster(request):
                 )
 
         elif action == "roll":
-            # Retrieve dates previously removed by the user so we skip them
-            removed_date_strs = request.session.get("removed_roster_dates", [])
-            exclude_dates = [dt_date.fromisoformat(ds) for ds in removed_date_strs]
+            # Retrieve dates previously removed by the user so we skip them (scoped to year/month)
+            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            removed_date_strs = request.session.get(session_key, [])
+            exclude_dates = []
+            cleaned_removed_date_strs = []
+            for ds in removed_date_strs:
+                try:
+                    parsed_date = dt_date.fromisoformat(ds)
+                except (TypeError, ValueError):
+                    # Skip any malformed or non-ISO-formatted values
+                    continue
+                else:
+                    exclude_dates.append(parsed_date)
+                    cleaned_removed_date_strs.append(ds)
+
+            # If we dropped any bad entries, update the session with only valid strings
+            if len(cleaned_removed_date_strs) != len(removed_date_strs):
+                request.session[session_key] = cleaned_removed_date_strs
+
             raw = generate_roster(
                 year, month, roles=enabled_roles, exclude_dates=exclude_dates
             )
@@ -1725,7 +1740,9 @@ def propose_roster(request):
                 created_assignments.append(assignment)
 
             request.session.pop("proposed_roster", None)
-            request.session.pop("removed_roster_dates", None)
+            # Clear removed dates for the current month
+            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            request.session.pop(session_key, None)
 
             # Send ICS calendar invites to all assigned members
             if created_assignments:
@@ -1764,8 +1781,9 @@ def propose_roster(request):
             return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
         elif action == "restore_dates":
-            # Clear removed dates so Roll Again includes all dates again
-            request.session.pop("removed_roster_dates", None)
+            # Clear removed dates so Roll Again includes all dates again (scoped to year/month)
+            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            request.session.pop(session_key, None)
             messages.info(
                 request,
                 "All previously removed dates have been restored. "
@@ -1774,7 +1792,9 @@ def propose_roster(request):
 
         elif action == "cancel":
             request.session.pop("proposed_roster", None)
-            request.session.pop("removed_roster_dates", None)
+            # Clear removed dates for the current month
+            session_key = f"removed_roster_dates_{year}_{month:02d}"
+            request.session.pop(session_key, None)
             return redirect("duty_roster:duty_calendar")
     else:
         raw = generate_roster(year, month, roles=enabled_roles)
@@ -1783,7 +1803,9 @@ def propose_roster(request):
             weekend = [
                 d
                 for d in cal.itermonthdates(year, month)
-                if d.month == month and d.weekday() in (5, 6)
+                if d.month == month
+                and d.weekday() in (5, 6)
+                and is_within_operational_season(d)
             ]
             raw = [
                 {"date": d, "slots": {r: None for r in enabled_roles}} for d in weekend
@@ -1806,9 +1828,16 @@ def propose_roster(request):
         }
         for e in request.session.get("proposed_roster", [])
     ]
-    # Build list of removed dates for display in the template
-    removed_date_strs = request.session.get("removed_roster_dates", [])
-    removed_dates = [dt_date.fromisoformat(ds) for ds in removed_date_strs]
+    # Build list of removed dates for display in the template (scoped to year/month)
+    session_key = f"removed_roster_dates_{year}_{month:02d}"
+    removed_date_strs = request.session.get(session_key, [])
+    removed_dates = []
+    for ds in removed_date_strs:
+        try:
+            removed_dates.append(dt_date.fromisoformat(ds))
+        except (TypeError, ValueError):
+            # Skip malformed values to prevent 500 errors in template rendering
+            continue
 
     return render(
         request,
