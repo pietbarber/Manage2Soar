@@ -36,11 +36,23 @@ Manage2Soar is a modern Django 5.2.11 web application for comprehensive soaring 
    ```
    ```sql
    CREATE DATABASE manage2soar;
-   CREATE USER m2s WITH PASSWORD 'your-password-here';
+   CREATE USER m2s WITH PASSWORD 'your-password-here' CREATEDB;
    ALTER ROLE m2s SET client_encoding TO 'utf8';
    ALTER ROLE m2s SET default_transaction_isolation TO 'read committed';
    ALTER ROLE m2s SET timezone TO 'UTC';
    GRANT ALL PRIVILEGES ON DATABASE manage2soar TO m2s;
+   \q
+   ```
+   ```bash
+   # Grant schema-level permissions (required for PostgreSQL 15+)
+   sudo -u postgres psql -d manage2soar
+   ```
+   ```sql
+   GRANT ALL PRIVILEGES ON SCHEMA public TO m2s;
+   GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO m2s;
+   GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO m2s;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO m2s;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO m2s;
    \q
    ```
 
