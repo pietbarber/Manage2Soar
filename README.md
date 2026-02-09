@@ -36,13 +36,15 @@ Manage2Soar is a modern Django 5.2.11 web application for comprehensive soaring 
    ```
    ```sql
    CREATE DATABASE manage2soar;
-   CREATE USER m2s WITH PASSWORD 'your-password-here';
+   CREATE USER m2s WITH PASSWORD 'your-password-here' CREATEDB;
    ALTER ROLE m2s SET client_encoding TO 'utf8';
    ALTER ROLE m2s SET default_transaction_isolation TO 'read committed';
    ALTER ROLE m2s SET timezone TO 'UTC';
    GRANT ALL PRIVILEGES ON DATABASE manage2soar TO m2s;
+   ALTER DATABASE manage2soar OWNER TO m2s;
    \q
    ```
+   **Note:** Granting `CREATEDB` to `m2s` allows Django to create test databases, while making `m2s` the owner of the `manage2soar` database ensures it has the necessary permissions for schema migrations and other database objects.
 
 5. **Configure environment variables:**
    ```bash

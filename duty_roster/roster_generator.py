@@ -418,7 +418,7 @@ def diagnose_empty_slot(
     }
 
 
-def generate_roster(year=None, month=None, roles=None):
+def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
     """
     Generate a duty roster for a given month.
 
@@ -426,6 +426,8 @@ def generate_roster(year=None, month=None, roles=None):
         year: Year to generate roster for (default: current year)
         month: Month to generate roster for (default: current month)
         roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
+        exclude_dates: Optional set/list of datetime.date objects to skip
+            (e.g. dates the user has already removed from the proposed roster).
 
     Returns:
         List of dicts, each with:
@@ -458,6 +460,18 @@ def generate_roster(year=None, month=None, roles=None):
         logger.info(
             f"Filtered out {len(filtered_out)} weekend dates outside operational season: {filtered_out}"
         )
+
+    # Exclude dates the user has already removed from the proposed roster
+    if exclude_dates:
+        exclude_set = set(exclude_dates)
+        before_count = len(weekend_dates)
+        weekend_dates = [d for d in weekend_dates if d not in exclude_set]
+        excluded_count = before_count - len(weekend_dates)
+        if excluded_count:
+            logger.info(
+                f"Excluded {excluded_count} user-removed dates from roster generation: "
+                f"{sorted(exclude_set)}"
+            )
     members = list(Member.objects.filter(is_active=True))
     prefs = {
         p.member_id: p for p in DutyPreference.objects.select_related("member").all()
