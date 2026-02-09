@@ -250,7 +250,7 @@ Welcome to the Manage2Soar duty roster and operations management system. This Dj
 ### Option A: Automated Setup (Recommended)
 2. **Run the setup script**:
    ```bash
-   ./setup-dev.sh
+   ./infrastructure/scripts/setup-dev.sh
    ```
    This automatically sets up virtual environment, dependencies, security tools, and database.
 
