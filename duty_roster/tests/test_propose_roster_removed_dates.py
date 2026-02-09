@@ -11,6 +11,7 @@ import pytest
 from django.urls import reverse
 
 from duty_roster.roster_generator import clear_operational_season_cache, generate_roster
+from logsheet.models import Airfield
 from members.models import Member
 
 
@@ -128,6 +129,15 @@ class TestGenerateRosterExcludeDates:
 @pytest.mark.django_db
 class TestProposeRosterSessionTracking:
     """Test the propose_roster view tracks removed dates in the session."""
+
+    @pytest.fixture
+    def airfield(self):
+        """Create a default airfield for publishing."""
+        return Airfield.objects.create(
+            id=1,
+            name="Test Field",
+            identifier="TEST",
+        )
 
     @pytest.fixture
     def rostermeister(self):
@@ -297,3 +307,32 @@ class TestProposeRosterSessionTracking:
         assert (
             date_to_remove not in dates_after_roll
         ), f"Date {date_to_remove} should still be excluded after Roll Again"
+
+    def test_publish_clears_removed_dates(self, client, rostermeister, airfield):
+        """Publishing roster should clear both proposed roster and removed dates."""
+        client.login(username="rostermeister", password="testpass123")
+        url = reverse("duty_roster:propose_roster")
+
+        # First do a GET to establish the session
+        client.get(url, {"year": 2026, "month": 3})
+
+        # Set up session data
+        session = client.session
+        session["proposed_roster"] = [{"date": "2026-03-07", "slots": {}}]
+        removed_key = "removed_roster_dates_2026_03"
+        session[removed_key] = ["2026-03-01"]
+        session.save()
+
+        # Publish (this will redirect)
+        response = client.post(
+            url,
+            {"year": 2026, "month": 3, "action": "publish"},
+        )
+
+        # Verify redirect
+        assert response.status_code == 302
+
+        # Verify session was cleaned up
+        session = client.session
+        assert "proposed_roster" not in session
+        assert removed_key not in session

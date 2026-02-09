@@ -44,7 +44,7 @@ Manage2Soar is a modern Django 5.2.11 web application for comprehensive soaring 
    ALTER DATABASE manage2soar OWNER TO m2s;
    \q
    ```
-   **Note:** Setting `m2s` as the database owner ensures proper permissions for migrations and test database creation.
+   **Note:** Granting `CREATEDB` to `m2s` allows Django to create test databases, while making `m2s` the owner of the `manage2soar` database ensures it has the necessary permissions for schema migrations and other database objects.
 
 5. **Configure environment variables:**
    ```bash
