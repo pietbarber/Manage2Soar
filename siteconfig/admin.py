@@ -204,6 +204,22 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Membership Application Settings",
+            {
+                "fields": (
+                    "membership_application_enabled",
+                    "membership_application_terms",
+                    "membership_auto_approve",
+                ),
+                "description": (
+                    "Configure the membership application form. Enable to allow prospective members "
+                    "to submit applications online. Set custom terms and conditions. "
+                    "Auto-approve skips manual review and immediately creates member accounts."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Mail Server Configuration",
             {
                 "fields": ("manual_whitelist",),
