@@ -5,6 +5,8 @@
 
 {% block content %}
 
+{% include "duty_roster/_messages.html" %}
+
 {% if incomplete %}
   <div class="alert alert-warning">
     ⚠️ Could not fully auto-generate a complete roster for {{ month }}/{{ year }}.
