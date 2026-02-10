@@ -335,12 +335,15 @@ def create_logsheet(request):
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    flights = (
+    # Base queryset for all flights in the logsheet
+    all_flights = (
         Flight.objects.select_related("pilot", "glider", "towplane", "tow_pilot")
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
     )
 
+    # Filtered queryset for display purposes only
+    flights = all_flights
     query = request.GET.get("q")
     if query:
         flights = flights.filter(
@@ -363,7 +366,8 @@ def manage_logsheet(request, pk):
         responsible_members = set()
         invalid_flights = []
 
-        for flight in flights:
+        # Use unfiltered queryset for validation to avoid filtered subset issues
+        for flight in all_flights:
             pilot = flight.pilot
             partner = flight.split_with
             split = flight.split_type
@@ -400,7 +404,8 @@ def manage_logsheet(request, pk):
 
         # Enforce required duty crew before finalization
         # Only require logsheet.tow_pilot if there are any towplane launches
-        has_tow_flights = any(f.requires_tow for f in flights)
+        # Use unfiltered queryset for validation
+        has_tow_flights = any(f.requires_tow for f in all_flights)
 
         required_roles = {
             "duty_officer": logsheet.duty_officer,
@@ -451,12 +456,15 @@ def manage_logsheet(request, pk):
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
         # Check towplane closeout data if there were flights
-        if flights.exists():
+        # Use unfiltered queryset for validation
+        if all_flights.exists():
             towplane_closeouts = logsheet.towplane_closeouts.all()
             missing_towplane_data = []
 
             # Get unique towplanes used in flights
-            used_towplanes = set(flights.values_list("towplane", flat=True).distinct())
+            used_towplanes = set(
+                all_flights.values_list("towplane", flat=True).distinct()
+            )
             used_towplanes.discard(None)  # Remove None values
 
             if used_towplanes:
@@ -464,14 +472,20 @@ def manage_logsheet(request, pk):
                 towplanes_dict = Towplane.objects.in_bulk(used_towplanes)
 
                 for towplane_id in used_towplanes:
-                    towplane = towplanes_dict[towplane_id]
+                    # Handle missing towplanes gracefully (may have been deleted)
+                    towplane = towplanes_dict.get(towplane_id)
+                    if towplane is None:
+                        missing_towplane_data.append(
+                            f"Missing towplane record for id {towplane_id}"
+                        )
+                        continue
 
                     # Skip closeout validation for virtual towplanes (WINCH, OTHER)
                     # except SELF when used with club-owned gliders
                     if towplane.is_virtual:
                         # For SELF, only require closeout if used with club-owned gliders
                         if towplane.n_number.upper() == "SELF":
-                            has_club_glider = flights.filter(
+                            has_club_glider = all_flights.filter(
                                 towplane=towplane, glider__club_owned=True
                             ).exists()
                             if not has_club_glider:
@@ -501,7 +515,8 @@ def manage_logsheet(request, pk):
         # Lock in cost values
         # That means take the temporary values we calculated for the costs
         # and place them in these other variables that get perma-written to the database.
-        for flight in flights:
+        # Use unfiltered queryset to lock in costs for all flights
+        for flight in all_flights:
             if flight.tow_cost_actual is None:
                 flight.tow_cost_actual = flight.tow_cost_calculated
             if flight.rental_cost_actual is None:
