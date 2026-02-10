@@ -54,6 +54,12 @@ if ! kubectl get nodes &>/dev/null; then
     exit 1
 fi
 
+# Verify kubectl context (production safety check)
+CURRENT_CONTEXT=$(kubectl config current-context)
+echo -e "${YELLOW}Current kubectl context: ${CURRENT_CONTEXT}${NC}"
+echo -e "${YELLOW}This will deploy to PRODUCTION${NC}"
+echo ""
+
 # Confirm deployment
 read -p "Deploy current code to production? (y/N) " -n 1 -r
 echo

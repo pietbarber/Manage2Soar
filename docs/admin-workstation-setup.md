@@ -34,7 +34,7 @@ Before proceeding, ensure you have:
 
 Verify your environment:
 ```bash
-python3 --version  # Should be 3.11 or higher
+python3 --version  # Should be 3.12 or higher
 git --version      # Any recent version
 ```
 
@@ -199,6 +199,9 @@ chmod 600 ~/.ansible_vault_pass
 
 ```bash
 cd infrastructure/ansible
+
+# Create directory for config files (these are gitignored)
+mkdir -p group_vars/gcp_app
 
 # Copy example files to create actual configs
 cp inventory/gcp_app.yml.example inventory/gcp_app.yml
