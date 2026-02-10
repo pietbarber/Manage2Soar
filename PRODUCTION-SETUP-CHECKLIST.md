@@ -2,16 +2,16 @@
 
 Use this checklist to track your laptop setup progress for production deployments.
 
-## ✅ Phase 1: Install Tools - COMPLETE
+## Phase 1: Install Tools
 
-- [x] Google Cloud CLI (`gcloud`)
-- [x] kubectl
-- [x] Docker Engine
-- [x] Ansible + required collections (kubernetes.core, google.cloud, community.postgresql)
-- [x] Optional: k9s, helm, jq
-- [x] Log out and log back in (for docker group membership)
+- [ ] Google Cloud CLI (`gcloud`)
+- [ ] kubectl
+- [ ] Docker Engine
+- [ ] Ansible + required collections (kubernetes.core, google.cloud, community.postgresql)
+- [ ] Optional: k9s, helm, jq
+- [ ] Log out and log back in (for docker group membership)
 
-**Installation completed via:**
+**Installation:**
 ```bash
 # Ubuntu/Debian:
 ./infrastructure/scripts/setup-admin-ubuntu.sh
@@ -20,29 +20,31 @@ Use this checklist to track your laptop setup progress for production deployment
 ./infrastructure/scripts/setup-admin-homebrew.sh
 ```
 
-## ✅ Phase 2: Authenticate & Configure - COMPLETE
+## Phase 2: Authenticate & Configure
 
-- [x] Authenticate with GCP  
-  - Account: *(your GCP account)*
-  - Project: manage2soar
-  - Already configured via `gcloud init`
-
-- [x] Configure Docker for GCR
+- [ ] Authenticate with GCP  
   ```bash
-  gcloud auth configure-docker gcr.io  # DONE
+  gcloud init
+  gcloud auth application-default login
   ```
 
-- [x] Get kubectl access to GKE cluster
+- [ ] Configure Docker for GCR
   ```bash
-  gcloud container clusters get-credentials manage2soar-cluster --zone=us-east1-b --project=manage2soar  # DONE
+  gcloud auth configure-docker gcr.io
   ```
 
-- [x] Verify kubectl access
-  - Cluster: manage2soar-cluster (check with `gcloud container clusters list`)
-  - Namespaces: tenant-ssc, tenant-masa
-  - Current deployed version: check with `kubectl get deployment -n tenant-ssc -o jsonpath='{.items[0].spec.template.spec.containers[0].image}'`
+- [ ] Get kubectl access to GKE cluster
+  ```bash
+  gcloud container clusters get-credentials CLUSTER_NAME --zone=ZONE --project=PROJECT_ID
+  ```
 
-**Note:** Docker group requires `newgrp docker` in each new terminal, or log out/back in for permanent access.
+- [ ] Verify kubectl access
+  ```bash
+  kubectl get nodes
+  kubectl get namespaces
+  ```
+
+**Note:** Docker group may require `newgrp docker` in each new terminal, or log out/back in for permanent access.
 
 ## ⚠️ Phase 3: Choose Deployment Method
 
@@ -71,20 +73,25 @@ newgrp docker
 # 4. Wait for rollout: kubectl rollout status ...
 ```
 
-### Option B: Full Ansible Setup (For complete infrastructure management) - ✅ COMPLETE
+### Option B: Full Ansible Setup (For complete infrastructure management)
 Required for: secrets management, database provisioning, cluster provisioning, multi-tenant config.
 
-- [x] Vault password file configured: `~/.ansible_vault_pass` ✓
-- [x] Extracted Ansible configuration from backup tarball ✓
-- [x] Generated SSH key: `~/.ssh/id_ed25519` ✓
-- [x] Added SSH key to GCP project metadata ✓
-- [x] Verified SSH connectivity to all hosts ✓
-- [x] Verified Ansible ping to all hosts ✓
-- [x] Verified Ansible vault access ✓
+- [ ] Vault password file configured: `~/.ansible_vault_pass`
+- [ ] SSH key generated and added to GCP project metadata
+- [ ] Ansible inventory files created from examples
+- [ ] Ansible group_vars configured and encrypted
+- [ ] Verify SSH connectivity to all hosts
+- [ ] Verify Ansible ping to all hosts
+- [ ] Verify Ansible vault access
 
 **Configured Hosts:**
-- **m2s-database**: PostgreSQL server (get IP via `gcloud compute instances describe m2s-database --zone=us-east1-b --format='get(networkInterfaces[0].accessConfigs[0].natIP)'`)
-- **m2s-mail**: Postfix mail server (get IP via `gcloud compute instances describe m2s-mail --zone=us-east1-b --format='get(networkInterfaces[0].accessConfigs[0].natIP)'`)
+- **m2s-database**: PostgreSQL server
+- **m2s-mail**: Postfix mail server
+
+Get host IPs with:
+```bash
+gcloud compute instances describe INSTANCE_NAME --zone=ZONE --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
+```
 
 **Test connectivity:**
 ```bash
@@ -110,31 +117,31 @@ ansible-playbook -i inventory/gcp_app.yml \
   playbooks/gcp-app-deploy.yml
 ```
 
-## ✅ Phase 4: Verify Setup - COMPLETE
+## Phase 4: Verify Setup
 
-- [x] Test GCP connection
+- [ ] Test GCP connection
   ```bash
-  gcloud projects list  # ✓ manage2soar project active
-  gcloud container clusters list  # ✓ manage2soar-cluster running
+  gcloud projects list
+  gcloud container clusters list
   ```
 
-- [x] Test kubectl
+- [ ] Test kubectl
   ```bash
-  kubectl cluster-info  # ✓ Shows cluster master endpoint for current context
-  kubectl get pods --all-namespaces  # ✓ Both tenants running pods
+  kubectl cluster-info
+  kubectl get pods --all-namespaces
   ```
 
-- [x] Test Docker
+- [ ] Test Docker
   ```bash
-  docker run hello-world  # ✓ Works (requires newgrp docker)
-  docker images  # ✓ Can pull from gcr.io/manage2soar
+  docker run hello-world
+  docker images
   ```
-  **Note:** Docker requires `newgrp docker` in each new terminal, or log out/back in once
+  **Note:** Docker may require `newgrp docker` in each new terminal
 
-- [x] Test Ansible
+- [ ] Test Ansible
   ```bash
-  ansible --version  # ✓ Check version is installed
-  ansible-galaxy collection list | grep -E "kubernetes|google.cloud|community.postgresql"  # ✓ All present
+  ansible --version
+  ansible-galaxy collection list | grep -E "kubernetes|google.cloud|community.postgresql"
   ```
 
 ## 🚀 Phase 5: Ready to Deploy!

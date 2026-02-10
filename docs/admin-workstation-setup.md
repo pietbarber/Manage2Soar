@@ -198,7 +198,7 @@ chmod 600 ~/.ansible_vault_pass
 ### 2. Copy Infrastructure Configuration Files
 
 ```bash
-cd ~/Projects/skylinesoaring/Manage2Soar/infrastructure/ansible
+cd infrastructure/ansible
 
 # Copy example files to create actual configs
 cp inventory/gcp_app.yml.example inventory/gcp_app.yml
@@ -349,9 +349,9 @@ kubectl config use-context <CONTEXT_NAME>
 
 1. **Never commit secrets**:
    - `~/.ansible_vault_pass`
-   - `inventory/gcp_app.yml`
-   - `group_vars/gcp_app/vars.yml`
-   - `group_vars/gcp_app/vault.yml` (unless encrypted)
+   - `infrastructure/ansible/inventory/gcp_app.yml`
+   - `infrastructure/ansible/group_vars/gcp_app.vars.yml`
+   - `infrastructure/ansible/group_vars/gcp_app.vault.yml` (unless encrypted)
    - `*.json` service account keys
 
 2. **Use Ansible Vault** for all secrets in playbooks

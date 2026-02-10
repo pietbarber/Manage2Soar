@@ -33,7 +33,7 @@ echo ""
 
 # Check if running on Ubuntu or Debian (or compatible derivatives)
 OS_ID=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-OS_ID_LIKE=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_ID_LIKE=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"' || true)
 
 if ! echo "$OS_ID $OS_ID_LIKE" | grep -Eq '\b(ubuntu|debian)\b'; then
     echo -e "${RED}ERROR: This script is designed for Ubuntu/Debian-based systems.${NC}"

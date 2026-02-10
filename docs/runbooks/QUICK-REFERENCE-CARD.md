@@ -40,8 +40,9 @@ kubectl rollout undo deployment/django-app-masa -n tenant-masa
 
 ### From Browser Console → Cloud Shell:
 ```bash
-# Download, review, then run:
-curl -s -o emergency-ssh-access.sh https://raw.githubusercontent.com/pietbarber/Manage2Soar/main/emergency-ssh-access.sh
+# Download, review, then run (pin to a specific tag for safety):
+TAG="v1.0.0"  # Update to latest stable tag
+curl -s -o emergency-ssh-access.sh https://raw.githubusercontent.com/pietbarber/Manage2Soar/${TAG}/emergency-ssh-access.sh
 less emergency-ssh-access.sh   # review before executing
 bash emergency-ssh-access.sh
 ```

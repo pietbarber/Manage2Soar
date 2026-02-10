@@ -2,7 +2,7 @@
 # Test Ansible Connectivity
 # Validates SSH access, Ansible ping, and vault access to all managed hosts
 
-set -e
+set -euo pipefail
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -39,15 +39,20 @@ fi
 
 echo ""
 echo -e "${YELLOW}[2/5] Testing SSH keys...${NC}"
-if [ -f ~/.ssh/id_ed25519 ]; then
-    echo -e "${GREEN}✓ SSH key exists: ~/.ssh/id_ed25519${NC}"
+# Check for common SSH keys (Ansible defaults to google_compute_engine for GCP)
+if [ -f ~/.ssh/google_compute_engine ] || [ -f ~/.ssh/id_ed25519 ] || [ -f ~/.ssh/id_rsa ]; then
+    echo -e "${GREEN}✓ SSH key found${NC}"
 else
-    echo -e "${RED}✗ SSH key not found${NC}"
+    echo -e "${RED}✗ No SSH key found (checked: google_compute_engine, id_ed25519, id_rsa)${NC}"
     exit 1
 fi
 
 echo ""
 echo -e "${YELLOW}[3/5] Testing Ansible ping: Database server...${NC}"
+if [ ! -f inventory/gcp_database.yml ]; then
+    echo -e "${RED}✗ inventory/gcp_database.yml not found (copy from .example)${NC}"
+    exit 1
+fi
 if ansible gcp_database_servers -i inventory/gcp_database.yml -m ping 2>&1 | grep -q "SUCCESS"; then
     echo -e "${GREEN}✓ m2s-database: reachable${NC}"
 else
@@ -57,6 +62,10 @@ fi
 
 echo ""
 echo -e "${YELLOW}[4/5] Testing Ansible ping: Mail server...${NC}"
+if [ ! -f inventory/gcp_mail.yml ]; then
+    echo -e "${RED}✗ inventory/gcp_mail.yml not found (copy from .example)${NC}"
+    exit 1
+fi
 if ansible gcp_mail_servers -i inventory/gcp_mail.yml -m ping 2>&1 | grep -q "SUCCESS"; then
     echo -e "${GREEN}✓ m2s-mail: reachable${NC}"
 else

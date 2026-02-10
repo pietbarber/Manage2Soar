@@ -64,7 +64,7 @@ fi
 
 # Step 1: Build Docker image
 echo -e "\n${GREEN}[1/4] Building Docker image...${NC}"
-docker build -t "${FULL_IMAGE}" .
+docker build --platform linux/amd64 -t "${FULL_IMAGE}" .
 
 # Step 2: Push to GCR
 echo -e "\n${GREEN}[2/4] Pushing to Google Container Registry...${NC}"
