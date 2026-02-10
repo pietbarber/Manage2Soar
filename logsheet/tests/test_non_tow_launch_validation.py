@@ -46,6 +46,18 @@ def glider(db):
 
 
 @pytest.fixture
+def private_glider(db):
+    """Create privately-owned glider."""
+    return Glider.objects.create(
+        make="Private",
+        model="Glider",
+        n_number="G-PRIV",
+        club_owned=False,
+        rental_rate=0.00,
+    )
+
+
+@pytest.fixture
 def towplane(db):
     """Create regular towplane."""
     return Towplane.objects.create(
@@ -509,3 +521,102 @@ class TestCloseoutValidationWithVirtualTowplanes:
         # Check error message
         messages = list(get_messages(response.wsgi_request))
         assert any("Missing closeout data" in str(m) for m in messages)
+
+
+@pytest.mark.django_db
+class TestSelfLaunchCloseoutRequirement:
+    """Test that SELF towplane closeout is only required for club-owned gliders."""
+
+    def test_self_launch_with_club_glider_requires_closeout(
+        self,
+        client,
+        logsheet,
+        pilot,
+        glider,
+        virtual_towplane_self,
+        duty_officer,
+        duty_instructor,
+    ):
+        """SELF with club-owned glider requires closeout for Hobbs tracking."""
+        # Create self-launch flight with club-owned glider
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,  # club_owned=True
+            launch_method=Flight.LaunchMethod.SELF,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=0,
+            towplane=virtual_towplane_self,
+        )
+
+        # Create closeout
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+
+        # Create payment
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        # NO TowplaneCloseout created - finalization should fail
+        # because club glider needs Hobbs tracking
+
+        # Log in as duty officer
+        client.force_login(duty_officer)
+
+        # Attempt finalization - should fail without SELF closeout
+        response = client.post(
+            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+        )
+
+        logsheet.refresh_from_db()
+        assert logsheet.finalized is False
+
+        # Check error message
+        messages = list(get_messages(response.wsgi_request))
+        assert any("Missing closeout data" in str(m) for m in messages)
+
+    def test_self_launch_with_private_glider_skips_closeout(
+        self,
+        client,
+        logsheet,
+        pilot,
+        private_glider,
+        virtual_towplane_self,
+        duty_officer,
+        duty_instructor,
+    ):
+        """SELF with privately-owned glider does not require closeout."""
+        # Create self-launch flight with privately-owned glider
+        Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=private_glider,  # club_owned=False
+            launch_method=Flight.LaunchMethod.SELF,
+            launch_time=time(10, 0),
+            landing_time=time(11, 0),
+            release_altitude=0,
+            towplane=virtual_towplane_self,
+        )
+
+        # Create closeout
+        LogsheetCloseout.objects.create(logsheet=logsheet)
+
+        # Create payment
+        LogsheetPayment.objects.create(
+            logsheet=logsheet, member=pilot, payment_method="cash"
+        )
+
+        # NO TowplaneCloseout created - should still finalize
+        # because private glider doesn't need Hobbs tracking
+
+        # Log in as duty officer
+        client.force_login(duty_officer)
+
+        # Attempt finalization - should succeed without SELF closeout
+        client.post(
+            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+        )
+
+        logsheet.refresh_from_db()
+        assert logsheet.finalized is True

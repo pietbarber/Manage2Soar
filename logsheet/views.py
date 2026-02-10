@@ -463,9 +463,17 @@ def manage_logsheet(request, pk):
                 for towplane_id in used_towplanes:
                     towplane = Towplane.objects.get(pk=towplane_id)
 
-                    # Skip closeout validation for virtual towplanes (SELF, WINCH, OTHER)
-                    if towplane.is_virtual:
+                    # Skip closeout validation for WINCH and OTHER (always virtual)
+                    if towplane.n_number.upper() in {"WINCH", "OTHER"}:
                         continue
+
+                    # For SELF, only require closeout if used with club-owned gliders
+                    if towplane.n_number.upper() == "SELF":
+                        has_club_glider = flights.filter(
+                            towplane=towplane, glider__club_owned=True
+                        ).exists()
+                        if not has_club_glider:
+                            continue
 
                     closeout = towplane_closeouts.filter(towplane=towplane).first()
 
