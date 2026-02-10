@@ -120,6 +120,12 @@ class Flight(models.Model):
         choices=LaunchMethod.choices,
         default=LaunchMethod.TOWPLANE,
     )
+
+    @property
+    def requires_tow(self):
+        """Return True if this flight's launch method requires a towplane and tow pilot."""
+        return self.launch_method == self.LaunchMethod.TOWPLANE
+
     # Airfield will need to go back in right here.
     airfield = models.ForeignKey("Airfield", on_delete=models.PROTECT, null=True)
 
@@ -143,21 +149,24 @@ class Flight(models.Model):
     )
 
     def is_incomplete(self):
-        return self.landing_time is not None and (
-            self.release_altitude is None
-            or self.towplane is None
-            or self.tow_pilot is None
-        )
+        if not self.landing_time:
+            return False
+        if self.release_altitude is None:
+            return True
+        if self.requires_tow and (self.towplane is None or self.tow_pilot is None):
+            return True
+        return False
 
     def get_missing_fields(self):
         missing = []
         if self.landing_time is not None:
             if not self.release_altitude:
                 missing.append("release altitude")
-            if not self.towplane:
-                missing.append("towplane")
-            if not self.tow_pilot:
-                missing.append("tow pilot")
+            if self.requires_tow:
+                if not self.towplane:
+                    missing.append("towplane")
+                if not self.tow_pilot:
+                    missing.append("tow pilot")
         return missing
 
     @property
@@ -472,6 +481,17 @@ class Towplane(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+    # N-numbers used for non-towplane launch methods (no closeout data needed)
+    VIRTUAL_N_NUMBERS = {"SELF", "WINCH", "OTHER"}
+
+    @property
+    def is_virtual(self):
+        """Return True if this is a virtual towplane (self-launch, winch, other).
+
+        Virtual towplanes don't require tach times, fuel data, or closeout entries.
+        """
+        return self.n_number.upper() in self.VIRTUAL_N_NUMBERS
 
     def __str__(self):
         status = " (Inactive)" if not self.is_active else ""

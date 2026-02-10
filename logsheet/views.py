@@ -385,19 +385,31 @@ def manage_logsheet(request, pk):
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a release altitude."
                 )
-            if not flight.towplane:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
-            if not flight.tow_pilot:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
+            # Only require towplane and tow pilot for towplane launches
+            if flight.requires_tow:
+                if not flight.towplane:
+                    invalid_flights.append(
+                        f"Flight #{flight.id} is missing a tow plane."
+                    )
+                if not flight.tow_pilot:
+                    invalid_flights.append(
+                        f"Flight #{flight.id} is missing a tow pilot."
+                    )
             if not flight.launch_time:
                 invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
             # Enforce required duty crew before finalization
+            # Only require logsheet.tow_pilot if there are any towplane launches
+            has_tow_flights = any(f.requires_tow for f in flights)
+
             required_roles = {
                 "duty_officer": logsheet.duty_officer,
-                "tow_pilot": logsheet.tow_pilot,
                 "duty_instructor": logsheet.duty_instructor,
             }
+
+            # Only require tow pilot if any flights use towplane launches
+            if has_tow_flights:
+                required_roles["tow_pilot"] = logsheet.tow_pilot
 
             missing_roles = [
                 label.replace("_", " ").title()
@@ -450,6 +462,11 @@ def manage_logsheet(request, pk):
             if used_towplanes:
                 for towplane_id in used_towplanes:
                     towplane = Towplane.objects.get(pk=towplane_id)
+
+                    # Skip closeout validation for virtual towplanes (SELF, WINCH, OTHER)
+                    if towplane.is_virtual:
+                        continue
+
                     closeout = towplane_closeouts.filter(towplane=towplane).first()
 
                     if not closeout:
