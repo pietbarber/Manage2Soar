@@ -60,6 +60,26 @@ echo -e "${YELLOW}Current kubectl context: ${CURRENT_CONTEXT}${NC}"
 echo -e "${YELLOW}This will deploy to PRODUCTION${NC}"
 echo ""
 
+# Validate context or require explicit confirmation
+if [[ ! "$CURRENT_CONTEXT" =~ manage2soar ]]; then
+    echo -e "${RED}WARNING: Current context does not contain 'manage2soar'!${NC}"
+    echo -e "${RED}You may be pointed at the wrong cluster.${NC}"
+    echo ""
+    read -p "Type the cluster name 'manage2soar' to continue: " -r
+    if [[ "$REPLY" != "manage2soar" ]]; then
+        echo "Deployment cancelled"
+        exit 1
+    fi
+fi
+
+# Check for migration changes
+MIGRATION_CHANGES=$(git diff --name-only origin/main...HEAD | grep -c 'migrations/.*\.py$' || true)
+if [ "$MIGRATION_CHANGES" -gt 0 ]; then
+    echo -e "${RED}⚠ WARNING: ${MIGRATION_CHANGES} migration file(s) changed in this deployment!${NC}"
+    echo -e "${YELLOW}Schema changes detected - migrations must be run after deployment.${NC}"
+    echo ""
+fi
+
 # Confirm deployment
 read -p "Deploy current code to production? (y/N) " -n 1 -r
 echo
@@ -69,15 +89,15 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Step 1: Build Docker image
-echo -e "\n${GREEN}[1/4] Building Docker image...${NC}"
+echo -e "\n${GREEN}[1/5] Building Docker image...${NC}"
 docker build --platform linux/amd64 -t "${FULL_IMAGE}" .
 
 # Step 2: Push to GCR
-echo -e "\n${GREEN}[2/4] Pushing to Google Container Registry...${NC}"
+echo -e "\n${GREEN}[2/5] Pushing to Google Container Registry...${NC}"
 docker push "${FULL_IMAGE}"
 
 # Step 3: Update deployments
-echo -e "\n${GREEN}[3/4] Updating Kubernetes deployments...${NC}"
+echo -e "\n${GREEN}[3/5] Updating Kubernetes deployments...${NC}"
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
     deployment="django-app-${tenant}"
@@ -92,7 +112,7 @@ for tenant in "${TENANTS[@]}"; do
 done
 
 # Step 4: Verify
-echo -e "\n${GREEN}[4/4] Verifying deployment...${NC}"
+echo -e "\n${GREEN}[4/5] Verifying deployment...${NC}"
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
     echo "  ${namespace}:"
@@ -104,6 +124,34 @@ for tenant in "${TENANTS[@]}"; do
         echo -e "  ${YELLOW}⚠ Warning: ${NON_RUNNING} pod(s) not in Running state${NC}"
     fi
 done
+
+# Step 5: Run migrations if needed
+if [ "$MIGRATION_CHANGES" -gt 0 ]; then
+    echo -e "\n${YELLOW}[5/5] Migration files changed - run migrations now?${NC}"
+    read -p "Run 'python manage.py migrate' on all tenants? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        for tenant in "${TENANTS[@]}"; do
+            namespace="tenant-${tenant}"
+            deployment="django-app-${tenant}"
+            echo "  Running migrations for ${namespace}..."
+
+            # Get first pod name
+            POD=$(kubectl get pods -n "${namespace}" -l app=django-app-${tenant} -o jsonpath='{.items[0].metadata.name}')
+
+            if [ -n "$POD" ]; then
+                kubectl exec -n "${namespace}" "$POD" -c django -- python manage.py migrate --noinput
+                echo -e "  ${GREEN}✓ Migrations complete for ${namespace}${NC}"
+            else
+                echo -e "  ${RED}✗ No pod found for ${namespace}${NC}"
+            fi
+        done
+    else
+        echo -e "${YELLOW}⚠ Skipped migrations - remember to run manually if needed!${NC}"
+    fi
+else
+    echo -e "\n${GREEN}[5/5] No migration changes detected - skipping migration step${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
