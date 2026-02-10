@@ -123,7 +123,16 @@ class Flight(models.Model):
 
     @property
     def requires_tow(self):
-        """Return True if this flight's launch method requires a towplane and tow pilot."""
+        """Return True if this flight's launch method requires a towplane and tow pilot.
+
+        Returns False if:
+        - Towplane is virtual (SELF, WINCH, OTHER N-numbers)
+        - Launch method is explicitly set to non-tow (winch, self, other)
+        """
+        # If towplane is virtual (SELF, WINCH, OTHER), no tow pilot needed
+        if self.towplane and self.towplane.is_virtual:
+            return False
+        # Otherwise check launch method
         return self.launch_method == self.LaunchMethod.TOWPLANE
 
     # Airfield will need to go back in right here.

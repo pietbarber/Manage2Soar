@@ -191,6 +191,23 @@ class TestFlightRequiresTow:
         )
         assert flight.requires_tow is False
 
+    def test_virtual_towplane_overrides_launch_method(
+        self, db, logsheet, pilot, glider, virtual_towplane_self
+    ):
+        """Flight with virtual towplane (SELF) doesn't require tow pilot, even with default launch_method.
+
+        This tests the real-world scenario where a user selects "Self-Launch (SELF)"
+        as the towplane in the UI, but launch_method remains at its default of "tow".
+        """
+        flight = Flight.objects.create(
+            logsheet=logsheet,
+            pilot=pilot,
+            glider=glider,
+            launch_method=Flight.LaunchMethod.TOWPLANE,  # Default value
+            towplane=virtual_towplane_self,  # But virtual towplane selected
+        )
+        assert flight.requires_tow is False
+
 
 class TestFlightIncomplete:
     """Test Flight.is_incomplete() with different launch methods."""
