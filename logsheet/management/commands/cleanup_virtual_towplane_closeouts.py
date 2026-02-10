@@ -69,7 +69,7 @@ class Command(BaseCommand):
 
         for closeout in to_delete:
             self.stdout.write(
-                f"  - Logsheet {closeout.logsheet.date} ({closeout.logsheet.pk}): "
+                f"  - Logsheet {closeout.logsheet.log_date} ({closeout.logsheet.pk}): "
                 f"{closeout.towplane.name} ({closeout.towplane.n_number})"
             )
 

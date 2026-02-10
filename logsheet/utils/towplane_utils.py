@@ -34,19 +34,18 @@ def get_relevant_towplanes(logsheet):
     # Filter out virtual towplanes that don't need closeout
     result = []
     for towplane in towplanes:
-        n_number_upper = towplane.n_number.upper()
-
-        # Always skip WINCH and OTHER (completely virtual)
-        if n_number_upper in {"WINCH", "OTHER"}:
-            continue
-
-        # For SELF, only include if used with club-owned gliders
-        if n_number_upper == "SELF":
-            # Check if any flight with this towplane used a club-owned glider
-            has_club_glider = logsheet.flights.filter(
-                towplane=towplane, glider__club_owned=True
-            ).exists()
-            if not has_club_glider:
+        # Skip virtual towplanes (WINCH, OTHER) except SELF when used with club gliders
+        if towplane.is_virtual:
+            # For SELF, only include if used with club-owned gliders (Hobbs tracking)
+            if towplane.n_number.upper() == "SELF":
+                # Check if any flight with this towplane used a club-owned glider
+                has_club_glider = logsheet.flights.filter(
+                    towplane=towplane, glider__club_owned=True
+                ).exists()
+                if not has_club_glider:
+                    continue
+            else:
+                # WINCH and OTHER never need closeout
                 continue
 
         result.append(towplane)
