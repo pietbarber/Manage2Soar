@@ -34,21 +34,37 @@ class Command(BaseCommand):
 
         # Find all closeouts for virtual towplanes
         # Reuse centralized logic from get_relevant_towplanes
+        from collections import defaultdict
+
         from logsheet.utils.towplane_utils import get_relevant_towplanes
 
-        virtual_closeouts = TowplaneCloseout.objects.filter(
-            towplane__n_number__iregex=r"^(SELF|WINCH|OTHER)$"
-        ).select_related("towplane", "logsheet")
+        virtual_closeouts = (
+            TowplaneCloseout.objects.filter(
+                towplane__n_number__iregex=r"^(SELF|WINCH|OTHER)$"
+            )
+            .select_related("towplane", "logsheet")
+            .order_by("logsheet_id")
+        )
+
+        # Group closeouts by logsheet to avoid repeated get_relevant_towplanes() calls
+        closeouts_by_logsheet = defaultdict(list)
+        for closeout in virtual_closeouts:
+            closeouts_by_logsheet[closeout.logsheet_id].append(closeout)
 
         to_delete = []
 
-        for closeout in virtual_closeouts:
-            # Use centralized logic to determine if this closeout should exist
-            relevant_towplanes = get_relevant_towplanes(closeout.logsheet)
+        # Process each logsheet once, caching relevant towplane IDs
+        for logsheet_id, closeouts in closeouts_by_logsheet.items():
+            # Get relevant towplanes for this logsheet once
+            logsheet = closeouts[0].logsheet  # All closeouts share the same logsheet
+            relevant_towplane_ids = set(
+                get_relevant_towplanes(logsheet).values_list("pk", flat=True)
+            )
 
-            # If this towplane is not in the relevant set, mark for deletion
-            if closeout.towplane not in relevant_towplanes:
-                to_delete.append(closeout)
+            # Check each closeout against the cached relevant set
+            for closeout in closeouts:
+                if closeout.towplane_id not in relevant_towplane_ids:
+                    to_delete.append(closeout)
 
         if not to_delete:
             self.stdout.write(

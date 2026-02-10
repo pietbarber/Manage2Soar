@@ -1367,11 +1367,10 @@ def edit_logsheet_closeout(request, pk):
             logsheet=logsheet, towplane_id=towplane_id
         )
 
-    # Build formset for towplane closeouts - only show closeouts for relevant towplanes
-    # This ensures SELF/WINCH/OTHER closeouts don't appear when they shouldn't
-    queryset = TowplaneCloseout.objects.filter(
-        logsheet=logsheet, towplane_id__in=relevant_towplane_ids
-    )
+    # Build formset for towplane closeouts - include all closeouts for this logsheet
+    # This keeps any existing (possibly stale) closeouts visible so they can be adjusted or removed
+    # The cleanup command can be run separately to remove truly stale virtual towplane closeouts
+    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
     formset_class = TowplaneCloseoutFormSet
     formset = formset_class(queryset=queryset)
 

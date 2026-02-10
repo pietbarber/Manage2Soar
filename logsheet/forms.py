@@ -496,9 +496,10 @@ class FlightForm(forms.ModelForm):
         self.fields["glider"].choices = [(g.pk, str(g)) for g in gliders_sorted]
 
         # Simple sequential altitude choices (0-7000 in 100ft steps)
+        # Include empty choice "----" to allow clearing the value (None)
         self.fields["release_altitude"].choices = [
-            (alt, f"{alt} ft") for alt in range(0, 7100, 100)
-        ]
+            ("", "----"),  # Allow None/blank for flights that haven't set altitude yet
+        ] + [(alt, f"{alt} ft") for alt in range(0, 7100, 100)]
 
         # Always use: active by last name, then inactive by last name
         active_statuses = get_active_membership_statuses()
