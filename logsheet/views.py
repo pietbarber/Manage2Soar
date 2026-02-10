@@ -336,7 +336,7 @@ def create_logsheet(request):
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     flights = (
-        Flight.objects.select_related("pilot", "glider")
+        Flight.objects.select_related("pilot", "glider", "towplane", "tow_pilot")
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
     )
@@ -460,8 +460,11 @@ def manage_logsheet(request, pk):
             used_towplanes.discard(None)  # Remove None values
 
             if used_towplanes:
+                # Fetch all towplanes in bulk to avoid N+1 queries
+                towplanes_dict = Towplane.objects.in_bulk(used_towplanes)
+
                 for towplane_id in used_towplanes:
-                    towplane = Towplane.objects.get(pk=towplane_id)
+                    towplane = towplanes_dict[towplane_id]
 
                     # Skip closeout validation for WINCH and OTHER (always virtual)
                     if towplane.n_number.upper() in {"WINCH", "OTHER"}:

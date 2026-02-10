@@ -13,6 +13,7 @@ from datetime import date, time
 
 import pytest
 from django.contrib.messages import get_messages
+from django.urls import reverse
 
 from logsheet.models import (
     Airfield,
@@ -351,7 +352,9 @@ class TestFinalizationWithNonTowFlights:
 
         # Attempt finalization - should succeed even without logsheet.tow_pilot
         client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()
@@ -408,7 +411,9 @@ class TestFinalizationWithNonTowFlights:
 
         # Attempt finalization - should fail without tow_pilot
         response = client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()
@@ -462,7 +467,9 @@ class TestCloseoutValidationWithVirtualTowplanes:
 
         # Attempt finalization - should succeed without towplane closeout
         client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()
@@ -512,7 +519,9 @@ class TestCloseoutValidationWithVirtualTowplanes:
 
         # Attempt finalization - should fail without towplane closeout
         response = client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()
@@ -566,7 +575,9 @@ class TestSelfLaunchCloseoutRequirement:
 
         # Attempt finalization - should fail without SELF closeout
         response = client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()
@@ -615,7 +626,9 @@ class TestSelfLaunchCloseoutRequirement:
 
         # Attempt finalization - should succeed without SELF closeout
         client.post(
-            f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
+            reverse("logsheet:manage", args=[logsheet.pk]),
+            {"finalize": "true"},
+            follow=True,
         )
 
         logsheet.refresh_from_db()

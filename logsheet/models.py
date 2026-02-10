@@ -158,7 +158,7 @@ class Flight(models.Model):
     )
 
     def is_incomplete(self):
-        if not self.landing_time:
+        if self.landing_time is None:
             return False
         if self.release_altitude is None:
             return True
