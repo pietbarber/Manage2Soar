@@ -381,7 +381,7 @@ def manage_logsheet(request, pk):
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a landing time."
                 )
-            if not flight.release_altitude:
+            if flight.release_altitude is None:
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a release altitude."
                 )
@@ -398,31 +398,31 @@ def manage_logsheet(request, pk):
             if not flight.launch_time:
                 invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
-            # Enforce required duty crew before finalization
-            # Only require logsheet.tow_pilot if there are any towplane launches
-            has_tow_flights = any(f.requires_tow for f in flights)
+        # Enforce required duty crew before finalization
+        # Only require logsheet.tow_pilot if there are any towplane launches
+        has_tow_flights = any(f.requires_tow for f in flights)
 
-            required_roles = {
-                "duty_officer": logsheet.duty_officer,
-                "duty_instructor": logsheet.duty_instructor,
-            }
+        required_roles = {
+            "duty_officer": logsheet.duty_officer,
+            "duty_instructor": logsheet.duty_instructor,
+        }
 
-            # Only require tow pilot if any flights use towplane launches
-            if has_tow_flights:
-                required_roles["tow_pilot"] = logsheet.tow_pilot
+        # Only require tow pilot if any flights use towplane launches
+        if has_tow_flights:
+            required_roles["tow_pilot"] = logsheet.tow_pilot
 
-            missing_roles = [
-                label.replace("_", " ").title()
-                for label, value in required_roles.items()
-                if not value
-            ]
+        missing_roles = [
+            label.replace("_", " ").title()
+            for label, value in required_roles.items()
+            if not value
+        ]
 
-            if missing_roles:
-                messages.error(
-                    request,
-                    "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles),
-                )
-                return redirect("logsheet:manage", pk=logsheet.pk)
+        if missing_roles:
+            messages.error(
+                request,
+                "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles),
+            )
+            return redirect("logsheet:manage", pk=logsheet.pk)
 
         missing = []
 

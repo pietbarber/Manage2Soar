@@ -169,7 +169,7 @@ class Flight(models.Model):
     def get_missing_fields(self):
         missing = []
         if self.landing_time is not None:
-            if not self.release_altitude:
+            if self.release_altitude is None:
                 missing.append("release altitude")
             if self.requires_tow:
                 if not self.towplane:

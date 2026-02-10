@@ -315,7 +315,7 @@ class TestFinalizationWithNonTowFlights:
     ):
         """Can finalize logsheet without tow_pilot if all flights are winch/self/other."""
         # Create winch flight without tow pilot
-        flight = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=pilot,
             glider=glider,
@@ -338,7 +338,7 @@ class TestFinalizationWithNonTowFlights:
         client.force_login(duty_officer)
 
         # Attempt finalization - should succeed even without logsheet.tow_pilot
-        response = client.post(
+        client.post(
             f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
         )
 
@@ -358,7 +358,7 @@ class TestFinalizationWithNonTowFlights:
     ):
         """Finalization requires logsheet.tow_pilot if any towplane flights exist."""
         # Create towplane flight
-        flight = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=pilot,
             glider=glider,
@@ -424,7 +424,7 @@ class TestCloseoutValidationWithVirtualTowplanes:
     ):
         """Virtual towplanes don't need closeout entries."""
         # Create winch flight
-        flight = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=pilot,
             glider=glider,
@@ -449,7 +449,7 @@ class TestCloseoutValidationWithVirtualTowplanes:
         client.force_login(duty_officer)
 
         # Attempt finalization - should succeed without towplane closeout
-        response = client.post(
+        client.post(
             f"/logsheet/manage/{logsheet.pk}/", {"finalize": "true"}, follow=True
         )
 
@@ -473,7 +473,7 @@ class TestCloseoutValidationWithVirtualTowplanes:
         logsheet.save()
 
         # Create towplane flight
-        flight = Flight.objects.create(
+        Flight.objects.create(
             logsheet=logsheet,
             pilot=pilot,
             glider=glider,
