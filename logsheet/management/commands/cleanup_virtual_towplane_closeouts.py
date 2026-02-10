@@ -33,6 +33,9 @@ class Command(BaseCommand):
             )
 
         # Find all closeouts for virtual towplanes
+        # Reuse centralized logic from get_relevant_towplanes
+        from logsheet.utils.towplane_utils import get_relevant_towplanes
+
         virtual_closeouts = TowplaneCloseout.objects.filter(
             towplane__n_number__iregex=r"^(SELF|WINCH|OTHER)$"
         ).select_related("towplane", "logsheet")
@@ -40,21 +43,12 @@ class Command(BaseCommand):
         to_delete = []
 
         for closeout in virtual_closeouts:
-            n_number = closeout.towplane.n_number.upper()
+            # Use centralized logic to determine if this closeout should exist
+            relevant_towplanes = get_relevant_towplanes(closeout.logsheet)
 
-            # Always delete WINCH and OTHER closeouts
-            if n_number in {"WINCH", "OTHER"}:
+            # If this towplane is not in the relevant set, mark for deletion
+            if closeout.towplane not in relevant_towplanes:
                 to_delete.append(closeout)
-                continue
-
-            # For SELF, only keep if used with club-owned gliders
-            if n_number == "SELF":
-                has_club_glider = closeout.logsheet.flights.filter(
-                    towplane=closeout.towplane, glider__club_owned=True
-                ).exists()
-
-                if not has_club_glider:
-                    to_delete.append(closeout)
 
         if not to_delete:
             self.stdout.write(
@@ -79,10 +73,11 @@ class Command(BaseCommand):
             )
             self.stdout.write("Run without --dry-run to actually delete these records")
         else:
-            # Actually delete the closeouts
+            # Actually delete the closeouts in bulk
             count = len(to_delete)
-            for closeout in to_delete:
-                closeout.delete()
+            TowplaneCloseout.objects.filter(
+                pk__in=[closeout.pk for closeout in to_delete]
+            ).delete()
 
             self.stdout.write(
                 self.style.SUCCESS(

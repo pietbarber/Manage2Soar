@@ -24,30 +24,31 @@ def get_relevant_towplanes(logsheet):
     Returns:
         QuerySet: Towplanes that need closeout forms
     """
-    from django.db.models import Q
+    from django.db.models import Exists, OuterRef, Q
+
+    # Build a single optimized query that:
+    # 1. Gets towplanes used in flights or with existing closeouts
+    # 2. Excludes WINCH and OTHER (never need closeout)
+    # 3. For SELF, only include if used with club-owned gliders
+    # Subquery: Check if SELF towplane has flights with club-owned gliders
+    club_glider_flights = logsheet.flights.filter(
+        towplane=OuterRef("pk"), glider__club_owned=True
+    )
 
     # Get all towplanes used in flights or with existing closeouts
     towplanes = Towplane.objects.filter(
         Q(flight__logsheet=logsheet) | Q(towplanecloseout__logsheet=logsheet)
     ).distinct()
 
-    # Filter out virtual towplanes that don't need closeout
-    result = []
-    for towplane in towplanes:
-        # Skip virtual towplanes (WINCH, OTHER) except SELF when used with club gliders
-        if towplane.is_virtual:
-            # For SELF, only include if used with club-owned gliders (Hobbs tracking)
-            if towplane.n_number.upper() == "SELF":
-                # Check if any flight with this towplane used a club-owned glider
-                has_club_glider = logsheet.flights.filter(
-                    towplane=towplane, glider__club_owned=True
-                ).exists()
-                if not has_club_glider:
-                    continue
-            else:
-                # WINCH and OTHER never need closeout
-                continue
+    # Exclude WINCH and OTHER (always)
+    towplanes = towplanes.exclude(n_number__iregex=r"^(WINCH|OTHER)$")
 
-        result.append(towplane)
+    # For SELF, only include if used with club-owned gliders
+    # Non-virtual towplanes are included automatically
+    towplanes = towplanes.filter(
+        Q(~Q(n_number__iexact="SELF"))  # Include all non-SELF towplanes
+        | Q(n_number__iexact="SELF")
+        & Q(Exists(club_glider_flights))  # SELF only with club gliders
+    )
 
-    return Towplane.objects.filter(pk__in=[tp.pk for tp in result])
+    return towplanes

@@ -377,7 +377,7 @@ def manage_logsheet(request, pk):
                 responsible_members.add(pilot)
 
             # Validate required fields before finalization
-            if not flight.landing_time:
+            if flight.landing_time is None:
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a landing time."
                 )
@@ -395,7 +395,7 @@ def manage_logsheet(request, pk):
                     invalid_flights.append(
                         f"Flight #{flight.id} is missing a tow pilot."
                     )
-            if not flight.launch_time:
+            if flight.launch_time is None:
                 invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
         # Enforce required duty crew before finalization
@@ -1359,13 +1359,18 @@ def edit_logsheet_closeout(request, pk):
     from logsheet.utils.towplane_utils import get_relevant_towplanes
 
     relevant_towplanes = get_relevant_towplanes(logsheet)
-    for towplane in relevant_towplanes:
-        TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
+    # Materialize towplane IDs once to avoid redundant DB queries
+    relevant_towplane_ids = list(relevant_towplanes.values_list("pk", flat=True))
+
+    for towplane_id in relevant_towplane_ids:
+        TowplaneCloseout.objects.get_or_create(
+            logsheet=logsheet, towplane_id=towplane_id
+        )
 
     # Build formset for towplane closeouts - only show closeouts for relevant towplanes
     # This ensures SELF/WINCH/OTHER closeouts don't appear when they shouldn't
     queryset = TowplaneCloseout.objects.filter(
-        logsheet=logsheet, towplane__in=relevant_towplanes
+        logsheet=logsheet, towplane_id__in=relevant_towplane_ids
     )
     formset_class = TowplaneCloseoutFormSet
     formset = formset_class(queryset=queryset)
