@@ -24,7 +24,7 @@ if [ ! -f ~/.ansible_vault_pass ]; then
 fi
 
 echo -e "${YELLOW}[1/5] Testing vault access...${NC}"
-VAULT_TEST_FILE="group_vars/localhost.vault.yml.example"
+VAULT_TEST_FILE="group_vars/localhost/vault.yml"
 if [ ! -f "$VAULT_TEST_FILE" ]; then
     echo -e "${RED}✗ Vault test file not found: ${VAULT_TEST_FILE}${NC}"
     echo -e "${YELLOW}  Ensure you're running this script from the infrastructure/ansible directory.${NC}"

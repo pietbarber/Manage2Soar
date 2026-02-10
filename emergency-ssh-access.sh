@@ -64,7 +64,7 @@ DB_RULE_IPS=$(gcloud compute firewall-rules describe m2s-database-allow-ssh \
 MAIL_RULE_IPS=$(gcloud compute firewall-rules describe m2s-mail-allow-ssh \
     --project=$PROJECT_ID --format="value(sourceRanges)" 2>/dev/null || echo "")
 
-if echo "$DB_RULE_IPS" | grep -q "${IP_CIDR}"; then
+if echo "$DB_RULE_IPS" | grep -Fq "${IP_CIDR}"; then
     echo -e "${GREEN}✓ Your IP is already allowed for database server${NC}"
     DB_NEEDS_UPDATE=false
 else
@@ -72,7 +72,7 @@ else
     DB_NEEDS_UPDATE=true
 fi
 
-if echo "$MAIL_RULE_IPS" | grep -q "${IP_CIDR}"; then
+if echo "$MAIL_RULE_IPS" | grep -Fq "${IP_CIDR}"; then
     echo -e "${GREEN}✓ Your IP is already allowed for mail server${NC}"
     MAIL_NEEDS_UPDATE=false
 else

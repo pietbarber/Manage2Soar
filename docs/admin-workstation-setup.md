@@ -28,7 +28,7 @@ If you prefer to install tools manually or need to troubleshoot the automated sc
 
 Before proceeding, ensure you have:
 
-- Python 3.11+ with virtual environment support
+- Python 3.12+ with virtual environment support
 - Git installed and configured
 - Codebase cloned and accessible
 
@@ -202,16 +202,16 @@ cd infrastructure/ansible
 
 # Copy example files to create actual configs
 cp inventory/gcp_app.yml.example inventory/gcp_app.yml
-cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app.vars.yml
-cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app.vault.yml
+cp group_vars/gcp_app.vars.yml.example group_vars/gcp_app/vars.yml
+cp group_vars/gcp_app.vault.yml.example group_vars/gcp_app/vault.yml
 
 # Edit with your actual values
 vim inventory/gcp_app.yml          # GCP project, region, cluster name
-vim group_vars/gcp_app.vars.yml    # Non-secret configuration
-vim group_vars/gcp_app.vault.yml   # Secrets (DB passwords, Django secret key, etc.)
+vim group_vars/gcp_app/vars.yml    # Non-secret configuration
+vim group_vars/gcp_app/vault.yml   # Secrets (DB passwords, Django secret key, etc.)
 
 # Encrypt the vault file
-ansible-vault encrypt group_vars/gcp_app.vault.yml --vault-password-file ~/.ansible_vault_pass
+ansible-vault encrypt group_vars/gcp_app/vault.yml --vault-password-file ~/.ansible_vault_pass
 ```
 
 ### 3. GCP Service Account Setup
