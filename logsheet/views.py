@@ -337,7 +337,9 @@ def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
     # Base queryset for all flights in the logsheet
     all_flights = (
-        Flight.objects.select_related("pilot", "glider", "towplane", "tow_pilot")
+        Flight.objects.select_related(
+            "pilot", "instructor", "glider", "towplane", "tow_pilot"
+        )
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
     )
@@ -1383,8 +1385,8 @@ def edit_logsheet_closeout(request, pk):
         )
 
     # Build formset for towplane closeouts - include all closeouts for this logsheet
-    # This keeps any existing (possibly stale) closeouts visible so they can be adjusted or removed
-    # The cleanup command can be run separately to remove truly stale virtual towplane closeouts
+    # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
+    # Run cleanup_virtual_towplane_closeouts management command to remove truly stale virtual towplane closeouts
     queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
     formset_class = TowplaneCloseoutFormSet
     formset = formset_class(queryset=queryset)

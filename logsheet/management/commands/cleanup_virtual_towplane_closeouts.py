@@ -11,7 +11,7 @@ Usage:
 
 from django.core.management.base import BaseCommand
 
-from logsheet.models import TowplaneCloseout
+from logsheet.models import Towplane, TowplaneCloseout
 
 
 class Command(BaseCommand):
@@ -40,7 +40,7 @@ class Command(BaseCommand):
 
         virtual_closeouts = (
             TowplaneCloseout.objects.filter(
-                towplane__n_number__iregex=r"^(SELF|WINCH|OTHER)$"
+                towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS
             )
             .select_related("towplane", "logsheet")
             .order_by("logsheet_id")
