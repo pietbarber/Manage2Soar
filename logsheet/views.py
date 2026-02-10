@@ -1357,8 +1357,11 @@ def edit_logsheet_closeout(request, pk):
     for towplane in relevant_towplanes:
         TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
 
-    # Build formset for towplane closeouts
-    queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
+    # Build formset for towplane closeouts - only show closeouts for relevant towplanes
+    # This ensures SELF/WINCH/OTHER closeouts don't appear when they shouldn't
+    queryset = TowplaneCloseout.objects.filter(
+        logsheet=logsheet, towplane__in=relevant_towplanes
+    )
     formset_class = TowplaneCloseoutFormSet
     formset = formset_class(queryset=queryset)
 

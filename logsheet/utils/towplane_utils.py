@@ -11,7 +11,7 @@ def get_relevant_towplanes(logsheet):
 
     This includes:
     - Towplanes used for towing (have flights on this logsheet)
-    - Towplanes with existing closeouts (manual additions or previous rentals)
+    - Towplanes with existing closeouts (manual additions for rentals)
     - Self-Launch towplane ONLY if used with club-owned gliders (for Hobbs tracking)
 
     Excludes:
@@ -34,12 +34,14 @@ def get_relevant_towplanes(logsheet):
     # Filter out virtual towplanes that don't need closeout
     result = []
     for towplane in towplanes:
+        n_number_upper = towplane.n_number.upper()
+
         # Always skip WINCH and OTHER (completely virtual)
-        if towplane.n_number.upper() in {"WINCH", "OTHER"}:
+        if n_number_upper in {"WINCH", "OTHER"}:
             continue
 
         # For SELF, only include if used with club-owned gliders
-        if towplane.n_number.upper() == "SELF":
+        if n_number_upper == "SELF":
             # Check if any flight with this towplane used a club-owned glider
             has_club_glider = logsheet.flights.filter(
                 towplane=towplane, glider__club_owned=True
