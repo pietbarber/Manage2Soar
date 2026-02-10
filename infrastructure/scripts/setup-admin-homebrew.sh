@@ -70,17 +70,10 @@ brew update
 echo -e "\n${GREEN}[2/6] Installing Google Cloud CLI...${NC}"
 if ! command -v gcloud &> /dev/null; then
     echo "Installing gcloud CLI..."
-    brew install --cask google-cloud-sdk
-
-    # Add gcloud to PATH for current session
-    if [ -f "/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc" ]; then
-        source "/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
-    elif [ -f "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc" ]; then
-        source "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
-    fi
+    brew install google-cloud-sdk
 
     # Install GKE auth plugin
-    gcloud components install gke-gcloud-auth-plugin
+    brew install google-cloud-sdk-gke-gcloud-auth-plugin
 
     echo -e "${GREEN}✓ gcloud CLI installed${NC}"
 else

@@ -24,16 +24,23 @@ These scripts will install all required and optional tools listed below. After r
 
 If you prefer to install tools manually or need to troubleshoot the automated scripts, follow the instructions below for your platform.
 
-## Current Status ✅
+## Prerequisites to Verify ✅
 
-- ✅ Python 3.12.3 with virtual environment
-- ✅ Git configured
-- ✅ Codebase cloned and up-to-date
-- ✅ Development environment working
+Before proceeding, ensure you have:
 
-## Missing Tools 🔧
+- Python 3.11+ with virtual environment support
+- Git installed and configured
+- Codebase cloned and accessible
 
-Based on your infrastructure, you need these tools installed:
+Verify your environment:
+```bash
+python3 --version  # Should be 3.11 or higher
+git --version      # Any recent version
+```
+
+## Required Tools 🔧
+
+For production deployment, you need:
 
 ### Required for Production Deployment
 

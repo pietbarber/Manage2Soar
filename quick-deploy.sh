@@ -90,7 +90,13 @@ echo -e "\n${GREEN}[4/4] Verifying deployment...${NC}"
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
     echo "  ${namespace}:"
-    kubectl get pods -n "${namespace}" -l app=django-app-${tenant} --field-selector=status.phase=Running
+    kubectl get pods -n "${namespace}" -l app=django-app-${tenant}
+
+    # Show non-Running pods if any exist
+    NON_RUNNING=$(kubectl get pods -n "${namespace}" -l app=django-app-${tenant} --field-selector=status.phase!=Running --no-headers 2>/dev/null | wc -l)
+    if [ "$NON_RUNNING" -gt 0 ]; then
+        echo -e "  ${YELLOW}⚠ Warning: ${NON_RUNNING} pod(s) not in Running state${NC}"
+    fi
 done
 
 echo ""

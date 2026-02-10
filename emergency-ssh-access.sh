@@ -21,7 +21,7 @@
 #   1. Get your IP: curl ifconfig.me
 #   2. Go to: https://console.cloud.google.com/net-security/firewall-manager/firewall-policies/list?project=manage2soar
 #   3. Edit: m2s-database-allow-ssh and m2s-mail-allow-ssh
-#   4. Add your IP with /32 suffix
+#   4. Add your IP with /32 suffix (IPv4) or /128 suffix (IPv6)
 
 set -e
 
@@ -45,12 +45,16 @@ if [ -z "$CURRENT_IP" ]; then
     echo "Try manually: curl https://ifconfig.me"
     exit 1
 fi
-# Validate IP format (IPv4 or IPv6)
-if ! echo "$CURRENT_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$|^[0-9a-fA-F:]+$'; then
+# Validate IP format (IPv4 or IPv6) and determine CIDR
+if echo "$CURRENT_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    IP_CIDR="${CURRENT_IP}/32"
+elif echo "$CURRENT_IP" | grep -qE '^[0-9a-fA-F:]+$'; then
+    IP_CIDR="${CURRENT_IP}/128"
+else
     echo -e "${RED}ERROR: Invalid IP address received: ${CURRENT_IP}${NC}"
     exit 1
 fi
-echo -e "Your IP: ${GREEN}${CURRENT_IP}${NC}"
+echo -e "Your IP: ${GREEN}${CURRENT_IP}${NC} (CIDR: ${IP_CIDR})"
 echo ""
 
 # Check if already allowed
@@ -60,7 +64,7 @@ DB_RULE_IPS=$(gcloud compute firewall-rules describe m2s-database-allow-ssh \
 MAIL_RULE_IPS=$(gcloud compute firewall-rules describe m2s-mail-allow-ssh \
     --project=$PROJECT_ID --format="value(sourceRanges)" 2>/dev/null || echo "")
 
-if echo "$DB_RULE_IPS" | grep -q "${CURRENT_IP}/32"; then
+if echo "$DB_RULE_IPS" | grep -q "${IP_CIDR}"; then
     echo -e "${GREEN}✓ Your IP is already allowed for database server${NC}"
     DB_NEEDS_UPDATE=false
 else
@@ -68,7 +72,7 @@ else
     DB_NEEDS_UPDATE=true
 fi
 
-if echo "$MAIL_RULE_IPS" | grep -q "${CURRENT_IP}/32"; then
+if echo "$MAIL_RULE_IPS" | grep -q "${IP_CIDR}"; then
     echo -e "${GREEN}✓ Your IP is already allowed for mail server${NC}"
     MAIL_NEEDS_UPDATE=false
 else
@@ -102,9 +106,9 @@ if [ "$DB_NEEDS_UPDATE" = true ]; then
     # Get existing IPs and add new one
     EXISTING_IPS=$(echo "$DB_RULE_IPS" | tr ';' ',' | sed 's/,$//')
     if [ -n "$EXISTING_IPS" ]; then
-        NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+        NEW_IPS="${EXISTING_IPS},${IP_CIDR}"
     else
-        NEW_IPS="${CURRENT_IP}/32"
+        NEW_IPS="${IP_CIDR}"
     fi
 
     gcloud compute firewall-rules update m2s-database-allow-ssh \
@@ -123,9 +127,9 @@ if [ "$MAIL_NEEDS_UPDATE" = true ]; then
     # Get existing IPs and add new one
     EXISTING_IPS=$(echo "$MAIL_RULE_IPS" | tr ';' ',' | sed 's/,$//')
     if [ -n "$EXISTING_IPS" ]; then
-        NEW_IPS="${EXISTING_IPS},${CURRENT_IP}/32"
+        NEW_IPS="${EXISTING_IPS},${IP_CIDR}"
     else
-        NEW_IPS="${CURRENT_IP}/32"
+        NEW_IPS="${IP_CIDR}"
     fi
 
     gcloud compute firewall-rules update m2s-mail-allow-ssh \

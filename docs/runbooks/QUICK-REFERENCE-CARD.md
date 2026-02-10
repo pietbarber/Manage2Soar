@@ -66,7 +66,7 @@ gcloud compute firewall-rules update m2s-database-allow-ssh \
 
 **SSH to database (Cloud Shell):**
 ```bash
-gcloud compute ssh pb@m2s-database --zone=us-east1-b --project=manage2soar
+gcloud compute ssh m2s-database --zone=us-east1-b --project=manage2soar
 ```
 
 **Then run:**
