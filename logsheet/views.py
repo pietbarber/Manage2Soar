@@ -465,9 +465,11 @@ def manage_logsheet(request, pk):
 
             # Get unique towplanes used in flights
             used_towplanes = set(
-                all_flights.values_list("towplane", flat=True).distinct()
+                all_flights.filter(towplane__isnull=False)
+                .order_by()
+                .values_list("towplane", flat=True)
+                .distinct()
             )
-            used_towplanes.discard(None)  # Remove None values
 
             if used_towplanes:
                 # Fetch all towplanes in bulk to avoid N+1 queries

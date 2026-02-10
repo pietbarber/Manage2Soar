@@ -10,6 +10,7 @@ Usage:
 """
 
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 
 from logsheet.models import Towplane, TowplaneCloseout
 
@@ -38,10 +39,13 @@ class Command(BaseCommand):
 
         from logsheet.utils.towplane_utils import get_relevant_towplanes
 
+        # Build case-insensitive filter for virtual towplanes to match is_virtual behavior
+        virtual_filter = Q()
+        for n_number in Towplane.VIRTUAL_N_NUMBERS:
+            virtual_filter |= Q(towplane__n_number__iexact=n_number)
+
         virtual_closeouts = (
-            TowplaneCloseout.objects.filter(
-                towplane__n_number__in=Towplane.VIRTUAL_N_NUMBERS
-            )
+            TowplaneCloseout.objects.filter(virtual_filter)
             .select_related("towplane", "logsheet")
             .order_by("logsheet_id")
         )
