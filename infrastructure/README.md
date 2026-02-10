@@ -39,6 +39,9 @@ infrastructure/
 │       ├── rspamd/              # Spam filtering
 │       └── m2s-mail-sync/       # M2S alias sync script
 ├── scripts/
+│   ├── setup-admin-ubuntu.sh        # Setup admin workstation (Ubuntu/Debian)
+│   ├── setup-admin-homebrew.sh      # Setup admin workstation (macOS)
+│   ├── setup-dev.sh                 # Setup development environment
 │   ├── generate-db-password.sh      # Generate secure DB password
 │   ├── generate-django-secret.sh    # Generate Django SECRET_KEY
 │   └── initialize-vault-secrets.sh  # Initialize all secrets

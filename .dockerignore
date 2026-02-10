@@ -28,7 +28,6 @@ CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 SECURITY.md
 ingress.yaml
-setup-dev.sh
 
-# Exclude infrastructure/ansible (not needed in Docker image)
+# Exclude infrastructure (not needed in Docker image)
 infrastructure/

@@ -7,7 +7,7 @@ We welcome contributions! This project is designed for soaring clubs worldwide t
 1. **Fork and clone** the repository
 2. **Run the setup script** for automatic environment setup:
    ```bash
-   ./setup-dev.sh
+   ./infrastructure/scripts/setup-dev.sh
    ```
    Or manually:
    ```bash
