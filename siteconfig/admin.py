@@ -209,12 +209,11 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "fields": (
                     "membership_application_enabled",
                     "membership_application_terms",
-                    "membership_auto_approve",
                 ),
                 "description": (
                     "Configure the membership application form. Enable to allow prospective members "
-                    "to submit applications online. Set custom terms and conditions. "
-                    "Auto-approve skips manual review and immediately creates member accounts."
+                    "to submit applications online, and set custom terms and conditions. "
+                    "Membership applications currently require manual review in the admin."
                 ),
                 "classes": ("collapse",),
             },
