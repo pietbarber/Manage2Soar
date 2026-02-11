@@ -460,61 +460,34 @@ def manage_logsheet(request, pk):
         # Check towplane closeout data if there were flights
         # Use unfiltered queryset for validation
         if all_flights.exists():
+            from logsheet.utils.towplane_utils import get_relevant_towplanes
+
             towplane_closeouts = logsheet.towplane_closeouts.all()
             missing_towplane_data = []
 
-            # Get unique towplanes used in flights
-            used_towplanes = set(
-                all_flights.filter(towplane__isnull=False)
-                .order_by()
-                .values_list("towplane", flat=True)
-                .distinct()
-            )
+            # Get towplanes that require closeout using centralized logic
+            # This ensures finalization validation matches UI behavior
+            relevant_towplanes = get_relevant_towplanes(logsheet)
+            relevant_towplane_ids = set(relevant_towplanes.values_list("pk", flat=True))
 
-            if used_towplanes:
-                # Fetch all towplanes in bulk to avoid N+1 queries
-                towplanes_dict = Towplane.objects.in_bulk(used_towplanes)
+            for towplane in relevant_towplanes:
+                closeout = towplane_closeouts.filter(towplane=towplane).first()
 
-                for towplane_id in used_towplanes:
-                    # Handle missing towplanes gracefully (may have been deleted)
-                    towplane = towplanes_dict.get(towplane_id)
-                    if towplane is None:
-                        missing_towplane_data.append(
-                            f"Missing towplane record for id {towplane_id}"
-                        )
-                        continue
+                if not closeout:
+                    missing_towplane_data.append(
+                        f"Missing closeout data for {towplane.n_number}"
+                    )
+                elif (
+                    closeout.start_tach is None or closeout.end_tach is None
+                ) and closeout.fuel_added is None:
+                    missing_towplane_data.append(
+                        f"Missing tach times or fuel data for {towplane.n_number}"
+                    )
 
-                    # Skip closeout validation for virtual towplanes (WINCH, OTHER)
-                    # except SELF when used with club-owned gliders
-                    if towplane.is_virtual:
-                        # For SELF, only require closeout if used with club-owned gliders
-                        if towplane.n_number.upper() == "SELF":
-                            has_club_glider = all_flights.filter(
-                                towplane=towplane, glider__club_owned=True
-                            ).exists()
-                            if not has_club_glider:
-                                continue
-                        else:
-                            # WINCH and OTHER always skip closeout validation
-                            continue
-
-                    closeout = towplane_closeouts.filter(towplane=towplane).first()
-
-                    if not closeout:
-                        missing_towplane_data.append(
-                            f"Missing closeout data for {towplane.n_number}"
-                        )
-                    elif (
-                        closeout.start_tach is None or closeout.end_tach is None
-                    ) and closeout.fuel_added is None:
-                        missing_towplane_data.append(
-                            f"Missing tach times or fuel data for {towplane.n_number}"
-                        )
-
-                if missing_towplane_data:
-                    for msg in missing_towplane_data:
-                        messages.error(request, f"Cannot finalize. {msg}")
-                    return redirect("logsheet:manage", pk=logsheet.pk)
+            if missing_towplane_data:
+                for msg in missing_towplane_data:
+                    messages.error(request, f"Cannot finalize. {msg}")
+                return redirect("logsheet:manage", pk=logsheet.pk)
 
         # Lock in cost values
         # That means take the temporary values we calculated for the costs
