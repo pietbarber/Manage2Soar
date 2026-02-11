@@ -512,3 +512,120 @@ def test_maintenance_issues_view_includes_aircraft_for_modal(client, active_memb
     # Issue #553: View should include aircraft for the Add Issue modal
     assert "gliders" in response.context
     assert "towplanes" in response.context
+
+
+@pytest.mark.django_db
+def test_edit_logsheet_closeout_virtual_towplane_handling(
+    client, active_member, logsheet
+):
+    """Test that edit_logsheet_closeout correctly handles virtual towplanes for Issue #623"""
+    from datetime import date, time
+
+    from logsheet.models import Flight, Glider, Logsheet, Towplane, TowplaneCloseout
+
+    # Create virtual towplanes
+    winch = Towplane.objects.create(n_number="WINCH", name="Winch", is_active=True)
+    other = Towplane.objects.create(n_number="OTHER", name="Other", is_active=True)
+    self_tp = Towplane.objects.create(n_number="SELF", name="Self", is_active=True)
+
+    # Create club-owned and private gliders
+    club_glider = Glider.objects.create(
+        n_number="001",
+        make="ASK21",
+        model="Club Glider",
+        club_owned=True,
+        is_active=True,
+    )
+    private_glider = Glider.objects.create(
+        n_number="002",
+        make="ASW20",
+        model="Private Glider",
+        club_owned=False,
+        is_active=True,
+    )
+
+    # Test 1: WINCH flight - no closeout should be created
+    Flight.objects.create(
+        logsheet=logsheet,
+        glider=club_glider,
+        towplane=winch,
+        pilot=active_member,
+        landing_time=time(12, 0),
+        launch_time=time(12, 0),
+        release_altitude=0,
+    )
+
+    client.force_login(active_member)
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+    assert response.status_code == 200
+
+    # WINCH should not have a closeout created
+    assert not TowplaneCloseout.objects.filter(
+        logsheet=logsheet, towplane=winch
+    ).exists()
+
+    # Test 2: OTHER flight - no closeout should be created
+    Flight.objects.create(
+        logsheet=logsheet,
+        glider=club_glider,
+        towplane=other,
+        pilot=active_member,
+        landing_time=time(12, 0),
+        launch_time=time(12, 0),
+        release_altitude=0,
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+    assert response.status_code == 200
+
+    # OTHER should not have a closeout created
+    assert not TowplaneCloseout.objects.filter(
+        logsheet=logsheet, towplane=other
+    ).exists()
+
+    # Test 3: SELF with club-owned glider - closeout SHOULD be created (Hobbs tracking)
+    Flight.objects.create(
+        logsheet=logsheet,
+        glider=club_glider,
+        towplane=self_tp,
+        pilot=active_member,
+        landing_time=time(12, 0),
+        launch_time=time(12, 0),
+        release_altitude=0,
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet.pk])
+    )
+    assert response.status_code == 200
+
+    # SELF with club glider SHOULD have a closeout created
+    assert TowplaneCloseout.objects.filter(logsheet=logsheet, towplane=self_tp).exists()
+
+    # Test 4: SELF with privately-owned glider - no closeout should be created
+    logsheet2 = Logsheet.objects.create(
+        log_date=date(2024, 1, 2), airfield=logsheet.airfield, created_by=active_member
+    )
+    Flight.objects.create(
+        logsheet=logsheet2,
+        glider=private_glider,
+        towplane=self_tp,
+        pilot=active_member,
+        landing_time=time(12, 0),
+        launch_time=time(12, 0),
+        release_altitude=0,
+    )
+
+    response = client.get(
+        reverse("logsheet:edit_logsheet_closeout", args=[logsheet2.pk])
+    )
+    assert response.status_code == 200
+
+    # SELF with private glider should NOT have a closeout created
+    assert not TowplaneCloseout.objects.filter(
+        logsheet=logsheet2, towplane=self_tp
+    ).exists()

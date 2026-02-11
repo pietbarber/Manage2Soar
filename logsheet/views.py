@@ -335,12 +335,17 @@ def create_logsheet(request):
 @active_member_required
 def manage_logsheet(request, pk):
     logsheet = get_object_or_404(Logsheet, pk=pk)
-    flights = (
-        Flight.objects.select_related("pilot", "glider")
+    # Base queryset for all flights in the logsheet
+    all_flights = (
+        Flight.objects.select_related(
+            "pilot", "instructor", "glider", "towplane", "tow_pilot"
+        )
         .filter(logsheet=logsheet)
         .order_by("-landing_time", "-launch_time")
     )
 
+    # Filtered queryset for display purposes only
+    flights = all_flights
     query = request.GET.get("q")
     if query:
         flights = flights.filter(
@@ -363,7 +368,8 @@ def manage_logsheet(request, pk):
         responsible_members = set()
         invalid_flights = []
 
-        for flight in flights:
+        # Use unfiltered queryset for validation to avoid filtered subset issues
+        for flight in all_flights:
             pilot = flight.pilot
             partner = flight.split_with
             split = flight.split_type
@@ -377,40 +383,53 @@ def manage_logsheet(request, pk):
                 responsible_members.add(pilot)
 
             # Validate required fields before finalization
-            if not flight.landing_time:
+            if flight.landing_time is None:
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a landing time."
                 )
-            if not flight.release_altitude:
+            if flight.release_altitude is None:
                 invalid_flights.append(
                     f"Flight #{flight.id} is missing a release altitude."
                 )
-            if not flight.towplane:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow plane.")
-            if not flight.tow_pilot:
-                invalid_flights.append(f"Flight #{flight.id} is missing a tow pilot.")
-            if not flight.launch_time:
+            # Only require towplane and tow pilot for towplane launches
+            if flight.requires_tow:
+                if not flight.towplane:
+                    invalid_flights.append(
+                        f"Flight #{flight.id} is missing a tow plane."
+                    )
+                if not flight.tow_pilot:
+                    invalid_flights.append(
+                        f"Flight #{flight.id} is missing a tow pilot."
+                    )
+            if flight.launch_time is None:
                 invalid_flights.append(f"Flight #{flight.id} is missing a launch time.")
 
-            # Enforce required duty crew before finalization
-            required_roles = {
-                "duty_officer": logsheet.duty_officer,
-                "tow_pilot": logsheet.tow_pilot,
-                "duty_instructor": logsheet.duty_instructor,
-            }
+        # Enforce required duty crew before finalization
+        # Only require logsheet.tow_pilot if there are any towplane launches
+        # Use unfiltered queryset for validation
+        has_tow_flights = any(f.requires_tow for f in all_flights)
 
-            missing_roles = [
-                label.replace("_", " ").title()
-                for label, value in required_roles.items()
-                if not value
-            ]
+        required_roles = {
+            "duty_officer": logsheet.duty_officer,
+            "duty_instructor": logsheet.duty_instructor,
+        }
 
-            if missing_roles:
-                messages.error(
-                    request,
-                    "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles),
-                )
-                return redirect("logsheet:manage", pk=logsheet.pk)
+        # Only require tow pilot if any flights use towplane launches
+        if has_tow_flights:
+            required_roles["tow_pilot"] = logsheet.tow_pilot
+
+        missing_roles = [
+            label.replace("_", " ").title()
+            for label, value in required_roles.items()
+            if not value
+        ]
+
+        if missing_roles:
+            messages.error(
+                request,
+                "Cannot finalize. Missing duty crew: " + ", ".join(missing_roles),
+            )
+            return redirect("logsheet:manage", pk=logsheet.pk)
 
         missing = []
 
@@ -439,39 +458,42 @@ def manage_logsheet(request, pk):
             return redirect("logsheet:manage_logsheet_finances", pk=logsheet.pk)
 
         # Check towplane closeout data if there were flights
-        if flights.exists():
+        # Use unfiltered queryset for validation
+        if all_flights.exists():
+            from logsheet.utils.towplane_utils import get_relevant_towplanes
+
             towplane_closeouts = logsheet.towplane_closeouts.all()
             missing_towplane_data = []
 
-            # Get unique towplanes used in flights
-            used_towplanes = set(flights.values_list("towplane", flat=True).distinct())
-            used_towplanes.discard(None)  # Remove None values
+            # Get towplanes that require closeout using centralized logic
+            # This ensures finalization validation matches UI behavior
+            relevant_towplanes = get_relevant_towplanes(logsheet)
+            relevant_towplane_ids = set(relevant_towplanes.values_list("pk", flat=True))
 
-            if used_towplanes:
-                for towplane_id in used_towplanes:
-                    towplane = Towplane.objects.get(pk=towplane_id)
-                    closeout = towplane_closeouts.filter(towplane=towplane).first()
+            for towplane in relevant_towplanes:
+                closeout = towplane_closeouts.filter(towplane=towplane).first()
 
-                    if not closeout:
-                        missing_towplane_data.append(
-                            f"Missing closeout data for {towplane.n_number}"
-                        )
-                    elif (
-                        closeout.start_tach is None or closeout.end_tach is None
-                    ) and closeout.fuel_added is None:
-                        missing_towplane_data.append(
-                            f"Missing tach times or fuel data for {towplane.n_number}"
-                        )
+                if not closeout:
+                    missing_towplane_data.append(
+                        f"Missing closeout data for {towplane.n_number}"
+                    )
+                elif (
+                    closeout.start_tach is None or closeout.end_tach is None
+                ) and closeout.fuel_added is None:
+                    missing_towplane_data.append(
+                        f"Missing tach times or fuel data for {towplane.n_number}"
+                    )
 
-                if missing_towplane_data:
-                    for msg in missing_towplane_data:
-                        messages.error(request, f"Cannot finalize. {msg}")
-                    return redirect("logsheet:manage", pk=logsheet.pk)
+            if missing_towplane_data:
+                for msg in missing_towplane_data:
+                    messages.error(request, f"Cannot finalize. {msg}")
+                return redirect("logsheet:manage", pk=logsheet.pk)
 
         # Lock in cost values
         # That means take the temporary values we calculated for the costs
         # and place them in these other variables that get perma-written to the database.
-        for flight in flights:
+        # Use unfiltered queryset to lock in costs for all flights
+        for flight in all_flights:
             if flight.tow_cost_actual is None:
                 flight.tow_cost_actual = flight.tow_cost_calculated
             if flight.rental_cost_actual is None:
@@ -1329,10 +1351,17 @@ def edit_logsheet_closeout(request, pk):
     from logsheet.utils.towplane_utils import get_relevant_towplanes
 
     relevant_towplanes = get_relevant_towplanes(logsheet)
-    for towplane in relevant_towplanes:
-        TowplaneCloseout.objects.get_or_create(logsheet=logsheet, towplane=towplane)
+    # Materialize towplane IDs once to avoid redundant DB queries
+    relevant_towplane_ids = list(relevant_towplanes.values_list("pk", flat=True))
 
-    # Build formset for towplane closeouts
+    for towplane_id in relevant_towplane_ids:
+        TowplaneCloseout.objects.get_or_create(
+            logsheet=logsheet, towplane_id=towplane_id
+        )
+
+    # Build formset for towplane closeouts - include all closeouts for this logsheet
+    # This keeps any existing (possibly stale) closeouts visible so they can be reviewed and adjusted
+    # Run cleanup_virtual_towplane_closeouts management command to remove truly stale virtual towplane closeouts
     queryset = TowplaneCloseout.objects.filter(logsheet=logsheet)
     formset_class = TowplaneCloseoutFormSet
     formset = formset_class(queryset=queryset)
