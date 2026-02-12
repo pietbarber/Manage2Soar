@@ -9,13 +9,13 @@ boolean.py==5.0
 CacheControl==0.14.3
 cachetools==5.5.2
 certifi==2025.8.3
-cffi==1.17.1
+cffi==2.0.0
 cfgv==3.4.0
 charset-normalizer==3.4.3
 click==8.3.0
 coverage==7.11.0
 crispy-bootstrap4==2025.6
-cryptography==45.0.7
+cryptography==46.0.5
 cyclonedx-python-lib==9.1.0
 defusedxml==0.7.1
 diff-match-patch==20241021
@@ -68,7 +68,7 @@ oauthlib==3.3.1
 packageurl-python==0.17.5
 packaging==25.0
 pathspec==0.12.1
-pillow==11.3.0
+pillow==12.1.1
 pip-api==0.0.34
 pip-requirements-parser==32.0.1
 pip_audit==2.9.0
