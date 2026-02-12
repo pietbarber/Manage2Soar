@@ -157,7 +157,7 @@ class TestDiagnostics:
             first_name="Diag",
             last_name="Test",
             duty_officer=True,
-            is_active=True,
+            membership_status="Full Member",
         )
 
         # Create preference with dont_schedule=True
@@ -194,7 +194,7 @@ class TestDiagnostics:
             first_name="Repeat",
             last_name="Test",
             instructor=True,
-            is_active=True,
+            membership_status="Full Member",
         )
 
         members = Member.objects.filter(is_active=True)
