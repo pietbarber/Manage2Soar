@@ -24,11 +24,16 @@ from .forms import SafetyReportOfficerForm
 from .models import SafetyReport
 
 # Regex pattern to identify "nothing to report" type entries
+# Note: HTML is already stripped by strip_tags() before matching
 NOTHING_TO_REPORT_PATTERN = re.compile(
-    r"^\s*(<[^>]*>\s*)*"  # Leading HTML tags
-    r"(n/?a|none|nil|nothing\s*(to\s*report)?|no\s*(safety\s*)?(issues?|report|concerns?)|"
-    r"all\s*good|all\s*clear|no\s*problems?|no\s*incidents?)"
-    r"(\.?\s*(<[^>]*>\s*)*)*$",  # Trailing punctuation and HTML tags
+    r"^\s*"  # Leading whitespace
+    r"(?:"  # Non-capturing group for alternatives
+    r"n/?a|none|nil|"  # Simple negatives
+    r"nothing(?:\s+to\s+report)?|"  # "nothing" or "nothing to report"
+    r"no\s+(?:safety\s+)?(?:issues?|reports?|concerns?|problems?|incidents?)|"  # "no X"
+    r"all\s+(?:good|clear)"  # "all good/clear"
+    r")"
+    r"\.?\s*$",  # Optional trailing period and whitespace
     re.IGNORECASE,
 )
 
