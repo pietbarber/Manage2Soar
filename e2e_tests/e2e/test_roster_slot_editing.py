@@ -32,7 +32,7 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         rostermeister_group, _ = Group.objects.get_or_create(name="rostermeister")
         self.rostermeister.groups.add(rostermeister_group)
 
-        # Create some schedulable members (need more than 2 to avoid hitting max assignments after roster generation)
+        # Create 4 schedulable members to avoid hitting max assignments after roster generation
         self.member1 = self.create_test_member(
             username="pilot1",
             email="pilot1@example.com",
@@ -196,6 +196,10 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         test_slot = filled_slots.first
 
+        # Get slot attributes BEFORE clicking to avoid stale values after AJAX update
+        slot_role = test_slot.get_attribute("data-role")
+        slot_date = test_slot.get_attribute("data-date")
+
         # Click slot to open edit modal
         test_slot.click()
 
@@ -231,11 +235,11 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         # Wait for modal to close and DOM to update
         modal.wait_for(state="hidden", timeout=5000)
-        self.page.wait_for_timeout(1000)
 
-        # Re-query the slot
-        slot_role = test_slot.get_attribute("data-role")
-        slot_date = test_slot.get_attribute("data-date")
+        # Wait for DOM update to complete - network idle ensures AJAX has finished
+        self.page.wait_for_load_state("networkidle", timeout=5000)
+
+        # Re-query the slot using the attributes we saved before clicking
         updated_slot = self.page.locator(
             f".roster-slot[data-role='{slot_role}'][data-date='{slot_date}']"
         )
@@ -357,8 +361,8 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         modal = self.page.locator("#editSlotModal")
         modal.wait_for(state="hidden", timeout=5000)
 
-        # Wait for AJAX to complete and cell to be updated
-        self.page.wait_for_timeout(1000)
+        # Wait for DOM update - network idle ensures AJAX has finished
+        self.page.wait_for_load_state("networkidle", timeout=5000)
 
         # Re-query the slot to get fresh attributes
         updated_slot = self.page.locator(
