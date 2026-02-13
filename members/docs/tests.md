@@ -24,6 +24,22 @@ This document describes the unit tests for the `members` app.
 ## Redaction tests
 - The redaction feature (toggle visibility and notification creation) is covered by tests in `members/tests/` including `test_toggle_redaction.py` and `test_notifications_on_toggle.py`.
 
+## Safety Officer Dashboard tests (Issue #622)
+- Tests are located in `members/tests/test_safety_dashboard.py`.
+- Coverage includes:
+  - Access control (anonymous → redirect, regular member → 403, safety officer → 200, superuser → 200)
+  - Suggestion box reports display and statistics
+  - Ops report safety sections from logsheet closeouts
+  - "Nothing to report" filtering logic (`_is_nothing_to_report` helper)
+  - 12-month date range enforcement
+  - Exclusion of unfinalized logsheets and empty safety_issues
+  - Show/hide toggle for filtered entries
+  - URL resolution
+
+## Safety Report tests (Issue #554, #585)
+- Tests are located in `members/tests/test_safety_reports.py`.
+- Coverage includes model CRUD, form validation, view access, email notifications, and in-app notifications.
+
 
 ## Also See
 - [README.md](README.md)

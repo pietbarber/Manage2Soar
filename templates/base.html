@@ -121,6 +121,27 @@
             </ul>
           </li>
 
+          {% if user.is_authenticated and user.safety_officer or user.is_authenticated and user.is_superuser %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="safetyDropdown" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              <i class="bi bi-shield-exclamation"></i> Safety
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="safetyDropdown">
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'members:safety_officer_dashboard' %}">
+                  <i class="bi bi-speedometer2"></i> Safety Dashboard
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'members:safety_report_list' %}">
+                  <i class="bi bi-list-ul"></i> Suggestion Box Reports
+                </a>
+              </li>
+            </ul>
+          </li>
+          {% endif %}
+
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="dutyrosterDropdown" role="button" data-bs-toggle="dropdown"
               aria-expanded="false">
