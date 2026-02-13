@@ -8,7 +8,6 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
 
 from logsheet.models import Airfield, Logsheet, LogsheetCloseout
 from members.models import SafetyReport
@@ -217,7 +216,6 @@ class TestSafetyDashboardSuggestionBox:
         client.login(username="safetyofficer", password="testpass123")
         url = reverse("members:safety_officer_dashboard")
         response = client.get(url)
-        content = response.content.decode()
         # Stats should reflect 3 total, 1 new, 1 in_progress, 1 resolved
         assert response.context["suggestion_stats"]["total"] == 3
         assert response.context["suggestion_stats"]["new"] == 1

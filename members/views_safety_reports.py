@@ -195,25 +195,26 @@ def safety_officer_dashboard(request):
         .order_by("-logsheet__log_date")
     )
 
-    # Filter based on show_all parameter
-    show_all_ops = request.GET.get("show_all_ops") == "1"
-    if not show_all_ops:
-        # Filter out "nothing to report" entries in Python
-        # (regex filtering in DB is database-dependent, so do it in Python)
-        ops_safety_entries = [
-            entry
-            for entry in ops_safety_entries_qs
-            if not _is_nothing_to_report(entry.safety_issues)
-        ]
-    else:
-        ops_safety_entries = list(ops_safety_entries_qs)
+    # Build counts and filtered lists in a single pass over the queryset
+    # (more efficient than iterating twice)
+    ops_total_count = 0
+    ops_substantive_count = 0
+    ops_all_entries = []
+    ops_substantive_entries = []
 
-    ops_total_count = ops_safety_entries_qs.count()
-    ops_substantive_count = sum(
-        1
-        for entry in ops_safety_entries_qs
-        if not _is_nothing_to_report(entry.safety_issues)
-    )
+    for entry in ops_safety_entries_qs:
+        ops_total_count += 1
+        ops_all_entries.append(entry)
+        if not _is_nothing_to_report(entry.safety_issues):
+            ops_substantive_count += 1
+            ops_substantive_entries.append(entry)
+
+    # Choose which set of entries to display based on show_all parameter
+    show_all_ops = request.GET.get("show_all_ops") == "1"
+    if show_all_ops:
+        ops_safety_entries = ops_all_entries
+    else:
+        ops_safety_entries = ops_substantive_entries
 
     # Paginate ops safety entries
     ops_paginator = Paginator(ops_safety_entries, 10)

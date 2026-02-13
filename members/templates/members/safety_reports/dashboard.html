@@ -193,7 +193,7 @@
                     </span>
                     <div>
                         {% if show_all_ops %}
-                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}show_all_ops=0"
+                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=0"
                            class="btn btn-sm btn-outline-warning">
                             <i class="bi bi-funnel"></i> Hide "Nothing to Report"
                         </a>
@@ -201,7 +201,7 @@
                             Showing all {{ ops_total_count }} entries
                         </span>
                         {% else %}
-                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}show_all_ops=1"
+                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=1"
                            class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-eye"></i> Show All (incl. "Nothing to Report")
                         </a>

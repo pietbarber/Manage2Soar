@@ -87,8 +87,6 @@ This document describes the views defined in `members/views.py`, `members/views_
   - General club membership information
   - No personal information exposed
 
-## Also See
-
 ## Safety Officer Views (`members/views_safety_reports.py`)
 
 ### `safety_officer_dashboard`
