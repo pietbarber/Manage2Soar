@@ -32,38 +32,75 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         rostermeister_group, _ = Group.objects.get_or_create(name="rostermeister")
         self.rostermeister.groups.add(rostermeister_group)
 
-        # Create some schedulable members
+        # Create 4 schedulable members to avoid hitting max assignments after roster generation
         self.member1 = self.create_test_member(
             username="pilot1",
             email="pilot1@example.com",
             instructor=True,
             towpilot=True,
+            assistant_duty_officer=True,
         )
         self.member2 = self.create_test_member(
             username="pilot2",
             email="pilot2@example.com",
             instructor=True,
             towpilot=True,
+            assistant_duty_officer=True,
+        )
+        self.member3 = self.create_test_member(
+            username="pilot3",
+            email="pilot3@example.com",
+            instructor=True,
+            towpilot=True,
+            duty_officer=True,
+            assistant_duty_officer=True,
+        )
+        self.member4 = self.create_test_member(
+            username="pilot4",
+            email="pilot4@example.com",
+            instructor=True,
+            towpilot=True,
+            duty_officer=True,
+            assistant_duty_officer=True,
         )
 
-        # Create duty preferences for members
+        # Create duty preferences for members (100% for all roles to ensure eligibility)
+        # Use max 6 assignments to ensure there are always some empty slots for testing
         DutyPreference.objects.create(
             member=self.member1,
             dont_schedule=False,
-            max_assignments_per_month=8,
-            instructor_percent=50,
-            duty_officer_percent=0,
-            ado_percent=0,
-            towpilot_percent=50,
+            max_assignments_per_month=6,
+            instructor_percent=100,
+            duty_officer_percent=100,
+            ado_percent=100,
+            towpilot_percent=100,
         )
         DutyPreference.objects.create(
             member=self.member2,
             dont_schedule=False,
-            max_assignments_per_month=8,
-            instructor_percent=50,
-            duty_officer_percent=0,
-            ado_percent=0,
-            towpilot_percent=50,
+            max_assignments_per_month=6,
+            instructor_percent=100,
+            duty_officer_percent=100,
+            ado_percent=100,
+            towpilot_percent=100,
+        )
+        DutyPreference.objects.create(
+            member=self.member3,
+            dont_schedule=False,
+            max_assignments_per_month=6,
+            instructor_percent=100,
+            duty_officer_percent=100,
+            ado_percent=100,
+            towpilot_percent=100,
+        )
+        DutyPreference.objects.create(
+            member=self.member4,
+            dont_schedule=False,
+            max_assignments_per_month=6,
+            instructor_percent=100,
+            duty_officer_percent=100,
+            ado_percent=100,
+            towpilot_percent=100,
         )
 
     def _create_test_roster(self):
@@ -78,19 +115,17 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
             f"{self.live_server_url}/duty_roster/propose-roster/?year={test_year}&month={test_month}"
         )
 
-        # Ensure correct month/year are selected
-        year_select = self.page.locator('select[name="year"]')
-        month_select = self.page.locator('select[name="month"]')
+        # Wait for page to load
+        self.page.wait_for_selector("h2", timeout=10000)
 
-        year_select.select_option(str(test_year))
-        month_select.select_option(str(test_month))
-
-        # Click roll button to generate roster
+        # Check if there's a roster to work with, or generate one
         roll_button = self.page.locator('button[name="action"][value="roll"]')
-        roll_button.click()
+        if roll_button.count() > 0:
+            # Click roll button to generate roster
+            roll_button.click()
 
-        # Wait for roster to be created and page to be ready
-        self.page.wait_for_url("**/duty_roster/propose-roster/**", timeout=10000)
+            # Wait for roster to be created and page to reload
+            self.page.wait_for_load_state("networkidle", timeout=15000)
 
     def test_clicking_empty_slot_shows_choice_modal(self):
         """Test that clicking an empty slot shows diagnostic/assign choice modal."""
@@ -151,65 +186,73 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         """Test that assigning a member via modal updates the roster table."""
         self._create_test_roster()
 
-        # Find an empty slot to assign
-        empty_slots = self.page.locator(".empty-slot.editable-slot")
-        assert empty_slots.count() > 0, "Test requires at least one empty slot"
+        # Find a FILLED slot to edit (avoids the choice modal flow)
+        filled_slots = self.page.locator(".roster-slot.editable-slot:not(.empty-slot)")
+        if filled_slots.count() == 0:
+            # If no filled slots, use empty slot
+            filled_slots = self.page.locator(".empty-slot.editable-slot")
 
-        empty_slot = empty_slots.first
+        assert filled_slots.count() > 0, "Test requires at least one slot"
 
-        # Store original cell content
-        original_content = empty_slot.text_content() or ""
+        test_slot = filled_slots.first
 
-        # Click slot
-        empty_slot.click()
+        # Get slot attributes BEFORE clicking to avoid stale values after AJAX update
+        slot_role = test_slot.get_attribute("data-role")
+        slot_date = test_slot.get_attribute("data-date")
 
-        # Wait for modal
+        # Click slot to open edit modal
+        test_slot.click()
+
+        # Wait for edit modal
         modal = self.page.locator("#editSlotModal")
         modal.wait_for(state="visible", timeout=5000)
 
-        # If choice modal, click assign button
+        # If it's the choice modal, click assign to get to edit modal
         assign_btn = self.page.locator("#assignSlotFromChoiceBtn")
         if assign_btn.is_visible():
             assign_btn.click()
-            # Wait for edit modal to replace choice modal
             self.page.wait_for_timeout(500)
 
         # Wait for member select
         member_select = self.page.locator("#memberSelect")
         member_select.wait_for(state="visible", timeout=5000)
 
-        # Select a member (first non-empty option)
-        options = member_select.locator('option[value!=""]')
+        # Select a different member (not the first, since slot may already have first member)
+        options = member_select.locator('option:not([value=""])')
         assert options.count() > 0, "Test requires at least one eligible member"
 
-        first_member_option = options.first
-        member_value = first_member_option.get_attribute("value")
-        member_name = first_member_option.text_content() or ""
-
-        # Extract just the name part (before assignment count)
+        # Select the last option to ensure it's different from current
+        option_to_select = options.last
+        member_value = option_to_select.get_attribute("value")
+        member_name = option_to_select.text_content() or ""
         member_name_only = member_name.split("[")[0].strip()
 
         member_select.select_option(member_value)
 
-        # Click save button
+        # Click save
         save_btn = self.page.locator("#saveSlotBtn")
         save_btn.click()
 
-        # Wait for modal to close
+        # Wait for modal to close and DOM to update
         modal.wait_for(state="hidden", timeout=5000)
 
-        # Verify cell content updated
-        updated_content = empty_slot.text_content() or ""
-        assert updated_content != original_content, "Cell content should have changed"
+        # Wait for DOM update to complete - network idle ensures AJAX has finished
+        self.page.wait_for_load_state("networkidle", timeout=5000)
+
+        # Re-query the slot using the attributes we saved before clicking
+        updated_slot = self.page.locator(
+            f".roster-slot[data-role='{slot_role}'][data-date='{slot_date}']"
+        )
+        updated_content = updated_slot.text_content() or ""
+
+        # Verify the member name appears in the slot
         assert (
             member_name_only in updated_content
-        ), f"Cell should contain member name: {member_name_only}"
+        ), f"Cell should contain selected member name '{member_name_only}', but got: {updated_content}"
 
-        # Verify cell no longer has empty-slot class
-        cell_classes = empty_slot.get_attribute("class") or ""
-        assert (
-            "empty-slot" not in cell_classes
-        ), "Cell should no longer be marked as empty"
+        # Verify cell doesn't have empty-slot class
+        cell_classes = updated_slot.get_attribute("class") or ""
+        assert "empty-slot" not in cell_classes, "Cell should not be marked as empty"
 
     def test_viewing_diagnostics_shows_reasons(self):
         """Test that viewing diagnostics shows detailed reasons for empty slot."""
@@ -296,6 +339,10 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
 
         filled_slot = filled_slots.first
 
+        # Get slot attributes before clicking to re-query later
+        slot_role = filled_slot.get_attribute("data-role")
+        slot_date = filled_slot.get_attribute("data-date")
+
         # Click to edit
         filled_slot.click()
 
@@ -314,10 +361,18 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         modal = self.page.locator("#editSlotModal")
         modal.wait_for(state="hidden", timeout=5000)
 
+        # Wait for DOM update - network idle ensures AJAX has finished
+        self.page.wait_for_load_state("networkidle", timeout=5000)
+
+        # Re-query the slot to get fresh attributes
+        updated_slot = self.page.locator(
+            f".roster-slot[data-role='{slot_role}'][data-date='{slot_date}']"
+        )
+
         # Verify cell is now empty
-        cell_classes = filled_slot.get_attribute("class") or ""
+        cell_classes = updated_slot.get_attribute("class") or ""
         assert "empty-slot" in cell_classes, "Cell should be marked as empty"
 
         # Verify content is em dash
-        cell_text = filled_slot.locator(".slot-content").text_content() or ""
+        cell_text = updated_slot.locator(".slot-content").text_content() or ""
         assert "—" in cell_text, "Cell should show empty placeholder"

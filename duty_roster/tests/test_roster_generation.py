@@ -93,13 +93,14 @@ class TestRoleScarcity:
     def test_calculate_role_scarcity_basic(self):
         """Role scarcity should prioritize roles with fewer available members."""
         # Create members with different role flags
+        # Note: membership_status must be set to an active status for is_active to be True
         Member.objects.create(
             username="inst1",
             email="inst1@test.com",
             first_name="I",
             last_name="One",
             instructor=True,
-            is_active=True,
+            membership_status="Full Member",
         )
         Member.objects.create(
             username="inst2",
@@ -107,7 +108,7 @@ class TestRoleScarcity:
             first_name="I",
             last_name="Two",
             instructor=True,
-            is_active=True,
+            membership_status="Full Member",
         )
         Member.objects.create(
             username="tow1",
@@ -115,7 +116,7 @@ class TestRoleScarcity:
             first_name="T",
             last_name="One",
             towpilot=True,
-            is_active=True,
+            membership_status="Full Member",
         )
 
         members = Member.objects.filter(is_active=True)
@@ -156,7 +157,7 @@ class TestDiagnostics:
             first_name="Diag",
             last_name="Test",
             duty_officer=True,
-            is_active=True,
+            membership_status="Full Member",
         )
 
         # Create preference with dont_schedule=True
@@ -193,7 +194,7 @@ class TestDiagnostics:
             first_name="Repeat",
             last_name="Test",
             instructor=True,
-            is_active=True,
+            membership_status="Full Member",
         )
 
         members = Member.objects.filter(is_active=True)
