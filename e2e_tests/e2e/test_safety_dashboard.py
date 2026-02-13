@@ -15,7 +15,7 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
     def test_tab_switching(self):
         """Test switching between Suggestion Box and Ops Safety tabs."""
         # Create safety officer
-        safety_officer = self.create_test_member(
+        self.create_test_member(
             username="safetyofficer",
             is_superuser=False,
             safety_officer=True,
@@ -27,7 +27,8 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
 
         # Verify Suggestion Box tab is active by default
         suggestions_tab = self.page.locator("#suggestions-tab")
-        assert "active" in suggestions_tab.get_attribute("class")
+        suggestions_class = suggestions_tab.get_attribute("class")
+        assert suggestions_class is not None and "active" in suggestions_class
 
         # Verify Suggestion Box content is visible
         suggestions_content = self.page.locator("#suggestions")
@@ -45,7 +46,8 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
         self.page.wait_for_timeout(300)
 
         # Verify Ops Safety tab is now active
-        assert "active" in ops_tab.get_attribute("class")
+        ops_class = ops_tab.get_attribute("class")
+        assert ops_class is not None and "active" in ops_class
 
         # Verify Ops Safety content is now visible
         assert ops_content.is_visible()
@@ -147,8 +149,10 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
         ops_content.wait_for(state="visible")
 
         # Should only see substantive entry by default
-        assert "Rope break" in ops_content.text_content()
-        assert "Nothing to report" not in ops_content.text_content()
+        content_text = ops_content.text_content()
+        assert content_text is not None
+        assert "Rope break" in content_text
+        assert "Nothing to report" not in content_text
 
         # Navigate to show all view
         self.page.goto(
@@ -161,5 +165,6 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
 
         # Both entries should be visible
         content_text = ops_content.text_content()
+        assert content_text is not None
         assert "Rope break" in content_text
         assert "Nothing to report" in content_text
