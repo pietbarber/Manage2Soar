@@ -195,7 +195,6 @@ class TestRosterSlotEditing(DjangoPlaywrightTestCase):
         assert filled_slots.count() > 0, "Test requires at least one slot"
 
         test_slot = filled_slots.first
-        original_content = test_slot.text_content() or ""
 
         # Click slot to open edit modal
         test_slot.click()
