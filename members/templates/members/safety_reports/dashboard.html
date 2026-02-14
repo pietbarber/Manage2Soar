@@ -156,7 +156,7 @@
 
                             {% for num in suggestion_page_obj.paginator.page_range %}
                             {% if suggestion_page_obj.number == num %}
-                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            <li class="page-item active"><span class="page-link" aria-current="page">{{ num }}</span></li>
                             {% elif num > suggestion_page_obj.number|add:'-3' and num < suggestion_page_obj.number|add:'3' %}
                             <li class="page-item">
                                 <a class="page-link" href="?suggestion_page={{ num }}{% if show_all_ops %}&show_all_ops=1{% endif %}">{{ num }}</a>
@@ -248,7 +248,7 @@
 
                             {% for num in ops_page_obj.paginator.page_range %}
                             {% if ops_page_obj.number == num %}
-                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            <li class="page-item active"><span class="page-link" aria-current="page">{{ num }}</span></li>
                             {% elif num > ops_page_obj.number|add:'-3' and num < ops_page_obj.number|add:'3' %}
                             <li class="page-item">
                                 <a class="page-link" href="?ops_page={{ num }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}#ops-safety">{{ num }}</a>
@@ -282,4 +282,15 @@
 
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.location.hash === '#ops-safety') {
+    const opsTabTrigger = document.getElementById('ops-safety-tab');
+    if (opsTabTrigger && window.bootstrap && typeof window.bootstrap.Tab === 'function') {
+      const opsTab = new bootstrap.Tab(opsTabTrigger);
+      opsTab.show();
+    }
+  }
+});
+</script>
 {% endblock %}

@@ -184,28 +184,38 @@ def safety_officer_dashboard(request):
     # --- Ops Report Safety Sections (last 12 months) ---
     twelve_months_ago = timezone.now().date() - timedelta(days=365)
 
-    # Get closeouts with non-empty safety_issues from the last 12 months
+    # Shared filters for ops safety entries (last 12 months, finalized, non-empty safety_issues)
+    ops_filters = {
+        "logsheet__log_date__gte": twelve_months_ago,
+        "logsheet__finalized": True,
+    }
+
+    # Lightweight queryset for counting and "nothing to report" detection (no select_related)
+    ops_entries_data = (
+        LogsheetCloseout.objects.filter(**ops_filters)
+        .exclude(safety_issues="")
+        .values("id", "safety_issues")
+    )
+
+    # Full queryset with related objects for display/pagination
     ops_safety_entries_qs = (
         LogsheetCloseout.objects.select_related("logsheet", "logsheet__airfield")
-        .filter(
-            logsheet__log_date__gte=twelve_months_ago,
-            logsheet__finalized=True,
-        )
+        .filter(**ops_filters)
         .exclude(safety_issues="")
         .order_by("-logsheet__log_date")
     )
 
     # Build counts and collect IDs for substantive entries in a single pass
-    # This avoids materializing the entire queryset as Python model instances
+    # This avoids materializing full model instances (and related objects) for counting
     ops_total_count = 0
     ops_substantive_count = 0
     ops_substantive_ids = []
 
-    for entry in ops_safety_entries_qs:
+    for entry_data in ops_entries_data:
         ops_total_count += 1
-        if not _is_nothing_to_report(entry.safety_issues):
+        if not _is_nothing_to_report(entry_data["safety_issues"]):
             ops_substantive_count += 1
-            ops_substantive_ids.append(entry.id)
+            ops_substantive_ids.append(entry_data["id"])
 
     # Choose which set of entries to display based on show_all parameter
     show_all_ops = request.GET.get("show_all_ops") == "1"
