@@ -4,17 +4,38 @@ This module provides views for safety officers to manage safety reports
 without needing Django admin access.
 
 Related: Issue #585 - Create Safety Officer Interface for Viewing Safety Reports
+Related: Issue #622 - Safety Officers Dashboard with Ops Report Safety Sections
 """
+
+import re
+from datetime import timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import strip_tags
+
+from logsheet.models import LogsheetCloseout
 
 from .decorators import safety_officer_required
 from .forms import SafetyReportOfficerForm
 from .models import SafetyReport
+
+# Regex pattern to identify "nothing to report" type entries
+# Note: HTML is already stripped by strip_tags() before matching
+NOTHING_TO_REPORT_PATTERN = re.compile(
+    r"^\s*"  # Leading whitespace
+    r"(?:"  # Non-capturing group for alternatives
+    r"n/?a|none|nil|"  # Simple negatives
+    r"nothing(?:\s+to\s+report)?|"  # "nothing" or "nothing to report"
+    r"no\s+(?:safety\s+)?(?:issues?|reports?|concerns?|problems?|incidents?)(?:\s+to\s+report)?|"  # "no X" or "no X to report"
+    r"all\s+(?:good|clear)"  # "all good/clear"
+    r")"
+    r"\.?\s*$",  # Optional trailing period and whitespace
+    re.IGNORECASE,
+)
 
 
 @safety_officer_required
@@ -114,3 +135,113 @@ def safety_report_detail(request, report_id):
         "form": form,
     }
     return render(request, "members/safety_reports/detail.html", context)
+
+
+def _is_nothing_to_report(html_content):
+    """Check if HTML content is essentially a 'nothing to report' entry.
+
+    Strips HTML tags and checks against common "nothing to report" phrases.
+    Returns True if the content is effectively empty or a non-report.
+    """
+    if not html_content:
+        return True
+    text = strip_tags(html_content).strip()
+    if not text:
+        return True
+    return bool(NOTHING_TO_REPORT_PATTERN.match(text))
+
+
+@safety_officer_required
+def safety_officer_dashboard(request):
+    """Safety Officer Dashboard - consolidated view of all safety data.
+
+    Combines:
+    1. Safety suggestion box reports (SafetyReport model)
+    2. Ops report safety sections from logsheet closeouts (last 12 months)
+
+    Filters out trivial "nothing to report" entries from ops reports.
+
+    Related: Issue #622
+    """
+    # --- Safety Suggestion Box Reports ---
+    suggestion_reports = SafetyReport.objects.select_related(
+        "reporter", "reviewed_by"
+    ).order_by("-created_at")
+
+    # Statistics for suggestion box reports
+    suggestion_stats = SafetyReport.objects.aggregate(
+        total=Count("id"),
+        new=Count("id", filter=Q(status="new")),
+        in_progress=Count("id", filter=Q(status="in_progress")),
+        resolved=Count("id", filter=Q(status="resolved")),
+    )
+
+    # Paginate suggestion box reports
+    suggestion_paginator = Paginator(suggestion_reports, 10)
+    suggestion_page = request.GET.get("suggestion_page")
+    suggestion_page_obj = suggestion_paginator.get_page(suggestion_page)
+
+    # --- Ops Report Safety Sections (last 12 months) ---
+    twelve_months_ago = timezone.now().date() - timedelta(days=365)
+
+    # Shared filters for ops safety entries (last 12 months, finalized, non-empty safety_issues)
+    ops_filters = {
+        "logsheet__log_date__gte": twelve_months_ago,
+        "logsheet__finalized": True,
+    }
+
+    # Lightweight queryset for counting and "nothing to report" detection (no select_related)
+    ops_entries_data = (
+        LogsheetCloseout.objects.filter(**ops_filters)
+        .exclude(safety_issues="")
+        .values("id", "safety_issues")
+    )
+
+    # Full queryset with related objects for display/pagination
+    ops_safety_entries_qs = (
+        LogsheetCloseout.objects.select_related("logsheet", "logsheet__airfield")
+        .filter(**ops_filters)
+        .exclude(safety_issues="")
+        .order_by("-logsheet__log_date")
+    )
+
+    # Build counts and collect IDs for substantive entries in a single pass
+    # This avoids materializing full model instances (and related objects) for counting
+    ops_total_count = 0
+    ops_substantive_count = 0
+    ops_substantive_ids = []
+
+    for entry_data in ops_entries_data:
+        ops_total_count += 1
+        if not _is_nothing_to_report(entry_data["safety_issues"]):
+            ops_substantive_count += 1
+            ops_substantive_ids.append(entry_data["id"])
+
+    # Choose which set of entries to display based on show_all parameter
+    show_all_ops = request.GET.get("show_all_ops") == "1"
+    if show_all_ops:
+        ops_safety_entries_qs_for_page = ops_safety_entries_qs
+    else:
+        # Filter by IDs of substantive entries while preserving original ordering
+        ops_safety_entries_qs_for_page = ops_safety_entries_qs.filter(
+            id__in=ops_substantive_ids
+        )
+
+    # Paginate ops safety entries
+    ops_paginator = Paginator(ops_safety_entries_qs_for_page, 10)
+    ops_page = request.GET.get("ops_page")
+    ops_page_obj = ops_paginator.get_page(ops_page)
+
+    context = {
+        # Suggestion box data
+        "suggestion_page_obj": suggestion_page_obj,
+        "suggestion_stats": suggestion_stats,
+        # Ops safety data
+        "ops_page_obj": ops_page_obj,
+        "ops_total_count": ops_total_count,
+        "ops_substantive_count": ops_substantive_count,
+        "show_all_ops": show_all_ops,
+        # General
+        "twelve_months_ago": twelve_months_ago,
+    }
+    return render(request, "members/safety_reports/dashboard.html", context)

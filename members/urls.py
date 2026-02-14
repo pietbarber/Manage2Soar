@@ -102,6 +102,12 @@ urlpatterns = [
         views_safety_reports.safety_report_detail,
         name="safety_report_detail",
     ),
+    # Safety Officer Dashboard (Issue #622)
+    path(
+        "safety-dashboard/",
+        views_safety_reports.safety_officer_dashboard,
+        name="safety_officer_dashboard",
+    ),
 ]
 
 

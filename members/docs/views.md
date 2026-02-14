@@ -1,6 +1,6 @@
 # Views in the Members App
 
-This document describes the views defined in `members/views.py` and `members/views_applications.py` and their purpose in the app.
+This document describes the views defined in `members/views.py`, `members/views_applications.py`, and `members/views_safety_reports.py` and their purpose in the app.
 
 ## Member Management Views (`members/views.py`)
 
@@ -86,6 +86,40 @@ This document describes the views defined in `members/views.py` and `members/vie
   - Anonymous waitlist position display
   - General club membership information
   - No personal information exposed
+
+## Safety Officer Views (`members/views_safety_reports.py`)
+
+### `safety_officer_dashboard`
+- **Purpose:** Consolidated safety dashboard combining suggestion box reports and ops report safety sections (Issue #622).
+- **Template:** `members/safety_reports/dashboard.html`
+- **Access:** Safety officers (`safety_officer=True`) and superusers only
+- **Features:**
+  - Statistics cards for suggestion box reports (total, new, in progress, resolved)
+  - Tabbed interface: Suggestion Box Reports + Ops Report Safety Sections
+  - Ops safety sections pulled from `LogsheetCloseout.safety_issues` for the last 12 months
+  - Automatic filtering of "nothing to report" entries (N/A, None, No issues, etc.)
+  - Toggle to show/hide filtered entries
+  - Independent pagination for both tabs
+  - Links to full report detail pages
+
+### `safety_report_list`
+- **Purpose:** Paginated, filterable list of all safety suggestion box reports (Issue #585).
+- **Template:** `members/safety_reports/list.html`
+- **Access:** Safety officers and superusers only
+- **Features:**
+  - Filter by status (new, reviewed, in_progress, resolved, closed)
+  - Sort by date, status, or observation date
+  - Statistics dashboard cards
+  - Pagination (20 per page)
+
+### `safety_report_detail`
+- **Purpose:** View and manage a single safety report with officer actions (Issue #585).
+- **Template:** `members/safety_reports/detail.html`
+- **Access:** Safety officers and superusers only
+- **Features:**
+  - Full report details display
+  - Officer form for adding notes, updating status, recording actions taken
+  - Automatic tracking of reviewer and review timestamp
 
 ## Also See
 - [README.md](README.md)
