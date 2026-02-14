@@ -199,6 +199,39 @@ erDiagram
     Towplane ||--o{ AircraftMeister : maintained_by
     Towplane ||--|| TowplaneChargeScheme : pricing
     TowplaneChargeScheme ||--o{ TowplaneChargeTier : tiers
+
+    MemberCharge {
+        int id PK
+        int member_id FK
+        int chargeable_item_id FK
+        decimal quantity
+        decimal unit_price
+        decimal total_price
+        date date
+        int logsheet_id FK
+        text notes
+        int entered_by_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    ChargeableItem {
+        int id PK
+        string name
+        decimal price
+        string unit
+        boolean allows_decimal_quantity
+        boolean is_active
+        text description
+        int sort_order
+        datetime created_at
+        datetime updated_at
+    }
+
+    Member ||--o{ MemberCharge : charges
+    Member ||--o{ MemberCharge : entered_by
+    ChargeableItem ||--o{ MemberCharge : item
+    Logsheet ||--o{ MemberCharge : charges
 ```
 
 This document describes all models in `logsheet/models.py`.
@@ -255,6 +288,16 @@ This document describes all models in `logsheet/models.py`.
 
 ## MaintenanceDeadline
 - Tracks maintenance deadlines for aircraft.
+
+## MemberCharge
+- Represents a miscellaneous charge applied to a member during logsheet operations.
+- **Issue #413**: Initial model creation for tracking merchandise, retrieve fees, and service charges.
+- **Issue #615**: User-facing form enabling duty officers to add charges without Django admin access.
+- **Key Fields**: `member` (who is charged), `chargeable_item` (catalog item), `quantity`, `unit_price` (snapshot), `total_price` (auto-calculated).
+- **Logsheet Integration**: Optional `logsheet` FK links charges to specific operation days. Charges on finalized logsheets are locked.
+- **Price Snapshot**: `unit_price` captures the catalog price at creation time; subsequent catalog price changes don't affect existing charges.
+- **Auto-Calculation**: `total_price` = `quantity` × `unit_price`, computed on save.
+- **Decimal Quantity**: Supports fractional quantities (e.g., 1.8 hours for tach time) when `ChargeableItem.allows_decimal_quantity` is True.
 
 ---
 

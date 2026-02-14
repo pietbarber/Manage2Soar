@@ -139,6 +139,11 @@
 <h4 class="mb-3 mt-5">
   <i class="bi bi-bag text-info me-2"></i>
   Miscellaneous Charges
+  {% if not logsheet.finalized %}
+    <a href="{% url 'logsheet:add_member_charge' logsheet_pk=logsheet.pk %}" class="btn btn-sm btn-info ms-3">
+      <i class="bi bi-plus-circle me-1"></i>Add Charge
+    </a>
+  {% endif %}
 </h4>
 <p class="text-muted mb-4">Merchandise, aerotow retrieves, and other fees</p>
 
@@ -152,6 +157,7 @@
         <th class="text-end" data-sort-method="number">Unit Price</th>
         <th class="text-end" data-sort-method="number">Total</th>
         <th data-sort-method="string">Notes</th>
+        {% if not logsheet.finalized %}<th class="no-sort"></th>{% endif %}
       </tr>
     </thead>
   <tbody>
@@ -163,11 +169,31 @@
       <td class="text-end">${{ charge.unit_price|floatformat:2 }}</td>
       <td class="text-end fw-bold">${{ charge.total_price|floatformat:2 }}</td>
       <td>{{ charge.notes|default:"—" }}</td>
+      {% if not logsheet.finalized %}
+      <td>
+        <form method="post" action="{% url 'logsheet:delete_member_charge' logsheet_pk=logsheet.pk charge_pk=charge.pk %}"
+              onsubmit="return confirm('Delete this charge?');" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete charge">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </td>
+      {% endif %}
     </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+{% elif not logsheet.finalized %}
+<h4 class="mb-3 mt-5">
+  <i class="bi bi-bag text-info me-2"></i>
+  Miscellaneous Charges
+  <a href="{% url 'logsheet:add_member_charge' logsheet_pk=logsheet.pk %}" class="btn btn-sm btn-info ms-3">
+    <i class="bi bi-plus-circle me-1"></i>Add Charge
+  </a>
+</h4>
+<p class="text-muted mb-4">No miscellaneous charges yet. Use the button above to add merchandise, retrieve fees, or other charges.</p>
 {% endif %}
 
 {% if towplane_data and towplane_rental_enabled %}
