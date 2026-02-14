@@ -195,29 +195,30 @@ def safety_officer_dashboard(request):
         .order_by("-logsheet__log_date")
     )
 
-    # Build counts and filtered lists in a single pass over the queryset
-    # (more efficient than iterating twice)
+    # Build counts and collect IDs for substantive entries in a single pass
+    # This avoids materializing the entire queryset as Python model instances
     ops_total_count = 0
     ops_substantive_count = 0
-    ops_all_entries = []
-    ops_substantive_entries = []
+    ops_substantive_ids = []
 
     for entry in ops_safety_entries_qs:
         ops_total_count += 1
-        ops_all_entries.append(entry)
         if not _is_nothing_to_report(entry.safety_issues):
             ops_substantive_count += 1
-            ops_substantive_entries.append(entry)
+            ops_substantive_ids.append(entry.id)
 
     # Choose which set of entries to display based on show_all parameter
     show_all_ops = request.GET.get("show_all_ops") == "1"
     if show_all_ops:
-        ops_safety_entries = ops_all_entries
+        ops_safety_entries_qs_for_page = ops_safety_entries_qs
     else:
-        ops_safety_entries = ops_substantive_entries
+        # Filter by IDs of substantive entries while preserving original ordering
+        ops_safety_entries_qs_for_page = ops_safety_entries_qs.filter(
+            id__in=ops_substantive_ids
+        )
 
     # Paginate ops safety entries
-    ops_paginator = Paginator(ops_safety_entries, 10)
+    ops_paginator = Paginator(ops_safety_entries_qs_for_page, 10)
     ops_page = request.GET.get("ops_page")
     ops_page_obj = ops_paginator.get_page(ops_page)
 

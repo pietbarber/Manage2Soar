@@ -272,7 +272,7 @@
                         No operations reports with safety sections found in the last 12 months.
                         {% else %}
                         No substantive safety reports found in operations closeouts from the last 12 months.
-                        <a href="?show_all_ops=1">Show all entries</a> including "nothing to report."
+                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=1#ops-safety">Show all entries</a> including "nothing to report."
                         {% endif %}
                     </div>
                     {% endif %}
