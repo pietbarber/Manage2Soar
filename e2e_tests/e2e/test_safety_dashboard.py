@@ -58,7 +58,6 @@ class TestSafetyDashboardE2E(DjangoPlaywrightTestCase):
     def test_pagination_works(self):
         """Test that pagination displays correctly for ops safety entries."""
         from logsheet.models import Airfield, Logsheet, LogsheetCloseout
-        from members.models import SafetyReport
 
         # Create safety officer
         safety_officer = self.create_test_member(

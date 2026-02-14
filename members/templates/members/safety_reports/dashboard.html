@@ -193,7 +193,7 @@
                     </span>
                     <div>
                         {% if show_all_ops %}
-                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=0"
+                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=0#ops-safety"
                            class="btn btn-sm btn-outline-warning">
                             <i class="bi bi-funnel"></i> Hide "Nothing to Report"
                         </a>
@@ -201,7 +201,7 @@
                             Showing all {{ ops_total_count }} entries
                         </span>
                         {% else %}
-                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=1"
+                        <a href="?{% if suggestion_page_obj.number != 1 %}suggestion_page={{ suggestion_page_obj.number }}&{% endif %}{% if ops_page_obj.number != 1 %}ops_page={{ ops_page_obj.number }}&{% endif %}show_all_ops=1#ops-safety"
                            class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-eye"></i> Show All (incl. "Nothing to Report")
                         </a>
@@ -242,7 +242,7 @@
                         <ul class="pagination justify-content-center">
                             {% if ops_page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?ops_page={{ ops_page_obj.previous_page_number }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}">Previous</a>
+                                <a class="page-link" href="?ops_page={{ ops_page_obj.previous_page_number }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}#ops-safety">Previous</a>
                             </li>
                             {% endif %}
 
@@ -251,14 +251,14 @@
                             <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                             {% elif num > ops_page_obj.number|add:'-3' and num < ops_page_obj.number|add:'3' %}
                             <li class="page-item">
-                                <a class="page-link" href="?ops_page={{ num }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}">{{ num }}</a>
+                                <a class="page-link" href="?ops_page={{ num }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}#ops-safety">{{ num }}</a>
                             </li>
                             {% endif %}
                             {% endfor %}
 
                             {% if ops_page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?ops_page={{ ops_page_obj.next_page_number }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}">Next</a>
+                                <a class="page-link" href="?ops_page={{ ops_page_obj.next_page_number }}{% if show_all_ops %}&show_all_ops=1{% endif %}{% if suggestion_page_obj.number != 1 %}&suggestion_page={{ suggestion_page_obj.number }}{% endif %}#ops-safety">Next</a>
                             </li>
                             {% endif %}
                         </ul>

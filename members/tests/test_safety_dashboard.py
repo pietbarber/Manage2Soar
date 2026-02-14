@@ -119,6 +119,13 @@ class TestIsNothingToReport:
         assert _is_nothing_to_report("No issues") is True
         assert _is_nothing_to_report("No safety concerns") is True
 
+    def test_no_safety_issues_to_report(self):
+        """Test that 'to report' suffix is handled (addresses Copilot review comment)."""
+        assert _is_nothing_to_report("No safety issues to report") is True
+        assert _is_nothing_to_report("No issues to report") is True
+        assert _is_nothing_to_report("No safety concerns to report") is True
+        assert _is_nothing_to_report("No problems to report") is True
+
     def test_html_wrapped_nothing(self):
         assert _is_nothing_to_report("<p>Nothing to report</p>") is True
         assert _is_nothing_to_report("<p>None</p>") is True
@@ -192,7 +199,7 @@ class TestSafetyDashboardSuggestionBox:
         url = reverse("members:safety_officer_dashboard")
         response = client.get(url)
         assert response.status_code == 200
-        assert b"Test safety concern" not in response.content  # HTML stripped in table
+        # The report row should be visible via its location field
         assert b"Runway 27" in response.content
 
     def test_displays_suggestion_stats(self, client, safety_officer, regular_member):

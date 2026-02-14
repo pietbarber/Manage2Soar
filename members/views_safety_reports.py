@@ -30,7 +30,7 @@ NOTHING_TO_REPORT_PATTERN = re.compile(
     r"(?:"  # Non-capturing group for alternatives
     r"n/?a|none|nil|"  # Simple negatives
     r"nothing(?:\s+to\s+report)?|"  # "nothing" or "nothing to report"
-    r"no\s+(?:safety\s+)?(?:issues?|reports?|concerns?|problems?|incidents?)|"  # "no X"
+    r"no\s+(?:safety\s+)?(?:issues?|reports?|concerns?|problems?|incidents?)(?:\s+to\s+report)?|"  # "no X" or "no X to report"
     r"all\s+(?:good|clear)"  # "all good/clear"
     r")"
     r"\.?\s*$",  # Optional trailing period and whitespace
