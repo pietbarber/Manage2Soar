@@ -14,6 +14,8 @@ This document summarizes all classes and functions in `logsheet/views.py`.
 - **add_flight(request, logsheet_pk)**: Add a new flight to a logsheet.
 - **delete_flight(request, logsheet_pk, flight_pk)**: Delete a flight from a logsheet.
 - **manage_logsheet_finances(request, pk)**: Manage finances for a logsheet.
+- **add_member_charge(request, logsheet_pk)**: Add a miscellaneous charge (t-shirt, logbook, aerotow retrieve, etc.) to a logsheet. Prevents adding charges to finalized logsheets. Auto-populates logsheet, entered_by, and date fields. Issue #615.
+- **delete_member_charge(request, logsheet_pk, charge_pk)**: Delete a miscellaneous charge from a non-finalized logsheet. POST-only endpoint. Issue #615.
 - **edit_logsheet_closeout(request, pk)**: Edit the closeout for a logsheet. Enhanced with manual towplane addition, conditional duty officer validation, Bootstrap5 styling, and improved redirect behavior.
 - **add_towplane_closeout(request, pk)**: Manually add a towplane to the closeout form for rental/non-towing usage. Includes permission checking and user feedback.
 - **view_logsheet_closeout(request, pk)**: View the closeout for a logsheet.

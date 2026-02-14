@@ -18,6 +18,7 @@ from .models import (
     Flight,
     Logsheet,
     LogsheetCloseout,
+    MemberCharge,
     Towplane,
     TowplaneCloseout,
 )
@@ -1047,3 +1048,72 @@ class MaintenanceIssueForm(forms.ModelForm):
                 ("Other", [(tp.pk, str(tp)) for tp in other_towplanes])
             )
         self.fields["towplane"].choices = towplane_choices
+
+
+# MemberChargeForm
+# Issue #615: User-facing form for adding miscellaneous member charges
+# (t-shirts, logbooks, aerotow retrieves, etc.) during logsheet management.
+# Allows duty officers to create charges without requiring Django admin access.
+class MemberChargeForm(forms.ModelForm):
+    class Meta:
+        model = MemberCharge
+        fields = ["member", "chargeable_item", "quantity", "notes"]
+        widgets = {
+            "member": forms.Select(attrs={"class": "form-select"}),
+            "chargeable_item": forms.Select(attrs={"class": "form-select"}),
+            "quantity": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": "0.01",
+                    "step": "0.01",
+                    "value": "1",
+                }
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "placeholder": "Optional notes about this charge",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Filter member dropdown: active members first, then inactive
+        active_statuses = get_active_membership_statuses()
+        active_members = Member.objects.filter(
+            membership_status__in=active_statuses
+        ).order_by("last_name", "first_name")
+        inactive_members = Member.objects.exclude(
+            membership_status__in=active_statuses
+        ).order_by("last_name", "first_name")
+
+        member_choices = [("", "— Select member —")]
+        if active_members:
+            member_choices.append(
+                (
+                    "Active Members",
+                    [(m.pk, m.get_full_name() or m.username) for m in active_members],  # type: ignore
+                )
+            )
+        if inactive_members:
+            member_choices.append(
+                (
+                    "Non-Active Members",
+                    [(m.pk, m.get_full_name() or m.username) for m in inactive_members],  # type: ignore
+                )
+            )
+        self.fields["member"].choices = member_choices
+
+        # Filter chargeable items: only active items, sorted by sort_order
+        from siteconfig.models import ChargeableItem
+
+        self.fields["chargeable_item"].queryset = ChargeableItem.objects.filter(
+            is_active=True
+        ).order_by("sort_order", "name")
+        self.fields["chargeable_item"].empty_label = "— Select item —"
+
+        # Make notes optional
+        self.fields["notes"].required = False

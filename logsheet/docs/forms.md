@@ -28,6 +28,14 @@ This document describes all forms in `logsheet/forms.py`.
 ## MaintenanceIssueForm
 - ModelForm for reporting maintenance issues.
 
+## MemberChargeForm
+- ModelForm for adding miscellaneous member charges during logsheet management (Issue #615).
+- **Fields**: member, chargeable_item, quantity, notes
+- **Member Dropdown**: Groups members by active/inactive status with optgroup labels
+- **Item Filtering**: Only shows active ChargeableItem entries, ordered by sort_order
+- **Bootstrap5 Styling**: All fields use `form-select` or `form-control` classes
+- **Notes Optional**: Notes field is not required
+
 ---
 
 ## Also See

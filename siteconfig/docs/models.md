@@ -74,6 +74,21 @@ erDiagram
     }
 
     MailingList ||--o{ Member : "subscribers (computed)"
+
+    ChargeableItem {
+        int id PK
+        string name
+        decimal price
+        string unit
+        boolean allows_decimal_quantity
+        boolean is_active
+        text description
+        int sort_order
+        datetime created_at
+        datetime updated_at
+    }
+
+    ChargeableItem ||--o{ MemberCharge : "charges (logsheet app)"
 ```
 
 ## SiteConfiguration
@@ -113,6 +128,14 @@ erDiagram
   - `member_manager` - Membership managers
   - `rostermeister` - Roster managers
   - `private_glider_owner` - Owners of active private (non-club) gliders
+
+## ChargeableItem
+- **Purpose:** Catalog of purchasable items and service charges for miscellaneous member billing (Issue #66, #413).
+- **Key Features:** Supports per-item and per-hour pricing, active/inactive toggle, decimal quantity control, sortable display order.
+- **Fields:** name, price, unit (each/hour), allows_decimal_quantity, is_active, description, sort_order, timestamps
+- **Cross-App Usage:** Referenced by `MemberCharge` model in logsheet app. Duty officers select from active ChargeableItems when adding charges during logsheet management (Issue #615).
+- **Admin Interface:** Managed by webmaster via Django admin (`ChargeableItemAdmin`)
+- **Examples:** T-shirts, logbooks, aerotow retrieves, instruction materials
 
 ---
 

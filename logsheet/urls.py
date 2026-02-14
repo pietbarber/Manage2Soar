@@ -26,6 +26,16 @@ urlpatterns = [
         name="manage_logsheet_finances",
     ),
     path(
+        "manage/<int:logsheet_pk>/add-charge/",
+        views.add_member_charge,
+        name="add_member_charge",
+    ),
+    path(
+        "manage/<int:logsheet_pk>/delete-charge/<int:charge_pk>/",
+        views.delete_member_charge,
+        name="delete_member_charge",
+    ),
+    path(
         "manage/<int:pk>/closeout/",
         views.edit_logsheet_closeout,
         name="edit_logsheet_closeout",
