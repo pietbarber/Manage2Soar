@@ -24,6 +24,7 @@ from .forms import (
     LogsheetCloseoutForm,
     LogsheetDutyCrewForm,
     MaintenanceIssueForm,
+    MemberChargeForm,
     TowplaneCloseoutFormSet,
 )
 from .models import (
@@ -981,6 +982,87 @@ def delete_flight(request, logsheet_pk, flight_pk):
 # Returns:
 # - HttpResponse: Renders the financial management page with cost breakdowns, summaries, and member charges.
 #################################################
+
+
+@active_member_required
+def add_member_charge(request, logsheet_pk):
+    """Add a miscellaneous charge to a logsheet."""
+    from django.core.exceptions import ValidationError
+
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
+
+    # Prevent adding charges to finalized logsheets
+    if logsheet.finalized:
+        messages.error(request, "Cannot add charges to a finalized logsheet.")
+        return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
+
+    if request.method == "POST":
+        form = MemberChargeForm(request.POST)
+        if form.is_valid():
+            charge = form.save(commit=False)
+            charge.logsheet = logsheet
+            charge.entered_by = request.user
+            charge.date = logsheet.log_date
+            try:
+                charge.save()
+                messages.success(
+                    request,
+                    f"Added {charge.chargeable_item.name} charge for "
+                    f"{charge.member.get_full_name()}.",
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
+            except ValidationError as e:
+                # Attach model validation errors to the form
+                form.add_error(None, e)
+                # Fall through to re-render the form
+    else:
+        form = MemberChargeForm()
+
+    return render(
+        request,
+        "logsheet/add_member_charge.html",
+        {
+            "form": form,
+            "logsheet": logsheet,
+        },
+    )
+
+
+#################################################
+# delete_member_charge
+#
+# Issue #615: Delete a miscellaneous charge from a logsheet.
+# Only allowed on non-finalized logsheets.
+#
+# Args:
+# - request (HttpRequest): The incoming HTTP request (POST only).
+# - logsheet_pk (int): Primary key of the logsheet.
+# - charge_pk (int): Primary key of the charge to delete.
+#
+# Returns:
+# - HttpResponse: Redirects to the finances view.
+#################################################
+
+
+@require_POST
+@active_member_required
+def delete_member_charge(request, logsheet_pk, charge_pk):
+    """Delete a miscellaneous charge from a logsheet."""
+    logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
+    charge = get_object_or_404(MemberCharge, pk=charge_pk, logsheet=logsheet)
+
+    if logsheet.finalized:
+        messages.error(request, "Cannot delete charges from a finalized logsheet.")
+    else:
+        item_name = charge.chargeable_item.name
+        member_name = charge.member.get_full_name()
+        charge.delete()
+        messages.success(
+            request,
+            f"Deleted {item_name} charge for {member_name}.",
+        )
+
+    return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
 
 
 @active_member_required

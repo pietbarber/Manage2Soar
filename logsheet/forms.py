@@ -18,6 +18,7 @@ from .models import (
     Flight,
     Logsheet,
     LogsheetCloseout,
+    MemberCharge,
     Towplane,
     TowplaneCloseout,
 )
@@ -1047,3 +1048,100 @@ class MaintenanceIssueForm(forms.ModelForm):
                 ("Other", [(tp.pk, str(tp)) for tp in other_towplanes])
             )
         self.fields["towplane"].choices = towplane_choices
+
+
+# MemberChargeForm
+# Issue #615: User-facing form for adding miscellaneous member charges
+# (t-shirts, logbooks, aerotow retrieves, etc.) during logsheet management.
+# Allows duty officers to create charges without requiring Django admin access.
+class MemberChargeForm(forms.ModelForm):
+    class Meta:
+        model = MemberCharge
+        fields = ["member", "chargeable_item", "quantity", "notes"]
+        widgets = {
+            "member": forms.Select(attrs={"class": "form-select"}),
+            "chargeable_item": forms.Select(attrs={"class": "form-select"}),
+            "quantity": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": "0.01",
+                    "step": "0.01",
+                }
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "placeholder": "Optional notes about this charge",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Filter member dropdown: active members first, then inactive
+        active_statuses = get_active_membership_statuses()
+        active_members = Member.objects.filter(
+            membership_status__in=active_statuses
+        ).order_by("last_name", "first_name")
+        inactive_members = Member.objects.exclude(
+            membership_status__in=active_statuses
+        ).order_by("last_name", "first_name")
+
+        member_choices = [("", "— Select member —")]
+        active_member_choices = [
+            (m.pk, m.get_full_name() or m.username) for m in active_members  # type: ignore
+        ]
+        if active_member_choices:
+            member_choices.append(
+                (
+                    "Active Members",
+                    active_member_choices,  # type: ignore
+                )
+            )
+        inactive_member_choices = [
+            (m.pk, m.get_full_name() or m.username) for m in inactive_members  # type: ignore
+        ]
+        if inactive_member_choices:
+            member_choices.append(
+                (
+                    "Non-Active Members",
+                    inactive_member_choices,  # type: ignore
+                )
+            )
+        self.fields["member"].choices = member_choices
+
+        # Filter chargeable items: only active items, sorted by sort_order
+        from siteconfig.models import ChargeableItem
+
+        self.fields["chargeable_item"].queryset = ChargeableItem.objects.filter(
+            is_active=True
+        ).order_by("sort_order", "name")
+        self.fields["chargeable_item"].empty_label = "— Select item —"
+
+        # Make notes optional
+        self.fields["notes"].required = False
+
+        # Set default quantity to 1
+        if not self.instance.pk:
+            self.fields["quantity"].initial = 1
+
+    def clean(self):
+        """Validate decimal quantity constraint before save."""
+        cleaned_data = super().clean()
+        chargeable_item = cleaned_data.get("chargeable_item")
+        quantity = cleaned_data.get("quantity")
+
+        if chargeable_item and quantity:
+            # Check if decimal quantity is allowed for this item
+            if not chargeable_item.allows_decimal_quantity:
+                # Check if quantity has decimal places
+                if quantity % 1 != 0:
+                    self.add_error(
+                        "quantity",
+                        f"Decimal quantities are not allowed for {chargeable_item.name}. "
+                        f"Please enter a whole number.",
+                    )
+
+        return cleaned_data
