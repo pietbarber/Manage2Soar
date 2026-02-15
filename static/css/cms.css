@@ -219,3 +219,76 @@ textarea.tinymce-enhanced {
 .cms-edit-card .breadcrumb-item.active {
     color: var(--bs-secondary);
 }
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@page {
+    size: portrait;
+    margin: 1in 0.75in;
+}
+
+@media print {
+
+    /* Hide edit/admin buttons and controls */
+    .page-title-row .btn,
+    .page-title-row .btn-group,
+    .create-subpage,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Hide breadcrumb navigation */
+    .cms-breadcrumb {
+        display: none !important;
+    }
+
+    /* Hide access control alerts */
+    .alert {
+        display: none !important;
+    }
+
+    /* Optimize page layout for printing */
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    .container,
+    .container-fluid {
+        width: 100% !important;
+        max-width: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Ensure proper page breaks */
+    .cms-content h1,
+    .cms-content h2,
+    .cms-content h3 {
+        page-break-after: avoid;
+    }
+
+    /* Avoid breaking inside important elements */
+    .cms-content table,
+    .cms-content img,
+    .cms-content pre {
+        page-break-inside: avoid;
+    }
+
+    /* Optimize table printing */
+    .cms-content table {
+        width: 100% !important;
+    }
+
+    /* Remove box shadows and transitions */
+    .cms-edit-card,
+    .card {
+        box-shadow: none !important;
+        border: none !important;
+    }
+}

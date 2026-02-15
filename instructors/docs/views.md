@@ -37,6 +37,7 @@ This document summarizes all classes and functions in `instructors/views.py`.
 - **needed_for_checkride(request, member_id)**: Shows requirements needed for checkride.
 - **instruction_report_detail(request, report_id)**: Detail view for a specific instruction report.
 - **export_member_logbook_csv(request)**: Exports a member's logbook as CSV.
+- **bulk_assign_qualification(request)**: Bulk-assigns a qualification to multiple members at once. Used by safety officers for recording attendance at mandatory meetings. Access restricted to instructors, safety officers, and superusers.
 
 ## Main Classes
 

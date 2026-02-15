@@ -247,3 +247,106 @@ class QualificationAssignForm(forms.ModelForm):
             },
         )
         return instance
+
+
+####################################################
+# BulkQualificationAssignForm
+#
+# A form for assigning a single qualification to multiple members at once.
+# Used by the safety officer to record attendance for mandatory meetings
+# (e.g., annual safety meeting) without clicking through each member
+# individually.
+#
+# Fields:
+# - qualification: Qualification type to assign.
+# - date_awarded: Date the qualification was earned (defaults to today).
+# - expiration_date: Optional expiration date.
+# - notes: Optional notes for all awarded records.
+# - members: Multiple-choice checkbox list of active members.
+#
+# Methods:
+# - save(instructor): Creates MemberQualification records for each
+#   selected member using update_or_create to handle duplicates.
+####################################################
+
+
+class BulkQualificationAssignForm(forms.Form):
+    qualification = forms.ModelChoiceField(
+        queryset=ClubQualificationType.objects.filter(is_obsolete=False).order_by(
+            "name"
+        ),
+        label="Qualification",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    date_awarded = forms.DateField(
+        initial=date.today,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="Date Awarded",
+    )
+
+    expiration_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="Expiration Date (optional)",
+    )
+
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+        label="Notes (optional)",
+    )
+
+    members = forms.ModelMultipleChoiceField(
+        queryset=Member.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Members",
+        error_messages={"required": "Please select at least one member."},
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from members.utils.membership import get_active_membership_statuses
+
+        active_statuses = get_active_membership_statuses()
+        self.fields["members"].queryset = Member.objects.filter(
+            membership_status__in=active_statuses
+        ).order_by("last_name", "first_name")
+
+    def save(self, instructor):
+        """Create MemberQualification records for all selected members.
+
+        Uses update_or_create to handle members who already have the
+        qualification (updates their record instead of raising an error).
+
+        Returns:
+            tuple: (created_count, updated_count)
+        """
+        qualification = self.cleaned_data["qualification"]
+        date_awarded = self.cleaned_data["date_awarded"]
+        expiration_date = self.cleaned_data.get("expiration_date")
+        notes = self.cleaned_data.get("notes", "")
+        members = self.cleaned_data["members"]
+
+        created_count = 0
+        updated_count = 0
+
+        for member in members:
+            _, created = MemberQualification.objects.update_or_create(
+                member=member,
+                qualification=qualification,
+                defaults={
+                    "is_qualified": True,
+                    "date_awarded": date_awarded,
+                    "expiration_date": expiration_date,
+                    "notes": notes,
+                    "instructor": instructor,
+                    "imported": False,
+                },
+            )
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+
+        return created_count, updated_count
