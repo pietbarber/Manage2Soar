@@ -1029,7 +1029,7 @@ def add_member_charge(request, logsheet_pk):
                 return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
             except ValidationError as e:
                 # Attach model validation errors to the form
-                form.add_error(None, e.message)
+                form.add_error(None, e)
                 # Fall through to re-render the form
     else:
         form = MemberChargeForm()
