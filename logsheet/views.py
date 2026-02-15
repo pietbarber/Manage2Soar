@@ -1003,6 +1003,8 @@ def delete_flight(request, logsheet_pk, flight_pk):
 @active_member_required
 def add_member_charge(request, logsheet_pk):
     """Add a miscellaneous charge to a logsheet."""
+    from django.core.exceptions import ValidationError
+
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)
 
     # Prevent adding charges to finalized logsheets
@@ -1017,13 +1019,18 @@ def add_member_charge(request, logsheet_pk):
             charge.logsheet = logsheet
             charge.entered_by = request.user
             charge.date = logsheet.log_date
-            charge.save()
-            messages.success(
-                request,
-                f"Added {charge.chargeable_item.name} charge for "
-                f"{charge.member.get_full_name()}.",
-            )
-            return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
+            try:
+                charge.save()
+                messages.success(
+                    request,
+                    f"Added {charge.chargeable_item.name} charge for "
+                    f"{charge.member.get_full_name()}.",
+                )
+                return redirect("logsheet:manage_logsheet_finances", pk=logsheet_pk)
+            except ValidationError as e:
+                # Attach model validation errors to the form
+                form.add_error(None, e.message)
+                # Fall through to re-render the form
     else:
         form = MemberChargeForm()
 
@@ -1053,8 +1060,8 @@ def add_member_charge(request, logsheet_pk):
 #################################################
 
 
-@active_member_required
 @require_POST
+@active_member_required
 def delete_member_charge(request, logsheet_pk, charge_pk):
     """Delete a miscellaneous charge from a logsheet."""
     logsheet = get_object_or_404(Logsheet, pk=logsheet_pk)

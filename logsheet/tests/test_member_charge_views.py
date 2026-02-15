@@ -140,6 +140,57 @@ class MemberChargeFormTestCase(TestCase):
         )
         self.assertFalse(form.is_valid())
 
+    def test_form_rejects_decimal_quantity_when_not_allowed(self):
+        """Test form rejects decimal quantity for items with allows_decimal_quantity=False."""
+        # T-shirt should not allow decimal quantities (default is False)
+        self.assertFalse(self.tshirt.allows_decimal_quantity)
+
+        form = MemberChargeForm(
+            data={
+                "member": self.member.pk,
+                "chargeable_item": self.tshirt.pk,
+                "quantity": "1.5",
+                "notes": "",
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("quantity", form.errors)
+        self.assertIn(
+            "Decimal quantities are not allowed", str(form.errors["quantity"])
+        )
+
+    def test_form_accepts_decimal_quantity_when_allowed(self):
+        """Test form accepts decimal quantity for items with allows_decimal_quantity=True."""
+        retrieve = ChargeableItem.objects.create(
+            name="Aerotow Retrieve",
+            price=Decimal("120.00"),
+            unit=ChargeableItem.UnitType.HOUR,
+            allows_decimal_quantity=True,
+            is_active=True,
+        )
+
+        form = MemberChargeForm(
+            data={
+                "member": self.member.pk,
+                "chargeable_item": retrieve.pk,
+                "quantity": "1.8",
+                "notes": "",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_accepts_whole_number_for_non_decimal_item(self):
+        """Test form accepts whole numbers for items with allows_decimal_quantity=False."""
+        form = MemberChargeForm(
+            data={
+                "member": self.member.pk,
+                "chargeable_item": self.tshirt.pk,
+                "quantity": "2",
+                "notes": "",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
 
 class AddMemberChargeViewTestCase(TestCase):
     """Test the add_member_charge view."""

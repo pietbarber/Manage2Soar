@@ -1117,3 +1117,22 @@ class MemberChargeForm(forms.ModelForm):
 
         # Make notes optional
         self.fields["notes"].required = False
+
+    def clean(self):
+        """Validate decimal quantity constraint before save."""
+        cleaned_data = super().clean()
+        chargeable_item = cleaned_data.get("chargeable_item")
+        quantity = cleaned_data.get("quantity")
+
+        if chargeable_item and quantity:
+            # Check if decimal quantity is allowed for this item
+            if not chargeable_item.allows_decimal_quantity:
+                # Check if quantity has decimal places
+                if quantity % 1 != 0:
+                    self.add_error(
+                        "quantity",
+                        f"Decimal quantities are not allowed for {chargeable_item.name}. "
+                        f"Please enter a whole number.",
+                    )
+
+        return cleaned_data
