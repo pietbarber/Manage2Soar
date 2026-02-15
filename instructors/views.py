@@ -25,7 +25,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import FormView
 
-from instructors.decorators import instructor_required
+from instructors.decorators import (
+    instructor_or_safety_officer_required,
+    instructor_required,
+)
 from instructors.forms import (
     BulkQualificationAssignForm,
     GroundInstructionForm,
@@ -2512,13 +2515,9 @@ def export_member_logbook_csv(request):
 ####################################################
 
 
-@active_member_required
+@instructor_or_safety_officer_required
 def bulk_assign_qualification(request):
     """Bulk-assign a qualification to multiple members at once."""
-    user = request.user
-    if not (user.is_superuser or user.instructor or user.safety_officer):
-        return render(request, "403.html", status=403)
-
     if request.method == "POST":
         form = BulkQualificationAssignForm(request.POST)
         if form.is_valid():
@@ -2541,11 +2540,15 @@ def bulk_assign_qualification(request):
         form = BulkQualificationAssignForm()
 
     # Build a set of member IDs who already have each qualification,
+    # limited to the qualifications shown in the form dropdown,
     # so the template can show "already has this" indicators.
     existing_quals = {}
-    for mq in MemberQualification.objects.filter(is_qualified=True).select_related(
-        "qualification"
-    ):
+    qualification_qs = form.fields["qualification"].queryset
+    qualified_mqs = MemberQualification.objects.filter(
+        is_qualified=True,
+        qualification__in=qualification_qs,
+    ).only("qualification_id", "member_id")
+    for mq in qualified_mqs:
         existing_quals.setdefault(mq.qualification_id, set()).add(mq.member_id)
 
     return render(

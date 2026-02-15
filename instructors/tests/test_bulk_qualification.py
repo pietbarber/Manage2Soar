@@ -275,6 +275,14 @@ class TestBulkAssignQualificationView(TestCase):
             password="testpass123",
             membership_status="Full Member",
         )
+        cls.member2 = Member.objects.create_user(
+            username="member2",
+            first_name="Bob",
+            last_name="Baker",
+            email="bob@example.com",
+            password="testpass123",
+            membership_status="Full Member",
+        )
 
         cls.url = reverse("instructors:bulk_assign_qualification")
 
@@ -381,6 +389,33 @@ class TestBulkAssignQualificationView(TestCase):
         )
         messages_list = list(response.context["messages"])
         assert "1 existing record updated" in str(messages_list[0])
+
+    def test_success_message_mixed_create_and_update(self):
+        """Success message shows both created and updated when processing both."""
+        # Create a qualification for member1 beforehand
+        MemberQualification.objects.create(
+            member=self.member1,
+            qualification=self.qual,
+            is_qualified=True,
+            date_awarded="2025-01-01",
+        )
+        # Submit for both member1 (existing) and member2 (new)
+        self.client.force_login(self.instructor)
+        response = self.client.post(
+            self.url,
+            {
+                "qualification": self.qual.pk,
+                "date_awarded": "2026-02-15",
+                "members": [self.member1.pk, self.member2.pk],
+            },
+            follow=True,
+        )
+        messages_list = list(response.context["messages"])
+        assert len(messages_list) == 1
+        message_text = str(messages_list[0])
+        # Should mention both created and updated
+        assert "1 member assigned" in message_text
+        assert "1 existing record updated" in message_text
 
     def test_safety_officer_can_post(self):
         """Safety officer can POST to create qualifications."""

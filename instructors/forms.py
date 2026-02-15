@@ -316,8 +316,9 @@ class BulkQualificationAssignForm(forms.Form):
     def save(self, instructor):
         """Create MemberQualification records for all selected members.
 
-        Uses update_or_create to handle members who already have the
-        qualification (updates their record instead of raising an error).
+        Uses bulk operations to efficiently handle large numbers of members.
+        For existing qualifications, updates them in bulk; for new ones,
+        creates them in bulk.
 
         Returns:
             tuple: (created_count, updated_count)
@@ -328,25 +329,56 @@ class BulkQualificationAssignForm(forms.Form):
         notes = self.cleaned_data.get("notes", "")
         members = self.cleaned_data["members"]
 
-        created_count = 0
-        updated_count = 0
+        # Find which members already have this qualification
+        existing_mqs = MemberQualification.objects.filter(
+            member__in=members,
+            qualification=qualification,
+        ).select_related("member")
 
-        for member in members:
-            _, created = MemberQualification.objects.update_or_create(
-                member=member,
-                qualification=qualification,
-                defaults={
-                    "is_qualified": True,
-                    "date_awarded": date_awarded,
-                    "expiration_date": expiration_date,
-                    "notes": notes,
-                    "instructor": instructor,
-                    "imported": False,
-                },
+        existing_member_ids = {mq.member_id for mq in existing_mqs}
+
+        # Update existing qualifications in bulk
+        to_update = []
+        for mq in existing_mqs:
+            mq.is_qualified = True
+            mq.date_awarded = date_awarded
+            mq.expiration_date = expiration_date
+            mq.notes = notes
+            mq.instructor = instructor
+            mq.imported = False
+            to_update.append(mq)
+
+        if to_update:
+            MemberQualification.objects.bulk_update(
+                to_update,
+                fields=[
+                    "is_qualified",
+                    "date_awarded",
+                    "expiration_date",
+                    "notes",
+                    "instructor",
+                    "imported",
+                ],
             )
-            if created:
-                created_count += 1
-            else:
-                updated_count += 1
 
-        return created_count, updated_count
+        # Create new qualifications in bulk
+        to_create = []
+        for member in members:
+            if member.id not in existing_member_ids:
+                to_create.append(
+                    MemberQualification(
+                        member=member,
+                        qualification=qualification,
+                        is_qualified=True,
+                        date_awarded=date_awarded,
+                        expiration_date=expiration_date,
+                        notes=notes,
+                        instructor=instructor,
+                        imported=False,
+                    )
+                )
+
+        if to_create:
+            MemberQualification.objects.bulk_create(to_create)
+
+        return len(to_create), len(to_update)

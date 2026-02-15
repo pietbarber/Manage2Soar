@@ -80,3 +80,46 @@ def member_or_instructor_required(view_func):
         return render(request, "403.html", status=403)
 
     return wrapper
+
+
+####################################################
+# instructor_or_safety_officer_required
+#
+# Decorator to restrict view access to instructors or safety officers.
+# Allows superusers, then checks:
+# - membership_status in ALLOWED_MEMBERSHIP_STATUSES
+# - user.instructor flag True OR user.safety_officer flag True
+# Redirects unauthenticated users to login;
+# renders 403.html for forbidden access.
+#
+# Usage:
+# @instructor_or_safety_officer_required
+# def my_view(request, ...):
+#     ...
+####################################################
+
+
+def instructor_or_safety_officer_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+
+        if not user.is_authenticated:
+            return redirect("login")
+
+        # Superusers bypass all checks
+        if getattr(user, "is_superuser", False):
+            return view_func(request, *args, **kwargs)
+
+        # Centralized check which handles superuser logic and statuses
+        if not is_active_member(user):
+            return render(request, "403.html", status=403)
+
+        if not (
+            getattr(user, "instructor", False) or getattr(user, "safety_officer", False)
+        ):
+            return render(request, "403.html", status=403)
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
