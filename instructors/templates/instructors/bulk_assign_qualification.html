@@ -139,6 +139,10 @@
   </form>
 </div>
 
+<script type="application/json" id="existing-quals-data">
+{{ existing_quals_json|safe }}
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('member-search');
@@ -150,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterStatus = document.getElementById('filter-status');
     const qualSelect = document.getElementById('id_qualification');
     const memberItems = document.querySelectorAll('.member-item');
-    const existingQuals = {{ existing_quals_json|safe }};
+    const existingQuals = JSON.parse(document.getElementById('existing-quals-data').textContent);
 
     function getCheckboxes() {
         return document.querySelectorAll('.member-checklist input[type="checkbox"]');
