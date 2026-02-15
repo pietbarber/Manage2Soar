@@ -1066,7 +1066,6 @@ class MemberChargeForm(forms.ModelForm):
                     "class": "form-control",
                     "min": "0.01",
                     "step": "0.01",
-                    "value": "1",
                 }
             ),
             "notes": forms.Textarea(
@@ -1091,18 +1090,24 @@ class MemberChargeForm(forms.ModelForm):
         ).order_by("last_name", "first_name")
 
         member_choices = [("", "— Select member —")]
-        if active_members:
+        active_member_choices = [
+            (m.pk, m.get_full_name() or m.username) for m in active_members  # type: ignore
+        ]
+        if active_member_choices:
             member_choices.append(
                 (
                     "Active Members",
-                    [(m.pk, m.get_full_name() or m.username) for m in active_members],  # type: ignore
+                    active_member_choices,  # type: ignore
                 )
             )
-        if inactive_members:
+        inactive_member_choices = [
+            (m.pk, m.get_full_name() or m.username) for m in inactive_members  # type: ignore
+        ]
+        if inactive_member_choices:
             member_choices.append(
                 (
                     "Non-Active Members",
-                    [(m.pk, m.get_full_name() or m.username) for m in inactive_members],  # type: ignore
+                    inactive_member_choices,  # type: ignore
                 )
             )
         self.fields["member"].choices = member_choices
@@ -1117,6 +1122,10 @@ class MemberChargeForm(forms.ModelForm):
 
         # Make notes optional
         self.fields["notes"].required = False
+
+        # Set default quantity to 1
+        if not self.instance.pk:
+            self.fields["quantity"].initial = 1
 
     def clean(self):
         """Validate decimal quantity constraint before save."""
