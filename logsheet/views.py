@@ -984,22 +984,6 @@ def delete_flight(request, logsheet_pk, flight_pk):
 #################################################
 
 
-#################################################
-# add_member_charge
-#
-# Issue #615: User-facing form for adding miscellaneous charges to a logsheet.
-# Enables duty officers to add charges (t-shirts, logbooks, aerotow retrieves)
-# without requiring Django admin access.
-#
-# Args:
-# - request (HttpRequest): The incoming HTTP request (GET or POST).
-# - logsheet_pk (int): Primary key of the logsheet to add the charge to.
-#
-# Returns:
-# - HttpResponse: Renders the add charge form (GET) or redirects to finances (POST).
-#################################################
-
-
 @active_member_required
 def add_member_charge(request, logsheet_pk):
     """Add a miscellaneous charge to a logsheet."""
