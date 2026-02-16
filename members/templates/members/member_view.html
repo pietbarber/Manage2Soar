@@ -494,9 +494,9 @@
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
                   <i class="bi bi-trophy me-2"></i>SSA Badges
                   <span class="ms-3">
-                    {% for badge in member.badges.all %}
-                    {% if badge.badge.image %}
-                    <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" width="20" height="20" class="ms-1 rounded" title="{{ badge.badge.name }}">
+                    {% for member_badge in member_badges %}
+                    {% if member_badge.badge.image %}
+                    <img src="{{ member_badge.badge.image.url }}" alt="{{ member_badge.badge.name }}" width="20" height="20" class="ms-1 rounded" title="{{ member_badge.badge.name }}">
                     {% endif %}
                     {% endfor %}
                   </span>
@@ -504,17 +504,17 @@
               </h2>
               <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges" data-bs-parent="#ssaBadgeAccordion">
                 <div class="accordion-body">
-                  {% if member.badges.exists %}
+                  {% if member_badges %}
                   <div class="row g-3">
-                    {% for badge in member.badges.all %}
+                    {% for member_badge in member_badges %}
                     <div class="col-6 col-sm-4 text-center">
                       <div class="card h-100 border-0 shadow-sm">
                         <div class="card-body p-3">
-                          {% if badge.badge.image %}
-                          <img src="{{ badge.badge.image.url }}" alt="{{ badge.badge.name }}" class="img-fluid mb-2 badge-image">
+                          {% if member_badge.badge.image %}
+                          <img src="{{ member_badge.badge.image.url }}" alt="{{ member_badge.badge.name }}" class="img-fluid mb-2 badge-image">
                           {% endif %}
-                          <h6 class="small fw-bold mb-1">{{ badge.badge.name }}</h6>
-                          <small class="text-muted">{{ badge.date_awarded|date:"M j, Y" }}</small>
+                          <h6 class="small fw-bold mb-1">{{ member_badge.badge.name }}</h6>
+                          <small class="text-muted">{{ member_badge.date_awarded|date:"M j, Y" }}</small>
                         </div>
                       </div>
                     </div>

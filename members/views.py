@@ -38,6 +38,7 @@ from .forms import (
 )
 from .models import Badge, Biography, Member, MemberBadge
 from .utils.avatar_generator import generate_identicon
+from .utils.badge_utils import suppress_badge_board_legs, suppress_member_badge_legs
 from .utils.vcard_tools import generate_vcard_qr
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,12 @@ def member_view(request, member_id):
         .order_by("qualification__code")
     )
 
+    # Filter badges: suppress legs if parent badge has been earned (Issue #560)
+    member_badges_qs = member.badges.select_related(
+        "badge", "badge__parent_badge"
+    ).order_by("badge__order")
+    member_badges = suppress_member_badge_legs(member_badges_qs)
+
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
@@ -185,6 +192,7 @@ def member_view(request, member_id):
         "can_edit": can_edit,
         "biography": biography,
         "qualifications": qualifications,
+        "member_badges": member_badges,
         "today": date.today(),
         # new flag for template
         "show_need_buttons": show_need_buttons,
@@ -498,24 +506,8 @@ def badge_board(request):
         .order_by("order")
     )
 
-    # Build a mapping of parent_badge_id -> set of member_ids who have earned it
-    parent_badge_members = {}
-    for badge in badges:
-        if badge.parent_badge_id is None:
-            # This badge could be a parent - collect members who have it
-            member_ids = {mb.member_id for mb in badge.filtered_memberbadges}
-            parent_badge_members[badge.id] = member_ids
-
-    # For leg badges, filter out members who already have the parent badge
-    for badge in badges:
-        if badge.parent_badge_id and badge.parent_badge_id in parent_badge_members:
-            # Filter out members who have earned the parent badge
-            parent_member_ids = parent_badge_members[badge.parent_badge_id]
-            badge.filtered_memberbadges = [
-                mb
-                for mb in badge.filtered_memberbadges
-                if mb.member_id not in parent_member_ids
-            ]
+    # Suppress leg badges for members who have earned the parent badge (Issue #560)
+    badges = suppress_badge_board_legs(badges)
 
     return render(request, "members/badges.html", {"badges": badges})
 
