@@ -2548,9 +2548,9 @@ def bulk_assign_qualification(request):
         is_qualified=True,
         qualification__in=qualification_qs,
         member__in=form.fields["members"].queryset,
-    ).only("qualification_id", "member_id")
-    for mq in qualified_mqs:
-        existing_quals.setdefault(mq.qualification_id, set()).add(mq.member_id)
+    ).values_list("qualification_id", "member_id")
+    for qualification_id, member_id in qualified_mqs:
+        existing_quals.setdefault(qualification_id, set()).add(member_id)
 
     return render(
         request,

@@ -265,9 +265,9 @@ class QualificationAssignForm(forms.ModelForm):
 # - members: Multiple-choice checkbox list of active members.
 #
 # Methods:
-# - save(instructor): Creates MemberQualification records for each
-#   selected member, using bulk_create for new records and bulk_update
-#   for existing ones to efficiently handle duplicates in batches.
+# - save(instructor): Iterates over the selected members and uses
+#   per-member create/update logic (update_or_create) to ensure
+#   each MemberQualification is created or updated as needed.
 ####################################################
 
 
@@ -318,7 +318,7 @@ class BulkQualificationAssignForm(forms.Form):
         """Create MemberQualification records for all selected members.
 
         Uses update_or_create for each member to ensure accurate counting
-        and consistency with the established codebase pattern (see line 237).
+        and consistency with the established codebase pattern for qualification updates.
 
         This approach is slightly less performant than bulk operations but
         provides accurate create/update counts and handles race conditions

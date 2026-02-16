@@ -8,14 +8,14 @@ Tests the full browser workflow including:
 - Permission enforcement
 """
 
-from django.test import tag
+import pytest
 
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
 from instructors.models import ClubQualificationType, MemberQualification
 from siteconfig.models import MembershipStatus
 
 
-@tag("e2e")
+@pytest.mark.e2e
 class TestBulkQualificationE2E(DjangoPlaywrightTestCase):
     """E2E tests for the bulk qualification assignment page."""
 
