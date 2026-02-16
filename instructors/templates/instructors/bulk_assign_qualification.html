@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Bulk Assign Qualification{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'instructors:instructors-dashboard' %}">Instructor Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Bulk Assign Qualification</li>
+    </ol>
+  </nav>
+
+  <h1 class="mb-4"><i class="bi bi-people-fill me-2"></i>Bulk Assign Qualification</h1>
+
+  <p class="text-muted mb-4">
+    Assign a qualification (e.g., annual safety meeting attendance) to multiple members at once.
+    Select the qualification, choose members, and submit.
+  </p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" id="bulk-qual-form">
+    {% csrf_token %}
+
+    <div class="row">
+      {# Left column: Qualification settings #}
+      <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-award me-2"></i>Qualification Details</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="id_qualification" class="form-label fw-bold">Qualification</label>
+              {{ form.qualification }}
+              {% if form.qualification.errors %}
+                <div class="invalid-feedback d-block">{{ form.qualification.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="id_date_awarded" class="form-label fw-bold">Date Awarded</label>
+              {{ form.date_awarded }}
+              {% if form.date_awarded.errors %}
+                <div class="invalid-feedback d-block">{{ form.date_awarded.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="id_expiration_date" class="form-label fw-bold">Expiration Date</label>
+              {{ form.expiration_date }}
+              {% if form.expiration_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.expiration_date.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label for="id_notes" class="form-label fw-bold">Notes</label>
+              {{ form.notes }}
+              {% if form.notes.errors %}
+                <div class="invalid-feedback d-block">{{ form.notes.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
+            <i class="bi bi-check-circle me-2"></i>Assign Qualification
+            <span class="badge bg-light text-success ms-2" id="selected-count-badge">0 selected</span>
+          </button>
+          <a href="{% url 'instructors:instructors-dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+          </a>
+        </div>
+      </div>
+
+      {# Right column: Member checklist #}
+      <div class="col-lg-8">
+        <div class="card shadow-sm">
+          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-person-check me-2"></i>Select Members</h5>
+            <span class="badge bg-light text-primary" id="member-count">
+              {{ form.members.field.queryset.count }} members
+            </span>
+          </div>
+          <div class="card-body">
+            {% if form.members.errors %}
+              <div class="alert alert-danger">{{ form.members.errors.0 }}</div>
+            {% endif %}
+
+            {# Search and bulk action controls #}
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-search"></i></span>
+                  <label for="member-search" class="visually-hidden">Filter members by name</label>
+                  <input type="text" class="form-control" id="member-search"
+                         placeholder="Filter by name..." autocomplete="off"
+                         aria-label="Filter members by name">
+                </div>
+              </div>
+              <div class="col-md-6 text-end">
+                <div class="btn-group" role="group">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="select-all-btn">
+                    <i class="bi bi-check-all me-1"></i>Select All
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="deselect-all-btn">
+                    <i class="bi bi-x-circle me-1"></i>Deselect All
+                  </button>
+                  <button type="button" class="btn btn-outline-info btn-sm" id="select-without-qual-btn"
+                          title="Select members who do not already have the chosen qualification">
+                    <i class="bi bi-funnel me-1"></i>Select Without Qual
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {# Scrollable member checklist #}
+            <div class="member-checklist border rounded p-2" style="max-height: 500px; overflow-y: auto;">
+              {% for checkbox in form.members %}
+                <div class="form-check member-item py-1 px-2 rounded" data-member-name="{{ checkbox.choice_label|lower }}">
+                  {{ checkbox.tag }}
+                  <label class="form-check-label ms-1" for="{{ checkbox.id_for_label }}">
+                    {{ checkbox.choice_label }}
+                    <span class="badge bg-warning text-dark ms-1 existing-qual-badge d-none"
+                          data-member-id="{{ checkbox.data.value }}">already has this</span>
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="text-muted small mt-2" id="filter-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+{{ existing_quals|json_script:"existing-quals-data" }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('member-search');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const deselectAllBtn = document.getElementById('deselect-all-btn');
+    const selectWithoutQualBtn = document.getElementById('select-without-qual-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const selectedCountBadge = document.getElementById('selected-count-badge');
+    const filterStatus = document.getElementById('filter-status');
+    const qualSelect = document.getElementById('id_qualification');
+    const memberItems = document.querySelectorAll('.member-item');
+    const existingQuals = JSON.parse(document.getElementById('existing-quals-data').textContent);
+
+    function getCheckboxes() {
+        return document.querySelectorAll('.member-checklist input[type="checkbox"]');
+    }
+
+    function getVisibleCheckboxes() {
+        const checkboxes = [];
+        memberItems.forEach(function(item) {
+            if (item.style.display !== 'none') {
+                const cb = item.querySelector('input[type="checkbox"]');
+                if (cb) checkboxes.push(cb);
+            }
+        });
+        return checkboxes;
+    }
+
+    function updateSelectedCount() {
+        const checkboxes = getCheckboxes();
+        let count = 0;
+        checkboxes.forEach(function(cb) { if (cb.checked) count++; });
+        selectedCountBadge.textContent = count + ' selected';
+        submitBtn.disabled = count === 0;
+    }
+
+    function updateExistingQualBadges() {
+        const qualId = qualSelect.value;
+        const memberIds = existingQuals[qualId] || [];
+        document.querySelectorAll('.existing-qual-badge').forEach(function(badge) {
+            const memberId = parseInt(badge.dataset.memberId, 10);
+            if (memberIds.indexOf(memberId) !== -1) {
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        });
+    }
+
+    // Search/filter
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        let visibleCount = 0;
+        memberItems.forEach(function(item) {
+            const name = item.dataset.memberName;
+            if (!query || name.indexOf(query) !== -1) {
+                item.style.display = '';
+                visibleCount++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        if (query) {
+            filterStatus.textContent = 'Showing ' + visibleCount + ' of ' + memberItems.length + ' members';
+        } else {
+            filterStatus.textContent = '';
+        }
+    });
+
+    // Select All (visible only)
+    selectAllBtn.addEventListener('click', function() {
+        getVisibleCheckboxes().forEach(function(cb) { cb.checked = true; });
+        updateSelectedCount();
+    });
+
+    // Deselect All
+    deselectAllBtn.addEventListener('click', function() {
+        getCheckboxes().forEach(function(cb) { cb.checked = false; });
+        updateSelectedCount();
+    });
+
+    // Select members who do NOT already have the chosen qualification
+    selectWithoutQualBtn.addEventListener('click', function() {
+        const qualId = qualSelect.value;
+        if (!qualId) {
+            alert('Please select a qualification first.');
+            return;
+        }
+        const memberIds = existingQuals[qualId] || [];
+        getCheckboxes().forEach(function(cb) { cb.checked = false; });
+        getVisibleCheckboxes().forEach(function(cb) {
+            const memberId = parseInt(cb.value, 10);
+            if (memberIds.indexOf(memberId) === -1) {
+                cb.checked = true;
+            }
+        });
+        updateSelectedCount();
+    });
+
+    // Track checkbox changes
+    document.querySelector('.member-checklist').addEventListener('change', function(e) {
+        if (e.target.type === 'checkbox') {
+            updateSelectedCount();
+        }
+    });
+
+    // Update badges when qualification changes
+    qualSelect.addEventListener('change', function() {
+        updateExistingQualBadges();
+    });
+
+    // Initial state
+    updateSelectedCount();
+    updateExistingQualBadges();
+});
+</script>
+{% endblock %}

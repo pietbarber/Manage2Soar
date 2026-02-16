@@ -67,4 +67,9 @@ urlpatterns = [
         name="instruction_report_detail",
     ),
     path("tests/create/", CreateWrittenTestView.as_view(), name="create-written-test"),
+    path(
+        "bulk-assign-qualification/",
+        views.bulk_assign_qualification,
+        name="bulk_assign_qualification",
+    ),
 ]

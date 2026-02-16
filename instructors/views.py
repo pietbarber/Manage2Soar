@@ -25,8 +25,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import FormView
 
-from instructors.decorators import instructor_required
+from instructors.decorators import (
+    instructor_or_safety_officer_required,
+    instructor_required,
+)
 from instructors.forms import (
+    BulkQualificationAssignForm,
     GroundInstructionForm,
     GroundLessonScoreFormSet,
     InstructionReportForm,
@@ -2495,3 +2499,64 @@ def export_member_logbook_csv(request):
     for row in rows:
         writer.writerow(row)
     return response
+
+
+####################################################
+# bulk_assign_qualification
+#
+# Allows a safety officer or instructor to assign a single
+# qualification to multiple members at once (e.g., recording
+# attendance at the annual mandatory safety meeting).
+#
+# GET: Renders the form with a checklist of all active members.
+# POST: Creates MemberQualification records for selected members.
+#
+# Access: Safety officers and instructors only.
+####################################################
+
+
+@instructor_or_safety_officer_required
+def bulk_assign_qualification(request):
+    """Bulk-assign a qualification to multiple members at once."""
+    if request.method == "POST":
+        form = BulkQualificationAssignForm(request.POST)
+        if form.is_valid():
+            created, updated = form.save(instructor=request.user)
+            qualification_name = form.cleaned_data["qualification"].name
+            parts = []
+            if created:
+                parts.append(f"{created} member{'s' if created != 1 else ''} assigned")
+            if updated:
+                parts.append(
+                    f"{updated} existing record{'s' if updated != 1 else ''} updated"
+                )
+            summary = " and ".join(parts)
+            messages.success(
+                request,
+                f'"{qualification_name}" — {summary}.',
+            )
+            return redirect("instructors:bulk_assign_qualification")
+    else:
+        form = BulkQualificationAssignForm()
+
+    # Build a set of member IDs who already have each qualification,
+    # limited to the qualifications shown in the form dropdown,
+    # so the template can show "already has this" indicators.
+    existing_quals = {}
+    qualification_qs = form.fields["qualification"].queryset
+    qualified_mqs = MemberQualification.objects.filter(
+        is_qualified=True,
+        qualification__in=qualification_qs,
+        member__in=form.fields["members"].queryset,
+    ).values_list("qualification_id", "member_id")
+    for qualification_id, member_id in qualified_mqs:
+        existing_quals.setdefault(qualification_id, set()).add(member_id)
+
+    return render(
+        request,
+        "instructors/bulk_assign_qualification.html",
+        {
+            "form": form,
+            "existing_quals": {str(k): list(v) for k, v in existing_quals.items()},
+        },
+    )

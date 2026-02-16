@@ -3,6 +3,14 @@
 {% block content %}
 <h1>Student Progress Reports</h1>
 
+{% if user.instructor or user.safety_officer or user.is_superuser %}
+<div class="mb-4">
+  <a href="{% url 'instructors:bulk_assign_qualification' %}" class="btn btn-info">
+    <i class="bi bi-people-fill me-2"></i>Bulk Assign Qualification
+  </a>
+</div>
+{% endif %}
+
 {% if pending_reports %}
   <div class="alert alert-warning">
     You have {{ pending_reports|length }} reports to file from flights in the last 30 days:

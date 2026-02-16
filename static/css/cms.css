@@ -219,3 +219,60 @@ textarea.tinymce-enhanced {
 .cms-edit-card .breadcrumb-item.active {
     color: var(--bs-secondary);
 }
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@page {
+    size: portrait;
+    margin: 1in 0.75in;
+}
+
+@media print {
+
+    /* Hide edit/admin buttons and controls */
+    .page-title-row .btn,
+    .page-title-row .btn-group,
+    .create-subpage,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Hide breadcrumb navigation */
+    .cms-breadcrumb {
+        display: none !important;
+    }
+
+    /* Hide access control alerts in CMS pages */
+    .cms-content~.alert,
+    .page-title-row~.alert {
+        display: none !important;
+    }
+
+    /* Ensure proper page breaks */
+    .cms-content h1,
+    .cms-content h2,
+    .cms-content h3 {
+        page-break-after: avoid;
+    }
+
+    /* Avoid breaking inside important elements */
+    .cms-content table,
+    .cms-content img,
+    .cms-content pre {
+        page-break-inside: avoid;
+    }
+
+    /* Optimize table printing */
+    .cms-content table {
+        width: 100% !important;
+    }
+
+    /* Remove box shadows and transitions for CMS cards */
+    .cms-edit-card,
+    .cms-content .card {
+        box-shadow: none !important;
+        border: none !important;
+    }
+}
