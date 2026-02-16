@@ -507,7 +507,7 @@ def badge_board(request):
     )
 
     # Suppress leg badges for members who have earned the parent badge (Issue #560)
-    suppress_badge_board_legs(badges)
+    badges = suppress_badge_board_legs(badges)
 
     return render(request, "members/badges.html", {"badges": badges})
 

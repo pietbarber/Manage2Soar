@@ -58,14 +58,14 @@ def suppress_badge_board_legs(badges):
                (typically created via Prefetch with to_attr='filtered_memberbadges')
 
     Returns:
-        The same badges iterable (modified in-place)
+        List of Badge instances with filtered_memberbadges attribute modified in-place
 
     Example:
         # In badge_board view:
         badges = Badge.objects.select_related('parent_badge').prefetch_related(
             Prefetch('memberbadge_set', queryset=..., to_attr='filtered_memberbadges')
         ).order_by('order')
-        suppress_badge_board_legs(badges)
+        badges = suppress_badge_board_legs(badges)
     """
     # Convert to list to allow multiple iterations
     badges_list = list(badges)
