@@ -254,9 +254,12 @@ class DutyRosterScheduler:
                 if members_for_slot:
                     self.model.Add(sum(members_for_slot) == 1)
                 else:
+                    # No eligible members for this slot - make model infeasible
                     logger.warning(
                         f"No eligible members for {role} on {day} - infeasible!"
                     )
+                    # Add unsatisfiable constraint to make model infeasible
+                    self.model.Add(0 == 1)
 
     def _add_avoidance_constraints(self):
         """
@@ -320,12 +323,13 @@ class DutyRosterScheduler:
 
                     # Check if days are calendar-consecutive (not week-separated)
                     if (day2 - day1).days == 1:
-                        # Constraint: can't do same role on both days
-                        var1 = self.x.get((member.id, role, day1))
-                        var2 = self.x.get((member.id, role, day2))
+                        # Check if both variables exist in our sparse set
+                        key1 = (member.id, role, day1)
+                        key2 = (member.id, role, day2)
 
-                        if var1 and var2:
-                            self.model.Add(var1 + var2 <= 1)
+                        if key1 in self.x and key2 in self.x:
+                            # Constraint: can't do same role on both days
+                            self.model.Add(self.x[key1] + self.x[key2] <= 1)
 
     def _add_max_assignments_constraints(self):
         """
@@ -526,12 +530,12 @@ class DutyRosterScheduler:
 
         return result
 
-    def _extract_results(self, status: cp_model.CpSolverStatus) -> dict[str, Any]:
+    def _extract_results(self, status: int) -> dict[str, Any]:
         """
         Extract schedule from solver solution.
 
         Args:
-            status: CpSolverStatus enum value
+            status: CpSolverStatus enum value (as int)
 
         Returns:
             Dict with status, schedule, solve_time, objective_value, diagnostics
