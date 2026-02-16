@@ -244,26 +244,10 @@ textarea.tinymce-enhanced {
         display: none !important;
     }
 
-    /* Hide all Bootstrap alerts when printing */
-    .alert {
+    /* Hide access control alerts in CMS pages */
+    .cms-content ~ .alert,
+    .page-title-row ~ .alert {
         display: none !important;
-    }
-
-    /* Optimize page layout for printing */
-    html,
-    body {
-        margin: 0;
-        padding: 0;
-        width: 100% !important;
-        max-width: none !important;
-    }
-
-    .container,
-    .container-fluid {
-        width: 100% !important;
-        max-width: none !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
     }
 
     /* Ensure proper page breaks */
@@ -285,9 +269,9 @@ textarea.tinymce-enhanced {
         width: 100% !important;
     }
 
-    /* Remove box shadows and transitions */
+    /* Remove box shadows and transitions for CMS cards */
     .cms-edit-card,
-    .card {
+    .cms-content .card {
         box-shadow: none !important;
         border: none !important;
     }

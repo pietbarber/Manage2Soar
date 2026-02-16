@@ -322,6 +322,9 @@ class BulkQualificationAssignForm(forms.Form):
         creates them in bulk. Wrapped in atomic transaction to prevent
         race conditions with concurrent requests.
 
+        Uses Django 5.x's bulk_create with update_conflicts to handle
+        concurrent insertions gracefully (upsert behavior).
+
         Returns:
             tuple: (created_count, updated_count)
         """
@@ -366,7 +369,8 @@ class BulkQualificationAssignForm(forms.Form):
                     ],
                 )
 
-            # Create new qualifications in bulk
+            # Create new qualifications in bulk with upsert behavior
+            # to handle concurrent inserts (e.g., double-submit, parallel requests)
             to_create = []
             for member in members:
                 if member.id not in existing_member_ids:
@@ -384,6 +388,21 @@ class BulkQualificationAssignForm(forms.Form):
                     )
 
             if to_create:
-                MemberQualification.objects.bulk_create(to_create)
+                # Use Django 5.x update_conflicts to handle race conditions
+                # If a concurrent transaction inserts the same (member, qualification),
+                # update it instead of raising IntegrityError
+                MemberQualification.objects.bulk_create(
+                    to_create,
+                    update_conflicts=True,
+                    unique_fields=["member", "qualification"],
+                    update_fields=[
+                        "is_qualified",
+                        "date_awarded",
+                        "expiration_date",
+                        "notes",
+                        "instructor",
+                        "imported",
+                    ],
+                )
 
         return len(to_create), len(to_update)

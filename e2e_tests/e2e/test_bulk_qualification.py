@@ -8,7 +8,6 @@ Tests the full browser workflow including:
 - Permission enforcement
 """
 
-import pytest
 from django.test import tag
 
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
