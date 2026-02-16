@@ -167,6 +167,24 @@ def member_view(request, member_id):
         .order_by("qualification__code")
     )
 
+    # Filter badges: suppress legs if parent badge has been earned (Issue #560)
+    member_badges_qs = member.badges.select_related(
+        "badge", "badge__parent_badge"
+    ).order_by("badge__order")
+
+    # Build set of parent badge IDs that this member has earned
+    parent_badge_ids = set()
+    for mb in member_badges_qs:
+        if mb.badge.parent_badge_id is None:
+            parent_badge_ids.add(mb.badge.id)
+
+    # Filter out leg badges where parent has been earned
+    member_badges = [
+        mb
+        for mb in member_badges_qs
+        if mb.badge.parent_badge_id not in parent_badge_ids
+    ]
+
     if is_self and request.method == "POST":
         form = MemberProfilePhotoForm(request.POST, request.FILES, instance=member)
         if form.is_valid():
@@ -185,6 +203,7 @@ def member_view(request, member_id):
         "can_edit": can_edit,
         "biography": biography,
         "qualifications": qualifications,
+        "member_badges": member_badges,
         "today": date.today(),
         # new flag for template
         "show_need_buttons": show_need_buttons,
