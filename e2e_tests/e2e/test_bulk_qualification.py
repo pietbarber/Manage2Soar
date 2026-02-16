@@ -119,8 +119,11 @@ class TestBulkQualificationE2E(DjangoPlaywrightTestCase):
         # Type a search query
         self.page.fill("#member-search", "Alice")
 
-        # Wait for filter to take effect
-        self.page.wait_for_timeout(300)
+        # Wait for filter to take effect by observing the filter-status text update
+        self.page.wait_for_function(
+            "document.querySelector('#filter-status') && "
+            "document.querySelector('#filter-status').textContent.includes('Showing')"
+        )
 
         # Only matching members should be visible
         visible_items = self.page.locator('.member-item:not([style*="display: none"])')
@@ -185,12 +188,16 @@ class TestBulkQualificationE2E(DjangoPlaywrightTestCase):
 
         # Select the qualification
         self.page.select_option("#id_qualification", str(self.qual.pk))
-        # Wait for badge update
-        self.page.wait_for_timeout(300)
+        # Wait for any badge/indicator updates triggered by qualification selection
+        self.page.wait_for_load_state("networkidle")
 
         # Click "Select Without Qual"
         self.page.click("#select-without-qual-btn")
-        self.page.wait_for_timeout(300)
+        # Wait for checkboxes to be updated by observing badge count change
+        self.page.wait_for_function(
+            "document.querySelector('#selected-count-badge') && "
+            "!document.querySelector('#selected-count-badge').textContent.includes('0 selected')"
+        )
 
         # The member who already has the qual should NOT be checked
         # Members without the qual should be checked
@@ -205,6 +212,9 @@ class TestBulkQualificationE2E(DjangoPlaywrightTestCase):
                     not cb.is_checked()
                 ), "Member who already has qualification should not be checked"
             else:
+                assert (
+                    cb.is_checked()
+                ), "Members without the qualification should be checked"
                 checked_count += 1
 
         assert checked_count >= 2  # at least member2 and member3

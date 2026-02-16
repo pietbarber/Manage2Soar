@@ -139,9 +139,7 @@
   </form>
 </div>
 
-<script type="application/json" id="existing-quals-data">
-{{ existing_quals_json|safe }}
-</script>
+{{ existing_quals|json_script:"existing-quals-data" }}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

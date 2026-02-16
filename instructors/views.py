@@ -2547,6 +2547,7 @@ def bulk_assign_qualification(request):
     qualified_mqs = MemberQualification.objects.filter(
         is_qualified=True,
         qualification__in=qualification_qs,
+        member__in=form.fields["members"].queryset,
     ).only("qualification_id", "member_id")
     for mq in qualified_mqs:
         existing_quals.setdefault(mq.qualification_id, set()).add(mq.member_id)
@@ -2556,8 +2557,6 @@ def bulk_assign_qualification(request):
         "instructors/bulk_assign_qualification.html",
         {
             "form": form,
-            "existing_quals_json": json.dumps(
-                {str(k): list(v) for k, v in existing_quals.items()}
-            ),
+            "existing_quals": {str(k): list(v) for k, v in existing_quals.items()},
         },
     )

@@ -266,7 +266,8 @@ class QualificationAssignForm(forms.ModelForm):
 #
 # Methods:
 # - save(instructor): Creates MemberQualification records for each
-#   selected member using update_or_create to handle duplicates.
+#   selected member, using bulk_create for new records and bulk_update
+#   for existing ones to efficiently handle duplicates in batches.
 ####################################################
 
 
@@ -318,67 +319,71 @@ class BulkQualificationAssignForm(forms.Form):
 
         Uses bulk operations to efficiently handle large numbers of members.
         For existing qualifications, updates them in bulk; for new ones,
-        creates them in bulk.
+        creates them in bulk. Wrapped in atomic transaction to prevent
+        race conditions with concurrent requests.
 
         Returns:
             tuple: (created_count, updated_count)
         """
+        from django.db import transaction
+
         qualification = self.cleaned_data["qualification"]
         date_awarded = self.cleaned_data["date_awarded"]
         expiration_date = self.cleaned_data.get("expiration_date")
         notes = self.cleaned_data.get("notes", "")
         members = self.cleaned_data["members"]
 
-        # Find which members already have this qualification
-        existing_mqs = MemberQualification.objects.filter(
-            member__in=members,
-            qualification=qualification,
-        ).select_related("member")
+        with transaction.atomic():
+            # Find which members already have this qualification
+            existing_mqs = MemberQualification.objects.filter(
+                member__in=members,
+                qualification=qualification,
+            ).select_related("member")
 
-        existing_member_ids = {mq.member_id for mq in existing_mqs}
+            existing_member_ids = {mq.member_id for mq in existing_mqs}
 
-        # Update existing qualifications in bulk
-        to_update = []
-        for mq in existing_mqs:
-            mq.is_qualified = True
-            mq.date_awarded = date_awarded
-            mq.expiration_date = expiration_date
-            mq.notes = notes
-            mq.instructor = instructor
-            mq.imported = False
-            to_update.append(mq)
+            # Update existing qualifications in bulk
+            to_update = []
+            for mq in existing_mqs:
+                mq.is_qualified = True
+                mq.date_awarded = date_awarded
+                mq.expiration_date = expiration_date
+                mq.notes = notes
+                mq.instructor = instructor
+                mq.imported = False
+                to_update.append(mq)
 
-        if to_update:
-            MemberQualification.objects.bulk_update(
-                to_update,
-                fields=[
-                    "is_qualified",
-                    "date_awarded",
-                    "expiration_date",
-                    "notes",
-                    "instructor",
-                    "imported",
-                ],
-            )
-
-        # Create new qualifications in bulk
-        to_create = []
-        for member in members:
-            if member.id not in existing_member_ids:
-                to_create.append(
-                    MemberQualification(
-                        member=member,
-                        qualification=qualification,
-                        is_qualified=True,
-                        date_awarded=date_awarded,
-                        expiration_date=expiration_date,
-                        notes=notes,
-                        instructor=instructor,
-                        imported=False,
-                    )
+            if to_update:
+                MemberQualification.objects.bulk_update(
+                    to_update,
+                    fields=[
+                        "is_qualified",
+                        "date_awarded",
+                        "expiration_date",
+                        "notes",
+                        "instructor",
+                        "imported",
+                    ],
                 )
 
-        if to_create:
-            MemberQualification.objects.bulk_create(to_create)
+            # Create new qualifications in bulk
+            to_create = []
+            for member in members:
+                if member.id not in existing_member_ids:
+                    to_create.append(
+                        MemberQualification(
+                            member=member,
+                            qualification=qualification,
+                            is_qualified=True,
+                            date_awarded=date_awarded,
+                            expiration_date=expiration_date,
+                            notes=notes,
+                            instructor=instructor,
+                            imported=False,
+                        )
+                    )
+
+            if to_create:
+                MemberQualification.objects.bulk_create(to_create)
 
         return len(to_create), len(to_update)
