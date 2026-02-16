@@ -245,8 +245,8 @@ textarea.tinymce-enhanced {
     }
 
     /* Hide access control alerts in CMS pages */
-    .cms-content ~ .alert,
-    .page-title-row ~ .alert {
+    .cms-content~.alert,
+    .page-title-row~.alert {
         display: none !important;
     }
 

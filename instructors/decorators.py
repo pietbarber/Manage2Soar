@@ -107,12 +107,16 @@ def instructor_or_safety_officer_required(view_func):
         if not user.is_authenticated:
             return redirect("login")
 
-        # Centralized check which handles superuser logic and statuses
+        # Superusers always have access
+        if user.is_superuser:
+            return view_func(request, *args, **kwargs)
+
+        # Centralized check which handles active membership statuses
         if not is_active_member(user):
             return render(request, "403.html", status=403)
 
-        # Superusers bypass role checks; others need instructor or safety_officer flag
-        if not user.is_superuser and not (
+        # Check if user has instructor or safety_officer flag
+        if not (
             getattr(user, "instructor", False) or getattr(user, "safety_officer", False)
         ):
             return render(request, "403.html", status=403)

@@ -317,13 +317,14 @@ class BulkQualificationAssignForm(forms.Form):
     def save(self, instructor):
         """Create MemberQualification records for all selected members.
 
-        Uses bulk operations to efficiently handle large numbers of members.
-        For existing qualifications, updates them in bulk; for new ones,
-        creates them in bulk. Wrapped in atomic transaction to prevent
-        race conditions with concurrent requests.
+        Uses update_or_create for each member to ensure accurate counting
+        and consistency with the established codebase pattern (see line 237).
 
-        Uses Django 5.x's bulk_create with update_conflicts to handle
-        concurrent insertions gracefully (upsert behavior).
+        This approach is slightly less performant than bulk operations but
+        provides accurate create/update counts and handles race conditions
+        gracefully. Given the typical use case (recording ~100 members at
+        annual safety meetings), the performance difference is negligible
+        compared to the benefits of accuracy and idempotency.
 
         Returns:
             tuple: (created_count, updated_count)
@@ -336,73 +337,26 @@ class BulkQualificationAssignForm(forms.Form):
         notes = self.cleaned_data.get("notes", "")
         members = self.cleaned_data["members"]
 
+        created_count = 0
+        updated_count = 0
+
         with transaction.atomic():
-            # Find which members already have this qualification
-            existing_mqs = MemberQualification.objects.filter(
-                member__in=members,
-                qualification=qualification,
-            ).select_related("member")
-
-            existing_member_ids = {mq.member_id for mq in existing_mqs}
-
-            # Update existing qualifications in bulk
-            to_update = []
-            for mq in existing_mqs:
-                mq.is_qualified = True
-                mq.date_awarded = date_awarded
-                mq.expiration_date = expiration_date
-                mq.notes = notes
-                mq.instructor = instructor
-                mq.imported = False
-                to_update.append(mq)
-
-            if to_update:
-                MemberQualification.objects.bulk_update(
-                    to_update,
-                    fields=[
-                        "is_qualified",
-                        "date_awarded",
-                        "expiration_date",
-                        "notes",
-                        "instructor",
-                        "imported",
-                    ],
-                )
-
-            # Create new qualifications in bulk with upsert behavior
-            # to handle concurrent inserts (e.g., double-submit, parallel requests)
-            to_create = []
             for member in members:
-                if member.id not in existing_member_ids:
-                    to_create.append(
-                        MemberQualification(
-                            member=member,
-                            qualification=qualification,
-                            is_qualified=True,
-                            date_awarded=date_awarded,
-                            expiration_date=expiration_date,
-                            notes=notes,
-                            instructor=instructor,
-                            imported=False,
-                        )
-                    )
-
-            if to_create:
-                # Use Django 5.x update_conflicts to handle race conditions
-                # If a concurrent transaction inserts the same (member, qualification),
-                # update it instead of raising IntegrityError
-                MemberQualification.objects.bulk_create(
-                    to_create,
-                    update_conflicts=True,
-                    unique_fields=["member", "qualification"],
-                    update_fields=[
-                        "is_qualified",
-                        "date_awarded",
-                        "expiration_date",
-                        "notes",
-                        "instructor",
-                        "imported",
-                    ],
+                _, created = MemberQualification.objects.update_or_create(
+                    member=member,
+                    qualification=qualification,
+                    defaults={
+                        "is_qualified": True,
+                        "date_awarded": date_awarded,
+                        "expiration_date": expiration_date,
+                        "notes": notes,
+                        "instructor": instructor,
+                        "imported": False,
+                    },
                 )
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
 
-        return len(to_create), len(to_update)
+        return created_count, updated_count
