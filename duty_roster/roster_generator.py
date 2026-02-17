@@ -436,7 +436,7 @@ def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=Non
     Returns:
         List of dicts, each with:
             - 'date': a datetime.date for the duty day
-            - 'slots': mapping of role name to assigned Member (or None if unfilled)
+            - 'slots': mapping of role name to assigned Member.id (or None if unfilled)
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
     from django.utils.timezone import now
@@ -730,13 +730,23 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
             - 'slots': mapping of role name to assigned Member ID (or None if unfilled)
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
+    # Normalize parameters to avoid None values in telemetry/logging
+    from django.utils.timezone import now
+
+    today = now().date()
+    year = year or today.year
+    month = month or today.month
+    roles = roles if roles is not None else DEFAULT_ROLES
+    exclude_dates = exclude_dates or set()
+
     # Check feature flag
     try:
         config = SiteConfiguration.objects.first()
         use_ortools = config.use_ortools_scheduler if config else False
     except Exception as e:
         logger.warning(
-            f"Failed to read SiteConfiguration, defaulting to legacy scheduler: {e}"
+            f"Failed to read SiteConfiguration, defaulting to legacy scheduler: {e}",
+            exc_info=True,
         )
         use_ortools = False
 

@@ -116,6 +116,7 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "schedule_tow_pilots",
                     "schedule_duty_officers",
                     "schedule_assistant_duty_officers",
+                    "use_ortools_scheduler",
                 ),
                 "classes": ("collapse",),
             },

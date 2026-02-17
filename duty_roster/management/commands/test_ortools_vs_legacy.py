@@ -19,7 +19,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from duty_roster.ortools_scheduler import generate_roster_ortools
-from duty_roster.roster_generator import _generate_roster_legacy
+from duty_roster.roster_generator import generate_roster_legacy
 from members.constants.membership import DEFAULT_ROLES
 from members.models import Member
 
@@ -123,7 +123,7 @@ class Command(BaseCommand):
         output_stream.write("  Running legacy scheduler...\n")
         legacy_start = time.perf_counter()
         try:
-            legacy_schedule = _generate_roster_legacy(year, month, roles)
+            legacy_schedule = generate_roster_legacy(year, month, roles)
             legacy_time_ms = (time.perf_counter() - legacy_start) * 1000
             legacy_error = None
         except Exception as e:
