@@ -128,7 +128,7 @@ class DualPathRoutingTests(TestCase):
         self.config.use_ortools_scheduler = False
         self.config.save()
 
-        roles = ["Instructor", "Tow Pilot"]
+        roles = ["instructor", "towpilot"]
         exclude = {date(2026, 3, 15), date(2026, 3, 16)}
 
         with patch(
@@ -146,7 +146,7 @@ class DualPathRoutingTests(TestCase):
         self.config.use_ortools_scheduler = True
         self.config.save()
 
-        roles = ["Instructor", "Tow Pilot"]
+        roles = ["instructor", "towpilot"]
         exclude = {date(2026, 3, 15), date(2026, 3, 16)}
 
         with patch(

@@ -1,6 +1,7 @@
 import calendar
 import logging
 import random
+import time
 from collections import defaultdict
 from datetime import date
 
@@ -729,8 +730,6 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
             - 'slots': mapping of role name to assigned Member ID (or None if unfilled)
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
-    import time
-
     # Check feature flag
     try:
         config = SiteConfiguration.objects.first()

@@ -7,7 +7,7 @@ comparison report including solve times, solution quality metrics, and differenc
 Usage:
     python manage.py test_ortools_vs_legacy --year=2026 --month=3
     python manage.py test_ortools_vs_legacy --year=2026 --month=3 --json
-    python manage.py test_ortools_vs_legacy --year=2026 --month=3 --roles=Instructor,Tow Pilot
+    python manage.py test_ortools_vs_legacy --year=2026 --month=3 --roles=instructor,towpilot
 """
 
 import json
