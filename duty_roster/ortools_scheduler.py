@@ -527,12 +527,12 @@ class DutyRosterScheduler:
 
         return result
 
-    def _extract_results(self, status: int) -> dict[str, Any]:
+    def _extract_results(self, status) -> dict[str, Any]:
         """
         Extract schedule from solver solution.
 
         Args:
-            status: CpSolverStatus enum value (as int)
+            status: CpSolverStatus enum value
 
         Returns:
             Dict with status, schedule, solve_time, objective_value, diagnostics
