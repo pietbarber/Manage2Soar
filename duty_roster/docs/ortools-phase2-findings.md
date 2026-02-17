@@ -14,14 +14,14 @@ Successfully implemented a production-ready OR-Tools constraint programming sche
 
 **Production Scheduler Files:**
 
-1. **duty_roster/ortools_scheduler.py** (722 lines)
+1. **duty_roster/ortools_scheduler.py** (749 lines)
    - `DutyRosterScheduler` class with full CP-SAT model
    - `extract_scheduling_data()` for Django ORM integration
    - `generate_roster_ortools()` compatible with legacy interface
    - Sparse variable creation (~60-80% reduction)
    - Comprehensive logging and error handling
 
-2. **duty_roster/tests/test_ortools_scheduler.py** (762 lines)
+2. **duty_roster/tests/test_ortools_scheduler.py** (812 lines)
    - 18 comprehensive tests covering all constraints
    - Basic tests (3): data extraction, initialization, variable creation
    - Hard constraint tests (6): role qualification, blackouts, avoidances, etc.
@@ -170,7 +170,7 @@ duty_roster/test_ortools_scheduler.py::ORToolsRegressionTests::test_deterministi
 
 ### 1. Declarative Constraint Model
 - **Legacy:** 700 lines of procedural code with nested loops and conditionals
-- **OR-Tools:** 722 lines with clear constraint formulation
+- **OR-Tools:** 749 lines with clear constraint formulation
 - **Benefit:** Easier to understand, modify, and debug
 
 ### 2. Global Optimization
@@ -308,12 +308,12 @@ The OR-Tools scheduler successfully implements all constraints from the legacy s
 ---
 
 **Files Modified:**
-- `duty_roster/ortools_scheduler.py` (722 lines, production scheduler)
-- `duty_roster/test_ortools_scheduler.py` (762 lines, 18 tests)
+- `duty_roster/ortools_scheduler.py` (749 lines, production scheduler)
+- `duty_roster/test_ortools_scheduler.py` (812 lines, 18 tests)
 - `duty_roster/docs/ortools-constraint-model.md` (588 lines, design spec)
 - `duty_roster/ortools_comparison.py` (371 lines, comparison tool)
 
-**Total Lines Added:** ~2,443 lines (code + tests + docs)
+**Total Lines Added:** ~2,520 lines (code + tests + docs)
 
 **Test Coverage:** 18/18 passing (100%)
 
