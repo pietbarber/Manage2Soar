@@ -17,25 +17,23 @@ This guide covers how to safely deploy and enable the OR-Tools constraint progra
 
 The OR-Tools integration uses a **dual-path architecture with automatic fallback**:
 
-```
-┌──────────────────────────────────┐
-│  roster_generator.generate_roster()  │
-└──────────┬───────────────────────┘
-           │
-           ├──► Check SiteConfiguration.use_ortools_scheduler flag
-           │
-       ┌───┴──────┐
-       │   True   │   False
-       │          │
-       ▼          ▼
-  OR-Tools    Legacy
-  Scheduler   Scheduler
-     │            │
-     │ (on error) │
-     └────────────┼──► Automatic fallback to legacy scheduler
-                  │
-                  ▼
-            Generated Roster
+```mermaid
+flowchart TD
+    Start([roster_generator.generate_roster]) --> CheckFlag{Check SiteConfiguration<br/>use_ortools_scheduler flag}
+
+    CheckFlag -->|True| ORTools[OR-Tools Scheduler]
+    CheckFlag -->|False| Legacy[Legacy Scheduler]
+
+    ORTools -->|Success| Result([Generated Roster])
+    ORTools -->|Error/Exception| Fallback[Automatic Fallback]
+    Fallback --> Legacy
+
+    Legacy --> Result
+
+    style ORTools fill:#e1f5e1
+    style Legacy fill:#fff4e1
+    style Result fill:#e1e8f5
+    style Fallback fill:#ffe1e1
 ```
 
 **Key Safety Features:**
