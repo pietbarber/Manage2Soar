@@ -629,7 +629,7 @@ def extract_scheduling_data(
     today = now().date()
     year = year or today.year
     month = month or today.month
-    roles = roles or DEFAULT_ROLES
+    roles = roles if roles is not None else DEFAULT_ROLES
 
     # Get all weekend dates in month
     cal = calendar.Calendar()

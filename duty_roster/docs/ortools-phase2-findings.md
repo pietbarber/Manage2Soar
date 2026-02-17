@@ -12,6 +12,8 @@ Successfully implemented a production-ready OR-Tools constraint programming sche
 
 ### Files Created/Modified
 
+**Production Scheduler Files:**
+
 1. **duty_roster/ortools_scheduler.py** (722 lines)
    - `DutyRosterScheduler` class with full CP-SAT model
    - `extract_scheduling_data()` for Django ORM integration
@@ -28,11 +30,46 @@ Successfully implemented a production-ready OR-Tools constraint programming sche
    - Integration tests (2): full month scheduling, performance benchmark
    - Regression test (1): deterministic output validation
 
+**Documentation Files:**
+
 3. **duty_roster/docs/ortools-constraint-model.md** (588 lines)
    - Complete mathematical specification of all constraints
    - Decision variable formulation
    - Django ORM integration patterns
    - Performance optimization strategies
+
+4. **duty_roster/docs/ortools-phase2-findings.md** (this file, 286 lines)
+   - Implementation summary and results
+   - Constraint coverage analysis
+   - Performance benchmarks and comparisons
+
+**Development/Analysis Tools:**
+
+5. **duty_roster/ortools_poc.py** (237 lines)
+   - Phase 1 proof-of-concept with simplified model
+   - Reference implementation for constraint prototyping
+   - Accessible via Django shell for experimentation
+
+6. **duty_roster/ortools_benchmark.py** (98 lines)
+   - Performance comparison tool (OR-Tools vs legacy)
+   - Solves identical problems with both schedulers
+   - Reports timing, objective value, and solution quality
+
+7. **duty_roster/ortools_comparison.py** (319 lines)
+   - Head-to-head scheduler comparison utility
+   - Metrics: solve time, slot fill rate, fairness variance
+   - Constraint violation detection
+   - Command-line usage via Django shell
+
+8. **duty_roster/docs/ortools-phase1-findings.md** (201 lines)
+   - Phase 1 POC findings and lessons learned
+   - Initial constraint formulation experiments
+   - Development history and design decisions
+
+**Dependencies:**
+
+9. **requirements.txt**
+   - Added: `ortools>=9.8.3296`
 
 4. **duty_roster/ortools_comparison.py** (371 lines)
    - Head-to-head comparison tool for both schedulers
