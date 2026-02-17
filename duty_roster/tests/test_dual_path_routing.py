@@ -6,7 +6,7 @@ OR-Tools constraint programming scheduler or legacy weighted-random algorithm.
 """
 
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.test import TestCase
 

@@ -795,3 +795,27 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
         },
     )
     return schedule
+
+
+def generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None):
+    """
+    Generate duty roster using legacy weighted-random algorithm.
+
+    This is a public wrapper for the legacy scheduler, intended for:
+    - Comparison scripts that need to explicitly test legacy algorithm
+    - Diagnostic/debugging tools
+    - Migration/testing scenarios
+
+    For normal roster generation, use generate_roster() which respects the
+    feature flag and provides automatic fallback.
+
+    Args:
+        year: Year to generate roster for (default: current year)
+        month: Month to generate roster for (default: current month)
+        roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
+        exclude_dates: Optional set/list of datetime.date objects to skip
+
+    Returns:
+        List of dicts, each with 'date', 'slots', and 'diagnostics'
+    """
+    return _generate_roster_legacy(year, month, roles, exclude_dates)

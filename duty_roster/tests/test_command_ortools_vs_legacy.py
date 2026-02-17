@@ -62,12 +62,12 @@ class TestORToolsVsLegacyCommandTests(TestCase):
             "test_ortools_vs_legacy",
             "--year=2026",
             "--month=3",
-            "--roles=Instructor,Tow Pilot",
+            "--roles=instructor,towpilot",
             stdout=out,
         )
 
         output = out.getvalue()
-        self.assertIn("Roles: Instructor, Tow Pilot", output)
+        self.assertIn("Roles: instructor, towpilot", output)
 
     def test_command_json_output(self):
         """Test that JSON output is valid and contains expected fields."""

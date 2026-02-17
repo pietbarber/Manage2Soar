@@ -135,27 +135,26 @@ Expected log entries:
 ```json
 {
   "level": "info",
-  "message": "Generating roster",
-  "scheduler_type": "ortools",
+  "message": "Using OR-Tools constraint programming scheduler",
   "year": 2026,
   "month": 6,
-  "num_days": 8,
-  "excluded_dates": 0
+  "roles": ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
 }
 {
   "level": "info",
-  "message": "Roster generation complete",
-  "scheduler_type": "ortools",
+  "message": "OR-Tools scheduler completed successfully",
+  "scheduler": "ortools",
   "solve_time_ms": 1234,
   "year": 2026,
-  "month": 6
+  "month": 6,
+  "num_days": 8
 }
 ```
 
 **Key Fields:**
-- `scheduler_type`: Should be `"ortools"` when flag is enabled
+- `scheduler`: Should be `"ortools"` when flag is enabled
 - `solve_time_ms`: Typical range 500-5000ms depending on problem size
-- No `fallback_to_legacy` messages indicate OR-Tools is working correctly
+- No error messages with "falling back to legacy algorithm" indicate OR-Tools is working correctly
 
 ### 2.4 Run Side-by-Side Comparison
 
@@ -252,7 +251,7 @@ print(f"New setting: {config.use_ortools_scheduler}")  # Should be True
 
 1. Generate a test roster for a future month (not current month)
 2. Verify roster generates successfully
-3. Check logs for `scheduler_type: ortools`
+3. Check logs for `scheduler: ortools`
 4. Monitor for any errors or fallback messages
 
 ### 3.4 Monitor for First Production Use
@@ -264,9 +263,9 @@ kubectl logs -f <production-pod> | grep -E "(generate_roster|roster_generator|or
 ```
 
 Expected success indicators:
-- `scheduler_type: "ortools"`
+- `scheduler: "ortools"`
 - `solve_time_ms` within normal range
-- No `fallback_to_legacy` warnings
+- No "falling back to legacy algorithm" error messages
 - No exceptions
 
 ## Step 4: Gradual Rollout Strategy (Optional)

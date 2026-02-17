@@ -68,7 +68,7 @@ Consider rollback if you encounter:
 5. **Verify Rollback:**
    - Navigate to **Duty Roster → Propose Roster**
    - Generate a test roster for a future month
-   - Check logs to confirm `scheduler_type: "legacy"`
+   - Check logs to confirm `scheduler: "legacy"`
 
 **Time Required:** < 2 minutes
 
@@ -131,10 +131,11 @@ Consider rollback if you encounter:
    ```json
    {
      "level": "info",
-     "message": "Generating roster",
-     "scheduler_type": "legacy",
+     "message": "Using legacy weighted-random scheduler",
+     "scheduler": "legacy",
      "year": 2026,
-     "month": 6
+     "month": 6,
+     "roles": ["instructor", "duty_officer", "assistant_duty_officer", "towpilot"]
    }
    ```
 
@@ -274,7 +275,7 @@ After rollback, verify each item:
 
 - [ ] `use_ortools_scheduler` flag is `False` in database
 - [ ] Admin UI shows checkbox is **unchecked**
-- [ ] Logs show `scheduler_type: "legacy"` on new roster generation
+- [ ] Logs show `scheduler: "legacy"` on new roster generation
 - [ ] Test roster generation succeeds
 - [ ] No `ortools` import errors in logs
 - [ ] Fill rates are acceptable (typically 80-95%)
@@ -285,7 +286,7 @@ After rollback, verify each item:
 
 ### Issue 1: Flag Shows Disabled But OR-Tools Still Used
 
-**Symptom:** Logs show `scheduler_type: "ortools"` but flag is `False`
+**Symptom:** Logs show `scheduler: "ortools"` but flag is `False`
 
 **Cause:** Django cache or stale config
 

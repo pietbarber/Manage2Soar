@@ -64,6 +64,16 @@ class Command(BaseCommand):
 
         if options["roles"]:
             roles = [r.strip() for r in options["roles"].split(",")]
+            # Validate roles against DEFAULT_ROLES
+            invalid_roles = [r for r in roles if r not in DEFAULT_ROLES]
+            if invalid_roles:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Invalid roles: {', '.join(invalid_roles)}. "
+                        f"Valid roles are: {', '.join(DEFAULT_ROLES)}"
+                    )
+                )
+                return
         else:
             roles = DEFAULT_ROLES
 
@@ -72,7 +82,7 @@ class Command(BaseCommand):
 
         # Run comparison
         try:
-            results = self.compare_schedulers(year, month, roles, verbose)
+            results = self.compare_schedulers(year, month, roles, verbose, output_json)
 
             if output_json:
                 self.output_json(results)
@@ -83,9 +93,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Comparison failed: {e}"))
             raise
 
-    def compare_schedulers(self, year, month, roles, verbose=False):
+    def compare_schedulers(self, year, month, roles, verbose=False, json_mode=False):
         """Run both schedulers and collect comparison metrics."""
-        self.stdout.write(f"Comparing schedulers for {year}-{month:02d}...")
+        # Use stderr for progress messages in JSON mode to keep stdout clean
+        output_stream = self.stderr if json_mode else self.stdout
+        output_stream.write(f"Comparing schedulers for {year}-{month:02d}...\n")
 
         # Get member counts for context
         total_members = Member.objects.filter(is_active=True).count()
@@ -93,13 +105,13 @@ class Command(BaseCommand):
         # Count qualified members per role
         qualified_counts = {}
         for role in roles:
-            if role == "Instructor":
+            if role == "instructor":
                 count = Member.objects.filter(is_active=True, instructor=True).count()
-            elif role == "Tow Pilot":
+            elif role == "towpilot":
                 count = Member.objects.filter(is_active=True, towpilot=True).count()
-            elif role == "Duty Officer":
+            elif role == "duty_officer":
                 count = Member.objects.filter(is_active=True, duty_officer=True).count()
-            elif role == "Assistant Duty Officer":
+            elif role == "assistant_duty_officer":
                 count = Member.objects.filter(
                     is_active=True, assistant_duty_officer=True
                 ).count()
@@ -108,7 +120,7 @@ class Command(BaseCommand):
             qualified_counts[role] = count
 
         # Run legacy scheduler
-        self.stdout.write("  Running legacy scheduler...")
+        output_stream.write("  Running legacy scheduler...\n")
         legacy_start = time.perf_counter()
         try:
             legacy_schedule = _generate_roster_legacy(year, month, roles)
@@ -118,10 +130,10 @@ class Command(BaseCommand):
             legacy_schedule = []
             legacy_time_ms = (time.perf_counter() - legacy_start) * 1000
             legacy_error = str(e)
-            self.stdout.write(self.style.WARNING(f"    Legacy failed: {e}"))
+            output_stream.write(self.style.WARNING(f"    Legacy failed: {e}\n"))
 
         # Run OR-Tools scheduler
-        self.stdout.write("  Running OR-Tools scheduler...")
+        output_stream.write("  Running OR-Tools scheduler...\n")
         ortools_start = time.perf_counter()
         try:
             ortools_schedule = generate_roster_ortools(year, month, roles)
@@ -131,7 +143,7 @@ class Command(BaseCommand):
             ortools_schedule = []
             ortools_time_ms = (time.perf_counter() - ortools_start) * 1000
             ortools_error = str(e)
-            self.stdout.write(self.style.WARNING(f"    OR-Tools failed: {e}"))
+            output_stream.write(self.style.WARNING(f"    OR-Tools failed: {e}\n"))
 
         # Calculate metrics for both schedules
         legacy_metrics = self.calculate_metrics(legacy_schedule, roles)

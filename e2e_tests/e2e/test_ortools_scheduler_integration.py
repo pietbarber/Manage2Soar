@@ -163,9 +163,9 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("h2", timeout=10000)
 
         roll_button = self.page.locator('button[name="action"][value="roll"]')
-        if roll_button.count() > 0:
-            roll_button.click()
-            self.page.wait_for_load_state("networkidle", timeout=15000)
+        assert roll_button.count() > 0, "Roll button should exist"
+        roll_button.click()
+        self.page.wait_for_load_state("networkidle", timeout=15000)
 
         legacy_filled_count = self.page.locator(".roster-slot:not(.empty-slot)").count()
         assert legacy_filled_count > 0, "Legacy scheduler should fill slots"
@@ -181,9 +181,9 @@ class TestORToolsSchedulerIntegration(DjangoPlaywrightTestCase):
         self.page.wait_for_selector("h2", timeout=10000)
 
         roll_button = self.page.locator('button[name="action"][value="roll"]')
-        if roll_button.count() > 0:
-            roll_button.click()
-            self.page.wait_for_load_state("networkidle", timeout=15000)
+        assert roll_button.count() > 0, "Roll button should exist"
+        roll_button.click()
+        self.page.wait_for_load_state("networkidle", timeout=15000)
 
         ortools_filled_count = self.page.locator(
             ".roster-slot:not(.empty-slot)"
