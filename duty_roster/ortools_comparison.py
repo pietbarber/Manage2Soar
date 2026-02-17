@@ -18,7 +18,7 @@ from collections import defaultdict
 from typing import Any
 
 from duty_roster.ortools_scheduler import generate_roster_ortools
-from duty_roster.roster_generator import generate_roster
+from duty_roster.roster_generator import generate_roster_legacy
 from members.constants.membership import DEFAULT_ROLES
 
 
@@ -169,7 +169,7 @@ def run_comparison(
         print("Running LEGACY scheduler (greedy weighted-random)...")
     start_time = time.time()
     try:
-        legacy_schedule = generate_roster(year=year, month=month, roles=roles)
+        legacy_schedule = generate_roster_legacy(year=year, month=month, roles=roles)
         legacy_time = time.time() - start_time
         legacy_error = None
     except Exception as e:

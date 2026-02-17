@@ -1,6 +1,7 @@
 import calendar
 import logging
 import random
+import time
 from collections import defaultdict
 from datetime import date
 
@@ -418,9 +419,12 @@ def diagnose_empty_slot(
     }
 
 
-def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
+def _generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None):
     """
-    Generate a duty roster for a given month.
+    Generate a duty roster for a given month using legacy weighted-random algorithm.
+
+    DEPRECATED: This is the legacy greedy weighted-random scheduler. New code should
+    use generate_roster() which routes to either this or OR-Tools based on feature flag.
 
     Args:
         year: Year to generate roster for (default: current year)
@@ -432,7 +436,7 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
     Returns:
         List of dicts, each with:
             - 'date': a datetime.date for the duty day
-            - 'slots': mapping of role name to assigned Member (or None if unfilled)
+            - 'slots': mapping of role name to assigned Member.id (or None if unfilled)
             - 'diagnostics': per-date scheduling diagnostics/metadata
     """
     from django.utils.timezone import now
@@ -699,3 +703,128 @@ def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
         schedule.append({"date": day, "slots": slots, "diagnostics": diagnostics})
         last_assigned = slots.copy()
     return schedule
+
+
+def generate_roster(year=None, month=None, roles=None, exclude_dates=None):
+    """
+    Generate duty roster using configured scheduler (OR-Tools or legacy).
+
+    This is the main entry point for duty roster generation. It checks the
+    SiteConfiguration feature flag to determine which scheduler to use:
+    - If use_ortools_scheduler=True: Use OR-Tools constraint programming solver
+    - If use_ortools_scheduler=False: Use legacy weighted-random algorithm
+
+    If OR-Tools scheduler is enabled but fails, automatically falls back to legacy
+    algorithm and logs the error for investigation.
+
+    Args:
+        year: Year to generate roster for (default: current year)
+        month: Month to generate roster for (default: current month)
+        roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
+        exclude_dates: Optional set/list of datetime.date objects to skip
+            (e.g. dates the user has already removed from the proposed roster).
+
+    Returns:
+        List of dicts, each with:
+            - 'date': a datetime.date for the duty day
+            - 'slots': mapping of role name to assigned Member ID (or None if unfilled)
+            - 'diagnostics': per-date scheduling diagnostics/metadata
+    """
+    # Normalize parameters to avoid None values in telemetry/logging
+    from django.utils.timezone import now
+
+    today = now().date()
+    year = year or today.year
+    month = month or today.month
+    roles = roles if roles is not None else DEFAULT_ROLES
+    exclude_dates = exclude_dates or set()
+
+    # Check feature flag
+    try:
+        config = SiteConfiguration.objects.first()
+        use_ortools = config.use_ortools_scheduler if config else False
+    except Exception as e:
+        logger.warning(
+            f"Failed to read SiteConfiguration, defaulting to legacy scheduler: {e}",
+            exc_info=True,
+        )
+        use_ortools = False
+
+    if use_ortools:
+        try:
+            logger.info(
+                "Using OR-Tools constraint programming scheduler",
+                extra={"year": year, "month": month, "roles": roles},
+            )
+            start_time = time.perf_counter()
+
+            from duty_roster.ortools_scheduler import generate_roster_ortools
+
+            schedule = generate_roster_ortools(year, month, roles, exclude_dates)
+
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                f"OR-Tools scheduler completed successfully",
+                extra={
+                    "solve_time_ms": round(elapsed_ms, 2),
+                    "year": year,
+                    "month": month,
+                    "num_days": len(schedule),
+                    "scheduler": "ortools",
+                },
+            )
+            return schedule
+
+        except Exception as e:
+            logger.error(
+                f"OR-Tools scheduler failed, falling back to legacy algorithm: {e}",
+                extra={"year": year, "month": month, "error": str(e)},
+                exc_info=True,
+            )
+            # Fall through to legacy scheduler
+
+    # Use legacy scheduler
+    logger.info(
+        "Using legacy weighted-random scheduler",
+        extra={"year": year, "month": month, "roles": roles, "scheduler": "legacy"},
+    )
+    start_time = time.perf_counter()
+
+    schedule = _generate_roster_legacy(year, month, roles, exclude_dates)
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        f"Legacy scheduler completed successfully",
+        extra={
+            "solve_time_ms": round(elapsed_ms, 2),
+            "year": year,
+            "month": month,
+            "num_days": len(schedule),
+            "scheduler": "legacy",
+        },
+    )
+    return schedule
+
+
+def generate_roster_legacy(year=None, month=None, roles=None, exclude_dates=None):
+    """
+    Generate duty roster using legacy weighted-random algorithm.
+
+    This is a public wrapper for the legacy scheduler, intended for:
+    - Comparison scripts that need to explicitly test legacy algorithm
+    - Diagnostic/debugging tools
+    - Migration/testing scenarios
+
+    For normal roster generation, use generate_roster() which respects the
+    feature flag and provides automatic fallback.
+
+    Args:
+        year: Year to generate roster for (default: current year)
+        month: Month to generate roster for (default: current month)
+        roles: List of roles to schedule (default: DEFAULT_ROLES from constants)
+        exclude_dates: Optional set/list of datetime.date objects to skip
+
+    Returns:
+        List of dicts, each with 'date', 'slots', and 'diagnostics'
+    """
+    return _generate_roster_legacy(year, month, roles, exclude_dates)
