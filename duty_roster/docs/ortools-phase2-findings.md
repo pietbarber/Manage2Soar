@@ -122,7 +122,7 @@ duty_roster/test_ortools_scheduler.py::ORToolsRegressionTests::test_deterministi
 2. **Infeasibility detection** (Line 259)
    - **Issue:** When no eligible members for a slot, solver returned schedule with `None` values instead of failing
    - **Root cause:** Empty constraint list (`sum([]) == 1` not added, so no constraint enforced)
-   - **Fix:** Add unsatisfiable constraint `model.Add(0 == 1)` when no eligible members found
+   - **Fix:** Raise `RuntimeError` immediately when no eligible members found (fail-fast approach)
 
 3. **Type hint for CpSolverStatus** (Line 529)
    - **Issue:** `cp_model.CpSolverStatus` not directly accessible as type hint

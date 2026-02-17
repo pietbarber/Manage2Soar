@@ -630,15 +630,13 @@ class ORToolsEdgeCasesTests(TestCase):
         )
 
         # Try to schedule for a role nobody has - should raise RuntimeError
-        try:
-            result = generate_roster_ortools(
+        with self.assertRaises(RuntimeError) as cm:
+            generate_roster_ortools(
                 year=2026, month=3, roles=["instructor"], timeout_seconds=2.0
             )
-            # If we get here, check the result
-            self.fail(f"Expected RuntimeError but got result: {result}")
-        except RuntimeError as e:
-            # Expected behavior - verify error message
-            self.assertIn("failed", str(e).lower())
+
+        # Expected behavior - verify error message contains stable fragment
+        self.assertIn("no eligible members", str(cm.exception).lower())
 
     def test_all_members_blacked_out(self):
         """Test handling when all members are blacked out on a day."""

@@ -342,10 +342,13 @@ class DutyRosterScheduler:
                 pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
             )
 
-            # Handle edge case: if max_assignments is 0, treat as model default (2)
-            # This matches legacy behavior and the DutyPreference model default
+            # Honor max_assignments including 0 (which means "no assignments allowed")
+            # A value of 0 is a hard constraint: member is ineligible for any assignments
+            # This matches legacy scheduler behavior where 0 blocks all scheduling
             if max_assignments == 0:
-                max_assignments = 2
+                # Skip this member entirely by not adding constraints
+                # (they have no valid decision variables anyway due to sparse creation)
+                continue
 
             # Sum all assignments for this member
             total_assignments = [
