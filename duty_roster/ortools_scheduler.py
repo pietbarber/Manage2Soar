@@ -3,7 +3,9 @@ Production OR-Tools scheduler for duty roster generation.
 
 This module implements a constraint programming approach to duty roster scheduling
 using Google OR-Tools CP-SAT solver. It replaces the greedy weighted-random algorithm
-with a declarative constraint model that guarantees optimal solutions.
+with a declarative constraint model that searches for optimal solutions and, when proven
+within configured limits, returns an optimal schedule; otherwise it returns the best
+feasible schedule found (or infeasibility/unknown).
 
 Phase 2 Implementation: Full production constraints matching legacy scheduler behavior.
 """
@@ -122,8 +124,10 @@ class DutyRosterScheduler:
                     # Tuple is valid - create variable
                     valid_tuples.add((member.id, role, day))
 
-        # Create BoolVars for all valid tuples
-        for member_id, role, day in valid_tuples:
+        # Create BoolVars for all valid tuples in a deterministic order
+        for member_id, role, day in sorted(
+            valid_tuples, key=lambda t: (t[0], t[1], t[2])
+        ):
             var_name = f"x_{member_id}_{role}_{day}"
             self.x[member_id, role, day] = self.model.NewBoolVar(var_name)
 
@@ -251,12 +255,10 @@ class DutyRosterScheduler:
                 if members_for_slot:
                     self.model.Add(sum(members_for_slot) == 1)
                 else:
-                    # No eligible members for this slot - make model infeasible
-                    logger.warning(
-                        f"No eligible members for {role} on {day} - infeasible!"
-                    )
-                    # Add unsatisfiable constraint to make model infeasible
-                    self.model.Add(0 == 1)
+                    # No eligible members for this slot - fail fast with clear diagnostics
+                    message = f"No eligible members for {role} on {day} - schedule infeasible."
+                    logger.error(message)
+                    raise RuntimeError(message)
 
     def _add_avoidance_constraints(self):
         """
@@ -380,35 +382,35 @@ class DutyRosterScheduler:
                         objective_terms.append(weight * self.x[member.id, role, day])
 
         # Soft constraint 2: Pairing affinity bonus
-        # (Simplified implementation: reward if both members assigned on same day)
+        # Cache member_assigned_on_day indicators to avoid creating duplicates for each pairing
+        member_assigned_on_day = {}
+        for day in self.data.duty_days:
+            for member in self.data.members:
+                member_vars = [
+                    self.x[member.id, role, day]
+                    for role in self.data.roles
+                    if (member.id, role, day) in self.x
+                ]
+                if member_vars:
+                    assigned_var = self.model.NewBoolVar(f"assigned_{member.id}_{day}")
+                    self.model.AddMaxEquality(assigned_var, member_vars)
+                    member_assigned_on_day[member.id, day] = assigned_var
+
+        # Apply pairing bonuses using cached indicators
         for day in self.data.duty_days:
             for m1_id, m2_id in self.data.pairings:
-                # Check if both m1 and m2 are assigned on this day (any roles)
-                m1_vars = [
-                    self.x[m1_id, role, day]
-                    for role in self.data.roles
-                    if (m1_id, role, day) in self.x
-                ]
-                m2_vars = [
-                    self.x[m2_id, role, day]
-                    for role in self.data.roles
-                    if (m2_id, role, day) in self.x
-                ]
+                # Check if both members have cached assignment indicators for this day
+                if (m1_id, day) in member_assigned_on_day and (
+                    m2_id,
+                    day,
+                ) in member_assigned_on_day:
+                    m1_assigned = member_assigned_on_day[m1_id, day]
+                    m2_assigned = member_assigned_on_day[m2_id, day]
 
-                if m1_vars and m2_vars:
-                    # Create indicator variable: both_assigned = 1 iff both assigned
+                    # Create indicator: both_assigned = 1 iff both assigned
                     both_assigned = self.model.NewBoolVar(
                         f"paired_{m1_id}_{m2_id}_{day}"
                     )
-
-                    # both_assigned => (m1_assigned AND m2_assigned)
-                    # Implemented as: both_assigned <= m1_assigned, both_assigned <= m2_assigned
-                    # and both_assigned >= m1_assigned + m2_assigned - 1
-                    m1_assigned = self.model.NewBoolVar(f"m1_{m1_id}_{day}")
-                    m2_assigned = self.model.NewBoolVar(f"m2_{m2_id}_{day}")
-
-                    self.model.AddMaxEquality(m1_assigned, m1_vars)
-                    self.model.AddMaxEquality(m2_assigned, m2_vars)
 
                     # both_assigned = m1_assigned AND m2_assigned
                     self.model.AddBoolAnd([m1_assigned, m2_assigned]).OnlyEnforceIf(
@@ -434,8 +436,9 @@ class DutyRosterScheduler:
             )
             days_since = (self.data.earliest_duty_day - last_duty).days
 
-            # Higher staleness = higher priority (linear scaling)
-            staleness_weight = max(0, days_since)  # Ensure non-negative
+            # Cap staleness to prevent dominating objective (max 365 days = 1 year)
+            # This prevents very large weights (45k+) for members who have never worked
+            staleness_weight = min(max(0, days_since), 365)
 
             for role in self.data.roles:
                 for day in self.data.duty_days:
@@ -587,7 +590,7 @@ class DutyRosterScheduler:
 
                 slots[role] = assigned_member
 
-            schedule.append({"date": day, "slots": slots, "diagnostics": None})
+            schedule.append({"date": day, "slots": slots, "diagnostics": {}})
 
         return schedule
 

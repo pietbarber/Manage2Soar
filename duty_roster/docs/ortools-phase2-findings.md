@@ -19,7 +19,7 @@ Successfully implemented a production-ready OR-Tools constraint programming sche
    - Sparse variable creation (~60-80% reduction)
    - Comprehensive logging and error handling
 
-2. **duty_roster/test_ortools_scheduler.py** (762 lines)
+2. **duty_roster/tests/test_ortools_scheduler.py** (762 lines)
    - 18 comprehensive tests covering all constraints
    - Basic tests (3): data extraction, initialization, variable creation
    - Hard constraint tests (6): role qualification, blackouts, avoidances, etc.
@@ -55,7 +55,7 @@ Successfully implemented a production-ready OR-Tools constraint programming sche
 10. ✅ **Max assignments per month** - Respects member's monthly assignment limits
 
 #### Soft Constraints (optimized via objective function)
-1. ✅ **Role preference weighting** - Higher preference percentages weighted 10x in objective
+1. ✅ **Role preference weighting** - Higher preference percentages are used directly as coefficients in the objective
 2. ✅ **Pairing affinity bonus** - Members who prefer working together get 3x bonus
 3. ✅ **Last duty date balancing** - Staleness (days since last duty) factored into priority
 

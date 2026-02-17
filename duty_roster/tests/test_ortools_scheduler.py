@@ -284,8 +284,6 @@ class ORToolsHardConstraintsTests(TestCase):
 
         data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
         scheduler = DutyRosterScheduler(data)
-        scheduler._create_decision_variables()
-        scheduler._add_hard_constraints()
 
         # Verify avoidance is in data
         self.assertIn((self.member1.id, self.member2.id), data.avoidances)
@@ -293,20 +291,22 @@ class ORToolsHardConstraintsTests(TestCase):
         # Solve and check that member1 and member2 are never assigned on same day
         result = scheduler.solve(timeout_seconds=5.0)
 
-        if result["status"] in ("OPTIMAL", "FEASIBLE"):
-            schedule = result["schedule"]
-            for day_schedule in schedule:
-                assigned_members = set(
-                    member_id
-                    for member_id in day_schedule["slots"].values()
-                    if member_id is not None
-                )
-                # member1 and member2 should never both be in assigned_members
-                self.assertFalse(
-                    self.member1.id in assigned_members
-                    and self.member2.id in assigned_members,
-                    f"Avoidance violated on {day_schedule['date']}: both member1 and member2 assigned",
-                )
+        # Assert solver found a solution
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+
+        schedule = result["schedule"]
+        for day_schedule in schedule:
+            assigned_members = set(
+                member_id
+                for member_id in day_schedule["slots"].values()
+                if member_id is not None
+            )
+            # member1 and member2 should never both be in assigned_members
+            self.assertFalse(
+                self.member1.id in assigned_members
+                and self.member2.id in assigned_members,
+                f"Avoidance violated on {day_schedule['date']}: both member1 and member2 assigned",
+            )
 
     def test_one_assignment_per_day_constraint(self):
         """Test that members are assigned to at most one role per day."""
@@ -314,23 +314,25 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        if result["status"] in ("OPTIMAL", "FEASIBLE"):
-            schedule = result["schedule"]
-            for day_schedule in schedule:
-                member_role_count = {}
-                for role, member_id in day_schedule["slots"].items():
-                    if member_id is not None:
-                        member_role_count[member_id] = (
-                            member_role_count.get(member_id, 0) + 1
-                        )
+        # Assert solver found a solution
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
 
-                # No member should have more than 1 role on same day
-                for member_id, count in member_role_count.items():
-                    self.assertLessEqual(
-                        count,
-                        1,
-                        f"Member {member_id} assigned to {count} roles on {day_schedule['date']}",
+        schedule = result["schedule"]
+        for day_schedule in schedule:
+            member_role_count = {}
+            for role, member_id in day_schedule["slots"].items():
+                if member_id is not None:
+                    member_role_count[member_id] = (
+                        member_role_count.get(member_id, 0) + 1
                     )
+
+            # No member should have more than 1 role on same day
+            for member_id, count in member_role_count.items():
+                self.assertLessEqual(
+                    count,
+                    1,
+                    f"Member {member_id} assigned to {count} roles on {day_schedule['date']}",
+                )
 
     def test_anti_repeat_constraint(self):
         """Test that members don't do same role on consecutive days."""
@@ -356,19 +358,21 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        if result["status"] in ("OPTIMAL", "FEASIBLE"):
-            schedule = result["schedule"]
-            # Check both days
-            day1_slots = schedule[0]["slots"]
-            day2_slots = schedule[1]["slots"]
+        # Assert solver found a solution
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
 
-            for role in ["instructor", "towpilot"]:
-                if day1_slots[role] is not None and day2_slots[role] is not None:
-                    self.assertNotEqual(
-                        day1_slots[role],
-                        day2_slots[role],
-                        f"Member {day1_slots[role]} assigned to {role} on consecutive days",
-                    )
+        schedule = result["schedule"]
+        # Check both days
+        day1_slots = schedule[0]["slots"]
+        day2_slots = schedule[1]["slots"]
+
+        for role in ["instructor", "towpilot"]:
+            if day1_slots[role] is not None and day2_slots[role] is not None:
+                self.assertNotEqual(
+                    day1_slots[role],
+                    day2_slots[role],
+                    f"Member {day1_slots[role]} assigned to {role} on consecutive days",
+                )
 
     def test_max_assignments_constraint(self):
         """Test that members don't exceed max_assignments_per_month."""
@@ -401,19 +405,21 @@ class ORToolsHardConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        if result["status"] in ("OPTIMAL", "FEASIBLE"):
-            schedule = result["schedule"]
-            member1_assignments = sum(
-                1
-                for day_schedule in schedule
-                for member_id in day_schedule["slots"].values()
-                if member_id == self.member1.id
-            )
-            self.assertLessEqual(
-                member1_assignments,
-                2,
-                f"member1 assigned {member1_assignments} times (max is 2)",
-            )
+        # Assert solver found a solution
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+
+        schedule = result["schedule"]
+        member1_assignments = sum(
+            1
+            for day_schedule in schedule
+            for member_id in day_schedule["slots"].values()
+            if member_id == self.member1.id
+        )
+        self.assertLessEqual(
+            member1_assignments,
+            2,
+            f"member1 assigned {member1_assignments} times (max is 2)",
+        )
 
 
 class ORToolsSoftConstraintsTests(TestCase):
@@ -463,25 +469,27 @@ class ORToolsSoftConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        if result["status"] in ("OPTIMAL", "FEASIBLE"):
-            schedule = result["schedule"]
-            member1_assignments = sum(
-                1
-                for day_schedule in schedule
-                for member_id in day_schedule["slots"].values()
-                if member_id == self.member1.id
-            )
-            member2_assignments = sum(
-                1
-                for day_schedule in schedule
-                for member_id in day_schedule["slots"].values()
-                if member_id == self.member2.id
-            )
+        # Assert solver found a solution
+        self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
 
-            # member1 (100%) should get more assignments than member2 (50%)
-            # (This is a soft constraint, so not guaranteed, but likely)
-            # Just verify both got some assignments
-            self.assertGreater(member1_assignments, 0)
+        schedule = result["schedule"]
+        member1_assignments = sum(
+            1
+            for day_schedule in schedule
+            for member_id in day_schedule["slots"].values()
+            if member_id == self.member1.id
+        )
+        member2_assignments = sum(
+            1
+            for day_schedule in schedule
+            for member_id in day_schedule["slots"].values()
+            if member_id == self.member2.id
+        )
+
+        # member1 (100%) should get more assignments than member2 (50%)
+        # (This is a soft constraint, so not guaranteed, but likely)
+        # Just verify both got some assignments
+        self.assertGreater(member1_assignments, 0)
 
     def test_pairing_affinity(self):
         """Test that paired members are scheduled together when possible."""
@@ -735,16 +743,26 @@ class ORToolsRegressionTests(TestCase):
         data1 = extract_scheduling_data(year=2026, month=3, roles=DEFAULT_ROLES)
         scheduler1 = DutyRosterScheduler(data1)
         scheduler1.solver.parameters.num_search_workers = 1  # Single-threaded
+        scheduler1.solver.parameters.random_seed = 123  # Fixed seed for determinism
         result1 = scheduler1.solve(timeout_seconds=5.0)
 
         data2 = extract_scheduling_data(year=2026, month=3, roles=DEFAULT_ROLES)
         scheduler2 = DutyRosterScheduler(data2)
         scheduler2.solver.parameters.num_search_workers = 1  # Single-threaded
+        scheduler2.solver.parameters.random_seed = 123  # Fixed seed for determinism
         result2 = scheduler2.solve(timeout_seconds=5.0)
 
-        # Both should succeed
+        # Both should produce the same status
         self.assertEqual(result1["status"], result2["status"])
 
-        # Objective values should be identical
-        if result1["status"] == "OPTIMAL":
-            self.assertEqual(result1["objective_value"], result2["objective_value"])
+        # For FEASIBLE/OPTIMAL solutions, the schedule and objective should be identical
+        if result1["status"] in {"FEASIBLE", "OPTIMAL"}:
+            self.assertEqual(
+                result1.get("objective_value"),
+                result2.get("objective_value"),
+            )
+            # Schedules should also be identical (same assignments)
+            self.assertEqual(len(result1["schedule"]), len(result2["schedule"]))
+            for day1, day2 in zip(result1["schedule"], result2["schedule"]):
+                self.assertEqual(day1["date"], day2["date"])
+                self.assertEqual(day1["slots"], day2["slots"])

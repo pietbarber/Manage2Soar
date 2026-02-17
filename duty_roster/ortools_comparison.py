@@ -15,7 +15,6 @@ Usage:
 
 import time
 from collections import defaultdict
-from datetime import date
 from typing import Any
 
 from duty_roster.ortools_scheduler import generate_roster_ortools
