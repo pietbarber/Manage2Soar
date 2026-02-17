@@ -9,7 +9,7 @@ This guide covers how to safely deploy and enable the OR-Tools constraint progra
 ## Prerequisites
 
 - OR-Tools library version 9.11+ installed (check `requirements.txt`)
-- Database migrations applied (migration `0029_siteconfig_use_ortools_scheduler`)
+- Database migrations applied (migration `0029_add_use_ortools_scheduler_flag`)
 - Access to Django admin or production Django shell
 - Monitoring/logging access to view scheduler selection logs
 
@@ -72,7 +72,7 @@ python manage.py showmigrations siteconfig
 
 Look for:
 ```
-[X] 0029_siteconfig_use_ortools_scheduler
+[X] 0029_add_use_ortools_scheduler_flag
 ```
 
 If not applied:
