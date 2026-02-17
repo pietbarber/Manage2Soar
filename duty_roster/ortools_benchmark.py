@@ -13,7 +13,6 @@ import time
 from datetime import date
 
 from duty_roster.ortools_poc import ScheduleProblem, SimpleMember, create_sample_problem
-from duty_roster.roster_generator import generate_roster
 
 
 def run_benchmark():

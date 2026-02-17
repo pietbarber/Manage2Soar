@@ -9,7 +9,6 @@ Phase 2 Implementation: Full production constraints matching legacy scheduler be
 """
 
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -22,9 +21,7 @@ from duty_roster.models import (
     DutyPreference,
     MemberBlackout,
 )
-from duty_roster.operational_calendar import get_operational_weekend
 from members.models import Member
-from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger("duty_roster.ortools_scheduler")
 
