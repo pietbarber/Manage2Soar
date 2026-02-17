@@ -252,6 +252,15 @@ class SiteConfiguration(models.Model):
     schedule_assistant_duty_officers = models.BooleanField(
         default=False, help_text="We schedule Assistant Duty Officers ahead of time"
     )
+    use_ortools_scheduler = models.BooleanField(
+        default=False,
+        verbose_name="Use OR-Tools Scheduler",
+        help_text=(
+            "Use OR-Tools constraint programming scheduler instead of legacy weighted-random algorithm. "
+            "OR-Tools provides globally optimal solutions, deterministic output, and better constraint handling. "
+            "Disable this flag to instantly roll back to legacy scheduler if needed."
+        ),
+    )
 
     # Duty Roster Announcement (Issue #333) - DEPRECATED as of Issue #551
     # Use DutyRosterMessage model in duty_roster app instead for rich HTML support
