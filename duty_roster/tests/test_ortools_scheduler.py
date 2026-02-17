@@ -487,9 +487,13 @@ class ORToolsSoftConstraintsTests(TestCase):
         )
 
         # member1 (100%) should get more assignments than member2 (50%)
-        # (This is a soft constraint, so not guaranteed, but likely)
-        # Just verify both got some assignments
+        # This is a soft constraint, so verify the objective favors higher preference
         self.assertGreater(member1_assignments, 0)
+        self.assertGreaterEqual(
+            member1_assignments,
+            member2_assignments,
+            "Member with 100% preference should get at least as many assignments as member with 50%",
+        )
 
     def test_pairing_affinity(self):
         """Test that paired members are scheduled together when possible."""
@@ -540,8 +544,27 @@ class ORToolsSoftConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        # Just verify solver succeeds with pairing constraint
+        # Assert solver found a solution
         self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+
+        # Verify pairing affinity is applied: member1 and towpilot1 should be
+        # co-scheduled at least once (soft constraint, highly likely with pairing bonus)
+        schedule = result["schedule"]
+        days_paired = 0
+        for day_schedule in schedule:
+            slots = day_schedule["slots"]
+            if (
+                slots.get("instructor") == self.member1.id
+                and slots.get("towpilot") == towpilot1.id
+            ):
+                days_paired += 1
+
+        # With the pairing bonus, they should be scheduled together at least once
+        self.assertGreater(
+            days_paired,
+            0,
+            "Paired members should be co-scheduled at least once with pairing affinity bonus",
+        )
 
     def test_last_duty_date_balancing(self):
         """Test that staleness (last_duty_date) is factored into objective."""
@@ -564,8 +587,31 @@ class ORToolsSoftConstraintsTests(TestCase):
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
-        # Just verify solver succeeds with last_duty_date weighting
+        # Assert solver found a solution
         self.assertIn(result["status"], ("OPTIMAL", "FEASIBLE"))
+
+        # Verify staleness affects scheduling: member1 (staler) should get more
+        # assignments than member2 (recent) due to last_duty_date weighting
+        schedule = result["schedule"]
+        member1_assignments = sum(
+            1
+            for day_schedule in schedule
+            for member_id in day_schedule["slots"].values()
+            if member_id == self.member1.id
+        )
+        member2_assignments = sum(
+            1
+            for day_schedule in schedule
+            for member_id in day_schedule["slots"].values()
+            if member_id == self.member2.id
+        )
+
+        # With staleness weighting, staler member should get more assignments
+        self.assertGreater(
+            member1_assignments,
+            member2_assignments,
+            "Staler member (older last_duty_date) should get more assignments",
+        )
 
 
 class ORToolsEdgeCasesTests(TestCase):

@@ -342,10 +342,10 @@ class DutyRosterScheduler:
                 pref.max_assignments_per_month if pref else DEFAULT_MAX_ASSIGNMENTS
             )
 
-            # Handle edge case: if max_assignments is 0, treat as default (8)
-            # (Current code uses getattr(p, "max_assignments_per_month", 0) which would block)
+            # Handle edge case: if max_assignments is 0, treat as model default (2)
+            # This matches legacy behavior and the DutyPreference model default
             if max_assignments == 0:
-                max_assignments = DEFAULT_MAX_ASSIGNMENTS
+                max_assignments = 2
 
             # Sum all assignments for this member
             total_assignments = [
@@ -573,7 +573,8 @@ class DutyRosterScheduler:
         Build schedule list from solver solution.
 
         Returns:
-            List of dicts with {'date': date, 'slots': {role: member_id}, 'diagnostics': None}
+            List of dicts with {'date': date, 'slots': {role: member_id}, 'diagnostics': {role: None}}
+            where diagnostics contains all roles set to None, matching legacy format.
         """
         schedule = []
 
@@ -590,7 +591,9 @@ class DutyRosterScheduler:
 
                 slots[role] = assigned_member
 
-            schedule.append({"date": day, "slots": slots, "diagnostics": {}})
+            # Build diagnostics dict with all roles set to None (matching legacy format)
+            diagnostics = {role: None for role in self.data.roles}
+            schedule.append({"date": day, "slots": slots, "diagnostics": diagnostics})
 
         return schedule
 
@@ -654,7 +657,18 @@ def extract_scheduling_data(
     }
     avoidances = {(a.member_id, a.avoid_with_id) for a in DutyAvoidance.objects.all()}
     pairings_qs = DutyPairing.objects.all()
-    pairings = {(p.member_id, p.pair_with_id) for p in pairings_qs}
+    pairings = set()
+    for p in pairings_qs:
+        member_id = p.member_id
+        pair_with_id = p.pair_with_id
+        # Treat pairings as undirected: canonicalize each pair so (A,B) and (B,A)
+        # are represented once as (min_id, max_id), matching legacy behavior.
+        if member_id is None or pair_with_id is None:
+            continue
+        if member_id == pair_with_id:
+            continue
+        a, b = sorted((member_id, pair_with_id))
+        pairings.add((a, b))
 
     # Calculate role scarcity
     from duty_roster.roster_generator import calculate_role_scarcity
