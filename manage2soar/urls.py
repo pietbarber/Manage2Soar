@@ -129,8 +129,11 @@ def manifest_view(request):
         )
     except (OperationalError, ProgrammingError):
         club_name = "Manage2Soar"
-    # Short name: use first word of club name, capped at 12 characters for home screen
-    short_name = club_name.split()[0][:12] if club_name else "M2S"
+    # Short name: use first word of club name, capped at 12 characters for home screen.
+    # `split()` on an all-whitespace string returns [] which would raise IndexError,
+    # so guard against that case explicitly.
+    club_name_parts = club_name.split() if club_name else []
+    short_name = club_name_parts[0][:12] if club_name_parts else "M2S"
 
     # Use club-branded icon when available, fall back to the default static icon
     club_icon_url = _club_pwa_icon_url()

@@ -17,6 +17,12 @@ from utils.favicon import generate_pwa_icon_from_logo
 class TestManifestView:
     """Tests for the PWA manifest view."""
 
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
+
+        cache.delete("pwa_club_icon_url")
+
     def test_manifest_returns_json(self, client):
         """Test that manifest returns valid JSON with correct content type."""
         response = client.get("/manifest.json")
@@ -50,23 +56,26 @@ class TestManifestView:
         response = client.get("/manifest.json")
         data = json.loads(response.content)
 
-        if siteconfig and siteconfig.club_name:
+        if siteconfig and siteconfig.club_name and siteconfig.club_name.split():
             assert data["name"] == siteconfig.club_name
             assert data["short_name"] == siteconfig.club_name.split()[0][:12]
         else:
-            # Falls back to default when no SiteConfiguration exists
+            # Falls back to default when no SiteConfiguration exists or name is blank
             assert data["name"] == "Manage2Soar"
             assert data["short_name"] == "Manage2Soar"
 
     def test_manifest_icon_urls_use_static_url(self, client):
-        """Test that icon URLs correctly use STATIC_URL setting."""
-        response = client.get("/manifest.json")
+        """Test that icon URLs correctly use STATIC_URL setting when no club icon exists."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/manifest.json")
         data = json.loads(response.content)
 
         icons = data["icons"]
         assert len(icons) == 2  # 192x192 club/fallback + 512x512 static default
 
-        # Icons should use the STATIC_URL prefix
+        # When no club icon is in storage, all icons should use the STATIC_URL prefix
         static_url = settings.STATIC_URL.rstrip("/")
         for icon in icons:
             assert icon["src"].startswith(static_url)
