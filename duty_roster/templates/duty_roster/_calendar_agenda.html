@@ -1,35 +1,6 @@
 {% load duty_extras %}
 {% load static %}
 {% load siteconfig_tags %}
-{% get_roster_message as roster_message %}
-
-{# Issue #551: Rich HTML message from DutyRosterMessage model #}
-{% if roster_message %}
-<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
-  <div class="d-flex align-items-start">
-    <i class="bi bi-megaphone-fill me-2 fs-5 text-info" aria-hidden="true"></i>
-    <div class="flex-grow-1">
-      <div class="d-flex justify-content-between align-items-start">
-        <strong class="d-block mb-1">Roster Manager Announcement:</strong>
-        {% if user.rostermeister or user.is_staff or user.is_superuser %}
-        <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-primary ms-2" title="Edit announcement">
-          <i class="bi bi-pencil"></i>
-        </a>
-        {% endif %}
-      </div>
-      <div class="cms-content">{{ roster_message.content|safe }}</div>
-    </div>
-  </div>
-  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% elif user.rostermeister or user.is_staff or user.is_superuser %}
-{# Show "Add Message" button for rostermeisters when no message exists #}
-<div class="mb-4 text-end">
-  <a href="{% url 'duty_roster:edit_roster_message' %}" class="btn btn-sm btn-outline-secondary" title="Add roster announcement">
-    <i class="bi bi-megaphone me-1"></i> Add Announcement
-  </a>
-</div>
-{% endif %}
 
 {% if user.rostermeister %}
   <div class="d-flex justify-content-center mb-4">
@@ -95,8 +66,8 @@
                 {% get_siteconfig as config %}
                 {% if assignment.instructor %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-primary bg-opacity-10 border border-primary rounded p-3">
-                      <h6 class="text-primary mb-2">
+                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
+                      <h6 class="text-success mb-2">
                         <i class="fas fa-graduation-cap me-2"></i>
                         {{ config.instructor_title|default:'Instructor' }}
                       </h6>
@@ -138,8 +109,8 @@
 
                 {% if assignment.tow_pilot %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
-                      <h6 class="text-success mb-2">
+                    <div class="duty-role-card bg-danger bg-opacity-10 border border-danger rounded p-3">
+                      <h6 class="text-danger mb-2">
                         <i class="fas fa-plane me-2"></i>
                         {{ config.towpilot_title|default:'Tow Pilot' }}
                       </h6>
@@ -168,8 +139,8 @@
 
                 {% if assignment.assistant_duty_officer %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-info bg-opacity-10 border border-info rounded p-3">
-                      <h6 class="text-info mb-2">
+                    <div class="duty-role-card bg-secondary bg-opacity-10 border border-secondary rounded p-3">
+                      <h6 class="text-secondary mb-2">
                         <i class="fas fa-hands-helping me-2"></i>
                         {{ config.assistant_duty_officer_title|default:'Assistant Duty Officer' }}
                       </h6>
@@ -183,8 +154,8 @@
 
                 {% if assignment.surge_instructor %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-primary bg-opacity-10 border border-primary rounded p-3">
-                      <h6 class="text-primary mb-2">
+                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
+                      <h6 class="text-success mb-2">
                         <i class="fas fa-graduation-cap me-2"></i>
                         {{ config.surge_instructor_title|default:'Surge Instructor' }}
                       </h6>
@@ -198,8 +169,8 @@
 
                 {% if assignment.surge_tow_pilot %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-success bg-opacity-10 border border-success rounded p-3">
-                      <h6 class="text-success mb-2">
+                    <div class="duty-role-card bg-danger bg-opacity-10 border border-danger rounded p-3">
+                      <h6 class="text-danger mb-2">
                         <i class="fas fa-plane me-2"></i>
                         {{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}
                       </h6>

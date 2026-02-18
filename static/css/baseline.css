@@ -468,19 +468,22 @@ table .duty-badge {
 }
 
 /* Role-specific badge colors */
+/* Colors aligned across calendar grid, agenda view, and modal popup (Issue #636) */
 .calendar-cell .duty-badge.badge-instructor,
 .duty-assignments .duty-badge.badge-instructor,
 table .duty-badge.badge-instructor {
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
-  border: 1px solid #0056b3 !important;
+  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
+  /* green - matches agenda/modal */
+  border: 1px solid #1e7e34 !important;
   color: white !important;
 }
 
 .calendar-cell .duty-badge.badge-tow-pilot,
 .duty-assignments .duty-badge.badge-tow-pilot,
 table .duty-badge.badge-tow-pilot {
-  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
-  border: 1px solid #1e7e34 !important;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+  /* red - matches agenda/modal */
+  border: 1px solid #c82333 !important;
   color: white !important;
 }
 
@@ -488,6 +491,7 @@ table .duty-badge.badge-tow-pilot {
 .duty-assignments .duty-badge.badge-duty-officer,
 table .duty-badge.badge-duty-officer {
   background: linear-gradient(135deg, #fd7e14 0%, #e55a00 100%) !important;
+  /* orange - matches agenda/modal */
   border: 1px solid #e55a00 !important;
   color: white !important;
 }
@@ -495,8 +499,9 @@ table .duty-badge.badge-duty-officer {
 .calendar-cell .duty-badge.badge-assistant-duty-officer,
 .duty-assignments .duty-badge.badge-assistant-duty-officer,
 table .duty-badge.badge-assistant-duty-officer {
-  background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%) !important;
-  border: 1px solid #563d7c !important;
+  background: linear-gradient(135deg, #6c757d 0%, #545b62 100%) !important;
+  /* gray - matches agenda/modal */
+  border: 1px solid #545b62 !important;
   color: white !important;
 }
 

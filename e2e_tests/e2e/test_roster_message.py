@@ -8,7 +8,9 @@ Tests the rich HTML roster announcement functionality:
 - JavaScript interactions work correctly
 """
 
-from duty_roster.models import DutyRosterMessage
+from datetime import date
+
+from duty_roster.models import DutyAssignment, DutyRosterMessage
 from e2e_tests.e2e.conftest import DjangoPlaywrightTestCase
 from siteconfig.models import SiteConfiguration
 
@@ -124,6 +126,66 @@ class TestRosterMessageE2E(DjangoPlaywrightTestCase):
         # Should see the announcement (note colon in template)
         assert self.page.is_visible("text=Roster Manager Announcement:")
         assert self.page.is_visible("text=Schedule change next week")
+
+    def test_message_appears_once_in_agenda_view(self):
+        """Test that message appears exactly once in agenda view (Issue #638)."""
+        # Create rostermeister to create announcement
+        rostermeister = self.create_test_member(
+            username="rostermeister",
+            email="roster@example.com",
+            rostermeister=True,
+            membership_status="Full Member",
+        )
+
+        # Get or create announcement (singleton model)
+        message = DutyRosterMessage.get_or_create_message()
+        message.content = "<p>Important roster update</p>"
+        message.is_active = True
+        message.updated_by = rostermeister
+        message.save()
+
+        # Create a duty assignment so agenda view has content
+        today = date.today()
+        instructor = self.create_test_member(
+            username="instructor",
+            email="instructor@example.com",
+            instructor=True,
+        )
+        DutyAssignment.objects.create(
+            date=today,
+            instructor=instructor,
+        )
+
+        # Login as regular member
+        viewer = self.create_test_member(
+            username="testmember",
+            email="test@example.com",
+            membership_status="Full Member",
+        )
+        self.login(username="testmember")
+
+        # Navigate to duty roster calendar
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
+
+        # Wait for page to load
+        self.page.wait_for_selector('label[for="agenda-view"]')
+
+        # Switch to Agenda view by clicking the label
+        agenda_label = self.page.locator('label[for="agenda-view"]')
+        agenda_label.click()
+
+        # Wait for agenda view to be visible
+        self.page.wait_for_selector("#agenda-view-content", state="visible")
+
+        # Count announcement blocks (should be exactly 1, not duplicated)
+        announcements = self.page.locator(
+            ".alert.alert-info:has-text('Roster Manager Announcement')"
+        )
+        count = announcements.count()
+
+        assert (
+            count == 1
+        ), f"Expected exactly 1 announcement in agenda view, found {count} (Issue #638: duplicate removed)"
 
     def test_inactive_message_not_displayed(self):
         """Test that inactive messages are not displayed."""

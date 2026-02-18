@@ -30,58 +30,9 @@
       </a>
     </div>
     {% endif %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <button
-        hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
-        hx-target="#calendar-body"
-        hx-swap="innerHTML"
-        class="btn btn-sm btn-outline-primary"
-        title="Go to {{ prev_month_name }} {{ prev_year }}"
-      >
-        <i class="fas fa-chevron-left"></i> {{ prev_month_name }}
-      </button>
 
-      <div class="text-center">
-        <h3 class="mb-2 text-primary fw-bold">📅 {{ formatted_date }}</h3>
-
-        <!-- Swap Navigation Links -->
-        {% if user.is_authenticated %}
-        <div class="mb-2">
-          <a href="{% url 'duty_roster:my_swap_requests' %}" class="btn btn-sm btn-outline-primary me-1">
-            <i class="fas fa-exchange-alt me-1"></i>My Swap Requests
-          </a>
-          <a href="{% url 'duty_roster:open_swap_requests' %}" class="btn btn-sm btn-outline-success">
-            <i class="fas fa-hands-helping me-1"></i>Help Others
-          </a>
-        </div>
-        {% endif %}
-
-        <!-- View Toggle -->
-        <div class="btn-group btn-group-sm" role="group" aria-label="Calendar View Toggle">
-          <input type="radio" class="btn-check" name="view-toggle" id="calendar-view" autocomplete="off"
-                 onchange="toggleCalendarView('calendar')" checked>
-          <label class="btn btn-outline-secondary" for="calendar-view">
-            <i class="fas fa-calendar-alt"></i> Calendar
-          </label>
-
-          <input type="radio" class="btn-check" name="view-toggle" id="agenda-view" autocomplete="off"
-                 onchange="toggleCalendarView('agenda')">
-          <label class="btn btn-outline-secondary" for="agenda-view">
-            <i class="fas fa-list"></i> Agenda
-          </label>
-        </div>
-      </div>
-
-      <button
-        hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
-        hx-target="#calendar-body"
-        hx-swap="innerHTML"
-        class="btn btn-sm btn-outline-primary"
-        title="Go to {{ next_month_name }} {{ next_year }}"
-      >
-        {{ next_month_name }} <i class="fas fa-chevron-right"></i>
-      </button>
-    </div>
+    {# Top navigation with full header #}
+    {% include "duty_roster/_calendar_month_nav.html" with show_full_header=True %}
 
     <!-- Calendar View -->
     <div id="calendar-view-content">
@@ -92,6 +43,9 @@
     <div id="agenda-view-content" style="display: none;">
       {% include "duty_roster/_calendar_agenda.html" %}
     </div>
+
+    {# Bottom navigation with simplified center (reuse shared month navigation partial) #}
+    {% include "duty_roster/_calendar_month_nav.html" with show_full_header=False margin_class="mt-4" %}
 
     <script>
       function toggleCalendarView(view) {
