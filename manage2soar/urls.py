@@ -28,6 +28,7 @@ from cms import views as cms_views
 from instructors import views as instr_views
 from members import views as members_views
 from members.api import email_lists
+from siteconfig.models import SiteConfiguration
 
 
 def service_worker_view(request):
@@ -87,9 +88,17 @@ def manifest_view(request):
     # Get the static URL prefix for icon paths
     static_url = settings.STATIC_URL.rstrip("/")
 
+    # Use the club name from SiteConfiguration so the shortcut is branded correctly
+    siteconfig = SiteConfiguration.objects.first()
+    club_name = (
+        siteconfig.club_name if siteconfig and siteconfig.club_name else "Manage2Soar"
+    )
+    # Short name: use first word of club name, capped at 12 characters for home screen
+    short_name = club_name.split()[0][:12] if club_name else "M2S"
+
     manifest = {
-        "name": "Manage2Soar",
-        "short_name": "M2S",
+        "name": club_name,
+        "short_name": short_name,
         "description": "Soaring club management - members, flights, instruction, and operations",
         "start_url": "/",
         "display": "standalone",
@@ -109,11 +118,30 @@ def manifest_view(request):
                 "type": "image/png",
                 "purpose": "any maskable",
             },
+            {
+                "src": f"{static_url}/images/pwa-icon-192.png",
+                "sizes": "180x180",
+                "type": "image/png",
+                "purpose": "any",
+            },
         ],
         "categories": ["business", "productivity"],
         "lang": "en-US",
     }
     return JsonResponse(manifest)
+
+
+def apple_touch_icon_view(request):
+    """Redirect Apple touch icon requests to the PWA icon.
+
+    iOS/Safari requests /apple-touch-icon.png and /apple-touch-icon-precomposed.png
+    when a user adds the site to their home screen.  Without this handler those
+    requests result in 404 errors in the logs.
+    """
+    from django.http import HttpResponsePermanentRedirect
+
+    icon_url = f"{settings.STATIC_URL.rstrip('/')}/images/pwa-icon-192.png"
+    return HttpResponsePermanentRedirect(icon_url)
 
 
 urlpatterns = [
@@ -192,6 +220,13 @@ urlpatterns = [
     ),
     path("service-worker.js", service_worker_view, name="service-worker"),
     path("manifest.json", manifest_view, name="manifest"),
+    # Apple touch icon - iOS/Safari requests these when adding to home screen
+    path("apple-touch-icon.png", apple_touch_icon_view, name="apple-touch-icon"),
+    path(
+        "apple-touch-icon-precomposed.png",
+        apple_touch_icon_view,
+        name="apple-touch-icon-precomposed",
+    ),
 ]
 
 # Serve media files in development only

@@ -7,6 +7,8 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 
+from siteconfig.models import SiteConfiguration
+
 
 @pytest.mark.django_db
 class TestManifestView:
@@ -35,11 +37,23 @@ class TestManifestView:
         assert "display" in data
         assert "icons" in data
 
-        # Verify values
-        assert data["name"] == "Manage2Soar"
-        assert data["short_name"] == "M2S"
+        # Verify structural values (name comes from SiteConfiguration)
         assert data["start_url"] == "/"
         assert data["display"] == "standalone"
+
+    def test_manifest_name_uses_site_configuration(self, client):
+        """Test that manifest name uses the club name from SiteConfiguration."""
+        siteconfig = SiteConfiguration.objects.first()
+        response = client.get("/manifest.json")
+        data = json.loads(response.content)
+
+        if siteconfig and siteconfig.club_name:
+            assert data["name"] == siteconfig.club_name
+            assert data["short_name"] == siteconfig.club_name.split()[0][:12]
+        else:
+            # Falls back to default when no SiteConfiguration exists
+            assert data["name"] == "Manage2Soar"
+            assert data["short_name"] == "Manage2Soar"
 
     def test_manifest_icon_urls_use_static_url(self, client):
         """Test that icon URLs correctly use STATIC_URL setting."""
@@ -47,7 +61,7 @@ class TestManifestView:
         data = json.loads(response.content)
 
         icons = data["icons"]
-        assert len(icons) == 2
+        assert len(icons) == 3  # 192, 512, and 180 (Apple touch)
 
         # Icons should use the STATIC_URL prefix
         static_url = settings.STATIC_URL.rstrip("/")
@@ -180,3 +194,29 @@ class TestOfflineView:
         content = response.content.decode()
 
         assert "offline" in content.lower()
+
+
+@pytest.mark.django_db
+class TestAppleTouchIconView:
+    """Tests for the Apple touch icon redirect view."""
+
+    def test_apple_touch_icon_redirects(self, client):
+        """Test that /apple-touch-icon.png returns a redirect to the PWA icon."""
+        response = client.get("/apple-touch-icon.png")
+
+        assert response.status_code == 301
+        assert "pwa-icon" in response["Location"]
+
+    def test_apple_touch_icon_precomposed_redirects(self, client):
+        """Test that /apple-touch-icon-precomposed.png returns a redirect."""
+        response = client.get("/apple-touch-icon-precomposed.png")
+
+        assert response.status_code == 301
+        assert "pwa-icon" in response["Location"]
+
+    def test_apple_touch_icon_redirect_target_uses_static_url(self, client):
+        """Test that the redirect target uses the correct STATIC_URL."""
+        response = client.get("/apple-touch-icon.png")
+
+        static_url = settings.STATIC_URL.rstrip("/")
+        assert response["Location"].startswith(static_url)
