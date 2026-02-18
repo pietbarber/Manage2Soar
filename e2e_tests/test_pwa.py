@@ -1,13 +1,16 @@
 """Tests for PWA (Progressive Web App) views."""
 
+import io
 import json
 import os
 from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from PIL import Image
 
 from siteconfig.models import SiteConfiguration
+from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
 
 
 @pytest.mark.django_db
@@ -215,8 +218,74 @@ class TestAppleTouchIconView:
         assert "pwa-icon" in response["Location"]
 
     def test_apple_touch_icon_redirect_target_uses_static_url(self, client):
-        """Test that the redirect target uses the correct STATIC_URL."""
+        """Test that the redirect target uses the correct STATIC_URL (no club icon present)."""
         response = client.get("/apple-touch-icon.png")
 
         static_url = settings.STATIC_URL.rstrip("/")
         assert response["Location"].startswith(static_url)
+
+
+@pytest.mark.django_db
+class TestClubBrandedPwaIcon:
+    """Tests for club-branded PWA / Apple touch icon generation and serving."""
+
+    def _make_tiny_png(self):
+        """Return a BytesIO containing a minimal 10x10 RGBA PNG."""
+        buf = io.BytesIO()
+        Image.new("RGBA", (10, 10), color=(30, 100, 200, 255)).save(buf, format="PNG")
+        buf.seek(0)
+        return buf
+
+    def test_generate_pwa_icon_produces_correct_size(self):
+        """generate_pwa_icon_from_logo should output a 192x192 PNG."""
+        out = io.BytesIO()
+        generate_pwa_icon_from_logo(self._make_tiny_png(), out)
+        out.seek(0)
+        img = Image.open(out)
+        assert img.size == (192, 192)
+        assert img.format == "PNG"
+
+    def test_generate_pwa_icon_respects_custom_size(self):
+        """generate_pwa_icon_from_logo should honour the size parameter."""
+        out = io.BytesIO()
+        generate_pwa_icon_from_logo(self._make_tiny_png(), out, size=180)
+        out.seek(0)
+        img = Image.open(out)
+        assert img.size == (180, 180)
+
+    def test_manifest_icon_uses_club_icon_when_available(self, client):
+        """When pwa-icon-club.png exists in storage the manifest should reference it."""
+        club_icon_url = "/media/pwa-icon-club.png"
+
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.url",
+            return_value=club_icon_url,
+        ):
+            response = client.get("/manifest.json")
+            data = json.loads(response.content)
+
+        icon_srcs = [icon["src"] for icon in data["icons"]]
+        # The 192x192 and 180x180 entries should point to the club icon
+        assert any(src == club_icon_url for src in icon_srcs)
+        # The 512x512 fallback should still be the static default
+        static_url = settings.STATIC_URL.rstrip("/")
+        assert any(
+            "pwa-icon-512" in src and src.startswith(static_url) for src in icon_srcs
+        )
+
+    def test_apple_touch_icon_uses_club_icon_when_available(self, client):
+        """When pwa-icon-club.png exists in storage the Apple touch icon should redirect to it."""
+        club_icon_url = "/media/pwa-icon-club.png"
+
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.url",
+            return_value=club_icon_url,
+        ):
+            response = client.get("/apple-touch-icon.png")
+
+        assert response.status_code == 301
+        assert response["Location"] == club_icon_url

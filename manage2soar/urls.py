@@ -83,6 +83,18 @@ def service_worker_view(request):
     )
 
 
+def _club_pwa_icon_url():
+    """Return the URL for the club-branded PWA/Apple touch icon if one has been
+    generated from the club logo, otherwise fall back to the default static icon."""
+    from django.core.files.storage import default_storage
+
+    from utils.favicon import PWA_CLUB_ICON_NAME
+
+    if default_storage.exists(PWA_CLUB_ICON_NAME):
+        return default_storage.url(PWA_CLUB_ICON_NAME)
+    return f"{settings.STATIC_URL.rstrip('/')}/images/pwa-icon-192.png"
+
+
 def manifest_view(request):
     """Serve PWA manifest from Django to avoid CORS issues with GCS."""
     # Get the static URL prefix for icon paths
@@ -96,6 +108,9 @@ def manifest_view(request):
     # Short name: use first word of club name, capped at 12 characters for home screen
     short_name = club_name.split()[0][:12] if club_name else "M2S"
 
+    # Use club-branded icon when available, fall back to the default static icon
+    club_icon_url = _club_pwa_icon_url()
+
     manifest = {
         "name": club_name,
         "short_name": short_name,
@@ -107,7 +122,7 @@ def manifest_view(request):
         "orientation": "any",
         "icons": [
             {
-                "src": f"{static_url}/images/pwa-icon-192.png",
+                "src": club_icon_url,
                 "sizes": "192x192",
                 "type": "image/png",
                 "purpose": "any maskable",
@@ -119,7 +134,7 @@ def manifest_view(request):
                 "purpose": "any maskable",
             },
             {
-                "src": f"{static_url}/images/pwa-icon-192.png",
+                "src": club_icon_url,
                 "sizes": "180x180",
                 "type": "image/png",
                 "purpose": "any",
@@ -132,16 +147,17 @@ def manifest_view(request):
 
 
 def apple_touch_icon_view(request):
-    """Redirect Apple touch icon requests to the PWA icon.
+    """Redirect Apple touch icon requests to the club-branded PWA icon.
 
     iOS/Safari requests /apple-touch-icon.png and /apple-touch-icon-precomposed.png
-    when a user adds the site to their home screen.  Without this handler those
-    requests result in 404 errors in the logs.
+    when a user adds the site to their home screen.  When a club logo has been
+    uploaded, this serves the club-branded 192×192 icon; otherwise it falls back
+    to the default static PWA icon.  Without this handler those requests result
+    in 404 errors in the logs.
     """
     from django.http import HttpResponsePermanentRedirect
 
-    icon_url = f"{settings.STATIC_URL.rstrip('/')}/images/pwa-icon-192.png"
-    return HttpResponsePermanentRedirect(icon_url)
+    return HttpResponsePermanentRedirect(_club_pwa_icon_url())
 
 
 urlpatterns = [

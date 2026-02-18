@@ -630,22 +630,36 @@ class SiteConfiguration(models.Model):
 
         cache.delete("siteconfig_instance")
 
-        # Generate favicon if logo was uploaded/changed
+        # Generate favicon + PWA icon if logo was uploaded/changed
         if self.club_logo and is_new_logo:
-            # Save favicon.ico at MEDIA_ROOT/favicon.ico using storage backend
+            from io import BytesIO
+
+            from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
+
+            # --- favicon.ico (16/32/48 px, .ico format) ---
             try:
                 with self.club_logo.open("rb") as logo_file:
-                    # Generate favicon in memory
-                    from io import BytesIO
-
                     outbuf = BytesIO()
                     generate_favicon_from_logo(logo_file, outbuf)
                     outbuf.seek(0)
-                    # Save to storage as 'favicon.ico' at root of MEDIA
                     default_storage.save("favicon.ico", outbuf)
             except Exception as e:
-                # Log storage or favicon generation errors but don't break model save
                 logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
+
+            # --- pwa-icon-club.png (192×192 PNG for PWA / Apple touch icon) ---
+            try:
+                with self.club_logo.open("rb") as logo_file:
+                    outbuf = BytesIO()
+                    generate_pwa_icon_from_logo(logo_file, outbuf)
+                    outbuf.seek(0)
+                    # Delete any previous version so the new one takes its place
+                    if default_storage.exists(PWA_CLUB_ICON_NAME):
+                        default_storage.delete(PWA_CLUB_ICON_NAME)
+                    default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
+            except Exception as e:
+                logging.exception(
+                    f"Failed to save {PWA_CLUB_ICON_NAME} to default_storage: {e}"
+                )
 
     def delete(self, *args, **kwargs):
         """Override delete to clear cache."""
