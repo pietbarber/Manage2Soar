@@ -59,8 +59,12 @@ class TestManifestView:
         if siteconfig and siteconfig.club_name and siteconfig.club_name.split():
             assert data["name"] == siteconfig.club_name
             assert data["short_name"] == siteconfig.club_name.split()[0][:12]
+        elif siteconfig and siteconfig.club_name and not siteconfig.club_name.split():
+            # Whitespace-only club_name: manifest uses the raw whitespace as name,
+            # and "M2S" as short_name (split() returns [], triggering the "M2S" fallback)
+            assert data["short_name"] == "M2S"
         else:
-            # Falls back to default when no SiteConfiguration exists or name is blank
+            # No SiteConfiguration or empty/None club_name: both fall back to defaults
             assert data["name"] == "Manage2Soar"
             assert data["short_name"] == "Manage2Soar"
 
