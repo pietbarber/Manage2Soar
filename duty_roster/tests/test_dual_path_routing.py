@@ -67,8 +67,8 @@ class DualPathRoutingTests(TestCase):
 
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
-            # Legacy should be called
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, None)
+            # Legacy should be called (exclude_dates normalized to set())
+            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
 
     def test_routes_to_ortools_when_flag_enabled(self):
         """Test that OR-Tools scheduler is used when feature flag is True."""
@@ -82,8 +82,8 @@ class DualPathRoutingTests(TestCase):
 
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
-            # OR-Tools should be called
-            mock_ortools.assert_called_once_with(2026, 3, DEFAULT_ROLES, None)
+            # OR-Tools should be called (exclude_dates normalized to set())
+            mock_ortools.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
 
     def test_fallback_to_legacy_when_ortools_fails(self):
         """Test that legacy scheduler is used if OR-Tools raises exception."""
@@ -105,8 +105,8 @@ class DualPathRoutingTests(TestCase):
             # OR-Tools should be attempted
             mock_ortools.assert_called_once()
 
-            # Legacy should be called as fallback
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, None)
+            # Legacy should be called as fallback (exclude_dates normalized to set())
+            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
 
     def test_uses_legacy_when_no_config_exists(self):
         """Test that legacy scheduler is used if SiteConfiguration doesn't exist."""
@@ -120,8 +120,8 @@ class DualPathRoutingTests(TestCase):
 
             generate_roster(year=2026, month=3, roles=DEFAULT_ROLES)
 
-            # Legacy should be called
-            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, None)
+            # Legacy should be called (exclude_dates normalized to set())
+            mock_legacy.assert_called_once_with(2026, 3, DEFAULT_ROLES, set())
 
     def test_passes_all_parameters_to_legacy(self):
         """Test that all parameters are correctly passed to legacy scheduler."""

@@ -29,8 +29,11 @@ logger = logging.getLogger("duty_roster.ortools_scheduler")
 
 
 # Constants
-DEFAULT_MAX_ASSIGNMENTS = 8  # For members without DutyPreference
+DEFAULT_MAX_ASSIGNMENTS = 2  # For members without DutyPreference
 PAIRING_MULTIPLIER = 3  # Weight multiplier for preferred pairings
+FAIRNESS_PENALTY_WEIGHT = (
+    200  # Weight for penalizing deviation from average assignments
+)
 
 
 @dataclass
@@ -369,6 +372,7 @@ class DutyRosterScheduler:
         1. Role preference weighting (higher % = higher weight)
         2. Pairing affinity bonus (members who prefer to work together)
         3. Last duty date balancing (prioritize members who haven't worked recently)
+        4. Balanced assignment distribution (minimize variance across members)
 
         The solver will maximize the sum of these weighted terms while respecting
         all hard constraints.
@@ -449,6 +453,63 @@ class DutyRosterScheduler:
                         objective_terms.append(
                             staleness_weight * self.x[member.id, role, day]
                         )
+
+        # Soft constraint 4: Balanced assignment distribution (fairness within month)
+        # Minimize variance in total assignments across qualified members
+        total_slots = len(self.data.duty_days) * len(self.data.roles)
+
+        # Identify qualified members (those who can be assigned to at least one role/day)
+        qualified_members = [
+            m
+            for m in self.data.members
+            if any(
+                (m.id, role, day) in self.x
+                for role in self.data.roles
+                for day in self.data.duty_days
+            )
+        ]
+
+        if qualified_members:
+            avg_assignments = total_slots / len(qualified_members)
+            logger.debug(
+                f"Fairness constraint: {len(qualified_members)} qualified members, "
+                f"avg={avg_assignments:.2f} assignments/member"
+            )
+
+            # For each qualified member, penalize deviation from average
+            for member in qualified_members:
+                # Collect all assignment variables for this member
+                member_assignments = [
+                    self.x[member.id, role, day]
+                    for role in self.data.roles
+                    for day in self.data.duty_days
+                    if (member.id, role, day) in self.x
+                ]
+
+                if member_assignments:
+                    # Track total assignments for this member
+                    total_assignments = self.model.NewIntVar(
+                        0, total_slots, f"total_assignments_{member.id}"
+                    )
+                    self.model.Add(total_assignments == sum(member_assignments))
+
+                    # Calculate deviation from average
+                    deviation = self.model.NewIntVar(
+                        -total_slots, total_slots, f"deviation_{member.id}"
+                    )
+                    self.model.Add(
+                        deviation == total_assignments - int(avg_assignments)
+                    )
+
+                    # Get absolute deviation (CP-SAT requires auxiliary variable)
+                    abs_deviation = self.model.NewIntVar(
+                        0, total_slots, f"abs_dev_{member.id}"
+                    )
+                    self.model.AddAbsEquality(abs_deviation, deviation)
+
+                    # Penalize deviation (negative weight to minimize in maximization objective)
+                    # Weight of 100 makes fairness comparable to preference weights (0-100)
+                    objective_terms.append(-FAIRNESS_PENALTY_WEIGHT * abs_deviation)
 
         # Set objective: maximize total weighted satisfaction
         self.model.Maximize(sum(objective_terms))
