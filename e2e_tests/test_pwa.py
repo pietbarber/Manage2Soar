@@ -10,7 +10,7 @@ from django.conf import settings
 from PIL import Image
 
 from siteconfig.models import SiteConfiguration
-from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
+from utils.favicon import generate_pwa_icon_from_logo
 
 
 @pytest.mark.django_db
@@ -64,7 +64,7 @@ class TestManifestView:
         data = json.loads(response.content)
 
         icons = data["icons"]
-        assert len(icons) == 3  # 192, 512, and 180 (Apple touch)
+        assert len(icons) == 2  # 192x192 club/fallback + 512x512 static default
 
         # Icons should use the STATIC_URL prefix
         static_url = settings.STATIC_URL.rstrip("/")

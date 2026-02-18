@@ -157,12 +157,6 @@ def manifest_view(request):
                 "type": "image/png",
                 "purpose": "any maskable",
             },
-            {
-                "src": club_icon_url,
-                "sizes": "180x180",
-                "type": "image/png",
-                "purpose": "any",
-            },
         ],
         "categories": ["business", "productivity"],
         "lang": "en-US",
