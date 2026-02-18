@@ -93,6 +93,33 @@
       {% include "duty_roster/_calendar_agenda.html" %}
     </div>
 
+    <!-- Bottom Navigation (duplicated for convenience, especially in Agenda view) -->
+    <div class="d-flex justify-content-between align-items-center mt-4">
+      <button
+        hx-get="{% url 'duty_roster:duty_calendar_month' year=prev_year month=prev_month %}"
+        hx-target="#calendar-body"
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-outline-primary"
+        title="Go to {{ prev_month_name }} {{ prev_year }}"
+      >
+        <i class="fas fa-chevron-left"></i> {{ prev_month_name }}
+      </button>
+
+      <div class="text-center">
+        <span class="text-muted">{{ formatted_date }}</span>
+      </div>
+
+      <button
+        hx-get="{% url 'duty_roster:duty_calendar_month' year=next_year month=next_month %}"
+        hx-target="#calendar-body"
+        hx-swap="innerHTML"
+        class="btn btn-sm btn-outline-primary"
+        title="Go to {{ next_month_name }} {{ next_year }}"
+      >
+        {{ next_month_name }} <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
     <script>
       function toggleCalendarView(view) {
         const calendarView = document.getElementById('calendar-view-content');
