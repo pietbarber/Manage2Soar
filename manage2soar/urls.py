@@ -85,14 +85,29 @@ def service_worker_view(request):
 
 def _club_pwa_icon_url():
     """Return the URL for the club-branded PWA/Apple touch icon if one has been
-    generated from the club logo, otherwise fall back to the default static icon."""
+    generated from the club logo, otherwise fall back to the default static icon.
+
+    The result is cached under 'pwa_club_icon_url' to avoid a GCS network call
+    on every manifest/apple-touch-icon request.  The cache entry is invalidated
+    by SiteConfiguration.save() whenever a new club logo is processed.
+    """
+    from django.core.cache import cache
     from django.core.files.storage import default_storage
 
     from utils.favicon import PWA_CLUB_ICON_NAME
 
+    cached = cache.get("pwa_club_icon_url")
+    if cached is not None:
+        return cached
+
     if default_storage.exists(PWA_CLUB_ICON_NAME):
-        return default_storage.url(PWA_CLUB_ICON_NAME)
-    return f"{settings.STATIC_URL.rstrip('/')}/images/pwa-icon-192.png"
+        url = default_storage.url(PWA_CLUB_ICON_NAME)
+    else:
+        url = f"{settings.STATIC_URL.rstrip('/')}/images/pwa-icon-192.png"
+
+    # Cache for 5 minutes; invalidated on logo upload via SiteConfiguration.save()
+    cache.set("pwa_club_icon_url", url, timeout=300)
+    return url
 
 
 def manifest_view(request):
@@ -100,11 +115,20 @@ def manifest_view(request):
     # Get the static URL prefix for icon paths
     static_url = settings.STATIC_URL.rstrip("/")
 
-    # Use the club name from SiteConfiguration so the shortcut is branded correctly
-    siteconfig = SiteConfiguration.objects.first()
-    club_name = (
-        siteconfig.club_name if siteconfig and siteconfig.club_name else "Manage2Soar"
-    )
+    # Use the club name from SiteConfiguration so the shortcut is branded correctly.
+    # Guard against DB-not-ready errors (migrations, startup) the same way
+    # utils.url_helpers.get_canonical_url() does.
+    try:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        siteconfig = SiteConfiguration.objects.first()
+        club_name = (
+            siteconfig.club_name
+            if siteconfig and siteconfig.club_name
+            else "Manage2Soar"
+        )
+    except (OperationalError, ProgrammingError):
+        club_name = "Manage2Soar"
     # Short name: use first word of club name, capped at 12 characters for home screen
     short_name = club_name.split()[0][:12] if club_name else "M2S"
 
@@ -154,10 +178,14 @@ def apple_touch_icon_view(request):
     uploaded, this serves the club-branded 192×192 icon; otherwise it falls back
     to the default static PWA icon.  Without this handler those requests result
     in 404 errors in the logs.
-    """
-    from django.http import HttpResponsePermanentRedirect
 
-    return HttpResponsePermanentRedirect(_club_pwa_icon_url())
+    Uses a 302 (temporary) redirect rather than 301 (permanent) so that clients
+    don't cache the fallback URL permanently — if a club logo is uploaded later
+    the next request will pick up the branded icon without requiring a cache flush.
+    """
+    from django.http import HttpResponseRedirect
+
+    return HttpResponseRedirect(_club_pwa_icon_url())
 
 
 urlpatterns = [

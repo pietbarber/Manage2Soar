@@ -642,6 +642,11 @@ class SiteConfiguration(models.Model):
                     outbuf = BytesIO()
                     generate_favicon_from_logo(logo_file, outbuf)
                     outbuf.seek(0)
+                    # Delete any previous version so the new one takes its place;
+                    # some storage backends (e.g. GCS) generate a new name instead
+                    # of overwriting, leaving the old file served indefinitely.
+                    if default_storage.exists("favicon.ico"):
+                        default_storage.delete("favicon.ico")
                     default_storage.save("favicon.ico", outbuf)
             except Exception as e:
                 logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
@@ -656,10 +661,38 @@ class SiteConfiguration(models.Model):
                     if default_storage.exists(PWA_CLUB_ICON_NAME):
                         default_storage.delete(PWA_CLUB_ICON_NAME)
                     default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
+                    # Invalidate the cached icon URL so requests immediately pick
+                    # up the new club-branded icon
+                    from django.core.cache import cache
+
+                    cache.delete("pwa_club_icon_url")
             except Exception as e:
                 logging.exception(
                     f"Failed to save {PWA_CLUB_ICON_NAME} to default_storage: {e}"
                 )
+
+        # Backfill: if a club logo already exists but the PWA icon was never
+        # generated (e.g. pre-existing installations before this feature was
+        # deployed), generate it now without requiring a re-upload.
+        elif self.club_logo and not is_new_logo:
+            from io import BytesIO
+
+            from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
+
+            if not default_storage.exists(PWA_CLUB_ICON_NAME):
+                try:
+                    with self.club_logo.open("rb") as logo_file:
+                        outbuf = BytesIO()
+                        generate_pwa_icon_from_logo(logo_file, outbuf)
+                        outbuf.seek(0)
+                        default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
+                        from django.core.cache import cache
+
+                        cache.delete("pwa_club_icon_url")
+                except Exception as e:
+                    logging.exception(
+                        f"Failed to backfill {PWA_CLUB_ICON_NAME} to default_storage: {e}"
+                    )
 
     def delete(self, *args, **kwargs):
         """Override delete to clear cache."""

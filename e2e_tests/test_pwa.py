@@ -203,23 +203,38 @@ class TestOfflineView:
 class TestAppleTouchIconView:
     """Tests for the Apple touch icon redirect view."""
 
-    def test_apple_touch_icon_redirects(self, client):
-        """Test that /apple-touch-icon.png returns a redirect to the PWA icon."""
-        response = client.get("/apple-touch-icon.png")
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
 
-        assert response.status_code == 301
+        cache.delete("pwa_club_icon_url")
+
+    def test_apple_touch_icon_redirects(self, client):
+        """Test that /apple-touch-icon.png returns a temporary redirect to the PWA icon."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon.png")
+
+        assert response.status_code == 302
         assert "pwa-icon" in response["Location"]
 
     def test_apple_touch_icon_precomposed_redirects(self, client):
-        """Test that /apple-touch-icon-precomposed.png returns a redirect."""
-        response = client.get("/apple-touch-icon-precomposed.png")
+        """Test that /apple-touch-icon-precomposed.png returns a temporary redirect."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon-precomposed.png")
 
-        assert response.status_code == 301
+        assert response.status_code == 302
         assert "pwa-icon" in response["Location"]
 
     def test_apple_touch_icon_redirect_target_uses_static_url(self, client):
-        """Test that the redirect target uses the correct STATIC_URL (no club icon present)."""
-        response = client.get("/apple-touch-icon.png")
+        """When no club icon exists the redirect target should be the static fallback."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon.png")
 
         static_url = settings.STATIC_URL.rstrip("/")
         assert response["Location"].startswith(static_url)
@@ -228,6 +243,12 @@ class TestAppleTouchIconView:
 @pytest.mark.django_db
 class TestClubBrandedPwaIcon:
     """Tests for club-branded PWA / Apple touch icon generation and serving."""
+
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
+
+        cache.delete("pwa_club_icon_url")
 
     def _make_tiny_png(self):
         """Return a BytesIO containing a minimal 10x10 RGBA PNG."""
@@ -287,5 +308,5 @@ class TestClubBrandedPwaIcon:
         ):
             response = client.get("/apple-touch-icon.png")
 
-        assert response.status_code == 301
+        assert response.status_code == 302
         assert response["Location"] == club_icon_url
