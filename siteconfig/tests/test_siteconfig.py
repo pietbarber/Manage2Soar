@@ -1,8 +1,13 @@
+import io
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
 from siteconfig.models import MembershipStatus, SiteConfiguration
+from utils.favicon import PWA_CLUB_ICON_NAME
 
 User = get_user_model()
 
@@ -388,3 +393,140 @@ def test_quick_altitude_validation_positive_integers():
     config.save()
     config.refresh_from_db()
     assert config.quick_altitude_buttons == "300,1000,2000,3000"
+
+
+# ---------------------------------------------------------------------------
+# PWA icon backfill and logo-removal tests
+# ---------------------------------------------------------------------------
+
+
+def _make_tiny_png_bytes():
+    """Return bytes for a minimal 10×10 RGBA PNG."""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGBA", (10, 10), color=(30, 100, 200, 255)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.mark.django_db
+class TestPwaIconBackfill:
+    """Tests for the backfill logic that generates pwa-icon-club.png for
+    pre-existing installations where a club logo exists but the PWA icon
+    was never generated."""
+
+    def setup_method(self):
+        cache.delete("pwa_club_icon_url")
+
+    def test_backfill_generates_pwa_icon_when_logo_exists_and_icon_missing(self):
+        """When saving a SiteConfiguration without a logo change, if the PWA
+        icon does not yet exist in storage, it should be generated and saved."""
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
+        )
+        # Simulate a pre-existing logo (set directly in the DB so that
+        # the next save sees the same logo name → is_new_logo=False → backfill branch).
+        SiteConfiguration.objects.filter(pk=config.pk).update(
+            club_logo="logos/fake_logo.png"
+        )
+        config.refresh_from_db()
+
+        saved_files = {}
+
+        def fake_save(name, content, **kwargs):
+            saved_files[name] = content.read()
+            return name
+
+        logo_bytes = _make_tiny_png_bytes()
+        # Patch club_logo.open() at the instance level so we can feed test bytes
+        # without touching the real storage backend.
+        ctx_manager = MagicMock()
+        ctx_manager.__enter__ = lambda s: io.BytesIO(logo_bytes)
+        ctx_manager.__exit__ = MagicMock(return_value=False)
+
+        with patch.object(config.club_logo, "open", return_value=ctx_manager), patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ), patch(
+            "django.core.files.storage.default_storage.save", side_effect=fake_save
+        ):
+            config.save()
+
+        assert (
+            PWA_CLUB_ICON_NAME in saved_files
+        ), "Backfill should save pwa-icon-club.png when logo exists but icon is missing"
+        # Verify it's a valid 192×192 PNG
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(saved_files[PWA_CLUB_ICON_NAME]))
+        assert img.size == (192, 192)
+
+    def test_backfill_does_not_overwrite_existing_pwa_icon(self):
+        """When the PWA icon already exists in storage, the backfill should
+        NOT overwrite it (no unnecessary network write)."""
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
+        )
+        # Same pre-existing-logo setup so is_new_logo=False
+        SiteConfiguration.objects.filter(pk=config.pk).update(
+            club_logo="logos/fake_logo.png"
+        )
+        config.refresh_from_db()
+
+        saved_files = {}
+
+        def fake_save(name, content, **kwargs):
+            saved_files[name] = content
+            return name
+
+        logo_bytes = _make_tiny_png_bytes()
+        ctx_manager = MagicMock()
+        ctx_manager.__enter__ = lambda s: io.BytesIO(logo_bytes)
+        ctx_manager.__exit__ = MagicMock(return_value=False)
+
+        with patch.object(config.club_logo, "open", return_value=ctx_manager), patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.save", side_effect=fake_save
+        ):
+            config.save()
+
+        # PWA icon already existed → no save should be triggered for it
+        assert (
+            PWA_CLUB_ICON_NAME not in saved_files
+        ), "Backfill should not overwrite an already-present pwa-icon-club.png"
+
+    def test_logo_removal_deletes_pwa_icon_and_favicon(self):
+        """When the club logo is cleared, pwa-icon-club.png and favicon.ico
+        should be deleted from storage and the cache key invalidated."""
+        config = SiteConfiguration.objects.create(
+            club_name="Test Club",
+            domain_name="test.com",
+            club_abbreviation="TC",
+        )
+        # Simulate that a logo was previously set so is_new_logo=True on clear
+        SiteConfiguration.objects.filter(pk=config.pk).update(club_logo="old_logo.png")
+        config.refresh_from_db()
+
+        deleted_files = []
+        cache.set("pwa_club_icon_url", "http://example.com/old-icon.png", 300)
+
+        def fake_delete(name):
+            deleted_files.append(name)
+
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.delete", side_effect=fake_delete
+        ):
+            # Clear the logo
+            config.club_logo = None
+            config.save()
+
+        assert "favicon.ico" in deleted_files
+        assert PWA_CLUB_ICON_NAME in deleted_files
+        # Cache key should have been cleared
+        assert cache.get("pwa_club_icon_url") is None

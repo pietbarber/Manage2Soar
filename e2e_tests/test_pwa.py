@@ -1,16 +1,27 @@
 """Tests for PWA (Progressive Web App) views."""
 
+import io
 import json
 import os
 from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from PIL import Image
+
+from siteconfig.models import SiteConfiguration
+from utils.favicon import generate_pwa_icon_from_logo
 
 
 @pytest.mark.django_db
 class TestManifestView:
     """Tests for the PWA manifest view."""
+
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
+
+        cache.delete("pwa_club_icon_url")
 
     def test_manifest_returns_json(self, client):
         """Test that manifest returns valid JSON with correct content type."""
@@ -35,21 +46,40 @@ class TestManifestView:
         assert "display" in data
         assert "icons" in data
 
-        # Verify values
-        assert data["name"] == "Manage2Soar"
-        assert data["short_name"] == "M2S"
+        # Verify structural values (name comes from SiteConfiguration)
         assert data["start_url"] == "/"
         assert data["display"] == "standalone"
 
-    def test_manifest_icon_urls_use_static_url(self, client):
-        """Test that icon URLs correctly use STATIC_URL setting."""
+    def test_manifest_name_uses_site_configuration(self, client):
+        """Test that manifest name uses the club name from SiteConfiguration."""
+        siteconfig = SiteConfiguration.objects.first()
         response = client.get("/manifest.json")
         data = json.loads(response.content)
 
-        icons = data["icons"]
-        assert len(icons) == 2
+        if siteconfig and siteconfig.club_name and siteconfig.club_name.split():
+            assert data["name"] == siteconfig.club_name
+            assert data["short_name"] == siteconfig.club_name.split()[0][:12]
+        elif siteconfig and siteconfig.club_name and not siteconfig.club_name.split():
+            # Whitespace-only club_name: manifest uses the raw whitespace as name,
+            # and "M2S" as short_name (split() returns [], triggering the "M2S" fallback)
+            assert data["short_name"] == "M2S"
+        else:
+            # No SiteConfiguration or empty/None club_name: both fall back to defaults
+            assert data["name"] == "Manage2Soar"
+            assert data["short_name"] == "Manage2Soar"
 
-        # Icons should use the STATIC_URL prefix
+    def test_manifest_icon_urls_use_static_url(self, client):
+        """Test that icon URLs correctly use STATIC_URL setting when no club icon exists."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/manifest.json")
+        data = json.loads(response.content)
+
+        icons = data["icons"]
+        assert len(icons) == 2  # 192x192 club/fallback + 512x512 static default
+
+        # When no club icon is in storage, all icons should use the STATIC_URL prefix
         static_url = settings.STATIC_URL.rstrip("/")
         for icon in icons:
             assert icon["src"].startswith(static_url)
@@ -180,3 +210,116 @@ class TestOfflineView:
         content = response.content.decode()
 
         assert "offline" in content.lower()
+
+
+@pytest.mark.django_db
+class TestAppleTouchIconView:
+    """Tests for the Apple touch icon redirect view."""
+
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
+
+        cache.delete("pwa_club_icon_url")
+
+    def test_apple_touch_icon_redirects(self, client):
+        """Test that /apple-touch-icon.png returns a temporary redirect to the PWA icon."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon.png")
+
+        assert response.status_code == 302
+        assert "pwa-icon" in response["Location"]
+
+    def test_apple_touch_icon_precomposed_redirects(self, client):
+        """Test that /apple-touch-icon-precomposed.png returns a temporary redirect."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon-precomposed.png")
+
+        assert response.status_code == 302
+        assert "pwa-icon" in response["Location"]
+
+    def test_apple_touch_icon_redirect_target_uses_static_url(self, client):
+        """When no club icon exists the redirect target should be the static fallback."""
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=False
+        ):
+            response = client.get("/apple-touch-icon.png")
+
+        static_url = settings.STATIC_URL.rstrip("/")
+        assert response["Location"].startswith(static_url)
+
+
+@pytest.mark.django_db
+class TestClubBrandedPwaIcon:
+    """Tests for club-branded PWA / Apple touch icon generation and serving."""
+
+    def setup_method(self):
+        """Clear cached icon URL before each test to prevent cross-test pollution."""
+        from django.core.cache import cache
+
+        cache.delete("pwa_club_icon_url")
+
+    def _make_tiny_png(self):
+        """Return a BytesIO containing a minimal 10x10 RGBA PNG."""
+        buf = io.BytesIO()
+        Image.new("RGBA", (10, 10), color=(30, 100, 200, 255)).save(buf, format="PNG")
+        buf.seek(0)
+        return buf
+
+    def test_generate_pwa_icon_produces_correct_size(self):
+        """generate_pwa_icon_from_logo should output a 192x192 PNG."""
+        out = io.BytesIO()
+        generate_pwa_icon_from_logo(self._make_tiny_png(), out)
+        out.seek(0)
+        img = Image.open(out)
+        assert img.size == (192, 192)
+        assert img.format == "PNG"
+
+    def test_generate_pwa_icon_respects_custom_size(self):
+        """generate_pwa_icon_from_logo should honour the size parameter."""
+        out = io.BytesIO()
+        generate_pwa_icon_from_logo(self._make_tiny_png(), out, size=180)
+        out.seek(0)
+        img = Image.open(out)
+        assert img.size == (180, 180)
+
+    def test_manifest_icon_uses_club_icon_when_available(self, client):
+        """When pwa-icon-club.png exists in storage the manifest should reference it."""
+        club_icon_url = "/media/pwa-icon-club.png"
+
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.url",
+            return_value=club_icon_url,
+        ):
+            response = client.get("/manifest.json")
+            data = json.loads(response.content)
+
+        icon_srcs = [icon["src"] for icon in data["icons"]]
+        # The 192x192 entry should point to the club icon
+        assert any(src == club_icon_url for src in icon_srcs)
+        # The 512x512 fallback should still be the static default
+        static_url = settings.STATIC_URL.rstrip("/")
+        assert any(
+            "pwa-icon-512" in src and src.startswith(static_url) for src in icon_srcs
+        )
+
+    def test_apple_touch_icon_uses_club_icon_when_available(self, client):
+        """When pwa-icon-club.png exists in storage the Apple touch icon should redirect to it."""
+        club_icon_url = "/media/pwa-icon-club.png"
+
+        with patch(
+            "django.core.files.storage.default_storage.exists", return_value=True
+        ), patch(
+            "django.core.files.storage.default_storage.url",
+            return_value=club_icon_url,
+        ):
+            response = client.get("/apple-touch-icon.png")
+
+        assert response.status_code == 302
+        assert response["Location"] == club_icon_url

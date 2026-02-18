@@ -628,24 +628,90 @@ class SiteConfiguration(models.Model):
         # Clear cache when configuration changes
         from django.core.cache import cache
 
+        from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
+
         cache.delete("siteconfig_instance")
 
-        # Generate favicon if logo was uploaded/changed
+        # Generate favicon + PWA icon if logo was uploaded/changed
         if self.club_logo and is_new_logo:
-            # Save favicon.ico at MEDIA_ROOT/favicon.ico using storage backend
+            # Read the logo content once into memory so both generation calls
+            # share the same in-memory buffer; seeking is cheaper and avoids
+            # multiple network round-trips on GCS-backed storage.
+            logo_data = None
             try:
                 with self.club_logo.open("rb") as logo_file:
-                    # Generate favicon in memory
-                    from io import BytesIO
-
-                    outbuf = BytesIO()
-                    generate_favicon_from_logo(logo_file, outbuf)
-                    outbuf.seek(0)
-                    # Save to storage as 'favicon.ico' at root of MEDIA
-                    default_storage.save("favicon.ico", outbuf)
+                    logo_data = BytesIO(logo_file.read())
             except Exception as e:
-                # Log storage or favicon generation errors but don't break model save
-                logging.exception(f"Failed to save favicon.ico to default_storage: {e}")
+                logging.exception(f"Failed to read club_logo from storage: {e}")
+
+            if logo_data is not None:
+                # --- favicon.ico (16/32/48 px, .ico format) ---
+                try:
+                    logo_data.seek(0)
+                    outbuf = BytesIO()
+                    generate_favicon_from_logo(logo_data, outbuf)
+                    outbuf.seek(0)
+                    # Delete any previous version so the new one takes its place;
+                    # some storage backends (e.g. GCS) generate a new name instead
+                    # of overwriting, leaving the old file served indefinitely.
+                    if default_storage.exists("favicon.ico"):
+                        default_storage.delete("favicon.ico")
+                    default_storage.save("favicon.ico", outbuf)
+                except Exception as e:
+                    logging.exception(
+                        f"Failed to save favicon.ico to default_storage: {e}"
+                    )
+
+                # --- pwa-icon-club.png (192×192 PNG for PWA / Apple touch icon) ---
+                try:
+                    logo_data.seek(0)
+                    outbuf = BytesIO()
+                    generate_pwa_icon_from_logo(logo_data, outbuf)
+                    outbuf.seek(0)
+                    # Delete any previous version so the new one takes its place
+                    if default_storage.exists(PWA_CLUB_ICON_NAME):
+                        default_storage.delete(PWA_CLUB_ICON_NAME)
+                    default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
+                    # Invalidate the cached icon URL so requests immediately pick
+                    # up the new club-branded icon
+                    cache.delete("pwa_club_icon_url")
+                except Exception as e:
+                    logging.exception(
+                        f"Failed to save {PWA_CLUB_ICON_NAME} to default_storage: {e}"
+                    )
+
+        # Backfill: if a club logo already exists but the PWA icon was never
+        # generated (e.g. pre-existing installations before this feature was
+        # deployed), generate it now without requiring a re-upload.
+        elif self.club_logo and not is_new_logo:
+            if not default_storage.exists(PWA_CLUB_ICON_NAME):
+                try:
+                    with self.club_logo.open("rb") as logo_file:
+                        logo_data = BytesIO(logo_file.read())
+                    logo_data.seek(0)
+                    outbuf = BytesIO()
+                    generate_pwa_icon_from_logo(logo_data, outbuf)
+                    outbuf.seek(0)
+                    default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
+                    cache.delete("pwa_club_icon_url")
+                except Exception as e:
+                    logging.exception(
+                        f"Failed to backfill {PWA_CLUB_ICON_NAME} to default_storage: {e}"
+                    )
+
+        # Logo removal: delete derived assets when the logo is cleared.
+        elif not self.club_logo and is_new_logo:
+            for _filename in ["favicon.ico", PWA_CLUB_ICON_NAME]:
+                if default_storage.exists(_filename):
+                    try:
+                        default_storage.delete(_filename)
+                    except Exception as e:
+                        logging.exception(
+                            "Failed to delete %s from default_storage: %s",
+                            _filename,
+                            e,
+                        )
+            cache.delete("pwa_club_icon_url")
 
     def delete(self, *args, **kwargs):
         """Override delete to clear cache."""
