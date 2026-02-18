@@ -288,7 +288,7 @@ class TestClubBrandedPwaIcon:
             data = json.loads(response.content)
 
         icon_srcs = [icon["src"] for icon in data["icons"]]
-        # The 192x192 and 180x180 entries should point to the club icon
+        # The 192x192 entry should point to the club icon
         assert any(src == club_icon_url for src in icon_srcs)
         # The 512x512 fallback should still be the static default
         static_url = settings.STATIC_URL.rstrip("/")

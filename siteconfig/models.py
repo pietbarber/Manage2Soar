@@ -626,16 +626,16 @@ class SiteConfiguration(models.Model):
         super().save(*args, **kwargs)
 
         # Clear cache when configuration changes
+        from io import BytesIO
+
         from django.core.cache import cache
+
+        from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
 
         cache.delete("siteconfig_instance")
 
         # Generate favicon + PWA icon if logo was uploaded/changed
         if self.club_logo and is_new_logo:
-            from io import BytesIO
-
-            from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
-
             # --- favicon.ico (16/32/48 px, .ico format) ---
             try:
                 with self.club_logo.open("rb") as logo_file:
@@ -663,8 +663,6 @@ class SiteConfiguration(models.Model):
                     default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
                     # Invalidate the cached icon URL so requests immediately pick
                     # up the new club-branded icon
-                    from django.core.cache import cache
-
                     cache.delete("pwa_club_icon_url")
             except Exception as e:
                 logging.exception(
@@ -675,10 +673,6 @@ class SiteConfiguration(models.Model):
         # generated (e.g. pre-existing installations before this feature was
         # deployed), generate it now without requiring a re-upload.
         elif self.club_logo and not is_new_logo:
-            from io import BytesIO
-
-            from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
-
             if not default_storage.exists(PWA_CLUB_ICON_NAME):
                 try:
                     with self.club_logo.open("rb") as logo_file:
@@ -686,8 +680,6 @@ class SiteConfiguration(models.Model):
                         generate_pwa_icon_from_logo(logo_file, outbuf)
                         outbuf.seek(0)
                         default_storage.save(PWA_CLUB_ICON_NAME, outbuf)
-                        from django.core.cache import cache
-
                         cache.delete("pwa_club_icon_url")
                 except Exception as e:
                     logging.exception(
