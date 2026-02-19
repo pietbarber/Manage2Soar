@@ -400,7 +400,7 @@ def test_maybe_notify_surge_towpilot_does_not_send_below_threshold(django_user_m
 
 
 @pytest.mark.django_db
-def test_check_surge_sends_email_with_three_or_more_accepted_students(
+def test_check_surge_sends_email_when_threshold_reached(
     django_user_model,
 ):
     """_check_surge_instructor_needed sends email when accepted students reach the
