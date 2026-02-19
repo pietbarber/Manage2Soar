@@ -403,12 +403,14 @@ def test_maybe_notify_surge_towpilot_does_not_send_below_threshold(django_user_m
 def test_check_surge_sends_email_with_three_or_more_accepted_students(
     django_user_model,
 ):
-    """_check_surge_instructor_needed sends email when ≥3 students are accepted."""
+    """_check_surge_instructor_needed sends email when accepted students reach the
+    configured instruction_surge_threshold."""
     SiteConfiguration.objects.create(
         club_name="Test Club",
         domain_name="test.org",
         club_abbreviation="TC",
         instructors_email="instructors@test.org",
+        instruction_surge_threshold=3,  # Set threshold to match student count in test
     )
 
     test_date = date.today() + timedelta(days=14)
@@ -452,6 +454,7 @@ def test_check_surge_does_not_send_when_instructors_email_blank(django_user_mode
         domain_name="test.org",
         club_abbreviation="TC",
         instructors_email="",  # Blank – misconfigured
+        instruction_surge_threshold=3,  # Set threshold to match student count in test
     )
 
     test_date = date.today() + timedelta(days=15)
@@ -545,6 +548,7 @@ def test_check_surge_does_not_resend_when_already_notified(django_user_model):
         domain_name="test.org",
         club_abbreviation="TC",
         instructors_email="instructors@test.org",
+        instruction_surge_threshold=3,  # Set threshold to match student count in test
     )
 
     test_date = date.today() + timedelta(days=18)

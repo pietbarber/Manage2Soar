@@ -2398,11 +2398,16 @@ def _notify_instructor_cancellation(slot):
 
 def _check_surge_instructor_needed(assignment):
     """
-    Check if the assignment now has 3+ accepted students and needs a surge instructor.
+    Check if the assignment now has accepted students at or above the configured
+    instruction_surge_threshold and needs a surge instructor.
 
     If so, and no surge instructor is already assigned, notify the instructor list.
+    Uses the same configurable instruction_surge_threshold as the ops-intent surge
+    system so both mechanisms stay in sync with admin configuration.
     """
     from .models import InstructionSlot
+
+    _, instruction_threshold = get_surge_thresholds()
 
     accepted_count = (
         InstructionSlot.objects.filter(
@@ -2413,8 +2418,8 @@ def _check_surge_instructor_needed(assignment):
         .count()
     )
 
-    # If 3+ students and no surge instructor yet, notify
-    if accepted_count >= 3 and not assignment.surge_instructor:
+    # If accepted students reach the configured threshold and no surge instructor yet, notify
+    if accepted_count >= instruction_threshold and not assignment.surge_instructor:
         # Only notify once, and only mark surge_notified=True if the email
         # was actually sent (prevents silently swallowing config errors)
         if not assignment.surge_notified:
