@@ -317,6 +317,15 @@ class SiteConfiguration(models.Model):
         default=4,
         help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
     )
+    instructors_email = models.EmailField(
+        blank=True,
+        default="",
+        help_text=(
+            "Email address to notify when a surge instructor is needed (e.g. your instructors mailing list "
+            "address). When a duty instructor accumulates 3 or more accepted students, this address receives "
+            "an alert asking for a volunteer surge instructor. Leave blank to suppress the alert."
+        ),
+    )
 
     membership_manager_title = models.CharField(
         max_length=40,

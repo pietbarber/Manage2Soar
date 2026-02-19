@@ -122,6 +122,25 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Surge Alerts & Instructor Notifications",
+            {
+                "fields": (
+                    "tow_surge_threshold",
+                    "instruction_surge_threshold",
+                    "instructors_email",
+                ),
+                "description": (
+                    "Configure surge alert thresholds and the email address to notify when a duty "
+                    "instructor has too many students. "
+                    "<strong>instructors_email</strong> should be set to your instructors mailing "
+                    "list address (e.g. instructors@skylinesoaring.org). "
+                    "Tow/instruction surge thresholds trigger an alert email to the respective "
+                    "mailing lists when ops-intent sign-ups reach or exceed the threshold."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Role Terminology",
             {
                 "fields": (

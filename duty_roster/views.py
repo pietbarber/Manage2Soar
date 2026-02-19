@@ -2415,22 +2415,33 @@ def _check_surge_instructor_needed(assignment):
 
     # If 3+ students and no surge instructor yet, notify
     if accepted_count >= 3 and not assignment.surge_instructor:
-        # Only notify once
+        # Only notify once, and only mark surge_notified=True if the email
+        # was actually sent (prevents silently swallowing config errors)
         if not assignment.surge_notified:
-            _notify_surge_instructor_needed(assignment, accepted_count)
-            assignment.surge_notified = True
-            assignment.save(update_fields=["surge_notified"])
+            sent = _notify_surge_instructor_needed(assignment, accepted_count)
+            if sent:
+                assignment.surge_notified = True
+                assignment.save(update_fields=["surge_notified"])
 
 
 def _notify_surge_instructor_needed(assignment, student_count):
-    """Notify the instructors mailing list that a surge instructor is needed."""
+    """Notify the instructors mailing list that a surge instructor is needed.
+
+    Returns True if the email was sent successfully, False otherwise.
+    The caller should only set surge_notified=True when this returns True,
+    so a misconfigured email address doesn't permanently suppress future attempts.
+    """
     try:
         config = SiteConfiguration.objects.first()
-        instructor_email = getattr(config, "instructors_email", None)
+        instructor_email = config.instructors_email if config else ""
 
         if not instructor_email:
-            logger.warning("No instructor email configured in SiteConfiguration")
-            return
+            logger.warning(
+                "No instructors_email configured in SiteConfiguration; "
+                "surge instructor alert for %s suppressed",
+                assignment.date,
+            )
+            return False
 
         primary_instructor = assignment.instructor
         instructor_name = (
@@ -2451,10 +2462,12 @@ def _notify_surge_instructor_needed(assignment, student_count):
             message,
             settings.DEFAULT_FROM_EMAIL,
             [instructor_email],
-            fail_silently=True,
+            fail_silently=False,
         )
+        return True
     except Exception:
         logger.exception("Failed to send surge instructor notification")
+        return False
 
 
 @active_member_required
