@@ -489,7 +489,7 @@ def test_check_surge_does_not_send_when_instructors_email_blank(django_user_mode
 
 
 @pytest.mark.django_db
-def test_notify_surge_returns_true_on_success(django_user_model):
+def test_notify_surge_returns_true_on_success():
     """_notify_surge_instructor_needed returns True when send_mail succeeds."""
     SiteConfiguration.objects.create(
         club_name="Test Club",
