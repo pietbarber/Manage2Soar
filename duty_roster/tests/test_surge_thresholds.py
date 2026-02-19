@@ -9,8 +9,10 @@ import pytest
 from django.core.cache import cache
 from django.urls import reverse
 
-from duty_roster.models import DutyAssignment, OpsIntent
+from duty_roster.models import DutyAssignment, InstructionSlot, OpsIntent
 from duty_roster.views import (
+    _check_surge_instructor_needed,
+    _notify_surge_instructor_needed,
     get_surge_thresholds,
     maybe_notify_surge_instructor,
     maybe_notify_surge_towpilot,
@@ -389,3 +391,185 @@ def test_maybe_notify_surge_towpilot_does_not_send_below_threshold(django_user_m
         # Assignment should not be marked as notified
         assignment = DutyAssignment.objects.get(date=test_date)
         assert assignment.tow_surge_notified is False
+
+
+# ---------------------------------------------------------------------------
+# Tests for _check_surge_instructor_needed / _notify_surge_instructor_needed
+# (Issue #646 – surge instructor email bug)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_check_surge_sends_email_with_three_or_more_accepted_students(
+    django_user_model,
+):
+    """_check_surge_instructor_needed sends email when ≥3 students are accepted."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instructors_email="instructors@test.org",
+    )
+
+    test_date = date.today() + timedelta(days=14)
+    instructor = django_user_model.objects.create_user(
+        username="instr1",
+        email="instr1@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    assignment = DutyAssignment.objects.create(date=test_date, instructor=instructor)
+
+    for i in range(3):
+        student = django_user_model.objects.create_user(
+            username=f"student_surge_{i}",
+            email=f"student_surge_{i}@example.com",
+            password="password",
+            membership_status="Full Member",
+        )
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student,
+            instructor_response="accepted",
+        )
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        _check_surge_instructor_needed(assignment)
+
+        mock_send_mail.assert_called_once()
+        assignment.refresh_from_db()
+        assert assignment.surge_notified is True
+
+
+@pytest.mark.django_db
+def test_check_surge_does_not_send_when_instructors_email_blank(django_user_model):
+    """_check_surge_instructor_needed skips email and leaves surge_notified=False when
+    instructors_email is empty."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instructors_email="",  # Blank – misconfigured
+    )
+
+    test_date = date.today() + timedelta(days=15)
+    instructor = django_user_model.objects.create_user(
+        username="instr_blank",
+        email="instr_blank@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    assignment = DutyAssignment.objects.create(date=test_date, instructor=instructor)
+
+    for i in range(3):
+        student = django_user_model.objects.create_user(
+            username=f"student_blank_{i}",
+            email=f"student_blank_{i}@example.com",
+            password="password",
+            membership_status="Full Member",
+        )
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student,
+            instructor_response="accepted",
+        )
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        _check_surge_instructor_needed(assignment)
+
+        mock_send_mail.assert_not_called()
+        assignment.refresh_from_db()
+        assert assignment.surge_notified is False
+
+
+@pytest.mark.django_db
+def test_notify_surge_returns_true_on_success(django_user_model):
+    """_notify_surge_instructor_needed returns True when send_mail succeeds."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instructors_email="instructors@test.org",
+    )
+
+    test_date = date.today() + timedelta(days=16)
+    assignment = DutyAssignment.objects.create(date=test_date)
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        mock_send_mail.return_value = None  # Simulates successful send
+        result = _notify_surge_instructor_needed(assignment, student_count=3)
+
+        assert result is True
+        mock_send_mail.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_notify_surge_returns_false_on_smtp_failure(django_user_model):
+    """_notify_surge_instructor_needed returns False when send_mail raises, and
+    the caller must NOT set surge_notified=True in that case."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instructors_email="instructors@test.org",
+    )
+
+    test_date = date.today() + timedelta(days=17)
+    instructor = django_user_model.objects.create_user(
+        username="instr_fail",
+        email="instr_fail@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    assignment = DutyAssignment.objects.create(date=test_date, instructor=instructor)
+
+    # Simulate SMTP failure by making send_mail raise
+    with patch("duty_roster.views.send_mail", side_effect=Exception("SMTP error")):
+        result = _notify_surge_instructor_needed(assignment, student_count=3)
+
+        assert result is False
+        assignment.refresh_from_db()
+        # Caller should not have set surge_notified; verify the flag is still False
+        assert assignment.surge_notified is False
+
+
+@pytest.mark.django_db
+def test_check_surge_does_not_resend_when_already_notified(django_user_model):
+    """_check_surge_instructor_needed does not send a second email when
+    surge_notified is already True."""
+    SiteConfiguration.objects.create(
+        club_name="Test Club",
+        domain_name="test.org",
+        club_abbreviation="TC",
+        instructors_email="instructors@test.org",
+    )
+
+    test_date = date.today() + timedelta(days=18)
+    instructor = django_user_model.objects.create_user(
+        username="instr_resend",
+        email="instr_resend@example.com",
+        password="password",
+        membership_status="Full Member",
+    )
+    # Pre-set surge_notified to True to simulate an already-notified assignment
+    assignment = DutyAssignment.objects.create(
+        date=test_date, instructor=instructor, surge_notified=True
+    )
+
+    for i in range(3):
+        student = django_user_model.objects.create_user(
+            username=f"student_resend_{i}",
+            email=f"student_resend_{i}@example.com",
+            password="password",
+            membership_status="Full Member",
+        )
+        InstructionSlot.objects.create(
+            assignment=assignment,
+            student=student,
+            instructor_response="accepted",
+        )
+
+    with patch("duty_roster.views.send_mail") as mock_send_mail:
+        _check_surge_instructor_needed(assignment)
+
+        mock_send_mail.assert_not_called()

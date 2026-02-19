@@ -322,7 +322,7 @@ class SiteConfiguration(models.Model):
         default="",
         help_text=(
             "Email address to notify when a surge instructor is needed (e.g. your instructors mailing list "
-            "address). When a duty instructor accumulates 3 or more accepted students, this address receives "
+            "address). When a duty instructor has accepted 3 or more students, this address receives "
             "an alert asking for a volunteer surge instructor. Leave blank to suppress the alert."
         ),
     )

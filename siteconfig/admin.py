@@ -130,12 +130,17 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                     "instructors_email",
                 ),
                 "description": (
-                    "Configure surge alert thresholds and the email address to notify when a duty "
-                    "instructor has too many students. "
-                    "<strong>instructors_email</strong> should be set to your instructors mailing "
-                    "list address (e.g. instructors@skylinesoaring.org). "
-                    "Tow/instruction surge thresholds trigger an alert email to the respective "
-                    "mailing lists when ops-intent sign-ups reach or exceed the threshold."
+                    "<strong>instructors_email</strong>: When a duty instructor accepts three or "
+                    "more students for instruction on a given day, a surge notification email is "
+                    "sent to this address asking for a volunteer surge instructor. Set it to your "
+                    "instructors mailing list (e.g. instructors@skylinesoaring.org). Leave blank "
+                    "to suppress the alert."
+                    "<br><br>"
+                    "<strong>Tow / instruction surge thresholds</strong>: These are used by the "
+                    "ops-intent surge alert system. When members sign up on the ops-intent calendar "
+                    "and the count reaches or exceeds the configured threshold, an alert email is "
+                    "sent to the respective mailing list (tow pilots or instructors). This is a "
+                    "separate mechanism from the instructors_email field above."
                 ),
                 "classes": ("collapse",),
             },
