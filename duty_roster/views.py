@@ -2457,14 +2457,14 @@ def _notify_surge_instructor_needed(assignment, student_count):
             f"Students signed up: {student_count}"
         )
 
-        send_mail(
+        sent_count = send_mail(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL,
             [instructor_email],
             fail_silently=False,
         )
-        return True
+        return sent_count > 0
     except Exception:
         logger.exception("Failed to send surge instructor notification")
         return False

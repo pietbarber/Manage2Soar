@@ -99,7 +99,7 @@ erDiagram
 - **Role Titles:** All staff positions configurable (Duty Officer, Instructor, Tow Pilot, etc.)
 - **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
 - **Surge Thresholds:** Configurable thresholds for tow and instruction demand alerts (Issue #403). Both thresholds trigger AT or ABOVE the specified value (e.g., threshold=4 triggers at 4+ requests). This ensures consistent behavior across both threshold types.
-- **Instructor Surge Email:** `instructors_email` is notified when a duty instructor accepts 3 or more students on a single day (Issue #646). This is a separate mechanism from the ops-intent surge thresholds — it fires from `InstructionSlot` acceptances, not ops-intent sign-up counts.
+- **Instructor Surge Email:** `instructors_email` is notified when a duty instructor accepts 3 or more students on a single day (Issue #646). This is a separate mechanism from the ops-intent surge thresholds in terms of its trigger source — it fires from `InstructionSlot` acceptances, not ops-intent sign-up counts — but both paths share the same `DutyAssignment.surge_notified` suppression flag, so only the first mechanism to fire will send an email for a given assignment date.
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 

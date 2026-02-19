@@ -431,9 +431,11 @@ def test_check_surge_sends_email_with_three_or_more_accepted_students(
             assignment=assignment,
             student=student,
             instructor_response="accepted",
+            status="confirmed",
         )
 
     with patch("duty_roster.views.send_mail") as mock_send_mail:
+        mock_send_mail.return_value = 1  # send_mail returns count of messages sent
         _check_surge_instructor_needed(assignment)
 
         mock_send_mail.assert_called_once()
@@ -472,6 +474,7 @@ def test_check_surge_does_not_send_when_instructors_email_blank(django_user_mode
             assignment=assignment,
             student=student,
             instructor_response="accepted",
+            status="confirmed",
         )
 
     with patch("duty_roster.views.send_mail") as mock_send_mail:
@@ -496,7 +499,7 @@ def test_notify_surge_returns_true_on_success(django_user_model):
     assignment = DutyAssignment.objects.create(date=test_date)
 
     with patch("duty_roster.views.send_mail") as mock_send_mail:
-        mock_send_mail.return_value = None  # Simulates successful send
+        mock_send_mail.return_value = 1  # send_mail returns count of messages sent
         result = _notify_surge_instructor_needed(assignment, student_count=3)
 
         assert result is True
@@ -567,6 +570,7 @@ def test_check_surge_does_not_resend_when_already_notified(django_user_model):
             assignment=assignment,
             student=student,
             instructor_response="accepted",
+            status="confirmed",
         )
 
     with patch("duty_roster.views.send_mail") as mock_send_mail:
