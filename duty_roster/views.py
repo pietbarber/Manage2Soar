@@ -2202,6 +2202,7 @@ def request_instruction(request, year, month, day):
     # Enforce instruction request window restriction (Issue #648)
     too_early, opens_on = _check_instruction_request_window(day_date)
     if too_early:
+        assert opens_on is not None  # always set when too_early is True
         max_days_ahead = (day_date - opens_on).days
         messages.error(
             request,
