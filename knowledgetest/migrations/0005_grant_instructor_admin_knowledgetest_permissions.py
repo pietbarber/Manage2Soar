@@ -18,7 +18,6 @@ Granted permissions:
 
 from django.db import migrations
 
-
 INSTRUCTOR_ADMIN_PERMISSIONS = [
     ("knowledgetest", "testpreset", "add_testpreset"),
     ("knowledgetest", "testpreset", "change_testpreset"),
