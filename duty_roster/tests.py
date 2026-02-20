@@ -704,6 +704,10 @@ class InstructionRequestViewTests(TestCase):
         self.assertContains(response, self.future_date.strftime("%B"))
 
 
+# InstructionRequestWindowTests has been moved to
+# duty_roster/tests/test_instruction_request_window.py (pytest-style).
+
+
 class InstructorManagementViewTests(TestCase):
     """Tests for instructor management views."""
 

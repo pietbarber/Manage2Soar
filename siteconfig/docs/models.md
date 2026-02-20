@@ -37,6 +37,8 @@ erDiagram
         string surge_instructor_title
         int tow_surge_threshold
         int instruction_surge_threshold
+        boolean restrict_instruction_requests_window
+        int instruction_request_max_days_ahead
         string instructors_email
         string membership_manager_title
         string equipment_manager_title
@@ -100,6 +102,7 @@ erDiagram
 - **Operational Settings:** Scheduling preferences, reservation controls, towplane rental permissions, notification settings
 - **Surge Thresholds:** Configurable thresholds for tow and instruction demand alerts (Issue #403). Both thresholds trigger AT or ABOVE the specified value (e.g., threshold=4 triggers at 4+ requests). This ensures consistent behavior across both threshold types.
 - **Instructor Surge Email:** `instructors_email` is notified when a duty instructor accepts 3 or more students on a single day (Issue #646). This is a separate mechanism from the ops-intent surge thresholds in terms of its trigger source — it fires from `InstructionSlot` acceptances, not ops-intent sign-up counts — but both paths share the same `DutyAssignment.surge_notified` suppression flag, so only the first mechanism to fire will send an email for a given assignment date.
+- **Instruction Request Window (Issue #648):** `restrict_instruction_requests_window` (boolean, default False) enables a configurable advance-request limit. When enabled, `instruction_request_max_days_ahead` (integer, default 14) controls how many days in advance a student may submit an instruction request. The restriction is enforced both in the UI (the form is hidden and a notice with the open date is shown) and server-side (a POST is rejected with an error message). Clubs without this rule leave the toggle disabled.
 - **Visiting Pilot Features:** Complete workflow configuration, security token management, auto-approval settings, validation requirements
 - **Usage:** Accessed via template tags and admin interface, enables multi-club deployment with club-specific branding and contact handling
 

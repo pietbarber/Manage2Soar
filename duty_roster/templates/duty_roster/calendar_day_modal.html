@@ -200,7 +200,7 @@
   {% endif %}
 
   {# Student Instruction Request Form with type checkboxes and notes #}
-  {% if user.is_authenticated and assignment.instructor and day >= today %}
+  {% if user.is_authenticated and has_instructor_assigned and day >= today %}
     {% if user_has_instruction_request %}
     <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
       <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
@@ -215,6 +215,16 @@
             {% endif %}
           {% endif %}
         {% endfor %}
+      </div>
+    </div>
+    {% elif instruction_request_too_early %}
+    {# Instruction request window not yet open #}
+    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+      <i class="bi bi-clock me-2" aria-hidden="true"></i>
+      <div>
+        <strong>Instruction requests not yet open.</strong>
+        Requests for this date open on
+        <strong>{{ instruction_request_opens_on|date:"N j, Y" }}</strong>.
       </div>
     </div>
     {% elif instruction_request_form %}

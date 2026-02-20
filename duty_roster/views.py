@@ -270,6 +270,12 @@ def get_adjacent_months(year, month):
     return prev_year, prev_month, next_year, next_month
 
 
+# Sentinel shared by get_surge_thresholds() and _check_instruction_request_window()
+# to distinguish a cache miss from a legitimately cached None (no SiteConfiguration
+# row), preventing repeated DB hits when the table is empty.
+_SITECONFIG_CACHE_SENTINEL = object()
+
+
 def get_surge_thresholds():
     """
     Get surge thresholds from SiteConfiguration with sensible defaults.
@@ -285,13 +291,44 @@ def get_surge_thresholds():
     > 3 (triggering at 4+), while tow used >= 6. The new defaults (instruction=4, tow=6)
     maintain backward compatibility while providing more intuitive threshold behavior.
     """
-    config = cache.get("siteconfig_instance")
-    if config is None:
+    config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if config is _SITECONFIG_CACHE_SENTINEL:
         config = SiteConfiguration.objects.first()
         cache.set("siteconfig_instance", config, timeout=60)
     tow_surge_threshold = config.tow_surge_threshold if config else 6
     instruction_surge_threshold = config.instruction_surge_threshold if config else 4
     return tow_surge_threshold, instruction_surge_threshold
+
+
+def _check_instruction_request_window(day_date):
+    """
+    Check whether instruction requests are permitted for *day_date* today.
+
+    Returns a (too_early, opens_on) tuple:
+      - too_early  (bool)  – True when the window restriction is active and the
+                             date is still too far in the future.
+      - opens_on   (date | None) – The first day on which a request is allowed
+                             (only set when too_early is True).
+
+    When the site-wide restriction is disabled (the default), always returns
+    (False, None) so existing behaviour is unchanged.
+
+    Uses the same SiteConfiguration cache as get_surge_thresholds() (60-second
+    TTL) to avoid unnecessary DB queries on every calendar modal view.
+    """
+    config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if config is _SITECONFIG_CACHE_SENTINEL:
+        config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", config, timeout=60)
+    if not config or not config.restrict_instruction_requests_window:
+        return False, None
+    if day_date < date.today():
+        return False, None
+    days_until = (day_date - date.today()).days
+    if days_until > config.instruction_request_max_days_ahead:
+        opens_on = day_date - timedelta(days=config.instruction_request_max_days_ahead)
+        return True, opens_on
+    return False, None
 
 
 def duty_calendar_view(request, year=None, month=None):
@@ -413,6 +450,8 @@ def calendar_day_detail(request, year, month, day):
     # Check if user already has a non-cancelled instruction request for this day
     user_has_instruction_request = False
     instruction_request_form = None
+    instruction_request_too_early = False
+    instruction_request_opens_on = None
     if request.user.is_authenticated and assignment:
         from .forms import InstructionRequestForm
         from .models import InstructionSlot
@@ -426,9 +465,15 @@ def calendar_day_detail(request, year, month, day):
             .exists()
         )
 
+        # Check instruction request window restriction (Issue #648)
+        instruction_request_too_early, instruction_request_opens_on = (
+            _check_instruction_request_window(day_date)
+        )
+
         # Only show form if user doesn't already have a request and an instructor is assigned
         if (
             not user_has_instruction_request
+            and not instruction_request_too_early
             and (assignment.instructor or assignment.surge_instructor)
             and day_date >= date.today()
         ):
@@ -452,6 +497,11 @@ def calendar_day_detail(request, year, month, day):
             "today": date.today(),
             "user_has_instruction_request": user_has_instruction_request,
             "instruction_request_form": instruction_request_form,
+            "instruction_request_too_early": instruction_request_too_early,
+            "instruction_request_opens_on": instruction_request_opens_on,
+            "has_instructor_assigned": bool(
+                assignment and (assignment.instructor or assignment.surge_instructor)
+            ),
         },
     )
 
@@ -462,7 +512,6 @@ def ops_intent_toggle(request, year, month, day):
         return HttpResponse("Not authorized", status=403)
 
     from django.conf import settings
-    from django.utils import timezone
 
     day_date = date(year, month, day)
 
@@ -472,18 +521,23 @@ def ops_intent_toggle(request, year, month, day):
 
     available_as = request.POST.getlist("available_as") or []
 
-    # enforce 14-day rule for instruction
+    # enforce site-configured instruction request window (Issue #648)
     if "instruction" in available_as:
-        days_until = (day_date - timezone.now().date()).days
-        if days_until > 14:
+        too_early_intent, opens_on_intent = _check_instruction_request_window(day_date)
+        if too_early_intent:
+            opens_str = (
+                opens_on_intent.strftime("%B %d, %Y")
+                if opens_on_intent
+                else "a future date"
+            )
             response = format_html(
-                '<p class="text-red-700">⏰ You can only request instruction '
-                "within 14 days of your duty date.</p>"
+                '<p class="text-danger">⏰ Instruction requests for this date do not open until {}.</p>'
                 '<form hx-get="{}form/" '
                 'hx-post="{}" '
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
                 '<button type="submit" class="btn btn-sm btn-primary">'
                 "🛩️ I Plan to Fly This Day</button></form>",
+                opens_str,
                 request.path,
                 request.path,
             )
@@ -2156,6 +2210,29 @@ def request_instruction(request, year, month, day):
     # Check if day is in the past
     if day_date < date.today():
         messages.error(request, "Cannot request instruction for past dates.")
+        return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+
+    # Enforce instruction request window restriction (Issue #648)
+    too_early, opens_on = _check_instruction_request_window(day_date)
+    if too_early:
+        if opens_on is None:
+            logger.error(
+                "Instruction request window check returned too_early=True but opens_on=None "
+                "for date %s",
+                day_date,
+            )
+            messages.error(
+                request,
+                "Instruction requests for this date cannot be submitted yet. Please try again later.",
+            )
+            return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+        max_days_ahead = (day_date - opens_on).days
+        messages.error(
+            request,
+            f"Instruction requests for {day_date.strftime('%B %d, %Y')} cannot be submitted yet. "
+            f"Requests open on {opens_on.strftime('%B %d, %Y')} "
+            f"({max_days_ahead} days before the scheduled date).",
+        )
         return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
     form = InstructionRequestForm(
