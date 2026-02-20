@@ -5,9 +5,10 @@ Rewrites From header to list address and sets Reply-To to original sender
 Uses X-Original-To header to find the original list recipient before alias expansion
 """
 import email
+import os
 import smtplib
 import sys
-from email.utils import formataddr, parseaddr
+from email.utils import formataddr, getaddresses, parseaddr
 
 # List of mailing list addresses this server handles
 # Format: set of lowercase email addresses
@@ -36,6 +37,38 @@ MAILING_LISTS = {
 {% endif %}
 {% endfor %}
 }
+
+
+def _load_lists_from_virtual(virtual_file='/etc/postfix/virtual'):
+    """
+    Load all mailing list addresses from the Postfix virtual aliases file.
+    This supplements the hardcoded MAILING_LISTS set with any lists dynamically
+    configured via the app's MailingList model (e.g. 'operations-team@domain').
+    """
+    lists = set()
+    try:
+        with open(virtual_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split(None, 1)
+                if parts:
+                    addr = parts[0].lower()
+                    if '@' in addr:
+                        lists.add(addr)
+    except Exception as e:
+        sys.stderr.write(
+            f"maillist-rewriter: warning: could not read {virtual_file}: {e}\n"
+        )
+    return lists
+
+
+# Combine hardcoded list addresses with any dynamically-configured aliases.
+# Dynamic lists are added by the app's MailingList model and written to
+# /etc/postfix/virtual; we must include them here so they are not bounced.
+ALL_KNOWN_LISTS = MAILING_LISTS | _load_lists_from_virtual()
+
 
 def rewrite_headers(msg, recipient):
     """
@@ -85,7 +118,7 @@ def find_list_from_recipients(recipients, preferred_domain=None):
 
         matches = []
         # Try each list address
-        for list_addr in MAILING_LISTS:
+        for list_addr in ALL_KNOWN_LISTS:
             # Look for line like: "webmaster@domain  user1@...,user2@...,user3@..."
             for line in virtual_content.split('\n'):
                 if line.startswith(list_addr):
@@ -135,7 +168,7 @@ def main():
     if to_header:
         # Parse To header to extract email address
         _, to_addr = parseaddr(to_header)
-        if to_addr and to_addr.lower() in MAILING_LISTS:
+        if to_addr and to_addr.lower() in ALL_KNOWN_LISTS:
             original_to = to_addr.lower()
 
     # Check CC header — reply-all from Gmail (and most clients) puts the list
@@ -144,13 +177,13 @@ def main():
     # forwarded to SMTP2Go with the original (unverified) sender domain, causing
     # 550 rejections for every recipient.  See issue #652.
     if not original_to:
-        cc_header = msg.get('Cc') or msg.get('CC')
-        if cc_header:
-            for cc_entry in cc_header.split(','):
-                _, cc_addr = parseaddr(cc_entry.strip())
-                if cc_addr and cc_addr.lower() in MAILING_LISTS:
-                    original_to = cc_addr.lower()
-                    break
+        # Use getaddresses() for RFC-compliant parsing — split(',') misparses display
+        # names that contain commas (e.g. "Doe, Jane" <jane@example.com>) and misses
+        # folded multi-line Cc headers.  get_all() captures every Cc header line.
+        for _, cc_addr in getaddresses(msg.get_all('Cc', []) + msg.get_all('CC', [])):
+            if cc_addr and cc_addr.lower() in ALL_KNOWN_LISTS:
+                original_to = cc_addr.lower()
+                break
 
     # Extract preferred domain from To/CC header for reverse-lookup fallback
     preferred_domain = None
@@ -175,10 +208,10 @@ def main():
             f"recipients {recipients}; rejecting to prevent SMTP2Go rejection "
             "of unverified sender domain (issue #652).\n"
         )
-        sys.exit(69)  # EX_UNAVAILABLE — Postfix generates clean bounce to sender
+        sys.exit(os.EX_UNAVAILABLE)  # Postfix generates a clean bounce to the sender
 
     # Rewrite if this is going to a mailing list
-    if original_to and original_to.lower() in MAILING_LISTS:
+    if original_to and original_to.lower() in ALL_KNOWN_LISTS:
         msg = rewrite_headers(msg, original_to)
 
     # Reinject to port 10025 (bypasses content_filter)
@@ -215,11 +248,11 @@ def main():
     except smtplib.SMTPException as e:
         # More specific logging for SMTP-related failures (including connection issues)
         sys.stderr.write(f"SMTP reinject failed: {e}\n")
-        sys.exit(75)  # EX_TEMPFAIL
+        sys.exit(os.EX_TEMPFAIL)
     except Exception as e:
         # Fallback for any non-SMTP unexpected errors
         sys.stderr.write(f"Reinject failed (unexpected error): {e}\n")
-        sys.exit(75)  # EX_TEMPFAIL
+        sys.exit(os.EX_TEMPFAIL)
 
 if __name__ == '__main__':
     main()
