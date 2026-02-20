@@ -294,6 +294,31 @@ def get_surge_thresholds():
     return tow_surge_threshold, instruction_surge_threshold
 
 
+def _check_instruction_request_window(day_date):
+    """
+    Check whether instruction requests are permitted for *day_date* today.
+
+    Returns a (too_early, opens_on) tuple:
+      - too_early  (bool)  – True when the window restriction is active and the
+                             date is still too far in the future.
+      - opens_on   (date | None) – The first day on which a request is allowed
+                             (only set when too_early is True).
+
+    When the site-wide restriction is disabled (the default), always returns
+    (False, None) so existing behaviour is unchanged.
+    """
+    config = SiteConfiguration.objects.first()
+    if not config or not config.restrict_instruction_requests_window:
+        return False, None
+    if day_date < date.today():
+        return False, None
+    days_until = (day_date - date.today()).days
+    if days_until > config.instruction_request_max_days_ahead:
+        opens_on = day_date - timedelta(days=config.instruction_request_max_days_ahead)
+        return True, opens_on
+    return False, None
+
+
 def duty_calendar_view(request, year=None, month=None):
     today = date.today()
     year = int(year) if year else today.year
@@ -429,20 +454,9 @@ def calendar_day_detail(request, year, month, day):
         )
 
         # Check instruction request window restriction (Issue #648)
-        config = SiteConfiguration.objects.first()
-        if (
-            config
-            and config.restrict_instruction_requests_window
-            and day_date >= date.today()
-        ):
-            days_until = (day_date - date.today()).days
-            if days_until > config.instruction_request_max_days_ahead:
-                instruction_request_too_early = True
-                from datetime import timedelta
-
-                instruction_request_opens_on = day_date - timedelta(
-                    days=config.instruction_request_max_days_ahead
-                )
+        instruction_request_too_early, instruction_request_opens_on = (
+            _check_instruction_request_window(day_date)
+        )
 
         # Only show form if user doesn't already have a request and an instructor is assigned
         if (
@@ -2180,22 +2194,16 @@ def request_instruction(request, year, month, day):
         return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
     # Enforce instruction request window restriction (Issue #648)
-    config = SiteConfiguration.objects.first()
-    if config and config.restrict_instruction_requests_window:
-        days_until = (day_date - date.today()).days
-        if days_until > config.instruction_request_max_days_ahead:
-            from datetime import timedelta
-
-            opens_on = day_date - timedelta(
-                days=config.instruction_request_max_days_ahead
-            )
-            messages.error(
-                request,
-                f"Instruction requests for {day_date.strftime('%B %d, %Y')} cannot be submitted yet. "
-                f"Requests open on {opens_on.strftime('%B %d, %Y')} "
-                f"({config.instruction_request_max_days_ahead} days before the scheduled date).",
-            )
-            return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+    too_early, opens_on = _check_instruction_request_window(day_date)
+    if too_early:
+        days_ahead = (day_date - opens_on).days
+        messages.error(
+            request,
+            f"Instruction requests for {day_date.strftime('%B %d, %Y')} cannot be submitted yet. "
+            f"Requests open on {opens_on.strftime('%B %d, %Y')} "
+            f"({days_ahead} days before the scheduled date).",
+        )
+        return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
     form = InstructionRequestForm(
         request.POST,
