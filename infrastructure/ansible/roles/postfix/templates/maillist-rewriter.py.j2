@@ -138,9 +138,25 @@ def main():
         if to_addr and to_addr.lower() in MAILING_LISTS:
             original_to = to_addr.lower()
 
-    # Extract preferred domain from To header for fallback
+    # Check CC header — reply-all from Gmail (and most clients) puts the list
+    # address in CC when a Reply-To header was present on the original message.
+    # Without this check, reply-all messages bypass header rewriting and are
+    # forwarded to SMTP2Go with the original (unverified) sender domain, causing
+    # 550 rejections for every recipient.  See issue #652.
+    if not original_to:
+        cc_header = msg.get('Cc') or msg.get('CC')
+        if cc_header:
+            for cc_entry in cc_header.split(','):
+                _, cc_addr = parseaddr(cc_entry.strip())
+                if cc_addr and cc_addr.lower() in MAILING_LISTS:
+                    original_to = cc_addr.lower()
+                    break
+
+    # Extract preferred domain from To/CC header for reverse-lookup fallback
     preferred_domain = None
-    if to_header:
+    if original_to and '@' in original_to:
+        preferred_domain = original_to.split('@')[1]
+    elif to_header:
         _, to_addr = parseaddr(to_header)
         if to_addr and '@' in to_addr:
             preferred_domain = to_addr.split('@')[1]
@@ -148,6 +164,18 @@ def main():
     if not original_to:
         # Fallback: reverse-lookup via virtual aliases file with domain preference
         original_to = find_list_from_recipients(recipients, preferred_domain)
+
+    # If list detection failed entirely, reject cleanly rather than forwarding the
+    # message with an unverified From header.  Forwarding would cause SMTP2Go to
+    # reject with "550 From header sender domain not verified" for every recipient,
+    # which is worse than a clean bounce back to the original sender.
+    if not original_to:
+        sys.stderr.write(
+            f"maillist-rewriter: Could not identify mailing list for "
+            f"recipients {recipients}; rejecting to prevent SMTP2Go rejection "
+            "of unverified sender domain (issue #652).\n"
+        )
+        sys.exit(69)  # EX_UNAVAILABLE — Postfix generates clean bounce to sender
 
     # Rewrite if this is going to a mailing list
     if original_to and original_to.lower() in MAILING_LISTS:
