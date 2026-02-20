@@ -270,6 +270,12 @@ def get_adjacent_months(year, month):
     return prev_year, prev_month, next_year, next_month
 
 
+# Sentinel shared by get_surge_thresholds() and _check_instruction_request_window()
+# to distinguish a cache miss from a legitimately cached None (no SiteConfiguration
+# row), preventing repeated DB hits when the table is empty.
+_SITECONFIG_CACHE_SENTINEL = object()
+
+
 def get_surge_thresholds():
     """
     Get surge thresholds from SiteConfiguration with sensible defaults.
@@ -285,18 +291,13 @@ def get_surge_thresholds():
     > 3 (triggering at 4+), while tow used >= 6. The new defaults (instruction=4, tow=6)
     maintain backward compatibility while providing more intuitive threshold behavior.
     """
-    config = cache.get("siteconfig_instance")
-    if config is None:
+    config = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+    if config is _SITECONFIG_CACHE_SENTINEL:
         config = SiteConfiguration.objects.first()
         cache.set("siteconfig_instance", config, timeout=60)
     tow_surge_threshold = config.tow_surge_threshold if config else 6
     instruction_surge_threshold = config.instruction_surge_threshold if config else 4
     return tow_surge_threshold, instruction_surge_threshold
-
-
-# Sentinel used by _check_instruction_request_window to distinguish a cached None
-# value (no SiteConfiguration row) from a cache miss, avoiding repeated DB hits.
-_SITECONFIG_CACHE_SENTINEL = object()
 
 
 def _check_instruction_request_window(day_date):
@@ -530,7 +531,7 @@ def ops_intent_toggle(request, year, month, day):
                 else "a future date"
             )
             response = format_html(
-                "<p>⏰ Instruction requests for this date do not open until {}.</p>"
+                '<p class="text-danger">⏰ Instruction requests for this date do not open until {}.</p>'
                 '<form hx-get="{}form/" '
                 'hx-post="{}" '
                 'hx-target="#ops-intent-response" hx-swap="innerHTML">'
