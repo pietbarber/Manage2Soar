@@ -269,7 +269,7 @@ spec:
                 secretName: {{ gke_gcp_sa_secret_name }}
 
 ---
-# Daily: Expire Ad-hoc Days (6:00 PM UTC for tomorrow)
+# Daily: Expire Ad-hoc Days (3:00 AM UTC = 10 PM EST, night-before deadline)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -282,7 +282,7 @@ metadata:
     tenant: {{ gke_club_prefix }}
 {% endif %}
 spec:
-  schedule: "0 18 * * *"  # Daily at 6:00 PM UTC
+  schedule: "0 3 * * *"  # Daily at 3:00 AM UTC (10 PM EST / 11 PM EDT)
   timeZone: "UTC"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3

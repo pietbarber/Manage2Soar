@@ -79,10 +79,12 @@ def notify_ops_status(assignment):
     if not assignment.tow_pilot and not assignment.duty_officer:
         # Get configuration
         email_config = get_email_config()
+        # Notify all members so duty officers, tow pilots, and instructors all
+        # see the call-to-action exactly once.  Previous approach of targeting
+        # INSTRUCTORS + TOWPILOTS lists caused duplicate emails for multi-role
+        # members and completely missed duty officers (issue #654).
         recipient_list = get_mailing_list(
-            "INSTRUCTORS_MAILING_LIST", "instructors", email_config["config"]
-        ) + get_mailing_list(
-            "TOWPILOTS_MAILING_LIST", "towpilots", email_config["config"]
+            "MEMBERS_MAILING_LIST", "members", email_config["config"]
         )
 
         tow_title = get_role_title("towpilot") or "Tow Pilot"

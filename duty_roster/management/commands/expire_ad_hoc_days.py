@@ -11,19 +11,26 @@ from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
 class Command(BaseCronJobCommand):
-    help = "Cancel unconfirmed ad-hoc ops days that are scheduled for tomorrow"
+    help = "Cancel unconfirmed ad-hoc ops days whose deadline has passed (runs at 3 AM UTC = 10 PM EST)"
     job_name = "expire_ad_hoc_days"
     max_execution_time = timedelta(minutes=10)  # This is a quick operation
 
     def execute_job(self, *args, **options):
-        tomorrow = now().date() + timedelta(days=1)
+        # Run at 3 AM UTC (10 PM EST / 11 PM EDT).  We expire ad-hoc days
+        # scheduled for TODAY — by the time this job fires at ~10 PM local time
+        # the "night before" deadline has passed and there is no longer enough
+        # time to assemble minimum crew before flying begins in the morning.
+        # Previously this checked `tomorrow` and ran at 6 PM UTC (1-2 PM EST),
+        # which cancelled days mid-afternoon before members had a chance to
+        # respond (issue #654).
+        today = now().date()
 
         assignments = DutyAssignment.objects.filter(
-            is_scheduled=False, is_confirmed=False, date=tomorrow
+            is_scheduled=False, is_confirmed=False, date=today
         )
 
         if not assignments.exists():
-            self.log_info("No unconfirmed ad-hoc ops days found for tomorrow")
+            self.log_info("No unconfirmed ad-hoc ops days found for today")
             return
 
         cancelled_count = 0
@@ -64,7 +71,7 @@ class Command(BaseCronJobCommand):
                 assignment.delete()
 
             self.log_warning(
-                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date}"
+                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date} (deadline passed at 10 PM local)"
             )
             cancelled_count += 1
 
