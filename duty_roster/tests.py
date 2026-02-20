@@ -933,6 +933,81 @@ class InstructionRequestWindowTests(TestCase):
         self.assertFalse(field_window.default)
         self.assertEqual(field_days.default, 14)
 
+    # ------------------------------------------------------------------
+    # UI / calendar_day_detail integration tests
+    # ------------------------------------------------------------------
+
+    def test_calendar_day_detail_shows_info_alert_when_too_early(self):
+        """When restriction is active and date is outside window, the day modal shows
+        the 'not yet open' info alert and does NOT render the instruction request form.
+        """
+        self.config.restrict_instruction_requests_window = True
+        self.config.instruction_request_max_days_ahead = 14
+        self.config.save()
+
+        assignment, future_date = self._make_assignment(30)
+        self.client.login(username="window_student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:calendar_day_detail",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Info alert should be present
+        self.assertContains(response, "Instruction requests not yet open")
+        # The open date should be shown
+        opens_on = future_date - timedelta(days=14)
+        self.assertContains(response, opens_on.strftime("%-d"))
+        # The request form action URL should NOT be in the response
+        form_action = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+        self.assertNotContains(response, form_action)
+
+    def test_calendar_day_detail_shows_form_when_within_window(self):
+        """When restriction is active but date is within the window, the request form
+        is rendered and the info alert is absent."""
+        self.config.restrict_instruction_requests_window = True
+        self.config.instruction_request_max_days_ahead = 14
+        self.config.save()
+
+        assignment, future_date = self._make_assignment(7)
+        self.client.login(username="window_student", password="testpass123")
+
+        url = reverse(
+            "duty_roster:calendar_day_detail",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Instruction requests not yet open")
+        # The request form action URL should be present
+        form_action = reverse(
+            "duty_roster:request_instruction",
+            kwargs={
+                "year": future_date.year,
+                "month": future_date.month,
+                "day": future_date.day,
+            },
+        )
+        self.assertContains(response, form_action)
+
 
 class InstructorManagementViewTests(TestCase):
     """Tests for instructor management views."""

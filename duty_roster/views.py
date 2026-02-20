@@ -306,8 +306,14 @@ def _check_instruction_request_window(day_date):
 
     When the site-wide restriction is disabled (the default), always returns
     (False, None) so existing behaviour is unchanged.
+
+    Uses the same SiteConfiguration cache as get_surge_thresholds() (60-second
+    TTL) to avoid unnecessary DB queries on every calendar modal view.
     """
-    config = SiteConfiguration.objects.first()
+    config = cache.get("siteconfig_instance")
+    if config is None:
+        config = SiteConfiguration.objects.first()
+        cache.set("siteconfig_instance", config, timeout=60)
     if not config or not config.restrict_instruction_requests_window:
         return False, None
     if day_date < date.today():
@@ -2196,12 +2202,12 @@ def request_instruction(request, year, month, day):
     # Enforce instruction request window restriction (Issue #648)
     too_early, opens_on = _check_instruction_request_window(day_date)
     if too_early:
-        days_ahead = (day_date - opens_on).days
+        max_days_ahead = (day_date - opens_on).days
         messages.error(
             request,
             f"Instruction requests for {day_date.strftime('%B %d, %Y')} cannot be submitted yet. "
             f"Requests open on {opens_on.strftime('%B %d, %Y')} "
-            f"({days_ahead} days before the scheduled date).",
+            f"({max_days_ahead} days before the scheduled date).",
         )
         return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 

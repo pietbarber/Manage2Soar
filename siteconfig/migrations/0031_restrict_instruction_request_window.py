@@ -28,14 +28,4 @@ class Migration(migrations.Migration):
                 verbose_name="Restrict instruction request window",
             ),
         ),
-        migrations.AlterField(
-            model_name="siteconfiguration",
-            name="instructors_email",
-            field=models.EmailField(
-                blank=True,
-                default="",
-                help_text="Email address to notify when a surge instructor is needed (e.g. your instructors mailing list address). When a duty instructor has accepted at least the configured instruction surge threshold of students, and no surge instructor is already assigned and no prior alert has been sent for that assignment, this address receives a request for a volunteer surge instructor. Leave blank to suppress the alert.",
-                max_length=254,
-            ),
-        ),
     ]
