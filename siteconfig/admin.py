@@ -147,6 +147,24 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Instruction Request Window",
+            {
+                "fields": (
+                    "restrict_instruction_requests_window",
+                    "instruction_request_max_days_ahead",
+                ),
+                "description": (
+                    "Configure how far in advance students may request instruction on the duty roster calendar. "
+                    "<br><br>"
+                    "When <strong>Restrict instruction request window</strong> is enabled, students can only "
+                    "submit an instruction request within the configured number of days before the duty date. "
+                    "For example, set to 14 days to enforce a 2-week advance-request limit. "
+                    "Disable to allow students to request instruction at any time in advance."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Role Terminology",
             {
                 "fields": (

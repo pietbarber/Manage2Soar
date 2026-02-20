@@ -317,6 +317,25 @@ class SiteConfiguration(models.Model):
         default=4,
         help_text="Surge alerts trigger when instruction requests are AT or ABOVE this value (default: 4)",
     )
+
+    # Instruction Request Window (Issue #648)
+    restrict_instruction_requests_window = models.BooleanField(
+        default=False,
+        verbose_name="Restrict instruction request window",
+        help_text=(
+            "When enabled, students may only request instruction within a configured number of days "
+            "before the scheduled date. Disable to allow requests at any time in advance."
+        ),
+    )
+    instruction_request_max_days_ahead = models.PositiveIntegerField(
+        default=14,
+        verbose_name="Max days ahead for instruction requests",
+        help_text=(
+            "How many days in advance a student may request instruction. Only applies when "
+            "'Restrict instruction request window' is enabled. Default: 14 (2 weeks)."
+        ),
+    )
+
     instructors_email = models.EmailField(
         blank=True,
         default="",

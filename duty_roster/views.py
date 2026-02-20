@@ -413,6 +413,8 @@ def calendar_day_detail(request, year, month, day):
     # Check if user already has a non-cancelled instruction request for this day
     user_has_instruction_request = False
     instruction_request_form = None
+    instruction_request_too_early = False
+    instruction_request_opens_on = None
     if request.user.is_authenticated and assignment:
         from .forms import InstructionRequestForm
         from .models import InstructionSlot
@@ -426,9 +428,26 @@ def calendar_day_detail(request, year, month, day):
             .exists()
         )
 
+        # Check instruction request window restriction (Issue #648)
+        config = SiteConfiguration.objects.first()
+        if (
+            config
+            and config.restrict_instruction_requests_window
+            and day_date >= date.today()
+        ):
+            days_until = (day_date - date.today()).days
+            if days_until > config.instruction_request_max_days_ahead:
+                instruction_request_too_early = True
+                from datetime import timedelta
+
+                instruction_request_opens_on = day_date - timedelta(
+                    days=config.instruction_request_max_days_ahead
+                )
+
         # Only show form if user doesn't already have a request and an instructor is assigned
         if (
             not user_has_instruction_request
+            and not instruction_request_too_early
             and (assignment.instructor or assignment.surge_instructor)
             and day_date >= date.today()
         ):
@@ -452,6 +471,8 @@ def calendar_day_detail(request, year, month, day):
             "today": date.today(),
             "user_has_instruction_request": user_has_instruction_request,
             "instruction_request_form": instruction_request_form,
+            "instruction_request_too_early": instruction_request_too_early,
+            "instruction_request_opens_on": instruction_request_opens_on,
         },
     )
 
@@ -2157,6 +2178,24 @@ def request_instruction(request, year, month, day):
     if day_date < date.today():
         messages.error(request, "Cannot request instruction for past dates.")
         return redirect("duty_roster:duty_calendar_month", year=year, month=month)
+
+    # Enforce instruction request window restriction (Issue #648)
+    config = SiteConfiguration.objects.first()
+    if config and config.restrict_instruction_requests_window:
+        days_until = (day_date - date.today()).days
+        if days_until > config.instruction_request_max_days_ahead:
+            from datetime import timedelta
+
+            opens_on = day_date - timedelta(
+                days=config.instruction_request_max_days_ahead
+            )
+            messages.error(
+                request,
+                f"Instruction requests for {day_date.strftime('%B %d, %Y')} cannot be submitted yet. "
+                f"Requests open on {opens_on.strftime('%B %d, %Y')} "
+                f"({config.instruction_request_max_days_ahead} days before the scheduled date).",
+            )
+            return redirect("duty_roster:duty_calendar_month", year=year, month=month)
 
     form = InstructionRequestForm(
         request.POST,
