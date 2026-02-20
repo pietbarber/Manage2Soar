@@ -2398,11 +2398,16 @@ def _notify_instructor_cancellation(slot):
 
 def _check_surge_instructor_needed(assignment):
     """
-    Check if the assignment now has 3+ accepted students and needs a surge instructor.
+    Check if the assignment now has accepted students at or above the configured
+    instruction_surge_threshold and needs a surge instructor.
 
     If so, and no surge instructor is already assigned, notify the instructor list.
+    Uses the same configurable instruction_surge_threshold as the ops-intent surge
+    system so both mechanisms stay in sync with admin configuration.
     """
     from .models import InstructionSlot
+
+    _, instruction_threshold = get_surge_thresholds()
 
     accepted_count = (
         InstructionSlot.objects.filter(
@@ -2413,24 +2418,35 @@ def _check_surge_instructor_needed(assignment):
         .count()
     )
 
-    # If 3+ students and no surge instructor yet, notify
-    if accepted_count >= 3 and not assignment.surge_instructor:
-        # Only notify once
+    # If accepted students reach the configured threshold and no surge instructor yet, notify
+    if accepted_count >= instruction_threshold and not assignment.surge_instructor:
+        # Only notify once, and only mark surge_notified=True if the email
+        # was actually sent (prevents silently swallowing config errors)
         if not assignment.surge_notified:
-            _notify_surge_instructor_needed(assignment, accepted_count)
-            assignment.surge_notified = True
-            assignment.save(update_fields=["surge_notified"])
+            sent = _notify_surge_instructor_needed(assignment, accepted_count)
+            if sent:
+                assignment.surge_notified = True
+                assignment.save(update_fields=["surge_notified"])
 
 
 def _notify_surge_instructor_needed(assignment, student_count):
-    """Notify the instructors mailing list that a surge instructor is needed."""
+    """Notify the instructors mailing list that a surge instructor is needed.
+
+    Returns True if the email was sent successfully, False otherwise.
+    The caller should only set surge_notified=True when this returns True,
+    so a misconfigured email address doesn't permanently suppress future attempts.
+    """
     try:
         config = SiteConfiguration.objects.first()
-        instructor_email = getattr(config, "instructors_email", None)
+        instructor_email = config.instructors_email if config else ""
 
         if not instructor_email:
-            logger.warning("No instructor email configured in SiteConfiguration")
-            return
+            logger.warning(
+                "No instructors_email configured in SiteConfiguration; "
+                "surge instructor alert for %s suppressed",
+                assignment.date,
+            )
+            return False
 
         primary_instructor = assignment.instructor
         instructor_name = (
@@ -2446,15 +2462,17 @@ def _notify_surge_instructor_needed(assignment, student_count):
             f"Students signed up: {student_count}"
         )
 
-        send_mail(
+        sent_count = send_mail(
             subject,
             message,
             settings.DEFAULT_FROM_EMAIL,
             [instructor_email],
-            fail_silently=True,
+            fail_silently=False,
         )
+        return sent_count > 0
     except Exception:
         logger.exception("Failed to send surge instructor notification")
+        return False
 
 
 @active_member_required
