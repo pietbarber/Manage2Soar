@@ -198,17 +198,24 @@ def main():
         # Fallback: reverse-lookup via virtual aliases file with domain preference
         original_to = find_list_from_recipients(recipients, preferred_domain)
 
-    # If list detection failed entirely, reject cleanly rather than forwarding the
-    # message with an unverified From header.  Forwarding would cause SMTP2Go to
-    # reject with "550 From header sender domain not verified" for every recipient,
-    # which is worse than a clean bounce back to the original sender.
+    # If list detection failed entirely, this is a transactional email (e.g. password
+    # reset, notification) — not a mailing list message.  Pass it through to the
+    # reinject port without any header rewriting.  No From-rewrite is needed because
+    # the envelope sender domain is already the verified manage2soar.com address.
     if not original_to:
         sys.stderr.write(
             f"maillist-rewriter: Could not identify mailing list for "
-            f"recipients {recipients}; rejecting to prevent SMTP2Go rejection "
-            "of unverified sender domain (issue #652).\n"
+            f"recipients {recipients}; passing through without header rewriting "
+            "(transactional email — not a mailing list message).\n"
         )
-        sys.exit(os.EX_UNAVAILABLE)  # Postfix generates a clean bounce to the sender
+        try:
+            smtp = smtplib.SMTP('127.0.0.1', 10025)
+            smtp.sendmail(sender, recipients, original_msg)
+            smtp.quit()
+            sys.exit(0)
+        except smtplib.SMTPException as e:
+            sys.stderr.write(f"maillist-rewriter: SMTP passthrough failed: {e}\n")
+            sys.exit(os.EX_TEMPFAIL)
 
     # Rewrite if this is going to a mailing list
     if original_to and original_to.lower() in ALL_KNOWN_LISTS:
