@@ -11,7 +11,11 @@ this date, your help would be greatly appreciated.
 
 Please consider confirming your availability on the duty roster.
 
-Confirm Availability: {{ roster_url }}
+To volunteer as surge instructor right now, click here:
+  {{ volunteer_url }}
+
+To view the full duty roster:
+  {{ roster_url }}
 
 - Manage2Soar Automated Notification
   {{ club_name }}

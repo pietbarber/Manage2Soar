@@ -1,0 +1,13 @@
+✅ Surge Instructor Confirmed - {{ ops_date }}
+================================================================================
+
+Hi {{ primary_instructor.first_name|default:primary_instructor.username }},
+
+Great news! {{ surge_instructor.get_full_name|default:surge_instructor.username }}
+has volunteered to serve as surge instructor on {{ ops_date }}.
+
+You can view the updated duty roster here:
+  {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

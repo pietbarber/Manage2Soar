@@ -19,6 +19,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -40,6 +41,7 @@ from siteconfig.models import SiteConfiguration
 from siteconfig.utils import get_role_title
 from utils.email import send_mail
 from utils.email_helpers import get_absolute_club_logo_url
+from utils.url_helpers import build_absolute_url
 
 from .forms import DutyAssignmentForm, DutyPreferenceForm, DutyRosterMessageForm
 from .models import (
@@ -2503,6 +2505,97 @@ def request_surge_instructor(request, assignment_id):
     return redirect("duty_roster:instructor_requests")
 
 
+@active_member_required
+@never_cache
+def volunteer_as_surge_instructor(request, assignment_id):
+    """
+    Allow an instructor to volunteer as surge instructor for a day.
+
+    GET  – Shows a confirmation page with the date, primary instructor, and
+           student count so the volunteer can confirm before committing.
+    POST – Assigns the current user as surge_instructor on the DutyAssignment
+           and notifies the primary instructor by email.
+
+    Guards:
+    * User must be an instructor (member.instructor == True).
+    * If a surge instructor is already assigned the request is gracefully
+      rejected with an informational message regardless of who this user is.
+    """
+    from .models import InstructionSlot
+
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    member = request.user
+
+    if not member.instructor:
+        messages.error(
+            request,
+            "Only qualified instructors can volunteer as surge instructor.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # If a surge instructor is already assigned, tell the volunteer and bail out.
+    if assignment.surge_instructor_id:
+        if assignment.surge_instructor == member:
+            messages.info(
+                request,
+                "You are already the surge instructor for "
+                f"{assignment.date.strftime('%B %d, %Y')}.",
+            )
+        else:
+            messages.info(
+                request,
+                "A surge instructor has already been assigned for "
+                f"{assignment.date.strftime('%B %d, %Y')}. Thank you for your willingness!",
+            )
+        return redirect("duty_roster:duty_calendar")
+
+    # Count accepted students for display on the confirmation page.
+    accepted_count = (
+        InstructionSlot.objects.filter(
+            assignment=assignment,
+            instructor_response="accepted",
+        )
+        .exclude(status="cancelled")
+        .count()
+    )
+
+    if request.method == "POST":
+        # Re-check surge_instructor inside the POST path to guard against a
+        # race between two concurrent volunteers.
+        assignment.refresh_from_db()
+        if assignment.surge_instructor_id:
+            messages.info(
+                request,
+                "Someone just volunteered ahead of you for "
+                f"{assignment.date.strftime('%B %d, %Y')}. "
+                "Thank you for offering!",
+            )
+            return redirect("duty_roster:duty_calendar")
+
+        assignment.surge_instructor = member
+        assignment.save(update_fields=["surge_instructor"])
+
+        messages.success(
+            request,
+            f"You have been assigned as surge instructor for "
+            f"{assignment.date.strftime('%B %d, %Y')}. "
+            "The primary instructor has been notified.",
+        )
+
+        _notify_primary_instructor_surge_filled(assignment)
+        return redirect("duty_roster:duty_calendar")
+
+    # GET – render confirmation page
+    return render(
+        request,
+        "duty_roster/surge_volunteer_confirm.html",
+        {
+            "assignment": assignment,
+            "accepted_count": accepted_count,
+        },
+    )
+
+
 # =============================================================================
 # Instruction Notification Helpers
 # Note: Most instruction notifications are now handled via signals.py
@@ -2596,10 +2689,16 @@ def _notify_surge_instructor_needed(assignment, student_count):
         ops_date = assignment.date.strftime("%A, %B %d, %Y")
         subject = f"Surge Instructor Needed - {assignment.date.strftime('%B %d, %Y')}"
 
+        volunteer_url = build_absolute_url(
+            reverse("duty_roster:volunteer_surge_instructor", args=[assignment.id]),
+            canonical=email_config["site_url"],
+        )
+
         context = {
             "ops_date": ops_date,
             "student_count": student_count,
             "roster_url": email_config["roster_url"],
+            "volunteer_url": volunteer_url,
             "club_name": email_config["club_name"],
             "club_logo_url": get_absolute_club_logo_url(config),
         }
@@ -2622,6 +2721,68 @@ def _notify_surge_instructor_needed(assignment, student_count):
         return sent_count > 0
     except Exception:
         logger.exception("Failed to send surge instructor notification")
+        return False
+
+
+def _notify_primary_instructor_surge_filled(assignment):
+    """Notify the primary instructor that a surge instructor has volunteered.
+
+    Sends an HTML + plain-text email to the primary instructor so they know
+    who will be joining them on the day.
+
+    Returns True if the email was sent, False otherwise (errors are logged).
+    """
+    try:
+        primary = assignment.instructor
+        if not primary or not primary.email:
+            logger.warning(
+                "Primary instructor for assignment %s has no email; "
+                "surge-filled notification suppressed",
+                assignment.id,
+            )
+            return False
+
+        surge = assignment.surge_instructor
+        if not surge:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = (
+            f"Surge Instructor Confirmed - {assignment.date.strftime('%B %d, %Y')}"
+        )
+
+        context = {
+            "ops_date": ops_date,
+            "primary_instructor": primary,
+            "surge_instructor": surge,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_instructor_filled.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_instructor_filled.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [primary.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-filled notification to primary instructor"
+        )
         return False
 
 
