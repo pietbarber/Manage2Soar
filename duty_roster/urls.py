@@ -173,6 +173,11 @@ urlpatterns = [
         views.instructor_respond,
         name="instructor_respond",
     ),
+    path(
+        "instruction/request-surge/<int:assignment_id>/",
+        views.request_surge_instructor,
+        name="request_surge_instructor",
+    ),
     # Duty Swap URLs
     path(
         "swap/request/create/<int:year>/<int:month>/<int:day>/<str:role>/",

@@ -2443,6 +2443,57 @@ def instructor_respond(request, slot_id):
     return redirect("duty_roster:instructor_requests")
 
 
+@active_member_required
+@require_POST
+def request_surge_instructor(request, assignment_id):
+    """
+    Allow the primary instructor to manually request a surge instructor for their day.
+
+    Sends a notification to the instructors mailing list and marks the assignment
+    surge_notified=True.  The button is visible whenever the accepted student count
+    is high AND no surge instructor has yet been assigned.  Clicking it a second time
+    (re-send) is intentionally allowed so instructors can follow up if needed.
+    """
+    from .models import InstructionSlot
+
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+
+    # Only the primary instructor may trigger this; surge instructors cannot self-request
+    if assignment.instructor != request.user:
+        messages.error(
+            request,
+            "Only the primary instructor for this day can request a surge instructor.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    accepted_count = (
+        InstructionSlot.objects.filter(
+            assignment=assignment,
+            instructor_response="accepted",
+        )
+        .exclude(status="cancelled")
+        .count()
+    )
+
+    sent = _notify_surge_instructor_needed(assignment, accepted_count)
+    if sent:
+        assignment.surge_notified = True
+        assignment.save(update_fields=["surge_notified"])
+        messages.success(
+            request,
+            f"Surge instructor request sent for {assignment.date.strftime('%B %d, %Y')}. "
+            f"The instructors list has been notified.",
+        )
+    else:
+        messages.error(
+            request,
+            "Could not send surge instructor request. "
+            "Verify that an instructors e-mail address is configured in Site Configuration.",
+        )
+
+    return redirect("duty_roster:instructor_requests")
+
+
 # =============================================================================
 # Instruction Notification Helpers
 # Note: Most instruction notifications are now handled via signals.py
