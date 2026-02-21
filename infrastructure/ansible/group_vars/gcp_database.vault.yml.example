@@ -68,7 +68,7 @@ vault_django_secret_key: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 # ============================================================
 # BACKUP ENCRYPTION PASSPHRASE
 # ============================================================
-# Required when postgresql_backup_encryption_enabled: true (the default for production).
+# Required when postgresql_backup_encryption_enabled: true (strongly recommended for production).
 # Used for AES-256-CBC client-side encryption of backups before GCS upload.
 # CRITICAL: Must be at least 64 characters.  Store only in this vault - NEVER in plaintext.
 # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(54))"

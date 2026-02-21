@@ -9,6 +9,12 @@
 # Using group_vars/gcp_database/ (wrong name) will silently use role defaults
 # instead of your values -- GCS backup and encryption will be disabled!
 #
+# HOW VARIABLES ARE LOADED: Ansible automatically loads group_vars/gcp_database_servers/
+# for any play that targets hosts in the 'gcp_database_servers' inventory group.
+# The playbook also explicitly loads group_vars/gcp_provisioner/{vars,vault}.yml via
+# vars_files for provisioner credentials (GCP service account, etc.). Your database
+# backup/encryption settings must live in gcp_database_servers/ for auto-loading.
+#
 # For secrets (passwords, keys), use a separate vault.yml file.
 # See gcp_database.vault.yml.example for the vault template.
 
