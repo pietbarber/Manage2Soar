@@ -2573,12 +2573,16 @@ def _check_surge_instructor_needed(assignment):
 def _notify_surge_instructor_needed(assignment, student_count):
     """Notify the instructors mailing list that a surge instructor is needed.
 
+    Sends an HTML + plain-text multipart email using the
+    ``surge_instructor_alert.html`` / ``surge_instructor_alert.txt`` templates.
+
     Returns True if the email was sent successfully, False otherwise.
     The caller should only set surge_notified=True when this returns True,
     so a misconfigured email address doesn't permanently suppress future attempts.
     """
     try:
-        config = SiteConfiguration.objects.first()
+        email_config = get_email_config()
+        config = email_config["config"]
         instructor_email = config.instructors_email if config else ""
 
         if not instructor_email:
@@ -2589,26 +2593,31 @@ def _notify_surge_instructor_needed(assignment, student_count):
             )
             return False
 
-        primary_instructor = assignment.instructor
-        instructor_name = (
-            primary_instructor.full_display_name if primary_instructor else "Unknown"
-        )
-
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
         subject = f"Surge Instructor Needed - {assignment.date.strftime('%B %d, %Y')}"
-        message = (
-            f"Instructor {instructor_name} has {student_count} students signed up for "
-            f"{assignment.date.strftime('%A, %B %d, %Y')} and needs assistance.\n\n"
-            f"If you are available to provide instruction on this day, please contact "
-            f"{instructor_name} or update your availability in Manage2Soar.\n\n"
-            f"Students signed up: {student_count}"
+
+        context = {
+            "ops_date": ops_date,
+            "student_count": student_count,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_instructor_alert.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_instructor_alert.txt", context
         )
 
         sent_count = send_mail(
             subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
+            text_message,
+            email_config["from_email"],
             [instructor_email],
             fail_silently=False,
+            html_message=html_message,
         )
         return sent_count > 0
     except Exception:
