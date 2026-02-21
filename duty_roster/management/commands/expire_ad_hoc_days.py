@@ -13,7 +13,9 @@ from utils.management.commands.base_cronjob import BaseCronJobCommand
 class Command(BaseCronJobCommand):
     help = "Cancel unconfirmed ad-hoc ops days whose deadline has passed (runs at 3 AM UTC = 10 PM EST / 11 PM EDT)"
     job_name = "expire_ad_hoc_days"
-    max_execution_time = timedelta(minutes=10)  # This is a quick operation
+    max_execution_time = timedelta(
+        minutes=5
+    )  # Matches K8s CronJob activeDeadlineSeconds=300
 
     def execute_job(self, *args, **options):
         # Run at 3 AM UTC (10 PM EST / 11 PM EDT).  We expire ad-hoc days

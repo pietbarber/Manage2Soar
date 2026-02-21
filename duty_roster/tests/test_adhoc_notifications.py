@@ -85,10 +85,53 @@ class TestNotifyOpsStatusRecipients(TestCase):
         # so no email at all should be sent once a tow pilot is assigned.
         mock_send.assert_not_called()
 
+    @override_settings(MEMBERS_MAILING_LIST="members@example.com")
+    @patch("duty_roster.utils.email.send_mail")
+    def test_rescind_to_empty_crew_does_not_resend_proposal(self, mock_send):
+        """After the last crew member rescinds, notify_ops_status with is_rescind=True
+        must NOT re-send the original proposal email (issue #654 duplicate fix)."""
+        notify_ops_status(self.assignment, is_rescind=True)
+        mock_send.assert_not_called()
+
+
+class TestProposeAdHocDayDeduplication(TestCase):
+    """Proposing an ad-hoc day that already exists must not send a second proposal email."""
+
+    def setUp(self):
+        _make_site_config()
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.member = User.objects.create_user(
+            username="proposer",
+            email="proposer@example.com",
+            password="testpass",
+            membership_status="Full Member",
+        )
+        # A future date to satisfy the "must be in the future" guard in the view
+        self.future = now().date() + timedelta(days=3)
+
+    @override_settings(MEMBERS_MAILING_LIST="members@example.com")
+    @patch("duty_roster.utils.email.send_mail")
+    def test_second_propose_click_does_not_send_duplicate_email(self, mock_send):
+        """POSTing calendar_ad_hoc_confirm twice for the same date must send
+        exactly one proposal email, not two (issue #654)."""
+        self.client.force_login(self.member)
+        url = f"/duty_roster/calendar/ad-hoc/confirm/{self.future.year}/{self.future.month}/{self.future.day}/"
+
+        self.client.post(url)
+        self.client.post(url)  # Second click — day already exists
+
+        self.assertEqual(
+            mock_send.call_count,
+            1,
+            "Proposal email must be sent exactly once even if the same date is proposed twice.",
+        )
+
 
 class TestExpireAdHocDaysDeadline(TestCase):
     """expire_ad_hoc_days should expire TODAY's unconfirmed ad-hoc days (runs
-    at 3 AM UTC = 10 PM EST), not tomorrow's."""
+    at 3 AM UTC = 10 PM EST / 11 PM EDT), not tomorrow's."""
 
     def setUp(self):
         _make_site_config()
