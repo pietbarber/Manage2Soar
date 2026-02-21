@@ -74,8 +74,8 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
         "duty_roster:request_surge_instructor",
         kwargs={"assignment_id": assignment.id},
     )
-    with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
-        mock_email_cls.return_value.send.return_value = 1
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
         response = client.post(url)
 
     assert response.status_code == 302
@@ -83,15 +83,14 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
 
     assignment.refresh_from_db()
     assert assignment.surge_notified is True
-    mock_email_cls.assert_called_once()
-    mock_email_cls.return_value.send.assert_called_once_with(fail_silently=False)
-    # Verify the HTML alternative was attached (guards against regression to text-only)
-    mock_email_cls.return_value.attach_alternative.assert_called_once()
-    attached_content, attached_mime = (
-        mock_email_cls.return_value.attach_alternative.call_args[0]
-    )
-    assert attached_mime == "text/html"
-    assert "<html" in attached_content.lower()
+    mock_send.assert_called_once()
+    call_kwargs = mock_send.call_args
+    # Verify the HTML alternative was passed (guards against regression to text-only)
+    assert call_kwargs.kwargs.get("html_message") or (
+        len(call_kwargs.args) > 4 and call_kwargs.args[4] is not None
+    ), "html_message must be passed to send_mail"
+    html_content = call_kwargs.kwargs.get("html_message", "")
+    assert "<html" in html_content.lower()
 
 
 @pytest.mark.django_db
@@ -109,9 +108,9 @@ def test_surge_instructor_cannot_send_surge_request(client, django_user_model):
         "duty_roster:request_surge_instructor",
         kwargs={"assignment_id": assignment.id},
     )
-    with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
+    with patch("duty_roster.views.send_mail") as mock_send:
         response = client.post(url)
-        mock_email_cls.assert_not_called()
+        mock_send.assert_not_called()
 
     assert response.status_code == 403
     assignment.refresh_from_db()
@@ -131,9 +130,9 @@ def test_unrelated_member_cannot_send_surge_request(client, django_user_model):
         "duty_roster:request_surge_instructor",
         kwargs={"assignment_id": assignment.id},
     )
-    with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
+    with patch("duty_roster.views.send_mail") as mock_send:
         response = client.post(url)
-        mock_email_cls.assert_not_called()
+        mock_send.assert_not_called()
 
     assert response.status_code == 403
     assignment.refresh_from_db()
@@ -193,18 +192,14 @@ def test_resend_surge_request_sends_email_even_when_already_notified(
         "duty_roster:request_surge_instructor",
         kwargs={"assignment_id": assignment.id},
     )
-    with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
-        mock_email_cls.return_value.send.return_value = 1
+    with patch("duty_roster.views.send_mail") as mock_send:
+        mock_send.return_value = 1
         response = client.post(url)
-        mock_email_cls.assert_called_once()
-        mock_email_cls.return_value.send.assert_called_once_with(fail_silently=False)
-        # Verify the HTML alternative was attached (guards against regression to text-only)
-        mock_email_cls.return_value.attach_alternative.assert_called_once()
-        attached_content, attached_mime = (
-            mock_email_cls.return_value.attach_alternative.call_args[0]
-        )
-        assert attached_mime == "text/html"
-        assert "<html" in attached_content.lower()
+        mock_send.assert_called_once()
+        call_kwargs = mock_send.call_args
+        # Verify the HTML alternative was passed (guards against regression to text-only)
+        html_content = call_kwargs.kwargs.get("html_message", "")
+        assert "<html" in html_content.lower()
 
     assert response.status_code == 302
 
@@ -406,9 +401,9 @@ def test_surge_request_blocked_when_surge_instructor_already_assigned(
         "duty_roster:request_surge_instructor",
         kwargs={"assignment_id": assignment.id},
     )
-    with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
+    with patch("duty_roster.views.send_mail") as mock_send:
         response = client.post(url)
-        mock_email_cls.assert_not_called()
+        mock_send.assert_not_called()
 
     assert response.status_code == 302
     assert response["Location"].endswith(reverse("duty_roster:instructor_requests"))

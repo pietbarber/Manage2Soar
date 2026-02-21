@@ -2612,14 +2612,14 @@ def _notify_surge_instructor_needed(assignment, student_count):
             "duty_roster/emails/surge_instructor_alert.txt", context
         )
 
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=text_message,
-            from_email=email_config["from_email"],
-            to=[instructor_email],
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [instructor_email],
+            fail_silently=False,
+            html_message=html_message,
         )
-        email.attach_alternative(html_message, "text/html")
-        sent_count = email.send(fail_silently=False)
         return sent_count > 0
     except Exception:
         logger.exception("Failed to send surge instructor notification")
