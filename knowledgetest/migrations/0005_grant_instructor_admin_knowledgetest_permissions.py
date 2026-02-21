@@ -70,7 +70,8 @@ def grant_instructor_permissions(apps, schema_editor):
             # Permission may not exist yet on very old schema versions; skip.
             pass
 
-    group.permissions.add(*perms_to_add)
+    if perms_to_add:
+        group.permissions.add(*perms_to_add)
 
 
 def revoke_instructor_permissions(apps, schema_editor):
@@ -92,7 +93,8 @@ def revoke_instructor_permissions(apps, schema_editor):
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             pass
 
-    group.permissions.remove(*perms_to_remove)
+    if perms_to_remove:
+        group.permissions.remove(*perms_to_remove)
 
 
 class Migration(migrations.Migration):
