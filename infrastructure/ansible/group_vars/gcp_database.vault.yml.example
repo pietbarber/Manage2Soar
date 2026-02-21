@@ -66,6 +66,20 @@ vault_postgresql_password_masa: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 vault_django_secret_key: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 
 # ============================================================
+# BACKUP ENCRYPTION PASSPHRASE
+# ============================================================
+# Required when postgresql_backup_encryption_enabled: true (strongly recommended for production).
+# Used for AES-256-CBC client-side encryption of backups before GCS upload.
+# CRITICAL: Must be at least 64 characters.  Store only in this vault - NEVER in plaintext.
+# Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(54))"
+# (54 bytes of randomness encodes to ~72 URL-safe base64 characters, exceeding the 64-char minimum.)
+#
+# WARNING: Losing this passphrase means encrypted backups cannot be decrypted.
+# Store a copy in a separate secrets manager (e.g. GCP Secret Manager, 1Password).
+
+vault_postgresql_backup_passphrase: "CHANGE_ME_GENERATE_72_CHAR_RANDOM_STRING_MINIMUM_64_CHARS_REQUIRED"
+
+# ============================================================
 # OPTIONAL: SMTP CREDENTIALS
 # ============================================================
 # For external SMTP relay (SendGrid, SMTP2GO, etc.)
