@@ -49,12 +49,13 @@ INSTRUCTOR_ADMIN_PERMISSIONS = [
 
 
 def grant_instructor_permissions(apps, schema_editor):
+    db_alias = schema_editor.connection.alias
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
 
     try:
-        group = Group.objects.get(name="Instructor Admins")
+        group = Group.objects.using(db_alias).get(name="Instructor Admins")
     except Group.DoesNotExist:
         # Group hasn't been created yet (fresh install); _sync_groups will handle
         # it when the first instructor account is saved.
@@ -63,38 +64,43 @@ def grant_instructor_permissions(apps, schema_editor):
     perms_to_add = []
     for app_label, model_name, codename in INSTRUCTOR_ADMIN_PERMISSIONS:
         try:
-            ct = ContentType.objects.get(app_label=app_label, model=model_name)
-            perm = Permission.objects.get(content_type=ct, codename=codename)
+            ct = ContentType.objects.using(db_alias).get(
+                app_label=app_label, model=model_name)
+            perm = Permission.objects.using(db_alias).get(
+                content_type=ct, codename=codename)
             perms_to_add.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             # Permission may not exist yet on very old schema versions; skip.
             pass
 
     if perms_to_add:
-        group.permissions.add(*perms_to_add)
+        group.permissions.db_manager(db_alias).add(*perms_to_add)
 
 
 def revoke_instructor_permissions(apps, schema_editor):
+    db_alias = schema_editor.connection.alias
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
 
     try:
-        group = Group.objects.get(name="Instructor Admins")
+        group = Group.objects.using(db_alias).get(name="Instructor Admins")
     except Group.DoesNotExist:
         return
 
     perms_to_remove = []
     for app_label, model_name, codename in INSTRUCTOR_ADMIN_PERMISSIONS:
         try:
-            ct = ContentType.objects.get(app_label=app_label, model=model_name)
-            perm = Permission.objects.get(content_type=ct, codename=codename)
+            ct = ContentType.objects.using(db_alias).get(
+                app_label=app_label, model=model_name)
+            perm = Permission.objects.using(db_alias).get(
+                content_type=ct, codename=codename)
             perms_to_remove.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             pass
 
     if perms_to_remove:
-        group.permissions.remove(*perms_to_remove)
+        group.permissions.db_manager(db_alias).remove(*perms_to_remove)
 
 
 class Migration(migrations.Migration):

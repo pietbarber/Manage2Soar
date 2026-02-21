@@ -388,7 +388,7 @@ GROUP_PERMISSIONS = {
 }
 
 
-def _resolve_permissions(Permission, ContentType, perm_tuples):
+def _resolve_permissions(Permission, ContentType, perm_tuples, db_alias="default"):
     """Return a list of Permission objects for the given (app, model, codename) tuples.
 
     Silently skips any permission/content-type that doesn't exist yet, so this
@@ -397,8 +397,10 @@ def _resolve_permissions(Permission, ContentType, perm_tuples):
     resolved = []
     for app_label, model_name, codename in perm_tuples:
         try:
-            ct = ContentType.objects.get(app_label=app_label, model=model_name)
-            perm = Permission.objects.get(content_type=ct, codename=codename)
+            ct = ContentType.objects.using(db_alias).get(
+                app_label=app_label, model=model_name)
+            perm = Permission.objects.using(db_alias).get(
+                content_type=ct, codename=codename)
             resolved.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             pass
@@ -406,35 +408,39 @@ def _resolve_permissions(Permission, ContentType, perm_tuples):
 
 
 def setup_groups(apps, schema_editor):
-    # On a fresh install, ContentType and Permission rows are normally created
-    # by Django's post_migrate signal, which fires *after* all migrations finish.
-    # Calling create_contenttypes/create_permissions here ensures those rows exist
-    # before we try to look them up, making this migration safe on a first-ever
-    # `manage.py migrate`.
     import warnings
-    from django.apps import apps as registry
-    from django.contrib.auth.management import create_permissions as _create_permissions
-    from django.contrib.contenttypes.management import create_contenttypes
 
-    referenced_labels = {
-        t[0] for perm_tuples in GROUP_PERMISSIONS.values() for t in perm_tuples
-    }
-    for app_label in referenced_labels:
-        try:
-            app_config = registry.get_app_config(app_label)
-            create_contenttypes(app_config, verbosity=0)
-            _create_permissions(app_config, verbosity=0)
-        except LookupError:
-            pass  # app not installed in this deployment
-
-    Group = apps.get_model("auth", "Group")
+    db_alias = schema_editor.connection.alias
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
+    Group = apps.get_model("auth", "Group")
+
+    # On a fresh install, ContentType and Permission rows are normally created by
+    # Django's post_migrate signal, which fires *after* all migrations finish.
+    # Explicitly create only the specific rows we need, using the historical migration
+    # state (apps.get_model) to avoid relying on the global app registry, which may
+    # not reflect the migration graph at this point.
+    for perm_tuples in GROUP_PERMISSIONS.values():
+        for app_label, model_name, codename in perm_tuples:
+            ct, _ = ContentType.objects.using(db_alias).get_or_create(
+                app_label=app_label,
+                model=model_name,
+            )
+            if "_" in codename:
+                _, action_rest = codename.split("_", 1)
+                perm_name = f"Can {action_rest.replace('_', ' ')}"
+            else:
+                perm_name = codename
+            Permission.objects.using(db_alias).get_or_create(
+                content_type=ct,
+                codename=codename,
+                defaults={"name": perm_name},
+            )
 
     for group_name, perm_tuples in GROUP_PERMISSIONS.items():
-        group, _ = Group.objects.get_or_create(name=group_name)
+        group, _ = Group.objects.using(db_alias).get_or_create(name=group_name)
         if perm_tuples:
-            perms = _resolve_permissions(Permission, ContentType, perm_tuples)
+            perms = _resolve_permissions(Permission, ContentType, perm_tuples, db_alias)
             if len(perms) < len(perm_tuples):
                 warnings.warn(
                     f"setup_groups: {len(perm_tuples) - len(perms)} permission(s) for "
@@ -443,29 +449,17 @@ def setup_groups(apps, schema_editor):
                     stacklevel=2,
                 )
             if perms:
-                group.permissions.add(*perms)
+                group.permissions.db_manager(db_alias).add(*perms)
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        # members app: latest migration (defines Badge, Member, Biography, MemberBadge)
+        # Only the previous members migration is required; ContentType and Permission
+        # rows for referenced models in other apps are created on-demand inside
+        # setup_groups, so pinning every app's latest migration is unnecessary and
+        # would cause migration-graph conflicts when those apps add new migrations.
         ("members", "0020_add_parent_badge_to_badge"),
-        # duty_roster app: latest migration (defines all duty roster models incl. GliderReservation)
-        ("duty_roster", "0008_add_singleton_constraint"),
-        # cms app: latest migration (defines Page, Document, HomepageContent, etc.)
-        ("cms", "0017_alter_pagememberpermission_member"),
-        # siteconfig app: latest migration (defines SiteConfiguration, ChargeableItem, MailingList, MembershipStatus)
-        ("siteconfig", "0033_enable_instruction_window_for_existing_rows"),
-        # logsheet app: latest migration (defines all flight/glider/logsheet models)
-        (
-            "logsheet",
-            "0018_maintenancedeadline_maintenance_deadline_must_have_aircraft",
-        ),
-        # instructors app: latest migration (defines TrainingPhase, TrainingLesson, SyllabusDocument)
-        ("instructors", "0004_add_sort_key_to_traininglesson"),
-        # knowledgetest app: latest migration (defines Question, QuestionCategory, TestPreset, WrittenTest*)
-        ("knowledgetest", "0005_grant_instructor_admin_knowledgetest_permissions"),
     ]
 
     operations = [
