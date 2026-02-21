@@ -422,15 +422,22 @@ def setup_groups(apps, schema_editor):
     # Explicitly create only the specific rows we need, using the historical migration
     # state (apps.get_model) to avoid relying on the global app registry, which may
     # not reflect the migration graph at this point.
+    # We only create rows for models that are registered in the current migration
+    # state; this prevents orphaned ContentType/Permission entries for typos or
+    # models that no longer exist.
     for perm_tuples in GROUP_PERMISSIONS.values():
         for app_label, model_name, codename in perm_tuples:
+            try:
+                apps.get_model(app_label, model_name)
+            except LookupError:
+                continue
             ct, _ = ContentType.objects.using(db_alias).get_or_create(
                 app_label=app_label,
                 model=model_name,
             )
             if "_" in codename:
-                _, action_rest = codename.split("_", 1)
-                perm_name = f"Can {action_rest.replace('_', ' ')}"
+                action, model_part = codename.split("_", 1)
+                perm_name = f"Can {action} {model_part.replace('_', ' ')}"
             else:
                 perm_name = codename
             Permission.objects.using(db_alias).get_or_create(
