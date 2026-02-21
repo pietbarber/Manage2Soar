@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 
 from members.models import Member
 from members.utils import can_view_personal_info
@@ -42,5 +43,7 @@ def test_can_view_personal_info_group_exempt(settings):
         username="subj3", email="s3@example.com", redact_contact=True
     )
     viewer = Member.objects.create(username="wm", email="wm@example.com")
-    gp = viewer.groups.create(name="Webmasters")
+    # Migration 0021 may have already created this group; use get_or_create to be safe.
+    gp, _ = Group.objects.get_or_create(name="Webmasters")
+    viewer.groups.add(gp)
     assert can_view_personal_info(viewer, subj)
