@@ -464,11 +464,17 @@ def setup_groups(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        # Only the previous members migration is required; ContentType and Permission
-        # rows for referenced models in other apps are created on-demand inside
-        # setup_groups, so pinning every app's latest migration is unnecessary and
-        # would cause migration-graph conflicts when those apps add new migrations.
+        # Ensure all apps whose models are referenced in GROUP_PERMISSIONS have
+        # their initial migrations applied first, so permission rows for every
+        # model exist when setup_groups runs (avoids incomplete groups on partial
+        # migration plans such as `manage.py migrate members`).
         ("members", "0020_add_parent_badge_to_badge"),
+        ("cms", "0001_initial"),
+        ("siteconfig", "0001_initial"),
+        ("logsheet", "0001_initial"),
+        ("duty_roster", "0001_initial"),
+        ("instructors", "0001_initial"),
+        ("knowledgetest", "0001_initial"),
     ]
 
     operations = [

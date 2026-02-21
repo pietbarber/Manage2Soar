@@ -17,14 +17,16 @@ from django.contrib.contenttypes.models import ContentType
 
 
 def _has_perm(group_name, app_label, model_name, codename):
-    """Return True if the named group has the given permission."""
-    try:
-        ct = ContentType.objects.get(app_label=app_label, model=model_name)
-        perm = Permission.objects.get(content_type=ct, codename=codename)
-        group = Group.objects.get(name=group_name)
-        return group.permissions.filter(pk=perm.pk).exists()
-    except (ContentType.DoesNotExist, Permission.DoesNotExist, Group.DoesNotExist):
-        return False
+    """Return True if the named group has the given permission.
+
+    Intentionally lets DoesNotExist errors bubble up so tests fail loudly on
+    missing ContentType/Permission rows or codename/model typos, rather than
+    silently returning False and masking broken permission creation.
+    """
+    ct = ContentType.objects.get(app_label=app_label, model=model_name)
+    perm = Permission.objects.get(content_type=ct, codename=codename)
+    group = Group.objects.get(name=group_name)
+    return group.permissions.filter(pk=perm.pk).exists()
 
 
 # ---------------------------------------------------------------------------
