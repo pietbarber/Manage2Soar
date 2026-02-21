@@ -406,38 +406,44 @@ def _resolve_permissions(Permission, ContentType, perm_tuples):
 
 
 def setup_groups(apps, schema_editor):
+    # On a fresh install, ContentType and Permission rows are normally created
+    # by Django's post_migrate signal, which fires *after* all migrations finish.
+    # Calling create_contenttypes/create_permissions here ensures those rows exist
+    # before we try to look them up, making this migration safe on a first-ever
+    # `manage.py migrate`.
+    import warnings
+    from django.apps import apps as registry
+    from django.contrib.auth.management import create_permissions as _create_permissions
+    from django.contrib.contenttypes.management import create_contenttypes
+
+    referenced_labels = {
+        t[0] for perm_tuples in GROUP_PERMISSIONS.values() for t in perm_tuples
+    }
+    for app_label in referenced_labels:
+        try:
+            app_config = registry.get_app_config(app_label)
+            create_contenttypes(app_config, verbosity=0)
+            _create_permissions(app_config, verbosity=0)
+        except LookupError:
+            pass  # app not installed in this deployment
+
     Group = apps.get_model("auth", "Group")
     Permission = apps.get_model("auth", "Permission")
     ContentType = apps.get_model("contenttypes", "ContentType")
 
     for group_name, perm_tuples in GROUP_PERMISSIONS.items():
-        group, created = Group.objects.get_or_create(name=group_name)
+        group, _ = Group.objects.get_or_create(name=group_name)
         if perm_tuples:
             perms = _resolve_permissions(Permission, ContentType, perm_tuples)
+            if len(perms) < len(perm_tuples):
+                warnings.warn(
+                    f"setup_groups: {len(perm_tuples) - len(perms)} permission(s) for "
+                    f"group '{group_name}' could not be resolved – check "
+                    f"GROUP_PERMISSIONS for typos.",
+                    stacklevel=2,
+                )
             if perms:
                 group.permissions.add(*perms)
-
-
-def teardown_groups(apps, schema_editor):
-    """Reverse migration: remove the permissions we added (don't delete groups).
-
-    Groups are not deleted because they may have members assigned to them, and
-    they are re-created by Member._sync_groups on next save anyway.  We only
-    remove the permissions this migration granted, leaving any extras untouched.
-    """
-    Group = apps.get_model("auth", "Group")
-    Permission = apps.get_model("auth", "Permission")
-    ContentType = apps.get_model("contenttypes", "ContentType")
-
-    for group_name, perm_tuples in GROUP_PERMISSIONS.items():
-        try:
-            group = Group.objects.get(name=group_name)
-        except Group.DoesNotExist:
-            continue
-        if perm_tuples:
-            perms = _resolve_permissions(Permission, ContentType, perm_tuples)
-            if perms:
-                group.permissions.remove(*perms)
 
 
 class Migration(migrations.Migration):
@@ -463,5 +469,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(setup_groups, teardown_groups),
+        # noop reverse: we cannot safely identify which permissions pre-existed,
+        # so rolling back would be potentially destructive.
+        migrations.RunPython(setup_groups, migrations.RunPython.noop),
     ]

@@ -10,7 +10,7 @@ need to do their job.
 
 Granted permissions:
   - testpreset           : add, change, delete, view  (instructors manage presets)
-  - writtentemplate      : add, change, delete, view  (instructors manage templates)
+  - writtentesttemplate  : add, change, delete, view  (instructors manage templates)
   - writtentestattempt   : view only (read-only admin; student records)
   - writtentestanswer    : view only (read-only admin; student records)
   - writtentesttemplatequestion : add, change, delete, view (inline on template)
