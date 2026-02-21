@@ -69,7 +69,7 @@ def test_instructor_admins_has_instructors_permissions():
 
 @pytest.mark.django_db
 def test_instructor_admins_has_knowledgetest_permissions():
-    """Permissions added in knowledgetest migration 0005 must also be present."""
+    """Permissions for knowledgetest models (TestPreset, WrittenTest*) must be present."""
     assert _has_perm(
         "Instructor Admins", "knowledgetest", "testpreset", "add_testpreset"
     )
