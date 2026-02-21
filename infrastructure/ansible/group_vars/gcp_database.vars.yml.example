@@ -1,11 +1,13 @@
 # GCP Database Server Variables
 #
 # COPY THIS FILE AND FILL IN YOUR VALUES:
-#   mkdir -p group_vars/gcp_provisioner
-#   cp group_vars/gcp_database.vars.yml.example group_vars/gcp_provisioner/vars.yml
+#   mkdir -p group_vars/gcp_database_servers
+#   cp group_vars/gcp_database.vars.yml.example group_vars/gcp_database_servers/vars.yml
 #
-# NOTE: Use group_vars/gcp_provisioner/ to match the playbook's vars_files paths.
-# This file is gitignored when placed in group_vars/gcp_provisioner/
+# IMPORTANT: The directory MUST be named group_vars/gcp_database_servers/ to match
+# the inventory group 'gcp_database_servers' in inventory/gcp_database.yml.
+# Using group_vars/gcp_database/ (wrong name) will silently use role defaults
+# instead of your values -- GCS backup and encryption will be disabled!
 #
 # For secrets (passwords, keys), use a separate vault.yml file.
 # See gcp_database.vault.yml.example for the vault template.
@@ -160,6 +162,13 @@ postgresql_tenants:
 
 postgresql_backup_enabled: true
 postgresql_backup_retention_days: 7
+
+# CRITICAL: These must be explicitly set to true - role defaults are false!
+# Leaving these out causes the backup script to be deployed WITHOUT GCS upload
+# or encryption, even if the GCS bucket and passphrase are correctly configured.
+postgresql_backup_gcs_enabled: true
+postgresql_backup_gcs_bucket: "m2s-database-backups-manage2soar"
+postgresql_backup_encryption_enabled: true
 
 # ============================================================
 # MEMORY TUNING

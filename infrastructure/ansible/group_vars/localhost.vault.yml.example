@@ -85,6 +85,13 @@ vault_postgresql_password_ssc: "REPLACE-WITH-SSC-DATABASE-PASSWORD"
 vault_postgresql_password_masa: "REPLACE-WITH-MASA-DATABASE-PASSWORD"
 # vault_postgresql_password_nfss: "nfss-database-password-32-chars"
 
+# Backup encryption passphrase (AES-256-CBC, client-side, required when
+# postgresql_backup_encryption_enabled: true).  Must be 64+ characters.
+# Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(54))"
+# WARNING: Store a copy in a separate secrets manager - losing this means
+#          encrypted backups cannot be restored.
+vault_postgresql_backup_passphrase: "REPLACE-WITH-72-CHAR-RANDOM-PASSPHRASE-MINIMUM-64-CHARS"
+
 # ============================================================
 # MAIL CREDENTIALS
 # ============================================================

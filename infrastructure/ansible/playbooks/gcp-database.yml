@@ -184,6 +184,15 @@
     - ../group_vars/gcp_provisioner/vault.yml
 
   pre_tasks:
+    # Ansible 2.18+ resolves task arg templates (e.g. {{ ansible_distribution_release }})
+    # during a "finalization" phase that runs before role tasks execute.  When using
+    # --tags to run a subset of tasks, play-level gather_facts may not have injected
+    # OS facts yet by the time finalization runs.  An explicit setup task tagged
+    # 'always' guarantees facts are available regardless of tag filtering.
+    - name: Gather OS facts
+      ansible.builtin.setup:
+      tags: [always]
+
     - name: Validate required variables
       ansible.builtin.assert:
         that:
