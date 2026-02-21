@@ -143,3 +143,56 @@ def test_secretary_group_exists_with_no_permissions():
 def test_treasurer_group_exists_with_no_permissions():
     group = Group.objects.get(name="Treasurer")
     assert group.permissions.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Member Managers representative permissions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_member_managers_has_member_crud_permissions():
+    assert _has_perm("Member Managers", "members", "member", "add_member")
+    assert _has_perm("Member Managers", "members", "member", "change_member")
+    assert _has_perm("Member Managers", "members", "member", "delete_member")
+    assert _has_perm("Member Managers", "members", "member", "view_member")
+
+
+@pytest.mark.django_db
+def test_member_managers_has_cms_sitefeedback_permissions():
+    assert _has_perm("Member Managers", "cms", "sitefeedback", "add_sitefeedback")
+    assert _has_perm("Member Managers", "cms", "sitefeedback", "view_sitefeedback")
+
+
+@pytest.mark.django_db
+def test_member_managers_has_view_only_badge_permission():
+    """Member Managers can view the badge catalogue but not create/edit badges."""
+    assert _has_perm("Member Managers", "members", "badge", "view_badge")
+    assert not _has_perm("Member Managers", "members", "badge", "add_badge")
+    assert not _has_perm("Member Managers", "members", "badge", "delete_badge")
+
+
+# ---------------------------------------------------------------------------
+# Rostermeisters representative permissions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_rostermeisters_has_duty_assignment_permissions():
+    assert _has_perm(
+        "Rostermeisters", "duty_roster", "dutyassignment", "add_dutyassignment"
+    )
+    assert _has_perm(
+        "Rostermeisters", "duty_roster", "dutyassignment", "change_dutyassignment"
+    )
+    assert _has_perm(
+        "Rostermeisters", "duty_roster", "dutyassignment", "view_dutyassignment"
+    )
+
+
+@pytest.mark.django_db
+def test_rostermeisters_has_view_only_member_permission():
+    """Rostermeisters can look up members but cannot create or delete them."""
+    assert _has_perm("Rostermeisters", "members", "member", "view_member")
+    assert not _has_perm("Rostermeisters", "members", "member", "add_member")
+    assert not _has_perm("Rostermeisters", "members", "member", "delete_member")

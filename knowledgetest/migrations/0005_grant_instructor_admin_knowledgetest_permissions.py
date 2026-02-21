@@ -23,8 +23,8 @@ INSTRUCTOR_ADMIN_PERMISSIONS = [
     ("knowledgetest", "testpreset", "change_testpreset"),
     ("knowledgetest", "testpreset", "delete_testpreset"),
     ("knowledgetest", "testpreset", "view_testpreset"),
-    ("knowledgetest", "writtentestattempt", "view_writtentestattempt"),
     ("knowledgetest", "writtentestanswer", "view_writtentestanswer"),
+    ("knowledgetest", "writtentestattempt", "view_writtentestattempt"),
     ("knowledgetest", "writtentesttemplate", "add_writtentesttemplate"),
     ("knowledgetest", "writtentesttemplate", "change_writtentesttemplate"),
     ("knowledgetest", "writtentesttemplate", "delete_writtentesttemplate"),
@@ -57,17 +57,19 @@ def grant_instructor_permissions(apps, schema_editor):
     try:
         group = Group.objects.using(db_alias).get(name="Instructor Admins")
     except Group.DoesNotExist:
-        # Group hasn't been created yet (fresh install); _sync_groups will handle
-        # it when the first instructor account is saved.
+        # Group hasn't been created yet (fresh install); members/0021 will create
+        # it with all permissions during the migration run.
         return
 
     perms_to_add = []
     for app_label, model_name, codename in INSTRUCTOR_ADMIN_PERMISSIONS:
         try:
             ct = ContentType.objects.using(db_alias).get(
-                app_label=app_label, model=model_name)
+                app_label=app_label, model=model_name
+            )
             perm = Permission.objects.using(db_alias).get(
-                content_type=ct, codename=codename)
+                content_type=ct, codename=codename
+            )
             perms_to_add.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             # Permission may not exist yet on very old schema versions; skip.
@@ -92,9 +94,11 @@ def revoke_instructor_permissions(apps, schema_editor):
     for app_label, model_name, codename in INSTRUCTOR_ADMIN_PERMISSIONS:
         try:
             ct = ContentType.objects.using(db_alias).get(
-                app_label=app_label, model=model_name)
+                app_label=app_label, model=model_name
+            )
             perm = Permission.objects.using(db_alias).get(
-                content_type=ct, codename=codename)
+                content_type=ct, codename=codename
+            )
             perms_to_remove.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             pass
