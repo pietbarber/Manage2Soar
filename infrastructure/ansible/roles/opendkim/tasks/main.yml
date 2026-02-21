@@ -87,6 +87,9 @@
     mode: "0600"
   loop: "{{ club_key_files_check.results }}"
   when: not item.stat.exists
+  # In --check mode opendkim-genkey is skipped so the file doesn't exist yet;
+  # ignore the absent-file error rather than failing the dry run.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 # ============================================================
 # Additional Domains (beyond club_domains pattern)
@@ -151,6 +154,9 @@
     mode: "0600"
   loop: "{{ additional_key_files_check.results }}"
   when: not item.stat.exists
+  # In --check mode opendkim-genkey is skipped so the file doesn't exist yet;
+  # ignore the absent-file error rather than failing the dry run.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 # ============================================================
 # GCS Backup (Optional - requires gcs_backup_bucket variable)

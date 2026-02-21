@@ -879,7 +879,11 @@ def calendar_ad_hoc_confirm(request, year, month, day):
             "is_confirmed": False,
         },
     )
-    notify_ops_status(assignment)
+    # Only send the proposal email when the day is genuinely new.
+    # If the day already existed (e.g. a second "Propose" click), skip
+    # to avoid sending a duplicate proposal (issue #654).
+    if created:
+        notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -1046,7 +1050,7 @@ def calendar_tow_rescind(request, year, month, day):
         assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
         assignment.save()
 
-    notify_ops_status(assignment)
+    notify_ops_status(assignment, is_rescind=True)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -1080,7 +1084,7 @@ def calendar_instructor_rescind(request, year, month, day):
         assignment.instructor = None
         assignment.save()
 
-    notify_ops_status(assignment)
+    notify_ops_status(assignment, is_rescind=True)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -1116,7 +1120,7 @@ def calendar_dutyofficer_rescind(request, year, month, day):
         assignment.is_confirmed = bool(assignment.tow_pilot and assignment.duty_officer)
         assignment.save()
 
-    notify_ops_status(assignment)
+    notify_ops_status(assignment, is_rescind=True)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
@@ -1153,7 +1157,7 @@ def calendar_ado_rescind(request, year, month, day):
         assignment.assistant_duty_officer = None
         assignment.save()
 
-    notify_ops_status(assignment)
+    notify_ops_status(assignment, is_rescind=True)
 
     # Return HTMX response to refresh calendar body with specific month context
     return calendar_refresh_response(year, month)
