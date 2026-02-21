@@ -11,7 +11,7 @@ from utils.management.commands.base_cronjob import BaseCronJobCommand
 
 
 class Command(BaseCronJobCommand):
-    help = "Cancel unconfirmed ad-hoc ops days whose deadline has passed (runs at 3 AM UTC = 10 PM EST)"
+    help = "Cancel unconfirmed ad-hoc ops days whose deadline has passed (runs at 3 AM UTC = 10 PM EST / 11 PM EDT)"
     job_name = "expire_ad_hoc_days"
     max_execution_time = timedelta(minutes=10)  # This is a quick operation
 
@@ -44,7 +44,13 @@ class Command(BaseCronJobCommand):
         for assignment in assignments:
             ops_date = assignment.date.strftime("%A, %B %d, %Y")
 
-            if not options.get("dry_run"):
+            if options.get("dry_run"):
+                self.log_info(
+                    f"[DRY RUN] Would cancel unconfirmed ad-hoc ops day for {assignment.date} "
+                    "(night-before deadline, 03:00 UTC)"
+                )
+                cancelled_count += 1
+            else:
                 # Prepare template context
                 context = {
                     "ops_date": ops_date,
@@ -69,13 +75,20 @@ class Command(BaseCronJobCommand):
                     html_message=html_message,
                 )
                 assignment.delete()
+                self.log_warning(
+                    f"Cancelled unconfirmed ad-hoc ops day for {assignment.date} "
+                    "(night-before deadline passed, 03:00 UTC)"
+                )
+                cancelled_count += 1
 
-            self.log_warning(
-                f"Cancelled unconfirmed ad-hoc ops day for {assignment.date} (deadline passed at 10 PM local)"
-            )
-            cancelled_count += 1
-
-        if cancelled_count > 0:
+        if options.get("dry_run"):
+            if cancelled_count > 0:
+                self.log_info(
+                    f"[DRY RUN] Would cancel {cancelled_count} unconfirmed ad-hoc ops day(s)"
+                )
+            else:
+                self.log_info("[DRY RUN] No ad-hoc ops days would require cancellation")
+        elif cancelled_count > 0:
             self.log_success(
                 f"Cancelled {cancelled_count} unconfirmed ad-hoc ops day(s)"
             )
