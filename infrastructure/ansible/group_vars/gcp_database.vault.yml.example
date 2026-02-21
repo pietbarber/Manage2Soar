@@ -72,6 +72,7 @@ vault_django_secret_key: "CHANGE_ME_GENERATE_WITH_SCRIPT"
 # Used for AES-256-CBC client-side encryption of backups before GCS upload.
 # CRITICAL: Must be at least 64 characters.  Store only in this vault - NEVER in plaintext.
 # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(54))"
+# (54 bytes of randomness encodes to ~72 URL-safe base64 characters, exceeding the 64-char minimum.)
 #
 # WARNING: Losing this passphrase means encrypted backups cannot be decrypted.
 # Store a copy in a separate secrets manager (e.g. GCP Secret Manager, 1Password).
