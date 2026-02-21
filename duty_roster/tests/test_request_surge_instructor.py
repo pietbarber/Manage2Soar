@@ -36,7 +36,7 @@ def _make_assignment(instructor, date_offset=30):
     return DutyAssignment.objects.create(date=test_date, instructor=instructor)
 
 
-def _make_accepted_students(django_user_model, assignment, count=3):
+def _make_accepted_students(django_user_model, assignment, count=4):
     for i in range(count):
         student = _make_member(
             django_user_model,
@@ -67,7 +67,7 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
     )
     instructor = _make_member(django_user_model, "primary_instr", instructor=True)
     assignment = _make_assignment(instructor, date_offset=30)
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
     client.force_login(instructor)
 
     url = reverse(
@@ -88,8 +88,8 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
 
 @pytest.mark.django_db
 def test_surge_instructor_cannot_send_surge_request(client, django_user_model):
-    """A member acting as surge_instructor (not primary) is rejected with an
-    error message; no email is sent."""
+    """A member acting as surge_instructor (not primary) is rejected with HTTP 403
+    Forbidden; no email is sent."""
     primary = _make_member(django_user_model, "primary2", instructor=True)
     surge = _make_member(django_user_model, "surge2", instructor=True)
     assignment = _make_assignment(primary, date_offset=31)
@@ -105,7 +105,7 @@ def test_surge_instructor_cannot_send_surge_request(client, django_user_model):
         response = client.post(url)
         mock_send.assert_not_called()
 
-    assert response.status_code == 302
+    assert response.status_code == 403
     assignment.refresh_from_db()
     # surge_notified must not have been flipped
     assert assignment.surge_notified is False
@@ -127,7 +127,7 @@ def test_unrelated_member_cannot_send_surge_request(client, django_user_model):
         response = client.post(url)
         mock_send.assert_not_called()
 
-    assert response.status_code == 302
+    assert response.status_code == 403
     assignment.refresh_from_db()
     assert assignment.surge_notified is False
 
@@ -144,7 +144,7 @@ def test_surge_request_shows_error_when_no_instructors_email(client, django_user
     )
     instructor = _make_member(django_user_model, "instr4", instructor=True)
     assignment = _make_assignment(instructor, date_offset=33)
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     client.force_login(instructor)
     url = reverse(
@@ -178,7 +178,7 @@ def test_resend_surge_request_sends_email_even_when_already_notified(
         instructor=instructor,
         surge_notified=True,
     )
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     client.force_login(instructor)
     url = reverse(
@@ -250,7 +250,7 @@ def test_get_request_returns_405(client, django_user_model):
 @pytest.mark.django_db
 def test_template_shows_request_button_to_primary_instructor(client, django_user_model):
     """The instructor_requests page shows the 'Request Surge Instructor' button
-    when the user is the primary instructor and 3+ students are accepted."""
+    when the user is the primary instructor and accepted students >= surge threshold."""
     SiteConfiguration.objects.create(
         club_name="Sky Club",
         domain_name="sky.org",
@@ -259,7 +259,7 @@ def test_template_shows_request_button_to_primary_instructor(client, django_user
     )
     instructor = _make_member(django_user_model, "tmpl_instr1", instructor=True)
     assignment = _make_assignment(instructor, date_offset=40)
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
@@ -288,7 +288,7 @@ def test_template_shows_resend_button_when_surge_already_notified(
         instructor=instructor,
         surge_notified=True,
     )
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
@@ -324,7 +324,7 @@ def test_template_shows_assigned_message_when_surge_instructor_set(
         instructor=instructor,
         surge_instructor=surge,
     )
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     client.force_login(instructor)
     url = reverse("duty_roster:instructor_requests")
@@ -351,7 +351,7 @@ def test_template_shows_static_text_to_non_primary_instructor(
         instructor=primary,
         surge_instructor=surge,
     )
-    _make_accepted_students(django_user_model, assignment, count=3)
+    _make_accepted_students(django_user_model, assignment, count=4)
 
     # Log in as the surge instructor
     client.force_login(surge)
@@ -363,3 +363,38 @@ def test_template_shows_static_text_to_non_primary_instructor(
     # The surge instructor sees the assigned message (their own name is on the assignment)
     assert "Surge instructor assigned" in content
     assert "Request Surge Instructor" not in content
+
+
+@pytest.mark.django_db
+def test_surge_request_blocked_when_surge_instructor_already_assigned(
+    client, django_user_model
+):
+    """If a surge instructor is already assigned, a POST by the primary instructor
+    is short-circuited: no email is sent and surge_notified stays unchanged."""
+    SiteConfiguration.objects.create(
+        club_name="Sky Club",
+        domain_name="sky.org",
+        club_abbreviation="SC",
+        instructors_email="instructors@sky.org",
+    )
+    primary = _make_member(django_user_model, "instr_blk", instructor=True)
+    surge = _make_member(django_user_model, "surge_blk", instructor=True)
+    assignment = DutyAssignment.objects.create(
+        date=date.today() + timedelta(days=50),
+        instructor=primary,
+        surge_instructor=surge,
+    )
+
+    client.force_login(primary)
+    url = reverse(
+        "duty_roster:request_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    with patch("duty_roster.views.send_mail") as mock_send:
+        response = client.post(url)
+        mock_send.assert_not_called()
+
+    assert response.status_code == 302
+    assert response["Location"].endswith(reverse("duty_roster:instructor_requests"))
+    assignment.refresh_from_db()
+    assert assignment.surge_notified is False

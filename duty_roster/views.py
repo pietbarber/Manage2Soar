@@ -2376,6 +2376,8 @@ def instructor_requests(request):
     for slot in accepted_slots:
         accepted_by_date[slot.assignment.date].append(slot)
 
+    _, instruction_surge_threshold = get_surge_thresholds()
+
     return render(
         request,
         "duty_roster/instructor_requests.html",
@@ -2385,6 +2387,7 @@ def instructor_requests(request):
             "pending_count": len(pending_slots),
             "accepted_count": len(accepted_slots),
             "today": today,
+            "instruction_surge_threshold": instruction_surge_threshold,
         },
     )
 
@@ -2460,9 +2463,15 @@ def request_surge_instructor(request, assignment_id):
 
     # Only the primary instructor may trigger this; surge instructors cannot self-request
     if assignment.instructor != request.user:
-        messages.error(
+        return HttpResponseForbidden(
+            "Only the primary instructor for this day can request a surge instructor."
+        )
+
+    # Guard: if a surge instructor is already assigned, no new notification is needed
+    if assignment.surge_instructor_id:
+        messages.info(
             request,
-            "Only the primary instructor for this day can request a surge instructor.",
+            "A surge instructor is already assigned for this day; no new request was sent.",
         )
         return redirect("duty_roster:instructor_requests")
 

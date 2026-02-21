@@ -158,7 +158,7 @@
                   </div>
                 {% endfor %}
 
-                {% if slots|length >= 3 %}
+                {% if slots|length >= instruction_surge_threshold %}
                   {% with assignment=slots.0.assignment %}
                     {% if assignment.surge_instructor %}
                       <div class="alert alert-success mt-2 mb-0 py-2">
