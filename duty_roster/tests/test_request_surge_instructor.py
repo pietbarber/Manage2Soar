@@ -193,6 +193,55 @@ def test_resend_surge_request_sends_email_even_when_already_notified(
     assert response.status_code == 302
 
 
+@pytest.mark.django_db
+def test_unauthenticated_user_is_redirected(client, django_user_model):
+    """An unauthenticated POST is redirected to the login page by the
+    @active_member_required decorator."""
+    instructor = _make_member(django_user_model, "instr6", instructor=True)
+    assignment = _make_assignment(instructor, date_offset=35)
+
+    url = reverse(
+        "duty_roster:request_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_invalid_assignment_id_returns_404(client, django_user_model):
+    """A POST with a non-existent assignment_id returns 404 via get_object_or_404."""
+    instructor = _make_member(django_user_model, "instr7", instructor=True)
+    client.force_login(instructor)
+
+    url = reverse(
+        "duty_roster:request_surge_instructor",
+        kwargs={"assignment_id": 999999},
+    )
+    response = client.post(url)
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_get_request_returns_405(client, django_user_model):
+    """A GET request to the view returns 405 Method Not Allowed, enforced by
+    the @require_POST decorator."""
+    instructor = _make_member(django_user_model, "instr8", instructor=True)
+    assignment = _make_assignment(instructor, date_offset=36)
+    client.force_login(instructor)
+
+    url = reverse(
+        "duty_roster:request_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 405
+
+
 # ---------------------------------------------------------------------------
 # Template rendering tests
 # ---------------------------------------------------------------------------
