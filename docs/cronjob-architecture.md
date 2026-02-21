@@ -121,7 +121,7 @@ Uses PostgreSQL's atomic operations:
 - **Weekly Monday 10:00 AM UTC**: Late SPR notifications ✅ **DEPLOYED**
 - **Monthly 1st @ 7:00 AM UTC**: Duty delinquent reports ✅ **DEPLOYED**
 - **Monthly 28th @ 11:59 PM UTC**: Cleanup old notifications (60+ days) ✅ **READY FOR DEPLOYMENT**
-- **Daily 6:00 PM UTC**: Expire ad-hoc days (for tomorrow) ✅ **DEPLOYED**
+- **Daily 3:00 AM UTC** (10 PM EST / 11 PM EDT): Expire ad-hoc days (night-before deadline, expires today's unconfirmed days) ✅ **DEPLOYED**
 
 ### 📊 Recent Production Metrics
 - **Aging Logsheets**: Found 1 logsheet (11 days old), notified Todd Morris & Bob Alexander

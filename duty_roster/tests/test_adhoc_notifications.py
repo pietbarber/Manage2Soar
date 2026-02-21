@@ -81,10 +81,9 @@ class TestNotifyOpsStatusRecipients(TestCase):
         self.assignment.tow_pilot = tow
         self.assignment.save()
         notify_ops_status(self.assignment)
-        # Initial proposal only fires when BOTH tow_pilot and duty_officer are None
-        for call in mock_send.call_args_list:
-            subject = call[1].get("subject", "")
-            self.assertNotIn("Proposed", subject)
+        # Initial proposal only fires when BOTH tow_pilot and duty_officer are None,
+        # so no email at all should be sent once a tow pilot is assigned.
+        mock_send.assert_not_called()
 
 
 class TestExpireAdHocDaysDeadline(TestCase):

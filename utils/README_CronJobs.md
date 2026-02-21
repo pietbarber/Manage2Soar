@@ -38,8 +38,8 @@ All CronJob commands inherit from `BaseCronJobCommand` which provides:
 - **Timeout**: 10 minutes
 - **Note**: Existing command, converted to use new framework
 
-#### `expire_ad_hoc_days` (6:00 PM UTC)
-- **Purpose**: Expire temporary duty assignments for tomorrow
+#### `expire_ad_hoc_days` (3:00 AM UTC = 10 PM EST / 11 PM EDT)
+- **Purpose**: Expire unconfirmed ad-hoc duty assignments for today (runs at night-before deadline)
 - **Target**: Ad-hoc duty slots
 - **Frequency**: Daily
 - **Timeout**: 5 minutes

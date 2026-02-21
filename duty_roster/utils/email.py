@@ -65,7 +65,14 @@ def get_mailing_list(setting_name, fallback_prefix, config=None):
         return [f"{fallback_prefix}@manage2soar.com"]
 
 
-def notify_ops_status(assignment):
+def notify_ops_status(assignment, is_rescind=False):
+    """
+    Fire the appropriate email for the current ad-hoc day state.
+
+    Pass ``is_rescind=True`` when called from a crew-rescind view so that
+    reaching the "no crew" state again does not re-send the initial proposal
+    email (it was already sent when the day was first created).
+    """
     print(
         f"🧠 State: tow_pilot={assignment.tow_pilot}, duty_officer={assignment.duty_officer}, confirmed={assignment.is_confirmed}"
     )
@@ -77,6 +84,10 @@ def notify_ops_status(assignment):
 
     # 1. Ad-hoc day created (no crew yet)
     if not assignment.tow_pilot and not assignment.duty_officer:
+        if is_rescind:
+            # The last crew member just rescinded.  The proposal was already
+            # sent when the day was first proposed — do not send it again.
+            return
         # Get configuration
         email_config = get_email_config()
         # Notify all members so duty officers, tow pilots, and instructors all
