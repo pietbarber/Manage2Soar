@@ -10,7 +10,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.cache import cache
-from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.http import (
     HttpResponse,
