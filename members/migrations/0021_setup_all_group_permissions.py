@@ -398,9 +398,11 @@ def _resolve_permissions(Permission, ContentType, perm_tuples, db_alias="default
     for app_label, model_name, codename in perm_tuples:
         try:
             ct = ContentType.objects.using(db_alias).get(
-                app_label=app_label, model=model_name)
+                app_label=app_label, model=model_name
+            )
             perm = Permission.objects.using(db_alias).get(
-                content_type=ct, codename=codename)
+                content_type=ct, codename=codename
+            )
             resolved.append(perm)
         except (ContentType.DoesNotExist, Permission.DoesNotExist):
             pass

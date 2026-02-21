@@ -112,6 +112,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("knowledgetest", "0004_populate_test_presets"),
         ("auth", "0012_alter_user_first_name_max_length"),
+        ("members", "0021"),
     ]
 
     operations = [
