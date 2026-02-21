@@ -158,11 +158,39 @@
                   </div>
                 {% endfor %}
 
-                {% if slots|length >= 3 %}
-                  <div class="alert alert-warning mt-2 mb-0 py-2">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
-                    <small>High student count - consider requesting a surge instructor if needed.</small>
-                  </div>
+                {% if slots|length >= instruction_surge_threshold %}
+                  {% with assignment=slots.0.assignment %}
+                    {% if assignment.surge_instructor %}
+                      <div class="alert alert-success mt-2 mb-0 py-2">
+                        <i class="fas fa-check-circle me-1"></i>
+                        <small>Surge instructor assigned: <strong>{{ assignment.surge_instructor.full_display_name }}</strong></small>
+                      </div>
+                    {% elif assignment.instructor == request.user %}
+                      <div class="alert alert-warning mt-2 mb-0 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span>
+                          <i class="fas fa-exclamation-triangle me-1"></i>
+                          <small>High student count &mdash; a surge instructor may be needed.</small>
+                        </span>
+                        <form action="{% url 'duty_roster:request_surge_instructor' assignment_id=assignment.id %}" method="post" class="d-inline">
+                          {% csrf_token %}
+                          {% if assignment.surge_notified %}
+                            <button type="submit" class="btn btn-sm btn-warning" title="Send another surge request to the instructors list">
+                              <i class="fas fa-redo me-1"></i>Re-send Surge Request
+                            </button>
+                          {% else %}
+                            <button type="submit" class="btn btn-sm btn-warning" title="Notify instructors that a surge instructor is needed">
+                              <i class="fas fa-user-plus me-1"></i>Request Surge Instructor
+                            </button>
+                          {% endif %}
+                        </form>
+                      </div>
+                    {% else %}
+                      <div class="alert alert-warning mt-2 mb-0 py-2">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <small>High student count &mdash; consider requesting a surge instructor if needed.</small>
+                      </div>
+                    {% endif %}
+                  {% endwith %}
                 {% endif %}
               </div>
             {% endfor %}
