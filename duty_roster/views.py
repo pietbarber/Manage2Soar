@@ -2619,8 +2619,8 @@ def _notify_surge_instructor_needed(assignment, student_count):
             to=[instructor_email],
         )
         email.attach_alternative(html_message, "text/html")
-        email.send(fail_silently=False)
-        return True
+        sent_count = email.send(fail_silently=False)
+        return sent_count > 0
     except Exception:
         logger.exception("Failed to send surge instructor notification")
         return False

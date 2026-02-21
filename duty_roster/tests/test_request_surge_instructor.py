@@ -75,6 +75,7 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
         kwargs={"assignment_id": assignment.id},
     )
     with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
+        mock_email_cls.return_value.send.return_value = 1
         response = client.post(url)
 
     assert response.status_code == 302
@@ -84,6 +85,13 @@ def test_primary_instructor_can_send_surge_request(client, django_user_model):
     assert assignment.surge_notified is True
     mock_email_cls.assert_called_once()
     mock_email_cls.return_value.send.assert_called_once_with(fail_silently=False)
+    # Verify the HTML alternative was attached (guards against regression to text-only)
+    mock_email_cls.return_value.attach_alternative.assert_called_once()
+    attached_content, attached_mime = (
+        mock_email_cls.return_value.attach_alternative.call_args[0]
+    )
+    assert attached_mime == "text/html"
+    assert "<html" in attached_content.lower()
 
 
 @pytest.mark.django_db
@@ -186,9 +194,17 @@ def test_resend_surge_request_sends_email_even_when_already_notified(
         kwargs={"assignment_id": assignment.id},
     )
     with patch("duty_roster.views.EmailMultiAlternatives") as mock_email_cls:
+        mock_email_cls.return_value.send.return_value = 1
         response = client.post(url)
         mock_email_cls.assert_called_once()
         mock_email_cls.return_value.send.assert_called_once_with(fail_silently=False)
+        # Verify the HTML alternative was attached (guards against regression to text-only)
+        mock_email_cls.return_value.attach_alternative.assert_called_once()
+        attached_content, attached_mime = (
+            mock_email_cls.return_value.attach_alternative.call_args[0]
+        )
+        assert attached_mime == "text/html"
+        assert "<html" in attached_content.lower()
 
     assert response.status_code == 302
 
