@@ -44,8 +44,12 @@ spec:
       tls:
         mode: Terminate
         options:
-          # Reference Google-managed SSL certificate created via gcloud
-          networking.gke.io/pre-shared-certs: {{ gke_ssl_cert_name | default(gke_app_name ~ '-ssl-cert') }}
+          # Reference Google-managed SSL certificate(s) created via gcloud.
+          # gke_ssl_cert_annotation may be a comma-separated list during cert
+          # rotation (old,new) to preserve HTTPS on existing domains while a
+          # new cert provisions. Once the new cert is ACTIVE, run:
+          #   ansible-playbook ... --tags cert-cleanup
+          networking.gke.io/pre-shared-certs: {{ gke_ssl_cert_annotation | default(gke_ssl_cert_name) | default(gke_app_name ~ '-ssl-cert') }}
       allowedRoutes:
         namespaces:
           from: All  # Allow HTTPRoutes from any namespace

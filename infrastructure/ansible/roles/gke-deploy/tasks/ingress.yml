@@ -280,6 +280,43 @@
   run_once: true
   tags: [ingress, tls]
 
+# Read the live Gateway annotation so we can combine old + new cert names.
+# This prevents an SSL outage on existing domains while a new cert provisions.
+# The Gateway template uses gke_ssl_cert_annotation (may be a comma-separated
+# list) rather than the bare gke_ssl_cert_name.
+- name: Read current Gateway pre-shared-certs annotation from cluster
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_app_name }}-gateway -n default
+      --output "jsonpath={.spec.listeners[?(@.name=='https')].tls.options['networking.gke.io/pre-shared-certs']}"
+  register: gateway_current_certs
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls, gateway]
+
+- name: Build combined SSL cert annotation (preserve existing certs during transition)
+  ansible.builtin.set_fact:
+    gke_ssl_cert_annotation: >-
+      {%- set existing = (gateway_current_certs.stdout | default('')) | trim -%}
+      {%- set existing_list = existing.split(',') | map('trim') | select | list if existing else [] -%}
+      {%- set combined = (existing_list + [gke_ssl_cert_name]) | unique | list -%}
+      {{ combined | join(',') }}
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls, gateway]
+
+- name: Display combined cert annotation
+  ansible.builtin.debug:
+    msg: "Gateway will reference certs: {{ gke_ssl_cert_annotation }}"
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gke_ssl_cert_annotation is defined
+  tags: [ingress, tls, gateway]
+
 # ============================================================
 # GATEWAY DEPLOYMENT (Single shared gateway)
 # ============================================================
@@ -545,3 +582,75 @@
       ========================================
   run_once: true
   tags: [ingress, verify]
+
+# ============================================================
+# CERT CLEANUP  (tag: cert-cleanup)
+#
+# After a cert rotation, the Gateway annotation may hold multiple certs
+# (e.g., "manage2soar-ssl-cert-v3,manage2soar-ssl-cert-v4").
+# Run this tag once the new cert is ACTIVE to trim back to a single entry.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml playbooks/gcp-app-deploy.yml \
+#     --vault-password-file ~/.ansible_vault_pass --tags cert-cleanup
+# ============================================================
+
+- name: Read current Gateway cert annotation (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_app_name }}-gateway -n default
+      --output "jsonpath={.spec.listeners[?(@.name=='https')].tls.options['networking.gke.io/pre-shared-certs']}"
+  register: cleanup_current_annotation
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]
+
+- name: Check if target cert is ACTIVE (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }}
+      --global --project={{ gcp_project }}
+      --format="value(managed.status)"
+  register: cleanup_target_status
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]
+
+- name: Trim Gateway annotation to single active cert (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      kubectl annotate gateway {{ gke_app_name }}-gateway -n default
+      networking.gke.io/pre-shared-certs={{ gke_ssl_cert_name }}
+      --overwrite
+  delegate_to: localhost
+  run_once: true
+  changed_when: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - cleanup_target_status.stdout | default('') | trim == 'ACTIVE'
+    - cleanup_current_annotation.stdout | default('') | trim != gke_ssl_cert_name
+    - (cleanup_current_annotation.stdout | default('') | trim).split(',') | map('trim') | list | length > 1
+  tags: [cert-cleanup]
+
+- name: Display cert-cleanup result
+  ansible.builtin.debug:
+    msg: |
+      {% set status = cleanup_target_status.stdout | default('') | trim %}
+      {% set current = cleanup_current_annotation.stdout | default('') | trim %}
+      {% if status == 'ACTIVE' and current != gke_ssl_cert_name %}
+      ✅ Trimmed Gateway annotation to: {{ gke_ssl_cert_name }}
+      {% elif status == 'ACTIVE' and current == gke_ssl_cert_name %}
+      ✅ Gateway already references only: {{ gke_ssl_cert_name }} — nothing to clean up.
+      {% else %}
+      ⏳ Target cert {{ gke_ssl_cert_name }} is {{ status }} — not trimming yet.
+         Re-run --tags cert-cleanup once it shows ACTIVE.
+      {% endif %}
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]
