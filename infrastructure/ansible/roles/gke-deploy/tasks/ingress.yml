@@ -625,9 +625,8 @@
 - name: Trim Gateway annotation to single active cert (cert-cleanup)
   ansible.builtin.command:
     cmd: >
-      kubectl annotate gateway {{ gke_app_name }}-gateway -n default
-      networking.gke.io/pre-shared-certs={{ gke_ssl_cert_name }}
-      --overwrite
+      kubectl patch gateway {{ gke_app_name }}-gateway -n default --type=json
+      -p '[{"op":"replace","path":"/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs","value":"{{ gke_ssl_cert_name }}"}]'
   delegate_to: localhost
   run_once: true
   changed_when: true
