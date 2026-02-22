@@ -215,7 +215,6 @@ def test_instructor_blocked_when_at_own_capacity_with_surge(client, django_user_
     _make_site_config(instruction_surge_threshold=2)
     primary = _make_member(django_user_model, "cp_vp1", instructor=True)
     surge = _make_member(django_user_model, "cp_vs1", instructor=True)
-    student = _make_member(django_user_model, "cp_vst1")
     new_student = _make_member(django_user_model, "cp_vst2")
     assignment = _make_assignment(primary, date_offset=66, surge=surge)
 

@@ -378,8 +378,8 @@ def test_template_shows_static_text_to_non_primary_instructor(
     content = response.content.decode()
     # Since surge is assigned and accepted students exist, this day appears in the
     # allocation_by_date section (Issue #664). The surge instructor appears there
-    # as a column header.
-    assert "Surge" in content
+    # as a column header — assert on their username for a specific marker.
+    assert surge.username in content
     assert "Request Surge Instructor" not in content
 
 

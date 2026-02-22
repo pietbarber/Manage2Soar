@@ -2460,10 +2460,9 @@ def instructor_respond(request, slot_id):
         return redirect("duty_roster:instructor_requests")
 
     # Per-instructor capacity check (Issue #665).
-    # When a surge instructor is assigned each instructor has their own quota
-    # equal to the global instruction_surge_threshold.  Prevent an instructor
-    # from accepting once their own queue is full.
-    if action == "accept" and assignment.surge_instructor:
+    # Only applies when BOTH a primary and surge instructor are assigned; each
+    # has their own quota equal to the global instruction_surge_threshold.
+    if action == "accept" and assignment.instructor and assignment.surge_instructor:
         _, instruction_threshold = get_surge_thresholds()
         my_accepted_count = (
             InstructionSlot.objects.filter(
