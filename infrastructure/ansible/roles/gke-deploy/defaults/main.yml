@@ -186,7 +186,9 @@ gke_gcp_sa_secret_name: "gcp-sa-key"
 # Local path to GCP service account JSON key file (required for secrets task)
 # This file is used to create the Kubernetes secret containing GCP credentials.
 # The file must exist locally and be accessible by Ansible during deployment.
-# Example: ~/Downloads/my-gcp-project-abc123.json
+# Override in group_vars with a relative path from playbook_dir, e.g.:
+#   gke_gcp_sa_key_file: "{{ playbook_dir }}/../../../your-key.json"
+# NOTE: playbook_dir = infrastructure/ansible/playbooks/, so ../../.. = project root
 gke_gcp_sa_key_file: ""
 
 # Path to GCP service account key in container

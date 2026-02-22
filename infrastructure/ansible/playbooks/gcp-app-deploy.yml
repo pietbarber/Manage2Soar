@@ -217,6 +217,19 @@
           {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_tenants }}
       tags: [always]
 
+    - name: Pre-create all tenant namespaces
+      # Ensures namespaces exist before the deploy loop runs so the ingress task
+      # (which loops over ALL tenants at once) can reference them without erroring.
+      ansible.builtin.command:
+        cmd: kubectl create namespace {{ item.namespace | default('tenant-' + item.prefix) }}
+      register: ns_precreate
+      failed_when: false
+      changed_when: "'created' in ns_precreate.stdout"
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        label: "{{ item.prefix }}"
+      tags: [always]
+
     - name: Validate vault secrets for selected tenants
       ansible.builtin.assert:
         that:
@@ -325,6 +338,68 @@
         label: "{{ tenant.prefix }}"
 
   post_tasks:
+    # Auto-run migrations for any tenant with unapplied migrations.
+    # Uses 'migrate --check' (exits non-zero if unapplied migrations exist) to detect
+    # new tenants or tenants that need schema updates, then runs migrate for those only.
+    # This handles first-time deploys without requiring gke_run_migrations=true.
+    - name: Check for unapplied migrations per tenant
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - deployment/django-app-{{ tenant.prefix }}
+          - -n
+          - "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+          - --
+          - python
+          - manage.py
+          - migrate
+          - --check
+          - --noinput
+      delegate_to: localhost
+      register: migrate_check_results
+      failed_when: false
+      changed_when: false
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      tags: [migrations]
+
+    - name: Run migrations for tenants with unapplied migrations
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - deployment/django-app-{{ item.tenant.prefix }}
+          - -n
+          - "{{ item.tenant.namespace | default('tenant-' + item.tenant.prefix) }}"
+          - --
+          - python
+          - manage.py
+          - migrate
+          - --noinput
+      delegate_to: localhost
+      register: migrate_run_result
+      changed_when: "'Applying' in migrate_run_result.stdout"
+      loop: "{{ migrate_check_results.results | selectattr('rc', 'ne', 0) | list }}"
+      loop_control:
+        label: "{{ item.tenant.prefix }}"
+      tags: [migrations]
+
+    - name: Display migration results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Migration Results
+          ========================================
+          {% for result in migrate_check_results.results | default([]) %}
+          {{ result.tenant.prefix }}: {% if result.rc == 0 %}✓ Up to date{% else %}⚡ Migrations applied{% endif %}
+          {% endfor %}
+          ========================================
+      when: migrate_check_results is defined
+      tags: [migrations]
+
     # Create superuser for each tenant (if enabled)
     - name: Create superuser for each tenant
       ansible.builtin.command:
