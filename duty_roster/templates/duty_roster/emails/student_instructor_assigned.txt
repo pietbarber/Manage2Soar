@@ -1,0 +1,14 @@
+✈️ Your Instructor Confirmed - {{ ops_date }}
+================================================================================
+
+Hi {{ student.first_name|default:student.username }},
+
+Your instructor for {{ ops_date }} has been confirmed:
+
+  {{ instructor.get_full_name|default:instructor.username }}
+
+Please check the duty roster for any updates as the day approaches:
+  {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

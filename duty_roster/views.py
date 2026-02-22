@@ -2380,14 +2380,50 @@ def instructor_requests(request):
 
     _, instruction_surge_threshold = get_surge_thresholds()
 
+    # Build a per-date allocation map for days that have both a primary and surge
+    # instructor, so the template can show the three-column split view (Issue #664).
+    assignment_by_date = {
+        a.date: a
+        for a in my_assignments.select_related("instructor", "surge_instructor")
+    }
+
+    allocation_by_date = {}
+    non_surge_accepted_by_date = {}
+    for day, slots in accepted_by_date.items():
+        assignment = assignment_by_date.get(day)
+        if assignment and assignment.instructor_id and assignment.surge_instructor_id:
+            primary_slots = [
+                s for s in slots if s.instructor_id == assignment.instructor_id
+            ]
+            surge_slots = [
+                s for s in slots if s.instructor_id == assignment.surge_instructor_id
+            ]
+            other_slots = [
+                s
+                for s in slots
+                if s.instructor_id
+                not in (assignment.instructor_id, assignment.surge_instructor_id)
+            ]
+            allocation_by_date[day] = {
+                "assignment": assignment,
+                "primary": assignment.instructor,
+                "surge": assignment.surge_instructor,
+                "primary_slots": primary_slots,
+                "surge_slots": surge_slots,
+                "unassigned_slots": other_slots,
+            }
+        else:
+            non_surge_accepted_by_date[day] = slots
+
     return render(
         request,
         "duty_roster/instructor_requests.html",
         {
             "pending_by_date": dict(pending_by_date),
-            "accepted_by_date": dict(accepted_by_date),
+            "accepted_by_date": non_surge_accepted_by_date,
+            "allocation_by_date": allocation_by_date,
             "pending_count": len(pending_slots),
-            "accepted_count": len(accepted_slots),
+            "accepted_count": sum(len(v) for v in non_surge_accepted_by_date.values()),
             "today": today,
             "instruction_surge_threshold": instruction_surge_threshold,
         },
@@ -2596,6 +2632,84 @@ def volunteer_as_surge_instructor(request, assignment_id):
     )
 
 
+@active_member_required
+@require_POST
+def assign_student_to_instructor(request, slot_id):
+    """
+    Allow the primary or surge instructor to move an accepted student between
+    their queues (Issue #664).
+
+    POST parameters:
+        action – "primary" | "surge"
+
+    Rules:
+    * The requesting user must be either the primary or surge instructor for
+      the slot's assignment.
+    * action="surge" requires that a surge instructor is actually assigned.
+    * Only already-accepted (instructor_response="accepted") slots may be moved.
+    """
+    from .models import InstructionSlot
+
+    slot = get_object_or_404(InstructionSlot, id=slot_id)
+    assignment = slot.assignment
+
+    # Auth: must be primary or surge instructor for this day
+    if request.user not in (assignment.instructor, assignment.surge_instructor):
+        return HttpResponseForbidden("You are not an instructor for this day.")
+
+    if slot.status == "cancelled":
+        messages.warning(request, "Cannot reassign a cancelled instruction request.")
+        return redirect("duty_roster:instructor_requests")
+
+    if slot.instructor_response != "accepted":
+        messages.warning(request, "Only accepted students can be reassigned.")
+        return redirect("duty_roster:instructor_requests")
+
+    action = request.POST.get("action")
+    if action not in ("primary", "surge"):
+        messages.error(request, "Invalid assignment action.")
+        return redirect("duty_roster:instructor_requests")
+
+    if action == "surge" and not assignment.surge_instructor:
+        messages.error(
+            request,
+            "No surge instructor is assigned for this day; cannot reassign.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    target_instructor = (
+        assignment.instructor if action == "primary" else assignment.surge_instructor
+    )
+
+    if target_instructor is None:
+        messages.error(
+            request,
+            "No instructor is assigned for this role; cannot reassign.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    # No-op if already assigned to the target
+    if slot.instructor == target_instructor:
+        messages.info(
+            request,
+            f"{slot.student.full_display_name} is already assigned to "
+            f"{target_instructor.full_display_name}. No change made.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    slot.instructor = target_instructor
+    slot.save(update_fields=["instructor"])
+
+    messages.success(
+        request,
+        f"Moved {slot.student.full_display_name} to "
+        f"{target_instructor.full_display_name}.",
+    )
+
+    _notify_student_instructor_assigned(slot)
+    return redirect("duty_roster:instructor_requests")
+
+
 # =============================================================================
 # Instruction Notification Helpers
 # Note: Most instruction notifications are now handled via signals.py
@@ -2783,6 +2897,61 @@ def _notify_primary_instructor_surge_filled(assignment):
         logger.exception(
             "Failed to send surge-filled notification to primary instructor"
         )
+        return False
+
+
+def _notify_student_instructor_assigned(slot):
+    """Notify a student that their assigned instructor for the day has been updated.
+
+    Sent whenever `slot.instructor` is changed by the student-allocation flow
+    (Issue #664).  Returns True on success, False on error.
+    """
+    try:
+        student = slot.student
+        if not student or not student.email:
+            logger.warning(
+                "Student %s has no email; instructor-assignment notification suppressed",
+                getattr(student, "full_display_name", "unknown"),
+            )
+            return False
+
+        assigned = slot.instructor
+        if not assigned:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = slot.assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Your instructor for {slot.assignment.date.strftime('%B %d, %Y')} has been confirmed"
+
+        context = {
+            "ops_date": ops_date,
+            "student": student,
+            "instructor": assigned,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/student_instructor_assigned.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/student_instructor_assigned.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [student.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception("Failed to send instructor-assignment notification to student")
         return False
 
 

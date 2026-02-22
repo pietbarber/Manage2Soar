@@ -40,6 +40,7 @@
             <a href="{% url 'password_reset' %}">Forgot your password?</a>
         </div>
         <hr class="my-4">
+        {% if google_oauth_configured %}
         <div class="text-center mb-2">
             <span class="fw-semibold">Or sign in with</span>
         </div>
@@ -50,6 +51,7 @@
                 style="height: 20px; margin-right: 8px;">
             <span class="text-dark">Sign in with Google</span>
         </a>
+        {% endif %}
         <div class="mt-3 text-center text-muted small">
             {{ now|date:'Y' }}
         </div>
