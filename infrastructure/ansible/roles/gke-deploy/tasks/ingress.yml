@@ -127,6 +127,28 @@
     - static_ipv6_address.stdout is defined
   tags: [ingress, ip, ipv6]
 
+- name: Get actual gateway IP from live Gateway resource
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_gateway_name | default(gke_app_name ~ '-gateway') }}
+      -n default
+      --output jsonpath='{.status.addresses[0].value}'
+  register: gateway_live_ip
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip]
+
+- name: Override ingress IP with live gateway IP if available
+  ansible.builtin.set_fact:
+    gke_ingress_ip: "{{ gateway_live_ip.stdout | trim }}"
+  run_once: true
+  when:
+    - gateway_live_ip.rc == 0
+    - (gateway_live_ip.stdout | trim) | length > 0
+  tags: [ingress, ip]
+
 - name: Display IP addresses for DNS configuration
   ansible.builtin.debug:
     msg: |
