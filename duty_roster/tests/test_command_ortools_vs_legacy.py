@@ -11,6 +11,7 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.test import TestCase
 
+from duty_roster.models import DutyPreference
 from members.models import Member
 from siteconfig.models import SiteConfiguration
 
@@ -30,9 +31,13 @@ class TestORToolsVsLegacyCommandTests(TestCase):
             operations_end_period="Last weekend of November",
         )
 
-        # Create test members with roles
+        # Create test members with roles and DutyPreference objects.
+        # DutyPreference with max_assignments_per_month=9 is required: the
+        # OR-Tools scheduler defaults to DEFAULT_MAX_ASSIGNMENTS=2 for members
+        # without a preference row, making 9-weekend-day months INFEASIBLE
+        # (10 members × 2 max = 20 slots < 36 required).
         for i in range(10):
-            Member.objects.create(
+            m = Member.objects.create(
                 username=f"test_member_{i}",
                 first_name=f"Test{i}",
                 last_name=f"Member{i}",
@@ -44,6 +49,7 @@ class TestORToolsVsLegacyCommandTests(TestCase):
                 duty_officer=(i % 4 == 0),
                 assistant_duty_officer=(i % 5 == 0),
             )
+            DutyPreference.objects.create(member=m, max_assignments_per_month=9)
 
     def test_command_runs_successfully(self):
         """Test that command runs without errors."""

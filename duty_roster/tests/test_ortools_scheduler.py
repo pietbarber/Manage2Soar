@@ -199,10 +199,38 @@ class ORToolsHardConstraintsTests(TestCase):
             is_active=True,
         )
 
+        # Add extra members so that each scarce role (DO, ADO, towpilot, instructor)
+        # has at least 2 qualifying members.  Without these, a single member must
+        # cover all 9 March 2026 weekend days in that role, which exceeds
+        # max_assignments_per_month=8 and makes the solver INFEASIBLE.
+        self.member4 = Member.objects.create(
+            username="member4",
+            email="m4@test.com",
+            first_name="Member",
+            last_name="Four",
+            membership_status="Full Member",
+            instructor=True,
+            duty_officer=True,
+            is_active=True,
+        )
+
+        self.member5 = Member.objects.create(
+            username="member5",
+            email="m5@test.com",
+            first_name="Member",
+            last_name="Five",
+            membership_status="Full Member",
+            towpilot=True,
+            assistant_duty_officer=True,
+            is_active=True,
+        )
+
         # Create preferences
         DutyPreference.objects.create(member=self.member1, max_assignments_per_month=8)
         DutyPreference.objects.create(member=self.member2, max_assignments_per_month=8)
         DutyPreference.objects.create(member=self.member3, max_assignments_per_month=8)
+        DutyPreference.objects.create(member=self.member4, max_assignments_per_month=8)
+        DutyPreference.objects.create(member=self.member5, max_assignments_per_month=8)
 
         self.test_dates = [
             date(2026, 3, 1),  # Sunday
@@ -282,13 +310,45 @@ class ORToolsHardConstraintsTests(TestCase):
         # Create avoidance: member1 avoids member2
         DutyAvoidance.objects.create(member=self.member1, avoid_with=self.member2)
 
-        data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
-        scheduler = DutyRosterScheduler(data)
+        # Use a controlled 3-date window (2 non-consecutive + 1 pair) so that
+        # the problem is feasible regardless of how the full March month looks.
+        # Using extract_scheduling_data(year=2026, month=3) would produce 9
+        # weekend days; with the avoidance applied, member4 would need to work
+        # all 9 days alone to cover both instructor and DO—exceeding max=8.
+        three_dates = [date(2026, 3, 1), date(2026, 3, 7), date(2026, 3, 8)]
+        prefs = {
+            m.id: DutyPreference.objects.get(member=m)
+            for m in [
+                self.member1,
+                self.member2,
+                self.member3,
+                self.member4,
+                self.member5,
+            ]
+        }
+        avoidances = {(self.member1.id, self.member2.id)}
+        data = SchedulingData(
+            members=[
+                self.member1,
+                self.member2,
+                self.member3,
+                self.member4,
+                self.member5,
+            ],
+            duty_days=three_dates,
+            roles=self.test_roles,
+            preferences=prefs,
+            blackouts=set(),
+            avoidances=avoidances,
+            pairings=set(),
+            role_scarcity={role: {"scarcity_score": 1.0} for role in self.test_roles},
+            earliest_duty_day=three_dates[0],
+        )
 
         # Verify avoidance is in data
         self.assertIn((self.member1.id, self.member2.id), data.avoidances)
 
-        # Solve and check that member1 and member2 are never assigned on same day
+        scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
         # Assert solver found a solution
@@ -310,7 +370,38 @@ class ORToolsHardConstraintsTests(TestCase):
 
     def test_one_assignment_per_day_constraint(self):
         """Test that members are assigned to at most one role per day."""
-        data = extract_scheduling_data(year=2026, month=3, roles=self.test_roles)
+        # Use a bounded 3-date window to keep the problem feasible with 5 members.
+        # Using the full March 2026 month (9 weekend days) risks INFEASIBLE
+        # when role coverage is tight; the constraint logic itself only needs a
+        # handful of days to be verified.
+        three_dates = [date(2026, 3, 1), date(2026, 3, 7), date(2026, 3, 8)]
+        prefs = {
+            m.id: DutyPreference.objects.get(member=m)
+            for m in [
+                self.member1,
+                self.member2,
+                self.member3,
+                self.member4,
+                self.member5,
+            ]
+        }
+        data = SchedulingData(
+            members=[
+                self.member1,
+                self.member2,
+                self.member3,
+                self.member4,
+                self.member5,
+            ],
+            duty_days=three_dates,
+            roles=self.test_roles,
+            preferences=prefs,
+            blackouts=set(),
+            avoidances=set(),
+            pairings=set(),
+            role_scarcity={role: {"scarcity_score": 1.0} for role in self.test_roles},
+            earliest_duty_day=three_dates[0],
+        )
         scheduler = DutyRosterScheduler(data)
         result = scheduler.solve(timeout_seconds=5.0)
 
@@ -336,14 +427,19 @@ class ORToolsHardConstraintsTests(TestCase):
 
     def test_anti_repeat_constraint(self):
         """Test that members don't do same role on consecutive days."""
-        # Use consecutive days (Sunday, Monday)
+        # Use consecutive days (Sunday, Monday).
+        # member5 is included so towpilot has 2 qualified members (member1 and
+        # member5); without a second towpilot the hard anti-repeat constraint
+        # makes the problem INFEASIBLE because member1 is the sole option and
+        # cannot be assigned the same role on both consecutive days.
         data = SchedulingData(
-            members=[self.member1, self.member2],
+            members=[self.member1, self.member2, self.member5],
             duty_days=[date(2026, 3, 1), date(2026, 3, 2)],  # Consecutive
             roles=["instructor", "towpilot"],
             preferences={
                 self.member1.id: DutyPreference.objects.get(member=self.member1),
                 self.member2.id: DutyPreference.objects.get(member=self.member2),
+                self.member5.id: DutyPreference.objects.get(member=self.member5),
             },
             blackouts=set(),
             avoidances=set(),
