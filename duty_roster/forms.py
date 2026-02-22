@@ -261,6 +261,38 @@ class InstructionRequestForm(forms.ModelForm):
                 "Please check back later or choose another day."
             )
 
+        # Capacity check: block new sign-ups when all available slots are taken.
+        # Read threshold directly to avoid a circular import with views.py.
+        try:
+            config = SiteConfiguration.objects.get()
+            instruction_surge_threshold = config.instruction_surge_threshold
+        except SiteConfiguration.DoesNotExist:
+            instruction_surge_threshold = 4
+
+        current_accepted = (
+            InstructionSlot.objects.filter(
+                assignment=self.assignment,
+                instructor_response="accepted",
+            )
+            .exclude(status="cancelled")
+            .count()
+        )
+
+        # With both instructors assigned, total capacity doubles.
+        has_surge = bool(
+            self.assignment.instructor and self.assignment.surge_instructor
+        )
+        total_capacity = (
+            instruction_surge_threshold * 2
+            if has_surge
+            else instruction_surge_threshold
+        )
+        if current_accepted >= total_capacity:
+            raise forms.ValidationError(
+                "Instruction is fully booked for this day. "
+                "Please check back later or choose another date."
+            )
+
         return cleaned_data
 
     def save(self, commit=True):
@@ -268,10 +300,15 @@ class InstructionRequestForm(forms.ModelForm):
         assert self.assignment is not None  # Validated in clean()
         instance.assignment = self.assignment
         instance.student = self.student
-        # Default to the primary instructor, or surge instructor if primary is None
-        instance.instructor = (
-            self.assignment.instructor or self.assignment.surge_instructor
-        )
+        # When both instructors are present the slot is left unassigned (None) so
+        # either instructor can accept it into their own queue (Issue #665).
+        # With only one instructor, assign directly to that instructor.
+        if self.assignment.instructor and self.assignment.surge_instructor:
+            instance.instructor = None
+        else:
+            instance.instructor = (
+                self.assignment.instructor or self.assignment.surge_instructor
+            )
         instance.status = "pending"
         instance.instructor_response = "pending"
         if commit:
