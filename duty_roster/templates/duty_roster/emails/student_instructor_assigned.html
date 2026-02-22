@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Instructor Confirmed</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!--[if mso]>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600">
+                <tr>
+                <td>
+                <![endif]-->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px;">
+                            {% if club_logo_url %}
+                            <img src="{{ club_logo_url }}" alt="{{ club_name }} Logo" style="max-height: 60px; max-width: 200px; height: auto; margin-bottom: 15px;">
+                            {% endif %}
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">✈️ Your Instructor Has Been Confirmed</h1>
+                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">{{ ops_date }}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px 20px;">
+
+                            <!-- Info Banner -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px; color: #0c5460;">
+                                        <strong>ℹ️ Instructor Assignment Updated</strong>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Hi {{ student.first_name|default:student.username }},
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                Your instructor for <strong>{{ ops_date }}</strong> has been confirmed:
+                            </p>
+
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8f9fa; border-radius: 4px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="margin: 0; font-size: 20px; font-weight: bold; color: #343a40;">
+                                            {{ instructor.get_full_name|default:instructor.username }}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                Please check the duty roster for any updates as the day approaches.
+                            </p>
+
+                            <!-- Call to Action -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ roster_url }}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="10%" strokecolor="#667eea" fillcolor="#667eea">
+                                        <w:anchorlock/>
+                                        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">View Duty Roster</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]>
+                                        <a href="{{ roster_url }}" style="display: inline-block; background-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; font-size: 16px;">View Duty Roster</a>
+                                        <![endif]-->
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 12px;">
+                                This is an automated notification from Manage2Soar
+                            </p>
+                            <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                                {{ club_name }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -203,7 +203,133 @@
         </div>
       </div>
     </div>
-  </div>
+  </div><!-- /.row -->
+
+  {% if allocation_by_date %}
+  <!-- ========================================================
+       Student Allocation Section (Issue #664)
+       Shown only for days that have both a primary and surge instructor.
+       ======================================================== -->
+  <div class="row mt-2">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-users-cog me-2"></i>Student Allocation
+            <small class="fw-normal ms-2">Drag students between instructors for surge days</small>
+          </h5>
+        </div>
+        <div class="card-body">
+          {% for day, alloc in allocation_by_date.items %}
+            <div class="mb-4">
+              <h6 class="border-bottom pb-2">
+                <i class="fas fa-calendar-day me-2"></i>{{ day|date:"l, F j, Y" }}
+                {% if day == today %}
+                  <span class="badge bg-danger ms-1">TODAY</span>
+                {% endif %}
+                <span class="badge bg-secondary ms-1">{{ alloc.primary_slots|length|add:alloc.surge_slots|length|add:alloc.unassigned_slots|length }} student{{ alloc.primary_slots|length|add:alloc.surge_slots|length|add:alloc.unassigned_slots|length|pluralize }}</span>
+              </h6>
+
+              <div class="row g-3">
+                <!-- Primary instructor's students -->
+                <div class="col-md-6">
+                  <div class="card border-primary h-100">
+                    <div class="card-header py-2 bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+                      <span class="fw-bold text-primary">
+                        <i class="fas fa-user-tie me-1"></i>{{ alloc.primary.full_display_name }}
+                      </span>
+                      <span class="badge bg-primary">{{ alloc.primary_slots|length }} student{{ alloc.primary_slots|length|pluralize }}</span>
+                    </div>
+                    <div class="card-body p-2">
+                      {% for slot in alloc.primary_slots %}
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                          <div class="flex-grow-1">
+                            <strong class="small">{{ slot.student.full_display_name }}</strong>
+                            {% if slot.instruction_types %}
+                              <br><small class="text-muted">{{ slot.get_instruction_types_text }}</small>
+                            {% endif %}
+                          </div>
+                          <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="ms-2 flex-shrink-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="surge">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Move to {{ alloc.surge.full_display_name }}">
+                              <i class="fas fa-arrow-right me-1"></i>Surge
+                            </button>
+                          </form>
+                        </div>
+                      {% empty %}
+                        <p class="text-muted small text-center py-3 mb-0">
+                          <i class="fas fa-inbox me-1"></i>No students assigned yet
+                        </p>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div><!-- /.col primary -->
+
+                <!-- Surge instructor's students -->
+                <div class="col-md-6">
+                  <div class="card border-success h-100">
+                    <div class="card-header py-2 bg-success bg-opacity-10 d-flex justify-content-between align-items-center">
+                      <span class="fw-bold text-success">
+                        <i class="fas fa-user-plus me-1"></i>{{ alloc.surge.full_display_name }}
+                        <span class="badge bg-secondary ms-1">Surge</span>
+                      </span>
+                      <span class="badge bg-success">{{ alloc.surge_slots|length }} student{{ alloc.surge_slots|length|pluralize }}</span>
+                    </div>
+                    <div class="card-body p-2">
+                      {% for slot in alloc.surge_slots %}
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                          <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="me-2 flex-shrink-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="primary">
+                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Move to {{ alloc.primary.full_display_name }}">
+                              <i class="fas fa-arrow-left me-1"></i>Primary
+                            </button>
+                          </form>
+                          <div class="flex-grow-1 text-end">
+                            <strong class="small">{{ slot.student.full_display_name }}</strong>
+                            {% if slot.instruction_types %}
+                              <br><small class="text-muted">{{ slot.get_instruction_types_text }}</small>
+                            {% endif %}
+                          </div>
+                        </div>
+                      {% empty %}
+                        <p class="text-muted small text-center py-3 mb-0">
+                          <i class="fas fa-inbox me-1"></i>No students assigned yet
+                        </p>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div><!-- /.col surge -->
+              </div><!-- /.row students -->
+
+              {% if alloc.unassigned_slots %}
+                <div class="alert alert-warning mt-2 py-2">
+                  <i class="fas fa-exclamation-triangle me-1"></i>
+                  <strong>{{ alloc.unassigned_slots|length }} unassigned student{{ alloc.unassigned_slots|length|pluralize }}:</strong>
+                  {% for slot in alloc.unassigned_slots %}
+                    <span class="badge bg-warning text-dark ms-1">{{ slot.student.full_display_name }}</span>
+                    <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="primary">
+                      <button type="submit" class="btn btn-xs btn-sm btn-outline-primary">→ Primary</button>
+                    </form>
+                    <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="surge">
+                      <button type="submit" class="btn btn-xs btn-sm btn-outline-success">→ Surge</button>
+                    </form>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+            </div><!-- /.mb-4 per day -->
+          {% endfor %}
+        </div><!-- /.card-body -->
+      </div><!-- /.card -->
+    </div>
+  </div><!-- /.row allocation -->
+  {% endif %}
 
   <!-- Quick Tips -->
   <div class="card shadow-sm mt-3">
