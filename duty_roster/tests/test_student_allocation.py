@@ -581,3 +581,37 @@ def test_template_shows_move_buttons_for_surge_day(client, django_user_model):
     assert response.status_code == 200
     content = response.content.decode()
     assert "assign-student" in content
+
+
+@pytest.mark.django_db
+def test_unassigned_slots_appear_in_context_and_render_warning(
+    client, django_user_model
+):
+    """
+    Accepted slots where instructor=None (or not the primary/surge instructor)
+    should appear in alloc['unassigned_slots'] in the view context, and the
+    template should render the amber 'alert-warning' section for them.
+    """
+    _make_site_config()
+    primary = _make_member(django_user_model, "tmpl_ua_p", instructor=True)
+    surge = _make_member(django_user_model, "tmpl_ua_s", instructor=True)
+    student = _make_member(django_user_model, "tmpl_ua_st")
+    assignment = _make_assignment(primary, date_offset=99, surge=surge)
+
+    # Slot with no instructor assigned yet
+    unassigned_slot = _make_accepted_slot(assignment, student, None)
+
+    client.force_login(primary)
+    response = client.get(reverse("duty_roster:instructor_requests"))
+
+    assert response.status_code == 200
+
+    # Verify the slot lands in unassigned_slots in the allocation context
+    allocation_by_date = response.context["allocation_by_date"]
+    assert allocation_by_date, "Expected allocation context for surged day"
+    alloc = list(allocation_by_date.values())[0]
+    assert unassigned_slot in alloc["unassigned_slots"]
+
+    # Verify the amber warning section is rendered in the template
+    content = response.content.decode()
+    assert "alert-warning" in content
