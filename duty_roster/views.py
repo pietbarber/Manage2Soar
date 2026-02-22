@@ -2398,7 +2398,12 @@ def instructor_requests(request):
             surge_slots = [
                 s for s in slots if s.instructor_id == assignment.surge_instructor_id
             ]
-            other_slots = [s for s in slots if s.instructor_id is None]
+            other_slots = [
+                s
+                for s in slots
+                if s.instructor_id
+                not in (assignment.instructor_id, assignment.surge_instructor_id)
+            ]
             allocation_by_date[day] = {
                 "assignment": assignment,
                 "primary": assignment.instructor,
@@ -2418,7 +2423,7 @@ def instructor_requests(request):
             "accepted_by_date": non_surge_accepted_by_date,
             "allocation_by_date": allocation_by_date,
             "pending_count": len(pending_slots),
-            "accepted_count": len(accepted_slots),
+            "accepted_count": sum(len(v) for v in non_surge_accepted_by_date.values()),
             "today": today,
             "instruction_surge_threshold": instruction_surge_threshold,
         },
@@ -2651,6 +2656,10 @@ def assign_student_to_instructor(request, slot_id):
     # Auth: must be primary or surge instructor for this day
     if request.user not in (assignment.instructor, assignment.surge_instructor):
         return HttpResponseForbidden("You are not an instructor for this day.")
+
+    if slot.status == "cancelled":
+        messages.warning(request, "Cannot reassign a cancelled instruction request.")
+        return redirect("duty_roster:instructor_requests")
 
     if slot.instructor_response != "accepted":
         messages.warning(request, "Only accepted students can be reassigned.")
