@@ -2391,19 +2391,14 @@ def instructor_requests(request):
     non_surge_accepted_by_date = {}
     for day, slots in accepted_by_date.items():
         assignment = assignment_by_date.get(day)
-        if assignment and assignment.surge_instructor:
+        if assignment and assignment.instructor_id and assignment.surge_instructor_id:
             primary_slots = [
                 s for s in slots if s.instructor_id == assignment.instructor_id
             ]
             surge_slots = [
                 s for s in slots if s.instructor_id == assignment.surge_instructor_id
             ]
-            other_slots = [
-                s
-                for s in slots
-                if s.instructor_id
-                not in (assignment.instructor_id, assignment.surge_instructor_id)
-            ]
+            other_slots = [s for s in slots if s.instructor_id is None]
             allocation_by_date[day] = {
                 "assignment": assignment,
                 "primary": assignment.instructor,
@@ -2422,7 +2417,6 @@ def instructor_requests(request):
             "pending_by_date": dict(pending_by_date),
             "accepted_by_date": non_surge_accepted_by_date,
             "allocation_by_date": allocation_by_date,
-            "assignment_by_date": assignment_by_date,
             "pending_count": len(pending_slots),
             "accepted_count": len(accepted_slots),
             "today": today,
@@ -2677,6 +2671,13 @@ def assign_student_to_instructor(request, slot_id):
     target_instructor = (
         assignment.instructor if action == "primary" else assignment.surge_instructor
     )
+
+    if target_instructor is None:
+        messages.error(
+            request,
+            "No instructor is assigned for this role; cannot reassign.",
+        )
+        return redirect("duty_roster:instructor_requests")
 
     # No-op if already assigned to the target
     if slot.instructor == target_instructor:

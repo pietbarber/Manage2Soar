@@ -544,6 +544,8 @@ def test_template_shows_allocation_section_for_surge_day(client, django_user_mod
     assert "Student Allocation" in content
     # Surge instructor name should appear in the allocation section
     assert "Surge Flyer" in content
+    # Student count badge should show correctly
+    assert "1 student" in content
 
 
 @pytest.mark.django_db

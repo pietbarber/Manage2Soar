@@ -227,7 +227,10 @@
                 {% if day == today %}
                   <span class="badge bg-danger ms-1">TODAY</span>
                 {% endif %}
-                <span class="badge bg-secondary ms-1">{{ alloc.primary_slots|length|add:alloc.surge_slots|length|add:alloc.unassigned_slots|length }} student{{ alloc.primary_slots|length|add:alloc.surge_slots|length|add:alloc.unassigned_slots|length|pluralize }}</span>
+                {% with primary_count=alloc.primary_slots|length surge_count=alloc.surge_slots|length unassigned_count=alloc.unassigned_slots|length %}
+                {% with total_students=primary_count|add:surge_count|add:unassigned_count %}
+                <span class="badge bg-secondary ms-1">{{ total_students }} student{{ total_students|pluralize }}</span>
+                {% endwith %}{% endwith %}
               </h6>
 
               <div class="row g-3">
@@ -312,12 +315,12 @@
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="primary">
-                      <button type="submit" class="btn btn-xs btn-sm btn-outline-primary">→ Primary</button>
+                      <button type="submit" class="btn btn-sm btn-outline-primary">→ Primary</button>
                     </form>
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="surge">
-                      <button type="submit" class="btn btn-xs btn-sm btn-outline-success">→ Surge</button>
+                      <button type="submit" class="btn btn-sm btn-outline-success">→ Surge</button>
                     </form>
                   {% endfor %}
                 </div>
