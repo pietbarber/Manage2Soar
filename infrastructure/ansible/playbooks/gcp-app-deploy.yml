@@ -369,12 +369,13 @@
       # rc=0: up to date. rc=1: pending migrations (Django migrate --check contract).
       # Fail loudly if kubectl itself errors (pod not found, auth failure, etc.) so
       # real infrastructure failures don't silently trigger an unconditional migrate run.
+      # Parentheses ensure the two OR clauses are evaluated independently — without them,
+      # "A and B or C" parses as "(A and B) or C" which can misfire.
       failed_when: >
-        migrate_check_results.rc != 0 and
-        migrate_check_results.rc != 1 or
+        (migrate_check_results.rc not in [0, 1]) or
         (migrate_check_results.rc != 0 and
-         migrate_check_results.stderr | default('') |
-         regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container'))
+         (migrate_check_results.stderr | default('') |
+          regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')))
       changed_when: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
