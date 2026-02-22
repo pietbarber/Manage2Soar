@@ -223,8 +223,12 @@
       ansible.builtin.command:
         cmd: kubectl create namespace {{ item.namespace | default('tenant-' + item.prefix) }}
       register: ns_precreate
-      failed_when: false
-      changed_when: "'created' in ns_precreate.stdout"
+      # rc=0: created; rc=1 + AlreadyExists: fine. Fail on all other errors
+      # (e.g. auth failure, cluster unreachable) so they don't silently propagate.
+      failed_when: >
+        ns_precreate.rc not in [0, 1] or
+        (ns_precreate.rc == 1 and 'AlreadyExists' not in ns_precreate.stderr)
+      changed_when: "ns_precreate.rc == 0 and 'created' in ns_precreate.stdout"
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         label: "{{ item.prefix }}"
@@ -332,6 +336,9 @@
         gke_build_image: false # Already built above
         gke_push_image: false # Already pushed above
         gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
+        # Disable the role's own migration step - post_tasks handles it via
+        # migrate --check detection to avoid running migrations twice.
+        gke_run_migrations: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
@@ -359,7 +366,15 @@
           - --noinput
       delegate_to: localhost
       register: migrate_check_results
-      failed_when: false
+      # rc=0: up to date. rc=1: pending migrations (Django migrate --check contract).
+      # Fail loudly if kubectl itself errors (pod not found, auth failure, etc.) so
+      # real infrastructure failures don't silently trigger an unconditional migrate run.
+      failed_when: >
+        migrate_check_results.rc != 0 and
+        migrate_check_results.rc != 1 or
+        (migrate_check_results.rc != 0 and
+         migrate_check_results.stderr | default('') |
+         regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container'))
       changed_when: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:

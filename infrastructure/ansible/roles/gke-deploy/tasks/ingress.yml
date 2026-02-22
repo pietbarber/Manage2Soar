@@ -127,26 +127,40 @@
     - static_ipv6_address.stdout is defined
   tags: [ingress, ip, ipv6]
 
-- name: Get actual gateway IP from live Gateway resource
+- name: Get all gateway status addresses from live Gateway resource
   ansible.builtin.command:
     cmd: >
-      kubectl get gateway {{ gke_gateway_name | default(gke_app_name ~ '-gateway') }}
+      kubectl get gateway {{ gke_app_name }}-gateway
       -n default
-      --output jsonpath='{.status.addresses[0].value}'
-  register: gateway_live_ip
+      --output jsonpath='{.status.addresses[*].value}'
+  register: gateway_live_ip_raw
   changed_when: false
   failed_when: false
   delegate_to: localhost
   run_once: true
   tags: [ingress, ip]
 
-- name: Override ingress IP with live gateway IP if available
+- name: Select IPv4 address from gateway status addresses
+  # Gateway may return multiple addresses (dual-stack). Filter for the IPv4 one
+  # explicitly rather than blindly taking index 0 which may be IPv6.
   ansible.builtin.set_fact:
-    gke_ingress_ip: "{{ gateway_live_ip.stdout | trim }}"
+    gateway_live_ipv4: >-
+      {{ (gateway_live_ip_raw.stdout | default('') | trim).split(' ')
+         | select('match', '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+         | list | first | default('') }}
   run_once: true
   when:
-    - gateway_live_ip.rc == 0
-    - (gateway_live_ip.stdout | trim) | length > 0
+    - gateway_live_ip_raw.rc == 0
+    - (gateway_live_ip_raw.stdout | default('') | trim) | length > 0
+  tags: [ingress, ip]
+
+- name: Override ingress IP with live gateway IPv4 if available
+  ansible.builtin.set_fact:
+    gke_ingress_ip: "{{ gateway_live_ipv4 }}"
+  run_once: true
+  when:
+    - gateway_live_ipv4 is defined
+    - (gateway_live_ipv4 | trim) | length > 0
   tags: [ingress, ip]
 
 - name: Display IP addresses for DNS configuration
