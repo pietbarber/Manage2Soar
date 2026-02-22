@@ -469,6 +469,78 @@
   tags: [ingress, httproute]
 
 # ============================================================
+# HEALTHCHECKPOLICY DEPLOYMENT
+# Configure GCP health checks to use /health/ instead of /
+# Without this, GCP probes with pod IP as Host header, Django
+# rejects with 400 (pod IP not in ALLOWED_HOSTS) -> UNHEALTHY
+# ============================================================
+
+- name: Generate HealthCheckPolicy manifest for tenant (multi-tenant)
+  ansible.builtin.template:
+    src: k8s-healthcheckpolicy.yml.j2
+    dest: "/tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml"
+    mode: "0600"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, healthcheck]
+
+- name: Apply HealthCheckPolicy for tenant (multi-tenant)
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml
+  register: healthcheck_result_mt
+  changed_when: "'created' in healthcheck_result_mt.stdout or 'configured' in healthcheck_result_mt.stdout"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, healthcheck]
+
+- name: Clean up HealthCheckPolicy manifests (multi-tenant)
+  ansible.builtin.file:
+    path: "/tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml"
+    state: absent
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when:
+    - gke_multi_tenant | bool
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, healthcheck]
+
+- name: Generate HealthCheckPolicy manifest (single-tenant)
+  ansible.builtin.template:
+    src: k8s-healthcheckpolicy-single.yml.j2
+    dest: "/tmp/k8s-healthcheckpolicy.yml"
+    mode: "0600"
+  delegate_to: localhost
+  when: not (gke_multi_tenant | bool)
+  tags: [ingress, healthcheck]
+
+- name: Apply HealthCheckPolicy (single-tenant)
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-healthcheckpolicy.yml
+  register: healthcheck_result_st
+  changed_when: "'created' in healthcheck_result_st.stdout or 'configured' in healthcheck_result_st.stdout"
+  delegate_to: localhost
+  when: not (gke_multi_tenant | bool)
+  tags: [ingress, healthcheck]
+
+- name: Clean up HealthCheckPolicy manifest (single-tenant)
+  ansible.builtin.file:
+    path: "/tmp/k8s-healthcheckpolicy.yml"
+    state: absent
+  delegate_to: localhost
+  when:
+    - not (gke_multi_tenant | bool)
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, healthcheck]
+
+# ============================================================
 # VERIFICATION
 # ============================================================
 
