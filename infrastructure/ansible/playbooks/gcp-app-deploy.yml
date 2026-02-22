@@ -336,6 +336,7 @@
       loop_control:
         loop_var: tenant
         label: "{{ tenant.prefix }}"
+      tags: [deploy, ingress, tls]
 
   post_tasks:
     # Auto-run migrations for any tenant with unapplied migrations.
