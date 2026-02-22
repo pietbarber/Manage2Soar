@@ -63,6 +63,20 @@
 vault_django_secret_key: "REPLACE-ME-WITH-DJANGO-SECRET-KEY-FROM-GENERATOR"
 
 # ============================================================
+# PER-TENANT DJANGO SECRET KEYS (Multi-Tenant, Recommended)
+# ============================================================
+# When defined, the gke-deploy role uses vault_django_secret_key_<prefix>
+# instead of the shared vault_django_secret_key above.
+# This isolates session/CSRF/token signing per tenant.
+# Generate each with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+# Avoid $, ", \, <, >, {, }, | in the key value (YAML/shell quoting issues).
+
+vault_django_secret_key_ssc: "REPLACE-WITH-SSC-SPECIFIC-SECRET-KEY"
+vault_django_secret_key_masa: "REPLACE-WITH-MASA-SPECIFIC-SECRET-KEY"
+# vault_django_secret_key_demo: "REPLACE-WITH-DEMO-SPECIFIC-SECRET-KEY"
+# vault_django_secret_key_svs: "REPLACE-WITH-SVS-SPECIFIC-SECRET-KEY"
+
+# ============================================================
 # DJANGO SUPERUSER PASSWORDS (Multi-Tenant)
 # ============================================================
 # Generate with: openssl rand -base64 32
@@ -112,6 +126,15 @@ vault_smtp_password: "REPLACE-WITH-SMTP2GO-API-KEY"
 # External SMTP relay credentials (used by m2s-mail server)
 vault_smtp_relay_username: "example-smtp-username"
 vault_smtp_relay_password: "example-smtp-password-replace-with-real-value"
+
+# SMTP auth password for the m2s-app user on the mail server
+# (used by Postfix sasl_passwd for authenticated submission from Django)
+# Generate with: openssl rand -base64 32
+vault_smtp_auth_password_m2s_app: "REPLACE-WITH-STRONG-PASSWORD"
+
+# M2S mail API key (used by the mail server to fetch member lists from the app)
+# Generate with: openssl rand -base64 32
+vault_m2s_api_key: "REPLACE-WITH-LONG-RANDOM-API-KEY"
 
 # ============================================================
 # GOOGLE OAUTH CREDENTIALS (OPTIONAL)

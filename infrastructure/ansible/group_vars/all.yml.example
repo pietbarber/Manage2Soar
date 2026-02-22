@@ -53,9 +53,10 @@ club_domains:
 # ============================================================
 # Default API key for clubs that don't have their own auth_token
 # For better multi-tenant isolation, prefer per-club auth_tokens above
-# This should be a long random string, shared with M2S settings
+# Store the actual key in vault.yml as: vault_m2s_api_key
+# Generate with: openssl rand -base64 32
 
-m2s_api_key: "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
+m2s_api_key: "{{ vault_m2s_api_key }}"
 
 # ============================================================
 # DEVELOPMENT MODE - SAFETY VALVE
@@ -81,8 +82,10 @@ dev_mode_redirect_to: ""
 
 smtp_relay_host: "mail.smtp2go.com"
 smtp_relay_port: 587
-smtp_relay_username: "YOUR_SMTP2GO_USERNAME"
-smtp_relay_password: "YOUR_SMTP2GO_PASSWORD"
+# Store credentials in vault.yml as: vault_smtp_relay_username, vault_smtp_relay_password
+# Get these from your SMTP2GO dashboard under Sending > SMTP Users
+smtp_relay_username: "{{ vault_smtp_relay_username }}"
+smtp_relay_password: "{{ vault_smtp_relay_password }}"
 
 # ============================================================
 # SMTP AUTHENTICATION (for M2S to send via this server)
@@ -93,7 +96,9 @@ smtp_relay_password: "YOUR_SMTP2GO_PASSWORD"
 
 smtp_auth_users:
   - username: "m2s-app"
-    password: "CHANGE_ME_STRONG_PASSWORD"
+    # Store in vault.yml as: vault_smtp_auth_password_m2s_app
+    # Generate with: openssl rand -base64 32
+    password: "{{ vault_smtp_auth_password_m2s_app }}"
     # Which domains this user can send from
     allowed_domains:
       - "ssc.manage2soar.com"

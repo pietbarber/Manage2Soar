@@ -53,7 +53,8 @@ gcloud container clusters get-credentials CLUSTER_NAME --zone ZONE --project PRO
 |----------|-------------|
 | `gcp_project` | GCP project ID |
 | `gke_cluster_name` | GKE cluster name |
-| `vault_django_secret_key` | Django SECRET_KEY |
+| `vault_django_secret_key` | Django SECRET_KEY (shared fallback for all tenants) |
+| `vault_django_secret_key_<prefix>` | Per-tenant Django SECRET_KEY (recommended; overrides shared key when defined) |
 | `vault_postgresql_password` | Database password (single-tenant) |
 | `vault_postgresql_password_<prefix>` | Database password per tenant (multi-tenant) |
 
