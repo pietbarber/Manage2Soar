@@ -343,7 +343,12 @@ def test_template_shows_assigned_message_when_surge_instructor_set(
 
     assert response.status_code == 200
     content = response.content.decode()
-    assert "Surge instructor assigned" in content
+    # Since surge is assigned and accepted students exist, this day appears in the
+    # allocation_by_date section (Issue #664). The surge instructor's name and
+    # 'Surge' badge are shown there; the old 'Surge instructor assigned' alert is
+    # in the accepted_by_date section which is no longer rendered for surge days.
+    assert "Surge Pilot" in content
+    assert "Surge" in content
     # Button should NOT be present since surge is already filled
     assert "Request Surge Instructor" not in content
     assert "Re-send Surge Request" not in content
@@ -371,8 +376,10 @@ def test_template_shows_static_text_to_non_primary_instructor(
 
     assert response.status_code == 200
     content = response.content.decode()
-    # The surge instructor sees the assigned message (their own name is on the assignment)
-    assert "Surge instructor assigned" in content
+    # Since surge is assigned and accepted students exist, this day appears in the
+    # allocation_by_date section (Issue #664). The surge instructor appears there
+    # as a column header — assert on their username for a specific marker.
+    assert surge.username in content
     assert "Request Surge Instructor" not in content
 
 

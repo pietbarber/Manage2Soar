@@ -2459,6 +2459,28 @@ def instructor_respond(request, slot_id):
         messages.error(request, "Invalid action.")
         return redirect("duty_roster:instructor_requests")
 
+    # Per-instructor capacity check (Issue #665).
+    # Only applies when BOTH a primary and surge instructor are assigned; each
+    # has their own quota equal to the global instruction_surge_threshold.
+    if action == "accept" and assignment.instructor and assignment.surge_instructor:
+        _, instruction_threshold = get_surge_thresholds()
+        my_accepted_count = (
+            InstructionSlot.objects.filter(
+                assignment=assignment,
+                instructor=request.user,
+                instructor_response="accepted",
+            )
+            .exclude(status="cancelled")
+            .count()
+        )
+        if my_accepted_count >= instruction_threshold:
+            messages.error(
+                request,
+                f"You have reached your student capacity ({instruction_threshold}) for this day. "
+                "The other instructor may still accept this student.",
+            )
+            return redirect("duty_roster:instructor_requests")
+
     form = InstructorResponseForm(request.POST, instance=slot, instructor=request.user)
 
     if form.is_valid():
@@ -2470,7 +2492,7 @@ def instructor_respond(request, slot_id):
             )
             # HTML email sent via signal (send_request_response_email)
 
-            # Check if we now have 3+ students and need surge instructor
+            # Only check for surge need if no surge instructor yet
             _check_surge_instructor_needed(slot.assignment)
 
         elif action == "reject":
