@@ -312,6 +312,9 @@
   tags: [ingress, tls, gateway]
 
 - name: Build combined SSL cert annotation (preserve existing certs during transition)
+  # Only combine when the live read succeeded. If kubectl failed (RBAC error,
+  # gateway not yet created, transient outage), fall through to the fallback below
+  # rather than clobbering the live cert list with only the new cert name.
   ansible.builtin.set_fact:
     gke_ssl_cert_annotation: >-
       {%- set existing = (gateway_current_certs.stdout | default('')) | trim -%}
@@ -319,7 +322,21 @@
       {%- set combined = (existing_list + [gke_ssl_cert_name]) | unique | list -%}
       {{ combined | join(',') }}
   run_once: true
-  when: gke_enable_tls | default(true) | bool
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gateway_current_certs.rc == 0
+  tags: [ingress, tls, gateway]
+
+- name: Set SSL cert annotation to new cert only (gateway read failed or first deploy)
+  # Fallback: when the gateway doesn't exist yet or the read failed, use only the
+  # new cert name. The template's default() also covers this but being explicit
+  # prevents stale gke_ssl_cert_annotation from a previous play iteration leaking in.
+  ansible.builtin.set_fact:
+    gke_ssl_cert_annotation: "{{ gke_ssl_cert_name }}"
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gateway_current_certs.rc != 0
   tags: [ingress, tls, gateway]
 
 - name: Display combined cert annotation

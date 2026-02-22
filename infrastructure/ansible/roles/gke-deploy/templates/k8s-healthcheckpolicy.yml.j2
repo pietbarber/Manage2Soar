@@ -13,7 +13,7 @@ apiVersion: networking.gke.io/v1
 kind: HealthCheckPolicy
 metadata:
   name: django-health-check
-  namespace: tenant-{{ ingress_tenant.prefix }}
+  namespace: {{ ingress_tenant.namespace | default('tenant-' ~ ingress_tenant.prefix) }}
   labels:
     app: {{ gke_app_name }}
     tenant: "{{ ingress_tenant.prefix }}"
@@ -23,7 +23,7 @@ spec:
     checkIntervalSec: 10
     config:
       httpHealthCheck:
-        port: 8000
+        port: {{ gke_container_port }}
         requestPath: /health/
       type: HTTP
     healthyThreshold: 2

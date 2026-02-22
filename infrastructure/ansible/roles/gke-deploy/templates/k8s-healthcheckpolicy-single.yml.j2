@@ -22,7 +22,7 @@ spec:
     checkIntervalSec: 10
     config:
       httpHealthCheck:
-        port: 8000
+        port: {{ gke_container_port }}
         requestPath: /health/
       type: HTTP
     healthyThreshold: 2

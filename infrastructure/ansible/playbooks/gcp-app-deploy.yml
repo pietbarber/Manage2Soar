@@ -217,11 +217,29 @@
           {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_tenants }}
       tags: [always]
 
+    - name: Validate tenant namespace follows tenant-<prefix> convention
+      # Ingress templates (HTTPRoute, HealthCheckPolicy) hard-code 'tenant-<prefix>'
+      # as the namespace. A custom namespace override would create a mismatch. Block
+      # early rather than letting manifests land in the wrong namespace.
+      ansible.builtin.assert:
+        that:
+          - item.namespace is not defined or item.namespace == 'tenant-' + item.prefix
+        fail_msg: |
+          Tenant {{ item.prefix }} sets namespace='{{ item.namespace | default('') }}', but ingress
+          resources are deployed into 'tenant-{{ item.prefix }}'. Either remove the custom
+          namespace key or update the ingress templates to honor it consistently.
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        label: "{{ item.prefix }}"
+      tags: [always]
+
     - name: Pre-create all tenant namespaces
-      # Ensures namespaces exist before the deploy loop runs so the ingress task
-      # (which loops over ALL tenants at once) can reference them without erroring.
+      # Loops over ALL gke_tenants (not just gke_deploy_tenants) because the ingress
+      # role iterates over the full tenant list when generating HTTPRoutes and
+      # HealthCheckPolicies. A subset deploy must not leave any referenced namespace
+      # missing. Skipped in check mode to keep --check side-effect-free.
       ansible.builtin.command:
-        cmd: kubectl create namespace {{ item.namespace | default('tenant-' + item.prefix) }}
+        cmd: kubectl create namespace tenant-{{ item.prefix }}
       register: ns_precreate
       # rc=0: created; rc=1 + AlreadyExists: fine. Fail on all other errors
       # (e.g. auth failure, cluster unreachable) so they don't silently propagate.
@@ -229,7 +247,8 @@
         ns_precreate.rc not in [0, 1] or
         (ns_precreate.rc == 1 and 'AlreadyExists' not in ns_precreate.stderr)
       changed_when: "ns_precreate.rc == 0 and 'created' in ns_precreate.stdout"
-      loop: "{{ gke_deploy_tenants }}"
+      when: not ansible_check_mode
+      loop: "{{ gke_tenants }}"
       loop_control:
         label: "{{ item.prefix }}"
       tags: [always]
