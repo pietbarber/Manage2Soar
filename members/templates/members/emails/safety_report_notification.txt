@@ -21,10 +21,13 @@ ACTION REQUIRED
 
 Please review this safety report and take appropriate action.
 
-Log into the admin interface to:
+Visit the safety officer dashboard to:
 - Review the full report details
 - Update the status
 - Add officer notes and actions taken
+
+{% if report_url %}View Safety Report: {{ report_url }}
+{% endif %}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
