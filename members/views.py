@@ -913,7 +913,7 @@ def _notify_safety_officers_of_new_report(report):
         site_url = get_canonical_url()
         try:
             report_path = reverse("members:safety_report_detail", args=[report.pk])
-            report_url = f"{site_url}{report_path}"
+            report_url = build_absolute_url(report_path, canonical=site_url)
         except Exception:
             report_url = None
 
