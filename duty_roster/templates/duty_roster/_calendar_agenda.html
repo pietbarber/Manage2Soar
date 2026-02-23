@@ -76,8 +76,9 @@
                         <small class="text-muted">{{ assignment.instructor.phone }}</small>
                       {% endif %}
 
-                      {# Show students signed up for instruction #}
-                      {% with students=assignment.instruction_slots.all %}
+                      {# Show students signed up for instruction — use active_instruction_slots
+                         to exclude cancelled requests from both count and list (issue #668) #}
+                      {% with students=assignment.active_instruction_slots %}
                         {% if students %}
                           <hr class="my-2">
                           <div class="small">
@@ -86,18 +87,16 @@
                             </strong>
                             <ul class="list-unstyled mb-0 mt-1">
                               {% for slot in students %}
-                                {% if slot.status != "cancelled" %}
-                                  <li class="ps-2">
-                                    {% if slot.instructor_response == "accepted" %}
-                                      <i class="fas fa-check-circle text-success me-1" title="Confirmed"></i>
-                                    {% elif slot.instructor_response == "pending" %}
-                                      <i class="fas fa-clock text-warning me-1" title="Pending"></i>
-                                    {% elif slot.instructor_response == "rejected" %}
-                                      <i class="fas fa-times-circle text-danger me-1" title="Declined"></i>
-                                    {% endif %}
-                                    {{ slot.student.full_display_name }}
-                                  </li>
-                                {% endif %}
+                                <li class="ps-2">
+                                  {% if slot.instructor_response == "accepted" %}
+                                    <i class="fas fa-check-circle text-success me-1" title="Confirmed"></i>
+                                  {% elif slot.instructor_response == "pending" %}
+                                    <i class="fas fa-clock text-warning me-1" title="Pending"></i>
+                                  {% elif slot.instructor_response == "rejected" %}
+                                    <i class="fas fa-times-circle text-danger me-1" title="Declined"></i>
+                                  {% endif %}
+                                  {{ slot.student.full_display_name }}
+                                </li>
                               {% endfor %}
                             </ul>
                           </div>
