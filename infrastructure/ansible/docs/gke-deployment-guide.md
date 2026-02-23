@@ -281,11 +281,15 @@ ansible-playbook -i inventory/gcp_app.yml \
 
 ### Collect Static Files
 
+Static files are collected automatically on every deployment (`gke_collect_static` defaults to `true`).
+
+To **skip** static file collection (e.g. for a migrations-only deploy):
+
 ```bash
 ansible-playbook -i inventory/gcp_app.yml \
   --vault-password-file ~/.ansible_vault_pass \
   playbooks/gcp-app-deploy.yml \
-  -e gke_collect_static=true
+  -e gke_collect_static=false
 ```
 
 ### Dry Run (Check Mode)
@@ -447,7 +451,7 @@ ansible-playbook ... --skip-tags docker
 | `gke_build_image` | `true` | Build Docker image |
 | `gke_push_image` | `true` | Push to GCR |
 | `gke_run_migrations` | `false` | Run Django migrations |
-| `gke_collect_static` | `false` | Run collectstatic |
+| `gke_collect_static` | `true` | Run collectstatic |
 | `gke_deploy_cronjobs` | `true` | Deploy CronJobs |
 | `gke_wait_for_rollout` | `true` | Wait for rollout |
 | `gke_rollout_timeout` | `300` | Rollout timeout (seconds) |

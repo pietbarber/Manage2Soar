@@ -171,7 +171,7 @@ gke_deploy_cronjobs: true
 gke_run_migrations: false
 
 # Collect static files after deploy
-gke_collect_static: false
+gke_collect_static: true
 
 # ============================================================
 # GCP SERVICE ACCOUNT

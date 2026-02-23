@@ -230,10 +230,10 @@ gke_rollout_timeout: 600  # 10 minutes - increased from 5 to handle slow startup
 # Run database migrations
 gke_run_migrations: false
 
-# Collect static files to GCS (disabled by default; enable when deploying static file changes)
-# Running collectstatic on every deployment increases deploy time and GCS costs unnecessarily.
-# Enable this when deploying CSS, JS, or image changes, or run as a separate post-deployment step.
-gke_collect_static: false
+# Collect static files to GCS after deployment.
+# Enabled by default — skipping this causes missing CSS/JS on the site if new static files were added.
+# The cost and time overhead is minimal (~10s); the risk of skipping is a broken site.
+gke_collect_static: true
 
 # Keep generated manifest files for debugging (default: clean up after deployment)
 gke_keep_manifests: false
