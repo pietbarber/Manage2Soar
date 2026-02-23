@@ -127,6 +127,42 @@
     - static_ipv6_address.stdout is defined
   tags: [ingress, ip, ipv6]
 
+- name: Get all gateway status addresses from live Gateway resource
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_app_name }}-gateway
+      -n default
+      --output jsonpath='{.status.addresses[*].value}'
+  register: gateway_live_ip_raw
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+  tags: [ingress, ip]
+
+- name: Select IPv4 address from gateway status addresses
+  # Gateway may return multiple addresses (dual-stack). Filter for the IPv4 one
+  # explicitly rather than blindly taking index 0 which may be IPv6.
+  ansible.builtin.set_fact:
+    gateway_live_ipv4: >-
+      {{ (gateway_live_ip_raw.stdout | default('') | trim).split(' ')
+         | select('match', '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+         | list | first | default('') }}
+  run_once: true
+  when:
+    - gateway_live_ip_raw.rc == 0
+    - (gateway_live_ip_raw.stdout | default('') | trim) | length > 0
+  tags: [ingress, ip]
+
+- name: Override ingress IP with live gateway IPv4 if available
+  ansible.builtin.set_fact:
+    gke_ingress_ip: "{{ gateway_live_ipv4 }}"
+  run_once: true
+  when:
+    - gateway_live_ipv4 is defined
+    - (gateway_live_ipv4 | trim) | length > 0
+  tags: [ingress, ip]
+
 - name: Display IP addresses for DNS configuration
   ansible.builtin.debug:
     msg: |
@@ -257,6 +293,60 @@
     - ssl_cert_create is defined
   run_once: true
   tags: [ingress, tls]
+
+# Read the live Gateway annotation so we can combine old + new cert names.
+# This prevents an SSL outage on existing domains while a new cert provisions.
+# The Gateway template uses gke_ssl_cert_annotation (may be a comma-separated
+# list) rather than the bare gke_ssl_cert_name.
+- name: Read current Gateway pre-shared-certs annotation from cluster
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_app_name }}-gateway -n default
+      --output "jsonpath={.spec.listeners[?(@.name=='https')].tls.options['networking.gke.io/pre-shared-certs']}"
+  register: gateway_current_certs
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [ingress, tls, gateway]
+
+- name: Build combined SSL cert annotation (preserve existing certs during transition)
+  # Only combine when the live read succeeded. If kubectl failed (RBAC error,
+  # gateway not yet created, transient outage), fall through to the fallback below
+  # rather than clobbering the live cert list with only the new cert name.
+  ansible.builtin.set_fact:
+    gke_ssl_cert_annotation: >-
+      {%- set existing = (gateway_current_certs.stdout | default('')) | trim -%}
+      {%- set existing_list = existing.split(',') | map('trim') | select | list if existing else [] -%}
+      {%- set combined = (existing_list + [gke_ssl_cert_name]) | unique | list -%}
+      {{ combined | join(',') }}
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gateway_current_certs.rc == 0
+  tags: [ingress, tls, gateway]
+
+- name: Set SSL cert annotation to new cert only (gateway read failed or first deploy)
+  # Fallback: when the gateway doesn't exist yet or the read failed, use only the
+  # new cert name. The template's default() also covers this but being explicit
+  # prevents stale gke_ssl_cert_annotation from a previous play iteration leaking in.
+  ansible.builtin.set_fact:
+    gke_ssl_cert_annotation: "{{ gke_ssl_cert_name }}"
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gateway_current_certs.rc != 0
+  tags: [ingress, tls, gateway]
+
+- name: Display combined cert annotation
+  ansible.builtin.debug:
+    msg: "Gateway will reference certs: {{ gke_ssl_cert_annotation }}"
+  run_once: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - gke_ssl_cert_annotation is defined
+  tags: [ingress, tls, gateway]
 
 # ============================================================
 # GATEWAY DEPLOYMENT (Single shared gateway)
@@ -396,6 +486,78 @@
   tags: [ingress, httproute]
 
 # ============================================================
+# HEALTHCHECKPOLICY DEPLOYMENT
+# Configure GCP health checks to use /health/ instead of /
+# Without this, GCP probes with pod IP as Host header, Django
+# rejects with 400 (pod IP not in ALLOWED_HOSTS) -> UNHEALTHY
+# ============================================================
+
+- name: Generate HealthCheckPolicy manifest for tenant (multi-tenant)
+  ansible.builtin.template:
+    src: k8s-healthcheckpolicy.yml.j2
+    dest: "/tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml"
+    mode: "0600"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, healthcheck]
+
+- name: Apply HealthCheckPolicy for tenant (multi-tenant)
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml
+  register: healthcheck_result_mt
+  changed_when: "'created' in healthcheck_result_mt.stdout or 'configured' in healthcheck_result_mt.stdout"
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when: gke_multi_tenant | bool
+  tags: [ingress, healthcheck]
+
+- name: Clean up HealthCheckPolicy manifests (multi-tenant)
+  ansible.builtin.file:
+    path: "/tmp/k8s-healthcheckpolicy-{{ ingress_tenant.prefix }}.yml"
+    state: absent
+  delegate_to: localhost
+  loop: "{{ gke_tenants }}"
+  loop_control:
+    loop_var: ingress_tenant
+  when:
+    - gke_multi_tenant | bool
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, healthcheck]
+
+- name: Generate HealthCheckPolicy manifest (single-tenant)
+  ansible.builtin.template:
+    src: k8s-healthcheckpolicy-single.yml.j2
+    dest: "/tmp/k8s-healthcheckpolicy.yml"
+    mode: "0600"
+  delegate_to: localhost
+  when: not (gke_multi_tenant | bool)
+  tags: [ingress, healthcheck]
+
+- name: Apply HealthCheckPolicy (single-tenant)
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/k8s-healthcheckpolicy.yml
+  register: healthcheck_result_st
+  changed_when: "'created' in healthcheck_result_st.stdout or 'configured' in healthcheck_result_st.stdout"
+  delegate_to: localhost
+  when: not (gke_multi_tenant | bool)
+  tags: [ingress, healthcheck]
+
+- name: Clean up HealthCheckPolicy manifest (single-tenant)
+  ansible.builtin.file:
+    path: "/tmp/k8s-healthcheckpolicy.yml"
+    state: absent
+  delegate_to: localhost
+  when:
+    - not (gke_multi_tenant | bool)
+    - not (gke_keep_manifests | default(false))
+  tags: [ingress, healthcheck]
+
+# ============================================================
 # VERIFICATION
 # ============================================================
 
@@ -523,3 +685,74 @@
       ========================================
   run_once: true
   tags: [ingress, verify]
+
+# ============================================================
+# CERT CLEANUP  (tag: cert-cleanup)
+#
+# After a cert rotation, the Gateway annotation may hold multiple certs
+# (e.g., "manage2soar-ssl-cert-v3,manage2soar-ssl-cert-v4").
+# Run this tag once the new cert is ACTIVE to trim back to a single entry.
+#
+# Usage:
+#   ansible-playbook -i inventory/gcp_app.yml playbooks/gcp-app-deploy.yml \
+#     --vault-password-file ~/.ansible_vault_pass --tags cert-cleanup
+# ============================================================
+
+- name: Read current Gateway cert annotation (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      kubectl get gateway {{ gke_app_name }}-gateway -n default
+      --output "jsonpath={.spec.listeners[?(@.name=='https')].tls.options['networking.gke.io/pre-shared-certs']}"
+  register: cleanup_current_annotation
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]
+
+- name: Check if target cert is ACTIVE (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      gcloud compute ssl-certificates describe {{ gke_ssl_cert_name }}
+      --global --project={{ gcp_project }}
+      --format="value(managed.status)"
+  register: cleanup_target_status
+  failed_when: false
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]
+
+- name: Trim Gateway annotation to single active cert (cert-cleanup)
+  ansible.builtin.command:
+    cmd: >
+      kubectl patch gateway {{ gke_app_name }}-gateway -n default --type=json
+      -p '[{"op":"replace","path":"/spec/listeners/0/tls/options/networking.gke.io~1pre-shared-certs","value":"{{ gke_ssl_cert_name }}"}]'
+  delegate_to: localhost
+  run_once: true
+  changed_when: true
+  when:
+    - gke_enable_tls | default(true) | bool
+    - cleanup_target_status.stdout | default('') | trim == 'ACTIVE'
+    - cleanup_current_annotation.stdout | default('') | trim != gke_ssl_cert_name
+    - (cleanup_current_annotation.stdout | default('') | trim).split(',') | map('trim') | list | length > 1
+  tags: [cert-cleanup]
+
+- name: Display cert-cleanup result
+  ansible.builtin.debug:
+    msg: |
+      {% set status = cleanup_target_status.stdout | default('') | trim %}
+      {% set current = cleanup_current_annotation.stdout | default('') | trim %}
+      {% if status == 'ACTIVE' and current != gke_ssl_cert_name %}
+      ✅ Trimmed Gateway annotation to: {{ gke_ssl_cert_name }}
+      {% elif status == 'ACTIVE' and current == gke_ssl_cert_name %}
+      ✅ Gateway already references only: {{ gke_ssl_cert_name }} — nothing to clean up.
+      {% else %}
+      ⏳ Target cert {{ gke_ssl_cert_name }} is {{ status }} — not trimming yet.
+         Re-run --tags cert-cleanup once it shows ACTIVE.
+      {% endif %}
+  run_once: true
+  when: gke_enable_tls | default(true) | bool
+  tags: [cert-cleanup]

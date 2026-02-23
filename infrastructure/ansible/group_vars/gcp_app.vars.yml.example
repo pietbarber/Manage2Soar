@@ -178,7 +178,9 @@ gke_collect_static: false
 # ============================================================
 
 # Path to GCP service account key file (for creating K8s secret)
-# gke_gcp_sa_key_file: "/path/to/service-account-key.json"
+# Use an absolute path or relative to the playbook directory.
+# When running from infrastructure/ansible/playbooks/, project root is 3 levels up:
+gke_gcp_sa_key_file: "{{ playbook_dir }}/../../../manage2soar-django-key.json"
 
 # ============================================================
 # MULTI-TENANT CONFIGURATION

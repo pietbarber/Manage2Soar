@@ -217,6 +217,42 @@
           {{ gke_tenants | selectattr('prefix', 'equalto', gke_deploy_tenant) | list if gke_deploy_tenant is defined else gke_tenants }}
       tags: [always]
 
+    - name: Validate tenant namespace follows tenant-<prefix> convention
+      # Ingress templates (HTTPRoute, HealthCheckPolicy) hard-code 'tenant-<prefix>'
+      # as the namespace. A custom namespace override would create a mismatch. Block
+      # early rather than letting manifests land in the wrong namespace.
+      ansible.builtin.assert:
+        that:
+          - item.namespace is not defined or item.namespace == 'tenant-' + item.prefix
+        fail_msg: |
+          Tenant {{ item.prefix }} sets namespace='{{ item.namespace | default('') }}', but ingress
+          resources are deployed into 'tenant-{{ item.prefix }}'. Either remove the custom
+          namespace key or update the ingress templates to honor it consistently.
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        label: "{{ item.prefix }}"
+      tags: [always]
+
+    - name: Pre-create all tenant namespaces
+      # Loops over ALL gke_tenants (not just gke_deploy_tenants) because the ingress
+      # role iterates over the full tenant list when generating HTTPRoutes and
+      # HealthCheckPolicies. A subset deploy must not leave any referenced namespace
+      # missing. Skipped in check mode to keep --check side-effect-free.
+      ansible.builtin.command:
+        cmd: kubectl create namespace tenant-{{ item.prefix }}
+      register: ns_precreate
+      # rc=0: created; rc=1 + AlreadyExists: fine. Fail on all other errors
+      # (e.g. auth failure, cluster unreachable) so they don't silently propagate.
+      failed_when: >
+        ns_precreate.rc not in [0, 1] or
+        (ns_precreate.rc == 1 and 'AlreadyExists' not in ns_precreate.stderr)
+      changed_when: "ns_precreate.rc == 0 and 'created' in ns_precreate.stdout"
+      when: not ansible_check_mode
+      loop: "{{ gke_tenants }}"
+      loop_control:
+        label: "{{ item.prefix }}"
+      tags: [always]
+
     - name: Validate vault secrets for selected tenants
       ansible.builtin.assert:
         that:
@@ -319,12 +355,87 @@
         gke_build_image: false # Already built above
         gke_push_image: false # Already pushed above
         gke_app_domain: "{{ tenant.domain | default(tenant.prefix + '.' + gke_base_domain | default('manage2soar.com')) }}"
+        # Disable the role's own migration step - post_tasks handles it via
+        # migrate --check detection to avoid running migrations twice.
+        gke_run_migrations: false
       loop: "{{ gke_deploy_tenants }}"
       loop_control:
         loop_var: tenant
         label: "{{ tenant.prefix }}"
+      tags: [deploy, ingress, tls, cert-cleanup, healthcheck]
 
   post_tasks:
+    # Auto-run migrations for any tenant with unapplied migrations.
+    # Uses 'migrate --check' (exits non-zero if unapplied migrations exist) to detect
+    # new tenants or tenants that need schema updates, then runs migrate for those only.
+    # This handles first-time deploys without requiring gke_run_migrations=true.
+    - name: Check for unapplied migrations per tenant
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - deployment/django-app-{{ tenant.prefix }}
+          - -n
+          - "{{ tenant.namespace | default('tenant-' + tenant.prefix) }}"
+          - --
+          - python
+          - manage.py
+          - migrate
+          - --check
+          - --noinput
+      delegate_to: localhost
+      register: migrate_check_results
+      # rc=0: up to date. rc=1: pending migrations (Django migrate --check contract).
+      # Fail loudly if kubectl itself errors (pod not found, auth failure, etc.) so
+      # real infrastructure failures don't silently trigger an unconditional migrate run.
+      # Parentheses ensure the two OR clauses are evaluated independently — without them,
+      # "A and B or C" parses as "(A and B) or C" which can misfire.
+      failed_when: >
+        (migrate_check_results.rc not in [0, 1]) or
+        (migrate_check_results.rc != 0 and
+         (migrate_check_results.stderr | default('') |
+          regex_search('Error from server|unable to find|exec failed|OCI runtime|no such container')))
+      changed_when: false
+      loop: "{{ gke_deploy_tenants }}"
+      loop_control:
+        loop_var: tenant
+        label: "{{ tenant.prefix }}"
+      tags: [migrations]
+
+    - name: Run migrations for tenants with unapplied migrations
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - deployment/django-app-{{ item.tenant.prefix }}
+          - -n
+          - "{{ item.tenant.namespace | default('tenant-' + item.tenant.prefix) }}"
+          - --
+          - python
+          - manage.py
+          - migrate
+          - --noinput
+      delegate_to: localhost
+      register: migrate_run_result
+      changed_when: "'Applying' in migrate_run_result.stdout"
+      loop: "{{ migrate_check_results.results | selectattr('rc', 'ne', 0) | list }}"
+      loop_control:
+        label: "{{ item.tenant.prefix }}"
+      tags: [migrations]
+
+    - name: Display migration results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Migration Results
+          ========================================
+          {% for result in migrate_check_results.results | default([]) %}
+          {{ result.tenant.prefix }}: {% if result.rc == 0 %}✓ Up to date{% else %}⚡ Migrations applied{% endif %}
+          {% endfor %}
+          ========================================
+      when: migrate_check_results is defined
+      tags: [migrations]
+
     # Create superuser for each tenant (if enabled)
     - name: Create superuser for each tenant
       ansible.builtin.command:
