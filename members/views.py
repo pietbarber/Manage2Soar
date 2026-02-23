@@ -15,7 +15,7 @@ from django.db import IntegrityError
 from django.db.models import F, Func, Prefetch
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -909,13 +909,23 @@ def _notify_safety_officers_of_new_report(report):
 
         config = SiteConfiguration.objects.first()
 
-        # Build context for email
-        site_url = get_canonical_url()
+        # Build context for email — reuse already-fetched config to avoid a
+        # second SiteConfiguration DB query inside get_canonical_url().
+        if config and getattr(config, "canonical_url", None):
+            site_url = config.canonical_url
+        else:
+            site_url = get_canonical_url()
+        report_path = None
         try:
             report_path = reverse("members:safety_report_detail", args=[report.pk])
-            report_url = build_absolute_url(report_path, canonical=site_url)
-        except Exception:
-            report_url = None
+        except NoReverseMatch:
+            logger.debug(
+                "Could not reverse members:safety_report_detail for report %s",
+                report.pk,
+            )
+        report_url = (
+            build_absolute_url(report_path, canonical=site_url) if report_path else None
+        )
 
         context = {
             "report": report,
@@ -956,10 +966,9 @@ def _notify_safety_officers_of_new_report(report):
             notification_message = (
                 f"New safety report submitted: {report.get_reporter_display()}"
             )
-            try:
-                detail_url = reverse("members:safety_report_detail", args=[report.pk])
-            except Exception:
-                detail_url = None
+            # Reuse the path already resolved above — keeps email and
+            # in-app notification URLs in sync with a single reverse() call.
+            detail_url = report_path
 
             for officer in safety_officers:
                 try:
