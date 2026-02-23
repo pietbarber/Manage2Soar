@@ -1,6 +1,7 @@
 # instructors/decorators.py
 from functools import wraps
 
+from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import get_object_or_404, redirect, render
 
 from members.models import Member
@@ -29,7 +30,7 @@ def instructor_required(view_func):
         user = request.user
 
         if not user.is_authenticated:
-            return redirect("login")
+            return redirect_to_login(request.get_full_path())
 
         # Centralized check which handles superuser logic and statuses
         if not is_active_member(user):
@@ -68,7 +69,7 @@ def member_or_instructor_required(view_func):
         user = request.user
 
         if not user.is_authenticated:
-            return redirect("login")
+            return redirect_to_login(request.get_full_path())
 
         # Centralized check which handles superuser logic and statuses
         if not is_active_member(user):
@@ -105,7 +106,7 @@ def instructor_or_safety_officer_required(view_func):
         user = request.user
 
         if not user.is_authenticated:
-            return redirect("login")
+            return redirect_to_login(request.get_full_path())
 
         # Superusers always have access
         if user.is_superuser:
