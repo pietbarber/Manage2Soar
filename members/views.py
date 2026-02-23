@@ -910,10 +910,18 @@ def _notify_safety_officers_of_new_report(report):
         config = SiteConfiguration.objects.first()
 
         # Build context for email
+        site_url = get_canonical_url()
+        try:
+            report_path = reverse("members:safety_report_detail", args=[report.pk])
+            report_url = f"{site_url}{report_path}"
+        except Exception:
+            report_url = None
+
         context = {
             "report": report,
             "club_name": config.club_name if config else "Club",
-            "site_url": get_canonical_url(),
+            "site_url": site_url,
+            "report_url": report_url,
             "reporter_display": report.get_reporter_display(),
         }
 
@@ -949,9 +957,7 @@ def _notify_safety_officers_of_new_report(report):
                 f"New safety report submitted: {report.get_reporter_display()}"
             )
             try:
-                detail_url = reverse(
-                    "admin:members_safetyreport_change", args=[report.pk]
-                )
+                detail_url = reverse("members:safety_report_detail", args=[report.pk])
             except Exception:
                 detail_url = None
 

@@ -112,8 +112,13 @@
                                             Action Required
                                         </h3>
                                         <p style="margin: 0 0 12px 0; color: #2d3748; font-size: 14px; line-height: 1.5;">
-                                            Please review this safety report and take appropriate action. Log into the admin interface to update the status and add any notes.
+                                            Please review this safety report and take appropriate action. Visit the safety officer dashboard to update the status and add any notes.
                                         </p>
+                                        {% if report_url %}
+                                        <p style="margin: 0;">
+                                            <a href="{{ report_url }}" style="display: inline-block; padding: 8px 16px; background-color: #3182ce; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 600;">View Safety Report</a>
+                                        </p>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             </table>

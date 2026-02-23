@@ -385,7 +385,10 @@ class TestSafetyReportNotifications:
             kwargs = call[1]
             assert "New safety report submitted" in kwargs["message"]
             assert "Test Member" in kwargs["message"]
-            assert kwargs["url"] is not None  # Should have admin URL
+            assert kwargs["url"] is not None  # Should have frontend URL
+            # Should use the frontend URL, not the admin change URL (issue #676)
+            assert "/admin/" not in kwargs["url"]
+            assert "safety-reports" in kwargs["url"]
 
     @patch("members.views.Notification", None)
     def test_no_error_when_notifications_unavailable(
@@ -405,3 +408,36 @@ class TestSafetyReportNotifications:
 
         # Email should still be sent
         assert len(mail.outbox) == 1
+
+    @patch("members.views.Notification")
+    def test_notification_url_is_frontend_not_admin(
+        self, mock_notification, client, active_member, safety_officer
+    ):
+        """Regression test for issue #676: notification URL must point to the
+        frontend safety report detail page, not the Django admin change URL."""
+        client.login(username="testmember", password="testpass123")
+        submit_url = reverse("members:safety_report_submit")
+        form_data = {
+            "observation": "<p>Safety concern observation.</p>",
+            "is_anonymous": False,
+        }
+
+        response = client.post(submit_url, form_data)
+        assert response.status_code == 302
+
+        assert mock_notification.objects.create.called
+        call_kwargs = mock_notification.objects.create.call_args_list[0][1]
+        notification_url = call_kwargs.get("url", "")
+
+        # Must NOT point to the Django admin
+        assert notification_url is not None
+        assert (
+            "/admin/" not in notification_url
+        ), "Notification URL should not point to Django admin (issue #676)"
+
+        # Must point to the frontend safety-reports detail path
+        report = SafetyReport.objects.latest("created_at")
+        expected_url = reverse("members:safety_report_detail", args=[report.pk])
+        assert (
+            notification_url == expected_url
+        ), f"Expected frontend URL {expected_url!r}, got {notification_url!r}"
