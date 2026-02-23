@@ -270,8 +270,20 @@ def notify_instructor_on_flight_created(sender, instance, created, **kwargs):
         return
 
     # Build a notification message and dedupe by instructor + log_date
+    # Note: instance.logsheet raises DoesNotExist (not caught by getattr's default)
+    # during fixture loading if the Logsheet row hasn't been loaded yet. Bail silently
+    # in that case — there's no point sending a notification for fixture data.
     try:
-        log_date = getattr(instance.logsheet, "log_date", None)
+        logsheet = instance.logsheet
+        log_date = logsheet.log_date
+    except Exception:
+        logger.debug(
+            "notify_instructor_on_flight_created: skipped because logsheet not accessible (fixture load?) for flight pk=%s",
+            getattr(instance, "pk", None),
+        )
+        return
+
+    try:
         date_str = log_date.isoformat() if log_date else "recent date"
         notif_msg = f"You have an instruction flight to complete a report for {instance.pilot.full_display_name} on {date_str}."
         recipient = instance.instructor
