@@ -1,5 +1,6 @@
 from functools import wraps
 
+from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect, render
 
 from .utils import is_active_member
@@ -12,7 +13,7 @@ def active_member_required(view_func):
         user = request.user
 
         if not user.is_authenticated:
-            return redirect("login")
+            return redirect_to_login(request.get_full_path())
 
         # Allow kiosk sessions regardless of membership_status (Issue #486)
         if is_kiosk_session(request):
@@ -43,7 +44,7 @@ def safety_officer_required(view_func):
         user = request.user
 
         if not user.is_authenticated:
-            return redirect("login")
+            return redirect_to_login(request.get_full_path())
 
         # Superusers always have access
         if user.is_superuser:
