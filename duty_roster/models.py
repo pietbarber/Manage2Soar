@@ -301,6 +301,19 @@ class DutyAssignment(models.Model):
     def __str__(self):
         return f"{self.date} @ {self.location.identifier if self.location else 'Unknown Field'}"
 
+    @property
+    def active_instruction_slots(self):
+        """Return instruction slots that have not been cancelled.
+
+        Use this in templates instead of instruction_slots.all to ensure
+        cancelled student requests are excluded from counts and lists (issue #668).
+        select_related("student") is included to avoid N+1 queries when templates
+        render slot.student.full_display_name for each slot.
+        """
+        return self.instruction_slots.select_related("student").exclude(
+            status="cancelled"
+        )
+
 
 class InstructionSlot(models.Model):
     """
