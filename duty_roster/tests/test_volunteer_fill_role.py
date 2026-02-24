@@ -285,7 +285,13 @@ def test_scheduled_holes_visible_to_non_qualified_user(client, django_user_model
     # Volunteer button NOT available (user isn't an instructor)
     assert "instructor" not in response.context["volunteerable_holes"]
 
-    """calendar_day_detail passes volunteerable_holes for qualified users."""
+
+@pytest.mark.django_db
+def test_volunteerable_holes_visible_to_qualified_user(client, django_user_model):
+    """
+    volunteerable_holes contains roles that the current user is qualified to fill.
+    A qualified instructor should see instructor in volunteerable_holes.
+    """
     _make_config()
     user = _make_user(django_user_model, instructor=True)
     assignment = _future_assignment()

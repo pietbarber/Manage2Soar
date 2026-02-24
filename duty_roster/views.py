@@ -507,7 +507,13 @@ def calendar_day_detail(request, year, month, day):
     scheduled_holes = {}
     volunteerable_holes = {}
     if assignment and day_date >= date.today():
-        _cfg = SiteConfiguration.objects.first()
+        # Reuse the cached SiteConfiguration to avoid an extra DB query and keep
+        # configuration reads consistent within the same request (same 60s cache
+        # as get_surge_thresholds / _check_instruction_request_window).
+        _cfg = cache.get("siteconfig_instance", _SITECONFIG_CACHE_SENTINEL)
+        if _cfg is _SITECONFIG_CACHE_SENTINEL:
+            _cfg = SiteConfiguration.objects.first()
+            cache.set("siteconfig_instance", _cfg, timeout=60)
         if _cfg:
             if _cfg.schedule_instructors and not assignment.instructor:
                 scheduled_holes["instructor"] = True
