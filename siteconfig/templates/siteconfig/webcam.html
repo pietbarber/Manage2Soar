@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Webcam{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <h2 class="mb-1">📷 Airport Webcam</h2>
+      <p class="text-muted small mb-3">
+        Live view refreshes every 10 seconds while this page is open.
+        Refresh pauses automatically when you switch to another tab.
+      </p>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-2 text-center">
+          <img id="webcam-img"
+               src="{% url 'siteconfig:webcam_snapshot' %}"
+               alt="Airport webcam snapshot"
+               class="img-fluid rounded"
+               style="max-height: 720px;"
+               onerror="this.style.display='none'; document.getElementById('webcam-error').style.display='block';">
+          <div id="webcam-error" class="alert alert-warning mt-3 mb-0" style="display:none;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Camera feed is temporarily unavailable. The image will resume automatically once the camera responds.
+          </div>
+        </div>
+        <div class="card-footer text-muted small d-flex justify-content-between align-items-center">
+          <span id="webcam-status">Auto-refreshing…</span>
+          <span id="webcam-last-updated"></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+
+  var img            = document.getElementById("webcam-img");
+  var errorDiv       = document.getElementById("webcam-error");
+  var statusSpan     = document.getElementById("webcam-status");
+  var lastUpdatedSpan = document.getElementById("webcam-last-updated");
+  var INTERVAL_MS    = 10000;
+  var timer          = null;
+  var snapshotBase   = "{% url 'siteconfig:webcam_snapshot' %}";
+
+  function refreshImage() {
+    if (document.visibilityState === "hidden") return;
+
+    var url = snapshotBase + "?t=" + Date.now();
+    var fresh = new Image();
+
+    fresh.onload = function () {
+      img.src = url;
+      img.style.display = "";
+      errorDiv.style.display = "none";
+      lastUpdatedSpan.textContent = "Updated " + new Date().toLocaleTimeString();
+    };
+
+    fresh.onerror = function () {
+      errorDiv.style.display = "block";
+      lastUpdatedSpan.textContent = "Last attempt: " + new Date().toLocaleTimeString();
+    };
+
+    fresh.src = url;
+  }
+
+  function startRefresh() {
+    if (timer) return;
+    timer = setInterval(refreshImage, INTERVAL_MS);
+    statusSpan.textContent = "Auto-refreshing every 10 s…";
+  }
+
+  function stopRefresh() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    statusSpan.textContent = "Refresh paused (tab hidden)";
+  }
+
+  // Pause/resume based on tab visibility so the camera is only polled
+  // while someone is actively looking at this page.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      refreshImage();   // immediate catch-up refresh when tab is foregrounded
+      startRefresh();
+    } else {
+      stopRefresh();
+    }
+  });
+
+  startRefresh();
+})();
+</script>
+{% endblock %}

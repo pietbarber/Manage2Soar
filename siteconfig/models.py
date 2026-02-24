@@ -483,6 +483,23 @@ class SiteConfiguration(models.Model):
         "Use for trusted non-members like former members, vendors, or partners.",
     )
 
+    # -----------------------------------------------------------------------
+    # Webcam integration (Issue #625)
+    # -----------------------------------------------------------------------
+    webcam_snapshot_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        verbose_name="Webcam snapshot URL",
+        help_text=(
+            "Full URL used server-side to fetch a single JPEG snapshot from the webcam. "
+            "May include credentials in the URL (e.g. http://host:9137/cgi-bin/CGIProxy.fcgi"
+            "?cmd=snapPicture2&usr=USER&pwd=PASS). "
+            "⚠️ This value is NEVER sent to the browser — the Django server fetches it "
+            "and proxies the image bytes. Leave blank to disable the webcam feature entirely."
+        ),
+    )
+
     def generate_visiting_pilot_token(self):
         """Generate a new secure token for visiting pilot URLs."""
         from django.utils import timezone

@@ -244,6 +244,8 @@ urlpatterns = [
         name="public_syllabus_qr",
     ),
     path("analytics/", include("analytics.urls")),
+    # Siteconfig app (webcam proxy, etc.)
+    path("", include("siteconfig.urls")),
     # API endpoints for mail server integration
     path("api/email-lists/", email_lists, name="api_email_lists"),
     path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),
