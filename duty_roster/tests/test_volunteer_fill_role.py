@@ -30,6 +30,12 @@ def _make_config(**kwargs):
         schedule_assistant_duty_officers=True,
     )
     defaults.update(kwargs)
+    existing = SiteConfiguration.objects.first()
+    if existing:
+        for k, v in defaults.items():
+            setattr(existing, k, v)
+        existing.save()
+        return existing
     return SiteConfiguration.objects.create(**defaults)
 
 
@@ -165,14 +171,24 @@ def test_post_assigns_role_for_all_four_roles(
 
 @pytest.mark.django_db
 def test_post_race_condition_guard(client, django_user_model):
-    """If someone else fills the slot between GET and POST, the late volunteer
-    is told about it and the assignment is unchanged."""
+    """
+    The POST path uses an atomic conditional UPDATE (filter + update where
+    field__isnull=True) rather than refresh_from_db + save, so a concurrent
+    volunteer cannot overwrite a slot that was claimed between the GET and POST.
+
+    This test simulates the race by pre-filling the slot in the DB before the
+    POST arrives.  The view fetches the assignment fresh (slot already taken),
+    skips the pre-POST "already filled" fast-exit (which is GET-only), enters
+    the POST branch, and runs the conditional update.  Since instructor is no
+    longer NULL, the filtered queryset matches 0 rows; the view redirects with
+    an informational message and leaves the original assignee untouched.
+    """
     _make_config()
     first = _make_user(django_user_model, username="first", instructor=True)
     second = _make_user(django_user_model, username="second", instructor=True)
     assignment = _future_assignment()
 
-    # Simulate the first user having already filled the role
+    # Fill the slot in the DB before `second` submits their POST.
     assignment.instructor = first
     assignment.save(update_fields=["instructor"])
 
@@ -181,7 +197,7 @@ def test_post_race_condition_guard(client, django_user_model):
 
     assert response.status_code == 302
     assignment.refresh_from_db()
-    # The original assignee should still be first, not second
+    # second should NOT have overwritten first
     assert assignment.instructor == first
 
 
@@ -241,7 +257,34 @@ def test_unauthenticated_user_redirected(client):
 
 
 @pytest.mark.django_db
-def test_volunteerable_holes_in_modal_context(client, django_user_model):
+def test_scheduled_holes_visible_to_non_qualified_user(client, django_user_model):
+    """
+    scheduled_holes is included in the modal context regardless of the user's
+    qualifications, so the 🕳️ Unfilled indicator is visible to everyone.
+    Only volunteerable_holes (qualified subset) controls the volunteer button.
+    """
+    _make_config()
+    # User has NO instructor qualification
+    user = _make_user(django_user_model, username="non_qual", instructor=False)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    url = reverse(
+        "duty_roster:calendar_day_detail",
+        kwargs={
+            "year": assignment.date.year,
+            "month": assignment.date.month,
+            "day": assignment.date.day,
+        },
+    )
+    response = client.get(url)
+
+    assert response.status_code == 200
+    # Unfilled indicator visible to everyone
+    assert "instructor" in response.context["scheduled_holes"]
+    # Volunteer button NOT available (user isn't an instructor)
+    assert "instructor" not in response.context["volunteerable_holes"]
+
     """calendar_day_detail passes volunteerable_holes for qualified users."""
     _make_config()
     user = _make_user(django_user_model, instructor=True)

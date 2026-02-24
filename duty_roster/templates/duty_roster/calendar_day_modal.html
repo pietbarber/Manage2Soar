@@ -26,12 +26,14 @@
               <small class="text-muted d-block">{{ config.instructor_title|default:'Instructor' }}</small>
               {% if assignment.instructor %}
                 <span class="fw-medium">{{ assignment.instructor.full_display_name }}</span>
-              {% elif volunteerable_holes.instructor %}
+              {% elif scheduled_holes.instructor %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
+                {% if volunteerable_holes.instructor %}
                 <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='instructor' %}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
+                {% endif %}
               {% else %}
                 <span class="fw-medium">—</span>
               {% endif %}
@@ -60,12 +62,14 @@
               <small class="text-muted d-block">{{ config.towpilot_title|default:'Tow Pilot' }}</small>
               {% if assignment.tow_pilot %}
                 <span class="fw-medium">{{ assignment.tow_pilot.full_display_name }}</span>
-              {% elif volunteerable_holes.tow_pilot %}
+              {% elif scheduled_holes.tow_pilot %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
+                {% if volunteerable_holes.tow_pilot %}
                 <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='tow_pilot' %}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
+                {% endif %}
               {% else %}
                 <span class="fw-medium">—</span>
               {% endif %}
@@ -94,12 +98,14 @@
               <small class="text-muted d-block">{{ config.duty_officer_title|default:'Duty Officer' }}</small>
               {% if assignment.duty_officer %}
                 <span class="fw-medium">{{ assignment.duty_officer.full_display_name }}</span>
-              {% elif volunteerable_holes.duty_officer %}
+              {% elif scheduled_holes.duty_officer %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
+                {% if volunteerable_holes.duty_officer %}
                 <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='duty_officer' %}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
+                {% endif %}
               {% else %}
                 <span class="fw-medium">—</span>
               {% endif %}
@@ -116,12 +122,14 @@
               <small class="text-muted d-block">{{ config.assistant_duty_officer_title|default:'Assistant DO' }}</small>
               {% if assignment.assistant_duty_officer %}
                 <span class="fw-medium">{{ assignment.assistant_duty_officer.full_display_name }}</span>
-              {% elif volunteerable_holes.assistant_duty_officer %}
+              {% elif scheduled_holes.assistant_duty_officer %}
                 <span class="fw-medium text-warning small">🕳️ Unfilled</span>
+                {% if volunteerable_holes.assistant_duty_officer %}
                 <a href="{% url 'duty_roster:volunteer_fill_role' assignment_id=assignment.id role='assistant_duty_officer' %}"
                    class="btn btn-warning btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
                   🪏 Volunteer to fill
                 </a>
+                {% endif %}
               {% else %}
                 <span class="fw-medium">—</span>
               {% endif %}
@@ -195,8 +203,7 @@
     {% endif %}
   {% endif %}
 
-  {# Bind active_instruction_slots once to avoid multiple DB queries for the
-     section guard, student list, and confirmation message below (issue #668) #}
+  {# Bind active_instruction_slots once to avoid multiple DB queries (issue #668) #}
   {% with active_slots=assignment.active_instruction_slots %}
   {# Students Requesting Instruction Section — cancelled requests excluded #}
   {% if active_slots %}

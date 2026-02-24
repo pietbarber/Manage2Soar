@@ -360,12 +360,23 @@ def duty_calendar_view(request, year=None, month=None):
     instruction_count = defaultdict(int)
     tow_count = defaultdict(int)
 
-    intents = OpsIntent.objects.filter(date__in=visible_dates)
+    # Instruction surge: count non-cancelled InstructionSlots per date.
+    # (The 'instruction' OpsIntent checkbox was removed in Issue #679 as ambiguous;
+    # actual InstructionSlot records are the authoritative signal.)
+    from .models import InstructionSlot as _IS
 
+    for row in (
+        _IS.objects.filter(assignment__date__in=visible_dates)
+        .exclude(status="cancelled")
+        .values("assignment__date")
+        .annotate(_count=models.Count("id"))
+    ):
+        instruction_count[row["assignment__date"]] += row["_count"]
+
+    # Tow surge: still driven by OpsIntent club/private activity flags.
+    intents = OpsIntent.objects.filter(date__in=visible_dates)
     for intent in intents:
         roles = intent.available_as or []
-        if "instruction" in roles:
-            instruction_count[intent.date] += 1
         if "private" in roles or "club" in roles:
             tow_count[intent.date] += 1
 
@@ -491,39 +502,30 @@ def calendar_day_detail(request, year, month, day):
                 assignment=assignment, student=request.user
             )
 
-    # Determine which empty scheduled roles the current user can volunteer to fill
-    # (Issue #679 – volunteer to fill roster holes)
+    # Determine scheduled but empty roles (visible to all users as an "unfilled" indicator)
+    # and the subset the current user is qualified to volunteer for (Issue #679).
+    scheduled_holes = {}
     volunteerable_holes = {}
-    if request.user.is_authenticated and assignment and day_date >= date.today():
-        config = SiteConfiguration.objects.first()
-        if (
-            config
-            and config.schedule_instructors
-            and not assignment.instructor
-            and request.user.instructor
-        ):
-            volunteerable_holes["instructor"] = True
-        if (
-            config
-            and config.schedule_tow_pilots
-            and not assignment.tow_pilot
-            and request.user.towpilot
-        ):
-            volunteerable_holes["tow_pilot"] = True
-        if (
-            config
-            and config.schedule_duty_officers
-            and not assignment.duty_officer
-            and request.user.duty_officer
-        ):
-            volunteerable_holes["duty_officer"] = True
-        if (
-            config
-            and config.schedule_assistant_duty_officers
-            and not assignment.assistant_duty_officer
-            and request.user.assistant_duty_officer
-        ):
-            volunteerable_holes["assistant_duty_officer"] = True
+    if assignment and day_date >= date.today():
+        _cfg = SiteConfiguration.objects.first()
+        if _cfg:
+            if _cfg.schedule_instructors and not assignment.instructor:
+                scheduled_holes["instructor"] = True
+            if _cfg.schedule_tow_pilots and not assignment.tow_pilot:
+                scheduled_holes["tow_pilot"] = True
+            if _cfg.schedule_duty_officers and not assignment.duty_officer:
+                scheduled_holes["duty_officer"] = True
+            if (
+                _cfg.schedule_assistant_duty_officers
+                and not assignment.assistant_duty_officer
+            ):
+                scheduled_holes["assistant_duty_officer"] = True
+
+        if request.user.is_authenticated and scheduled_holes:
+            for hole_role in scheduled_holes:
+                qual_attr = _HOLE_FILL_ROLE_MAP[hole_role][0]
+                if getattr(request.user, qual_attr, False):
+                    volunteerable_holes[hole_role] = True
 
     return render(
         request,
@@ -546,6 +548,7 @@ def calendar_day_detail(request, year, month, day):
             "has_instructor_assigned": bool(
                 assignment and (assignment.instructor or assignment.surge_instructor)
             ),
+            "scheduled_holes": scheduled_holes,
             "volunteerable_holes": volunteerable_holes,
         },
     )
@@ -732,8 +735,15 @@ def maybe_notify_surge_instructor(day_date):
     # Get surge threshold
     _, instruction_surge_threshold = get_surge_thresholds()
 
-    intents = OpsIntent.objects.filter(date=day_date)
-    instruction_count = sum(1 for i in intents if "instruction" in i.available_as)
+    # Use InstructionSlot records as the authoritative instruction-demand signal.
+    # (The 'instruction' OpsIntent checkbox was removed in Issue #679.)
+    from .models import InstructionSlot
+
+    instruction_count = (
+        InstructionSlot.objects.filter(assignment=assignment)
+        .exclude(status="cancelled")
+        .count()
+    )
 
     if instruction_count >= instruction_surge_threshold:
         # Prepare template context
@@ -3155,34 +3165,37 @@ def volunteer_fill_role(request, assignment_id, role):
         )
         return redirect("duty_roster:duty_calendar")
 
-    # Check whether the slot is already filled.
-    if getattr(assignment, assign_attr) is not None:
-        messages.info(
-            request,
-            f"The {role_label} slot for {assignment.date.strftime('%B %d, %Y')} "
-            "has already been filled. Thank you for your willingness!",
-        )
-        return redirect("duty_roster:duty_calendar")
-
     if request.method == "POST":
-        # Re-fetch inside POST to guard against concurrent volunteers.
-        assignment.refresh_from_db()
-        if getattr(assignment, assign_attr) is not None:
+        # Atomically claim the slot with a conditional UPDATE so concurrent
+        # volunteers cannot both succeed.  filter(..., <field>__isnull=True)
+        # matches only if the role is still empty; update() returns the number
+        # of rows actually modified, so 0 means someone else just got there first.
+        rows = DutyAssignment.objects.filter(
+            pk=assignment.id, **{f"{assign_attr}__isnull": True}
+        ).update(**{assign_attr: member.id})
+        if rows == 0:
             messages.info(
                 request,
-                f"Someone just filled the {role_label} slot for "
+                f"Someone just claimed the {role_label} slot for "
                 f"{assignment.date.strftime('%B %d, %Y')} ahead of you. "
                 "Thank you for offering!",
             )
             return redirect("duty_roster:duty_calendar")
 
-        setattr(assignment, assign_attr, member)
-        assignment.save(update_fields=[assign_attr])
-
         messages.success(
             request,
             f"You have been assigned as {role_label} for "
             f"{assignment.date.strftime('%B %d, %Y')}. Thank you for volunteering!",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # GET – stale-navigation guard: if the slot was already filled before the
+    # user loaded this page, give a friendly message rather than a blank confirm.
+    if getattr(assignment, assign_attr) is not None:
+        messages.info(
+            request,
+            f"The {role_label} slot for {assignment.date.strftime('%B %d, %Y')} "
+            "has already been filled. Thank you for your willingness!",
         )
         return redirect("duty_roster:duty_calendar")
 
