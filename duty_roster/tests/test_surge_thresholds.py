@@ -84,7 +84,11 @@ def test_calendar_view_uses_custom_thresholds(client, django_user_model):
 
 @pytest.mark.django_db
 def test_surge_alert_with_custom_instruction_threshold(client, django_user_model):
-    """Test that surge alerts trigger at custom instruction threshold."""
+    """Test that surge alerts trigger at custom instruction threshold.
+
+    After Issue #679 the surge count uses InstructionSlot records rather than
+    the removed 'instruction' OpsIntent checkbox.
+    """
     # Create config with lower instruction threshold
     SiteConfiguration.objects.create(
         club_name="Test Club",
@@ -108,19 +112,11 @@ def test_surge_alert_with_custom_instruction_threshold(client, django_user_model
         membership_status="Full Member",
     )
 
-    # Create instruction intents (2 should trigger alert with threshold=2)
-    OpsIntent.objects.create(
-        member=user1,
-        date=test_date,
-        available_as=["instruction"],
-        notes="Test 1",
-    )
-    OpsIntent.objects.create(
-        member=user2,
-        date=test_date,
-        available_as=["instruction"],
-        notes="Test 2",
-    )
+    # Create a DutyAssignment and InstructionSlots to trigger the surge alert.
+    # (The old approach used OpsIntent "instruction", removed in Issue #679.)
+    assignment = DutyAssignment.objects.create(date=test_date)
+    InstructionSlot.objects.create(assignment=assignment, student=user1)
+    InstructionSlot.objects.create(assignment=assignment, student=user2)
 
     # Login as user and check day detail
     client.force_login(user1)
@@ -201,13 +197,11 @@ def test_calendar_view_surge_indicator_respects_threshold(client, django_user_mo
         membership_status="Full Member",
     )
 
-    # Create exactly 2 instruction intents (meets threshold)
-    OpsIntent.objects.create(
-        member=user1, date=test_date, available_as=["instruction"], notes="Test 1"
-    )
-    OpsIntent.objects.create(
-        member=user2, date=test_date, available_as=["instruction"], notes="Test 2"
-    )
+    # Create exactly 2 InstructionSlot records (meets threshold).
+    # The old approach used OpsIntent "instruction" which was removed in Issue #679.
+    assignment = DutyAssignment.objects.create(date=test_date)
+    InstructionSlot.objects.create(assignment=assignment, student=user1)
+    InstructionSlot.objects.create(assignment=assignment, student=user2)
 
     # Login and request calendar for that month
     client.force_login(user1)
@@ -250,13 +244,11 @@ def test_maybe_notify_surge_instructor_respects_custom_threshold(django_user_mod
         membership_status="Full Member",
     )
 
-    # Create exactly 2 instruction intents (meets custom threshold=2)
-    OpsIntent.objects.create(
-        member=user1, date=test_date, available_as=["instruction"], notes="Test 1"
-    )
-    OpsIntent.objects.create(
-        member=user2, date=test_date, available_as=["instruction"], notes="Test 2"
-    )
+    # Create exactly 2 InstructionSlot records (meets custom threshold=2).
+    # The old approach used OpsIntent "instruction" which was removed in Issue #679.
+    assignment = DutyAssignment.objects.create(date=test_date)
+    InstructionSlot.objects.create(assignment=assignment, student=user1)
+    InstructionSlot.objects.create(assignment=assignment, student=user2)
 
     # Mock send_mail to verify it's called
     with patch("duty_roster.views.send_mail") as mock_send_mail:

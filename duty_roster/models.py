@@ -643,7 +643,6 @@ class OpsIntent(models.Model):
     # Centralize available activities so templates and admin can render
     # consistent labels. Keys here are stored in the JSONField.
     AVAILABLE_ACTIVITIES = [
-        ("instruction", "Instruction"),
         ("club", "Club glider"),
         ("private", "Private glider"),
         ("towpilot", "Tow Pilot"),

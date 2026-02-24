@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Volunteer to Fill {{ role_label }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  {% include "duty_roster/_messages.html" %}
+
+  <div class="row justify-content-center">
+    <div class="col-lg-6 col-md-8">
+
+      <div class="card shadow-sm border-0">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);">
+          <h4 class="mb-0">
+            <i class="bi bi-hand-thumbs-up-fill me-2"></i>
+            Volunteer to Fill {{ role_label }}
+          </h4>
+        </div>
+
+        <div class="card-body p-4">
+
+          <div class="alert alert-info d-flex align-items-start mb-4" role="alert">
+            <i class="bi bi-info-circle-fill flex-shrink-0 me-2 mt-1"></i>
+            <div>
+              <strong>This role is currently unfilled.</strong>
+              <div class="text-muted small mt-1">
+                Your club needs a <strong>{{ role_label }}</strong> on
+                <strong>{{ assignment.date|date:"l, F j, Y" }}</strong>.
+              </div>
+            </div>
+          </div>
+
+          <p class="mb-4">
+            You are about to volunteer as <strong>{{ role_label }}</strong> for
+            <strong>{{ assignment.date|date:"l, F j, Y" }}</strong>.
+            Please confirm this commitment below.
+          </p>
+
+          <form method="post">
+            {% csrf_token %}
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="submit" class="btn btn-warning px-4">
+                <i class="bi bi-check-circle-fill me-2"></i>Yes, I'll fill this role
+              </button>
+              <a href="{% url 'duty_roster:duty_calendar' %}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-x-circle me-2"></i>Cancel
+              </a>
+            </div>
+          </form>
+
+        </div>
+      </div><!-- /.card -->
+
+    </div>
+  </div>
+</div>
+{% endblock %}
