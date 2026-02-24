@@ -100,15 +100,20 @@ class TestActiveInstructionSlots:
         """Assignment with no instruction requests at all must return empty."""
         assert not assignment.active_instruction_slots.exists()
 
-    def test_select_related_student_populated(self, db, assignment):
+    def test_select_related_student_populated(
+        self, db, assignment, django_assert_num_queries
+    ):
         """active_instruction_slots must have student already fetched to avoid
-        N+1 queries when templates access slot.student.full_display_name."""
+        N+1 queries when templates access slot.student.full_display_name.
+
+        Asserts with django_assert_num_queries that evaluating the queryset AND
+        then accessing slot.student costs exactly 1 DB query total.  Without
+        select_related this would be 2 queries (one for slots, one for student).
+        """
         student = _make_student(1)
         _make_slot(assignment, student, status="pending")
 
-        slots = list(assignment.active_instruction_slots)
-        assert len(slots) == 1
-        # Accessing student on a select_related queryset must not hit the DB again.
-        # (The object is already cached on the instance.)
-        assert slots[0].student_id == student.pk
-        assert slots[0].student.full_display_name  # should not raise or re-query
+        # Exactly 1 query: the JOIN that fetches slots + students together.
+        with django_assert_num_queries(1):
+            slots = list(assignment.active_instruction_slots)
+            _ = slots[0].student.full_display_name  # must not fire a second query
