@@ -3062,20 +3062,36 @@ def edit_roster_message(request):
 # ---------------------------------------------------------------------------
 
 # Maps URL role slug → (member qualification attr, assignment FK attr, config title attr, default title)
+# Maps URL role slug →
+#   (member qual attr, assignment FK attr, config title attr, default title, config schedule attr)
 _HOLE_FILL_ROLE_MAP = {
-    "instructor": ("instructor", "instructor", "instructor_title", "Instructor"),
-    "tow_pilot": ("towpilot", "tow_pilot", "towpilot_title", "Tow Pilot"),
+    "instructor": (
+        "instructor",
+        "instructor",
+        "instructor_title",
+        "Instructor",
+        "schedule_instructors",
+    ),
+    "tow_pilot": (
+        "towpilot",
+        "tow_pilot",
+        "towpilot_title",
+        "Tow Pilot",
+        "schedule_tow_pilots",
+    ),
     "duty_officer": (
         "duty_officer",
         "duty_officer",
         "duty_officer_title",
         "Duty Officer",
+        "schedule_duty_officers",
     ),
     "assistant_duty_officer": (
         "assistant_duty_officer",
         "assistant_duty_officer",
         "assistant_duty_officer_title",
         "Assistant Duty Officer",
+        "schedule_assistant_duty_officers",
     ),
 }
 
@@ -3096,32 +3112,43 @@ def volunteer_fill_role(request, assignment_id, role):
 
     Guards:
     * The ``role`` parameter must be one of the known fillable roles.
+    * The role's scheduling flag must be enabled in SiteConfiguration.
     * The user must hold the appropriate qualification flag.
     * The role must still be empty (race-condition guard via refresh_from_db).
     * The day must be today or in the future.
     """
-    from datetime import date as _date
-
     if role not in _HOLE_FILL_ROLE_MAP:
         messages.error(request, "Unknown role specified.")
         return redirect("duty_roster:duty_calendar")
 
-    qual_attr, assign_attr, config_title_attr, default_title = _HOLE_FILL_ROLE_MAP[role]
+    qual_attr, assign_attr, config_title_attr, default_title, schedule_attr = (
+        _HOLE_FILL_ROLE_MAP[role]
+    )
 
     assignment = get_object_or_404(DutyAssignment, id=assignment_id)
     member = request.user
 
+    # Fetch config once; derive the human-readable role label from it.
+    config = SiteConfiguration.objects.first()
+    role_label = (
+        getattr(config, config_title_attr, None) if config else None
+    ) or default_title
+
     # Past days are not fillable.
-    if assignment.date < _date.today():
+    if assignment.date < date.today():
         messages.error(request, "You cannot fill roles on past duty days.")
+        return redirect("duty_roster:duty_calendar")
+
+    # Reject if this role is not enabled for scheduling.
+    if not (config and getattr(config, schedule_attr, False)):
+        messages.error(
+            request,
+            f"The {role_label} role is not currently enabled for scheduling.",
+        )
         return redirect("duty_roster:duty_calendar")
 
     # Check qualification.
     if not getattr(member, qual_attr, False):
-        config = SiteConfiguration.objects.first()
-        role_label = (
-            getattr(config, config_title_attr, None) if config else None
-        ) or default_title
         messages.error(
             request,
             f"You are not qualified to fill the {role_label} role.",
@@ -3130,10 +3157,6 @@ def volunteer_fill_role(request, assignment_id, role):
 
     # Check whether the slot is already filled.
     if getattr(assignment, assign_attr) is not None:
-        config = SiteConfiguration.objects.first()
-        role_label = (
-            getattr(config, config_title_attr, None) if config else None
-        ) or default_title
         messages.info(
             request,
             f"The {role_label} slot for {assignment.date.strftime('%B %d, %Y')} "
@@ -3145,10 +3168,6 @@ def volunteer_fill_role(request, assignment_id, role):
         # Re-fetch inside POST to guard against concurrent volunteers.
         assignment.refresh_from_db()
         if getattr(assignment, assign_attr) is not None:
-            config = SiteConfiguration.objects.first()
-            role_label = (
-                getattr(config, config_title_attr, None) if config else None
-            ) or default_title
             messages.info(
                 request,
                 f"Someone just filled the {role_label} slot for "
@@ -3160,10 +3179,6 @@ def volunteer_fill_role(request, assignment_id, role):
         setattr(assignment, assign_attr, member)
         assignment.save(update_fields=[assign_attr])
 
-        config = SiteConfiguration.objects.first()
-        role_label = (
-            getattr(config, config_title_attr, None) if config else None
-        ) or default_title
         messages.success(
             request,
             f"You have been assigned as {role_label} for "
@@ -3172,10 +3187,6 @@ def volunteer_fill_role(request, assignment_id, role):
         return redirect("duty_roster:duty_calendar")
 
     # GET – render confirmation page
-    config = SiteConfiguration.objects.first()
-    role_label = (
-        getattr(config, config_title_attr, None) if config else None
-    ) or default_title
     return render(
         request,
         "duty_roster/volunteer_fill_confirm.html",

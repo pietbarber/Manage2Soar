@@ -200,6 +200,25 @@ def test_post_rejected_for_unqualified_member(client, django_user_model):
     assert assignment.instructor is None
 
 
+@pytest.mark.django_db
+def test_post_does_not_assign_when_role_scheduling_disabled(client, django_user_model):
+    """
+    Volunteering is rejected when the role's scheduling flag is disabled in
+    SiteConfiguration, even if the user has the correct qualification.
+    This prevents a direct URL bypass of the scheduling configuration.
+    """
+    _make_config(schedule_instructors=False)
+    user = _make_user(django_user_model, instructor=True)
+    assignment = _future_assignment()
+
+    client.force_login(user)
+    response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.instructor is None
+
+
 # ---------------------------------------------------------------------------
 # Authentication guard
 # ---------------------------------------------------------------------------
