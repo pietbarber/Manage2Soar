@@ -15,11 +15,17 @@
 
       <div class="card shadow-sm">
         <div class="card-body p-2 text-center">
+          <!--
+            Start hidden; JavaScript shows the element after the first
+            successful load, preventing a broken-image icon on initial
+            camera errors.
+          -->
           <img id="webcam-img"
                src="{% url 'siteconfig:webcam_snapshot' %}"
                alt="Airport webcam snapshot"
                class="img-fluid rounded"
-               style="max-height: 720px;"
+               style="display:none; max-height: 720px;"
+               onload="this.style.display=''"
                onerror="this.style.display='none'; document.getElementById('webcam-error').style.display='block';">
           <div id="webcam-error" class="alert alert-warning mt-3 mb-0" style="display:none;">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
@@ -97,6 +103,16 @@
   });
 
   startRefresh();
+
+  // Clean up the interval when the page is unloaded.  This primarily guards
+  // against memory leaks in bfcache (back/forward cache) scenarios where the
+  // page is kept in memory after navigation.
+  window.addEventListener("beforeunload", function () {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  });
 })();
 </script>
 {% endblock %}

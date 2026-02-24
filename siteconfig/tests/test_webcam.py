@@ -187,3 +187,35 @@ def test_snapshot_404_when_not_configured(client, django_user_model):
     url = reverse("siteconfig:webcam_snapshot")
     response = client.get(url)
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_snapshot_handles_non_image_content_type(client, django_user_model):
+    """Non-image Content-Type from camera is coerced to image/jpeg."""
+    _make_config()
+    user = _make_member(django_user_model)
+    client.force_login(user)
+
+    fake_image = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+    mock_resp = MagicMock()
+    mock_resp.content = fake_image
+    mock_resp.headers = {"Content-Type": "text/html; charset=utf-8"}  # wrong type
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("siteconfig.views.requests.get", return_value=mock_resp):
+        response = client.get(reverse("siteconfig:webcam_snapshot"))
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "image/jpeg"
+
+
+@pytest.mark.django_db
+def test_snapshot_returns_503_for_invalid_url_scheme(client, django_user_model):
+    """Returns 503 when webcam URL has a non-http/https scheme (SSRF guard)."""
+    _make_config(webcam_snapshot_url="file:///etc/passwd")
+    user = _make_member(django_user_model)
+    client.force_login(user)
+
+    response = client.get(reverse("siteconfig:webcam_snapshot"))
+
+    assert response.status_code == 503
