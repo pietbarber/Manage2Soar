@@ -80,7 +80,7 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         # Give JS a moment to execute.
         self.page.wait_for_timeout(200)
 
-        status_text = self.page.locator("#webcam-status").text_content()
+        status_text = self.page.locator("#webcam-status").text_content() or ""
         assert (
             "refresh" in status_text.lower()
         ), f"Status span should mention refresh, got: {status_text!r}"
