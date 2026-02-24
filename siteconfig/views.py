@@ -4,7 +4,6 @@ import logging
 from urllib.parse import urlparse
 
 import requests
-from django.core.cache import cache
 from django.http import Http404, HttpResponse
 from django.shortcuts import render
 
@@ -12,25 +11,6 @@ from members.decorators import active_member_required
 from siteconfig.models import SiteConfiguration
 
 logger = logging.getLogger(__name__)
-
-_SITECONFIG_CACHE_MISS = object()
-
-
-def _get_cached_siteconfig():
-    """Return the SiteConfiguration instance using a shared 60-second cache.
-
-    The full object (including webcam_snapshot_url) is cached so that per-page
-    navbar checks can read the field without triggering a deferred DB load.
-    Security note: ensure your cache backend is network-isolated or
-    authenticated (e.g. Redis with auth), as the cached object may contain
-    camera credentials.  The webcam views themselves use ``_get_webcam_url()``
-    which intentionally never caches the credentials-bearing URL.
-    """
-    cfg = cache.get("siteconfig_instance", _SITECONFIG_CACHE_MISS)
-    if cfg is _SITECONFIG_CACHE_MISS:
-        cfg = SiteConfiguration.objects.first()
-        cache.set("siteconfig_instance", cfg, timeout=60)
-    return cfg
 
 
 def _get_webcam_url() -> str:
@@ -88,18 +68,24 @@ def webcam_snapshot(request):
 
     if not _validate_webcam_url(url):
         logger.error("Webcam URL has an invalid/unsafe scheme; request blocked.")
-        return HttpResponse(status=503)
+        resp = HttpResponse(status=503)
+        resp["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return resp
 
     try:
         # Timeout of 8 s balances responsiveness against slow cameras.
         # stream=False (the default) loads the full JPEG into memory before
         # forwarding — appropriate for webcam snapshots (typically < 1 MB).
-        resp = requests.get(url, timeout=8)
+        # allow_redirects=False prevents a redirect chain from bypassing the
+        # scheme/host validation above (redirect-based SSRF).
+        resp = requests.get(url, timeout=8, allow_redirects=False)
         resp.raise_for_status()
     except requests.RequestException as exc:
         logger.warning("Webcam snapshot fetch failed: %s", exc)
         # Return a 503 so the browser <img onerror> handler fires.
-        return HttpResponse(status=503)
+        err = HttpResponse(status=503)
+        err["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return err
 
     content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
     if not content_type.startswith("image/"):

@@ -60,21 +60,22 @@
     if (document.visibilityState === "hidden") return;
 
     var url = snapshotBase + "?t=" + Date.now();
-    var fresh = new Image();
 
-    fresh.onload = function () {
-      img.src = url;
+    // Update the existing <img> directly — one network request per cycle.
+    // (A separate Image() preload would cause a second request because the
+    //  snapshot endpoint carries Cache-Control: no-store.)
+    img.onload = function () {
       img.style.display = "";
       errorDiv.style.display = "none";
       lastUpdatedSpan.textContent = "Updated " + new Date().toLocaleTimeString();
     };
-
-    fresh.onerror = function () {
+    img.onerror = function () {
+      img.style.display = "none";
       errorDiv.style.display = "block";
       lastUpdatedSpan.textContent = "Last attempt: " + new Date().toLocaleTimeString();
     };
 
-    fresh.src = url;
+    img.src = url;
   }
 
   function startRefresh() {

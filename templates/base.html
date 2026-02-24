@@ -247,7 +247,8 @@
             </ul>
           </li>
 
-          {% if user.is_authenticated and siteconfig.webcam_snapshot_url %}
+          {% webcam_enabled as webcam_feature_on %}
+          {% if user.is_active_member and webcam_feature_on %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a>
           </li>
