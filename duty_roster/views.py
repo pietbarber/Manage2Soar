@@ -3071,7 +3071,6 @@ def edit_roster_message(request):
 # Volunteer to fill a roster hole (Issue #679)
 # ---------------------------------------------------------------------------
 
-# Maps URL role slug → (member qualification attr, assignment FK attr, config title attr, default title)
 # Maps URL role slug →
 #   (member qual attr, assignment FK attr, config title attr, default title, config schedule attr)
 _HOLE_FILL_ROLE_MAP = {
@@ -3124,7 +3123,7 @@ def volunteer_fill_role(request, assignment_id, role):
     * The ``role`` parameter must be one of the known fillable roles.
     * The role's scheduling flag must be enabled in SiteConfiguration.
     * The user must hold the appropriate qualification flag.
-    * The role must still be empty (race-condition guard via refresh_from_db).
+    * The role must still be empty (race-condition guard via conditional UPDATE query).
     * The day must be today or in the future.
     """
     if role not in _HOLE_FILL_ROLE_MAP:
