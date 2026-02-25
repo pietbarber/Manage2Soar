@@ -321,7 +321,9 @@
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="primary">
+                      {% if slot.student != alloc.primary %}
                       <button type="submit" class="btn btn-sm btn-outline-primary">→ Primary</button>
+                      {% endif %}
                     </form>
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
