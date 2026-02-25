@@ -79,6 +79,17 @@ def webcam_snapshot(request):
         # allow_redirects=False prevents a redirect chain from bypassing the
         # scheme/host validation above (redirect-based SSRF).
         resp = requests.get(url, timeout=8, allow_redirects=False)
+        # raise_for_status() only raises for 4xx/5xx; 3xx responses are
+        # silently passed through without it.  Treat any redirect as an error
+        # so a compromised camera cannot redirect us to an internal endpoint.
+        if 300 <= resp.status_code < 400:
+            logger.warning(
+                "Webcam returned redirect (status=%s), which is blocked for security",
+                resp.status_code,
+            )
+            err = HttpResponse(status=503)
+            err["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            return err
         resp.raise_for_status()
     except requests.RequestException as exc:
         # Log only the exception class and HTTP status to avoid leaking the

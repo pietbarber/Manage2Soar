@@ -125,6 +125,7 @@ def test_snapshot_proxies_image_bytes(client, django_user_model):
 
     fake_image = b"\xff\xd8\xff\xe0" + b"\x00" * 100  # minimal JPEG header
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.content = fake_image
     mock_resp.headers = {"Content-Type": "image/jpeg"}
     mock_resp.raise_for_status = MagicMock()
@@ -151,6 +152,7 @@ def test_snapshot_no_cache_headers(client, django_user_model):
     client.force_login(user)
 
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.content = b"\xff\xd8"
     mock_resp.headers = {"Content-Type": "image/jpeg"}
     mock_resp.raise_for_status = MagicMock()
@@ -198,6 +200,7 @@ def test_snapshot_handles_non_image_content_type(client, django_user_model):
 
     fake_image = b"\xff\xd8\xff\xe0" + b"\x00" * 100
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.content = fake_image
     mock_resp.headers = {"Content-Type": "text/html; charset=utf-8"}  # wrong type
     mock_resp.raise_for_status = MagicMock()
@@ -219,3 +222,28 @@ def test_snapshot_returns_503_for_invalid_url_scheme(client, django_user_model):
     response = client.get(reverse("siteconfig:webcam_snapshot"))
 
     assert response.status_code == 503
+
+
+@pytest.mark.django_db
+def test_snapshot_returns_503_for_redirect_response(client, django_user_model):
+    """Returns 503 when camera responds with a 3xx redirect.
+
+    With allow_redirects=False the redirect is not followed, but
+    raise_for_status() does not raise for 3xx.  The view must detect it
+    explicitly so a compromised camera cannot redirect the proxy to an
+    internal endpoint (SSRF via redirect).
+    """
+    _make_config()
+    user = _make_member(django_user_model)
+    client.force_login(user)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 302
+    mock_resp.headers = {}
+    mock_resp.raise_for_status = MagicMock()
+
+    with patch("siteconfig.views.requests.get", return_value=mock_resp):
+        response = client.get(reverse("siteconfig:webcam_snapshot"))
+
+    assert response.status_code == 503
+    assert "no-store" in response["Cache-Control"]
