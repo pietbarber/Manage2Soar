@@ -117,7 +117,7 @@ def test_get_siteconfig_returns_none_when_missing():
 
 @pytest.mark.django_db
 def test_get_siteconfig_caches_instance():
-    """Result is stored under siteconfig_instance and reused."""
+    """Result is stored under siteconfig_deferred and reused."""
     cache.clear()
     _make_config()
 
@@ -125,7 +125,7 @@ def test_get_siteconfig_caches_instance():
     assert cfg is not None
 
     # Cache should be populated now.
-    cached = cache.get("siteconfig_instance")
+    cached = cache.get("siteconfig_deferred")
     assert cached is not None
     assert cached.pk == cfg.pk
 
@@ -144,7 +144,7 @@ def test_get_siteconfig_defers_webcam_snapshot_url():
 
     get_siteconfig()
 
-    cached = cache.get("siteconfig_instance")
+    cached = cache.get("siteconfig_deferred")
     assert cached is not None
     # Deferred fields are absent from __dict__; accessing them triggers a
     # fresh DB query.  Verify the key is NOT in the instance's field cache.

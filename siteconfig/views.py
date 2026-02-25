@@ -81,7 +81,14 @@ def webcam_snapshot(request):
         resp = requests.get(url, timeout=8, allow_redirects=False)
         resp.raise_for_status()
     except requests.RequestException as exc:
-        logger.warning("Webcam snapshot fetch failed: %s", exc)
+        # Log only the exception class and HTTP status to avoid leaking the
+        # camera URL (which may contain embedded credentials) into logs/Sentry.
+        status_code = getattr(getattr(exc, "response", None), "status_code", "unknown")
+        logger.warning(
+            "Webcam snapshot fetch failed (%s, status=%s)",
+            exc.__class__.__name__,
+            status_code,
+        )
         # Return a 503 so the browser <img onerror> handler fires.
         err = HttpResponse(status=503)
         err["Cache-Control"] = "no-store, no-cache, must-revalidate"

@@ -12,15 +12,18 @@ _MISS = object()
 def get_siteconfig():
     """Return the SiteConfiguration instance, cached for 60 s.
 
-    ``webcam_snapshot_url`` is deferred so that camera credentials are never
-    serialised into the cache backend.  Any template access to that field will
-    trigger a single lazy DB load; use the ``webcam_enabled`` tag for the
-    simple boolean nav-visibility check to avoid that extra query.
+    Uses its own ``siteconfig_deferred`` cache key (distinct from the
+    ``siteconfig_instance`` key used by duty_roster and other callers that
+    cache the full non-deferred object).  ``webcam_snapshot_url`` is deferred
+    so camera credentials are never serialised into the cache backend.  Any
+    template access to that field will trigger a single lazy DB load; use the
+    ``webcam_enabled`` tag for the simple boolean nav-visibility check to
+    avoid that extra query.
     """
-    cfg = cache.get("siteconfig_instance", _MISS)
+    cfg = cache.get("siteconfig_deferred", _MISS)
     if cfg is _MISS:
         cfg = SiteConfiguration.objects.defer("webcam_snapshot_url").first()
-        cache.set("siteconfig_instance", cfg, timeout=60)
+        cache.set("siteconfig_deferred", cfg, timeout=60)
     return cfg
 
 

@@ -105,10 +105,12 @@
 
   startRefresh();
 
-  // Clean up the interval when the page is unloaded.  This primarily guards
-  // against memory leaks in bfcache (back/forward cache) scenarios where the
-  // page is kept in memory after navigation.
-  window.addEventListener("beforeunload", function () {
+  // Clean up the interval on page unload.  We use "pagehide" rather than
+  // "beforeunload" because beforeunload does not fire for back/forward-cache
+  // (bfcache) navigations; pagehide fires reliably for both bfcache and
+  // regular unloads.  The visibilitychange handler above already pauses the
+  // timer while the tab is hidden, so this is an extra safety net.
+  window.addEventListener("pagehide", function () {
     if (timer) {
       clearInterval(timer);
       timer = null;
