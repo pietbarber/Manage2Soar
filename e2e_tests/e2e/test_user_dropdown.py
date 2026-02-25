@@ -1,5 +1,5 @@
 """
-E2E tests for the "Welcome, [Name]" user dropdown added in PR #692.
+E2E tests for the "Welcome, [Name]" user dropdown in the navbar.
 
 Covers:
 - Dropdown opens and closes correctly (Bootstrap JavaScript)
@@ -12,7 +12,7 @@ from siteconfig.models import SiteConfiguration
 
 
 class TestUserDropdown(DjangoPlaywrightTestCase):
-    """E2E tests for the user dropdown navigation (#692)."""
+    """E2E tests for the navbar user dropdown (Welcome, [Name])."""
 
     def setUp(self):
         super().setUp()

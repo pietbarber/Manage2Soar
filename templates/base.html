@@ -131,7 +131,7 @@
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
               </li>
-              {% if user.is_authenticated %}
+              {% if user.is_active_member %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:my_swap_requests' %}"><i class="fas fa-exchange-alt me-1"></i> My Swap Requests</a>
               </li>

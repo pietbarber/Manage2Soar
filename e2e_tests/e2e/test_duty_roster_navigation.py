@@ -141,7 +141,7 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         ), "Agenda view should be hidden after switching back"
 
     def test_view_param_overrides_localstorage(self):
-        """URL ?view= param takes priority over saved localStorage preference (PR #692)."""
+        """URL ?view= parameter must take priority over the saved duty-roster-view localStorage preference."""
         self.create_test_member(
             username="testmember",
             email="test@example.com",
