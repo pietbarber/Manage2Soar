@@ -1,0 +1,13 @@
+✅ Surge Tow Pilot Confirmed - {{ ops_date }}
+================================================================================
+
+Hi {{ primary_tow_pilot.first_name|default:primary_tow_pilot.username }},
+
+Great news! {{ surge_tow_pilot.get_full_name|default:surge_tow_pilot.username }}
+has volunteered to serve as surge tow pilot on {{ ops_date }}.
+
+You can view the updated duty roster here:
+  {{ roster_url }}
+
+- Manage2Soar Automated Notification
+  {{ club_name }}

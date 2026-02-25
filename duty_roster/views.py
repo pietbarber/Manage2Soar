@@ -2791,8 +2791,11 @@ def volunteer_as_surge_tow_pilot(request, assignment_id):
         messages.success(
             request,
             f"You have been assigned as surge tow pilot for "
-            f"{assignment.date.strftime('%B %d, %Y')}. Thank you for volunteering!",
+            f"{assignment.date.strftime('%B %d, %Y')}. "
+            "The primary tow pilot has been notified.",
         )
+
+        _notify_primary_tow_pilot_surge_filled(assignment)
         return redirect("duty_roster:duty_calendar")
 
     # GET – render confirmation page
@@ -3076,6 +3079,64 @@ def _notify_primary_instructor_surge_filled(assignment):
     except Exception:
         logger.exception(
             "Failed to send surge-filled notification to primary instructor"
+        )
+        return False
+
+
+def _notify_primary_tow_pilot_surge_filled(assignment):
+    """Notify the primary tow pilot that a surge tow pilot has volunteered.
+
+    Mirrors _notify_primary_instructor_surge_filled for the tow pilot role.
+    Returns True if the email was sent, False otherwise (errors are logged).
+    """
+    try:
+        primary = assignment.tow_pilot
+        if not primary or not primary.email:
+            logger.warning(
+                "Primary tow pilot for assignment %s has no email; "
+                "surge-filled notification suppressed",
+                assignment.id,
+            )
+            return False
+
+        surge = assignment.surge_tow_pilot
+        if not surge:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Surge Tow Pilot Confirmed - {assignment.date.strftime('%B %d, %Y')}"
+
+        context = {
+            "ops_date": ops_date,
+            "primary_tow_pilot": primary,
+            "surge_tow_pilot": surge,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [primary.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-filled notification to primary tow pilot"
         )
         return False
 
