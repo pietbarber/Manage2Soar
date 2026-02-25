@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.cache import cache
-from django.db import models
+from django.db import models, transaction
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -566,7 +566,7 @@ def calendar_day_detail(request, year, month, day):
                 and getattr(request.user, "instructor", False)
                 and assignment.instructor_id is not None
                 and assignment.surge_instructor_id is None
-                and request.user != assignment.instructor
+                and request.user.id != assignment.instructor_id
             ),
             "can_volunteer_surge_tow_pilot": bool(
                 assignment
@@ -575,7 +575,7 @@ def calendar_day_detail(request, year, month, day):
                 and getattr(request.user, "towpilot", False)
                 and assignment.tow_pilot_id is not None
                 and assignment.surge_tow_pilot_id is None
-                and request.user != assignment.tow_pilot
+                and request.user.id != assignment.tow_pilot_id
             ),
         },
     )
@@ -2758,6 +2758,31 @@ def volunteer_as_surge_tow_pilot(request, assignment_id):
         )
         return redirect("duty_roster:duty_calendar")
 
+    # Guard: cannot volunteer for past days
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot volunteer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: no primary tow pilot means surge is not needed
+    if not assignment.tow_pilot_id:
+        messages.error(
+            request,
+            "There is no primary tow pilot assigned for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: volunteer cannot be the primary tow pilot
+    if assignment.tow_pilot_id == member.id:
+        messages.info(
+            request,
+            "You are already the primary tow pilot for "
+            f"{assignment.date.strftime('%B %d, %Y')}.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
     if assignment.surge_tow_pilot_id:
         if assignment.surge_tow_pilot == member:
             messages.info(
@@ -2774,28 +2799,36 @@ def volunteer_as_surge_tow_pilot(request, assignment_id):
         return redirect("duty_roster:duty_calendar")
 
     if request.method == "POST":
-        # Re-check inside POST to guard against concurrent volunteers.
-        assignment.refresh_from_db()
-        if assignment.surge_tow_pilot_id:
-            messages.info(
-                request,
-                "Someone just volunteered ahead of you for "
-                f"{assignment.date.strftime('%B %d, %Y')}. "
-                "Thank you for offering!",
-            )
-            return redirect("duty_roster:duty_calendar")
+        # Use select_for_update inside a transaction to guarantee only the
+        # first concurrent volunteer wins (prevents last-write-wins race).
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+            if locked.surge_tow_pilot_id:
+                messages.info(
+                    request,
+                    "Someone just volunteered ahead of you for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. "
+                    "Thank you for offering!",
+                )
+                return redirect("duty_roster:duty_calendar")
 
-        assignment.surge_tow_pilot = member
-        assignment.save(update_fields=["surge_tow_pilot"])
+            locked.surge_tow_pilot = member
+            locked.save(update_fields=["surge_tow_pilot"])
 
+        notified = _notify_primary_tow_pilot_surge_filled(locked)
+        base_msg = (
+            f"You have been assigned as surge tow pilot for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
         messages.success(
             request,
-            f"You have been assigned as surge tow pilot for "
-            f"{assignment.date.strftime('%B %d, %Y')}. "
-            "The primary tow pilot has been notified.",
+            (
+                base_msg + " The primary tow pilot has been notified."
+                if notified
+                else base_msg
+                + " The primary tow pilot could not be notified automatically."
+            ),
         )
-
-        _notify_primary_tow_pilot_surge_filled(assignment)
         return redirect("duty_roster:duty_calendar")
 
     # GET – render confirmation page

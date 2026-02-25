@@ -118,6 +118,66 @@ def test_get_rejected_for_non_tow_pilot(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_get_rejected_for_past_duty_day(client, django_user_model):
+    """A tow pilot cannot volunteer for a duty day that is already past."""
+    primary = _make_member(django_user_model, "tp_past_primary", towpilot=True)
+    volunteer = _make_member(django_user_model, "tp_past_vol", towpilot=True)
+    # Create assignment in the past (negative offset)
+    past_date = date.today() - timedelta(days=1)
+    assignment = DutyAssignment.objects.create(date=past_date, tow_pilot=primary)
+
+    client.force_login(volunteer)
+    url = reverse(
+        "duty_roster:volunteer_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot is None  # not assigned
+
+
+@pytest.mark.django_db
+def test_get_rejected_when_no_primary_tow_pilot(client, django_user_model):
+    """Cannot volunteer as surge when there is no primary tow pilot on the assignment."""
+    volunteer = _make_member(django_user_model, "tp_noprimary_vol", towpilot=True)
+    # Assignment with no tow pilot set
+    assignment = DutyAssignment.objects.create(
+        date=date.today() + timedelta(days=30), tow_pilot=None
+    )
+
+    client.force_login(volunteer)
+    url = reverse(
+        "duty_roster:volunteer_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot is None
+
+
+@pytest.mark.django_db
+def test_get_rejected_when_volunteer_is_the_primary(client, django_user_model):
+    """The primary tow pilot cannot volunteer as their own surge."""
+    primary = _make_member(django_user_model, "tp_selfprimary", towpilot=True)
+    assignment = _make_assignment(primary, date_offset=50)
+
+    client.force_login(primary)
+    url = reverse(
+        "duty_roster:volunteer_surge_tow_pilot",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.surge_tow_pilot is None
+
+
+@pytest.mark.django_db
 def test_get_redirects_if_surge_already_assigned_by_other(client, django_user_model):
     """If a surge tow pilot is already assigned, GET shows an informational redirect."""
     primary = _make_member(django_user_model, "tp_primary4", towpilot=True)
