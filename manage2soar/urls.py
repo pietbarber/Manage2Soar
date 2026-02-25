@@ -244,6 +244,12 @@ urlpatterns = [
         name="public_syllabus_qr",
     ),
     path("analytics/", include("analytics.urls")),
+    # Siteconfig app (webcam proxy, etc.).
+    # Blank prefix is safe because siteconfig URLs use specific top-level
+    # segments ("webcam/", "webcam/snapshot/") that don't conflict with any
+    # other registered pattern.  Add future siteconfig paths with the same
+    # care, or introduce a prefix such as "club/" if conflicts arise.
+    path("", include("siteconfig.urls")),
     # API endpoints for mail server integration
     path("api/email-lists/", email_lists, name="api_email_lists"),
     path("avatar/<str:username>.png", members_views.pydenticon_view, name="pydenticon"),

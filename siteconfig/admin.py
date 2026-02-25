@@ -275,6 +275,22 @@ class SiteConfigurationAdmin(AdminHelperMixin, admin.ModelAdmin):
                 "classes": ("collapse",),
             },
         ),
+        (
+            "📷 Webcam Integration",
+            {
+                "fields": ("webcam_snapshot_url",),
+                "description": (
+                    "<strong>Webcam snapshot URL</strong>: Paste the full URL (including any "
+                    "username/password) used to retrieve a JPEG snapshot from your club's webcam. "
+                    "This URL is stored only in the database and is <em>never</em> sent to members' "
+                    "browsers — the Django server fetches it and serves the image bytes through "
+                    "<code>/webcam/snapshot/</code>, which requires an active-member login. "
+                    "Leave blank to hide the Webcam link from the navigation menu entirely. "
+                    "Supports both <code>http://</code> and <code>https://</code> camera endpoints."
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     @admin.action(description="Regenerate visiting pilot security token")

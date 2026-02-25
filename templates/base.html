@@ -247,6 +247,13 @@
             </ul>
           </li>
 
+          {% webcam_enabled as webcam_feature_on %}
+          {% if user.is_active_member and webcam_feature_on %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a>
+          </li>
+          {% endif %}
+
         </ul>
 
         <!-- Right side: Welcome + Logout -->

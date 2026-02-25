@@ -483,6 +483,23 @@ class SiteConfiguration(models.Model):
         "Use for trusted non-members like former members, vendors, or partners.",
     )
 
+    # -----------------------------------------------------------------------
+    # Webcam integration (Issue #625)
+    # -----------------------------------------------------------------------
+    webcam_snapshot_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        verbose_name="Webcam snapshot URL",
+        help_text=(
+            "Full URL used server-side to fetch a single JPEG snapshot from the webcam. "
+            "May include credentials in the URL (e.g. http://host:9137/cgi-bin/CGIProxy.fcgi"
+            "?cmd=snapPicture2&usr=USER&pwd=PASS). "
+            "⚠️ This value is NEVER sent to the browser — the Django server fetches it "
+            "and proxies the image bytes. Leave blank to disable the webcam feature entirely."
+        ),
+    )
+
     def generate_visiting_pilot_token(self):
         """Generate a new secure token for visiting pilot URLs."""
         from django.utils import timezone
@@ -660,7 +677,9 @@ class SiteConfiguration(models.Model):
 
         from utils.favicon import PWA_CLUB_ICON_NAME, generate_pwa_icon_from_logo
 
-        cache.delete("siteconfig_instance")
+        cache.delete_many(
+            ["siteconfig_instance", "siteconfig_deferred", "siteconfig_webcam_enabled"]
+        )
 
         # Generate favicon + PWA icon if logo was uploaded/changed
         if self.club_logo and is_new_logo:
@@ -747,7 +766,9 @@ class SiteConfiguration(models.Model):
         """Override delete to clear cache."""
         from django.core.cache import cache
 
-        cache.delete("siteconfig_instance")
+        cache.delete_many(
+            ["siteconfig_instance", "siteconfig_deferred", "siteconfig_webcam_enabled"]
+        )
         super().delete(*args, **kwargs)
 
     def __str__(self):
