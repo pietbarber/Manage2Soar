@@ -63,16 +63,27 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         ), f"Expected img hidden on load, got display={display!r}"
 
     def test_error_div_is_hidden_initially(self):
-        """The error div is hidden on first render (shown only on camera failure)."""
+        """The error div has style='display:none' in the initial server-rendered HTML.
+
+        We intercept the snapshot request via Playwright route interception so the
+        browser's <img onerror> handler cannot fire before the assertion runs.
+        Without interception the 503 response from the server can trigger onerror
+        and change the div to display:block in a race with this check.
+        """
+        # Abort snapshot requests at the browser level so the onerror handler
+        # never fires during this test.  This lets us cleanly assert the
+        # server-rendered initial state (style="display:none").
+        self.page.route("**/webcam/snapshot*", lambda route: route.abort())
         self.page.goto(f"{self.live_server_url}/webcam/")
 
         error_div = self.page.locator("#webcam-error")
         assert error_div.count() == 1, "webcam-error element must exist"
-        # The element has style="display:none" in the HTML
-        display = error_div.evaluate("el => el.style.display")
+        # Verify the static HTML attribute, not the computed style, so we are
+        # asserting the server-rendered state rather than a post-JS-execution state.
+        style_attr = error_div.get_attribute("style") or ""
         assert (
-            display == "none"
-        ), f"Error div should be hidden initially, got {display!r}"
+            "none" in style_attr
+        ), f"Error div should be display:none in initial HTML, got style={style_attr!r}"
 
     def test_auto_refresh_timer_is_running(self):
         """JS sets up the interval timer; the status span confirms auto-refresh."""
