@@ -107,17 +107,20 @@
               Members
             </a>
             <ul class="dropdown-menu" aria-labelledby="membersDropdown">
-              <li><a class="dropdown-item" href="{% url 'members:member_list' %}">Member List</a></li>
+              <li><a class="dropdown-item" href="{% url 'members:member_list' %}"><i class="fas fa-list me-1"></i> Member List</a></li>
               {% if user.is_authenticated %}
                 {% if user.member_manager or user.webmaster or user.is_superuser %}
               <li><a class="dropdown-item" href="{% url 'members:membership_applications_list' %}"><i class="fas fa-user-plus"></i> Membership Applications</a></li>
                 {% endif %}
               {% endif %}
-              <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">Badge Board</a></li>
-              <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
+              <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">🥇 Badge Board</a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{% url 'cms:resources' %}">Resources</a></li>
-
+              <li><a class="dropdown-item" href="{% url 'cms:resources' %}">📚 Documents</a></li>
+              <li><a class="dropdown-item" href="{% url 'public_syllabus_overview' %}"><i class="fas fa-book me-1"></i> Syllabus</a></li>
+              {% webcam_enabled as webcam_feature_on %}
+              {% if user.is_authenticated and webcam_feature_on %}
+              <li><a class="dropdown-item" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a></li>
+              {% endif %}
             </ul>
           </li>
 
@@ -128,19 +131,28 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="dutyrosterDropdown">
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">Blackout Dates</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}"><i class="fas fa-calendar-alt me-1"></i> Calendar</a>
               </li>
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}">📅 Calendar</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:duty_calendar' %}?view=agenda"><i class="fas fa-list me-1"></i> Roster Agenda</a>
               </li>
-              {% if user.is_authenticated and site_config.allow_glider_reservations %}
+              {% if user.is_authenticated %}
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:reservation_list' %}">🛫 Glider Reservations</a>
+                <a class="dropdown-item" href="{% url 'duty_roster:my_swap_requests' %}"><i class="fas fa-exchange-alt me-1"></i> My Swap Requests</a>
+              </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:open_swap_requests' %}"><i class="fas fa-hands-helping me-1"></i> Help Others</a>
+              </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:reservation_list' %}"><i class="fas fa-plane me-1"></i> Glider Reservations</a>
               </li>
               {% endif %}
               {% if user.is_authenticated %}
                 {% if user.rostermeister or user.member_manager or user.director or user.is_superuser %}
               <li><hr class="dropdown-divider"></li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">🚫 Blackout Dates</a>
+              </li>
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:duty_delinquents_detail' %}">
                   <i class="fas fa-exclamation-triangle text-warning"></i> Duty Delinquents Report
@@ -148,7 +160,6 @@
               </li>
                 {% endif %}
               {% endif %}
-
             </ul>
           </li>
           <li class="nav-item dropdown">
@@ -157,9 +168,9 @@
               Log Sheets
             </a>
             <ul class="dropdown-menu" aria-labelledby="logsheetDropdown">
-              <li><a class="dropdown-item" href="{% url 'logsheet:index' %}">Manage Log Sheets</a></li>
+              <li><a class="dropdown-item" href="{% url 'logsheet:index' %}"><i class="bi bi-journal-text me-1"></i> Manage Log Sheets</a></li>
               {% if user.is_authenticated %}
-              <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">Analytics</a></li>
+              <li><a class="dropdown-item" href="{% url 'analytics:dashboard' %}">📈 Analytics</a></li>
               {% endif %}
             </ul>
           </li>
@@ -178,7 +189,7 @@
             <ul class="dropdown-menu" aria-labelledby="instructorDropdown">
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:instructor_requests' %}">
-                  <i class="fas fa-user-graduate me-1"></i>Student Requests
+                  <i class="fas fa-chalkboard-teacher me-1"></i>Student Requests
                   {% if instructor_pending_count %}
                     <span class="badge bg-warning text-dark ms-1" aria-label="{{ instructor_pending_count }} pending student requests">{{ instructor_pending_count }}</span>
                   {% endif %}
@@ -235,10 +246,10 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="equipmentDropdown">
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'logsheet:equipment_list' %}">Gliders & Towplanes</a>
+                <a class="dropdown-item" href="{% url 'logsheet:equipment_list' %}">🛩️ Gliders & Towplanes</a>
               </li>
               <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'logsheet:maintenance_issues' %}">Maintenance Issues</a>
+                <a class="dropdown-item" href="{% url 'logsheet:maintenance_issues' %}">🔧 Maintenance Issues</a>
               </li>
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'logsheet:maintenance_deadlines' %}">⏰ Maintenance Deadlines</a>
@@ -247,34 +258,57 @@
             </ul>
           </li>
 
-          {% webcam_enabled as webcam_feature_on %}
-          {% if user.is_active_member and webcam_feature_on %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a>
-          </li>
-          {% endif %}
-
         </ul>
 
-        <!-- Right side: Welcome + Logout -->
+        <!-- Right side: User dropdown + Logout -->
         {% if user.is_authenticated %}
         {% is_kiosk_session as kiosk_mode %}
-        <div class="d-flex align-items-center me-3 user-section">
-          <a href="{% url 'members:member_view' member_id=user.pk %}" class="profile-bubble" title="View My Profile">
-            <img src="{{ user.profile_image_url_small }}" class="nav-avatar" alt="Profile Photo">
-          </a>
-          <span class="navbar-text ms-2">
-            Welcome, {{ user.full_display_name }}
-            {% if kiosk_mode %}<small class="text-warning ms-1">(Kiosk)</small>{% endif %}
-          </span>
+        <ul class="navbar-nav mb-2 mb-lg-0 d-flex flex-row align-items-center">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">
+              <img src="{{ user.profile_image_url_small }}" class="nav-avatar me-2" alt="Profile Photo">
+              Welcome, {{ user.full_display_name }}
+              {% if kiosk_mode %}<small class="text-warning ms-1">(Kiosk)</small>{% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+              <li><a class="dropdown-item" href="{% url 'members:member_view' member_id=user.pk %}">
+                <i class="fas fa-user me-1"></i> View my Profile
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'members:biography_view' member_id=user.pk %}">
+                <i class="fas fa-pen me-1"></i> Edit my Biography
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'instructors:member_training_grid' member_id=user.pk %}">
+                <i class="fas fa-th me-1"></i> View my Training Grid
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'instructors:member_instruction_record' member_id=user.pk %}">
+                <i class="fas fa-clipboard-list me-1"></i> View my Instruction Record
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'public_syllabus_overview' %}">
+                <i class="fas fa-book me-1"></i> View Training Syllabus
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'instructors:member_logbook' %}">🗒️ My Logbook</a></li>
+              {% if user.glider_rating != "private" and user.glider_rating != "commercial" %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'instructors:needed_for_solo' member_id=user.pk %}">
+                <i class="fas fa-plane-departure me-1"></i> What's needed to solo?
+              </a></li>
+              <li><a class="dropdown-item" href="{% url 'instructors:needed_for_checkride' member_id=user.pk %}">
+                <i class="fas fa-check-circle me-1"></i> What's needed for checkride?
+              </a></li>
+              {% endif %}
+            </ul>
+          </li>
           {% if user.is_staff or user.webmaster or user.rostermeister or user.member_manager or user.instructor %}
-            <a href="/admin/" class="ms-3" title="Admin interface" data-bs-toggle="tooltip" data-bs-placement="bottom">
+          <li class="nav-item">
+            <a href="/admin/" class="nav-link" title="Admin interface" data-bs-toggle="tooltip" data-bs-placement="bottom">
               <span style="font-size:1.5em; vertical-align:middle; cursor:pointer;">🛠️</span>
             </a>
+          </li>
           {% endif %}
-        </div>
+        </ul>
         {% if not kiosk_mode %}
-        <form action="{% url 'logout' %}" method="post" class="d-flex">
+        <form action="{% url 'logout' %}" method="post" class="d-flex ms-2">
           {% csrf_token %}
           <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
         </form>

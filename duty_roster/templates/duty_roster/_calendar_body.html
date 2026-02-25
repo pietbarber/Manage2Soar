@@ -75,7 +75,10 @@
 
       // Restore view state after HTMX loads new content
       function restoreViewState() {
-        const savedView = localStorage.getItem('duty-roster-view') || 'calendar';
+        // URL param takes priority (e.g. ?view=agenda from the navbar link)
+        const params = new URLSearchParams(window.location.search);
+        const urlView = params.get('view');
+        const savedView = urlView || localStorage.getItem('duty-roster-view') || 'calendar';
         const calendarRadio = document.getElementById('calendar-view');
         const agendaRadio = document.getElementById('agenda-view');
 
