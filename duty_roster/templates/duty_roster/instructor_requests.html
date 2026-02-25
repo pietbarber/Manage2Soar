@@ -255,9 +255,15 @@
                           <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="ms-2 flex-shrink-0">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="surge">
+                            {% if slot.student != alloc.surge %}
                             <button type="submit" class="btn btn-sm btn-outline-success" title="Move to {{ alloc.surge.full_display_name }}">
                               <i class="fas fa-arrow-right me-1"></i>Surge
                             </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Cannot assign an instructor as their own student" disabled aria-disabled="true">
+                              <i class="fas fa-arrow-right me-1"></i>Surge
+                            </button>
+                            {% endif %}
                           </form>
                         </div>
                       {% empty %}
@@ -312,16 +318,20 @@
                   <strong>{{ alloc.unassigned_slots|length }} unassigned student{{ alloc.unassigned_slots|length|pluralize }}:</strong>
                   {% for slot in alloc.unassigned_slots %}
                     <span class="badge bg-warning text-dark ms-1">{{ slot.student.full_display_name }}</span>
+                    {% if slot.student != alloc.primary %}
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="primary">
                       <button type="submit" class="btn btn-sm btn-outline-primary">→ Primary</button>
                     </form>
+                    {% endif %}
+                    {% if slot.student != alloc.surge %}
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="surge">
                       <button type="submit" class="btn btn-sm btn-outline-success">→ Surge</button>
                     </form>
+                    {% endif %}
                   {% endfor %}
                 </div>
               {% endif %}

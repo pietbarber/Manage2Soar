@@ -42,13 +42,20 @@
         </div>
         {% endif %}
 
-        {% if assignment.surge_instructor %}
+        {% if assignment.surge_instructor or can_volunteer_surge_instructor %}
         <div class="col-6">
           <div class="d-flex align-items-center">
             <span class="badge bg-success me-2"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.surge_instructor_title|default:'Surge Instructor' }}</small>
-              <span class="fw-medium">{{ assignment.surge_instructor.full_display_name }}</span>
+              {% if assignment.surge_instructor %}
+                <span class="fw-medium">{{ assignment.surge_instructor.full_display_name }}</span>
+              {% elif can_volunteer_surge_instructor %}
+                <a href="{% url 'duty_roster:volunteer_surge_instructor' assignment_id=assignment.id %}"
+                   class="btn btn-success btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
+                  ✋ Volunteer as surge
+                </a>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -78,13 +85,20 @@
         </div>
         {% endif %}
 
-        {% if assignment.surge_tow_pilot %}
+        {% if assignment.surge_tow_pilot or can_volunteer_surge_tow_pilot %}
         <div class="col-6">
           <div class="d-flex align-items-center">
             <span class="badge bg-danger me-2"><i class="bi bi-airplane" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.surge_towpilot_title|default:'Surge Tow Pilot' }}</small>
-              <span class="fw-medium">{{ assignment.surge_tow_pilot.full_display_name }}</span>
+              {% if assignment.surge_tow_pilot %}
+                <span class="fw-medium">{{ assignment.surge_tow_pilot.full_display_name }}</span>
+              {% elif can_volunteer_surge_tow_pilot %}
+                <a href="{% url 'duty_roster:volunteer_surge_tow_pilot' assignment_id=assignment.id %}"
+                   class="btn btn-danger btn-sm mt-1 d-block" style="font-size:0.7rem;padding:2px 6px;">
+                  ✋ Volunteer as surge
+                </a>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -93,7 +107,7 @@
         {% if config.schedule_duty_officers or assignment.duty_officer %}
         <div class="col-6">
           <div class="d-flex align-items-start">
-            <span class="badge bg-warning text-dark me-2 mt-1"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+            <span class="badge duty-badge badge-duty-officer me-2 mt-1"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
             <div>
               <small class="text-muted d-block">{{ config.duty_officer_title|default:'Duty Officer' }}</small>
               {% if assignment.duty_officer %}

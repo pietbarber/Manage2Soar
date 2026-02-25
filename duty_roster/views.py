@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.cache import cache
-from django.db import models
+from django.db import models, transaction
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -556,6 +556,27 @@ def calendar_day_detail(request, year, month, day):
             ),
             "scheduled_holes": scheduled_holes,
             "volunteerable_holes": volunteerable_holes,
+            # Surge-volunteer eligibility flags (Issue #688).
+            # True when the primary slot is filled, the surge slot is empty,
+            # the user is qualified, and the day is today or in the future.
+            "can_volunteer_surge_instructor": bool(
+                assignment
+                and day_date >= date.today()
+                and request.user.is_authenticated
+                and getattr(request.user, "instructor", False)
+                and assignment.instructor_id is not None
+                and assignment.surge_instructor_id is None
+                and request.user.id != assignment.instructor_id
+            ),
+            "can_volunteer_surge_tow_pilot": bool(
+                assignment
+                and day_date >= date.today()
+                and request.user.is_authenticated
+                and getattr(request.user, "towpilot", False)
+                and assignment.tow_pilot_id is not None
+                and assignment.surge_tow_pilot_id is None
+                and request.user.id != assignment.tow_pilot_id
+            ),
         },
     )
 
@@ -2635,6 +2656,9 @@ def volunteer_as_surge_instructor(request, assignment_id):
 
     Guards:
     * User must be an instructor (member.instructor == True).
+    * Duty day must be today or in the future (consistent with tow-pilot flow).
+    * A primary instructor must already be assigned (surge is only needed then).
+    * Volunteer cannot be the primary instructor themselves.
     * If a surge instructor is already assigned the request is gracefully
       rejected with an informational message regardless of who this user is.
     """
@@ -2647,6 +2671,31 @@ def volunteer_as_surge_instructor(request, assignment_id):
         messages.error(
             request,
             "Only qualified instructors can volunteer as surge instructor.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: cannot volunteer for past days (mirrors tow-pilot flow).
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot volunteer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: no primary instructor means surge is not needed.
+    if not assignment.instructor_id:
+        messages.error(
+            request,
+            "There is no primary instructor assigned for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: volunteer cannot be the primary instructor themselves.
+    if assignment.instructor_id == member.id:
+        messages.info(
+            request,
+            "You are already the primary instructor for "
+            f"{assignment.date.strftime('%B %d, %Y')}.",
         )
         return redirect("duty_roster:duty_calendar")
 
@@ -2677,29 +2726,37 @@ def volunteer_as_surge_instructor(request, assignment_id):
     )
 
     if request.method == "POST":
-        # Re-check surge_instructor inside the POST path to guard against a
-        # race between two concurrent volunteers.
-        assignment.refresh_from_db()
-        if assignment.surge_instructor_id:
-            messages.info(
-                request,
-                "Someone just volunteered ahead of you for "
-                f"{assignment.date.strftime('%B %d, %Y')}. "
-                "Thank you for offering!",
-            )
-            return redirect("duty_roster:duty_calendar")
+        # Use select_for_update inside a transaction to guarantee only the
+        # first volunteer wins (prevents last-write-wins race condition,
+        # mirroring the tow-pilot surge flow).
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+            if locked.surge_instructor_id:
+                messages.info(
+                    request,
+                    "Someone just volunteered ahead of you for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. "
+                    "Thank you for offering!",
+                )
+                return redirect("duty_roster:duty_calendar")
 
-        assignment.surge_instructor = member
-        assignment.save(update_fields=["surge_instructor"])
+            locked.surge_instructor = member
+            locked.save(update_fields=["surge_instructor"])
 
+        notified = _notify_primary_instructor_surge_filled(locked)
+        base_msg = (
+            f"You have been assigned as surge instructor for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
         messages.success(
             request,
-            f"You have been assigned as surge instructor for "
-            f"{assignment.date.strftime('%B %d, %Y')}. "
-            "The primary instructor has been notified.",
+            (
+                base_msg + " The primary instructor has been notified."
+                if notified
+                else base_msg
+                + " The primary instructor could not be notified automatically."
+            ),
         )
-
-        _notify_primary_instructor_surge_filled(assignment)
         return redirect("duty_roster:duty_calendar")
 
     # GET – render confirmation page
@@ -2710,6 +2767,111 @@ def volunteer_as_surge_instructor(request, assignment_id):
             "assignment": assignment,
             "accepted_count": accepted_count,
         },
+    )
+
+
+@active_member_required
+@never_cache
+def volunteer_as_surge_tow_pilot(request, assignment_id):
+    """
+    Allow a tow pilot to volunteer as surge tow pilot for a day (Issue #688).
+
+    GET  – Shows a confirmation page with the date and primary tow pilot.
+    POST – Assigns the current user as surge_tow_pilot on the DutyAssignment.
+
+    Guards:
+    * User must be a tow pilot (member.towpilot == True).
+    * If a surge tow pilot is already assigned the request is gracefully
+      rejected with an informational message.
+    """
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    member = request.user
+
+    if not getattr(member, "towpilot", False):
+        messages.error(
+            request,
+            "Only qualified tow pilots can volunteer as surge tow pilot.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: cannot volunteer for past days
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot volunteer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: no primary tow pilot means surge is not needed
+    if not assignment.tow_pilot_id:
+        messages.error(
+            request,
+            "There is no primary tow pilot assigned for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: volunteer cannot be the primary tow pilot
+    if assignment.tow_pilot_id == member.id:
+        messages.info(
+            request,
+            "You are already the primary tow pilot for "
+            f"{assignment.date.strftime('%B %d, %Y')}.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.surge_tow_pilot_id:
+        if assignment.surge_tow_pilot == member:
+            messages.info(
+                request,
+                "You are already the surge tow pilot for "
+                f"{assignment.date.strftime('%B %d, %Y')}.",
+            )
+        else:
+            messages.info(
+                request,
+                "A surge tow pilot has already been assigned for "
+                f"{assignment.date.strftime('%B %d, %Y')}. Thank you for your willingness!",
+            )
+        return redirect("duty_roster:duty_calendar")
+
+    if request.method == "POST":
+        # Use select_for_update inside a transaction to guarantee only the
+        # first concurrent volunteer wins (prevents last-write-wins race).
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+            if locked.surge_tow_pilot_id:
+                messages.info(
+                    request,
+                    "Someone just volunteered ahead of you for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. "
+                    "Thank you for offering!",
+                )
+                return redirect("duty_roster:duty_calendar")
+
+            locked.surge_tow_pilot = member
+            locked.save(update_fields=["surge_tow_pilot"])
+
+        notified = _notify_primary_tow_pilot_surge_filled(locked)
+        base_msg = (
+            f"You have been assigned as surge tow pilot for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
+        messages.success(
+            request,
+            (
+                base_msg + " The primary tow pilot has been notified."
+                if notified
+                else base_msg
+                + " The primary tow pilot could not be notified automatically."
+            ),
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # GET – render confirmation page
+    return render(
+        request,
+        "duty_roster/surge_tow_volunteer_confirm.html",
+        {"assignment": assignment},
     )
 
 
@@ -2766,6 +2928,15 @@ def assign_student_to_instructor(request, slot_id):
         messages.error(
             request,
             "No instructor is assigned for this role; cannot reassign.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    # Guard (Issue #685): an instructor cannot be assigned as their own student.
+    if slot.student == target_instructor:
+        messages.error(
+            request,
+            f"{target_instructor.full_display_name} is the instructor for this day "
+            "and cannot be assigned as their own student.",
         )
         return redirect("duty_roster:instructor_requests")
 
@@ -2977,6 +3148,64 @@ def _notify_primary_instructor_surge_filled(assignment):
     except Exception:
         logger.exception(
             "Failed to send surge-filled notification to primary instructor"
+        )
+        return False
+
+
+def _notify_primary_tow_pilot_surge_filled(assignment):
+    """Notify the primary tow pilot that a surge tow pilot has volunteered.
+
+    Mirrors _notify_primary_instructor_surge_filled for the tow pilot role.
+    Returns True if the email was sent, False otherwise (errors are logged).
+    """
+    try:
+        primary = assignment.tow_pilot
+        if not primary or not primary.email:
+            logger.warning(
+                "Primary tow pilot for assignment %s has no email; "
+                "surge-filled notification suppressed",
+                assignment.id,
+            )
+            return False
+
+        surge = assignment.surge_tow_pilot
+        if not surge:
+            return False
+
+        email_config = get_email_config()
+        config = email_config["config"]
+
+        ops_date = assignment.date.strftime("%A, %B %d, %Y")
+        subject = f"Surge Tow Pilot Confirmed - {assignment.date.strftime('%B %d, %Y')}"
+
+        context = {
+            "ops_date": ops_date,
+            "primary_tow_pilot": primary,
+            "surge_tow_pilot": surge,
+            "roster_url": email_config["roster_url"],
+            "club_name": email_config["club_name"],
+            "club_logo_url": get_absolute_club_logo_url(config),
+        }
+
+        html_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled.html", context
+        )
+        text_message = render_to_string(
+            "duty_roster/emails/surge_tow_pilot_filled.txt", context
+        )
+
+        sent_count = send_mail(
+            subject,
+            text_message,
+            email_config["from_email"],
+            [primary.email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+        return sent_count > 0
+    except Exception:
+        logger.exception(
+            "Failed to send surge-filled notification to primary tow pilot"
         )
         return False
 

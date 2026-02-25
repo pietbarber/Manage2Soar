@@ -184,6 +184,11 @@ urlpatterns = [
         name="volunteer_surge_instructor",
     ),
     path(
+        "tow/volunteer-surge/<int:assignment_id>/",
+        views.volunteer_as_surge_tow_pilot,
+        name="volunteer_surge_tow_pilot",
+    ),
+    path(
         "volunteer-fill/<int:assignment_id>/<str:role>/",
         views.volunteer_fill_role,
         name="volunteer_fill_role",

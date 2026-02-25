@@ -73,22 +73,22 @@
                 {% endif %}
                 <div class="duty-assignments">
                   {% if a.instructor %}
-                    <span class="duty-badge badge-instructor">{{ a.instructor.last_name }}</span>
+                    <span class="duty-badge badge-instructor"><i class="bi bi-mortarboard" aria-hidden="true"></i> {{ a.instructor.last_name }}</span>
                   {% endif %}
                   {% if a.tow_pilot %}
-                    <span class="duty-badge badge-tow-pilot">{{ a.tow_pilot.last_name }}</span>
+                    <span class="duty-badge badge-tow-pilot"><i class="bi bi-airplane" aria-hidden="true"></i> {{ a.tow_pilot.last_name }}</span>
                   {% endif %}
                   {% if a.duty_officer %}
-                    <span class="duty-badge badge-duty-officer">{{ a.duty_officer.last_name }}</span>
+                    <span class="duty-badge badge-duty-officer"><i class="bi bi-clipboard-check" aria-hidden="true"></i> {{ a.duty_officer.last_name }}</span>
                   {% endif %}
                   {% if a.assistant_duty_officer %}
-                    <span class="duty-badge badge-assistant-duty-officer">{{ a.assistant_duty_officer.last_name }}</span>
+                    <span class="duty-badge badge-assistant-duty-officer"><i class="bi bi-person-badge" aria-hidden="true"></i> {{ a.assistant_duty_officer.last_name }}</span>
                   {% endif %}
                   {% if a.surge_instructor %}
-                    <span class="duty-badge badge-instructor">{{ a.surge_instructor.last_name }} (S)</span>
+                    <span class="duty-badge badge-instructor"><i class="bi bi-mortarboard" aria-hidden="true"></i> {{ a.surge_instructor.last_name }} (S)</span>
                   {% endif %}
                   {% if a.surge_tow_pilot %}
-                    <span class="duty-badge badge-tow-pilot">{{ a.surge_tow_pilot.last_name }} (S)</span>
+                    <span class="duty-badge badge-tow-pilot"><i class="bi bi-airplane" aria-hidden="true"></i> {{ a.surge_tow_pilot.last_name }} (S)</span>
                   {% endif %}
                 </div>
               {% endwith %}

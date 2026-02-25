@@ -322,6 +322,111 @@ def test_noop_when_already_on_target_instructor(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_surge_instructor_cannot_be_assigned_as_own_student_to_surge(
+    client, django_user_model
+):
+    """Issue #685: when the student IS the surge instructor, action=surge is blocked."""
+    _make_site_config()
+    primary = _make_member(django_user_model, "al_self1_primary", instructor=True)
+    surge = _make_member(django_user_model, "al_self1_surge", instructor=True)
+    assignment = _make_assignment(primary, date_offset=80, surge=surge)
+
+    # A student request exists where the student IS the surge instructor
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=surge,
+        instructor=primary,
+        instructor_response="accepted",
+        status="confirmed",
+    )
+
+    client.force_login(primary)
+    url = reverse(
+        "duty_roster:assign_student_to_instructor", kwargs={"slot_id": slot.id}
+    )
+    with patch("duty_roster.views.send_mail") as mock_send:
+        response = client.post(url, {"action": "surge"})
+        mock_send.assert_not_called()
+
+    assert response.status_code == 302
+    slot.refresh_from_db()
+    # Slot must not have been moved to surge instructor
+    assert slot.instructor == primary
+
+
+@pytest.mark.django_db
+def test_primary_instructor_cannot_be_assigned_as_own_student(
+    client, django_user_model
+):
+    """Issue #685: block applies when student IS the primary instructor and action=primary."""
+    _make_site_config()
+    primary = _make_member(django_user_model, "al_self2_primary", instructor=True)
+    surge = _make_member(django_user_model, "al_self2_surge", instructor=True)
+    assignment = _make_assignment(primary, date_offset=81, surge=surge)
+
+    # Slot where student IS the primary instructor (moving to primary is self-referential)
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=primary,
+        instructor=surge,
+        instructor_response="accepted",
+        status="confirmed",
+    )
+
+    client.force_login(surge)
+    url = reverse(
+        "duty_roster:assign_student_to_instructor", kwargs={"slot_id": slot.id}
+    )
+    with patch("duty_roster.views.send_mail") as mock_send:
+        response = client.post(url, {"action": "primary"})
+        mock_send.assert_not_called()
+
+    assert response.status_code == 302
+    slot.refresh_from_db()
+    assert slot.instructor == surge  # unchanged — guard blocked the move
+
+
+@pytest.mark.django_db
+def test_self_student_guard_error_message_contains_name(client, django_user_model):
+    """Issue #685: the error flash message mentions the instructor's name."""
+    _make_site_config()
+    primary = _make_member(
+        django_user_model,
+        "al_self3_primary",
+        instructor=True,
+        first_name="Alice",
+        last_name="Smith",
+    )
+    surge = _make_member(
+        django_user_model,
+        "al_self3_surge",
+        instructor=True,
+        first_name="Bob",
+        last_name="Jones",
+    )
+    assignment = _make_assignment(primary, date_offset=82, surge=surge)
+
+    slot = InstructionSlot.objects.create(
+        assignment=assignment,
+        student=surge,
+        instructor=primary,
+        instructor_response="accepted",
+        status="confirmed",
+    )
+
+    client.force_login(primary)
+    url = reverse(
+        "duty_roster:assign_student_to_instructor", kwargs={"slot_id": slot.id}
+    )
+    with patch("duty_roster.views.send_mail"):
+        response = client.post(url, {"action": "surge"}, follow=True)
+
+    content = response.content.decode()
+    # Error message should contain "cannot be assigned as their own student"
+    assert "cannot be assigned as their own student" in content
+
+
+@pytest.mark.django_db
 def test_unauthenticated_post_redirects_to_login(client, django_user_model):
     """Unauthenticated POST is caught by @active_member_required and redirected."""
     primary = _make_member(django_user_model, "al_anon_p", instructor=True)

@@ -140,6 +140,72 @@ def test_get_rejected_for_non_instructor(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_get_rejected_for_past_duty_day(client, django_user_model):
+    """An instructor volunteering for a past day is redirected with an error message."""
+    primary = _make_member(django_user_model, "vol_primary_past", instructor=True)
+    volunteer = _make_member(django_user_model, "vol_volunteer_past", instructor=True)
+    # Create assignment in the past
+    past_assignment = DutyAssignment.objects.create(
+        date=date.today() - timedelta(days=1),
+        instructor=primary,
+    )
+
+    client.force_login(volunteer)
+    url = reverse(
+        "duty_roster:volunteer_surge_instructor",
+        kwargs={"assignment_id": past_assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assert "duty_calendar" in response["Location"] or response["Location"].endswith("/")
+    # Surge instructor must remain unset
+    past_assignment.refresh_from_db()
+    assert past_assignment.surge_instructor_id is None
+
+
+@pytest.mark.django_db
+def test_get_rejected_when_no_primary_instructor(client, django_user_model):
+    """Volunteering is rejected when no primary instructor is assigned (surge not needed)."""
+    volunteer = _make_member(django_user_model, "vol_noprimary", instructor=True)
+    # Assignment with no primary instructor set
+    assignment = DutyAssignment.objects.create(
+        date=date.today() + timedelta(days=10),
+    )
+
+    client.force_login(volunteer)
+    url = reverse(
+        "duty_roster:volunteer_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assert "duty_calendar" in response["Location"] or response["Location"].endswith("/")
+    assignment.refresh_from_db()
+    assert assignment.surge_instructor_id is None
+
+
+@pytest.mark.django_db
+def test_get_rejected_when_volunteer_is_the_primary(client, django_user_model):
+    """The primary instructor cannot volunteer as their own surge instructor."""
+    primary = _make_member(django_user_model, "vol_selfprimary", instructor=True)
+    assignment = _make_assignment(primary, date_offset=11)
+
+    client.force_login(primary)
+    url = reverse(
+        "duty_roster:volunteer_surge_instructor",
+        kwargs={"assignment_id": assignment.id},
+    )
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assert "duty_calendar" in response["Location"] or response["Location"].endswith("/")
+    assignment.refresh_from_db()
+    assert assignment.surge_instructor_id is None
+
+
+@pytest.mark.django_db
 def test_get_redirects_if_surge_already_assigned_by_other(client, django_user_model):
     """If a surge instructor is already assigned, GET shows an informational redirect."""
     primary = _make_member(django_user_model, "vol_primary4", instructor=True)
