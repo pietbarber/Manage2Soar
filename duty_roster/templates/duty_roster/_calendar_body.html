@@ -44,6 +44,16 @@
       {% include "duty_roster/_calendar_agenda.html" %}
     </div>
 
+    <!-- Calendar Legend (Issue #690) -->
+    {% get_siteconfig as config %}
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3 mb-1 px-2" aria-label="Calendar legend">
+      <span class="duty-badge badge-instructor"><i class="bi bi-mortarboard"></i> {{ config.instructor_title|default:'Instructor' }}</span>
+      <span class="duty-badge badge-tow-pilot"><i class="bi bi-airplane"></i> {{ config.towpilot_title|default:'Tow Pilot' }}</span>
+      <span class="duty-badge badge-duty-officer"><i class="bi bi-clipboard-check"></i> {{ config.duty_officer_title|default:'Duty Officer' }}</span>
+      <span class="duty-badge badge-assistant-duty-officer"><i class="bi bi-person-badge"></i> {{ config.assistant_duty_officer_title|default:'Assistant DO' }}</span>
+      <span class="duty-badge badge-surge"><i class="bi bi-exclamation-triangle"></i> Surge Demand</span>
+    </div>
+
     {# Bottom navigation with simplified center (reuse shared month navigation partial) #}
     {% include "duty_roster/_calendar_month_nav.html" with show_full_header=False margin_class="mt-4" %}
 

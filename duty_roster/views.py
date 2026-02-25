@@ -556,6 +556,27 @@ def calendar_day_detail(request, year, month, day):
             ),
             "scheduled_holes": scheduled_holes,
             "volunteerable_holes": volunteerable_holes,
+            # Surge-volunteer eligibility flags (Issue #688).
+            # True when the primary slot is filled, the surge slot is empty,
+            # the user is qualified, and the day is today or in the future.
+            "can_volunteer_surge_instructor": bool(
+                assignment
+                and day_date >= date.today()
+                and request.user.is_authenticated
+                and getattr(request.user, "instructor", False)
+                and assignment.instructor_id is not None
+                and assignment.surge_instructor_id is None
+                and request.user != assignment.instructor
+            ),
+            "can_volunteer_surge_tow_pilot": bool(
+                assignment
+                and day_date >= date.today()
+                and request.user.is_authenticated
+                and getattr(request.user, "towpilot", False)
+                and assignment.tow_pilot_id is not None
+                and assignment.surge_tow_pilot_id is None
+                and request.user != assignment.tow_pilot
+            ),
         },
     )
 
@@ -2714,6 +2735,75 @@ def volunteer_as_surge_instructor(request, assignment_id):
 
 
 @active_member_required
+@never_cache
+def volunteer_as_surge_tow_pilot(request, assignment_id):
+    """
+    Allow a tow pilot to volunteer as surge tow pilot for a day (Issue #688).
+
+    GET  – Shows a confirmation page with the date and primary tow pilot.
+    POST – Assigns the current user as surge_tow_pilot on the DutyAssignment.
+
+    Guards:
+    * User must be a tow pilot (member.towpilot == True).
+    * If a surge tow pilot is already assigned the request is gracefully
+      rejected with an informational message.
+    """
+    assignment = get_object_or_404(DutyAssignment, id=assignment_id)
+    member = request.user
+
+    if not getattr(member, "towpilot", False):
+        messages.error(
+            request,
+            "Only qualified tow pilots can volunteer as surge tow pilot.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    if assignment.surge_tow_pilot_id:
+        if assignment.surge_tow_pilot == member:
+            messages.info(
+                request,
+                "You are already the surge tow pilot for "
+                f"{assignment.date.strftime('%B %d, %Y')}.",
+            )
+        else:
+            messages.info(
+                request,
+                "A surge tow pilot has already been assigned for "
+                f"{assignment.date.strftime('%B %d, %Y')}. Thank you for your willingness!",
+            )
+        return redirect("duty_roster:duty_calendar")
+
+    if request.method == "POST":
+        # Re-check inside POST to guard against concurrent volunteers.
+        assignment.refresh_from_db()
+        if assignment.surge_tow_pilot_id:
+            messages.info(
+                request,
+                "Someone just volunteered ahead of you for "
+                f"{assignment.date.strftime('%B %d, %Y')}. "
+                "Thank you for offering!",
+            )
+            return redirect("duty_roster:duty_calendar")
+
+        assignment.surge_tow_pilot = member
+        assignment.save(update_fields=["surge_tow_pilot"])
+
+        messages.success(
+            request,
+            f"You have been assigned as surge tow pilot for "
+            f"{assignment.date.strftime('%B %d, %Y')}. Thank you for volunteering!",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # GET – render confirmation page
+    return render(
+        request,
+        "duty_roster/surge_tow_volunteer_confirm.html",
+        {"assignment": assignment},
+    )
+
+
+@active_member_required
 @require_POST
 def assign_student_to_instructor(request, slot_id):
     """
@@ -2766,6 +2856,15 @@ def assign_student_to_instructor(request, slot_id):
         messages.error(
             request,
             "No instructor is assigned for this role; cannot reassign.",
+        )
+        return redirect("duty_roster:instructor_requests")
+
+    # Guard (Issue #685): an instructor cannot be assigned as their own student.
+    if slot.student == target_instructor:
+        messages.error(
+            request,
+            f"{target_instructor.full_display_name} is the instructor for this day "
+            "and cannot be assigned as their own student.",
         )
         return redirect("duty_roster:instructor_requests")
 

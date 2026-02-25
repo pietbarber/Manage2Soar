@@ -76,8 +76,8 @@
                         <small class="text-muted">{{ assignment.instructor.phone }}</small>
                       {% endif %}
 
-                      {# Show students signed up for instruction — use active_instruction_slots
-                         to exclude cancelled requests from both count and list (issue #668) #}
+                      {% comment %}Show students signed up for instruction — use active_instruction_slots
+                         to exclude cancelled requests from both count and list (issue #668){% endcomment %}
                       {% with students=assignment.active_instruction_slots %}
                         {% if students %}
                           <hr class="my-2">
@@ -123,8 +123,8 @@
 
                 {% if assignment.duty_officer %}
                   <div class="col-md-6 mb-3">
-                    <div class="duty-role-card bg-warning bg-opacity-10 border border-warning rounded p-3">
-                      <h6 class="text-warning mb-2">
+                    <div class="duty-role-card bg-opacity-10 rounded p-3" style="background-color:rgba(253,126,20,0.1);border:1px solid #fd7e14;">
+                      <h6 class="mb-2" style="color:#fd7e14;">
                         <i class="fas fa-clipboard-list me-2"></i>
                         {{ config.duty_officer_title|default:'Duty Officer' }}
                       </h6>

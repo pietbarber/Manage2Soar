@@ -511,6 +511,9 @@ table .duty-badge.badge-surge {
   background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
   border: 1px solid #c82333 !important;
   color: white !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
 }
 
 /* Surge badge pulsing animation for users who allow motion */

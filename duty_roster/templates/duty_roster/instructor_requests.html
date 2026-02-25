@@ -255,9 +255,15 @@
                           <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="ms-2 flex-shrink-0">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="surge">
+                            {% if slot.student != alloc.surge %}
                             <button type="submit" class="btn btn-sm btn-outline-success" title="Move to {{ alloc.surge.full_display_name }}">
                               <i class="fas fa-arrow-right me-1"></i>Surge
                             </button>
+                            {% else %}
+                            <span class="btn btn-sm btn-outline-secondary disabled" title="Cannot assign an instructor as their own student">
+                              <i class="fas fa-arrow-right me-1"></i>Surge
+                            </span>
+                            {% endif %}
                           </form>
                         </div>
                       {% empty %}
@@ -320,7 +326,9 @@
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="surge">
+                      {% if slot.student != alloc.surge %}
                       <button type="submit" class="btn btn-sm btn-outline-success">→ Surge</button>
+                      {% endif %}
                     </form>
                   {% endfor %}
                 </div>
