@@ -2657,6 +2657,8 @@ def volunteer_as_surge_instructor(request, assignment_id):
     Guards:
     * User must be an instructor (member.instructor == True).
     * Duty day must be today or in the future (consistent with tow-pilot flow).
+    * A primary instructor must already be assigned (surge is only needed then).
+    * Volunteer cannot be the primary instructor themselves.
     * If a surge instructor is already assigned the request is gracefully
       rejected with an informational message regardless of who this user is.
     """
@@ -2677,6 +2679,23 @@ def volunteer_as_surge_instructor(request, assignment_id):
         messages.error(
             request,
             "Cannot volunteer for a past duty day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: no primary instructor means surge is not needed.
+    if not assignment.instructor_id:
+        messages.error(
+            request,
+            "There is no primary instructor assigned for this day.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: volunteer cannot be the primary instructor themselves.
+    if assignment.instructor_id == member.id:
+        messages.info(
+            request,
+            "You are already the primary instructor for "
+            f"{assignment.date.strftime('%B %d, %Y')}.",
         )
         return redirect("duty_roster:duty_calendar")
 
