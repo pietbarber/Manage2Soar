@@ -138,9 +138,11 @@
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:open_swap_requests' %}"><i class="fas fa-hands-helping me-1"></i> Help Others</a>
               </li>
+              {% if siteconfig.allow_glider_reservations %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:reservation_list' %}"><i class="fas fa-plane me-1"></i> Glider Reservations</a>
               </li>
+              {% endif %}
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">🚫 Blackout Dates</a>
               </li>
