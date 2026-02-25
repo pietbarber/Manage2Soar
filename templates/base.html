@@ -106,20 +106,16 @@
               Members
             </a>
             <ul class="dropdown-menu" aria-labelledby="membersDropdown">
-              <li><a class="dropdown-item" href="{% url 'members:member_list' %}"><i class="fas fa-list me-1"></i> Member List</a></li>
+              <li><a class="dropdown-item" href="{% url 'members:member_list' %}"><i class="fas fa-address-book me-1"></i> Member List</a></li>
               {% if user.is_authenticated %}
                 {% if user.member_manager or user.webmaster or user.is_superuser %}
               <li><a class="dropdown-item" href="{% url 'members:membership_applications_list' %}"><i class="fas fa-user-plus"></i> Membership Applications</a></li>
                 {% endif %}
               {% endif %}
-              <li><a class="dropdown-item" href="{% url 'members:badge_board' %}">🥇 Badge Board</a></li>
+              <li><a class="dropdown-item" href="{% url 'members:badge_board' %}"><i class="fas fa-award me-1"></i> Badge Board</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{% url 'cms:resources' %}">📚 Documents</a></li>
               <li><a class="dropdown-item" href="{% url 'public_syllabus_overview' %}"><i class="fas fa-book me-1"></i> Syllabus</a></li>
-              {% webcam_enabled as webcam_feature_on %}
-              {% if user.is_authenticated and webcam_feature_on %}
-              <li><a class="dropdown-item" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a></li>
-              {% endif %}
             </ul>
           </li>
 
@@ -253,6 +249,12 @@
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'logsheet:maintenance_deadlines' %}">⏰ Maintenance Deadlines</a>
               </li>
+              {% webcam_enabled as webcam_feature_on %}
+              {% if user.is_active_member and webcam_feature_on %}
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'siteconfig:webcam' %}">📷 Webcam</a>
+              </li>
+              {% endif %}
 
             </ul>
           </li>

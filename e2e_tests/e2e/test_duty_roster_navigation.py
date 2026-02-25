@@ -139,3 +139,42 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         assert (
             not agenda_content.is_visible()
         ), "Agenda view should be hidden after switching back"
+
+    def test_view_param_overrides_localstorage(self):
+        """URL ?view= param takes priority over saved localStorage preference (PR #692)."""
+        self.create_test_member(
+            username="testmember",
+            email="test@example.com",
+            membership_status="Full Member",
+        )
+        self.login(username="testmember")
+
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/")
+        self.page.wait_for_selector("#calendar-body")
+
+        # Set localStorage to 'calendar', then navigate with ?view=agenda — URL wins
+        self.page.evaluate("localStorage.setItem('duty-roster-view', 'calendar')")
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
+        self.page.wait_for_selector("#calendar-body")
+
+        agenda_content = self.page.locator("#agenda-view-content")
+        calendar_content = self.page.locator("#calendar-view-content")
+
+        assert (
+            agenda_content.is_visible()
+        ), "Agenda view should be visible when ?view=agenda is in URL even if localStorage says 'calendar'"
+        assert (
+            not calendar_content.is_visible()
+        ), "Calendar view should be hidden when ?view=agenda is in URL"
+
+        # Reverse: localStorage='agenda', ?view=calendar should show calendar
+        self.page.evaluate("localStorage.setItem('duty-roster-view', 'agenda')")
+        self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=calendar")
+        self.page.wait_for_selector("#calendar-body")
+
+        assert (
+            calendar_content.is_visible()
+        ), "Calendar view should be visible when ?view=calendar is in URL even if localStorage says 'agenda'"
+        assert (
+            not agenda_content.is_visible()
+        ), "Agenda view should be hidden when ?view=calendar is in URL"
