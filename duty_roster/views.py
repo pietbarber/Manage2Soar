@@ -2656,6 +2656,7 @@ def volunteer_as_surge_instructor(request, assignment_id):
 
     Guards:
     * User must be an instructor (member.instructor == True).
+    * Duty day must be today or in the future (consistent with tow-pilot flow).
     * If a surge instructor is already assigned the request is gracefully
       rejected with an informational message regardless of who this user is.
     """
@@ -2668,6 +2669,14 @@ def volunteer_as_surge_instructor(request, assignment_id):
         messages.error(
             request,
             "Only qualified instructors can volunteer as surge instructor.",
+        )
+        return redirect("duty_roster:duty_calendar")
+
+    # Guard: cannot volunteer for past days (mirrors tow-pilot flow).
+    if assignment.date < date.today():
+        messages.error(
+            request,
+            "Cannot volunteer for a past duty day.",
         )
         return redirect("duty_roster:duty_calendar")
 
@@ -2698,29 +2707,37 @@ def volunteer_as_surge_instructor(request, assignment_id):
     )
 
     if request.method == "POST":
-        # Re-check surge_instructor inside the POST path to guard against a
-        # race between two concurrent volunteers.
-        assignment.refresh_from_db()
-        if assignment.surge_instructor_id:
-            messages.info(
-                request,
-                "Someone just volunteered ahead of you for "
-                f"{assignment.date.strftime('%B %d, %Y')}. "
-                "Thank you for offering!",
-            )
-            return redirect("duty_roster:duty_calendar")
+        # Use select_for_update inside a transaction to guarantee only the
+        # first volunteer wins (prevents last-write-wins race condition,
+        # mirroring the tow-pilot surge flow).
+        with transaction.atomic():
+            locked = DutyAssignment.objects.select_for_update().get(id=assignment_id)
+            if locked.surge_instructor_id:
+                messages.info(
+                    request,
+                    "Someone just volunteered ahead of you for "
+                    f"{assignment.date.strftime('%B %d, %Y')}. "
+                    "Thank you for offering!",
+                )
+                return redirect("duty_roster:duty_calendar")
 
-        assignment.surge_instructor = member
-        assignment.save(update_fields=["surge_instructor"])
+            locked.surge_instructor = member
+            locked.save(update_fields=["surge_instructor"])
 
+        notified = _notify_primary_instructor_surge_filled(locked)
+        base_msg = (
+            f"You have been assigned as surge instructor for "
+            f"{assignment.date.strftime('%B %d, %Y')}."
+        )
         messages.success(
             request,
-            f"You have been assigned as surge instructor for "
-            f"{assignment.date.strftime('%B %d, %Y')}. "
-            "The primary instructor has been notified.",
+            (
+                base_msg + " The primary instructor has been notified."
+                if notified
+                else base_msg
+                + " The primary instructor could not be notified automatically."
+            ),
         )
-
-        _notify_primary_instructor_surge_filled(assignment)
         return redirect("duty_roster:duty_calendar")
 
     # GET – render confirmation page

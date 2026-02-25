@@ -469,6 +469,29 @@ table .duty-badge {
 
 /* Role-specific badge colors */
 /* Colors aligned across calendar grid, agenda view, and modal popup (Issue #636) */
+
+/* -----------------------------------------------------------------------
+   Duty Officer color — context-independent helpers
+   Used in calendar_day_modal.html (icon badge) and _calendar_agenda.html
+   (role card). The parent-scoped rules below override with !important for
+   calendar-cell / table contexts.
+   --------------------------------------------------------------------- */
+.duty-badge.badge-duty-officer {
+  background-color: #fd7e14;
+  border: 1px solid #e55a00;
+  color: white;
+}
+
+/* Role card — light-tinted variant for agenda / modal detail cards */
+.duty-role-card-do {
+  background-color: rgba(253, 126, 20, 0.1);
+  border: 1px solid #fd7e14;
+}
+
+.duty-role-card-do > h6 {
+  color: #fd7e14;
+}
+
 .calendar-cell .duty-badge.badge-instructor,
 .duty-assignments .duty-badge.badge-instructor,
 table .duty-badge.badge-instructor {
