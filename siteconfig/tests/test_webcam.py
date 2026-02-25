@@ -247,3 +247,40 @@ def test_snapshot_returns_503_for_redirect_response(client, django_user_model):
 
     assert response.status_code == 503
     assert "no-store" in response["Cache-Control"]
+
+
+# ---------------------------------------------------------------------------
+# SSRF guard — private / loopback IP ranges
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "blocked_url",
+    [
+        "http://localhost/internal-api",
+        "http://127.0.0.1:8000/admin/",
+        "http://192.168.1.1/router-config",
+        "http://10.0.0.1/metadata",
+        "http://[::1]/ipv6-loopback",
+        "http://172.16.0.1/private",
+        "http://169.254.169.254/latest/meta-data/",  # AWS metadata endpoint
+    ],
+)
+@pytest.mark.django_db
+def test_snapshot_returns_503_for_private_and_loopback_urls(
+    client, django_user_model, blocked_url
+):
+    """Returns 503 for URLs pointing at loopback/private/link-local addresses.
+
+    These are all SSRF vectors that the _validate_webcam_url guard must block
+    so that a misconfigured webcam URL cannot proxy internal services to members.
+    """
+    _make_config(webcam_snapshot_url=blocked_url)
+    user = _make_member(django_user_model)
+    client.force_login(user)
+
+    response = client.get(reverse("siteconfig:webcam_snapshot"))
+
+    assert (
+        response.status_code == 503
+    ), f"Expected 503 for blocked URL {blocked_url!r}, got {response.status_code}"

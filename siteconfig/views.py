@@ -1,5 +1,6 @@
 # Visiting pilot views moved to members app
 
+import ipaddress
 import logging
 from urllib.parse import urlparse
 
@@ -27,17 +28,53 @@ def _get_webcam_url() -> str:
 
 
 def _validate_webcam_url(url: str) -> bool:
-    """Return True only for http/https URLs with a non-empty host.
+    """Return True only for http/https URLs that do not point at internal networks.
 
-    Basic SSRF guard: prevents accidental ``file://`` or other unexpected
-    schemes from reaching ``requests.get``.  The URL is admin-configured so
-    full IP-range blocking is omitted as an acceptable trade-off.
+    SSRF guard: blocks non-http/https schemes, empty hosts, ``localhost`` by
+    name, IPv4/IPv6 loopback (127.0.0.0/8, ::1), private ranges
+    (10/8, 172.16/12, 192.168/16), and link-local (169.254/16, fe80::/10).
+
+    Hostname-based addresses that resolve to private IPs at DNS time are
+    *not* blocked here (no live DNS lookup) because the configured URL is
+    expected to be an admin-supplied camera endpoint, not arbitrary user
+    input.  Direct IP literals and "localhost" are always blocked.
     """
     try:
         parsed = urlparse(url)
-        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return False
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return False
+        # Block 'localhost' by name.
+        if host == "localhost":
+            return False
+        # If the host is an IP literal, reject private/loopback/link-local ranges.
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_loopback or ip.is_private or ip.is_link_local:
+                return False
+        except ValueError:
+            pass  # not an IP literal — hostname accepted as-is
+        return True
     except Exception:
         return False
+
+
+# Allowed image MIME types forwarded to the browser.  Any other Content-Type
+# returned by the camera is coerced to image/jpeg rather than forwarded
+# verbatim, preventing a content-sniffing attack via an unusual type string.
+_ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+}
+
+# Maximum response body size accepted from the camera (10 MB).  Cameras that
+# return larger payloads are rejected with 503 to prevent memory exhaustion.
+_MAX_WEBCAM_BYTES = 10 * 1024 * 1024
 
 
 @active_member_required
@@ -91,6 +128,22 @@ def webcam_snapshot(request):
             err["Cache-Control"] = "no-store, no-cache, must-revalidate"
             return err
         resp.raise_for_status()
+        # Reject oversized responses before reading the body into memory.
+        # Cameras should never return multi-megabyte snapshots, but a
+        # misconfigured or malicious endpoint could exhaust Django worker RAM.
+        content_length = resp.headers.get("Content-Length")
+        if content_length:
+            try:
+                if int(content_length) > _MAX_WEBCAM_BYTES:
+                    logger.warning(
+                        "Webcam response too large (%s bytes), rejecting",
+                        content_length,
+                    )
+                    err = HttpResponse(status=503)
+                    err["Cache-Control"] = "no-store, no-cache, must-revalidate"
+                    return err
+            except ValueError:
+                pass  # malformed Content-Length — proceed and let the read fail
     except requests.RequestException as exc:
         # Log only the exception class and HTTP status to avoid leaking the
         # camera URL (which may contain embedded credentials) into logs/Sentry.
@@ -105,8 +158,10 @@ def webcam_snapshot(request):
         err["Cache-Control"] = "no-store, no-cache, must-revalidate"
         return err
 
-    content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
-    if not content_type.startswith("image/"):
+    content_type = (
+        resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip().lower()
+    )
+    if content_type not in _ALLOWED_IMAGE_TYPES:
         content_type = "image/jpeg"
 
     response = HttpResponse(resp.content, content_type=content_type)
