@@ -1179,6 +1179,7 @@ def edit_syllabus_document(request, slug):
 ####################################################
 
 
+@active_member_required
 def member_instruction_record(request, member_id):
     """
     Displays a detailed timeline and summary of all instruction

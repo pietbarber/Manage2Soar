@@ -155,7 +155,8 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         # Set localStorage to 'calendar', then navigate with ?view=agenda — URL wins
         self.page.evaluate("localStorage.setItem('duty-roster-view', 'calendar')")
         self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=agenda")
-        self.page.wait_for_selector("#calendar-body")
+        # Wait explicitly for the JS to switch to agenda view (avoids flakiness)
+        self.page.wait_for_selector("#agenda-view-content", state="visible")
 
         agenda_content = self.page.locator("#agenda-view-content")
         calendar_content = self.page.locator("#calendar-view-content")
@@ -170,7 +171,8 @@ class TestDutyRosterNavigation(DjangoPlaywrightTestCase):
         # Reverse: localStorage='agenda', ?view=calendar should show calendar
         self.page.evaluate("localStorage.setItem('duty-roster-view', 'agenda')")
         self.page.goto(f"{self.live_server_url}/duty_roster/calendar/?view=calendar")
-        self.page.wait_for_selector("#calendar-body")
+        # Wait explicitly for the JS to switch to calendar view (avoids flakiness)
+        self.page.wait_for_selector("#calendar-view-content", state="visible")
 
         assert (
             calendar_content.is_visible()

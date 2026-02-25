@@ -61,8 +61,8 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
             menu.is_visible()
         ), "Dropdown menu should be visible after clicking toggle"
 
-    def test_dropdown_closes_when_clicking_outside(self):
-        """Clicking outside the dropdown closes it."""
+    def test_dropdown_closes_on_escape(self):
+        """Pressing Escape closes the dropdown."""
         self.create_test_member(
             username="dropdownmember",
             email="dropdown@example.com",
@@ -77,7 +77,7 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
         menu = self.page.locator(".dropdown-menu[aria-labelledby='userDropdown']")
         assert menu.is_visible(), "Dropdown should be open"
 
-        # Click somewhere neutral to close
+        # Press Escape to close the dropdown
         self.page.keyboard.press("Escape")
         self.page.wait_for_selector(
             ".dropdown-menu[aria-labelledby='userDropdown']", state="hidden"
@@ -99,11 +99,16 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
 
         menu = self.page.locator(".dropdown-menu[aria-labelledby='userDropdown']")
 
-        # Profile link should contain the member's PK in the href
-        profile_link = menu.locator(f"a[href*='/members/{member.pk}/']").first
+        # Profile view and biography links should be present with exact hrefs
+        profile_view_link = menu.locator(f"a[href='/members/{member.pk}/view/']")
         assert (
-            profile_link.count() >= 1 or profile_link.is_visible()
-        ), "Profile-related links should appear in the dropdown"
+            profile_view_link.count() == 1
+        ), "View my Profile link should appear in the dropdown with the correct href"
+
+        biography_link = menu.locator(f"a[href='/members/{member.pk}/biography/']")
+        assert (
+            biography_link.count() == 1
+        ), "Edit my Biography link should appear in the dropdown with the correct href"
 
         # Training grid link
         training_link = menu.locator(
@@ -149,7 +154,7 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
             username="studentpilot",
             email="student@example.com",
             membership_status="Full Member",
-            glider_rating="",
+            glider_rating="none",
         )
         self.login(username="studentpilot")
 
