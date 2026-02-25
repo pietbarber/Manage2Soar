@@ -146,13 +146,13 @@
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:reservation_list' %}"><i class="fas fa-plane me-1"></i> Glider Reservations</a>
               </li>
+              <li class="nav-item">
+                <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">🚫 Blackout Dates</a>
+              </li>
               {% endif %}
               {% if user.is_authenticated %}
                 {% if user.rostermeister or user.member_manager or user.director or user.is_superuser %}
               <li><hr class="dropdown-divider"></li>
-              <li class="nav-item">
-                <a class="dropdown-item" href="{% url 'duty_roster:blackout_manage' %}">🚫 Blackout Dates</a>
-              </li>
               <li class="nav-item">
                 <a class="dropdown-item" href="{% url 'duty_roster:duty_delinquents_detail' %}">
                   <i class="fas fa-exclamation-triangle text-warning"></i> Duty Delinquents Report
