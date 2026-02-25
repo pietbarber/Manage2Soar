@@ -318,20 +318,20 @@
                   <strong>{{ alloc.unassigned_slots|length }} unassigned student{{ alloc.unassigned_slots|length|pluralize }}:</strong>
                   {% for slot in alloc.unassigned_slots %}
                     <span class="badge bg-warning text-dark ms-1">{{ slot.student.full_display_name }}</span>
+                    {% if slot.student != alloc.primary %}
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="primary">
-                      {% if slot.student != alloc.primary %}
                       <button type="submit" class="btn btn-sm btn-outline-primary">→ Primary</button>
-                      {% endif %}
                     </form>
+                    {% endif %}
+                    {% if slot.student != alloc.surge %}
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="surge">
-                      {% if slot.student != alloc.surge %}
                       <button type="submit" class="btn btn-sm btn-outline-success">→ Surge</button>
-                      {% endif %}
                     </form>
+                    {% endif %}
                   {% endfor %}
                 </div>
               {% endif %}
