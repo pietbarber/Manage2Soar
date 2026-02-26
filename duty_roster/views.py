@@ -2494,9 +2494,11 @@ def instructor_requests(request):
             other_slots = [
                 s
                 for s in slots
-                if s.instructor_id is None
-                or s.instructor_id
-                not in (assignment.instructor_id, assignment.surge_instructor_id)
+                if (
+                    s.instructor_id is None
+                    or s.instructor_id
+                    not in (assignment.instructor_id, assignment.surge_instructor_id)
+                )
             ]
             allocation_by_date[day] = {
                 "assignment": assignment,
