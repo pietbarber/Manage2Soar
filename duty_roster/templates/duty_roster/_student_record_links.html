@@ -1,0 +1,19 @@
+{# Reusable snippet: Training Grid + Instruction Record icon links for a student.
+   Expected variables:
+     student    – the Member object
+     link_class – optional extra CSS class on the <a> tags (default: "ms-1")
+#}
+{% with lc=link_class|default:"ms-1" %}
+<a href="{% url 'instructors:member_training_grid' member_id=student.pk %}"
+   class="{{ lc }} text-muted"
+   title="Training Grid for {{ student.full_display_name }}"
+   aria-label="Training Grid for {{ student.full_display_name }}"
+   target="_blank"
+   rel="noopener noreferrer"><i class="fas fa-th fa-sm" aria-hidden="true"></i></a>
+<a href="{% url 'instructors:member_instruction_record' member_id=student.pk %}"
+   class="{{ lc }} text-muted"
+   title="Instruction Record for {{ student.full_display_name }}"
+   aria-label="Instruction Record for {{ student.full_display_name }}"
+   target="_blank"
+   rel="noopener noreferrer"><i class="fas fa-clipboard-list fa-sm" aria-hidden="true"></i></a>
+{% endwith %}

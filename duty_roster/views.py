@@ -2443,7 +2443,12 @@ def instructor_requests(request):
             instructor_response="accepted",
         )
         .exclude(status="cancelled")
-        .select_related("assignment", "student")
+        .select_related(
+            "assignment",
+            "assignment__instructor",
+            "assignment__surge_instructor",
+            "student",
+        )
         .order_by("assignment__date", "created_at")
     )
 
