@@ -1,5 +1,9 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Pilot Logbook{% endblock %}
+{% block extra_css %}
+  <link href="{% static 'css/logbook.css' %}" rel="stylesheet">
+{% endblock %}
 {% block head_extra %}{% endblock %}
 
 {% block content %}
