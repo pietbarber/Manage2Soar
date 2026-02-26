@@ -2473,11 +2473,12 @@ def instructor_requests(request):
     }
 
     # Build the allocation map for surge days (primary/surge/unassigned split).
-    # NOTE: allocation_by_date is built for ALL surge days so that the Student
-    # Allocation section (showing primary/surge/unassigned columns) is always
-    # available when both instructors are assigned. The green "Accepted Students"
-    # card always uses the full accepted_by_date dict (see context below) so it is
-    # never empty due to surge status (Issue #695).
+    # NOTE: allocation_by_date is built only for surge days that have accepted
+    # student slots (i.e., dates present in accepted_by_date) and where both a
+    # primary and surge instructor are assigned. The Student Allocation section
+    # (showing primary/surge/unassigned columns) is therefore shown only on those
+    # days. The green "Accepted Students" card always uses the full accepted_by_date
+    # dict (see context below), so it is never empty due to surge status (Issue #695).
     allocation_by_date = {}
     for day, slots in accepted_by_date.items():
         assignment = assignment_by_date.get(day)
