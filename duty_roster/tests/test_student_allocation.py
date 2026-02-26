@@ -555,7 +555,8 @@ def test_notify_student_returns_false_when_no_assigned_instructor(django_user_mo
 @pytest.mark.django_db
 def test_view_splits_surge_day_into_allocation_context(client, django_user_model):
     """For a day with a surge instructor, the view puts slots into
-    allocation_by_date rather than accepted_by_date."""
+    allocation_by_date AND also includes them in accepted_by_date so that the
+    green 'Accepted Students' card is always populated (Issue #695 fix)."""
     _make_site_config()
     primary = _make_member(django_user_model, "ctx_primary", instructor=True)
     surge = _make_member(django_user_model, "ctx_surge", instructor=True)
@@ -570,10 +571,12 @@ def test_view_splits_surge_day_into_allocation_context(client, django_user_model
     allocation_by_date = response.context["allocation_by_date"]
     accepted_by_date = response.context["accepted_by_date"]
 
-    # The surged day must appear in allocation_by_date
+    # The surged day must appear in allocation_by_date for the allocation UI
     assert assignment.date in allocation_by_date
-    # The surged day must NOT appear in the flat accepted_by_date
-    assert assignment.date not in accepted_by_date
+    # The surged day MUST also appear in accepted_by_date for the green card
+    # (Issue #695: the green card was always empty when a surge instructor was
+    # assigned because the view previously excluded surge days from this dict).
+    assert assignment.date in accepted_by_date
 
 
 @pytest.mark.django_db
@@ -595,6 +598,54 @@ def test_view_keeps_non_surge_day_in_accepted_by_date(client, django_user_model)
 
     assert assignment.date not in allocation_by_date
     assert assignment.date in accepted_by_date
+
+
+@pytest.mark.django_db
+def test_accepted_students_card_populated_on_surge_day(client, django_user_model):
+    """
+    Regression test for Issue #695: 'Accepted Students card never gets filled'.
+
+    When both a primary and surge instructor are assigned, the green
+    'Accepted Students' card must show accepted students regardless.  The
+    accepted_by_date context variable must contain the slots so the template
+    can render the card.
+    """
+    _make_site_config()
+    primary = _make_member(django_user_model, "695_primary", instructor=True)
+    surge = _make_member(django_user_model, "695_surge", instructor=True)
+    student_a = _make_member(django_user_model, "695_student_a")
+    student_b = _make_member(django_user_model, "695_student_b")
+    assignment = _make_assignment(primary, date_offset=93, surge=surge)
+
+    _make_accepted_slot(assignment, student_a, surge)
+    _make_accepted_slot(assignment, student_b, surge)
+
+    # Verify from the primary instructor's perspective
+    client.force_login(primary)
+    response = client.get(reverse("duty_roster:instructor_requests"))
+
+    assert response.status_code == 200
+
+    accepted_by_date = response.context["accepted_by_date"]
+    accepted_count = response.context["accepted_count"]
+
+    # Both slots appear in the green "Accepted Students" card context
+    assert assignment.date in accepted_by_date, (
+        "Surge day slots must appear in accepted_by_date for the green card "
+        "(Issue #695: the card was always empty when a surge instructor was assigned)"
+    )
+    assert len(accepted_by_date[assignment.date]) == 2
+    assert accepted_count == 2
+
+    # Template must also render student names (not just an empty card)
+    content = response.content.decode()
+    assert "Accepted Students" in content
+    assert "No accepted students yet" not in content
+
+    # Also check from the surge instructor's perspective
+    client.force_login(surge)
+    response2 = client.get(reverse("duty_roster:instructor_requests"))
+    assert assignment.date in response2.context["accepted_by_date"]
 
 
 @pytest.mark.django_db

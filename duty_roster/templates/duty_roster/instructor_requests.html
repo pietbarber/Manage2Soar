@@ -43,6 +43,7 @@
                       <div class="d-flex justify-content-between align-items-start">
                         <div>
                           <strong>{{ slot.student.full_display_name }}</strong>
+                          {% include "duty_roster/_student_record_links.html" with student=slot.student %}
                           {% if slot.instruction_types %}
                             <br><small><i class="fas fa-graduation-cap me-1 text-success"></i><strong>{{ slot.get_instruction_types_text }}</strong></small>
                           {% endif %}
@@ -144,6 +145,7 @@
                   <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
                       <strong>{{ slot.student.full_display_name }}</strong>
+                      {% include "duty_roster/_student_record_links.html" with student=slot.student %}
                       {% if slot.instruction_types %}
                         <br><small><i class="fas fa-graduation-cap me-1 text-success"></i>{{ slot.get_instruction_types_text }}</small>
                       {% endif %}
@@ -248,6 +250,7 @@
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                           <div class="flex-grow-1">
                             <strong class="small">{{ slot.student.full_display_name }}</strong>
+                            {% include "duty_roster/_student_record_links.html" with student=slot.student %}
                             {% if slot.instruction_types %}
                               <br><small class="text-muted">{{ slot.get_instruction_types_text }}</small>
                             {% endif %}
@@ -296,6 +299,7 @@
                             </button>
                           </form>
                           <div class="flex-grow-1 text-end">
+                            {% include "duty_roster/_student_record_links.html" with student=slot.student link_class="me-1" %}
                             <strong class="small">{{ slot.student.full_display_name }}</strong>
                             {% if slot.instruction_types %}
                               <br><small class="text-muted">{{ slot.get_instruction_types_text }}</small>
@@ -318,6 +322,7 @@
                   <strong>{{ alloc.unassigned_slots|length }} unassigned student{{ alloc.unassigned_slots|length|pluralize }}:</strong>
                   {% for slot in alloc.unassigned_slots %}
                     <span class="badge bg-warning text-dark ms-1">{{ slot.student.full_display_name }}</span>
+                    {% include "duty_roster/_student_record_links.html" with student=slot.student %}
                     {% if slot.student != alloc.primary %}
                     <form action="{% url 'duty_roster:assign_student_to_instructor' slot_id=slot.id %}" method="post" class="d-inline ms-1">
                       {% csrf_token %}
