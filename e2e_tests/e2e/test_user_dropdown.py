@@ -164,8 +164,12 @@ class TestUserDropdown(DjangoPlaywrightTestCase):
 
         menu = self.page.locator(".dropdown-menu[aria-labelledby='userDropdown']")
 
-        solo_link = menu.locator(f"a[href*='needed-for-solo']")
-        checkride_link = menu.locator(f"a[href*='needed-for-checkride']")
+        solo_link = menu.locator(
+            f"a[href='/instructors/students/{member.pk}/needed-for-solo/']"
+        )
+        checkride_link = menu.locator(
+            f"a[href='/instructors/students/{member.pk}/needed-for-checkride/']"
+        )
 
         assert (
             solo_link.count() == 1
