@@ -571,7 +571,7 @@ def test_view_splits_surge_day_into_allocation_context(client, django_user_model
     allocation_by_date = response.context["allocation_by_date"]
     accepted_by_date = response.context["accepted_by_date"]
 
-    # The surged day must appear in allocation_by_date for the drag-drop section
+    # The surged day must appear in allocation_by_date for the allocation UI
     assert assignment.date in allocation_by_date
     # The surged day MUST also appear in accepted_by_date for the green card
     # (Issue #695: the green card was always empty when a surge instructor was
