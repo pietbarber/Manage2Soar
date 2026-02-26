@@ -2467,8 +2467,13 @@ def instructor_requests(request):
         for a in my_assignments.select_related("instructor", "surge_instructor")
     }
 
+    # Build the allocation map for surge days (primary/surge/unassigned split).
+    # NOTE: allocation_by_date is built for ALL surge days so that the drag-drop
+    # Student Allocation section is always available when both instructors are
+    # assigned.  The green "Accepted Students" card always uses the full
+    # accepted_by_date dict (see context below) so it is never empty due to surge
+    # status (Issue #695).
     allocation_by_date = {}
-    non_surge_accepted_by_date = {}
     for day, slots in accepted_by_date.items():
         assignment = assignment_by_date.get(day)
         if assignment and assignment.instructor_id and assignment.surge_instructor_id:
@@ -2478,10 +2483,13 @@ def instructor_requests(request):
             surge_slots = [
                 s for s in slots if s.instructor_id == assignment.surge_instructor_id
             ]
+            # Slots with no instructor assigned or assigned to a third party
+            # (should not happen in normal flow, but guard defensively).
             other_slots = [
                 s
                 for s in slots
-                if s.instructor_id
+                if s.instructor_id is None
+                or s.instructor_id
                 not in (assignment.instructor_id, assignment.surge_instructor_id)
             ]
             allocation_by_date[day] = {
@@ -2492,18 +2500,20 @@ def instructor_requests(request):
                 "surge_slots": surge_slots,
                 "unassigned_slots": other_slots,
             }
-        else:
-            non_surge_accepted_by_date[day] = slots
 
     return render(
         request,
         "duty_roster/instructor_requests.html",
         {
             "pending_by_date": dict(pending_by_date),
-            "accepted_by_date": non_surge_accepted_by_date,
+            # Pass ALL accepted slots so the green card is populated even on
+            # surge days (Issue #695 fix – previously only non-surge days were
+            # included, leaving the card empty whenever a surge instructor was
+            # assigned).
+            "accepted_by_date": dict(accepted_by_date),
             "allocation_by_date": allocation_by_date,
             "pending_count": len(pending_slots),
-            "accepted_count": sum(len(v) for v in non_surge_accepted_by_date.values()),
+            "accepted_count": sum(len(v) for v in accepted_by_date.values()),
             "today": today,
             "instruction_surge_threshold": instruction_surge_threshold,
         },
