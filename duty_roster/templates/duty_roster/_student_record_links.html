@@ -1,8 +1,9 @@
-{# Reusable snippet: Training Grid + Instruction Record icon links for a student.
-   Expected variables:
-     student    – the Member object
-     link_class – optional extra CSS class on the <a> tags (default: "ms-1")
-#}
+{% comment %}
+Reusable snippet: Training Grid + Instruction Record icon links for a student.
+Expected variables:
+  student    – the Member object
+  link_class – optional extra CSS class on the <a> tags (default: "ms-1")
+{% endcomment %}
 {% with lc=link_class|default:"ms-1" %}
 <a href="{% url 'instructors:member_training_grid' member_id=student.pk %}"
    class="{{ lc }} text-muted"
