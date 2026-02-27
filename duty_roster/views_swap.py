@@ -458,8 +458,6 @@ def _build_volunteer_opportunities(member, today):
             and instruction_counts[d] >= instruction_surge_threshold
             and member.instructor
             and member.id != assignment.instructor_id
-            and member.id
-            != assignment.surge_instructor_id  # not already surge instructor
         ):
             opportunities.append(
                 {
@@ -481,8 +479,6 @@ def _build_volunteer_opportunities(member, today):
             and tow_counts[d] >= tow_surge_threshold
             and member.towpilot
             and member.id != assignment.tow_pilot_id
-            and member.id
-            != assignment.surge_tow_pilot_id  # not already surge tow pilot
         ):
             opportunities.append(
                 {
