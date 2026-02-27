@@ -15,6 +15,8 @@ endpoint.  The error-path tests below are fully deterministic: they use a
 503, causing the browser <img> onerror to fire immediately.
 """
 
+import re
+
 from siteconfig.models import SiteConfiguration
 
 from .conftest import DjangoPlaywrightTestCase
@@ -72,12 +74,17 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         """
         self.client.force_login(self.member)
         response = self.client.get("/webcam/")
+        assert response.status_code == 200
         content = response.content.decode()
 
-        assert 'id="webcam-error"' in content, "webcam-error element missing from HTML"
+        # Locate the opening tag of #webcam-error specifically, so we don't
+        # accidentally match the display:none on the <img> or other elements.
+        match = re.search(r"<[^>]+id=[\"']webcam-error[\"'][^>]*>", content)
+        assert match, "webcam-error element missing from HTML"
+        element_tag = match.group(0)
         assert (
-            'style="display:none"' in content or "display:none" in content
-        ), "Error div should have display:none in server-rendered HTML"
+            "display:none" in element_tag
+        ), f"Error div opening tag should contain display:none, got: {element_tag!r}"
 
     def test_auto_refresh_timer_is_running(self):
         """JS sets up the interval timer; the status span confirms auto-refresh."""
@@ -132,6 +139,10 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         assert "?t=" in new_src, (
             f"After interval fires the img src should contain '?t=' cache-buster, "
             f"got: {new_src!r}. This likely means setInterval was never registered."
+        )
+        assert new_src != original_src, (
+            f"img src should change after the interval fires; "
+            f"original={original_src!r}, new={new_src!r}"
         )
 
 
