@@ -3434,6 +3434,13 @@ def volunteer_fill_role(request, assignment_id, role):
             )
             return redirect("duty_roster:duty_calendar")
 
+        # Refresh from DB so notify_ops_status sees the latest state (including
+        # the update we just applied and any other concurrent signups).  This
+        # also triggers the collecting-volunteers → confirmed-ops transition for
+        # ad-hoc days the same way the calendar_*_signup views do (issue #696).
+        assignment.refresh_from_db()
+        notify_ops_status(assignment)
+
         messages.success(
             request,
             f"You have been assigned as {role_label} for "

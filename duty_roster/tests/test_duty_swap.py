@@ -794,3 +794,83 @@ class TestSwapIntegration:
         # Verify final state
         swap_request.refresh_from_db()
         assert swap_request.status == "fulfilled"
+
+
+# ---------------------------------------------------------------------------
+# Volunteer Opportunities in Help Others context (issue #693)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestVolunteerOpportunities:
+    """
+    open_swap_requests view must include volunteer_opportunities in context,
+    populated with unfilled scheduled roster holes the requesting member is
+    qualified to fill (issue #693).
+    """
+
+    def test_volunteer_opportunities_key_in_context(self, client, alice, site_config):
+        """volunteer_opportunities must always be present in context."""
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+        assert resp.status_code == 200
+        assert "volunteer_opportunities" in resp.context
+
+    def test_opportunity_appears_for_qualified_member(self, client, alice, site_config):
+        """
+        A qualified tow-pilot sees a hole opportunity for a future scheduled day
+        where the tow_pilot slot is empty.
+        """
+        future = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future,
+            is_scheduled=True,
+        )
+        # alice is a towpilot (fixture), tow_pilot slot is empty
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        opps = resp.context["volunteer_opportunities"]
+        matching = [o for o in opps if o["date"] == future and o["kind"] == "hole"]
+        assert matching, "Expected a tow-pilot hole opportunity for the future day"
+        role_labels = {o["role_label"] for o in matching}
+        assert any("tow" in label.lower() for label in role_labels)
+
+    def test_no_opportunity_when_slot_filled(self, client, alice, site_config):
+        """No opportunity is shown for a role that is already filled."""
+        future = date.today() + timedelta(days=7)
+        assignment = DutyAssignment.objects.create(
+            date=future,
+            is_scheduled=True,
+            tow_pilot=alice,  # alice's own slot is filled
+        )
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        opps = resp.context["volunteer_opportunities"]
+        tow_holes = [
+            o
+            for o in opps
+            if o["date"] == future
+            and o["kind"] == "hole"
+            and "tow" in o["role_label"].lower()
+        ]
+        assert (
+            not tow_holes
+        ), "Should not show a tow-pilot hole when slot is already filled"
+
+    def test_no_opportunity_for_past_dates(self, client, alice, site_config):
+        """Opportunities from past dates must not appear."""
+        past = date.today() - timedelta(days=3)
+        DutyAssignment.objects.create(date=past, is_scheduled=True)
+
+        client.force_login(alice)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        opps = resp.context["volunteer_opportunities"]
+        past_opps = [o for o in opps if o["date"] < date.today()]
+        assert not past_opps, "Past dates must not appear in volunteer opportunities"

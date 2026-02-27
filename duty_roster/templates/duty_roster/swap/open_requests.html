@@ -15,6 +15,77 @@
 
     {% include "duty_roster/_messages.html" %}
 
+    {# ------------------------------------------------------------------ #}
+    {# Volunteer Opportunities (issue #693) – current + next calendar month #}
+    {# ------------------------------------------------------------------ #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="bi bi-hand-thumbs-up me-2"></i>Volunteer Opportunities
+                {% if volunteer_opportunities %}
+                <span class="badge bg-dark ms-2">{{ volunteer_opportunities|length }}</span>
+                {% endif %}
+            </h5>
+            <small class="text-muted">Open slots &amp; surge needs you are qualified to fill — current and next month</small>
+        </div>
+        <div class="card-body p-0">
+            {% if volunteer_opportunities %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Role</th>
+                            <th scope="col">Type</th>
+                            <th scope="col" class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for opp in volunteer_opportunities %}
+                        <tr>
+                            <td>
+                                <strong>{{ opp.date|date:"D, M j" }}</strong>
+                                <small class="text-muted d-block">{{ opp.date|date:"Y" }}</small>
+                            </td>
+                            <td>
+                                {% if opp.kind == "surge" %}
+                                <span class="badge bg-warning text-dark me-1">
+                                    <i class="bi bi-lightning-fill" aria-hidden="true"></i>
+                                </span>
+                                {% else %}
+                                <span class="badge bg-danger me-1">
+                                    <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+                                </span>
+                                {% endif %}
+                                {{ opp.role_label }}
+                            </td>
+                            <td>
+                                {% if opp.kind == "surge" %}
+                                <span class="badge bg-warning text-dark">Surge need</span>
+                                {% else %}
+                                <span class="badge bg-danger">Unfilled slot</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ opp.volunteer_url }}"
+                                   class="btn btn-sm {% if opp.kind == 'surge' %}btn-warning{% else %}btn-danger{% endif %}">
+                                    <i class="bi bi-hand-index me-1" aria-hidden="true"></i>Volunteer
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 px-3">
+                <i class="bi bi-check-circle-fill text-success fs-2 mb-2 d-block" aria-hidden="true"></i>
+                <p class="text-muted mb-0">No openings match your qualifications right now.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="card shadow-sm">
         <div class="card-header bg-success text-white">
             <h5 class="mb-0">
