@@ -25,6 +25,7 @@ from instructors.models import MemberQualification
 from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
+from members.utils.username import generate_username
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -616,7 +617,10 @@ def visiting_pilot_signup(request, token):
                         {"form": form, "config": config},
                     )
                 member = Member.objects.create_user(
-                    username=form.cleaned_data["email"],  # Use email as username
+                    username=generate_username(
+                        form.cleaned_data["first_name"],
+                        form.cleaned_data["last_name"],
+                    ),
                     email=form.cleaned_data["email"],
                     first_name=form.cleaned_data["first_name"],
                     last_name=form.cleaned_data["last_name"],

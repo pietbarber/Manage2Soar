@@ -386,25 +386,12 @@ class MembershipApplication(models.Model):
             return self.member_account
 
         # Import Member here to avoid circular imports
-        import re
-
         from members.models import Member
-
-        # Generate username in firstname.lastname format
-        first_clean = re.sub(r"[^A-Za-z]", "", self.first_name).lower()
-        last_clean = re.sub(r"[^A-Za-z]", "", self.last_name).lower()
-        base_username = f"{first_clean}.{last_clean}"
-
-        # Ensure username is unique
-        username = base_username
-        counter = 1
-        while Member.objects.filter(username=username).exists():
-            username = f"{base_username}{counter}"
-            counter += 1
+        from members.utils.username import generate_username
 
         # Create the member account
         member = Member.objects.create_user(
-            username=username,
+            username=generate_username(self.first_name, self.last_name),
             email=self.email,
             first_name=self.first_name,
             last_name=self.last_name,

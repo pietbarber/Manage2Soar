@@ -7,5 +7,6 @@ Keep this file minimal to avoid duplication of logic.
 """
 
 from .utils.permissions import can_view_personal_info, is_privileged_viewer
+from .utils.username import generate_username
 
-__all__ = ["is_privileged_viewer", "can_view_personal_info"]
+__all__ = ["is_privileged_viewer", "can_view_personal_info", "generate_username"]
