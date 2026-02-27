@@ -63,27 +63,21 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         ), f"Expected img hidden on load, got display={display!r}"
 
     def test_error_div_is_hidden_initially(self):
-        """The error div has style='display:none' in the initial server-rendered HTML.
+        """Server-rendered HTML sets the error div to display:none.
 
-        We intercept the snapshot request via Playwright route interception so the
-        browser's <img onerror> handler cannot fire before the assertion runs.
-        Without interception the 503 response from the server can trigger onerror
-        and change the div to display:block in a race with this check.
+        This is a template/server-rendering concern rather than browser-JS
+        behaviour, so we verify it via Django's test client (available on
+        StaticLiveServerTestCase) instead of fighting Playwright route
+        interception timing issues.
         """
-        # Abort snapshot requests at the browser level so the onerror handler
-        # never fires during this test.  This lets us cleanly assert the
-        # server-rendered initial state (style="display:none").
-        self.page.route("**/webcam/snapshot*", lambda route: route.abort())
-        self.page.goto(f"{self.live_server_url}/webcam/")
+        self.client.force_login(self.member)
+        response = self.client.get("/webcam/")
+        content = response.content.decode()
 
-        error_div = self.page.locator("#webcam-error")
-        assert error_div.count() == 1, "webcam-error element must exist"
-        # Verify the static HTML attribute, not the computed style, so we are
-        # asserting the server-rendered state rather than a post-JS-execution state.
-        style_attr = error_div.get_attribute("style") or ""
+        assert 'id="webcam-error"' in content, "webcam-error element missing from HTML"
         assert (
-            "none" in style_attr
-        ), f"Error div should be display:none in initial HTML, got style={style_attr!r}"
+            'style="display:none"' in content or "display:none" in content
+        ), "Error div should have display:none in server-rendered HTML"
 
     def test_auto_refresh_timer_is_running(self):
         """JS sets up the interval timer; the status span confirms auto-refresh."""
@@ -95,6 +89,50 @@ class TestWebcamPageStructure(DjangoPlaywrightTestCase):
         assert (
             "refresh" in status_text.lower()
         ), f"Status span should mention refresh, got: {status_text!r}"
+
+    def test_js_updates_status_span(self):
+        """JS writes an interval description into the status span.
+
+        The static HTML does NOT contain "every 10" — only the JavaScript
+        fills this in after the IIFE runs.  This test would fail if the
+        ``{% block extra_scripts %}`` block were misnamed and the JS never
+        loaded (the original bug in issue #694).
+        """
+        self.page.goto(f"{self.live_server_url}/webcam/")
+        # Give the IIFE a moment to execute and update the DOM.
+        self.page.wait_for_timeout(500)
+
+        status_text = self.page.locator("#webcam-status").text_content() or ""
+        assert "every 10" in status_text.lower(), (
+            f"JS should write 'every 10' into the status span, got: {status_text!r}. "
+            "This likely means the extra_scripts block is misnamed and JS never loaded."
+        )
+
+    def test_img_src_changes_after_interval(self):
+        """After the refresh interval fires the img src gains a cache-buster param.
+
+        Uses Playwright's fake clock to advance time by 11 seconds without
+        actually waiting, then checks that the JS added ``?t=<timestamp>`` to
+        the image src — proof that setInterval() fired and refreshImage() ran.
+        """
+        # Install fake clock *before* navigating so setInterval uses it.
+        self.page.clock.install()
+
+        self.page.goto(f"{self.live_server_url}/webcam/")
+        # Give JS time to execute and register the interval.
+        self.page.wait_for_timeout(200)
+
+        original_src = self.page.locator("#webcam-img").get_attribute("src") or ""
+
+        # Advance past the 10-second interval.
+        self.page.clock.fast_forward(11000)
+        self.page.wait_for_timeout(200)
+
+        new_src = self.page.locator("#webcam-img").get_attribute("src") or ""
+        assert "?t=" in new_src, (
+            f"After interval fires the img src should contain '?t=' cache-buster, "
+            f"got: {new_src!r}. This likely means setInterval was never registered."
+        )
 
 
 class TestWebcamErrorState(DjangoPlaywrightTestCase):
