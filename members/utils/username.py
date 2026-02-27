@@ -21,7 +21,11 @@ def generate_username(first_name: str, last_name: str) -> str:
         last_name:  The member's last name.
 
     Returns:
-        A unique username string that does not yet exist in the Member table.
+        A unique username string that does not yet exist in the Member table
+        at the time of the check.  Note: the availability check and the
+        subsequent ``create_user()`` call in the caller are not atomic; in
+        a concurrent environment callers should catch ``IntegrityError`` and
+        retry to handle the rare race condition.
     """
     # Import locally to avoid circular imports (members.utils is part of the
     # members app itself, so a top-level import of Member would be circular).

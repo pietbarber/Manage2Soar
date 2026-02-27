@@ -616,21 +616,28 @@ def visiting_pilot_signup(request, token):
                         "members/visiting_pilot_signup.html",
                         {"form": form, "config": config},
                     )
-                member = Member.objects.create_user(
-                    username=generate_username(
-                        form.cleaned_data["first_name"],
-                        form.cleaned_data["last_name"],
-                    ),
-                    email=form.cleaned_data["email"],
-                    first_name=form.cleaned_data["first_name"],
-                    last_name=form.cleaned_data["last_name"],
-                    phone=form.cleaned_data.get("phone", ""),
-                    SSA_member_number=form.cleaned_data.get("ssa_member_number", ""),
-                    glider_rating=form.cleaned_data.get("glider_rating", ""),
-                    home_club=form.cleaned_data.get("home_club", ""),
-                    membership_status=config.visiting_pilot_status,
-                    # No password set - account cannot be logged in via password until reset
-                )
+                while True:
+                    try:
+                        member = Member.objects.create_user(
+                            username=generate_username(
+                                form.cleaned_data["first_name"],
+                                form.cleaned_data["last_name"],
+                            ),
+                            email=form.cleaned_data["email"],
+                            first_name=form.cleaned_data["first_name"],
+                            last_name=form.cleaned_data["last_name"],
+                            phone=form.cleaned_data.get("phone", ""),
+                            SSA_member_number=form.cleaned_data.get(
+                                "ssa_member_number", ""
+                            ),
+                            glider_rating=form.cleaned_data.get("glider_rating", ""),
+                            home_club=form.cleaned_data.get("home_club", ""),
+                            membership_status=config.visiting_pilot_status,
+                            # No password set - account cannot be logged in via password until reset
+                        )
+                        break
+                    except IntegrityError:
+                        pass  # username claimed between check and insert; retry with next suffix
 
                 # Mark account as unusable for password login
                 member.set_unusable_password()

@@ -386,16 +386,25 @@ class MembershipApplication(models.Model):
             return self.member_account
 
         # Import Member here to avoid circular imports
+        from django.db import IntegrityError
+
         from members.models import Member
         from members.utils.username import generate_username
 
-        # Create the member account
-        member = Member.objects.create_user(
-            username=generate_username(self.first_name, self.last_name),
-            email=self.email,
-            first_name=self.first_name,
-            last_name=self.last_name,
-        )
+        # Create the member account, retrying if a race condition produces a
+        # username collision between generate_username()'s exists() check and
+        # the actual INSERT.
+        while True:
+            try:
+                member = Member.objects.create_user(
+                    username=generate_username(self.first_name, self.last_name),
+                    email=self.email,
+                    first_name=self.first_name,
+                    last_name=self.last_name,
+                )
+                break
+            except IntegrityError:
+                pass  # username claimed between check and insert; retry with next suffix
 
         # Set additional member fields from application
         member.middle_initial = self.middle_initial
