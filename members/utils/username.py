@@ -8,6 +8,10 @@ only).  When a collision occurs an incrementing numeric suffix is appended:
 
 import re
 
+# Maximum attempts to find a unique username before propagating an IntegrityError.
+# Shared by all call sites that wrap create_user() in a retry loop.
+_MAX_USERNAME_RETRIES = 10
+
 
 def generate_username(first_name: str, last_name: str) -> str:
     """Return a unique ``firstname.lastname`` username.

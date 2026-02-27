@@ -391,13 +391,12 @@ class MembershipApplication(models.Model):
         from django.db import IntegrityError
 
         from members.models import Member
-        from members.utils.username import generate_username
+        from members.utils.username import _MAX_USERNAME_RETRIES, generate_username
 
         # Create the member account, retrying if a race condition produces a
         # username collision between generate_username()'s exists() check and
         # the actual INSERT.  Cap retries to avoid an infinite loop if the
         # IntegrityError is caused by a different unique constraint.
-        _MAX_USERNAME_RETRIES = 10
         for _attempt in range(_MAX_USERNAME_RETRIES):
             try:
                 member = Member.objects.create_user(

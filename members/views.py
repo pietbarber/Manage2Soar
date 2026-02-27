@@ -25,7 +25,7 @@ from instructors.models import MemberQualification
 from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
-from members.utils.username import generate_username
+from members.utils.username import _MAX_USERNAME_RETRIES, generate_username
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -616,7 +616,6 @@ def visiting_pilot_signup(request, token):
                         "members/visiting_pilot_signup.html",
                         {"form": form, "config": config},
                     )
-                _MAX_USERNAME_RETRIES = 10
                 for _attempt in range(_MAX_USERNAME_RETRIES):
                     try:
                         member = Member.objects.create_user(
