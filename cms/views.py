@@ -765,7 +765,7 @@ def edit_homepage_content(request, content_id):
             messages.success(
                 request, f'Homepage content "{content.title}" updated successfully!'
             )
-            return redirect("homepage")
+            return redirect("home")
     else:
         form = HomePageContentForm(instance=content)
 
