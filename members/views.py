@@ -616,7 +616,8 @@ def visiting_pilot_signup(request, token):
                         "members/visiting_pilot_signup.html",
                         {"form": form, "config": config},
                     )
-                while True:
+                _MAX_USERNAME_RETRIES = 10
+                for _attempt in range(_MAX_USERNAME_RETRIES):
                     try:
                         member = Member.objects.create_user(
                             username=generate_username(
@@ -627,9 +628,10 @@ def visiting_pilot_signup(request, token):
                             first_name=form.cleaned_data["first_name"],
                             last_name=form.cleaned_data["last_name"],
                             phone=form.cleaned_data.get("phone", ""),
-                            SSA_member_number=form.cleaned_data.get(
-                                "ssa_member_number", ""
-                            ),
+                            # Store None rather than "" to avoid a unique-constraint
+                            # violation when multiple pilots omit their SSA number.
+                            SSA_member_number=form.cleaned_data.get("ssa_member_number")
+                            or None,
                             glider_rating=form.cleaned_data.get("glider_rating", ""),
                             home_club=form.cleaned_data.get("home_club", ""),
                             membership_status=config.visiting_pilot_status,
@@ -637,7 +639,9 @@ def visiting_pilot_signup(request, token):
                         )
                         break
                     except IntegrityError:
-                        pass  # username claimed between check and insert; retry with next suffix
+                        if _attempt == _MAX_USERNAME_RETRIES - 1:
+                            raise  # not a transient username collision; propagate
+                        # username claimed between check and insert; retry with next suffix
 
                 # Mark account as unusable for password login
                 member.set_unusable_password()

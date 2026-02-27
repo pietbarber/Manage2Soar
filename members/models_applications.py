@@ -393,8 +393,10 @@ class MembershipApplication(models.Model):
 
         # Create the member account, retrying if a race condition produces a
         # username collision between generate_username()'s exists() check and
-        # the actual INSERT.
-        while True:
+        # the actual INSERT.  Cap retries to avoid an infinite loop if the
+        # IntegrityError is caused by a different unique constraint.
+        _MAX_USERNAME_RETRIES = 10
+        for _attempt in range(_MAX_USERNAME_RETRIES):
             try:
                 member = Member.objects.create_user(
                     username=generate_username(self.first_name, self.last_name),
@@ -404,7 +406,9 @@ class MembershipApplication(models.Model):
                 )
                 break
             except IntegrityError:
-                pass  # username claimed between check and insert; retry with next suffix
+                if _attempt == _MAX_USERNAME_RETRIES - 1:
+                    raise  # not a transient username collision; propagate
+                # username claimed between check and insert; retry with next suffix
 
         # Set additional member fields from application
         member.middle_initial = self.middle_initial

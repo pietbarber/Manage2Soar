@@ -100,3 +100,48 @@ class GenerateUsernameTests(TestCase):
             username.startswith("user"),
             f"Expected fallback to start with 'user', got {username!r}",
         )
+
+    def test_very_long_name_truncated_to_max_length(self):
+        """Usernames are truncated so they never exceed the field's max_length."""
+        from members.models import Member
+
+        max_length = Member._meta.get_field("username").max_length
+        long_first = "a" * 100
+        long_last = "b" * 100
+        username = generate_username(long_first, long_last)
+        self.assertLessEqual(
+            len(username),
+            max_length,
+            f"Username length {len(username)} exceeds max_length {max_length}",
+        )
+
+    def test_collision_suffix_respects_max_length(self):
+        """When a collision suffix is appended the result still fits max_length.
+
+        The DB's actual column size may differ from the Django field's max_length
+        (e.g. a pending migration).  We temporarily set max_length to 20 so the
+        test can create the base user without hitting the real DB limit while
+        still exercising the truncation+suffix logic.
+        """
+        from members.models import Member
+
+        field = Member._meta.get_field("username")
+        original_max_length = field.max_length
+        mock_max = 20
+        field.max_length = mock_max
+        try:
+            # First call: produces a truncated base username of length ≤ 20.
+            base = generate_username("alexandrina", "thoroughgood")
+            self.assertLessEqual(len(base), mock_max)
+            Member.objects.create_user(username=base, email="collision@example.com")
+
+            # Second call: same names, base is taken, suffix is appended.
+            username = generate_username("alexandrina", "thoroughgood")
+            self.assertLessEqual(
+                len(username),
+                mock_max,
+                f"Username with suffix length {len(username)} exceeds mock max_length {mock_max}",
+            )
+            self.assertNotEqual(username, base)
+        finally:
+            field.max_length = original_max_length

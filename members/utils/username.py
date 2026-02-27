@@ -45,10 +45,18 @@ def generate_username(first_name: str, last_name: str) -> str:
     else:
         base_username = f"{first_clean}.{last_clean}"
 
+    # Truncate to the model field's max_length, reserving space for a
+    # numeric suffix so the final username always fits in the column.
+    username_field = Member._meta.get_field("username")
+    max_length = getattr(username_field, "max_length", 150)
+    base_username = base_username[:max_length]
+
     username = base_username
     counter = 1
     while Member.objects.filter(username=username).exists():
-        username = f"{base_username}{counter}"
+        suffix = str(counter)
+        truncated_base = base_username[: max_length - len(suffix)]
+        username = f"{truncated_base}{suffix}"
         counter += 1
 
     return username
