@@ -385,7 +385,9 @@ class MembershipApplication(models.Model):
         if self.status == "approved" and self.member_account:
             return self.member_account
 
-        # Import Member here to avoid circular imports
+        # Local imports to avoid circular imports at module level (this module is
+        # part of the members app, so top-level imports of Member/utils would be
+        # circular).
         from django.db import IntegrityError
 
         from members.models import Member
