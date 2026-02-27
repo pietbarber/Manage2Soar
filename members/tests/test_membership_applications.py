@@ -122,7 +122,7 @@ class MembershipApplicationModelTests:
         member = app.approve_application()
 
         assert member is not None
-        assert member.username == "john@example.com"
+        assert member.username == "john.doe"  # generate_username("John", "Doe")
         assert member.email == "john@example.com"
         assert member.first_name == "John"
         assert member.last_name == "Doe"

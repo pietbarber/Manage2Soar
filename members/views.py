@@ -25,7 +25,7 @@ from instructors.models import MemberQualification
 from members.constants.membership import STATUS_ALIASES
 from members.utils import can_view_personal_info as can_view_personal_info_fn
 from members.utils.membership import get_active_membership_statuses
-from members.utils.username import generate_username
+from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 from siteconfig.forms import VisitingPilotSignupForm
 from siteconfig.models import SiteConfiguration
 from utils.url_helpers import build_absolute_url, get_canonical_url
@@ -616,21 +616,39 @@ def visiting_pilot_signup(request, token):
                         "members/visiting_pilot_signup.html",
                         {"form": form, "config": config},
                     )
-                member = Member.objects.create_user(
-                    username=generate_username(
+                for _attempt in range(MAX_USERNAME_RETRIES):
+                    candidate_username = generate_username(
                         form.cleaned_data["first_name"],
                         form.cleaned_data["last_name"],
-                    ),
-                    email=form.cleaned_data["email"],
-                    first_name=form.cleaned_data["first_name"],
-                    last_name=form.cleaned_data["last_name"],
-                    phone=form.cleaned_data.get("phone", ""),
-                    SSA_member_number=form.cleaned_data.get("ssa_member_number", ""),
-                    glider_rating=form.cleaned_data.get("glider_rating", ""),
-                    home_club=form.cleaned_data.get("home_club", ""),
-                    membership_status=config.visiting_pilot_status,
-                    # No password set - account cannot be logged in via password until reset
-                )
+                    )
+                    try:
+                        member = Member.objects.create_user(
+                            username=candidate_username,
+                            email=form.cleaned_data["email"],
+                            first_name=form.cleaned_data["first_name"],
+                            last_name=form.cleaned_data["last_name"],
+                            phone=form.cleaned_data.get("phone", ""),
+                            # Store None rather than "" to avoid a unique-constraint
+                            # violation when multiple pilots omit their SSA number.
+                            SSA_member_number=form.cleaned_data.get("ssa_member_number")
+                            or None,
+                            glider_rating=form.cleaned_data.get("glider_rating", ""),
+                            home_club=form.cleaned_data.get("home_club", ""),
+                            membership_status=config.visiting_pilot_status,
+                            # No password set - account cannot be logged in via password until reset
+                        )
+                        break
+                    except IntegrityError:
+                        # Only retry if this was a username race (the candidate
+                        # was claimed between generate_username()'s exists() check
+                        # and the INSERT).  Any other constraint violation (e.g.
+                        # email uniqueness) should propagate immediately.
+                        if not Member.objects.filter(
+                            username=candidate_username
+                        ).exists():
+                            raise
+                        if _attempt == MAX_USERNAME_RETRIES - 1:
+                            raise  # username race, but exhausted retries
 
                 # Mark account as unusable for password login
                 member.set_unusable_password()

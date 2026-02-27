@@ -385,17 +385,35 @@ class MembershipApplication(models.Model):
         if self.status == "approved" and self.member_account:
             return self.member_account
 
-        # Import Member here to avoid circular imports
-        from members.models import Member
-        from members.utils.username import generate_username
+        # Local imports to avoid circular imports at module level (this module is
+        # part of the members app, so top-level imports of Member/utils would be
+        # circular).
+        from django.db import IntegrityError
 
-        # Create the member account
-        member = Member.objects.create_user(
-            username=generate_username(self.first_name, self.last_name),
-            email=self.email,
-            first_name=self.first_name,
-            last_name=self.last_name,
-        )
+        from members.models import Member
+        from members.utils.username import MAX_USERNAME_RETRIES, generate_username
+
+        # Create the member account, retrying if a race condition produces a
+        # username collision between generate_username()'s exists() check and
+        # the actual INSERT.  Cap retries to avoid an infinite loop if the
+        # IntegrityError is caused by a different unique constraint.
+        for _attempt in range(MAX_USERNAME_RETRIES):
+            candidate_username = generate_username(self.first_name, self.last_name)
+            try:
+                member = Member.objects.create_user(
+                    username=candidate_username,
+                    email=self.email,
+                    first_name=self.first_name,
+                    last_name=self.last_name,
+                )
+                break
+            except IntegrityError:
+                # Only retry if this was a username race.  Any other constraint
+                # violation (e.g. duplicate email) should propagate immediately.
+                if not Member.objects.filter(username=candidate_username).exists():
+                    raise
+                if _attempt == MAX_USERNAME_RETRIES - 1:
+                    raise  # username race, but exhausted retries
 
         # Set additional member fields from application
         member.middle_initial = self.middle_initial

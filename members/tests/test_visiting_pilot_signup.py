@@ -77,3 +77,45 @@ class VisitingPilotSignupUsernameTests(TestCase):
 
         member = Member.objects.get(email="jane.doe@example.com")
         self.assertEqual(member.email, "jane.doe@example.com")
+
+    def test_collision_produces_suffixed_username(self):
+        """When firstname.lastname is already taken the view assigns firstname.lastname1."""
+        # Pre-create the base username so it is already taken.
+        Member.objects.create_user(
+            username="jane.doe",
+            email="other.jane@example.com",
+        )
+
+        self._post_signup()
+
+        member = Member.objects.get(email="jane.doe@example.com")
+        self.assertEqual(
+            member.username,
+            "jane.doe1",
+            f"Expected 'jane.doe1' on collision, got {member.username!r}.",
+        )
+
+    def test_two_pilots_without_ssa_number_both_created(self):
+        """Two visiting pilot signups with no SSA number must both succeed.
+
+        SSA_member_number is unique=True on Member; storing '' (empty string)
+        for both would raise an IntegrityError on the second insert.  The view
+        must store None instead so both rows are accepted by the DB.
+        """
+        self._post_signup(
+            first_name="Alice",
+            last_name="Alpha",
+            email="alice@example.com",
+            ssa_member_number="",
+        )
+        self._post_signup(
+            first_name="Bob",
+            last_name="Beta",
+            email="bob@example.com",
+            ssa_member_number="",
+        )
+
+        alice = Member.objects.get(email="alice@example.com")
+        bob = Member.objects.get(email="bob@example.com")
+        self.assertIsNone(alice.SSA_member_number)
+        self.assertIsNone(bob.SSA_member_number)

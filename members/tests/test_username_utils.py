@@ -80,3 +80,68 @@ class GenerateUsernameTests(TestCase):
             Member.objects.filter(username=username).exists(),
             f"generate_username returned an already-taken username: {username!r}",
         )
+
+    # --- Fallback tests for non-ASCII / empty name parts ---
+
+    def test_non_ascii_first_name_falls_back_to_last(self):
+        """A first name with no ASCII letters falls back to just the last name."""
+        username = generate_username("\u674e", "Smith")
+        self.assertEqual(username, "smith")
+
+    def test_non_ascii_last_name_falls_back_to_first(self):
+        """A last name with no ASCII letters falls back to just the first name."""
+        username = generate_username("John", "\u674e")
+        self.assertEqual(username, "john")
+
+    def test_both_empty_after_strip_yields_user(self):
+        """If both parts strip to empty, the fallback base username is 'user'."""
+        username = generate_username("\u674e", "\u674e")
+        self.assertTrue(
+            username.startswith("user"),
+            f"Expected fallback to start with 'user', got {username!r}",
+        )
+
+    def test_very_long_name_truncated_to_max_length(self):
+        """Usernames are truncated so they never exceed the field's max_length."""
+        from members.models import Member
+
+        max_length = Member._meta.get_field("username").max_length
+        long_first = "a" * 100
+        long_last = "b" * 100
+        username = generate_username(long_first, long_last)
+        self.assertLessEqual(
+            len(username),
+            max_length,
+            f"Username length {len(username)} exceeds max_length {max_length}",
+        )
+
+    def test_collision_suffix_respects_max_length(self):
+        """When a collision suffix is appended the result still fits max_length.
+
+        The DB's actual column size may differ from the Django field's max_length
+        (e.g. a pending migration).  We temporarily set max_length to 20 so the
+        test can create the base user without hitting the real DB limit while
+        still exercising the truncation+suffix logic.
+        """
+        from members.models import Member
+
+        field = Member._meta.get_field("username")
+        original_max_length = field.max_length
+        mock_max = 20
+        field.max_length = mock_max
+        try:
+            # First call: produces a truncated base username of length ≤ 20.
+            base = generate_username("alexandrina", "thoroughgood")
+            self.assertLessEqual(len(base), mock_max)
+            Member.objects.create_user(username=base, email="collision@example.com")
+
+            # Second call: same names, base is taken, suffix is appended.
+            username = generate_username("alexandrina", "thoroughgood")
+            self.assertLessEqual(
+                len(username),
+                mock_max,
+                f"Username with suffix length {len(username)} exceeds mock max_length {mock_max}",
+            )
+            self.assertNotEqual(username, base)
+        finally:
+            field.max_length = original_max_length
