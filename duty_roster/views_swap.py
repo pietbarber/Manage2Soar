@@ -7,7 +7,7 @@ for their scheduled duties and for other members to offer help.
 
 import calendar as _cal_lib
 import logging
-from datetime import date, timedelta
+from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
