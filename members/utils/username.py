@@ -12,9 +12,11 @@ import re
 def generate_username(first_name: str, last_name: str) -> str:
     """Return a unique ``firstname.lastname`` username.
 
-    Strips all non-alphabetic characters from both name parts, combines them
-    with a dot, and adds an incrementing suffix if the base username is already
-    taken.
+    Strips all non-ASCII-alphabetic characters from both name parts (the regex
+    ``[^A-Za-z]`` removes anything that is not an ASCII letter, including
+    accented characters such as "é" or "Ö"), lowercases each part, and
+    combines them with a dot.  An incrementing numeric suffix is appended if
+    the base username is already taken.
 
     Args:
         first_name: The member's first name (raw, may contain spaces/hyphens/etc.)
