@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
@@ -78,11 +79,18 @@ class Command(BaseCommand):
             self.style.NOTICE(f"Generating pre-op report for {target_date}")
         )
 
-        # Get the duty assignment
+        # Get the duty assignment — send for both regular scheduled days and
+        # confirmed ad-hoc days (is_scheduled=False, is_confirmed=True).
+        # Unconfirmed ad-hoc days (is_confirmed=False) are excluded.
         try:
-            assignment = DutyAssignment.objects.get(date=target_date, is_scheduled=True)
+            assignment = DutyAssignment.objects.get(
+                Q(date=target_date)
+                & (Q(is_scheduled=True) | Q(is_scheduled=False, is_confirmed=True))
+            )
         except DutyAssignment.DoesNotExist:
-            self.stdout.write("No scheduled ops for this date.")
+            self.stdout.write(
+                "No ops for this date (no scheduled or confirmed ad-hoc assignment found)."
+            )
             return
 
         # Build crew list with role information for personalized emails

@@ -390,7 +390,7 @@ class TestSendDutyPreopEmails:
         SITE_URL="https://test.manage2soar.com",
     )
     def test_no_scheduled_ops(self, site_config, tomorrow):
-        """Test that command handles no scheduled ops gracefully."""
+        """Test that command handles no ops gracefully."""
         out = StringIO()
         call_command(
             "send_duty_preop_emails",
@@ -399,8 +399,69 @@ class TestSendDutyPreopEmails:
         )
 
         output = out.getvalue()
-        assert "No scheduled ops" in output
+        assert "No ops" in output
         assert len(mail.outbox) == 0
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_sends_email_for_confirmed_adhoc_day(self, site_config, members, tomorrow):
+        """Confirmed ad-hoc days (is_scheduled=False, is_confirmed=True) get a pre-op email.
+
+        This was broken before issue #678-adjacent fix: the command filtered on
+        is_scheduled=True only, so ad-hoc days were silently skipped.
+        """
+        DutyAssignment.objects.create(
+            date=tomorrow,
+            is_scheduled=False,
+            is_confirmed=True,
+            instructor=members["instructor"],
+            tow_pilot=members["tow_pilot"],
+            duty_officer=members["duty_officer"],
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        assert len(mail.outbox) == 3, (
+            "Expected emails to crew for confirmed ad-hoc day; "
+            f"command output: {out.getvalue()!r}"
+        )
+        assert "Email sent" in out.getvalue()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_skips_unconfirmed_adhoc_day(self, site_config, members, tomorrow):
+        """Unconfirmed ad-hoc days (is_scheduled=False, is_confirmed=False) are skipped."""
+        DutyAssignment.objects.create(
+            date=tomorrow,
+            is_scheduled=False,
+            is_confirmed=False,
+            instructor=members["instructor"],
+            tow_pilot=members["tow_pilot"],
+            duty_officer=members["duty_officer"],
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        assert len(mail.outbox) == 0
+        assert "No ops" in out.getvalue()
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
