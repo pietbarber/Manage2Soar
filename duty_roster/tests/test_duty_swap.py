@@ -874,3 +874,81 @@ class TestVolunteerOpportunities:
         opps = resp.context["volunteer_opportunities"]
         past_opps = [o for o in opps if o["date"] < date.today()]
         assert not past_opps, "Past dates must not appear in volunteer opportunities"
+
+    def test_no_tow_opportunity_when_already_instructor_same_day(
+        self, client, site_config
+    ):
+        """
+        A dual-qualified member who is already serving as instructor on a day
+        must NOT see a tow-pilot hole for that same day (double-booking guard,
+        issue #696 review comment).
+        """
+        from members.models import Member as _Member
+
+        multi_role = _Member.objects.create(
+            username="multi_instr_tow",
+            email="multi_it@example.com",
+            membership_status="Full Member",
+            instructor=True,
+            towpilot=True,
+        )
+        future = date.today() + timedelta(days=8)
+        DutyAssignment.objects.create(
+            date=future,
+            is_scheduled=True,
+            instructor=multi_role,  # already has instructor role
+        )
+        client.force_login(multi_role)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        opps = resp.context["volunteer_opportunities"]
+        tow_holes = [
+            o
+            for o in opps
+            if o["date"] == future
+            and o["kind"] == "hole"
+            and "tow" in o["role_label"].lower()
+        ]
+        assert (
+            not tow_holes
+        ), "Should not show tow-pilot hole to someone already serving as instructor that day"
+
+    def test_no_instructor_opportunity_when_already_tow_same_day(
+        self, client, site_config
+    ):
+        """
+        A dual-qualified member who is already serving as tow pilot on a day
+        must NOT see an instructor hole for that same day (double-booking guard,
+        issue #696 review comment).
+        """
+        from members.models import Member as _Member
+
+        multi_role = _Member.objects.create(
+            username="multi_tow_instr",
+            email="multi_ti@example.com",
+            membership_status="Full Member",
+            instructor=True,
+            towpilot=True,
+        )
+        future = date.today() + timedelta(days=9)
+        DutyAssignment.objects.create(
+            date=future,
+            is_scheduled=True,
+            tow_pilot=multi_role,  # already has tow pilot role
+        )
+        client.force_login(multi_role)
+        url = reverse("duty_roster:open_swap_requests")
+        resp = client.get(url)
+
+        opps = resp.context["volunteer_opportunities"]
+        instr_holes = [
+            o
+            for o in opps
+            if o["date"] == future
+            and o["kind"] == "hole"
+            and "instructor" in o["role_label"].lower()
+        ]
+        assert (
+            not instr_holes
+        ), "Should not show instructor hole to someone already serving as tow pilot that day"
