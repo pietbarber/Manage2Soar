@@ -29,7 +29,17 @@ def generate_username(first_name: str, last_name: str) -> str:
 
     first_clean = re.sub(r"[^A-Za-z]", "", first_name).lower()
     last_clean = re.sub(r"[^A-Za-z]", "", last_name).lower()
-    base_username = f"{first_clean}.{last_clean}"
+
+    # Fall back gracefully when name parts contain no ASCII letters (e.g.
+    # non-ASCII names like "李" or accented-only strings like "Ö").
+    if not first_clean and not last_clean:
+        base_username = "user"
+    elif not first_clean:
+        base_username = last_clean
+    elif not last_clean:
+        base_username = first_clean
+    else:
+        base_username = f"{first_clean}.{last_clean}"
 
     username = base_username
     counter = 1

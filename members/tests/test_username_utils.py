@@ -2,7 +2,6 @@
 Tests for the generate_username utility (members.utils.username).
 """
 
-import pytest
 from django.test import TestCase
 
 from members.models import Member
@@ -80,4 +79,24 @@ class GenerateUsernameTests(TestCase):
         self.assertFalse(
             Member.objects.filter(username=username).exists(),
             f"generate_username returned an already-taken username: {username!r}",
+        )
+
+    # --- Fallback tests for non-ASCII / empty name parts ---
+
+    def test_non_ascii_first_name_falls_back_to_last(self):
+        """A first name with no ASCII letters falls back to just the last name."""
+        username = generate_username("\u674e", "Smith")
+        self.assertEqual(username, "smith")
+
+    def test_non_ascii_last_name_falls_back_to_first(self):
+        """A last name with no ASCII letters falls back to just the first name."""
+        username = generate_username("John", "\u674e")
+        self.assertEqual(username, "john")
+
+    def test_both_empty_after_strip_yields_user(self):
+        """If both parts strip to empty, the fallback base username is 'user'."""
+        username = generate_username("\u674e", "\u674e")
+        self.assertTrue(
+            username.startswith("user"),
+            f"Expected fallback to start with 'user', got {username!r}",
         )
