@@ -1010,7 +1010,7 @@ def calendar_tow_signup(request, year, month, day):
     # Only notify if assignment was actually changed
     if assignment_changed:
         # Refresh from DB to get current state (in case concurrent signups updated other roles)
-        assignment.refresh_from_db()
+        assignment.refresh_from_db()  # type: ignore[call-arg]
         notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -1075,7 +1075,7 @@ def calendar_instructor_signup(request, year, month, day):
     # Only notify if assignment was actually changed
     if assignment_changed:
         # Refresh from DB to get current state (in case concurrent signups updated other roles)
-        assignment.refresh_from_db()
+        assignment.refresh_from_db()  # type: ignore[call-arg]
         notify_ops_status(assignment)
 
     # Return HTMX response to refresh calendar body with specific month context
@@ -3440,7 +3440,7 @@ def volunteer_fill_role(request, assignment_id, role):
         # notify_ops_status anyway, so skipping the refresh + call for them
         # avoids a redundant DB round-trip and debug log noise.
         if not assignment.is_scheduled:
-            assignment.refresh_from_db()
+            assignment.refresh_from_db()  # type: ignore[call-arg]
             notify_ops_status(assignment)
 
         messages.success(
