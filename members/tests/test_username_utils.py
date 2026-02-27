@@ -2,7 +2,6 @@
 Tests for the generate_username utility (members.utils.username).
 """
 
-import pytest
 from django.test import TestCase
 
 from members.models import Member

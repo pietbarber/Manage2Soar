@@ -389,8 +389,8 @@ class TestSendDutyPreopEmails:
         DEFAULT_FROM_EMAIL="noreply@test.com",
         SITE_URL="https://test.manage2soar.com",
     )
-    def test_no_scheduled_ops(self, site_config, tomorrow):
-        """Test that command handles no ops gracefully."""
+    def test_no_qualifying_ops(self, site_config, tomorrow):
+        """Test that command handles the case where no qualifying ops assignment exists gracefully."""
         out = StringIO()
         call_command(
             "send_duty_preop_emails",
@@ -411,8 +411,8 @@ class TestSendDutyPreopEmails:
     def test_sends_email_for_confirmed_adhoc_day(self, site_config, members, tomorrow):
         """Confirmed ad-hoc days (is_scheduled=False, is_confirmed=True) get a pre-op email.
 
-        This was broken before issue #678-adjacent fix: the command filtered on
-        is_scheduled=True only, so ad-hoc days were silently skipped.
+        Previously, the command filtered only on is_scheduled=True, so confirmed
+        ad-hoc days were silently skipped.
         """
         DutyAssignment.objects.create(
             date=tomorrow,
