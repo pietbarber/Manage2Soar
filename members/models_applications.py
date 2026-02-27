@@ -391,25 +391,29 @@ class MembershipApplication(models.Model):
         from django.db import IntegrityError
 
         from members.models import Member
-        from members.utils.username import _MAX_USERNAME_RETRIES, generate_username
+        from members.utils.username import MAX_USERNAME_RETRIES, generate_username
 
         # Create the member account, retrying if a race condition produces a
         # username collision between generate_username()'s exists() check and
         # the actual INSERT.  Cap retries to avoid an infinite loop if the
         # IntegrityError is caused by a different unique constraint.
-        for _attempt in range(_MAX_USERNAME_RETRIES):
+        for _attempt in range(MAX_USERNAME_RETRIES):
+            candidate_username = generate_username(self.first_name, self.last_name)
             try:
                 member = Member.objects.create_user(
-                    username=generate_username(self.first_name, self.last_name),
+                    username=candidate_username,
                     email=self.email,
                     first_name=self.first_name,
                     last_name=self.last_name,
                 )
                 break
             except IntegrityError:
-                if _attempt == _MAX_USERNAME_RETRIES - 1:
-                    raise  # not a transient username collision; propagate
-                # username claimed between check and insert; retry with next suffix
+                # Only retry if this was a username race.  Any other constraint
+                # violation (e.g. duplicate email) should propagate immediately.
+                if not Member.objects.filter(username=candidate_username).exists():
+                    raise
+                if _attempt == MAX_USERNAME_RETRIES - 1:
+                    raise  # username race, but exhausted retries
 
         # Set additional member fields from application
         member.middle_initial = self.middle_initial

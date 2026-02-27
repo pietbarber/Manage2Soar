@@ -1,16 +1,17 @@
 """
 Username generation utilities for Member accounts.
 
-The canonical username format is ``firstname.lastname`` (lower-case, letters
-only).  When a collision occurs an incrementing numeric suffix is appended:
-``john.smith``, ``john.smith1``, ``john.smith2``, …
+The canonical username format is ``firstname.lastname``: lower-case ASCII
+letters with a single dot separator between the cleaned name parts. When a
+collision occurs an incrementing numeric suffix is appended to the base
+username (e.g. ``john.smith``, ``john.smith1``, ``john.smith2``, …).
 """
 
 import re
 
 # Maximum attempts to find a unique username before propagating an IntegrityError.
 # Shared by all call sites that wrap create_user() in a retry loop.
-_MAX_USERNAME_RETRIES = 10
+MAX_USERNAME_RETRIES = 10
 
 
 def generate_username(first_name: str, last_name: str) -> str:
