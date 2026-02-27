@@ -197,6 +197,10 @@ class DutyAssignmentForm(forms.ModelForm):
             assistant_duty_officer=True
         ).order_by("last_name", "first_name")
 
+        # Apply Bootstrap 5 styling to all select widgets (issue #614).
+        for field in self.fields.values():
+            field.widget.attrs.setdefault("class", "form-select")
+
 
 class InstructionRequestForm(forms.ModelForm):
     """Form for students to request instruction on a duty day."""

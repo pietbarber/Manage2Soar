@@ -402,30 +402,16 @@
       {% endif %}
     </div>
 
-    {# Volunteer Signup Buttons (for ad-hoc days) #}
-    {% comment %}
-    For ad-hoc days, show volunteer section when:
-    1. Day is not confirmed (allow signups), OR
-    2. User has a role on this day (allow rescind)
-    {% endcomment %}
+    {# Rescind buttons for ad-hoc day crew (issue #696: signup via shovel buttons in duty crew card above) #}
     {% if assignment and not assignment.is_scheduled %}
-      {% if not assignment.is_confirmed or assignment.tow_pilot == user or assignment.instructor == user or assignment.duty_officer == user or assignment.assistant_duty_officer == user %}
+      {% if assignment.tow_pilot == user or assignment.instructor == user or assignment.duty_officer == user or assignment.assistant_duty_officer == user %}
     <hr class="my-3">
     <h6 class="fw-semibold text-secondary mb-2">
-      <i class="bi bi-hand-thumbs-up me-2" aria-hidden="true"></i>Volunteer for Duty:
+      <i class="bi bi-person-check me-2" aria-hidden="true"></i>Your Ad-Hoc Assignment:
     </h6>
     <div class="d-grid gap-2">
-      {# Tow Pilot: Show signup if slot open and user not already instructor for this day #}
-      {% if user.towpilot and not assignment.tow_pilot and assignment.instructor != user and not assignment.is_confirmed %}
-      <form method="post"
-            hx-post="{% url 'duty_roster:calendar_tow_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger w-100">
-          <i class="bi bi-airplane me-2" aria-hidden="true"></i>I am willing to tow
-        </button>
-      </form>
-      {% elif assignment.tow_pilot == user %}
-      {# User is the tow pilot - show rescind button (works even when confirmed) #}
+      {# Tow Pilot rescind #}
+      {% if assignment.tow_pilot == user %}
       <form method="post"
             hx-post="{% url 'duty_roster:calendar_tow_rescind' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
@@ -436,17 +422,8 @@
       </form>
       {% endif %}
 
-      {# Duty Officer #}
-      {% if user.duty_officer and not assignment.duty_officer and not assignment.is_confirmed %}
-      <form method="post"
-            hx-post="{% url 'duty_roster:calendar_dutyofficer_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-warning w-100">
-          <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i>I will serve as Duty Officer
-        </button>
-      </form>
-      {% elif assignment.duty_officer == user %}
-      {# User is the duty officer - show rescind button (works even when confirmed) #}
+      {# Duty Officer rescind #}
+      {% if assignment.duty_officer == user %}
       <form method="post"
             hx-post="{% url 'duty_roster:calendar_dutyofficer_rescind' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
@@ -457,17 +434,8 @@
       </form>
       {% endif %}
 
-      {# Instructor: Show signup if slot open and user not already tow pilot for this day #}
-      {% if user.instructor and not assignment.instructor and assignment.tow_pilot != user and not assignment.is_confirmed %}
-      <form method="post"
-            hx-post="{% url 'duty_roster:calendar_instructor_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-success w-100">
-          <i class="bi bi-mortarboard me-2" aria-hidden="true"></i>I am willing to instruct today
-        </button>
-      </form>
-      {% elif assignment.instructor == user %}
-      {# User is the instructor - show rescind button (works even when confirmed) #}
+      {# Instructor rescind #}
+      {% if assignment.instructor == user %}
       <form method="post"
             hx-post="{% url 'duty_roster:calendar_instructor_rescind' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}
@@ -478,17 +446,8 @@
       </form>
       {% endif %}
 
-      {# Assistant Duty Officer #}
-      {% if user.assistant_duty_officer and not assignment.assistant_duty_officer and not assignment.is_confirmed %}
-      <form method="post"
-            hx-post="{% url 'duty_roster:calendar_ado_signup' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-secondary w-100">
-          <i class="bi bi-person-badge me-2" aria-hidden="true"></i>I can serve as Assistant Duty Officer
-        </button>
-      </form>
-      {% elif assignment.assistant_duty_officer == user %}
-      {# User is the ADO - show rescind button (works even when confirmed) #}
+      {# ADO rescind (supports ad-hoc ADO signup via shovel button, issue #614) #}
+      {% if assignment.assistant_duty_officer == user %}
       <form method="post"
             hx-post="{% url 'duty_roster:calendar_ado_rescind' year=assignment.date.year month=assignment.date.month day=assignment.date.day %}">
         {% csrf_token %}

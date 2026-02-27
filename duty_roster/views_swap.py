@@ -5,6 +5,7 @@ These views handle the workflow for duty crew members to request coverage
 for their scheduled duties and for other members to offer help.
 """
 
+import calendar as _cal_lib
 import logging
 from datetime import date
 
@@ -27,7 +28,13 @@ from utils.email_helpers import get_absolute_club_logo_url
 from utils.url_helpers import get_canonical_url
 
 from .forms import DutySwapOfferForm, DutySwapRequestForm
-from .models import DutyAssignment, DutySwapOffer, DutySwapRequest, MemberBlackout
+from .models import (
+    DutyAssignment,
+    DutySwapOffer,
+    DutySwapRequest,
+    MemberBlackout,
+    OpsIntent,
+)
 from .utils.ics import generate_swap_ics
 
 logger = logging.getLogger("duty_roster.views_swap")
@@ -251,11 +258,242 @@ def open_swap_requests(request):
         models.Q(request_type="general") | models.Q(direct_request_to=member)
     )
 
+    # -----------------------------------------------------------------------
+    # Volunteer Opportunities (issue #693)
+    # Aggregate roster holes + surge needs for the current and next calendar
+    # month so members have a single place to see where they can help out.
+    # -----------------------------------------------------------------------
+    volunteer_opportunities = _build_volunteer_opportunities(member, today)
+
     context = {
         "open_requests": open_requests,
         "today": today,
+        "volunteer_opportunities": volunteer_opportunities,
     }
     return render(request, "duty_roster/swap/open_requests.html", context)
+
+
+def _end_of_next_month(today):
+    """Return the last day of the month following *today*'s month."""
+    next_month = today.month % 12 + 1
+    next_year = today.year + (1 if today.month == 12 else 0)
+    return date(next_year, next_month, _cal_lib.monthrange(next_year, next_month)[1])
+
+
+def _build_volunteer_opportunities(member, today):
+    """
+    Return a list of volunteer opportunity dicts for the current + next
+    calendar month (issue #693).
+
+    Each entry describes a single actionable slot:
+      - date          – the duty date
+      - role_label    – human-readable role name
+      - kind          – 'hole' (unfilled primary) or 'surge' (extra crew needed)
+      - volunteer_url – direct URL for the volunteer action
+      - assignment    – DutyAssignment object for extra context
+
+    Only includes opportunities the requesting *member* is qualified for.
+    """
+    from collections import defaultdict
+
+    from django.db.models import Count
+    from django.urls import reverse
+
+    from .models import InstructionSlot
+
+    window_end = _end_of_next_month(today)
+    config = SiteConfiguration.objects.first()
+    if not config:
+        return []
+
+    # Surge thresholds (mirrors get_surge_thresholds in views.py)
+    tow_surge_threshold = getattr(config, "tow_surge_threshold", 6)
+    instruction_surge_threshold = getattr(config, "instruction_surge_threshold", 4)
+
+    # All assignments in the window (scheduled + ad-hoc), with crew fields loaded
+    window_assignments = (
+        DutyAssignment.objects.filter(date__range=(today, window_end))
+        .select_related(
+            "instructor",
+            "tow_pilot",
+            "duty_officer",
+            "assistant_duty_officer",
+            "surge_instructor",
+            "surge_tow_pilot",
+        )
+        .order_by("date")
+    )
+
+    # Instruction-request counts per date (proxy for surge-instructor demand)
+    instruction_counts = defaultdict(int)
+    for row in (
+        InstructionSlot.objects.filter(assignment__date__range=(today, window_end))
+        .exclude(status="cancelled")
+        .values("assignment__date")
+        .annotate(_c=Count("id"))
+    ):
+        instruction_counts[row["assignment__date"]] += row["_c"]
+
+    # Tow-intent counts per date (club or private activities)
+    tow_counts = defaultdict(int)
+    for intent in OpsIntent.objects.filter(date__range=(today, window_end)):
+        if "club" in (intent.available_as or []) or "private" in (
+            intent.available_as or []
+        ):
+            tow_counts[intent.date] += 1
+
+    role_label = {
+        "instructor": getattr(config, "instructor_title", None) or "Instructor",
+        "tow_pilot": getattr(config, "towpilot_title", None) or "Tow Pilot",
+        "duty_officer": getattr(config, "duty_officer_title", None) or "Duty Officer",
+        "assistant_duty_officer": (
+            getattr(config, "assistant_duty_officer_title", None)
+            or "Assistant Duty Officer"
+        ),
+        "surge_instructor": (
+            getattr(config, "surge_instructor_title", None) or "Surge Instructor"
+        ),
+        "surge_tow_pilot": (
+            getattr(config, "surge_towpilot_title", None) or "Surge Tow Pilot"
+        ),
+    }
+
+    opportunities = []
+
+    for assignment in window_assignments:
+        d = assignment.date
+
+        # --- Primary hole opportunities (volunteer_fill_role) ---------------
+        if assignment.is_scheduled:
+            if (
+                config.schedule_instructors
+                and not assignment.instructor
+                and member.instructor
+                # Prevent double-booking: instructors can't also tow the same day
+                and member.id != assignment.tow_pilot_id
+            ):
+                opportunities.append(
+                    {
+                        "date": d,
+                        "role_label": role_label["instructor"],
+                        "kind": "hole",
+                        "volunteer_url": reverse(
+                            "duty_roster:volunteer_fill_role",
+                            kwargs={
+                                "assignment_id": assignment.id,
+                                "role": "instructor",
+                            },
+                        ),
+                        "assignment": assignment,
+                    }
+                )
+            if (
+                config.schedule_tow_pilots
+                and not assignment.tow_pilot
+                and member.towpilot
+                # Prevent double-booking: tow pilots can't also instruct the same day
+                and member.id != assignment.instructor_id
+            ):
+                opportunities.append(
+                    {
+                        "date": d,
+                        "role_label": role_label["tow_pilot"],
+                        "kind": "hole",
+                        "volunteer_url": reverse(
+                            "duty_roster:volunteer_fill_role",
+                            kwargs={
+                                "assignment_id": assignment.id,
+                                "role": "tow_pilot",
+                            },
+                        ),
+                        "assignment": assignment,
+                    }
+                )
+            if (
+                config.schedule_duty_officers
+                and not assignment.duty_officer
+                and member.duty_officer
+            ):
+                opportunities.append(
+                    {
+                        "date": d,
+                        "role_label": role_label["duty_officer"],
+                        "kind": "hole",
+                        "volunteer_url": reverse(
+                            "duty_roster:volunteer_fill_role",
+                            kwargs={
+                                "assignment_id": assignment.id,
+                                "role": "duty_officer",
+                            },
+                        ),
+                        "assignment": assignment,
+                    }
+                )
+            if (
+                config.schedule_assistant_duty_officers
+                and not assignment.assistant_duty_officer
+                and member.assistant_duty_officer
+            ):
+                opportunities.append(
+                    {
+                        "date": d,
+                        "role_label": role_label["assistant_duty_officer"],
+                        "kind": "hole",
+                        "volunteer_url": reverse(
+                            "duty_roster:volunteer_fill_role",
+                            kwargs={
+                                "assignment_id": assignment.id,
+                                "role": "assistant_duty_officer",
+                            },
+                        ),
+                        "assignment": assignment,
+                    }
+                )
+
+        # --- Surge opportunities ---------------------------------------------
+        # Surge instructor: primary slot filled, surge slot empty, demand high
+        if (
+            assignment.instructor_id is not None
+            and assignment.surge_instructor_id is None
+            and instruction_counts[d] >= instruction_surge_threshold
+            and member.instructor
+            and member.id != assignment.instructor_id
+        ):
+            opportunities.append(
+                {
+                    "date": d,
+                    "role_label": role_label["surge_instructor"],
+                    "kind": "surge",
+                    "volunteer_url": reverse(
+                        "duty_roster:volunteer_surge_instructor",
+                        kwargs={"assignment_id": assignment.id},
+                    ),
+                    "assignment": assignment,
+                }
+            )
+
+        # Surge tow pilot: primary slot filled, surge slot empty, demand high
+        if (
+            assignment.tow_pilot_id is not None
+            and assignment.surge_tow_pilot_id is None
+            and tow_counts[d] >= tow_surge_threshold
+            and member.towpilot
+            and member.id != assignment.tow_pilot_id
+        ):
+            opportunities.append(
+                {
+                    "date": d,
+                    "role_label": role_label["surge_tow_pilot"],
+                    "kind": "surge",
+                    "volunteer_url": reverse(
+                        "duty_roster:volunteer_surge_tow_pilot",
+                        kwargs={"assignment_id": assignment.id},
+                    ),
+                    "assignment": assignment,
+                }
+            )
+
+    return opportunities
 
 
 @active_member_required

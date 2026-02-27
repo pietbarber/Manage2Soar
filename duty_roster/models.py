@@ -638,7 +638,7 @@ class DutySwapOffer(models.Model):
 
 class OpsIntent(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
-    date = models.DateField()
+    date = models.DateField(db_index=True)
     # e.g. ["towpilot", "glider_pilot", "instruction"]
     # Centralize available activities so templates and admin can render
     # consistent labels. Keys here are stored in the JSONField.

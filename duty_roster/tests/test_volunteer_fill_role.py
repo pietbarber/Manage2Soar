@@ -335,3 +335,64 @@ def test_no_volunteerable_holes_when_roles_filled(client, django_user_model):
     assert response.status_code == 200
     holes = response.context["volunteerable_holes"]
     assert "instructor" not in holes
+
+
+# ---------------------------------------------------------------------------
+# notify_ops_status is fired for ad-hoc days (issue #696)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_post_fires_notify_ops_status_for_adhoc_day(client, django_user_model):
+    """
+    After a successful fill on an ad-hoc day, notify_ops_status must be called
+    so that the collecting-volunteers → confirmed-ops transition happens
+    (issue #696: shovel path must behave identically to the calendar signup path).
+    """
+    from unittest.mock import patch
+
+    _make_config()
+    user = _make_user(django_user_model, instructor=True)
+    future = date.today() + timedelta(days=7)
+    assignment, _ = DutyAssignment.objects.update_or_create(
+        date=future,
+        defaults={"is_scheduled": False, "is_confirmed": False},
+    )
+
+    client.force_login(user)
+    with patch("duty_roster.views.notify_ops_status") as mock_notify:
+        response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    assignment.refresh_from_db()
+    assert assignment.instructor == user
+    mock_notify.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_post_does_not_fire_notify_when_concurrent_fill(client, django_user_model):
+    """
+    When the conditional UPDATE finds 0 rows (concurrent volunteer won the race),
+    notify_ops_status must NOT be called — nothing changed for this user.
+    """
+    from unittest.mock import patch
+
+    _make_config()
+    first = _make_user(django_user_model, username="first_instr", instructor=True)
+    second = _make_user(django_user_model, username="second_instr", instructor=True)
+    future = date.today() + timedelta(days=7)
+    assignment, _ = DutyAssignment.objects.update_or_create(
+        date=future,
+        defaults={"is_scheduled": False, "is_confirmed": False},
+    )
+
+    # Pre-fill the slot so second's POST finds 0 rows
+    assignment.instructor = first
+    assignment.save(update_fields=["instructor"])
+
+    client.force_login(second)
+    with patch("duty_roster.views.notify_ops_status") as mock_notify:
+        response = client.post(_url(assignment.id, "instructor"))
+
+    assert response.status_code == 302
+    mock_notify.assert_not_called()
