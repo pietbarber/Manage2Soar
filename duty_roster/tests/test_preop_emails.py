@@ -536,7 +536,8 @@ class TestSendDutyPreopEmails:
     def test_cc_students_requesting_instruction(
         self, site_config, duty_assignment, members, tomorrow
     ):
-        """Test that students requesting instruction are CC'd on the email."""
+        """Test that students requesting instruction receive their own dedicated
+        email with a generic Flying Day ICS (not a crew-role ICS for someone else)."""
         # Create an instruction slot for the student
         InstructionSlot.objects.create(
             assignment=duty_assignment,
@@ -551,9 +552,23 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        email = mail.outbox[0]
-        # Student should be CC'd
-        assert members["student"].email in email.cc
+        # 3 crew emails + 1 student email
+        assert len(mail.outbox) == 4
+
+        # Crew emails should have no CC
+        for crew_email in mail.outbox[:3]:
+            assert crew_email.cc == []
+
+        # Student should receive their own dedicated email
+        student_email = mail.outbox[3]
+        assert student_email.to == [members["student"].email]
+        assert student_email.cc == []
+
+        # Student's ICS should be the generic flying-day type, not a crew-role ICS
+        assert len(student_email.attachments) == 1
+        attachment = student_email.attachments[0]
+        assert attachment[0].startswith("flying-day-")
+        assert attachment[0].endswith(".ics")
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -564,7 +579,8 @@ class TestSendDutyPreopEmails:
     def test_cc_ops_intent_members(
         self, site_config, duty_assignment, members, glider, tomorrow
     ):
-        """Test that members with ops intent are CC'd on the email."""
+        """Test that ops intent members receive their own dedicated email
+        with a generic Flying Day ICS (not a crew-role ICS for someone else)."""
         # Create an ops intent
         OpsIntent.objects.create(
             member=members["private_owner"],
@@ -580,9 +596,23 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        email = mail.outbox[0]
-        # Private owner should be CC'd
-        assert members["private_owner"].email in email.cc
+        # 3 crew emails + 1 ops intent email
+        assert len(mail.outbox) == 4
+
+        # Crew emails should have no CC
+        for crew_email in mail.outbox[:3]:
+            assert crew_email.cc == []
+
+        # Ops intent member should receive their own dedicated email
+        participant_email = mail.outbox[3]
+        assert participant_email.to == [members["private_owner"].email]
+        assert participant_email.cc == []
+
+        # Participant's ICS should be the generic flying-day type
+        assert len(participant_email.attachments) == 1
+        attachment = participant_email.attachments[0]
+        assert attachment[0].startswith("flying-day-")
+        assert attachment[0].endswith(".ics")
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -593,7 +623,8 @@ class TestSendDutyPreopEmails:
     def test_cc_excludes_duplicates_and_duty_crew(
         self, site_config, duty_assignment, members, tomorrow
     ):
-        """Test that CC list excludes duplicates and members already in to_emails."""
+        """Test that crew members don't receive a duplicate participant email,
+        and non-crew participants receive exactly one dedicated email."""
         # Create instruction slot for the instructor (who is already in duty crew)
         InstructionSlot.objects.create(
             assignment=duty_assignment,
@@ -617,11 +648,14 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        email = mail.outbox[0]
-        # Instructor should NOT be in CC (already in TO)
-        assert members["instructor"].email not in email.cc
-        # Student should be in CC
-        assert members["student"].email in email.cc
+        # 3 crew emails + 1 student email (instructor NOT duplicated as participant)
+        assert len(mail.outbox) == 4
+
+        all_to = [e.to[0] for e in mail.outbox]
+        # Instructor should appear exactly once (as their crew TO email only)
+        assert all_to.count(members["instructor"].email) == 1
+        # Student should appear exactly once (as participant TO email)
+        assert all_to.count(members["student"].email) == 1
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -631,7 +665,7 @@ class TestSendDutyPreopEmails:
         SITE_URL="https://test.manage2soar.com",
     )
     def test_cc_in_dev_mode(self, site_config, duty_assignment, members, tomorrow):
-        """Test that CC functionality works correctly in dev mode."""
+        """Test that participant emails are correctly redirected in dev mode."""
         # Create an instruction slot
         InstructionSlot.objects.create(
             assignment=duty_assignment,
@@ -646,11 +680,12 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        email = mail.outbox[0]
-        # In dev mode, TO should be redirected
-        assert email.to == ["dev@example.com"]
-        # In dev mode, CC should be cleared (redirected to TO)
-        assert email.cc == []
-        # Subject should indicate dev mode and include original recipients info
-        assert "[DEV MODE]" in email.subject
-        assert "TO:" in email.subject
+        # 3 crew emails + 1 student email, all redirected to dev address
+        assert len(mail.outbox) == 4
+
+        for email_obj in mail.outbox:
+            # In dev mode, all emails should be redirected
+            assert email_obj.to == ["dev@example.com"]
+            assert email_obj.cc == []
+            assert "[DEV MODE]" in email_obj.subject
+            assert "TO:" in email_obj.subject

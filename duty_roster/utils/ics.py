@@ -234,6 +234,61 @@ def generate_preop_ics(assignment, for_member, role_title):
     )
 
 
+def generate_ops_day_ics(duty_date):
+    """
+    Generate a generic ICS calendar event for an operations day.
+
+    Intended for non-crew participants (ops intent members, students) who will
+    be flying on the day but do not have a specific crew duty assignment.
+    Each recipient gets their own copy, but the content is not personalized to
+    any individual crew role.
+
+    Args:
+        duty_date: date object for the operations day
+
+    Returns:
+        bytes: ICS file content as bytes
+    """
+    config = SiteConfiguration.objects.first()
+    club_name = config.club_name if config else "Soaring Club"
+    domain_name = config.domain_name if config else "manage2soar.com"
+
+    cal = Calendar()
+    cal.add("prodid", f"-//Manage2Soar//{club_name}//EN")
+    cal.add("version", "2.0")
+    cal.add("method", "PUBLISH")
+
+    event = Event()
+    event.add("summary", f"Flying Day - {club_name}")
+
+    description_parts = [
+        f"Flying operations at {club_name}.",
+        f"\nView duty roster: {build_absolute_url('/duty_roster/calendar/')}",
+    ]
+    event.add("description", "\n".join(description_parts))
+
+    event.add("dtstart", duty_date)
+    event.add("dtend", duty_date + timedelta(days=1))
+
+    if config and hasattr(config, "club_address") and config.club_address:
+        event.add("location", config.club_address)
+    else:
+        event.add("location", club_name)
+
+    now_dt = timezone.now()
+    timestamp = now_dt.strftime("%Y%m%dT%H%M%S")
+    event.add("uid", f"{duty_date.isoformat()}-flying-day-{timestamp}@{domain_name}")
+    event.add("dtstamp", now_dt)
+    event.add("status", "CONFIRMED")
+
+    default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "")
+    if default_from:
+        event.add("organizer", f"MAILTO:{default_from}")
+
+    cal.add_component(event)
+    return cal.to_ical()
+
+
 def generate_roster_ics(duty_date, role_title, member_name):
     """
     Generate ICS file for a newly established roster duty assignment.
