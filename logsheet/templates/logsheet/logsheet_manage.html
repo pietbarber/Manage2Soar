@@ -662,7 +662,8 @@ window.showOfflineToast = window.showOfflineToast || function(message) {
 
 // Helper to read CSRF token from DOM input or cookie fallback.
 // Using cookie fallback prevents 403 errors from causing spurious offline-pending state.
-window.getCsrfToken = function() {
+// Guard against overriding an existing definition (e.g. from kiosk_fingerprint.js).
+window.getCsrfToken = window.getCsrfToken || function() {
   const domToken = document.querySelector('[name=csrfmiddlewaretoken]');
   if (domToken && domToken.value) return domToken.value;
   // Cookie fallback (CSRF cookie is typically set by Django's CSRF middleware but may be absent)
@@ -728,9 +729,10 @@ window.attachModalButtonHandlers = function() {
 
 // Handle "Launch them now" and "Landing now" button clicks
 document.addEventListener("click", async function(e) {
-  if (e.target && e.target.classList.contains("launch-now-btn")) {
+  const launchBtn = e.target && e.target.closest(".launch-now-btn");
+  if (launchBtn) {
     e.preventDefault();
-    const btn = e.target;
+    const btn = launchBtn;
     const flightId = btn.getAttribute("data-flight-id");
     // Get user's local time in HH:MM (24h)
     const now = new Date();
@@ -816,9 +818,10 @@ document.addEventListener("click", async function(e) {
       }
     }
   }
-  if (e.target && e.target.classList.contains("landing-now-btn")) {
+  const landingBtn = e.target && e.target.closest(".landing-now-btn");
+  if (landingBtn) {
     e.preventDefault();
-    const btn = e.target;
+    const btn = landingBtn;
     const flightId = btn.getAttribute("data-flight-id");
     // Get user's local time in HH:MM (24h)
     const now = new Date();
