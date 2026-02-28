@@ -276,8 +276,9 @@ def generate_ops_day_ics(duty_date):
         event.add("location", club_name)
 
     now_dt = timezone.now()
-    timestamp = now_dt.strftime("%Y%m%dT%H%M%S")
-    event.add("uid", f"{duty_date.isoformat()}-flying-day-{timestamp}@{domain_name}")
+    # Use a stable UID (no timestamp) so that re-sending the same flying-day
+    # ICS updates the existing calendar entry rather than creating duplicates.
+    event.add("uid", f"{duty_date.isoformat()}-flying-day@{domain_name}")
     event.add("dtstamp", now_dt)
     event.add("status", "CONFIRMED")
 

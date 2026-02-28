@@ -176,13 +176,22 @@ class TestSendDutyPreopEmails:
         assert "Test Soaring Club" in html_content
         assert "Assigned Duty Crew" in html_content
 
-        # Check ICS attachment is present
+        # Check ICS attachment is present and personalized to the crew member
         assert len(email.attachments) == 1
         attachment = email.attachments[0]
         assert attachment[0].startswith("duty-")
         assert attachment[0].endswith(".ics")
         assert "text/calendar" in attachment[2]
-        assert "BEGIN:VCALENDAR" in attachment[1]
+        ics_text = (
+            attachment[1].decode("utf-8")
+            if isinstance(attachment[1], bytes)
+            else attachment[1]
+        )
+        # Unfold iCalendar line continuations (RFC 5545 folded at 75 chars)
+        ics_unfolded = ics_text.replace("\r\n ", "").replace("\r\n\t", "")
+        assert "BEGIN:VCALENDAR" in ics_unfolded
+        # Crew ICS must include the "Assigned to:" personalization line
+        assert "Assigned to:" in ics_unfolded
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -569,6 +578,14 @@ class TestSendDutyPreopEmails:
         attachment = student_email.attachments[0]
         assert attachment[0].startswith("flying-day-")
         assert attachment[0].endswith(".ics")
+        ics_text = (
+            attachment[1].decode("utf-8")
+            if isinstance(attachment[1], bytes)
+            else attachment[1]
+        )
+        # Generic flying-day ICS must not contain any crew member's name
+        assert "Assigned to:" not in ics_text
+        assert "SUMMARY:Flying Day" in ics_text
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -613,6 +630,47 @@ class TestSendDutyPreopEmails:
         attachment = participant_email.attachments[0]
         assert attachment[0].startswith("flying-day-")
         assert attachment[0].endswith(".ics")
+        ics_text = (
+            attachment[1].decode("utf-8")
+            if isinstance(attachment[1], bytes)
+            else attachment[1]
+        )
+        assert "Assigned to:" not in ics_text
+        assert "SUMMARY:Flying Day" in ics_text
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_participant_email_uses_participant_wording(
+        self, site_config, duty_assignment, members, tomorrow
+    ):
+        """Test that participant emails use appropriate wording rather than
+        'Duty Crew' / 'scheduled for duty' language meant for crew members."""
+        InstructionSlot.objects.create(
+            assignment=duty_assignment,
+            student=members["student"],
+            status="confirmed",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=tomorrow.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        student_email = mail.outbox[3]
+        html_content = student_email.alternatives[0][0]
+
+        # Participant wording should be present
+        assert "plan to fly" in html_content or "Operations are planned" in html_content
+        # Crew-only greeting should NOT appear in participant email.
+        # Note: "Assigned Duty Crew" section header is acceptable (informational).
+        assert "Hello Test Club Duty Crew" not in html_content
+        assert "scheduled for duty" not in html_content
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",

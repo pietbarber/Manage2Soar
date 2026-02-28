@@ -123,9 +123,18 @@ class Command(BaseCommand):
         # Remove duplicates and any emails already in crew_emails
         cc_emails = list(set(cc_emails) - set(crew_emails))
 
-        # Render templates
+        # Render templates — two variants: crew (default) and participant.
+        # Participant emails use the same template but with is_participant=True
+        # so the greeting and reminder wording is appropriate for non-crew members.
         html_message = render_to_string("duty_roster/emails/preop_email.html", context)
         text_message = render_to_string("duty_roster/emails/preop_email.txt", context)
+        participant_context = {**context, "is_participant": True}
+        participant_html_message = render_to_string(
+            "duty_roster/emails/preop_email.html", participant_context
+        )
+        participant_text_message = render_to_string(
+            "duty_roster/emails/preop_email.txt", participant_context
+        )
 
         # Send email - use noreply@ with domain extracted from DEFAULT_FROM_EMAIL
         default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
@@ -193,11 +202,13 @@ class Command(BaseCommand):
             for participant_email in cc_emails:
                 participant_email_obj = EmailMultiAlternatives(
                     subject=subject,
-                    body=text_message,
+                    body=participant_text_message,
                     from_email=from_email,
                     to=[participant_email],
                 )
-                participant_email_obj.attach_alternative(html_message, "text/html")
+                participant_email_obj.attach_alternative(
+                    participant_html_message, "text/html"
+                )
                 participant_email_obj.attach(
                     ics_flying_filename, ics_flying_day, "text/calendar"
                 )
