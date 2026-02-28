@@ -50,16 +50,17 @@ class TestLogsheetLaunchLandHandlers(DjangoPlaywrightTestCase):
             logsheet=self.logsheet,
             pilot=self.member,
             glider=self.glider,
+            airfield=self.airfield,
+            flight_type="solo",
         )
         # Site config required for manage page to render correctly
-        SiteConfiguration.objects.get_or_create(
-            defaults={
-                "club_name": "Test Club",
-                "domain_name": "test.example.com",
-                "club_abbreviation": "TC",
-                "quick_altitude_buttons": "2000,3000",
-            }
-        )
+        if not SiteConfiguration.objects.first():
+            SiteConfiguration.objects.create(
+                club_name="Test Club",
+                domain_name="test.example.com",
+                club_abbreviation="TC",
+                quick_altitude_buttons="2000,3000",
+            )
 
     # ------------------------------------------------------------------
     # Happy-path: online launch
