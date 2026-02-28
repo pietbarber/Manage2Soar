@@ -1474,7 +1474,7 @@ document.addEventListener("click", async function(e) {
 
             // Build form data
             const formData = new FormData();
-            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+            formData.append('csrfmiddlewaretoken', window.getCsrfToken());
 
             // Add flight fields
             const fieldMap = {
