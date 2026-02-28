@@ -211,18 +211,20 @@ class TestLogsheetLaunchLandHandlers(DjangoPlaywrightTestCase):
             "500" in msg or "could not" in msg or "server error" in msg
         ), f"Alert should describe the server error, got: '{dialog_messages[0]}'"
 
+        # Directly assert the button is NOT in the pending-sync UI state.
+        # When landing goes offline-pending, the handler removes btn-warning and
+        # adds btn-secondary.  The normal in-flight button stays btn-warning.
         btn_class = land_btn.get_attribute("class") or ""
         assert (
             "btn-secondary" not in btn_class
-            or "Pending Sync" not in land_btn.inner_text()
-        ), "Land button should not switch to pending-sync state on a server error"
+        ), "Land button should NOT switch to btn-secondary (Pending Sync) on a server error"
         assert (
             "Pending Sync" not in land_btn.inner_text()
         ), f"Land button text should not say 'Pending Sync', got: '{land_btn.inner_text()}'"
 
     def test_launch_now_session_timeout_shows_alert_not_pending(self):
         """
-        Regression test for session-timeout edge case (PR #708 review comment).
+        Regression test for session-timeout edge case (Issue #707).
 
         When a session expires, Django redirects to the login page. The fetch()
         follows the redirect and returns a 200 OK HTML login page.
@@ -282,3 +284,91 @@ class TestLogsheetLaunchLandHandlers(DjangoPlaywrightTestCase):
         assert (
             "btn-warning" not in btn_class
         ), "Launch button should NOT switch to btn-warning on a session-timeout response"
+
+    # ------------------------------------------------------------------
+    # Sync Now button: UI appears and triggers sync
+    # ------------------------------------------------------------------
+
+    def test_sync_now_button_appears_and_triggers_sync(self):
+        """
+        When pending offline operations exist, the #offline-sync-status element
+        should render a "Sync Now" button.  Clicking it must invoke
+        window.M2SSyncPendingFlights (or fall back to dispatching the 'online'
+        event), change its label to "Retry", and must NOT open an alert dialog.
+
+        We simulate the pending-indicator state by mocking
+        window.M2SIndexedDB.getPendingFlights() to return a non-empty list, then
+        calling window.M2SOffline.updatePendingIndicator() to render the button.
+        """
+        self.page.goto(f"{self.live_server_url}/logsheet/manage/{self.logsheet.pk}/")
+
+        # Wait for the offline bundle to finish loading.
+        self.page.wait_for_function(
+            "() => window.M2SOffline && typeof window.M2SOffline.updatePendingIndicator === 'function'",
+            timeout=5000,
+        )
+
+        # Install spies and trigger the pending-sync UI in one evaluate so there
+        # are no async races between separate evaluate() calls.
+        # - getPendingFlightCount() internally calls window.M2SIndexedDB.getPendingFlights().
+        #   We mock that method to return a non-empty array so updatePendingIndicator
+        #   renders the Sync Now button without requiring real IndexedDB entries.
+        # - M2SSyncPendingFlights is replaced with a spy that records calls.
+        # - updatePendingIndicator() is awaited so the DOM is updated before
+        #   wait_for_selector() is called.
+        self.page.evaluate(
+            """async () => {
+            window._syncNowCallCount = 0;
+            window.M2SSyncPendingFlights = async function() {
+                window._syncNowCallCount++;
+            };
+            // Mock at the IndexedDB layer so the closed-over getPendingFlightCount
+            // sees a non-zero count and renders the Sync Now button.
+            if (window.M2SIndexedDB) {
+                window.M2SIndexedDB.getPendingFlights = async function() {
+                    return [{ id: 1, type: 'launch' }];
+                };
+            }
+            await window.M2SOffline.updatePendingIndicator();
+        }"""
+        )
+
+        # Wait for the button to be injected into the DOM.
+        sync_btn = self.page.query_selector("#force-sync-now-btn")
+        assert (
+            sync_btn is not None
+        ), "#force-sync-now-btn should appear when pending items exist"
+        assert (
+            sync_btn.is_visible()
+        ), "Sync Now button should be visible when pending items exist"
+
+        # Clicking it must not show an alert dialog.
+        dialog_messages = []
+
+        def capture_dialog(dialog):
+            dialog_messages.append(dialog.message)
+            dialog.dismiss()
+
+        self.page.on("dialog", capture_dialog)
+
+        sync_btn.click()
+        # Give async click handler time to complete.
+        self.page.wait_for_timeout(800)
+
+        # The spy should have been called exactly once.
+        call_count = self.page.evaluate("() => window._syncNowCallCount")
+        assert call_count == 1, (
+            f"window.M2SSyncPendingFlights should be called once on Sync Now click, "
+            f"got {call_count}"
+        )
+
+        # No alert dialogs should have been shown.
+        assert (
+            len(dialog_messages) == 0
+        ), f"Sync Now click should NOT open an alert dialog, got: {dialog_messages}"
+
+        # Button label should have changed to "Retry" after the sync completes.
+        btn_text = sync_btn.inner_text()
+        assert (
+            "Retry" in btn_text
+        ), f"Sync Now button should change to 'Retry' after sync, got: '{btn_text}'"

@@ -574,7 +574,7 @@
             if (forceSyncBtn) {
                 forceSyncBtn.addEventListener('click', async function () {
                     forceSyncBtn.disabled = true;
-                    forceSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Syncing…';
+                    forceSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"><span class="visually-hidden">Syncing…</span></span>Syncing…';
                     try {
                         if (typeof window.M2SSyncPendingFlights === 'function') {
                             await window.M2SSyncPendingFlights();
