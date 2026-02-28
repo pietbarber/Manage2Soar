@@ -660,6 +660,16 @@ window.showOfflineToast = window.showOfflineToast || function(message) {
   toast.show();
 };
 
+// Helper to read CSRF token from DOM input or cookie fallback.
+// Using cookie fallback prevents 403 errors from causing spurious offline-pending state.
+window.getCsrfToken = function() {
+  const domToken = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (domToken && domToken.value) return domToken.value;
+  // Cookie fallback (always available from Django session)
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
 // Shared function to attach NOW and 2K/3K button handlers to flight modal form
 // This must be called after any modal content is loaded (normal open, clone, etc.)
 // Uses clone-and-replace pattern to prevent duplicate event listeners
@@ -749,25 +759,34 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to endpoint to set launch_time (online mode)
-    fetch(`/logsheet/flight/${flightId}/launch_now/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      body: JSON.stringify({ launch_time: launchTime })
-    })
-    .then(resp => resp.json())
-    .then(data => {
-      if (data.success) {
-        location.reload();
+    // IMPORTANT: Use try/catch so only a true network failure (fetch throws) queues
+    // the operation offline. Server errors (403 CSRF, 500, etc.) show an alert instead
+    // of silently going into pending-sync mode.
+    try {
+      const resp = await fetch(`/logsheet/flight/${flightId}/launch_now/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ launch_time: launchTime })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || "Could not launch flight.");
+        }
       } else {
-        alert(data.error || "Could not launch flight.");
+        // Server returned an HTTP error — do NOT queue offline, show a clear message
+        let errorMsg = `Could not launch flight (server error ${resp.status}).`;
+        try { const d = await resp.json(); if (d.error) errorMsg = d.error; } catch (_) {}
+        alert(errorMsg);
       }
-    })
-    .catch(async () => {
-      // Network error - try to save offline
+    } catch (_networkErr) {
+      // fetch() itself threw — true network failure (no route to server)
       if (typeof M2SIndexedDB !== 'undefined') {
         try {
           const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
@@ -783,9 +802,9 @@ document.addEventListener("click", async function(e) {
           alert('Could not launch flight. Please try again.');
         }
       } else {
-        alert("Could not launch flight. Please try again.");
+        alert("Could not launch flight. Network error. Please try again.");
       }
-    });
+    }
   }
   if (e.target && e.target.classList.contains("landing-now-btn")) {
     e.preventDefault();
@@ -818,25 +837,34 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to endpoint to set landing_time (online mode)
-    fetch(`/logsheet/flight/${flightId}/landing_now/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      body: JSON.stringify({ landing_time: landingTime })
-    })
-    .then(resp => resp.json())
-    .then(data => {
-      if (data.success) {
-        location.reload();
+    // IMPORTANT: Use try/catch so only a true network failure (fetch throws) queues
+    // the operation offline. Server errors (403 CSRF, 500, etc.) show an alert instead
+    // of silently going into pending-sync mode.
+    try {
+      const resp = await fetch(`/logsheet/flight/${flightId}/landing_now/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ landing_time: landingTime })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || "Could not mark landing.");
+        }
       } else {
-        alert(data.error || "Could not mark landing.");
+        // Server returned an HTTP error — do NOT queue offline, show a clear message
+        let errorMsg = `Could not mark landing (server error ${resp.status}).`;
+        try { const d = await resp.json(); if (d.error) errorMsg = d.error; } catch (_) {}
+        alert(errorMsg);
       }
-    })
-    .catch(async () => {
-      // Network error - try to save offline
+    } catch (_networkErr) {
+      // fetch() itself threw — true network failure (no route to server)
       if (typeof M2SIndexedDB !== 'undefined') {
         try {
           const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
@@ -852,9 +880,9 @@ document.addEventListener("click", async function(e) {
           alert('Could not mark landing. Please try again.');
         }
       } else {
-        alert("Could not mark landing. Please try again.");
+        alert("Could not mark landing. Network error. Please try again.");
       }
-    });
+    }
   }
 
   // Handle delete flight button clicks
@@ -898,10 +926,11 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to delete endpoint (online mode)
+    // Do NOT re-throw for server errors — only let .catch() handle true network failures.
     fetch(deleteUrl, {
       method: "POST",
       headers: {
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+        "X-CSRFToken": window.getCsrfToken(),
         "X-Requested-With": "XMLHttpRequest"
       }
     })
@@ -909,7 +938,8 @@ document.addEventListener("click", async function(e) {
       if (resp.ok || resp.redirected) {
         location.reload();
       } else {
-        return resp.text().then(text => { throw new Error(text); });
+        // Server error — show message but do NOT throw (would trigger offline queue)
+        alert(`Could not delete flight (server error ${resp.status}). Please try again.`);
       }
     })
     .catch(async (error) => {
@@ -1588,6 +1618,9 @@ document.addEventListener("click", async function(e) {
       const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
       toast.show();
     }
+
+    // Expose syncPendingFlights globally so the "Force Sync Now" button can call it
+    window.M2SSyncPendingFlights = syncPendingFlights;
 
   })();
 </script>
