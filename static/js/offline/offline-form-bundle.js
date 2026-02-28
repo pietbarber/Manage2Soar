@@ -572,7 +572,7 @@
             // Attach click handler each time indicator is redrawn
             const forceSyncBtn = document.getElementById('force-sync-now-btn');
             if (forceSyncBtn) {
-                forceSyncBtn.addEventListener('click', async function() {
+                forceSyncBtn.addEventListener('click', async function () {
                     forceSyncBtn.disabled = true;
                     forceSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Syncing…';
                     try {
