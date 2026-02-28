@@ -583,7 +583,13 @@
                             window.dispatchEvent(new Event('online'));
                         }
                     } catch (e) {
+                        // syncPendingFlights swallows most errors internally, but
+                        // catch here defensively so finally always runs.
                         console.error('[OfflineForm] Force sync failed:', e);
+                    } finally {
+                        // Always re-enable the button so the duty officer can retry.
+                        // (syncPendingFlights resolves without throwing on soft failures,
+                        // so only a finally block guarantees the button is never stuck.)
                         forceSyncBtn.disabled = false;
                         forceSyncBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Retry';
                     }
