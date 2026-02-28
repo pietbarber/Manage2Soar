@@ -219,3 +219,66 @@ class TestLogsheetLaunchLandHandlers(DjangoPlaywrightTestCase):
         assert (
             "Pending Sync" not in land_btn.inner_text()
         ), f"Land button text should not say 'Pending Sync', got: '{land_btn.inner_text()}'"
+
+    def test_launch_now_session_timeout_shows_alert_not_pending(self):
+        """
+        Regression test for session-timeout edge case (PR #708 review comment).
+
+        When a session expires, Django redirects to the login page. The fetch()
+        follows the redirect and returns a 200 OK HTML login page.
+        resp.ok === True but resp.json() throws a SyntaxError.
+
+        If that SyntaxError bubbles to the outer catch it would be treated as a
+        network failure and queue the operation as offline-pending.
+
+        The fix narrows the offline-queue path to only fetch() exceptions and
+        wraps resp.json() in its own try/catch that alerts instead.
+        """
+        self.page.goto(f"{self.live_server_url}/logsheet/manage/{self.logsheet.pk}/")
+
+        # Simulate a session-timeout redirect: 200 OK but HTML body (not JSON)
+        self.page.route(
+            f"**/logsheet/flight/{self.flight.pk}/launch_now/",
+            lambda route: route.fulfill(
+                status=200,
+                body="<html><body><h1>Please log in</h1></body></html>",
+                content_type="text/html",
+            ),
+        )
+
+        dialog_messages = []
+
+        def handle_dialog(dialog):
+            dialog_messages.append(dialog.message)
+            dialog.dismiss()
+
+        self.page.on("dialog", handle_dialog)
+
+        launch_btn = self.page.query_selector(
+            f'.launch-now-btn[data-flight-id="{self.flight.pk}"]'
+        )
+        assert launch_btn is not None
+
+        launch_btn.click()
+        self.page.wait_for_timeout(600)
+
+        # An alert should have fired (session timeout message)
+        assert len(dialog_messages) > 0, (
+            "An alert dialog should appear when the server returns a 200 HTML "
+            "page (e.g. session-timeout login redirect) instead of JSON"
+        )
+        msg = dialog_messages[0].lower()
+        assert (
+            "refresh" in msg or "unexpected" in msg or "server" in msg
+        ), f"Alert should describe the unexpected response, got: '{dialog_messages[0]}'"
+
+        # Must NOT be stuck in Pending Sync state
+        btn_text = launch_btn.inner_text()
+        assert "Pending Sync" not in btn_text, (
+            f"Button should not say 'Pending Sync' after a session-timeout 200 "
+            f"HTML response, got: '{btn_text}'"
+        )
+        btn_class = launch_btn.get_attribute("class") or ""
+        assert (
+            "btn-warning" not in btn_class
+        ), "Launch button should NOT switch to btn-warning on a session-timeout response"

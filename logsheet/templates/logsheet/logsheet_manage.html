@@ -773,7 +773,17 @@ document.addEventListener("click", async function(e) {
         body: JSON.stringify({ launch_time: launchTime })
       });
       if (resp.ok) {
-        const data = await resp.json();
+        // Guard resp.json() separately: a session timeout returns a 200 HTML
+        // login-redirect page. If we let that SyntaxError bubble to the outer
+        // catch it would be treated as a network failure and queue offline.
+        let data;
+        try {
+          data = await resp.json();
+        } catch (_parseErr) {
+          console.error('[Launch] Unexpected non-JSON response (possible session timeout):', _parseErr);
+          alert('Unexpected server response when launching flight. Please refresh the page and try again.');
+          return;
+        }
         if (data.success) {
           location.reload();
         } else {
@@ -851,7 +861,17 @@ document.addEventListener("click", async function(e) {
         body: JSON.stringify({ landing_time: landingTime })
       });
       if (resp.ok) {
-        const data = await resp.json();
+        // Guard resp.json() separately: a session timeout returns a 200 HTML
+        // login-redirect page. If we let that SyntaxError bubble to the outer
+        // catch it would be treated as a network failure and queue offline.
+        let data;
+        try {
+          data = await resp.json();
+        } catch (_parseErr) {
+          console.error('[Landing] Unexpected non-JSON response (possible session timeout):', _parseErr);
+          alert('Unexpected server response when marking landing. Please refresh the page and try again.');
+          return;
+        }
         if (data.success) {
           location.reload();
         } else {
@@ -1550,7 +1570,10 @@ document.addEventListener("click", async function(e) {
       }
 
       const headers = {
-        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        // Use window.getCsrfToken() (DOM + cookie fallback) so manual sync
+        // initiated via the "Sync Now" button is reliable even when the hidden
+        // csrfmiddlewaretoken input isn't in the current viewport/DOM.
+        'X-CSRFToken': window.getCsrfToken ? window.getCsrfToken() : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''),
         'X-Requested-With': 'XMLHttpRequest',
         'X-Idempotency-Key': operation.idempotencyKey
       };
