@@ -568,9 +568,11 @@ class TestSendDutyPreopEmails:
         for crew_email in mail.outbox[:3]:
             assert crew_email.cc == []
 
-        # Student should receive their own dedicated email
-        student_email = mail.outbox[3]
-        assert student_email.to == [members["student"].email]
+        # Student should receive their own dedicated email — select by address,
+        # not by index, so this remains valid if crew roster size changes.
+        student_email = next(
+            e for e in mail.outbox if e.to == [members["student"].email]
+        )
         assert student_email.cc == []
 
         # Student's ICS should be the generic flying-day type, not a crew-role ICS
@@ -620,9 +622,11 @@ class TestSendDutyPreopEmails:
         for crew_email in mail.outbox[:3]:
             assert crew_email.cc == []
 
-        # Ops intent member should receive their own dedicated email
-        participant_email = mail.outbox[3]
-        assert participant_email.to == [members["private_owner"].email]
+        # Ops intent member should receive their own dedicated email — select by
+        # address, not by index.
+        participant_email = next(
+            e for e in mail.outbox if e.to == [members["private_owner"].email]
+        )
         assert participant_email.cc == []
 
         # Participant's ICS should be the generic flying-day type
@@ -662,7 +666,9 @@ class TestSendDutyPreopEmails:
             stdout=out,
         )
 
-        student_email = mail.outbox[3]
+        student_email = next(
+            e for e in mail.outbox if e.to == [members["student"].email]
+        )
         html_content = student_email.alternatives[0][0]
 
         # Participant wording should be present
