@@ -553,13 +553,48 @@
         // Also update any sync status UI
         const syncStatus = document.getElementById('offline-sync-status');
         if (syncStatus && count > 0) {
+            // Show pending count badge + a "Sync Now" button so the duty officer
+            // can force a sync attempt without going into browser DevTools.
             syncStatus.innerHTML = `
-                <span class="badge bg-warning text-dark">
+                <span class="badge bg-warning text-dark me-1">
                     <i class="bi bi-cloud-arrow-up me-1"></i>
                     ${count} flight${count > 1 ? 's' : ''} pending sync
                 </span>
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary ms-1"
+                        id="force-sync-now-btn"
+                        title="Attempt to sync pending flights to server now">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Sync Now
+                </button>
             `;
             syncStatus.style.display = 'block';
+
+            // Attach click handler each time indicator is redrawn
+            const forceSyncBtn = document.getElementById('force-sync-now-btn');
+            if (forceSyncBtn) {
+                forceSyncBtn.addEventListener('click', async function () {
+                    forceSyncBtn.disabled = true;
+                    forceSyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"><span class="visually-hidden">Syncing…</span></span>Syncing…';
+                    try {
+                        if (typeof window.M2SSyncPendingFlights === 'function') {
+                            await window.M2SSyncPendingFlights();
+                        } else {
+                            // Fallback: trigger online event which starts sync
+                            window.dispatchEvent(new Event('online'));
+                        }
+                    } catch (e) {
+                        // syncPendingFlights swallows most errors internally, but
+                        // catch here defensively so finally always runs.
+                        console.error('[OfflineForm] Force sync failed:', e);
+                    } finally {
+                        // Always re-enable the button so the duty officer can retry.
+                        // (syncPendingFlights resolves without throwing on soft failures,
+                        // so only a finally block guarantees the button is never stuck.)
+                        forceSyncBtn.disabled = false;
+                        forceSyncBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Retry';
+                    }
+                });
+            }
         } else if (syncStatus) {
             syncStatus.style.display = 'none';
         }

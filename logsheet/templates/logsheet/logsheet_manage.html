@@ -660,6 +660,17 @@ window.showOfflineToast = window.showOfflineToast || function(message) {
   toast.show();
 };
 
+// Helper to read CSRF token from DOM input or cookie fallback.
+// Using cookie fallback prevents 403 errors from causing spurious offline-pending state.
+// Guard against overriding an existing definition (e.g. from kiosk_fingerprint.js).
+window.getCsrfToken = window.getCsrfToken || function() {
+  const domToken = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (domToken && domToken.value) return domToken.value;
+  // Cookie fallback (CSRF cookie is typically set by Django's CSRF middleware but may be absent)
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
 // Shared function to attach NOW and 2K/3K button handlers to flight modal form
 // This must be called after any modal content is loaded (normal open, clone, etc.)
 // Uses clone-and-replace pattern to prevent duplicate event listeners
@@ -718,9 +729,10 @@ window.attachModalButtonHandlers = function() {
 
 // Handle "Launch them now" and "Landing now" button clicks
 document.addEventListener("click", async function(e) {
-  if (e.target && e.target.classList.contains("launch-now-btn")) {
+  const launchBtn = e.target && e.target.closest(".launch-now-btn");
+  if (launchBtn) {
     e.preventDefault();
-    const btn = e.target;
+    const btn = launchBtn;
     const flightId = btn.getAttribute("data-flight-id");
     // Get user's local time in HH:MM (24h)
     const now = new Date();
@@ -749,25 +761,44 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to endpoint to set launch_time (online mode)
-    fetch(`/logsheet/flight/${flightId}/launch_now/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      body: JSON.stringify({ launch_time: launchTime })
-    })
-    .then(resp => resp.json())
-    .then(data => {
-      if (data.success) {
-        location.reload();
+    // IMPORTANT: Use try/catch so only a true network failure (fetch throws) queues
+    // the operation offline. Server errors (403 CSRF, 500, etc.) show an alert instead
+    // of silently going into pending-sync mode.
+    try {
+      const resp = await fetch(`/logsheet/flight/${flightId}/launch_now/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ launch_time: launchTime })
+      });
+      if (resp.ok) {
+        // Guard resp.json() separately: a session timeout returns a 200 HTML
+        // login-redirect page. If we let that SyntaxError bubble to the outer
+        // catch it would be treated as a network failure and queue offline.
+        let data;
+        try {
+          data = await resp.json();
+        } catch (_parseErr) {
+          console.error('[Launch] Unexpected non-JSON response (possible session timeout):', _parseErr);
+          alert('Unexpected server response when launching flight. Please refresh the page and try again.');
+          return;
+        }
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || "Could not launch flight.");
+        }
       } else {
-        alert(data.error || "Could not launch flight.");
+        // Server returned an HTTP error — do NOT queue offline, show a clear message
+        let errorMsg = `Could not launch flight (server error ${resp.status}).`;
+        try { const d = await resp.json(); if (d.error) errorMsg = d.error; } catch (_) {}
+        alert(errorMsg);
       }
-    })
-    .catch(async () => {
-      // Network error - try to save offline
+    } catch (_networkErr) {
+      // fetch() itself threw — true network failure (no route to server)
       if (typeof M2SIndexedDB !== 'undefined') {
         try {
           const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
@@ -783,13 +814,14 @@ document.addEventListener("click", async function(e) {
           alert('Could not launch flight. Please try again.');
         }
       } else {
-        alert("Could not launch flight. Please try again.");
+        alert("Could not launch flight. Network error. Please try again.");
       }
-    });
+    }
   }
-  if (e.target && e.target.classList.contains("landing-now-btn")) {
+  const landingBtn = e.target && e.target.closest(".landing-now-btn");
+  if (landingBtn) {
     e.preventDefault();
-    const btn = e.target;
+    const btn = landingBtn;
     const flightId = btn.getAttribute("data-flight-id");
     // Get user's local time in HH:MM (24h)
     const now = new Date();
@@ -818,25 +850,44 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to endpoint to set landing_time (online mode)
-    fetch(`/logsheet/flight/${flightId}/landing_now/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
-        "X-Requested-With": "XMLHttpRequest"
-      },
-      body: JSON.stringify({ landing_time: landingTime })
-    })
-    .then(resp => resp.json())
-    .then(data => {
-      if (data.success) {
-        location.reload();
+    // IMPORTANT: Use try/catch so only a true network failure (fetch throws) queues
+    // the operation offline. Server errors (403 CSRF, 500, etc.) show an alert instead
+    // of silently going into pending-sync mode.
+    try {
+      const resp = await fetch(`/logsheet/flight/${flightId}/landing_now/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": window.getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ landing_time: landingTime })
+      });
+      if (resp.ok) {
+        // Guard resp.json() separately: a session timeout returns a 200 HTML
+        // login-redirect page. If we let that SyntaxError bubble to the outer
+        // catch it would be treated as a network failure and queue offline.
+        let data;
+        try {
+          data = await resp.json();
+        } catch (_parseErr) {
+          console.error('[Landing] Unexpected non-JSON response (possible session timeout):', _parseErr);
+          alert('Unexpected server response when marking landing. Please refresh the page and try again.');
+          return;
+        }
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || "Could not mark landing.");
+        }
       } else {
-        alert(data.error || "Could not mark landing.");
+        // Server returned an HTTP error — do NOT queue offline, show a clear message
+        let errorMsg = `Could not mark landing (server error ${resp.status}).`;
+        try { const d = await resp.json(); if (d.error) errorMsg = d.error; } catch (_) {}
+        alert(errorMsg);
       }
-    })
-    .catch(async () => {
-      // Network error - try to save offline
+    } catch (_networkErr) {
+      // fetch() itself threw — true network failure (no route to server)
       if (typeof M2SIndexedDB !== 'undefined') {
         try {
           const logsheetId = parseInt(document.getElementById('logsheet-container').dataset.logsheetId, 10);
@@ -852,9 +903,9 @@ document.addEventListener("click", async function(e) {
           alert('Could not mark landing. Please try again.');
         }
       } else {
-        alert("Could not mark landing. Please try again.");
+        alert("Could not mark landing. Network error. Please try again.");
       }
-    });
+    }
   }
 
   // Handle delete flight button clicks
@@ -898,10 +949,11 @@ document.addEventListener("click", async function(e) {
     }
 
     // POST to delete endpoint (online mode)
+    // Do NOT re-throw for server errors — only let .catch() handle true network failures.
     fetch(deleteUrl, {
       method: "POST",
       headers: {
-        "X-CSRFToken": (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value,
+        "X-CSRFToken": window.getCsrfToken(),
         "X-Requested-With": "XMLHttpRequest"
       }
     })
@@ -909,7 +961,8 @@ document.addEventListener("click", async function(e) {
       if (resp.ok || resp.redirected) {
         location.reload();
       } else {
-        return resp.text().then(text => { throw new Error(text); });
+        // Server error — show message but do NOT throw (would trigger offline queue)
+        alert(`Could not delete flight (server error ${resp.status}). Please try again.`);
       }
     })
     .catch(async (error) => {
@@ -1424,7 +1477,7 @@ document.addEventListener("click", async function(e) {
 
             // Build form data
             const formData = new FormData();
-            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+            formData.append('csrfmiddlewaretoken', window.getCsrfToken());
 
             // Add flight fields
             const fieldMap = {
@@ -1520,7 +1573,10 @@ document.addEventListener("click", async function(e) {
       }
 
       const headers = {
-        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        // Use window.getCsrfToken() (DOM + cookie fallback) so manual sync
+        // initiated via the "Sync Now" button is reliable even when the hidden
+        // csrfmiddlewaretoken input isn't in the current viewport/DOM.
+        'X-CSRFToken': window.getCsrfToken ? window.getCsrfToken() : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''),
         'X-Requested-With': 'XMLHttpRequest',
         'X-Idempotency-Key': operation.idempotencyKey
       };
@@ -1588,6 +1644,25 @@ document.addEventListener("click", async function(e) {
       const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
       toast.show();
     }
+
+    // Expose syncPendingFlights globally so the "Force Sync Now" button can call it.
+    // Re-entrancy guard: if a sync is already in progress (e.g. "Sync Now" clicked
+    // while the browser's 'online' event also fires), return the in-flight promise
+    // instead of starting a second concurrent sync.
+    let syncInProgressPromise = null;
+    window.M2SSyncPendingFlights = function() {
+      if (syncInProgressPromise) {
+        return syncInProgressPromise;
+      }
+      syncInProgressPromise = (async () => {
+        try {
+          await syncPendingFlights();
+        } finally {
+          syncInProgressPromise = null;
+        }
+      })();
+      return syncInProgressPromise;
+    };
 
   })();
 </script>
