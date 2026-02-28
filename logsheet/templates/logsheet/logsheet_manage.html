@@ -1645,8 +1645,24 @@ document.addEventListener("click", async function(e) {
       toast.show();
     }
 
-    // Expose syncPendingFlights globally so the "Force Sync Now" button can call it
-    window.M2SSyncPendingFlights = syncPendingFlights;
+    // Expose syncPendingFlights globally so the "Force Sync Now" button can call it.
+    // Re-entrancy guard: if a sync is already in progress (e.g. "Sync Now" clicked
+    // while the browser's 'online' event also fires), return the in-flight promise
+    // instead of starting a second concurrent sync.
+    let syncInProgressPromise = null;
+    window.M2SSyncPendingFlights = function() {
+      if (syncInProgressPromise) {
+        return syncInProgressPromise;
+      }
+      syncInProgressPromise = (async () => {
+        try {
+          await syncPendingFlights();
+        } finally {
+          syncInProgressPromise = null;
+        }
+      })();
+      return syncInProgressPromise;
+    };
 
   })();
 </script>
