@@ -251,7 +251,8 @@ def generate_ops_day_ics(duty_date):
     """
     config = SiteConfiguration.objects.first()
     club_name = config.club_name if config else "Soaring Club"
-    domain_name = config.domain_name if config else "manage2soar.com"
+    # Use a fallback when domain_name is missing or an empty string (not only None)
+    domain_name = (config.domain_name if config else None) or "manage2soar.com"
 
     cal = Calendar()
     cal.add("prodid", f"-//Manage2Soar//{club_name}//EN")
