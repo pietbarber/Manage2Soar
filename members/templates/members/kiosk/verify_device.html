@@ -55,6 +55,10 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- Hidden CSRF anchor: provides the masked 64-char form token required by
+     Django 5.x X-CSRFToken headers. getCsrfToken() in kiosk_fingerprint.js
+     reads this instead of the raw cookie secret. -->
+<form id="csrf-anchor" style="display:none">{% csrf_token %}</form>
 <!-- Import shared fingerprinting module -->
 <script src="{% static 'js/kiosk_fingerprint.js' %}"></script>
 <script>

@@ -554,12 +554,14 @@ LOGGING = {
             "level": "WARNING",
             "propagate": False,
         },
-        # Log all HTTP requests (access log equivalent at Django level).
-        # django.request emits INFO for 2xx/3xx, WARNING for 4xx, ERROR for 5xx;
-        # WARNING level would only capture error responses, not successful ones.
+        # Log CSRF failures (403) and other 4xx/5xx HTTP errors to stdout.
+        # Note: django.request only emits WARNING for 4xx and ERROR for 5xx;
+        # it does NOT log successful 2xx/3xx requests at any level.
+        # For access-log-level visibility, use gunicorn's --access-logfile -
+        # (already configured in Dockerfile).
         "django.request": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": "WARNING",
             "propagate": False,
         },
     },

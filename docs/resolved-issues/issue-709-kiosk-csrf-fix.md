@@ -128,7 +128,7 @@ token rotation pattern became clear in the logs immediately.
 
 - `manage2soar/settings.py` — MIDDLEWARE reordered: `AuthenticationMiddleware` + `KioskAutoLoginMiddleware` moved before `CsrfViewMiddleware`; `django.security` and `django.request` loggers added
 - `utils/middleware.py` — docstring updated to document required ordering constraint
-- `logsheet/views.py` — `@ensure_csrf_cookie` on `manage_logsheet` only (all `@csrf_exempt` decorators removed — full CSRF protection restored)
+- `logsheet/views.py` — `@ensure_csrf_cookie` added to `manage_logsheet` so kiosk pages are always served with a valid CSRF cookie (prior `@csrf_exempt` usages introduced and then removed within this branch — final diff against `main` has no `@csrf_exempt` changes)
 - `logsheet/tests/test_kiosk_csrf.py` — regression tests: middleware order assertions + functional kiosk POST tests with `enforce_csrf_checks=True`
 - `logsheet/templates/logsheet/logsheet_manage.html` — hidden csrf-anchor form; raw-cookie fallback removed from `getCsrfToken()`
 - `static/js/offline/sync-manager.js` — raw-cookie CSRF fallback removed
