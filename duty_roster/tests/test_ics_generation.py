@@ -472,9 +472,8 @@ class TestGenerateOpsDayIcs:
         uid1 = str(next(c for c in cal1.walk() if c.name == "VEVENT").get("uid"))
         uid2 = str(next(c for c in cal2.walk() if c.name == "VEVENT").get("uid"))
         assert uid1 == uid2
-        assert "2026-07-04" in uid1
-        assert "flying-day" in uid1
-        assert "testsoaring.org" in uid1
+        # Assert the full expected UID — exact match avoids substring-sanitization pitfalls
+        assert uid1 == "2026-07-04-flying-day@testsoaring.org"
 
     def test_no_crew_personalization(self, site_config):
         """ICS must not contain any crew-assignment personalization."""
