@@ -753,3 +753,49 @@ class TestSendDutyPreopEmails:
             assert email_obj.cc == []
             assert "[DEV MODE]" in email_obj.subject
             assert "TO:" in email_obj.subject
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        EMAIL_DEV_MODE=False,
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        SITE_URL="https://test.manage2soar.com",
+    )
+    def test_participant_past_date_uses_summary_wording(
+        self, site_config, members, glider
+    ):
+        """Participant emails for past dates should say 'summary of operations',
+        not 'Operations are planned' (which is future-tense / incorrect)."""
+        yesterday = date.today() - timedelta(days=1)
+
+        past_assignment = DutyAssignment.objects.create(
+            date=yesterday,
+            is_scheduled=True,
+            instructor=members["instructor"],
+            duty_officer=members["duty_officer"],
+            tow_pilot=members["tow_pilot"],
+        )
+        InstructionSlot.objects.create(
+            assignment=past_assignment,
+            student=members["student"],
+            status="confirmed",
+        )
+
+        out = StringIO()
+        call_command(
+            "send_duty_preop_emails",
+            date=yesterday.strftime("%Y-%m-%d"),
+            stdout=out,
+        )
+
+        student_email = next(
+            e for e in mail.outbox if e.to == [members["student"].email]
+        )
+        html_content = student_email.alternatives[0][0]
+        text_content = student_email.body
+
+        # Past-date participant wording must be the summary variant
+        assert "summary of operations" in html_content
+        assert "summary of operations" in text_content
+        # Future-tense wording must NOT appear for a past date
+        assert "Operations are planned" not in html_content
+        assert "Operations are planned" not in text_content
