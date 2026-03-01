@@ -541,6 +541,19 @@ LOGGING = {
             "handlers": ["console"],
             "level": "WARNING",
         },
+        # Log CSRF failures and security warnings to stdout in all environments
+        # (Django's default console handler is filtered to DEBUG=True only)
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # Log all HTTP requests (access log equivalent at Django level)
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 
